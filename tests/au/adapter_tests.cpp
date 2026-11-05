@@ -604,7 +604,7 @@ void failed_initialization() {
     const auto f = unit.failure();
     require(f.present && f.kind == static_cast<UInt32>(HostFailureKind::activation) && f.silent &&
                 f.request == 0 &&
-                std::string(f.message).find("could not be prepared") != std::string::npos,
+                std::string(f.message).find("could not be started") != std::string::npos,
             "a failed initialization was not recorded as an activation failure");
 }
 
@@ -1188,8 +1188,8 @@ void status_parameter() {
                        "the Convolver log." &&
                 value() == HostStatus::load_failed,
             "failed first load not shown: " + shown());
-    require(contains(log_text(), "Filter not loaded, so Convolver plays silence. The filter was "
-                                 "made for 44100 Hz, but the host runs at 48000 Hz."),
+    require(contains(log_text(), "Not loaded, so Convolver plays silence: the filter is for "
+                                 "44100 Hz, and the host runs at 48000 Hz."),
             "failed first load not logged");
     check(unit.load(state_of(stereo(48000))), "status good preset");
     require(shown() == "Filter loaded: 48000 Hz, 2 in, 2 out." && value() == HostStatus::playing,
@@ -1200,12 +1200,14 @@ void status_parameter() {
     require(value() == HostStatus::playing, "a host write changed the status");
     // A wrong preset while a filter plays: it keeps playing, and both say so.
     require(unit.load(state_of(stereo(44100))) != noErr, "wrong-rate replacement accepted");
-    require(contains(shown(), "Load failed, previous filter kept: the filter is for 44100 Hz") &&
-                contains(log_text(), "Filter not loaded; the previous filter is kept."),
-            "refused replacement not shown or logged: " + shown());
+    require(
+        contains(shown(), "Load failed, previous filter kept: the filter is for 44100 Hz") &&
+            contains(log_text(),
+                     "Not loaded; the previous filter keeps playing: the filter is for 44100 Hz"),
+        "refused replacement not shown or logged: " + shown());
     // A state refused before it reaches the filter is logged too, with why.
     require(unit.restore(CFSTR("not a preset")) != noErr, "a string accepted as ClassInfo");
-    require(contains(log_text(), "The saved state is not an Audio Unit preset dictionary."),
+    require(contains(log_text(), "the saved state is not an Audio Unit preset dictionary."),
             "refused state not logged");
     // Another value reads as its name.
     AudioUnitParameterValue playing = 0;
@@ -1243,7 +1245,7 @@ void status_parameter() {
     require(shown() == "Fault: output too large, silenced and the filter restarted. Details in "
                        "the Convolver log.",
             "fault not shown: " + shown());
-    require(contains(log_text(), "The output became too large to represent (") &&
+    require(contains(log_text(), "the output became too large to represent (") &&
                 contains(log_text(), "Lower the level going into Convolver"),
             "fault not logged");
     check(unit.load(state_of(stereo(48000))), "load after a fault");

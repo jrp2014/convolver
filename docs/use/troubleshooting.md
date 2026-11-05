@@ -9,7 +9,34 @@ match the filter, a file path in a `.cfg` that does not lead to the IR, or a
 plug-in the system or host has refused to load. Convolver's own messages say
 what differs and what to change; read them first.
 
-Contents: [the host does not list Convolver](#the-host-does-not-list-convolver) ·
+## Reading Convolver's messages
+
+Every message names the problem first, then its cause and the fix, each on
+its own line (the [plug-in window](plugins.md#convolvers-window) shows the
+same parts, and the [Convolver log](plugins.md#status-and-the-convolver-log)
+keeps them on one line):
+
+```text
+convolver: error: room.cfg:4:1: filter 'irs/left.wav': IR file not found
+  Cause: There is no file at /Users/me/Filters/irs/left.wav. IR file names are relative to the folder that holds room.cfg.
+  Fix: Correct the name on line 4, or put the IR file in that folder.
+  Note: Letter case counts on Linux and on case-sensitive macOS volumes.
+```
+
+- **The problem** names the file and line (`room.cfg:4:1:`), the value or
+  the setting.
+- **Cause** says why; **Fix** says what to do, the most likely fix first.
+- **Note**, when there is one, gives the limit behind it: Convolver never
+  resamples, a host gives a mono track one channel, a library this build
+  lacks.
+
+A command-line tool that fails exits with a nonzero status. `convolver-preset`
+and `convolver-equalizer-apo` then keep nothing from the run; when
+`convolver` fails after it has started writing, its Note says the output is
+incomplete.
+
+Contents: [reading Convolver's messages](#reading-convolvers-messages) ·
+[the host does not list Convolver](#the-host-does-not-list-convolver) ·
 [a plug-in plays silence](#a-plug-in-plays-silence) ·
 [filters and configurations](#filters-and-configurations) ·
 [a tool will not write its output](#a-tool-will-not-write-its-output) ·

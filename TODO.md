@@ -136,12 +136,6 @@ is superseded.
   preview, and the SourceForge project summary now points here (24 October
   2026); the old SourceForge website stays as it is. Remaining, at each
   preview: the steps after publishing.
-- [ ] **DIAG-2 — Actionable diagnostics.** From jrp's request of 5 November
-  2026: messages that state the problem, its cause and the fix plainly, with
-  troubleshooting context for environment and design limits, and an inline
-  fix button in the plug-in window where one applies, without losing DIAG-1's
-  explanations. [Plan](docs/project/plans/2026-11-05-actionable-diagnostics.md)
-  with jrp's decisions.
 - [ ] **HOST-1 — Named host matrix.** Record versions and results for Windows/macOS
   hosts: scan, load, preset/state restore, silence/tails, seek, variable callbacks,
   bypass, filter changes, multiple instances and unequal channel counts. SDK
@@ -1062,6 +1056,17 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   and failed saves, with a test per message. What named hosts show is
   HOST-1 and AU-4; [output safety](docs/use/command-line.md#output-safety),
   [status and log](docs/develop/plugin-contract.md#status-and-log).
+- [x] **DIAG-2 — Actionable diagnostics.** 5 November 2026, PR #110, from
+  jrp's request of that day: every message a user can meet states the
+  problem, its cause and the fix, with a note for an environment, host or
+  design limit. The command-line tools print them as labelled lines, the
+  Convolver log as one line, and the macOS window shows the problem in bold,
+  Cause and Fix rows, a button that carries out the fix (Choose Filter… or
+  Copy Diagnostics) and a Note row, with Bypass and the diagnostics buttons
+  moved off the bottom edge (jrp's choices); a test per message. The window's
+  look in a host is part of HOST-1;
+  [troubleshooting](docs/use/troubleshooting.md),
+  [plan](docs/archive/plans/2026-11-05-actionable-diagnostics.md).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;

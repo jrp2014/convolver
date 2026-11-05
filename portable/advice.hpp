@@ -70,12 +70,19 @@ inline std::string advice_problem(std::string_view text) {
     return parse_advice(text).problem;
 }
 
-// One line, for the Convolver log and JSON reports: "Problem. Cause: ...
-// Fix: ... Note: ...". Lines that go on (an example .cfg) are joined with
-// " / ", which keeps them apart.
+// Whether a sentence or phrase already ends as a sentence does.
+inline bool ends_sentence(std::string_view text) {
+    return !text.empty() &&
+           (text.back() == '.' || text.back() == '!' || text.back() == '?' || text.back() == ':');
+}
+
+// One line, for the Convolver log: "problem. Cause: ... Fix: ... Note: ...".
+// Lines that go on (an example .cfg) are joined with " / ", which keeps them
+// apart.
 inline std::string advice_line(std::string_view text) {
     std::string line;
-    line.reserve(text.size());
+    line.reserve(text.size() + 1);
+    bool in_problem = true;
     for (std::size_t i = 0; i < text.size(); ++i) {
         if (text[i] != '\n') {
             line += text[i];
@@ -86,6 +93,9 @@ inline std::string advice_line(std::string_view text) {
         for (const auto label : advice_labels)
             labelled = labelled || next.starts_with(label);
         if (labelled) {
+            if (in_problem && !ends_sentence(line))
+                line += '.';
+            in_problem = false;
             line += ' ';
             continue;
         }
@@ -95,6 +105,22 @@ inline std::string advice_line(std::string_view text) {
         line += " / ";
     }
     return line;
+}
+
+// A problem phrase as a sentence of its own, for the plug-in window and the
+// log: the first letter in capitals, unless the phrase starts with a file
+// name or path (a word holding '.', '/', '\\', ':' or a quote), and a full
+// stop at the end.
+inline std::string as_sentence(std::string_view phrase) {
+    std::string text(phrase);
+    if (text.empty())
+        return text;
+    const auto word = text.substr(0, text.find(' '));
+    if (word.find_first_of("./\\:'\"") == std::string::npos && text[0] >= 'a' && text[0] <= 'z')
+        text[0] = static_cast<char>(text[0] - 'a' + 'A');
+    if (!ends_sentence(text))
+        text += '.';
+    return text;
 }
 
 // What a command-line tool prints: "program: error: problem", then each

@@ -68,17 +68,25 @@ std::string foreign(CFDictionaryRef dict, const AudioComponentDescription& desc)
     };
     SInt32 version = -1, subtype = 0, manufacturer = 0;
     if (CFDictionaryContainsKey(dict, CFSTR(kAUPresetPartKey)))
-        return "The preset holds the state of one part of a multi-part instrument, not of a "
-               "whole effect. Make a Convolver preset with convolver-preset.";
+        return detail::advice_text({"the preset holds the state of one part of a multi-part "
+                                    "instrument, not of a whole effect",
+                                    {},
+                                    "Make a Convolver preset with convolver-preset.",
+                                    {}});
     if (!number(CFSTR(kAUPresetVersionKey), version) || version != 0)
-        return "The preset is not an Audio Unit preset this plug-in can read (its version "
-               "entry is missing or not 0).";
+        return detail::advice_text({"the preset is not an Audio Unit preset this plug-in can "
+                                    "read (its version entry is missing or not 0)",
+                                    {},
+                                    "Make a Convolver preset with convolver-preset.",
+                                    {}});
     if (!number(CFSTR(kAUPresetSubtypeKey), subtype) ||
         !number(CFSTR(kAUPresetManufacturerKey), manufacturer) ||
         static_cast<UInt32>(subtype) != desc.componentSubType ||
         static_cast<UInt32>(manufacturer) != desc.componentManufacturer)
-        return "The preset belongs to another plug-in. Make a Convolver preset with "
-               "convolver-preset.";
+        return detail::advice_text({"the preset belongs to another plug-in",
+                                    {},
+                                    "Make a Convolver preset with convolver-preset.",
+                                    {}});
     return {};
 }
 } // namespace
@@ -202,8 +210,7 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                 try {
                     uninitialized_tail = configuration_tail_frames(*next.configuration);
                 } catch (...) {
-                    filter_.reject(HostFailureKind::preparation,
-                                   "The filter could not be prepared.", request);
+                    filter_.reject(HostFailureKind::preparation, preparation_message({}), request);
                     throw;
                 }
             }
@@ -310,7 +317,10 @@ OSStatus Effect::load_file(const std::string& path) {
 OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     if (!plist || CFGetTypeID(plist) != CFDictionaryGetTypeID()) {
         reject(HostFailureKind::state_unreadable,
-               "The saved state is not an Audio Unit preset dictionary.");
+               detail::advice_text({"the saved state is not an Audio Unit preset dictionary",
+                                    {},
+                                    "Load the filter again, then save the project.",
+                                    {}}));
         return kAudioUnitErr_InvalidPropertyValue;
     }
     const auto dict = static_cast<CFDictionaryRef>(plist);
@@ -320,22 +330,22 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
             throw std::invalid_argument(why);
         const auto value = CFDictionaryGetValue(dict, state_key());
         if (!value || CFGetTypeID(value) != CFDataGetTypeID())
-            throw std::invalid_argument(
-                "The preset holds no Convolver filter (it has no convolver-state entry). Make "
-                "the preset with convolver-preset, or save it from Convolver in the host.");
+            throw std::invalid_argument(detail::advice_text(
+                {"the preset holds no Convolver filter (it has no convolver-state entry)",
+                 {},
+                 "Make the preset with convolver-preset, or save it from Convolver in the host.",
+                 {}}));
         const auto data = static_cast<CFDataRef>(value);
         const auto size = static_cast<std::size_t>(CFDataGetLength(data));
         if (size > max_host_state_bytes)
-            throw std::invalid_argument("The saved filter is larger than the 64 MB limit.");
+            throw std::invalid_argument("the saved filter is larger than the 64 MiB limit");
         next = decode_host_state(
             std::span(reinterpret_cast<const std::byte*>(CFDataGetBytePtr(data)), size));
     } catch (const NewerHostState& e) {
-        reject(HostFailureKind::state_newer,
-               std::string("The saved state could not be read: ") + e.what());
+        reject(HostFailureKind::state_newer, state_read_message(e));
         return kAudioUnitErr_InvalidPropertyValue;
     } catch (const std::exception& e) {
-        reject(HostFailureKind::state_unreadable,
-               std::string("The saved state could not be read: ") + e.what());
+        reject(HostFailureKind::state_unreadable, state_read_message(e));
         return kAudioUnitErr_InvalidPropertyValue;
     }
 

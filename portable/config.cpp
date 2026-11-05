@@ -134,7 +134,7 @@ std::string read_configuration_text(const std::filesystem::path& path) {
             advice_text({"cannot read this file",
                          std::filesystem::exists(path)
                              ? "The file is there, but this program may not read it."
-                             : "There is no file at that path.",
+                             : "There is no file at " + utf8_string(path) + ".",
                          std::filesystem::exists(path)
                              ? "Check the file's permissions."
                              : "Check the name and folder (letter case counts on Linux and on "
@@ -295,8 +295,8 @@ std::string explain_one(const std::filesystem::path& filter, const SelectionCand
     const auto name = utf8_string(filter);
     const auto diffs = differences(c, w);
     Advice a;
-    a.problem = name + " cannot be used with " + std::string(subject) + " (" + wanted_text(w) +
-                "): " + joined(diffs, "; ");
+    // The differences name both values, so the request is not repeated.
+    a.problem = name + " cannot be used with " + std::string(subject) + ": " + joined(diffs, "; ");
     if (c.sound_file)
         a.cause = name + " is a sound-file filter (" + hertz(c.sample_rate) + ", " +
                   channels(c.input_channels) +
@@ -314,7 +314,25 @@ std::string explain_one(const std::filesystem::path& filter, const SelectionCand
         append(a.fix, resample_fix(w.sample_rate, hertz(c.sample_rate), false, who));
         a.note = resample_note(false);
     }
-    if (w.input_channels && w.input_channels != c.input_channels) {
+    const bool channels_differ = (w.input_channels && w.input_channels != c.input_channels) ||
+                                 (w.output_channels && w.output_channels != c.output_channels);
+    if (plugin && !c.sound_file && channels_differ) {
+        // A host sets both counts: one cause and one fix for the two.
+        const auto counts = [](std::size_t in, std::size_t out) {
+            return channels(in, "input ") + " and " + channels(out, "output ");
+        };
+        append(a.cause,
+               "The host gives the plug-in " + counts(w.input_channels, w.output_channels) + ".");
+        append(a.fix, "Give the plug-in " + counts(c.input_channels, c.output_channels) +
+                          " in the host's track or routing settings, or load a configuration "
+                          "made for " +
+                          counts(w.input_channels, w.output_channels) +
+                          " (a configuration list can hold one for each layout).");
+        if (w.input_channels == 1 && w.output_channels == 1 && c.input_channels == 2 &&
+            c.output_channels == 2)
+            append(a.note, "Hosts run an effect with one channel on a mono track (GarageBand "
+                           "does): put Convolver on a stereo track instead.");
+    } else if (w.input_channels && w.input_channels != c.input_channels) {
         if (c.sound_file && c.input_channels == 1 && w.input_channels <= 8) {
             append(a.fix, "To apply this mono IR to all " + std::to_string(w.input_channels) +
                               " channels, save a configuration such as the following beside " +
@@ -347,18 +365,14 @@ std::string explain_one(const std::filesystem::path& filter, const SelectionCand
     // already covers equal counts, the output advice would only repeat it.
     const bool covered = c.sound_file && w.input_channels != c.input_channels &&
                          w.input_channels == w.output_channels;
-    if (w.output_channels && w.output_channels != c.output_channels && plugin && !covered) {
+    if (w.output_channels && w.output_channels != c.output_channels && plugin && !covered &&
+        c.sound_file) {
         append(a.cause,
                "The host gives the plug-in " + channels(w.output_channels, "output ") + ".");
-        append(a.fix, c.sound_file
-                          ? "A sound-file filter always has as many outputs as inputs: use a "
-                            "configuration (.cfg) file to produce a different number, or give the "
-                            "plug-in as many outputs as inputs in the host's track or routing "
-                            "settings."
-                          : "Use a configuration with that output count (its third header "
-                            "number), or give the plug-in " +
-                                channels(c.output_channels, "output ") +
-                                " in the host's track or routing settings.");
+        append(a.fix, "A sound-file filter always has as many outputs as inputs: use a "
+                      "configuration (.cfg) file to produce a different number, or give the "
+                      "plug-in as many outputs as inputs in the host's track or routing "
+                      "settings.");
     } else if (w.output_channels && w.output_channels != c.output_channels && !plugin) {
         append(a.cause, "--output-channels asked for " + channels(w.output_channels, "output ") +
                             (c.sound_file ? ", but a sound-file filter always has as many "
@@ -867,7 +881,7 @@ Configuration load_configuration(const std::filesystem::path& path,
     const auto who = plugin ? Chooser::host : options ? Chooser::options : Chooser::audio;
     auto explanation =
         detail::explain_no_match(path, list, candidates, selection,
-                                 who == Chooser::host      ? "the plug-in in its host"
+                                 who == Chooser::host      ? "this host"
                                  : who == Chooser::options ? "the requested selection"
                                                            : "the audio to be filtered",
                                  who);

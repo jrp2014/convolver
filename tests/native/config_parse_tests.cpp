@@ -45,7 +45,7 @@ int main() {
                         parsed.fix == advice.fix && parsed.note == advice.note,
                     "advice round trip");
             require(advice_problem(text) == advice.problem, "advice problem");
-            require(advice_line(text) == "route channel out of range: 2 Cause: The header "
+            require(advice_line(text) == "route channel out of range: 2. Cause: The header "
                                          "declares 1 channel. Fix: Use channel 0. / 0 / 0 "
                                          "Note: Letter case counts.",
                     "advice on one log line");
@@ -53,6 +53,10 @@ int main() {
                     "command-line error shape");
             require(advice_text({"only a problem", {}, {}, {}}) == "only a problem",
                     "empty parts are left out");
+            require(as_sentence("the filter is for 44100 Hz") == "The filter is for 44100 Hz." &&
+                        as_sentence("room.cfg:4:1: bad") == "room.cfg:4:1: bad." &&
+                        as_sentence("done.") == "done.",
+                    "a problem as a sentence");
         }
         const std::string text = "\xef\xbb\xbf// generated\r\n\r\n48000 2 3 3f // header\r\n"
                                  "0.04 1\r\n0 .02 0\r\n\r\n// path\r\n  ir ü.wav  \r\n1\r\n"

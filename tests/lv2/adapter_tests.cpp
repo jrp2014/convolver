@@ -342,12 +342,12 @@ void status_and_log(host::World& world, const Fixture& f) {
     p->run_empty();
     check(p->status == static_cast<float>(lv2::Status::load_failed),
           label + "failed first load: status load failed");
-    check(p->log.contains(LV2_LOG__Error, "does not resample"),
+    check(p->log.contains(LV2_LOG__Error, "never resamples"),
           label + "failed first load: the explanation reaches log:log");
     {
         const auto r = p->failure();
         check(r && r->kind == HostFailureKind::sample_rate && r->request.number == 1 && r->silent &&
-                  p->log.contains(LV2_LOG__Error, r->message),
+                  p->log.contains(LV2_LOG__Error, detail::advice_line(r->message)),
               label + "failed first load: recorded, and the log carries its message");
     }
     {
@@ -367,7 +367,7 @@ void status_and_log(host::World& world, const Fixture& f) {
     p->run_empty();
     check(p->status == static_cast<float>(lv2::Status::load_failed),
           label + "failed replacement: status load failed");
-    check(p->log.contains(LV2_LOG__Error, "previous filter is kept"),
+    check(p->log.contains(LV2_LOG__Error, "the previous filter keeps playing"),
           label + "failed replacement: logged, previous filter kept");
     check(p->failure() && p->failure()->kind == HostFailureKind::channels &&
               p->failure()->request.number == 3 && !p->failure()->silent,
@@ -700,7 +700,7 @@ void lifecycle(host::World& world, const Fixture& f, unsigned seed,
             m.requests = 1;     // A new instance, whose first request is the restore.
             m.kind = m.failed ? std::optional(HostFailureKind::saved_failure) : std::nullopt;
             m.failed_request = 1;
-            check(p->log.contains(LV2_LOG__Error, "failed to load before") == m.failed,
+            check(p->log.contains(LV2_LOG__Error, "had failed to load when this") == m.failed,
                   label() + ": a reopened failure is explained in the log, and only then");
             p->activate();
             break;
@@ -889,7 +889,7 @@ void worker_loads(host::World& world, const fs::path& work) {
         check(r && r->kind == HostFailureKind::filter_file && r->silent &&
                   r->request.source == HostFilterSource::file &&
                   r->request.path == files.missing.string() &&
-                  p->log.contains(LV2_LOG__Error, r->message) &&
+                  p->log.contains(LV2_LOG__Error, detail::advice_line(r->message)) &&
                   r->message.find("missing.cfg") != std::string::npos,
               "missing file: recorded as filter_file and logged with its path");
         check(silent(play_constant(*p, 1024)), "missing file as the first load plays silence");
@@ -909,7 +909,7 @@ void worker_loads(host::World& world, const fs::path& work) {
             r = p->failure();
             check(p->status == as_float(Status::load_failed) && r && r->kind == kind &&
                       !r->silent &&
-                      r->message.find("previous filter is kept") != std::string::npos &&
+                      p->log.contains(LV2_LOG__Error, "the previous filter keeps playing") &&
                       p->log.contains(LV2_LOG__Error, what),
                   "failed replacement with " + path + ": recorded, explained, original kept");
             // The refused file's own rate or counts are recorded for the short

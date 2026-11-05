@@ -159,10 +159,6 @@ including the 18 October plug-in distribution plan, whose open work is now in
   the status, the full explanation of a failure, what is loaded and the
   Convolver log; settings, framework, threads, testing, accessibility and
   phases, with decisions for jrp.
-- [Actionable diagnostics](project/plans/2026-11-05-actionable-diagnostics.md)
-  (DIAG-2): every message as problem, cause, fix and, for an environment or
-  design limit, a note; labelled lines in the command-line tools, and one
-  action button beside the fix in the plug-in window; with decisions for jrp.
 - [Media Foundation transform](project/plans/2026-10-21-media-foundation-transform.md)
   (HOST-3, parked): a Windows audio effect for Media Player Legacy, DirectShow players and
   Media Foundation or WinRT applications, with APO and Equalizer APO alternatives

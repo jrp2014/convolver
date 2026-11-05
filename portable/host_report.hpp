@@ -56,11 +56,15 @@ struct HostReport {
     // "Convolver 0.6.0, Audio Unit #2 in REAPER": which instance this is, in the
     // program that runs it (a host's separate plug-in process where it has one).
     std::string title;
-    // In full: what plays, why, and what to change. Several sentences.
+    // DIAG-2: what the window shows under the status word, each part on its
+    // own: the problem as a sentence (empty when nothing is wrong), what
+    // plays, then the cause, the fix and a note (each may be empty), and the
+    // window's action for the fix: "choose filter" (Choose Filter…), "copy
+    // diagnostics" (Copy Diagnostics) or empty.
+    std::string problem, plays, cause, fix, note, action;
+    // All of it as text: the problem and what plays, then "Cause: ", "Fix: "
+    // and "Note: " lines (advice.hpp), for the text report.
     std::string explanation;
-    // What the window shows under the status word: the explanation, without
-    // a leading "Playing", which the status word already says.
-    std::string headline;
     // The window's Filter row: the accepted filter's file name ("From the
     // saved project or preset" when it came from saved state, "None"), and
     // a note about the newest request when it was refused.
@@ -93,7 +97,8 @@ HostReport host_report(const HostFilter&, const HostReportFacts&);
 
 // The report as named text values, for a format's transport (an Audio Unit
 // property dictionary): status (the HostStatus number), status name,
-// summary (the status line), title, explanation, headline, filter name,
+// summary (the status line), title, explanation, problem, plays, cause, fix,
+// note, action, filter name,
 // filter note, filter path, filter files (one per line), sample rate (digits, or empty), latency
 // waits ("yes" or "no"), audio (one line per fact: label, value, note, "problem" or empty, and
 // help, separated by tabs), reference (one "Label: value" line each), log path and log written

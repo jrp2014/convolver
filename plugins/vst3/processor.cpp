@@ -514,12 +514,10 @@ tresult Processor::load_state(IBStream* stream) {
         try {
             next = read_state(stream);
         } catch (const NewerHostState& e) {
-            filter_.reject(HostFailureKind::state_newer,
-                           std::string("The saved state could not be read: ") + e.what());
+            filter_.reject(HostFailureKind::state_newer, state_read_message(e));
             throw;
         } catch (const std::exception& e) {
-            filter_.reject(HostFailureKind::state_unreadable,
-                           std::string("The saved state could not be read: ") + e.what());
+            filter_.reject(HostFailureKind::state_unreadable, state_read_message(e));
             throw;
         }
         install(std::move(next), {}, true);
@@ -544,8 +542,7 @@ void Processor::install(HostState next, const HostRequest& request, bool restore
         try {
             inactive_tail = static_cast<uint32>(configuration_tail_frames(*next.configuration));
         } catch (...) {
-            filter_.reject(HostFailureKind::preparation, "The filter could not be prepared.",
-                           request);
+            filter_.reject(HostFailureKind::preparation, preparation_message({}), request);
             throw;
         }
     }
@@ -599,10 +596,13 @@ bool Processor::load_file(const std::string& path) {
         const auto* reader = files_ ? files_ : test_file_reader;
         if (!reader) {
             filter_.reject(HostFailureKind::filter_file,
-                           "This build of Convolver cannot read filter files in the plug-in, so " +
-                               path +
-                               " was not loaded. Load a preset made from it with "
-                               "convolver-preset instead.",
+                           detail::advice_text({"this build of Convolver cannot read filter "
+                                                "files in the plug-in, so " +
+                                                    path + " was not loaded",
+                                                {},
+                                                "Make a preset from it with convolver-preset, "
+                                                "and load the preset instead.",
+                                                {}}),
                            request);
             throw std::runtime_error("no reader");
         }

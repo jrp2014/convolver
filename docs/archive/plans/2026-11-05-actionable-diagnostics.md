@@ -1,11 +1,15 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+
+> **Archived plan — completed.** Moved on 5 November 2026 from `docs/project/plans/2026-11-05-actionable-diagnostics.md`. jrp chose "Structure plus fix buttons" and moving Bypass and the diagnostics buttons off the window's bottom edge ([decisions](../../project/decisions.md#diagnostics)), and [PR #110](https://github.com/jrp2014/convolver/pull/110) implemented both. Current behaviour: [command line](../../use/command-line.md), [troubleshooting](../../use/troubleshooting.md) and [plug-ins](../../use/plugins.md#convolvers-window). The "before" examples below record the messages of 5 November 2026; for current wording read the guides, not this plan.
+
 # Actionable diagnostics: problem, cause, fix
 
 Status: proposal for jrp, 5 November 2026, written against `main` at `1467571`
 (0.8.11). It serves DIAG-2 in [TODO](../../../TODO.md). jrp chose both recommended
 options on 5 November 2026 ("Structure plus fix buttons";
-[decisions](../decisions.md#diagnostics)); implementation is in progress. It keeps DIAG-1's choices
-([decisions](../decisions.md#diagnostics)): messages still explain generously,
+[decisions](../../project/decisions.md#diagnostics)), and moving Bypass and the
+diagnostics buttons as in the mock-up; implemented in the same pull request. It keeps DIAG-1's choices
+([decisions](../../project/decisions.md#diagnostics)): messages still explain generously,
 and the CLI still replaces an existing output.
 
 For jrp, deciding the shape of Convolver's messages, and for whoever then
@@ -75,68 +79,70 @@ fix.
 ## Before and after
 
 Command line (the same parts for `convolver-preset` and
-`convolver-equalizer-apo`, with their own program names):
+`convolver-equalizer-apo`, with their own program names), as the
+implementation prints them; each line is one line in a terminal, which wraps
+it:
 
 ```text
-convolver: error: missing.cfg:8:1: IR file 'missing.wav' not found
-  Cause: there is no file at /…/fx/missing.wav. IR file names are relative to
-         the folder that holds missing.cfg.
-  Fix: correct the name on line 8, or put missing.wav in that folder.
-  Note: letter case counts on Linux and on case-sensitive macOS volumes.
+convolver: error: missing.cfg:8:1: filter 'missing.wav': IR file not found
+  Cause: There is no file at /tmp/fx/missing.wav. IR file names are relative to the folder that holds missing.cfg.
+  Fix: Correct the name on line 8, or put the IR file in that folder.
+  Note: Letter case counts on Linux and on case-sensitive macOS volumes.
 ```
 
 ```text
-convolver: error: filter.cfg is for 48000 Hz audio, but in441.wav is 44100 Hz
-  Cause: Convolver never resamples, so a filter only fits audio at the rate it
-         was made for.
-  Fix: use a filter made for 44100 Hz, or convert in441.wav to 48000 Hz first.
-  Note: a configuration list can hold one configuration per sample rate and
-        picks the matching one.
+convolver: error: filter.cfg cannot be used with the audio to be filtered: its sample rate is 48000 Hz, not 44100 Hz
+  Cause: filter.cfg is a configuration for 48000 Hz audio with 2 input channels and 2 output channels (the first three numbers on its first non-comment line).
+  Fix: Use a filter made for 44100 Hz (with IRs recorded or designed at that rate), or convert the audio to 48000 Hz first.
+  Note: Convolver never resamples, so a filter only fits audio at the rate it was made for. A configuration list can hold one configuration per sample rate and picks the matching one automatically.
 ```
 
 ```text
-convolver: error: syntax.cfg:3:1: filter path 1 is incomplete (0 of 4 lines)
-  Cause: each filter path needs four lines: IR file, IR channel, input
-         channel(s), output channel(s).
-  Fix: add the missing lines after line 3, or remove the path.
+convolver: error: syntax.cfg:4:1: filter path 1 is incomplete (3 of 4 lines)
+  Cause: After the header and two delay lines, each filter path has four lines: the IR file, its channel, the input channels and the output channels.
+  Fix: Add the missing lines, or remove the incomplete path.
 ```
 
 ```text
-convolver: error: cannot create the output file /nonexistent/o.wav
-  Cause: its folder /nonexistent does not exist.
-  Fix: create the folder, or choose an output in an existing folder.
+convolver: error: cannot open audio output /nonexistent/o.wav
+  Cause: Its folder /nonexistent does not exist.
+  Fix: Create the folder, or choose an output in an existing folder.
 ```
 
 ```text
 convolver: error: --gain-db abc is not a gain
-  Cause: --gain-db takes a number of decibels (such as -6), 'no-clip' or
-         'auto'.
-  Fix: write the gain as a number, such as --gain-db -6, or use
-       --gain-db no-clip to keep full-scale input within full scale.
+  Cause: --gain-db takes a number of decibels (such as -6), 'no-clip' or 'auto'.
+  Fix: Write the gain as a number, such as --gain-db -6, or use --gain-db no-clip to keep full-scale input within full scale.
 ```
 
-Plug-ins, in the window (and as one line in the Convolver log):
+Plug-ins, in the window (the problem in semibold, then what plays, then the
+labelled rows and the button), from `native.host_report`:
 
 ```text
-[bold] The new filter was not loaded: it is for 44100 Hz, and the host runs at 48000 Hz.
+[bold] The filter is for 48000 Hz, and the host runs at 44100 Hz.
        The previous filter keeps playing.
-Fix:   Choose a filter made for 48000 Hz, or set the host's project to 44100 Hz.
+Cause: Convolver never resamples, so a filter plays only at the rate it was made for.
+Fix:   Load a filter made for 44100 Hz, or set the host's project or audio device to 48000 Hz.
        [Choose Filter…]
-Note:  Convolver never resamples.
 ```
 
 ```text
-[bold] Fault: the filter failed while processing, so Convolver silenced the
-       audio and restarted it (3 times).
-Cause: this is a fault in Convolver, not in your audio or settings.
-Fix:   Copy the diagnostics and send them with a short description.
+[bold] The filter failed while processing (2 times). The filter keeps playing.
+Cause: This is a fault in Convolver, not in your audio or settings. Convolver silenced the audio and restarted the filter each time.
+Fix:   Copy the diagnostics and report it, with a line on what was playing.
        [Copy Diagnostics]
+Note:  Also: the host sent invalid samples (once). The status shows Fault until a filter is loaded again or the host restarts the plug-in.
 ```
 
-The Status parameter, which hosts show in a small field, keeps its one line:
-problem first, then "See the Convolver log." ("Load failed, previous filter
-kept: the filter is for 44100 Hz, the host runs at 48000 Hz. See the Convolver
-log.").
+The same in the Convolver log, on one line:
+
+```text
+Request 2: Not loaded; the previous filter keeps playing: the filter is for 44100 Hz, and the host runs at 48000 Hz. Cause: Convolver never resamples, so a filter plays only at the rate it was made for. Fix: Load a filter made for 48000 Hz, or set the host's project or audio device to 44100 Hz.
+```
+
+The Status parameter, which hosts show in a small field, keeps its one line
+as before ("Load failed, previous filter kept: the filter is for 44100 Hz,
+the host runs at 48000 Hz. Details in the Convolver log.").
 
 ## The plug-in window
 
@@ -160,7 +166,7 @@ host (so no alert or sheet for a message). A
 | Integrate status feedback near what it describes; use alerts only for critical, actionable news ("Feedback", "Alerts") | Status stays passive and inline; nothing pops up |
 | Make feedback accessible: not colour alone ("Feedback") | Symbol, coloured word and text together; VoiceOver reads status, problem, Cause, Fix, button, Note in order |
 | Use the caution symbol sparingly ("Alerts") | The triangle only for Fault; Load failed keeps its stop sign, Playing its tick |
-| Avoid controls and critical information at the bottom of a macOS window ("Layout", macOS) | Bypass moves to the top right, beside the title line; Copy Diagnostics and Show Log move up onto the row of the folded File, software and log section they belong with, so nothing sits on the bottom edge |
+| Avoid controls and critical information at the bottom of a macOS window ("Layout", macOS) | Bypass moves to the top right, beside the title line; Copy Diagnostics and Show Log join the row of the folded File, software and log section they belong with, instead of a separate button bar along the bottom edge (jrp chose this on 5 November 2026) |
 | Hide details until relevant; one disclosure control per view ("Disclosure controls") | The file, software and log lines stay folded behind the one triangle |
 
 - **Message area**, from the top: the title line (small, secondary) with

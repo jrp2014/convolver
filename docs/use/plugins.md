@@ -212,7 +212,15 @@ each time the host starts the plug-in (with the sample rate, channels and block
 size), and each failure, explained in full with what to change. Each line
 starts with the time, the Convolver version, the format and instance (`VST3 #2`),
 the host program and its process number. Loads and refusals are numbered
-(`Request 3:`), so you can follow a sequence of presets. The VST3 plug-in
+(`Request 3:`), so you can follow a sequence of presets. A failure keeps to
+one line: what plays instead, the problem, then its `Cause:`, `Fix:` and
+`Note:`, as the window shows them, for example:
+
+```text
+Request 2: Not loaded; the previous filter keeps playing: the filter is for 44100 Hz, and the host runs at 48000 Hz. Cause: Convolver never resamples, so a filter plays only at the rate it was made for. Fix: Load a filter made for 48000 Hz, or set the host's project or audio device to 44100 Hz.
+```
+
+The VST3 plug-in
 also logs host settings it cannot use, with the reason: a sample rate that is
 not a whole number of hertz, a block size or sample type it does not take, or
 (once for each instance, as hosts try several) a channel layout with more than
@@ -266,18 +274,31 @@ From the top, the window has:
 - **A title line** with the Convolver version, the instance (`Audio Unit #2`,
   as in the log) and the program that runs the plug-in, or "the host's
   plug-in process" when the host runs plug-ins in Apple's separate service,
-  as GarageBand does (the Software line names that process).
+  as GarageBand does (the Software line names that process). The VST3
+  plug-in's Bypass checkbox sits at its right-hand end.
 - **The status** (Playing, No filter, Load failed, Not checked yet or Fault),
-  the same as the Status parameter, as a symbol, a coloured word, and under
-  them **what plays, why, and what to change**, in full, as the log
-  explains it. For example, a stereo preset on a GarageBand mono track
-  reads: "The saved filter does not suit the host, so Convolver plays
-  silence until it does. The filter has 2 inputs and 2 outputs, but the
-  plug-in is set up with 1 input and 1 output. Give the plug-in 2 inputs and
-  2 outputs in the host's track or routing settings, or load a filter made
-  for 1 input and 1 output. Hosts run an effect with one channel on a mono
-  track (GarageBand does): put Convolver on a stereo track instead." While
-  a filter simply plays, it gives the filter's rate and channels.
+  the same as the Status parameter, as a symbol and a coloured word, and
+  under them **the message**, as the log explains it, in parts:
+
+  | Part | What it says |
+  | --- | --- |
+  | Problem, in bold | What went wrong, naming the file or the values that differ |
+  | What plays | What you hear now: the previous filter, silence, or the dry signal Mix lets through |
+  | Cause | Why, in the host's terms |
+  | **Fix** | What to do, the most likely fix first |
+  | A button | Under the fix, when the window can carry it out: **Choose Filter…** (the same as Choose…) when a different filter puts it right, **Copy Diagnostics** for a fault in Convolver itself |
+  | Note | In smaller text: the host or design limit behind it, and when the status clears |
+
+  For example, a stereo preset on a GarageBand mono track reads "**The saved
+  filter has 2 inputs and 2 outputs, and the plug-in has 1 input and 1
+  output.** Convolver plays silence.", then Cause: "A filter plays only with
+  the channel counts it was made for.", **Fix**: "Give the plug-in 2 inputs
+  and 2 outputs in the host's track or routing settings, or load a filter
+  made for 1 input and 1 output.", the Choose Filter… button, and Note:
+  "Hosts run an effect with one channel on a mono track (GarageBand does):
+  put Convolver on a stereo track instead." While a filter simply plays,
+  the message is only the filter's rate and channels; with no filter, Fix
+  says what to load, with Choose Filter… under it.
 - **Filter:** the name of the file that plays (or "From the saved project or
   preset" after reopening a project, which saves the filter itself, not the
   file), a note when the newest file was refused, and **Choose…** beside it.
@@ -377,12 +398,12 @@ From the top, the window has:
 - **File, software and log**, folded away under a disclosure triangle: the
   filter file's path and request number (and a refused file's), the software
   (version, FFT library, CPU kernels, the plug-in SDK, and what reads the
-  filter files), and where the log is.
-- **Copy Diagnostics** puts all of this, with the settings and this
-  instance's recent lines from the Convolver log, on the clipboard as plain
-  text, ready to paste into a report.
-- **Show Log** selects the log file in the Finder (in a sandboxed host, the
-  copy inside the host's container).
+  filter files), and where the log is. On the same row:
+  - **Copy Diagnostics** puts all of this, with the settings and this
+    instance's recent lines from the Convolver log, on the clipboard as plain
+    text, ready to paste into a report.
+  - **Show Log** selects the log file in the Finder (in a sandboxed host, the
+    copy inside the host's container).
 
 The text can be selected and copied. The controls are standard macOS ones
 with names for VoiceOver, which has not been tried with the window yet, and
@@ -401,7 +422,7 @@ except:
 - Dragging a Gain or Mix slider is one change for the host's undo and
   automation, from mouse down to mouse up, as the VST3 SDK asks.
 - An accepted file marks the project changed, so the host asks to save it.
-- A **Bypass** checkbox at the bottom left is the plug-in's bypass: ticking
+- A **Bypass** checkbox at the end of the title line is the plug-in's bypass: ticking
   it is the same as the host's own bypass button, which it follows, and the
   host's undo and automation record it. The Audio Unit's window has none,
   since Audio Unit hosts show their own bypass button.

@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -265,9 +266,9 @@ void properties(const au_test::LogSince& log) {
             "diagnostics:\n" + text(copied));
     // GarageBand restored the same preset five times in a second on a mono
     // track: the identical failure is logged once, not once per request.
-    // A refused load while the saved filter is kept: "Filter not loaded; the
-    // previous filter is kept. …".
-    const char* refused = "Filter not loaded";
+    // A refused load while the saved filter is kept: "Not loaded; the
+    // previous filter is kept (it does not play): …".
+    const char* refused = "Not loaded; the previous filter is kept";
     const auto before_repeats = count(log.text(), refused);
     for (int i = 0; i < 4; ++i)
         static_cast<void>(unit.load(state_of(identity(44100, 2))));
@@ -333,10 +334,21 @@ void window() {
     const auto r = report(unit);
     require([view.statusField.stringValue isEqualToString:@"Load failed"],
             "window status " + text(view.statusField.stringValue));
-    require([view.explanationView.string isEqualToString:r[@"headline"]] &&
-                contains(view.explanationView.string, text(r[@"explanation"]).c_str()) &&
-                contains(view.explanationView.string, "put Convolver on a stereo track"),
-            "window text:\n" + text(view.explanationView.string));
+    // DIAG-2: the problem and what plays, then the cause and the fix as
+    // labelled rows; the note in its own row; and Choose Filter… under the
+    // fix, since a filter for the track's channels puts it right.
+    require([view.explanationView.string hasPrefix:r[@"problem"]] && r[@"problem"].length > 0 &&
+                contains(view.explanationView.string, text(r[@"plays"]).c_str()) &&
+                contains(view.explanationView.string, ("\tCause:\t" + text(r[@"cause"])).c_str()) &&
+                contains(view.explanationView.string, ("\tFix:\t" + text(r[@"fix"])).c_str()) &&
+                contains(view.noteField.stringValue, "put Convolver on a stereo track") &&
+                !view.noteField.hidden,
+            "window text:\n" + text(view.explanationView.string) +
+                "\nNote: " + text(view.noteField.stringValue));
+    require([r[@"action"] isEqualToString:@"choose filter"] && !view.actionButton.hidden &&
+                [view.actionButton.title isEqualToString:@"Choose Filter…"] &&
+                view.actionButton.action == view.chooseButton.action,
+            "fix button: " + text(r[@"action"]) + " / " + text(view.actionButton.title));
     // The Audio facts in plain words, the mismatch marked in words too. The
     // sign is U+26A0 with its text-style selector U+FE0E: NSString matches
     // whole composed characters, so the sign alone would not be found.
@@ -374,7 +386,8 @@ void window() {
     const auto in_view = [&](NSView* v) { return [view convertRect:v.bounds fromView:v]; };
     const NSRect copy = in_view(view.diagnosticsButton), log_button = in_view(view.logButton),
                  explained = in_view(view.explanationView.enclosingScrollView),
-                 audio = in_view(view.audioValues.lastObject);
+                 audio = in_view(view.audioValues.lastObject), action = in_view(view.actionButton),
+                 note = in_view(view.noteField), disclosure = in_view(view.referenceButton);
     const auto frames = [&] {
         return "view " + text(NSStringFromRect(view.frame)) + ", text " +
                text(NSStringFromRect(explained)) + ", last fact " + text(NSStringFromRect(audio)) +
@@ -384,7 +397,10 @@ void window() {
     require(view.isFlipped && NSMaxX(log_button) <= NSWidth(view.frame) &&
                 NSMinX(copy) > NSWidth(view.frame) / 3 && NSMaxY(copy) <= NSHeight(view.frame) &&
                 NSHeight(view.frame) - NSMaxY(copy) <= 24 && NSMinY(explained) >= 0 &&
-                NSMinY(audio) > NSMaxY(explained) && NSMinY(copy) > NSMaxY(audio),
+                NSMinY(audio) > NSMaxY(explained) && NSMinY(copy) > NSMaxY(audio) &&
+                NSMinY(action) >= NSMaxY(explained) && NSMinY(note) >= NSMaxY(action) &&
+                NSMinY(audio) > NSMaxY(note) && NSMinX(action) >= 64 &&
+                std::abs(NSMidY(copy) - NSMidY(disclosure)) < 8,
             "layout: " + frames());
     // The file, software and log lines are folded away, and opening them
     // makes the window taller by their height, closing returns it.
@@ -688,7 +704,7 @@ void files() {
     require(![view loadFile:@(mono.c_str())], "a mono file accepted by a stereo unit");
     r = report(unit);
     require(contains(r[@"explanation"], mono.c_str()) &&
-                contains(r[@"explanation"], "could not be used"),
+                contains(r[@"explanation"], "cannot be used with this host"),
             "mono file refusal: " + text(r[@"explanation"]));
     require([view.filterNameField.stringValue isEqualToString:@"stereo.wav"] &&
                 [view.filterNoteField.stringValue hasPrefix:@"mono.wav was refused."] &&
@@ -857,7 +873,7 @@ void faults(const au_test::LogSince& log) {
         bool silent = false;
         check(unit.render(ins, outs, 512, false, silent), "invalid-input render");
     };
-    const char* logged = "The host sent invalid samples";
+    const char* logged = "host sent invalid samples";
     const auto fault = static_cast<AudioUnitParameterValue>(HostStatus::fault);
     render();
     require(status_value(unit) == fault, "Render did not signal Fault");

@@ -254,6 +254,15 @@ void window() {
                 shown.bypassButton.state == NSControlStateValueOff &&
                 [shown.bypassButton.title isEqualToString:@"Bypass"],
             "Bypass checkbox");
+    // DIAG-2 (jrp, 5 November 2026): Bypass sits at the end of the title
+    // line, above the status, not on the window's bottom edge.
+    const NSRect bypass_frame = [shown convertRect:shown.bypassButton.bounds
+                                          fromView:shown.bypassButton];
+    const NSRect status_frame = [shown convertRect:shown.statusField.bounds
+                                          fromView:shown.statusField];
+    require(NSMaxY(bypass_frame) <= NSMinY(status_frame) + 4 &&
+                NSMinX(bypass_frame) > NSWidth(shown.frame) / 2,
+            "Bypass is not at the end of the title line: " + text(NSStringFromRect(bypass_frame)));
     handler.edits.clear();
     [shown.bypassButton performClick:nil];
     require(handler.kinds(bypass_id) == "bpe" && handler.edits[1].value == 1.0 &&

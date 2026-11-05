@@ -1,11 +1,27 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "filter_file.hpp"
+#include "advice.hpp"
 #include "config_parse.hpp"
 #include <algorithm>
 #include <exception>
 #include <utility>
 
 namespace convolver {
+namespace {
+// DIAG-2: the reader's message, with the chosen file named by its file name
+// in the problem, which the window shows in bold; the cause and the
+// reference lines keep the full path.
+std::string refusal(const std::string& path, const char* what) {
+    auto a = detail::parse_advice(what);
+    const auto name = std::filesystem::path(std::u8string(path.begin(), path.end())).filename();
+    const auto u8 = name.u8string();
+    const std::string short_name(u8.begin(), u8.end());
+    if (!short_name.empty() && a.problem.starts_with(path))
+        a.problem.replace(0, path.size(), short_name);
+    return detail::advice_text(a);
+}
+} // namespace
+
 HostState filter_file_state(const std::filesystem::path& path,
                             const ConfigurationSelection& selection,
                             const detail::SoundFiles& reader,
@@ -61,9 +77,9 @@ std::optional<HostState> read_filter_file(const std::string& path, const HostLay
             only.output_channels = checked.front().output_channels;
             failure.carried = std::move(only);
         }
-        failure.message = "The filter file \"" + path + "\" could not be used: " + e.what();
+        failure.message = refusal(path, e.what());
     } catch (const std::exception& e) {
-        failure.message = "The filter file \"" + path + "\" could not be used: " + e.what();
+        failure.message = refusal(path, e.what());
     }
     return std::nullopt;
 }

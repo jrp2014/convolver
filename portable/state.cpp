@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "advice.hpp"
 #include "bytes.hpp"
 #include "convolver/host.hpp"
 #include <algorithm>
@@ -125,16 +126,17 @@ std::string host_state_size_error(const HostState& state) {
     // Each sample takes 4 bytes; the rest (rates, counts, routes) is small.
     constexpr auto limit_samples = max_host_state_bytes / 4;
     const auto n = state.configuration ? samples(*state.configuration) : 0;
-    return "The filter is too large to save: its " + std::to_string(n) +
-           " samples (all its impulse responses together) would take " + std::to_string(size) +
-           " bytes in the saved state with the plug-in's settings, and plug-in state and presets "
-           "hold at most " +
-           std::to_string(max_host_state_bytes) + " bytes (64 MiB), just under " +
-           std::to_string(limit_samples) +
-           " samples, with room kept for the plug-in's settings. Plug-ins refuse it so that a "
-           "project never holds a filter it cannot save. Shorten "
-           "the impulse responses (most of a long one's end is usually silence) or use fewer "
-           "of them; the convolver command-line tool can still render with it.";
+    return detail::advice_text(
+        {"the filter is too large to save: its " + std::to_string(n) + " samples would take " +
+             std::to_string(size) + " bytes",
+         "Plug-in state and presets hold at most " + std::to_string(max_host_state_bytes) +
+             " bytes (64 MiB), just under " + std::to_string(limit_samples) +
+             " samples of all the impulse responses together, with room kept for the plug-in's "
+             "settings.",
+         "Shorten the impulse responses (most of a long one's end is usually silence) or use "
+         "fewer of them.",
+         "Plug-ins refuse it so that a project never holds a filter it cannot save; the "
+         "convolver command-line tool can still render with it."});
 }
 std::vector<std::byte> encode_host_state(const HostState& state) {
     if (state.configuration)
@@ -192,11 +194,14 @@ HostState decode_host_state(std::span<const std::byte> bytes) {
         throw std::invalid_argument("it is not Convolver plug-in state");
     const auto format = r.word();
     if (format > version)
-        throw NewerHostState("it was saved by a newer version of Convolver (state version " +
-                             std::to_string(format) + "; this version reads versions 1 to " +
-                             std::to_string(version) +
-                             "). Update Convolver to load it, or make the preset again "
-                             "from its .cfg with this version's convolver-preset.");
+        throw NewerHostState(detail::advice_text(
+            {"it was saved by a newer version of Convolver (state version " +
+                 std::to_string(format) + "; this version reads versions 1 to " +
+                 std::to_string(version) + ")",
+             {},
+             "Update Convolver to load it, or make the preset again from its .cfg with this "
+             "version's convolver-preset.",
+             {}}));
     if (format < 1)
         throw std::invalid_argument("unsupported host state version " + std::to_string(format));
     auto flags = r.word();

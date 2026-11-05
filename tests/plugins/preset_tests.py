@@ -295,9 +295,12 @@ def message_tests(root):
         ((nine, root / 'g.aupreset'), ['9 inputs and 9 outputs', 'command-line tool, convolver']),
         (
             ('--sample-rate', 44100, cfg, root / 'g.vstpreset'),
-            ['the requested selection (44100 Hz)', 'choose 48000 Hz with --sample-rate'],
+            [
+                'the requested selection: its sample rate is 48000 Hz, not 44100 Hz',
+                'choose 48000 Hz with --sample-rate',
+            ],
         ),
-        ((cfg, root / 'g.vstpreset', '--sample-rate', 44100), ['the requested selection (44100 Hz)']),
+        ((cfg, root / 'g.vstpreset', '--sample-rate', 44100), ['the requested selection: its sample rate is 48000 Hz']),
         (
             ('--input-channels', 3, cfg, root / 'g.vstpreset'),
             ['--input-channels asked for 3 input channels', 'omit --input-channels'],
