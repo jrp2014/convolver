@@ -83,6 +83,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
 | 31 October 2026 | The Audio Unit keeps reading and preparing a chosen filter on the main thread for now: work on load performance (a worker thread, as LV2 has) is deferred. In GarageBand a 1.3-million-tap filter showed its report after about 1.4 s and a 5.3-million-tap one after about 1.7 s, observation included; whether the host stays responsive and the audio uninterrupted during the load is not qualified | [TODO AU-6](../../TODO.md) |
 | 1 November 2026 | REL-5 closes as a package and command-line check of a macOS candidate, without its host steps; those (install, render, save and reopen, presets that do not fit) move to HOST-1's REAPER smoke test and REL-3 (jrp chose "Close REL-5 as CLI-only") | [TODO](../../TODO.md#done) (REL-5) |
 | 1 November 2026 | A new Audio Unit Latency (PLUG-10, AU-7) plays at once, with a gap in the sound while the new processor starts, rather than at the next `Initialize`: GarageBand starts the unit before it restores a project | [Adapter contract](../develop/plugin-contract.md#settings) |
+| 5 November 2026 | The Audio Unit wakes its Latency work with a GCD `DISPATCH_SOURCE_TYPE_DATA_OR` source in place of Convolver's own thread ("Do AU-12"), although Apple does not document `dispatch_source_merge_data` as real-time safe | [Adapter contract](../develop/plugin-contract.md#settings) |
 
 ## Identities and file formats
 
