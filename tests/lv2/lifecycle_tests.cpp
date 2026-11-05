@@ -286,16 +286,20 @@ int load_timing(host::World& world, const fs::path& work, bool long_filters) {
     timing::Options options;
     options.work_directory = work;
     options.long_filters = long_filters;
+    options.reset_holds_audio = true; // Deactivate and activate.
     Lv2 driver(world, host::Worker::deferred);
-    const std::vector<timing::Entry> entries{
-        {"restore",
-         [&](const timing::Filter& f, timing::Audio&) {
-             return timing::Outcome{driver.restore(f.state)};
-         },
-         true},
-        {"worker", [&](const timing::Filter& f, timing::Audio& audio) {
-             return driver.request_file(f.file, audio);
-         }}};
+    // Neither holds the host's own thread while audio plays: the host stops
+    // audio for restore(), and the worker has its own thread.
+    const std::vector<timing::Entry> entries{{"restore",
+                                              [&](const timing::Filter& f, timing::Audio&) {
+                                                  return timing::Outcome{driver.restore(f.state)};
+                                              },
+                                              true, false},
+                                             {"worker",
+                                              [&](const timing::Filter& f, timing::Audio& audio) {
+                                                  return driver.request_file(f.file, audio);
+                                              },
+                                              false, false}};
     return timing::run(driver, entries, options) ? 1 : 0;
 }
 

@@ -17,9 +17,10 @@ Until 1.0 the C++ API may change between minor versions.
   window's file, the Audio Unit's `RestoreState` and load property, LV2's
   `restore()` and worker) with filters of 1 to 30 seconds while another
   thread renders at the host's pace, and report how long the caller was held
-  and how late audio callbacks were. Measurement only, until jrp sets the
-  limits of the loading-responsiveness gate. Tests only: no change to the
-  plug-ins or the sound.
+  and how late audio callbacks were. In optimised builds they fail above
+  jrp's limits for the loading-responsiveness gate: no late callback, and
+  the host's thread held at most 100 ms with filters up to 10 s and 250 ms
+  with 30 s. Tests only: no change to the plug-ins or the sound.
 
 - `convolver --compare OUTPUT EXPECTED` (REL-5) checks a render, such as a
   plug-in host's, against the file it should match, sample for sample. It
@@ -168,7 +169,7 @@ Until 1.0 the C++ API may change between minor versions.
 - The version is now 0.8.0, the minor step for the library change below
   (jrp, 1 November 2026: an incompatible API change before 1.0 needs one).
   CMake consumers now request `find_package(Convolver 0.8)`, and the first
-  preview is cut from the 0.8 series. The LV2 plug-in reports minor version
+  preview is cut from the 0.8 series (now the 0.9 series, above). The LV2 plug-in reports minor version
   8, an even (release) minor again, though odd patch numbers still give a
   micro version LV2 treats as a development one (LV2-5).
 - Library (PLUG-10): `HostSettings` gains `latency` (one of the new

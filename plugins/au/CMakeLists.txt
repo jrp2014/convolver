@@ -180,7 +180,9 @@ if(CONVOLVER_BUILD_TESTS)
     # The loading-responsiveness timings (TODO.md): measurement only.
     add_test(NAME au.load_timing COMMAND convolver_au_lifecycle --load-timing
         "${PROJECT_BINARY_DIR}/au-load-timing")
-    set_tests_properties(au.load_timing PROPERTIES LABELS "au;real-libraries;timing" TIMEOUT 600 COST 60)
+    # Alone, so that other tests do not take its machine (RUN_SERIAL).
+    set_tests_properties(au.load_timing PROPERTIES LABELS "au;real-libraries;timing" TIMEOUT 600
+        RUN_SERIAL TRUE)
     list(APPEND au_test_targets convolver_au_lifecycle)
     foreach(target IN ITEMS convolver_au_tests convolver_au_harness convolver_au_lifecycle
             convolver_au_editor_tests)
