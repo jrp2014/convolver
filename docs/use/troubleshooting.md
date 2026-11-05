@@ -9,6 +9,13 @@ match the filter, a file path in a `.cfg` that does not lead to the IR, or a
 plug-in the system or host has refused to load. Convolver's own messages say
 what differs and what to change; read them first.
 
+Contents: [reading Convolver's messages](#reading-convolvers-messages) ·
+[the host does not list Convolver](#the-host-does-not-list-convolver) ·
+[a plug-in plays silence](#a-plug-in-plays-silence) ·
+[filters and configurations](#filters-and-configurations) ·
+[a tool will not write its output](#a-tool-will-not-write-its-output) ·
+[Equalizer APO](#equalizer-apo) · [report a problem](#report-a-problem)
+
 ## Reading Convolver's messages
 
 Every message names the problem first, then its cause and the fix, each on
@@ -34,13 +41,6 @@ A command-line tool that fails exits with a nonzero status. `convolver-preset`
 and `convolver-equalizer-apo` then keep nothing from the run; when
 `convolver` fails after it has started writing, its Note says the output is
 incomplete.
-
-Contents: [reading Convolver's messages](#reading-convolvers-messages) ·
-[the host does not list Convolver](#the-host-does-not-list-convolver) ·
-[a plug-in plays silence](#a-plug-in-plays-silence) ·
-[filters and configurations](#filters-and-configurations) ·
-[a tool will not write its output](#a-tool-will-not-write-its-output) ·
-[Equalizer APO](#equalizer-apo) · [report a problem](#report-a-problem)
 
 ## The host does not list Convolver
 

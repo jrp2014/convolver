@@ -418,7 +418,9 @@ void HostFilter::fail_activation(std::string why) {
     f.message = advice_text(
         {"the filter could not be started when the host started the plug-in" +
              (why.empty() ? std::string() : ": " + detail::advice_problem(why)),
-         "Memory may have run out.",
+         why.empty() ? "Memory may have run out."
+                     : "Usually memory has run out; the words after the colon are the reason "
+                       "given.",
          "Close other projects or programs, then restart playback or load the filter again. If "
          "it keeps failing, copy the diagnostics and report it.",
          {}});

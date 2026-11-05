@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <string>
 
 namespace convolver {
@@ -46,6 +47,28 @@ void add_note(Message& m, const std::string& sentence) {
     if (!sentence.empty())
         m.note += (m.note.empty() ? "" : " ") + sentence;
 }
+// DIAG-2: a refused file's problem starts with its full path, for the log;
+// the window names it by its file name (the reference lines keep the path).
+std::string short_problem(std::string problem, const HostFailure& failure) {
+    const auto& path = failure.request.path;
+    if (failure.request.source != HostFilterSource::file || path.empty() ||
+        !problem.starts_with(path))
+        return problem;
+    const auto name = std::filesystem::path(std::u8string(path.begin(), path.end())).filename();
+    const auto u8 = name.u8string();
+    if (!u8.empty())
+        problem.replace(0, path.size(), std::string(u8.begin(), u8.end()));
+    return problem;
+}
+// What the window says to do with no filter loaded.
+std::string load_fix(bool chooses_files) {
+    return chooses_files
+               ? "Choose a .cfg, configuration list or sound file (or drop one on this window), "
+                 "or load a Convolver preset (made with convolver-preset) from the host's preset "
+                 "menu."
+               : "Load a Convolver preset (made with convolver-preset) from the host's preset "
+                 "menu.";
+}
 // Failures the window's Choose Filter… puts right.
 bool chosen_away(HostFailureKind kind) {
     return kind != HostFailureKind::preparation && kind != HostFailureKind::activation;
@@ -63,7 +86,9 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         m.note = a.note;
     };
     if (failure) {
-        take(detail::parse_advice(failure->message));
+        auto a = detail::parse_advice(failure->message);
+        a.problem = short_problem(std::move(a.problem), *failure);
+        take(a);
         m.plays = failure_consequence(*failure, layout, facts.settings);
         if (chosen_away(failure->kind))
             m.action = choose;
@@ -74,7 +99,15 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
                                                 advice_text(fault_advice(filter.faults(), true)))));
     } else if (filter.faults().any() && !filter.failed()) {
         take(fault_advice(filter.faults(), false));
-        m.plays = "The filter keeps playing.";
+        if (filter.filter()) {
+            m.plays = "The filter keeps playing.";
+        } else {
+            // Faults are counted with no filter too (the host's samples).
+            m.plays = host ? playing_words(filter, *host, facts.settings)
+                           : std::string("No filter is loaded.");
+            add_note(m, load_fix(facts.chooses_files));
+            m.action = choose;
+        }
         if (filter.faults().processing_failure)
             m.action = "copy diagnostics";
     } else if (const auto& c = filter.filter()) {
@@ -92,12 +125,7 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
     } else {
         m.plays = host ? playing_words(filter, *host, facts.settings)
                        : std::string("No filter is loaded.");
-        m.fix = facts.chooses_files
-                    ? "Choose a .cfg, configuration list or sound file (or drop one on this "
-                      "window), or load a Convolver preset (made with convolver-preset) from the "
-                      "host's preset menu."
-                    : "Load a Convolver preset (made with convolver-preset) from the host's "
-                      "preset menu.";
+        m.fix = load_fix(facts.chooses_files);
         m.action = choose;
     }
     if (!host && !(filter.filter() && !failure))

@@ -153,7 +153,7 @@ std::string loaded_line(const HostFilter& filter, bool host_known) {
     return request + "Loaded state with no filter.";
 }
 
-std::string rejected_line(const HostFilter& filter) {
+std::string rejected_line(const HostFilter& filter, bool started) {
     const auto& r = filter.rejection();
     if (!r)
         return {};
@@ -164,7 +164,8 @@ std::string rejected_line(const HostFilter& filter) {
            (r->silent                ? "Not loaded, so Convolver plays silence: "
             : shown && shown->silent ? "Not loaded; the previous filter is kept (it does "
                                        "not play): "
-                                     : "Not loaded; the previous filter keeps playing: ") +
+            : started                ? "Not loaded; the previous filter keeps playing: "
+                                     : "Not loaded; the previous filter is kept: ") +
            detail::advice_line(r->message);
 }
 

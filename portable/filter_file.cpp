@@ -8,16 +8,13 @@
 
 namespace convolver {
 namespace {
-// DIAG-2: the reader's message, with the chosen file named by its file name
-// in the problem, which the window shows in bold; the cause and the
-// reference lines keep the full path.
+// DIAG-2: the reader's message, always naming the chosen file by its full
+// path, so that the log says which folder's file was refused (the window
+// shows only the file name; host_report.cpp).
 std::string refusal(const std::string& path, const char* what) {
     auto a = detail::parse_advice(what);
-    const auto name = std::filesystem::path(std::u8string(path.begin(), path.end())).filename();
-    const auto u8 = name.u8string();
-    const std::string short_name(u8.begin(), u8.end());
-    if (!short_name.empty() && a.problem.starts_with(path))
-        a.problem.replace(0, path.size(), short_name);
+    if (a.problem.find(path) == std::string::npos)
+        a.problem = path + ": " + a.problem;
     return detail::advice_text(a);
 }
 } // namespace

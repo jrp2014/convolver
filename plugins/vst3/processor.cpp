@@ -579,7 +579,7 @@ void Processor::refused(bool was_failed) noexcept {
         tail_.store(0);
     hold_fault_signal();
     try {
-        log(rejected_line(filter_));
+        log(rejected_line(filter_, host_ != nullptr));
     } catch (...) { // Out of memory for the line: it is dropped.
     }
 }

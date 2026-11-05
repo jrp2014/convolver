@@ -472,6 +472,30 @@ void actions() {
                 faulted.note.starts_with("Also: the host sent invalid samples (once). The status "
                                          "shows Fault until"),
             "processing failure: " + faulted.explanation);
+    // Faults are counted with no filter too: the window then says no filter
+    // plays and still offers to choose one.
+    HostFilter unfiltered(8);
+    static_cast<void>(unfiltered.activate(stereo));
+    HostFaults input;
+    input.rejected_input = 3;
+    static_cast<void>(unfiltered.observe(input));
+    const auto bare = host_report(unfiltered, choosing);
+    require(bare.status.status == HostStatus::fault && bare.action == "choose filter" &&
+                !contains(bare.explanation, "filter keeps playing") &&
+                contains(bare.plays, "No filter") && contains(bare.note, "Choose a .cfg"),
+            "fault with no filter: " + bare.explanation);
+    // A refused file's message names its full path, for the log; the window's
+    // problem names only the file.
+    const std::string path = "/Users/me/Filters/room.cfg";
+    HostFilter named(8);
+    named.reject(
+        HostFailureKind::filter_file,
+        detail::advice_text({path + ":2:1: the delay line has 3 values", "A cause.", "A fix.", {}}),
+        {HostFilterSource::file, path, 1});
+    const auto shown = host_report(named, choosing);
+    require(shown.problem == "room.cfg:2:1: the delay line has 3 values." &&
+                contains(rejected_line(named, true), path + ":2:1:"),
+            "refused file's name: " + shown.problem);
 }
 // The log's start line gives the same corrective action as the window.
 void log_agrees() {

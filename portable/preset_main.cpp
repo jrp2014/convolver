@@ -324,14 +324,28 @@ template <class Char> int run(int argc, Char** argv) {
                 std::cerr << "Invalid option or value: " << option << '\n' << text;
                 return 2;
             }
-            std::cerr << cli_error(
-                             "convolver-preset",
-                             advice_text({"invalid option or value: " + option + " " + value_text,
+            const bool numeric = option == "--sample-rate" || option == "--input-channels" ||
+                                 option == "--output-channels";
+            const auto limit = option == "--sample-rate"
+                                   ? static_cast<std::size_t>(convolver::max_sample_rate)
+                                   : convolver::max_channel_count;
+            std::cerr
+                << cli_error(
+                       "convolver-preset",
+                       numeric
+                           ? advice_text(
+                                 {option + " " + value_text + " is not a whole number from 1 to " +
+                                      std::to_string(limit),
+                                  {},
+                                  "Write a whole number in that range, such "
+                                  "as " +
+                                      option + (option == "--sample-rate" ? " 48000" : " 2") + ".",
+                                  {}})
+                           : advice_text({"invalid option: " + option,
                                           {},
-                                          "Use an option listed below, with a whole number "
-                                          "of at least 1 as its value.",
+                                          "Use one of the options listed below.",
                                           {}}))
-                      << text;
+                << text;
             return 2;
         }
         selected = true;

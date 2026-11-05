@@ -179,15 +179,23 @@ struct Instance {
         return totals.total();
     }
     // Why the newest request failed, or the saved failure it restored.
-    void log_rejection() {
-        if (filter.rejection())
-            log_error(rejected_line(filter));
+    void log_rejection() noexcept {
+        try {
+            if (filter.rejection())
+                log_error(rejected_line(filter, host != nullptr));
+        } catch (...) { // Out of memory for the line: the status port still shows it.
+        }
     }
-    void log_error(const std::string& message) {
+    // Never throws, so a line that cannot be built (out of memory) never
+    // interrupts the state change it explains; the line is then dropped.
+    void log_error(const std::string& message) noexcept {
         // Without the host's log feature this prints to stderr, which is
         // also where LV2 hosts send a plug-in's unlogged diagnostics. One
         // line per event (DIAG-2).
-        lv2_log_error(&logger, "Convolver: %s\n", detail::advice_line(message).c_str());
+        try {
+            lv2_log_error(&logger, "Convolver: %s\n", detail::advice_line(message).c_str());
+        } catch (...) {
+        }
     }
     // After a rejection: a failed first load plays silence rather than the
     // unfiltered input, without allocating, as memory may have run out

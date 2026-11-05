@@ -99,7 +99,7 @@ std::string Effect::error() {
 std::string Effect::rejection_line() noexcept {
     try {
         std::lock_guard lock(control_);
-        return rejected_line(filter_);
+        return rejected_line(filter_, host_ != nullptr);
     } catch (...) { // Out of memory for the line: it is dropped.
         return {};
     }
@@ -234,7 +234,7 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
             // Why this request failed, or what was loaded (with the saved
             // failure it restored); not an older failure found at initialization.
             if (!accepted) {
-                message = rejected_line(filter_);
+                message = rejected_line(filter_, host_ != nullptr);
             } else {
                 problem = filter_.failure().has_value() || !filter_.notice().empty();
                 message = loaded_line(filter_, host.has_value());

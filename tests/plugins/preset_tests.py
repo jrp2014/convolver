@@ -307,7 +307,11 @@ def message_tests(root):
         ),
         ((cfg, root / 'g.vstpreset', '--sample-rate'), ['--sample-rate needs a value']),
         ((cfg, root / 'g.vstpreset', '--bogus'), ['error: invalid option: --bogus']),
-        (('--bogus', 1, cfg, root / 'g.vstpreset'), ['error: invalid option or value: --bogus 1']),
+        (('--bogus', 1, cfg, root / 'g.vstpreset'), ['error: invalid option: --bogus']),
+        (
+            ('--sample-rate', 'fast', cfg, root / 'g.vstpreset'),
+            ['--sample-rate fast is not a whole number from 1 to 768000', 'such as --sample-rate 48000'],
+        ),
     )
     for args, texts in cases:
         message = run(*args, ok=False).stderr

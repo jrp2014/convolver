@@ -1422,17 +1422,21 @@ void status_lines() {
     require(loaded_line(g, false) == "Request 1: Loaded a filter for 44100 Hz, 2 in, 2 out; it is "
                                      "checked when the host starts the plug-in.",
             "unchecked load line");
-    require(rejected_line(g).empty(), "rejected line without a rejection");
+    require(rejected_line(g, true).empty(), "rejected line without a rejection");
     try {
         g.load(HostState{crossover}, stereo);
     } catch (const std::invalid_argument&) {
     }
-    require(rejected_line(g).rfind("Request 2: Not loaded; the previous filter keeps playing: the "
-                                   "filter has 2 inputs and 6 outputs, and the plug-in has 2 "
-                                   "inputs and 2 outputs. Cause: ",
-                                   0) == 0 &&
-                rejected_line(g).find('\n') == std::string::npos,
+    require(rejected_line(g, true).rfind("Request 2: Not loaded; the previous filter keeps "
+                                         "playing: the filter has 2 inputs and 6 outputs, and "
+                                         "the plug-in has 2 inputs and 2 outputs. Cause: ",
+                                         0) == 0 &&
+                rejected_line(g, true).find('\n') == std::string::npos,
             "rejected line");
+    // Before the host starts the plug-in, the kept filter does not play yet.
+    require(rejected_line(g, false).rfind("Request 2: Not loaded; the previous filter is kept: ",
+                                          0) == 0,
+            "rejected line before the host starts the plug-in");
     static_cast<void>(g.activate(stereo));
     require(contains(started_line(g, stereo, 64),
                      "Convolver plays silence. The saved filter is for 44100 Hz") &&

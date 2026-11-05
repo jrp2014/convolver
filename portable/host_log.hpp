@@ -55,8 +55,9 @@ void set_host_log_sdk(const char* description) noexcept;
 std::string loaded_line(const HostFilter&, bool host_known);
 // After a rejected load: what plays instead and HostFilter::rejection()'s
 // message, numbered as loaded_line() numbers accepted ones ("Request 3: ");
-// empty if there is none.
-std::string rejected_line(const HostFilter&);
+// empty if there is none. `started` says whether the host has started the
+// plug-in, so that a kept filter is said to play only once it can.
+std::string rejected_line(const HostFilter&, bool started);
 // DIAG-1: logged when the host's save call fails, which hosts may not report.
 inline constexpr const char* save_failure_message =
     "Saving failed: the plug-in's state could not be written for the host (out of memory, or "

@@ -93,13 +93,16 @@ Files retain the entire FIR/routing tail. Algorithmic latency is trimmed unless
     throw std::invalid_argument(
         convolver::detail::advice_text({std::move(problem), std::move(cause), std::move(fix), {}}));
 }
-std::size_t count(std::string_view s, std::string_view option) {
+// `option` names the value in the problem ("--block", "--raw-input's sample
+// rate"); `example` is the fix's example, by default `option` followed by 2.
+std::size_t count(std::string_view s, std::string_view option, std::string_view example = {}) {
     std::size_t n = 0;
     const auto [end, error] = std::from_chars(s.data(), s.data() + s.size(), n);
     if (error != std::errc{} || end != s.data() + s.size() || n == 0)
-        bad_option(std::string(option) + " " + std::string(s) +
-                       " is not a whole number of at least 1",
-                   {}, "Write a whole number, such as " + std::string(option) + " 2.");
+        bad_option(
+            std::string(option) + " " + std::string(s) + " is not a whole number of at least 1", {},
+            "Write a whole number, such as " +
+                (example.empty() ? std::string(option) + " 2" : std::string(example)) + ".");
     return n;
 }
 // A decimal number in the C locale, or nothing (std::stod's only message is
@@ -298,8 +301,10 @@ int run(int argc, char** argv) {
                 audio_options = true;
             } else if (option == "--raw-input") {
                 audio_options = true;
-                const auto rate = count(value(), "--raw-input (the sample rate)");
-                const auto channels = count(value(), "--raw-input (the channel count)");
+                const auto rate =
+                    count(value(), "--raw-input's sample rate", "--raw-input 48000 2");
+                const auto channels =
+                    count(value(), "--raw-input's channel count", "--raw-input 48000 2");
                 if (rate > static_cast<std::size_t>(convolver::max_sample_rate) ||
                     channels > convolver::max_channel_count)
                     bad_option("--raw-input " + std::to_string(rate) + " " +
