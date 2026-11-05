@@ -270,11 +270,14 @@ void ramps_follow_time() {
     }
 }
 
-// PLUG-18: bypass and mute end exactly at silence or the dry signal on a
-// ramp's last frame, at every rate and when a ramp is reversed midway. From
-// the external review of 0.8.13: at 176.4 kHz the summed float step left
-// about 2.4e-6 of unit input for one frame after the ramp's 235 frames.
-void exact_ramp_endpoints() {
+// PLUG-18, PLUG-19: bypass and mute end exactly at silence or the dry
+// signal, at every rate and when a ramp is reversed midway, and do not end
+// early. From the external review of 0.8.13: at 176.4 kHz a summed float step
+// left about 2.4e-6 of unit input (-112 dB) for one frame after the ramp's 235
+// frames. jrp (5 November 2026): that frame is inaudible, so the endpoint may
+// come one frame after the ramp's last; reported latency and channel
+// alignment have no such allowance.
+void ramp_endpoints() {
     for (const int hz : {8000, 44100, 48000, 96000, 176400, 192000, 352800, 768000}) {
         const auto at = " at " + std::to_string(hz) + " Hz";
         const std::size_t ramp = (static_cast<std::size_t>(hz) * 64 + 24000) / 48000;
@@ -293,52 +296,46 @@ void exact_ramp_endpoints() {
             }
             return out;
         };
-        const auto silent_from = [&](const std::vector<float>& out, std::size_t frame,
-                                     const std::string& what) {
-            require(out[frame - 1] != 0, what + " ended early" + at);
-            for (std::size_t t = frame; t < out.size(); ++t)
-                require(out[t] == 0, what + " not exactly silent at frame " + std::to_string(t) +
-                                         " of " + std::to_string(ramp) + at);
+        // A ramp of `frames` frames, starting at out[0]: still moving on
+        // its last frame but one, and exactly at `target` from one frame
+        // after its last.
+        const auto ends = [&](const std::vector<float>& out, std::size_t frames, float target,
+                              const std::string& what) {
+            require(out[frames - 2] != target, what + " ended early" + at);
+            for (std::size_t t = frames; t < out.size(); ++t)
+                require(out[t] == target, what + " not exactly at its end at frame " +
+                                              std::to_string(t) + " of " + std::to_string(frames) +
+                                              at);
         };
-        // Unequal counts: bypass is silence (no dry signal), reached exactly.
+        // Unequal counts: bypass is silence (no dry signal).
         const Configuration unequal{hz, 1, 2, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}, {1, 1}}}}};
         HostProcessor host(unequal, 1, HostSettings{0, 1, 64});
         split(host, 200);
         host.set_bypass(true);
-        silent_from(split(host, ramp + 10), ramp - 1, "unequal bypass");
+        ends(split(host, ramp + 10), ramp, 0, "unequal bypass");
         // Reversed after a third, then bypassed again: back to silence after
         // as many frames as it came out.
         const auto third = ramp / 3; // At least 3 (8 kHz: 11 frames).
         host.set_bypass(false);
         require(split(host, third).back() != 0, "bypass did not reverse" + at);
         host.set_bypass(true);
-        silent_from(split(host, third + 10), third - 1, "reversed bypass");
-        // Equal counts: bypass ends exactly at the dry input, also when reversed.
+        ends(split(host, third + 10), third, 0, "reversed bypass");
+        // Equal counts: bypass ends at the dry input, also when reversed.
         HostProcessor equal(tap_filter(.5f, hz), 1, HostSettings{0, 1, 64});
         per_sample(equal, 200);
         equal.set_bypass(true);
-        auto out = per_sample(equal, ramp + 10);
-        require(out[ramp - 2] != 1, "bypass ramp ended early" + at);
-        for (std::size_t t = ramp - 1; t < out.size(); ++t)
-            require(out[t] == 1,
-                    "bypass not exactly the dry input at frame " + std::to_string(t) + at);
+        ends(per_sample(equal, ramp + 10), ramp, 1, "bypass");
         equal.set_bypass(false);
         per_sample(equal, third);
         equal.set_bypass(true);
-        out = per_sample(equal, third + 10);
-        require(out[third - 2] != 1, "reversed bypass ended early" + at);
-        for (std::size_t t = third - 1; t < out.size(); ++t)
-            require(out[t] == 1, "reversed bypass not exactly the dry input" + at);
-        // Mute: the filter ramps to exact silence.
+        ends(per_sample(equal, third + 10), third, 1, "reversed bypass");
+        // Mute: the filter ramps to silence.
         equal.set_bypass(false);
         per_sample(equal, ramp + 10);
         audio_thread = true;
         equal.mute();
         audio_thread = false;
-        out = per_sample(equal, ramp + 10);
-        require(out[ramp - 2] != 0, "mute ramp ended early" + at);
-        for (std::size_t t = ramp - 1; t < out.size(); ++t)
-            require(out[t] == 0, "mute not exactly silent at frame " + std::to_string(t) + at);
+        ends(per_sample(equal, ramp + 10), ramp, 0, "mute");
     }
 }
 
@@ -618,7 +615,7 @@ int main() {
         gain_and_mix_against_oracle();
         ramps();
         ramps_follow_time();
-        exact_ramp_endpoints();
+        ramp_endpoints();
         unequal_mix();
         latency_choices();
         settings_text();

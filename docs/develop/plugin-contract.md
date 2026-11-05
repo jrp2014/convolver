@@ -421,9 +421,15 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   ramps linearly over 1.33 ms. The ramps (also bypass and mute) and the
   replacement crossfade last a fixed time at every sample rate (PLUG-17):
   64 and 256 frames at 48 kHz, to the nearest frame elsewhere, so 128 and
-  512 at 96 kHz and 59 and 235 at 44.1 kHz. Every ramp reaches its target
-  exactly on its last frame, also when it is reversed midway: bypass and
-  mute count whole frames rather than summing a float step (PLUG-18). The latency is fixed for a processor's life.
+  512 at 96 kHz and 59 and 235 at 44.1 kHz. A ramp must not click, must
+  finish promptly and must end exactly at its target (silence, the dry
+  signal, or the new gain or mix), also when it is reversed midway; the end
+  may come one frame after the ramp's last (PLUG-19, jrp, 5 November 2026:
+  one frame is about 5.7 µs at 176.4 kHz and inaudible), and
+  `native.host_settings` allows that. Bypass and mute count whole frames, so
+  today they end on the last frame itself (PLUG-18). The allowance is for
+  setting transitions only: the reported latency and the alignment between
+  channels are exact to the sample. The latency is fixed for a processor's life.
 - **Gain** applies to the filtered signal, after convolution and before the
   mix; the dry path stays the untouched input. Range −100 to +24 dB, linear
   in decibels (jrp). During a replacement both filters play at the same gain.

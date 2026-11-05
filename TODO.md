@@ -1240,6 +1240,14 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   96 kHz and above as at 48 kHz, which plays exactly as before;
   `native.host_settings` checks the lengths at 44.1, 48 and 96 kHz;
   [contract](docs/develop/plugin-contract.md#settings).
+- [x] **PLUG-19 — One frame's allowance at a ramp's end.** 5 November
+  2026, from jrp's simplification review: a setting transition must not
+  click, must finish promptly and must end exactly at its target, but may
+  end one frame after its last (inaudible: about 5.7 µs at 176.4 kHz).
+  `native.host_settings` tests that allowance; PLUG-18's frame counting is
+  kept because it is no larger than the float step it replaced. Reported
+  latency and channel alignment have no allowance;
+  [settings](docs/develop/plugin-contract.md#settings).
 - [x] **PLUG-18 — Exact bypass and mute ramp endpoints.** 5 November 2026,
   PR #111, from the external review of `91fcf1f` (0.8.13): PLUG-17's bypass
   and mute ramps summed a float step, so at 176.4 kHz they left about

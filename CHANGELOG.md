@@ -103,7 +103,13 @@ Until 1.0 the C++ API may change between minor versions.
   (jrp, 5 November 2026). CMake consumers request
   `find_package(Convolver 0.9)`. The LV2 plug-in reports minor version 9,
   which LV2 reads as a development version; LV2 is not in the first preview.
-
+- Plug-in contract (PLUG-19, from jrp's simplification review of 5 November
+  2026): a setting transition (bypass, mute, gain, mix) may end one frame
+  after its ramp's last frame, which is inaudible (about 5.7 µs at
+  176.4 kHz). It must still end exactly at its target and not click.
+  `native.host_settings` allows that frame, so a later shared ramp helper
+  need not reproduce PLUG-18's frame counting. Reported latency and channel
+  alignment stay exact to the sample. The sound is unchanged.
 - CLI (GAIN-2, from an external review of `91fcf1f`): `--gain-db no-clip`
   takes the largest possible peak directly instead of also filtering ten
   filter lengths of noise, so choosing it costs well under a millisecond
