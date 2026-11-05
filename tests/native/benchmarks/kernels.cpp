@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Time the actual production partition kernel, including history-ring traversal.
+// Time the partition kernels the engine selects (or the baseline set with
+// --baseline), including history-ring traversal.
 #include "kernels.hpp"
 #include <chrono>
 #include <cmath>
@@ -14,7 +15,8 @@ int main(int argc, char** argv) {
         if (argc == 5 && std::string(argv[4]) == "--baseline")
             convolver::detail::force_baseline_kernels(true);
         else if (argc != 4)
-            throw std::invalid_argument("usage: mac BINS PARTITIONS SECONDS [--baseline]");
+            throw std::invalid_argument(
+                "usage: convolver_kernel_benchmark BINS PARTITIONS SECONDS [--baseline]");
         const auto bins = std::stoul(argv[1]), parts = std::stoul(argv[2]);
         const double seconds = std::stod(argv[3]);
         if (!bins || bins > 65537 || !parts || parts > 4096 || !std::isfinite(seconds) ||

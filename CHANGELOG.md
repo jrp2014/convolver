@@ -204,7 +204,8 @@ Until 1.0 the C++ API may change between minor versions.
   after `project()`, so a developer's plug-in build targeted another macOS
   than the packages and the core it links.
 - Build (FFT-4): the Apple vDSP kernel experiment
-  (`CONVOLVER_EXPERIMENT_VDSP_MAC`, `portable/kernels_vdsp.cpp`) is removed.
+  (`CONVOLVER_EXPERIMENT_VDSP_MAC`, `portable/kernels_vdsp.cpp` and its two
+  scripts) is removed; its timing program is now `convolver_kernel_benchmark`.
   It was off by default and its 24 October results kept the existing
   kernels; no build that ships changes.
 - Plug-in contract (PLUG-16): a replacement filter plays for one Latency
