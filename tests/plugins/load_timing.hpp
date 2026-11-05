@@ -53,6 +53,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <functional>
+#include <iosfwd>
 #include <optional>
 #include <string>
 #include <vector>
@@ -247,6 +248,12 @@ int met_on(std::vector<Run>::const_iterator first, std::vector<Run>::const_itera
 // run that did not pass.
 Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
            const std::vector<Workload>& workloads, const Options&);
+
+// PERF-13: every run's records as JSON, with the build, the compiler, the FFT
+// backend and the machine they came from; run() writes them to
+// <work_directory>/<format>-load-timing.json.
+void write_records(std::ostream&, const std::string& format, const Result&,
+                   const std::vector<Workload>&, const Options&);
 
 // CTest's SKIP_RETURN_CODE for the timing tests: nothing failed, but not
 // every entry qualified, so the test is reported as skipped, not passed.

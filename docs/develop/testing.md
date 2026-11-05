@@ -633,6 +633,16 @@ version, which slept and spun, took 40 to 60. It also checks the input the
 audio thread plays: noise from -0.1 to 0.1 of both signs (PERF-11; the first
 version wrapped its negative half to about 1.8e15).
 
+Each test also writes every run's records as JSON (PERF-13), as
+`FORMAT-load-timing.json` in its work folder (`vst3-load-timing/` and the
+like in the build folder): the Convolver version and commit, the build, the
+compiler, the FFT backend, the operating system and processor count, the
+time, and for each run its workload, limits, verdict and reasons, and for
+each phase its hold, a summary and every callback (due, wake, entry, return,
+CPU time and success, in seconds). The Release jobs of the VST3 and Audio
+Unit workflows keep these files as a `load-timing-*` artifact, and a failed
+job keeps them with its test evidence.
+
 CTest runs the three alone (`RUN_SERIAL`); the first line says which build
 ran, and the last gives the overall result. The plug-in candidates leave
 them out (`-LE timing` in `candidate.py`), because they run the other tests

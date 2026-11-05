@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <iostream>
 #include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -356,6 +357,55 @@ void records() {
     }
 }
 
+// PERF-13: the records as JSON: brackets balance outside strings, no comma
+// before a closing bracket, text escaped, and every callback kept.
+void records_json() {
+    timing::Result result;
+    Spec s;
+    s.held = 0.4;
+    auto rec = record(s);
+    rec.phases[1].error = "a \"quoted\" error\n";
+    result.runs.push_back(timing::judge(rec, {period, hold_limit, true, true}).run);
+    result.records.push_back(rec);
+    result.failed = 1;
+    timing::Workload w{"10 s", {48000, 2, 2}, 10, 480, std::chrono::milliseconds(100)};
+    timing::Options o;
+    std::ostringstream out;
+    timing::write_records(out, "mock", result, {w}, o);
+    const auto json = out.str();
+    int depth = 0;
+    bool in_string = false, escaped = false, balanced = true, trailing = false;
+    char last = 0;
+    for (const char c : json) {
+        if (in_string) {
+            in_string = escaped || c != '"';
+            escaped = !escaped && c == '\\';
+            continue;
+        }
+        if (c == '"')
+            in_string = true;
+        else if (c == '{' || c == '[')
+            ++depth;
+        else if (c == '}' || c == ']') {
+            trailing = trailing || last == ',';
+            balanced = balanced && --depth >= 0;
+        }
+        if (c != ' ' && c != '\n')
+            last = c;
+    }
+    std::size_t rows = 0;
+    for (auto at = json.find("], ["); at != std::string::npos; at = json.find("], [", at + 1))
+        ++rows;
+    check(balanced && depth == 0 && !in_string && !trailing, "records: well-formed JSON");
+    check(json.find("\"format\": \"mock\"") != std::string::npos &&
+              json.find("\"result\": \"FAILED\"") != std::string::npos &&
+              json.find("\"held\": 0.400000") != std::string::npos &&
+              json.find("a \\\"quoted\\\" error\\u000a") != std::string::npos,
+          "records: fields and escapes");
+    // Each phase's callbacks less one separator each: 50 + 30 + 30 + 30 + 50.
+    check(rows == 190 - 5, "records: every callback, " + std::to_string(rows) + " separators");
+}
+
 // An adapter that keeps the state it is given, taking `load` to accept it.
 class Mock final : public lc::Driver {
   public:
@@ -475,6 +525,7 @@ int main() {
         verdict_table();
         summaries();
         records();
+        records_json();
         integration();
     } catch (const std::exception& e) {
         std::cout << "FAILED: " << e.what() << '\n';

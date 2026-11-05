@@ -1313,6 +1313,15 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   mixed results across runs) and keeps only a few short real-thread runs:
   about 9 s instead of 40 to 60;
   [load timing](docs/develop/testing.md#load-timing-perf-9).
+- [x] **PERF-13 — Load-timing records as JSON.** 5 November 2026, from
+  jrp's review of `db54160`: each timing test writes every run's records
+  (each callback's due, wake, entry, return, CPU time and success; each
+  phase's hold and summary; verdicts and reasons) with the Convolver
+  version, build, compiler, FFT backend, operating system and processor
+  count, to `FORMAT-load-timing.json` in its work folder. The VST3 and Audio
+  Unit Release jobs keep them as an artifact, and a failed job keeps them
+  with its test evidence. Timing the loading stages inside the plug-in
+  remains open; [load timing](docs/develop/testing.md#load-timing-perf-9).
 - [x] **GAIN-2 — No noise simulation for `--gain-db no-clip`.** 5 November
   2026, PR #111, from the external review of `91fcf1f` (0.8.13): no-clip
   ran the whole noise estimate to use only the bound it also returns. It

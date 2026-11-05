@@ -219,6 +219,15 @@ jobs:
         run: >-
           sed -n '/load timing (/,/load timing: /p'
           build-vst3/Testing/Temporary/LastTest.log || true
+      # PERF-13: every callback's record, with the build and machine.
+      - name: Keep the load-timing records
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: load-timing-${{ github.job }}-${{ strategy.job-index }}-attempt-${{ github.run_attempt }}
+          path: build-vst3/*-load-timing/*-load-timing.json
+          retention-days: 14
+          if-no-files-found: ignore
       # The newest pluginval beta or release candidate, when one is newer than
       # the release above: what it reports is a warning in the summary, not a
       # failure, since a pre-release only signposts what is coming. The one

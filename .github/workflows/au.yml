@@ -129,6 +129,15 @@ jobs:
         run: >-
           sed -n '/load timing (/,/load timing: /p'
           build-au/Testing/Temporary/LastTest.log || true
+      # PERF-13: every callback's record, with the build and machine.
+      - name: Keep the load-timing records
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: load-timing-${{ github.job }}-${{ strategy.job-index }}-attempt-${{ github.run_attempt }}
+          path: build-au/*-load-timing/*-load-timing.json
+          retention-days: 14
+          if-no-files-found: ignore
       - name: Install for this user
         run: |
           components="$HOME/Library/Audio/Plug-Ins/Components"

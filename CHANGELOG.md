@@ -131,6 +131,12 @@ Until 1.0 the C++ API may change between minor versions.
   failed. `native.load_timing_harness` tests the verdicts on made-up records
   instead of sleeping, in about 9 seconds rather than 40 to 60. Tests only:
   no change to the plug-ins or the sound.
+- Tests (PERF-13, from jrp's review of `db54160`): each load-timing test
+  writes every callback's record, each phase's summary and each run's
+  verdict, with the Convolver version, build, compiler, FFT backend and
+  machine, to `FORMAT-load-timing.json` in its work folder; the VST3 and
+  Audio Unit Release jobs keep them as an artifact. Tests only: no change to
+  the plug-ins or the sound.
 
 - The version is now 0.10.0 (jrp, 5 November 2026), the minor step for the
   library changes in DIAG-3 and DIAG-4 below, after 0.9.0. CMake consumers

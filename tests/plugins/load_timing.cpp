@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // The loading-responsiveness timings; see load_timing.hpp.
 #include "load_timing.hpp"
+#include "convolver/engine.hpp"
 #include "convolver/host.hpp"
 #include <algorithm>
 #include <atomic>
@@ -16,7 +17,11 @@
 #include <thread>
 #include <utility>
 #if !defined(_WIN32)
-#include <time.h> // clock_gettime
+#include <sys/utsname.h>
+#include <time.h> // clock_gettime, gmtime_r
+#endif
+#if __has_include("convolver_version.hpp")
+#include "convolver_version.hpp"
 #endif
 
 namespace convolver::plugin_test::load_timing {
@@ -496,6 +501,147 @@ Judged judge(const RunRecord& rec, const Limits& l) {
     return j;
 }
 
+namespace {
+// A JSON string: quotes, backslashes and control characters escaped.
+std::string quoted(const std::string& s) {
+    std::string out = "\"";
+    for (const unsigned char c : s) {
+        if (c == '"' || c == '\\') {
+            out += '\\';
+            out += static_cast<char>(c);
+        } else if (c < 0x20) {
+            char escaped[8];
+            std::snprintf(escaped, sizeof escaped, "\\u%04x", c);
+            out += escaped;
+        } else
+            out += static_cast<char>(c);
+    }
+    return out + "\"";
+}
+
+// Seconds to the microsecond, enough for callbacks of a few milliseconds.
+std::string number(double seconds) {
+    char text[32];
+    std::snprintf(text, sizeof text, "%.6f", seconds);
+    return text;
+}
+
+std::string compiler() {
+#if defined(__clang__)
+    return std::string("clang ") + __clang_version__;
+#elif defined(__GNUC__)
+    return std::string("gcc ") + __VERSION__;
+#elif defined(_MSC_VER)
+    return "MSVC " + std::to_string(_MSC_FULL_VER);
+#else
+    return "unknown";
+#endif
+}
+
+std::string operating_system() {
+#if defined(_WIN32)
+    return "Windows";
+#else
+    utsname u{};
+    if (uname(&u) != 0)
+        return "unknown";
+    return std::string(u.sysname) + " " + u.release + " " + u.machine;
+#endif
+}
+
+std::string now_utc() {
+    const auto t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::tm utc{};
+#if defined(_WIN32)
+    gmtime_s(&utc, &t);
+#else
+    gmtime_r(&t, &utc);
+#endif
+    char text[32];
+    std::strftime(text, sizeof text, "%Y-%m-%dT%H:%M:%SZ", &utc);
+    return text;
+}
+
+const char* overall(const Result& r) {
+    return r.errors || r.failed ? "FAILED"
+           : r.not_qualified    ? "NOT QUALIFIED"
+           : r.passed == 0      ? "REPORTED ONLY"
+                                : "PASSED";
+}
+} // namespace
+
+void write_records(std::ostream& out, const std::string& format, const Result& result,
+                   const std::vector<Workload>& list, const Options& o) {
+    out << "{\n  \"format\": " << quoted(format) << ",\n  \"convolver\": "
+        << quoted(
+#if defined(CONVOLVER_VERSION_STRING)
+               CONVOLVER_VERSION_STRING
+#else
+               "unknown"
+#endif
+               )
+        << ",\n  \"build\": " << quoted(build ? build : "optimised")
+        << ",\n  \"limits_enforced\": " << (o.enforce ? "true" : "false")
+        << ",\n  \"compiler\": " << quoted(compiler())
+        << ",\n  \"fft\": " << quoted(std::string(fft_backend_name()) + " " + fft_backend_version())
+        << ",\n  \"system\": " << quoted(operating_system())
+        << ",\n  \"processors\": " << std::thread::hardware_concurrency()
+        << ",\n  \"written\": " << quoted(now_utc())
+        << ",\n  \"result\": " << quoted(overall(result)) << ",\n  \"runs\": [";
+    for (std::size_t i = 0; i < result.runs.size(); ++i) {
+        const auto& r = result.runs[i];
+        const auto& rec = result.records.at(i);
+        const auto w = std::find_if(list.begin(), list.end(), [&](const Workload& candidate) {
+            return candidate.name == r.workload;
+        });
+        const double period =
+            w == list.end() ? 0 : static_cast<double>(w->block) / w->host.sample_rate;
+        out << (i ? "," : "") << "\n    {\"workload\": " << quoted(r.workload)
+            << ", \"entry\": " << quoted(r.entry) << ", \"attempt\": " << r.attempt;
+        if (w != list.end()) {
+            out << ", \"filter_seconds\": " << w->seconds
+                << ", \"sample_rate\": " << w->host.sample_rate << ", \"channels\": ["
+                << w->host.inputs << ", " << w->host.outputs << "], \"block\": " << w->block
+                << ", \"period\": " << number(period) << ", \"held_limit\": "
+                << (w->held_limit ? number(w->held_limit->count()) : std::string("null"));
+        }
+        out << ", \"verdict\": " << quoted(describe(r.verdict))
+            << ", \"hold\": " << quoted(describe(r.hold))
+            << ", \"callbacks\": " << quoted(describe(r.callbacks)) << ", \"errors\": " << r.errors
+            << ", \"why\": " << quoted(r.why) << ", \"saved\": " << (rec.saved ? "true" : "false")
+            << ",\n     \"phases\": [";
+        for (std::size_t k = 0; k < rec.phases.size(); ++k) {
+            const auto& p = rec.phases[k];
+            const auto c = summarise(p.callbacks, period);
+            out << (k ? "," : "") << "\n      {\"name\": " << quoted(p.name)
+                << ", \"baseline\": " << (p.baseline ? "true" : "false")
+                << ", \"held\": " << (p.held ? number(*p.held) : std::string("null"))
+                << ", \"accepted\": " << (p.accepted ? "true" : "false")
+                << ", \"audio_held\": " << (p.audio_held ? "true" : "false")
+                << ", \"dropped\": " << p.dropped << ", \"error\": " << quoted(p.error)
+                << ",\n       \"summary\": {\"count\": " << c.count << ", \"failed\": " << c.failed
+                << ", \"late\": " << c.late << ", \"late_scheduling\": " << c.late_scheduling
+                << ", \"slow\": " << c.slow << ", \"slow_scheduling\": " << c.slow_scheduling
+                << ", \"missed\": " << c.missed << ", \"worst_late\": " << number(c.worst_late)
+                << ", \"worst_wake\": " << number(c.worst_wake)
+                << ", \"longest\": " << number(c.longest)
+                << ", \"longest_call\": " << number(c.longest_call) << "},"
+                << "\n       \"callback_fields\": [\"due\", \"woke\", \"entered\", \"returned\", "
+                   "\"cpu\", \"ok\"],\n       \"callbacks\": [";
+            for (std::size_t n = 0; n < p.callbacks.size(); ++n) {
+                const auto& cb = p.callbacks[n];
+                out << (n ? ", " : "") << '[' << number(cb.due) << ", " << number(cb.woke) << ", "
+                    << number(cb.entered) << ", " << number(cb.returned) << ", "
+                    << (cb.cpu >= 0 ? number(cb.cpu) : std::string("null")) << ", "
+                    << (cb.ok ? "true" : "false") << ']';
+            }
+            out << "]}";
+        }
+        out << "]}";
+    }
+    out << "\n  ]\n}\n";
+}
+
 Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
            const std::vector<Workload>& list, const Options& o) {
     const auto format = driver.format().name;
@@ -669,11 +815,18 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
         }
         i = j;
     }
-    const char* overall = result.errors || result.failed ? "FAILED"
-                          : result.not_qualified         ? "NOT QUALIFIED"
-                          : result.passed == 0           ? "REPORTED ONLY"
-                                                         : "PASSED";
-    std::cout << format << " load timing: " << overall << " (" << result.passed << " passed";
+    // PERF-13: every record, with the build and machine it came from.
+    const auto records = o.work_directory / (format + "-load-timing.json");
+    {
+        std::ofstream file(records);
+        write_records(file, format, result, list, o);
+        if (file)
+            std::cout << "records: " << records.string() << '\n';
+        else
+            std::cout << "could not write the records to " << records.string() << '\n';
+    }
+    std::cout << format << " load timing: " << overall(result) << " (" << result.passed
+              << " passed";
     if (result.passed_after_failure)
         std::cout << ", " << result.passed_after_failure << " of them after a run that did not";
     std::cout << "; " << result.failed << " failed, " << result.not_qualified << " not qualified, "
