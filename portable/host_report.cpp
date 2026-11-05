@@ -229,8 +229,7 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
     constexpr const char* not_started = "not known until the host starts the plug-in";
 
     HostFact sample_rate{"Sample rate",
-                         host ? std::to_string(host->sample_rate) + " Hz"
-                              : std::string(not_started),
+                         host ? host_rate_text(*host) : std::string(not_started),
                          {},
                          false,
                          "The rate the host runs the plug-in at. A filter must be made for the "

@@ -17,8 +17,13 @@ failed, also go to the job's summary with the run attempt, so they stay
 listed when a re-run passes (CI-22): a pass on re-run does not explain a
 failure.
 
-Usage: ci_evidence.py OUTPUT BUILD [BUILD ...]. Missing folders and files are
-skipped, so the step can run whichever stage failed.
+Usage: ci_evidence.py [--advisory] OUTPUT BUILD [BUILD ...]. Missing folders
+and files are skipped, so the step can run whichever stage failed.
+
+--advisory is for a check that warns rather than fails, such as the newest
+pluginval pre-release (CI-8): the evidence is collected the same way (with
+the advisory run's advisory-junit.xml in place of junit.xml), but the summary
+calls it an advisory problem, since the check only warns.
 """
 
 import os
@@ -44,11 +49,12 @@ def cache_value(cache, name):
     return ''
 
 
-def collect(build, out):
+def collect(build, out, *, advisory=False):
     copied = []
     patterns = [
         'Testing/Temporary/LastTest*.log',
-        'junit.xml',
+        # An advisory run's own JUnit report; the formal run's passed.
+        'advisory-junit.xml' if advisory else 'junit.xml',
         'CMakeCache.txt',
         '**/convolver-*tests.log',
         '**/convolver-*tests.log.old',
@@ -72,31 +78,43 @@ def failed_tests(build):
     return [line.split(':', 1)[-1].strip() for line in log.read_text(errors='replace').splitlines() if line.strip()]
 
 
-def summarize(failures):
-    """Appends this attempt's failure to the GitHub job summary, if there is one."""
+def summarize(failures, *, advisory=False):
+    """Appends this attempt's failure (or advisory problem) to the GitHub job
+    summary, if there is one."""
     summary = os.environ.get('GITHUB_STEP_SUMMARY')
     if not summary:
         return
     attempt = os.environ.get('GITHUB_RUN_ATTEMPT', '?')
-    lines = [f'### Failed on attempt {attempt}', '']
+    heading = f'Advisory problem on attempt {attempt}' if advisory else f'Failed on attempt {attempt}'
+    lines = [f'### {heading}', '']
     lines += [f'- `{name}` in `{build}`' for build, names in failures for name in names]
     if not failures:
-        lines.append('No CTest failures recorded: another step failed (see the job log).')
-    lines += [
-        '',
-        (
-            'A later attempt that passes does not explain this failure: see [intermittent failures]'
-            '(https://github.com/jrp2014/convolver/blob/main/docs/develop/testing.md#intermittent-failures).'
-        ),
-        '',
-    ]
+        lines.append(
+            'No CTest failures recorded: see the log of the advisory step.'
+            if advisory
+            else 'No CTest failures recorded: another step failed (see the job log).'
+        )
+    if advisory:
+        lines += ['', 'This check only warns; its evidence is kept.', '']
+    else:
+        lines += [
+            '',
+            (
+                'A later attempt that passes does not explain this failure: see [intermittent failures]'
+                '(https://github.com/jrp2014/convolver/blob/main/docs/develop/testing.md#intermittent-failures).'
+            ),
+            '',
+        ]
     with Path(summary).open('a', encoding='utf-8') as out:
         out.write('\n'.join(lines))
 
 
 def main(argv):
+    advisory = len(argv) > 1 and argv[1] == '--advisory'
+    if advisory:
+        argv = argv[:1] + argv[2:]
     if len(argv) < 3:
-        print('usage: ci_evidence.py OUTPUT BUILD [BUILD ...]', file=sys.stderr)
+        print('usage: ci_evidence.py [--advisory] OUTPUT BUILD [BUILD ...]', file=sys.stderr)
         return 2
     output = Path(argv[1])
     output.mkdir(parents=True, exist_ok=True)
@@ -122,7 +140,7 @@ def main(argv):
         if not build.is_dir():
             identity.append(f'{name}: not built')
             continue
-        copied = collect(build, output / build.name)
+        copied = collect(build, output / build.name, advisory=advisory)
         cache = build / 'CMakeCache.txt'
         if cache.is_file():
             compiler = cache_value(cache, 'CMAKE_CXX_COMPILER')
@@ -133,7 +151,7 @@ def main(argv):
         identity.append(f'  kept: {", ".join(copied) if copied else "nothing"}')
     (output / 'identity.txt').write_text('\n'.join(identity) + '\n')
     print('\n'.join(identity))
-    summarize(failures)
+    summarize(failures, advisory=advisory)
     return 0
 
 

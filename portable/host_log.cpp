@@ -256,9 +256,8 @@ std::string playing_words(const HostFilter& filter, const HostLayout& host,
 
 std::string started_line(const HostFilter& filter, const HostLayout& host, std::size_t max_frames,
                          const HostSettings* settings) {
-    auto line = "Started at " + std::to_string(host.sample_rate) + " Hz, " +
-                ports(host.inputs, host.outputs) + ", blocks of up to " +
-                std::to_string(max_frames) + " frames. " +
+    auto line = "Started at " + host_rate_text(host) + ", " + ports(host.inputs, host.outputs) +
+                ", blocks of up to " + std::to_string(max_frames) + " frames. " +
                 playing_words(filter, host, settings ? *settings : HostSettings{});
     if (settings)
         line += " Settings: " + settings_words(*settings, host.inputs == host.outputs) + ".";

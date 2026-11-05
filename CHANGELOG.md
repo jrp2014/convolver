@@ -12,6 +12,27 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- VST3 (VST3-9): host rates that are not a whole number of hertz, such as a
+  pull-down 48000 ÷ 1.001 ≈ 47952.04795 Hz, are accepted rather than refused
+  by `setupProcessing` (which made hosts report the plug-in unusable). They
+  are matched strictly, as jrp decided: no filter suits such a rate, so the
+  plug-in plays silence (bypass still plays the input), keeps its filter,
+  and Status and the log give both rates; it plays the filter again when the
+  host returns to its rate. Only floating-point rounding of a whole rate
+  (within 1e-12 of it) counts as that rate. Nothing is resampled.
+- C++ API (VST3-9): `HostLayout::fractional_rate` (the host's exact rate
+  when it is not whole hertz, else 0), `set_host_rate()`, `host_rate_text()`
+  and `same_rate()` in `convolver/host.hpp`. Added, so existing code
+  compiles unchanged.
+
+- Tests (FFMPEG-1): `native.ffmpeg_pipe` runs the
+  [FFmpeg pipe](docs/use/command-line.md#with-ffmpeg) as the guide writes
+  it, on a short film with two audio tracks: the second track is chosen,
+  the 2-in/6-out crossover's six channels keep every frame and the filter's
+  tail and match the expected output after FLAC, the video is copied, and
+  audio that started late starts at time zero, as the guide warns. It runs
+  where CMake finds `ffmpeg` and `ffprobe`; the Linux g++ Release CI job
+  installs them.
 - macOS preview packages (AU-5, PLUG-5) hold the Audio Unit,
   `Components/Convolver.component`, beside the VST3 plug-in, with its
   licence notices in `licenses/` (`Convolver-AU.txt`, `GPL-3.0.txt`,
@@ -295,6 +316,17 @@ Until 1.0 the C++ API may change between minor versions.
   since the Latency setting arrived; the page now says so. In
   `HostProcessor` the 64-frame ramps and the crossfade are named constants;
   the sound is unchanged.
+- Continuous integration (CI-7): the VST3 and Audio Unit workflows resolve
+  the newest SDK release once per run, in a first `sdk` job that uploads a
+  lock file, and every build job of the run builds exactly that release
+  (`sources.py --lock`), so one run can no longer mix two releases. Each
+  job's summary still lists what it built with.
+- Continuous integration (CI-8): the advisory checks (the newest pluginval
+  pre-release in the VST3 jobs, the newest upstream lilv in the LV2
+  workflow) keep CTest's output as an `advisory-evidence-…` artifact when
+  they report a problem, as failed jobs keep theirs; the job still passes.
+  `scripts/ci_evidence.py --advisory` collects it and lists the tests in the
+  job summary as an advisory problem.
 - Continuous integration (CI-29): static analysis runs LLVM's
   `run-clang-tidy.py`, installed with clang-tidy, in place of
   `scripts/clang_tidy.py` (removed with its tests and pre-commit hook). The

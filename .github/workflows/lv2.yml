@@ -347,3 +347,15 @@ jobs:
           message="$message Advisory: the formal LV2 tests use Ubuntu's packages."
           echo "::warning title=Newest upstream lilv::$message"
           echo "**Warning:** $message" >> "$GITHUB_STEP_SUMMARY"
+      # CI-8: the job stays green, so keep what failing tests left behind.
+      - name: Collect advisory evidence
+        if: always() && steps.tests.outcome == 'failure'
+        run: python scripts/ci_evidence.py --advisory advisory-evidence build-upstream
+      - name: Keep advisory evidence
+        if: always() && steps.tests.outcome == 'failure'
+        uses: actions/upload-artifact@v7
+        with:
+          name: advisory-evidence-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: advisory-evidence
+          retention-days: 14
+          if-no-files-found: ignore

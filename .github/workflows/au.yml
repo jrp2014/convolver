@@ -42,9 +42,33 @@ jobs:
       - id: scope
         run: python3 scripts/ci_scope.py --workflow au --github-output "$GITHUB_OUTPUT"
 
-  au:
+  # CI-7: the newest SDK release is resolved once per run, here, and every
+  # job below builds exactly that release from this lock file, so the jobs
+  # of one run cannot build against different releases.
+  sdk:
     needs: scope
     if: needs.scope.outputs.build == 'true'
+    name: Newest AudioUnitSDK
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Resolve and record it
+        run: |
+          mkdir -p "$RUNNER_TEMP/lock"
+          python3 scripts/release/resolve.py dependencies --cache "$RUNNER_TEMP/downloads" \
+            --lock "$RUNNER_TEMP/lock/audiounitsdk-lock.json" audiounitsdk
+      - uses: actions/upload-artifact@v7
+        with:
+          name: audiounitsdk-lock
+          path: ${{ runner.temp }}/lock/audiounitsdk-lock.json
+          if-no-files-found: error
+      - name: Explain a failure that may come from a new upstream release
+        if: failure()
+        run: python3 scripts/release/resolve.py explain-failure --suspect audiounitsdk
+  au:
+    # Skipped with the sdk job when the scope job finds nothing to build.
+    needs: sdk
     # A fixed image label. GitHub still updates its Xcode and macOS point
     # releases, so the versions are logged for each run.
     runs-on: macos-15
@@ -59,9 +83,14 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
+      - uses: actions/download-artifact@v8
+        with:
+          name: audiounitsdk-lock
+          path: ${{ runner.temp }}/lock
+      # Resolved once by the sdk job (CI-7).
       - name: Newest AudioUnitSDK
         run: >-
-          python scripts/release/sources.py --latest --fetch
+          python scripts/release/sources.py --lock "$RUNNER_TEMP/lock/audiounitsdk-lock.json" --fetch
           --cache "$RUNNER_TEMP/downloads" --destination "$RUNNER_TEMP/sources" audiounitsdk
       - name: Tools and libraries
         run: |
@@ -143,8 +172,8 @@ jobs:
   # files and FFTW for the FFT, so they keep working; the Release job above
   # builds the defaults (AudioToolbox and Accelerate) that packages use.
   au-sanitizers:
-    needs: scope
-    if: needs.scope.outputs.build == 'true'
+    # Skipped with the sdk job when the scope job finds nothing to build.
+    needs: sdk
     runs-on: macos-15
     timeout-minutes: 30
     env:
@@ -157,9 +186,14 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
+      - uses: actions/download-artifact@v8
+        with:
+          name: audiounitsdk-lock
+          path: ${{ runner.temp }}/lock
+      # Resolved once by the sdk job (CI-7).
       - name: Newest AudioUnitSDK
         run: >-
-          python scripts/release/sources.py --latest --fetch
+          python scripts/release/sources.py --lock "$RUNNER_TEMP/lock/audiounitsdk-lock.json" --fetch
           --cache "$RUNNER_TEMP/downloads" --destination "$RUNNER_TEMP/sources" audiounitsdk
       - name: Tools and libraries
         run: brew install libsndfile fftw

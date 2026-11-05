@@ -496,6 +496,14 @@ packages. An artifact manifest lists only the dependencies its build used,
 while the corresponding source bundle carries every dependency's archive (about
 0.4 MB more for lv2 and AudioUnitSDK), so one bundle serves every format.
 
+In CI each SDK is resolved once per workflow run (CI-7, from jrp's review of
+0.5.2): the VST3 and Audio Unit workflows' first `sdk` job writes a lock file
+with `resolve.py dependencies` and uploads it, and every build job of that
+run fetches exactly those releases with `sources.py --lock`, listing them in
+its own summary as before. The candidate workflow does the same through its
+`sources` job's corresponding source. Tools with one download per operating
+system (pluginval, lv2lint) are still resolved by each job that runs them.
+
 The VST3, LV2, Audio Unit and candidate workflows also run every Monday, so a
 new upstream release is built and tested within a week even when nothing in
 Convolver changes. GitHub Actions versions are updated by Dependabot instead.
@@ -527,6 +535,10 @@ exception below).
   pre-release when it is newer than the newest release) with the newest lv2
   headers, runs the same LV2 tests against them and reports any failure,
   including a failed download or build, as a warning.
+
+When an advisory run's tests report a problem, the job keeps their evidence,
+as a failed job does, in an artifact named `advisory-evidence-…` (CI-8;
+[evidence from CI runs](testing.md#evidence-from-failed-ci-runs)).
 
 ### When a new release breaks the build
 

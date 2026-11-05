@@ -62,7 +62,7 @@ boundary and C++20 in the core.
 | 5. The milestone | A candidate from a 0.10.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
 | 6. Later previews | **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need; the loading-responsiveness gate uses its workloads. |
-| Supporting, cheap | **VST3-9**, **FFMPEG-1**, **PERF-1**, **HOST-4** | VST3-9 affects only hosts running at a pull-down rate such as 47952 Hz, which the journeys do not use. It does not block the first preview; it moves up if a tester meets it. HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
+| Supporting, cheap | **PERF-1**, **HOST-4** | HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. |
 | Optional editor work | **PLUG-11** (FFT planning in FFTW-built plug-ins), **LV2-6** (an LV2 window, only if Linux users ask) | Not needed for any preview. |
 | On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **PERF-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
@@ -550,7 +550,7 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 ## FFmpeg integration
 
 Parked: maintaining a patched FFmpeg source tree adds
-uncomfortable coupling. FFMPEG-1 is still worth doing. If this is revisited,
+uncomfortable coupling. The pipe is tested (FFMPEG-1, done). If this is revisited,
 prefer the pipe, a filter accepted upstream, or upstream state support in
 FFmpeg's generic `lv2` filter (it cannot pass a file path today), which would let
 the LV2 plug-in serve FFmpeg.
@@ -559,12 +559,6 @@ Design and evidence: [FFmpeg filter plan](docs/project/plans/2026-10-21-ffmpeg-f
 (21 October 2026). FFmpeg cannot load filters at run time, so a built-in filter
 means a patched FFmpeg build with `--enable-gpl`.
 
-- [ ] **FFMPEG-1 — Test the pipe workflow.** The
-  [FFmpeg pipe example](docs/use/command-line.md#with-ffmpeg) is documented and was
-  originally run by hand for one stereo audio/video pair. Add a CI test when
-  `ffmpeg` is installed, covering explicit track selection, 2-in/6-out routing,
-  frame counts/tails and timestamp offsets. The revised commands are not new
-  end-to-end validation evidence.
 - [ ] **FFMPEG-2 — C API.** A C99 header over `HostProcessor` and the
   configuration loader, a `Convolver::c` target and `convolver.pc`, with C-only
   tests and the same output as `Engine`. First add tested host FFT-option
@@ -666,11 +660,6 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   defined (see limitations), declare the VST2 ID `'Conv'` in `moduleinfo.json`'s
   `Compatibility` section or `IPluginCompatibility`, and map old parameters with
   `IRemapParamID`. Old VST2 chunk state would still need a converter.
-- [ ] **VST3-9 — Non-integer host rates.** `setupProcessing` refuses a rate that
-  is not a whole number (for example a 0.1% pull-down rate), so the host reports
-  a failed plug-in. Accept any finite rate in range and play silence with the
-  reason (DIAG-1's status), as for any rate mismatch. jrp to decide whether a
-  small tolerance counts as a match.
 - [ ] **VST3-11 — Editor window on macOS.** An AppKit view behind `IPlugView`
   (`kPlatformTypeNSView`), shared with AU-6: status and full messages,
   active configuration, choose and reload a filter (with drag and drop,
@@ -901,21 +890,6 @@ request with a DSP change.
 
 ## Developer tooling
 
-- [ ] **CI-7 — Resolve shared SDKs once per workflow.** Each matrix job of the
-  VST3, LV2, Audio Unit and candidate workflows resolves the newest releases
-  itself (CI-6), so jobs of one run can in principle build against different
-  releases, and every job repeats the lookups and downloads. Resolve once in a
-  first job, pass its lock file to the matrix jobs (`sources.py --lock`), and
-  keep the per-job summaries. Suggested in jrp's review of 0.5.2; no coverage
-  may be lost. See
-  [supporting libraries](docs/develop/build.md#supporting-libraries).
-- [ ] **CI-8 — Keep evidence from advisory failures.** Test jobs keep their
-  evidence (JUnit results, logs) only when a job fails, but advisory checks
-  (the pluginval pre-release, the newest upstream lilv) report problems as
-  warnings and leave the job green, so their evidence is not kept. Upload it
-  when an advisory step reports a problem as well. Suggested in jrp's review
-  of 0.5.2. See
-  [pre-releases and newer upstream versions](docs/develop/build.md#pre-releases-and-newer-upstream-versions).
 - [ ] **CI-32 — Run the most extreme numerical cases less often, once they
   cost.** From jrp's simplification review of 5 November 2026: keep
   representative oracle and allocation checks as everyday gates, and run
@@ -942,6 +916,7 @@ with compatibility tests; linked IDs point to open work above.
 | --- | --- | --- |
 | Plug-in settings (gain, mix, latency) in VST3 and the Audio Unit, not yet LV2; a preset from `convolver-preset` carries the filter only, and a state moved between formats keeps the filter, not the settings | The same project can play at another gain, mix or latency in another format; LV2-7 adds the settings to LV2. | [Settings](docs/use/plugins.md#settings) |
 | Changing the Audio Unit's Latency during playback leaves a gap (the new latency plus the filter's own delay) and cuts a sounding tail | The new processor starts with no history; a crossfade would need both sizes running at once. Not automatable for this reason (PLUG-10). | [Latency and tail](docs/use/plugins.md#latency-and-tail) |
+| A host rate that is not a whole number of hertz (such as 48000 ÷ 1.001) plays silence in VST3 and is refused by the Audio Unit and LV2 | No filter is made for such a rate and nothing is resampled (VST3-9, decided by jrp). The Audio Unit and LV2 could accept it the same way when a host needs it. | [When a filter does not fit](docs/use/plugins.md#when-a-filter-does-not-fit) |
 | No IR resampling or automatic channel adaptation for direct sound-file filters | Rate/count mismatches fail; use an explicit configuration. IO-2 covers resampling. | [Configuration](docs/use/configuration.md) |
 | One VST3 input bus and one output bus, each 1–8 channels; a window on macOS only | Presets and generic host controls elsewhere; layouts are checked with a notice only; the Windows and Linux windows are VST3-12 and VST3-13, host switching VST3-2. | [VST3](docs/use/plugins.md#loading-a-filter) |
 | No promised migration of old VST2 project state | New VST3 identity; define a migration requirement before implementing one (VST3-6). | [VST3](docs/use/plugins.md#identities) |
@@ -1051,6 +1026,20 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   tests use full releases; newer pre-releases (pluginval 2.0 beta) and
   upstream lilv run as advisory checks;
   [supporting libraries](docs/develop/build.md#supporting-libraries).
+- [x] **CI-7 — Resolve shared SDKs once per workflow.** 5 November 2026,
+  from jrp's review of 0.5.2: the VST3 and Audio Unit workflows resolve
+  their SDK in a first `sdk` job, whose lock file every build job of the run
+  fetches with `sources.py --lock`; each job's summary still lists the
+  release. LV2's formal jobs need no shared SDK (one job fetches the lv2
+  headers; the rest use Ubuntu's packages), and the candidates already share
+  their `sources` job's corresponding source. Per-OS tools (pluginval,
+  lv2lint) are still resolved per job
+  ([supporting libraries](docs/develop/build.md#supporting-libraries)).
+- [x] **CI-8 — Keep evidence from advisory failures.** 5 November 2026,
+  from jrp's review of 0.5.2: when the newest pluginval pre-release reports
+  problems, or the LV2 tests fail against the newest upstream lilv, the job
+  keeps CTest's output as an `advisory-evidence-…` artifact, although it
+  stays green ([evidence from CI runs](docs/develop/testing.md#evidence-from-failed-ci-runs)).
 - [x] **CI-9 — Shorter CI jobs, no test dropped.** 25 October 2026, PR #85,
   from jrp's CI analysis: the Linux VST3 jobs and the Audio Unit sanitizer job
   build only what their tests run, long tests carry a CTest `COST` so they
@@ -1241,6 +1230,12 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   "unclaimed"). Checked against 0.8.6; progress detail now lives only in
   TODO's `Progress` lines, and the status page names what remains and links
   the items ([recording progress](docs/develop/workflow.md#recording-progress-in-todo)).
+- [x] **FFMPEG-1 — Test the pipe workflow.** 5 November 2026:
+  `native.ffmpeg_pipe` runs the guide's FFmpeg pipe on a film FFmpeg makes,
+  checking track selection, 2-in/6-out routing, the frame count with the
+  tail, and the start time of late audio, wherever FFmpeg is installed (the
+  native g++ Release job on Linux CI);
+  [tests](docs/develop/testing.md#native-production-tests).
 - [x] **FFT-1 — Check that we have the latest Ooura version.** 21 October 2026;
   [provenance](portable/third_party/ooura/README.md#upstream-comparison-21-october-2026).
 - [x] **FFT-3 — Accelerate by default on macOS.** 30 October 2026, PR #89: every
@@ -1455,6 +1450,16 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [VST3 API audit](docs/review-2026-10/vst3-api-audit-2026-10-23.md): tail
   includes the latency, input silence flags not trusted, Bypass text converts
   back, controller state calls succeed; [adapter contract](docs/develop/plugin-contract.md).
+- [x] **VST3-9 — Non-integer host rates.** 5 November 2026, on jrp's
+  decision of that day: `setupProcessing` accepts any finite rate from 1 to
+  768000 Hz, such as 48000 ÷ 1.001 ≈ 47952.04795 Hz (47952 Hz itself was
+  always accepted). The rate is kept exactly (`HostLayout::fractional_rate`)
+  and matched strictly: no filter suits a fractional rate, so the plug-in
+  plays silence (bypass still plays the input), keeps its filter, names both
+  rates, and plays the filter again at its rate; only floating-point
+  rounding of a whole rate counts as that rate. Checked by `vst3.adapter`
+  (`fractional_rates`) and `native.filter_file`;
+  [when a filter does not fit](docs/use/plugins.md#when-a-filter-does-not-fit).
 - [x] **VST3-10 — Mark silent output.** 24 October 2026, PR #70: an output
   channel is flagged silent exactly when a call left it all zero, so a tail
   that is still sounding is never flagged; [format notes](docs/develop/plugin-contract.md#format-notes).
