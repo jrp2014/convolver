@@ -67,6 +67,10 @@ def check(candidate, policy, root, *, production=False):
             raise ValueError('missing platform binary artifact: ' + name)
         if record.get('source_commit') != commit:
             raise ValueError('platform source commit mismatch')
+        if record.get('formats') != platform['formats']:
+            raise ValueError(
+                f"{record['id']}: formats {record.get('formats')} differ from the policy's {platform['formats']}"
+            )
         source = assets.get(record.get('source'))
         if not source or source['kind'] != 'source' or not record.get('notices'):
             raise ValueError('matching source archive and notices required')

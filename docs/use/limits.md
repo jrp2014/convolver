@@ -17,7 +17,7 @@ unsigned developer previews.
 | Filter everything a computer plays, by itself | On Windows, export to [Equalizer APO](equalizer-apo.md) |
 | Show a window or file chooser in a plug-in host | Load a [preset](presets.md); the host's own bypass switch works |
 | Handle more than 8 channels in a plug-in, or more than one input and one output | Use the [command-line tool](command-line.md), which takes up to 256 channels |
-| Offer every channel layout in LV2 | Use one of the [LV2 layouts](plugins.md#lv2-channel-layouts), or the VST3 or Audio Unit plug-in |
+| Offer every channel layout in LV2 | Use one of the [LV2 layouts](plugins.md#lv2-channel-layouts), or the VST® 3 or Audio Unit plug-in |
 | Open projects saved with the old Windows VST 2 plug-in | Load a preset made from the same `.cfg` |
 | Limit peaks | Lower the [gain](command-line.md#gain-and-attenuation) yourself; float output can exceed full scale, and integer output clips |
 | Write lossy formats such as MP3 or Ogg Vorbis | Write one of the [output formats](command-line.md#output-formats) and convert it with another tool |
@@ -28,3 +28,11 @@ unsigned developer previews.
 
 Some configurations from other programs, or from the old Windows Convolver,
 need small changes first; see [other programs](other-programs.md).
+
+<!-- VST trademark notice: written by scripts/trademarks.py from packaging/trademarks/vst.json -->
+
+<img src="images/VST_Compatible_Logo_Steinberg.png" alt="VST Compatible logo" width="120">
+
+Convolver supports VST® 3. VST is a registered trademark of Steinberg Media Technologies GmbH.
+
+<!-- End of the VST trademark notice -->

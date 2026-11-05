@@ -39,6 +39,20 @@ class PackagedDocsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.rewrite('[a](../../../outside.md)')
 
+    def test_images_must_ship(self):
+        # The VST Compatible logo (PLUG-5): kept relative when its folder ships.
+        logo = '<img src="images/logo.png" alt="logo" width="120">'
+        self.assertEqual(self.rewrite(logo), logo)
+        for text in ('![a](logo.png)', '<img src="../images/x.png">', '![a](https://example.org/x.png)'):
+            with self.subTest(text=text), self.assertRaisesRegex(ValueError, 'image'):
+                self.rewrite(text)
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary)
+            (source / 'docs/use').mkdir(parents=True)
+            (source / 'docs/use/plugins.md').write_text('# Plug-ins\n\n' + logo + '\n')
+            with self.assertRaisesRegex(ValueError, 'does not exist'):
+                package_docs.package(source, ['docs/use/plugins.md'], ['docs/use/images'], source / 'out', '1.2.3')
+
     def test_package(self):
         with tempfile.TemporaryDirectory() as temporary:
             source, output = Path(temporary) / 'source', Path(temporary) / 'docs'

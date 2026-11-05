@@ -9,7 +9,7 @@ package or from your own build. Afterwards, follow
 
 - Copy the whole plug-in bundle (a folder, not just the file inside it) into a
   folder your host scans, then ask the host to rescan.
-- Preview packages contain the VST3 plug-in for Windows, macOS and Linux. The
+- Preview packages contain the VST® 3 plug-in for Windows, macOS and Linux. The
   Audio Unit (macOS) and LV2 (Linux) plug-ins are built from source for now.
 - Previews are not signed. On macOS, clear the download quarantine for the
   Convolver bundle only; on Windows, an installer shows a SmartScreen warning.
@@ -105,3 +105,11 @@ The host lists Convolver among its effects. If it does not, read the host's
 scan log and see [troubleshooting](troubleshooting.md#the-host-does-not-list-convolver).
 
 To build the plug-ins yourself, see [build from source](../develop/build.md#plug-ins).
+
+<!-- VST trademark notice: written by scripts/trademarks.py from packaging/trademarks/vst.json -->
+
+<img src="images/VST_Compatible_Logo_Steinberg.png" alt="VST Compatible logo" width="120">
+
+Convolver supports VST® 3. VST is a registered trademark of Steinberg Media Technologies GmbH.
+
+<!-- End of the VST trademark notice -->

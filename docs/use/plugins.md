@@ -8,7 +8,7 @@ does not fit. Installing is in [install](install.md); making presets is in
 
 **In short:**
 
-- Convolver comes as a VST3 plug-in (Windows, macOS, Linux), an Audio Unit
+- Convolver comes as a VST® 3 plug-in (Windows, macOS, Linux), an Audio Unit
   (macOS) and an LV2 plug-in (Linux). They behave the same way; the table
   below lists the differences.
 - One input and one output of 1 to 8 channels each; the counts may differ,
@@ -622,3 +622,11 @@ version 2, so the Audio Unit as a whole is distributed under GPL-3.0-or-later.
 Convolver's own source code and every other build stay GPL-2.0-or-later. The
 bundle's `Contents/Resources/licenses/` folder holds the notice, GPL version 3
 and the AudioUnitSDK licence.
+
+<!-- VST trademark notice: written by scripts/trademarks.py from packaging/trademarks/vst.json -->
+
+<img src="images/VST_Compatible_Logo_Steinberg.png" alt="VST Compatible logo" width="120">
+
+Convolver supports VST® 3. VST is a registered trademark of Steinberg Media Technologies GmbH.
+
+<!-- End of the VST trademark notice -->

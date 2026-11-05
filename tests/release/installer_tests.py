@@ -47,10 +47,50 @@ class InstallerTests(unittest.TestCase):
             with self.subTest(filename=filename), self.assertRaises(ValueError):
                 self.installers.destinations([filename], 'Windows')
 
+    def test_audio_unit_owned_on_macos_only(self):
+        # AU-5: the component goes beside other Audio Units, for all users.
+        name = 'Components/Convolver.component/Contents/MacOS/Convolver'
+        owned = self.installers.destinations([name], 'Darwin')
+        self.assertEqual(owned[name], '/Library/Audio/Plug-Ins/Components/Convolver.component/Contents/MacOS/Convolver')
+        for filename, system in (
+            (name, 'Windows'),
+            ('Components/Other.component/Contents/MacOS/Other', 'Darwin'),
+            ('Components/Convolver.component', 'Darwin'),
+        ):
+            with self.subTest(filename=filename, system=system), self.assertRaises(ValueError):
+                self.installers.destinations([filename], system)
+
+    def test_macos_payloads(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            stage, output = Path(temporary) / 'stage', Path(temporary) / 'installer'
+            for name in (
+                'VST3/Convolver.vst3/Contents/MacOS/Convolver',
+                'Components/Convolver.component/Contents/MacOS/Convolver',
+                'bin/convolver',
+            ):
+                (stage / name).parent.mkdir(parents=True, exist_ok=True)
+                (stage / name).write_bytes(b'owned')
+            self.installers.prepare(stage, output, 'Darwin', {'version': '1.2.3'})
+            self.assertTrue((output / 'plugin-payload/Convolver.vst3/Contents/MacOS/Convolver').is_file())
+            self.assertTrue((output / 'au-payload/Convolver.component/Contents/MacOS/Convolver').is_file())
+            self.assertTrue((output / 'tools-payload/bin/convolver').is_file())
+            import plistlib
+
+            for plist, bundle in (('component.plist', 'Convolver.vst3'), ('au-component.plist', 'Convolver.component')):
+                with (output / plist).open('rb') as stream:
+                    self.assertEqual(plistlib.load(stream)[0]['RootRelativeBundlePath'], bundle)
+            script = (output / 'uninstall.sh').read_text(encoding='utf-8')
+            self.assertIn('rmdir -- /Library/Audio/Plug-Ins/Components/Convolver.component 2>/dev/null', script)
+            self.assertNotIn('rmdir -- /Library/Audio/Plug-Ins/Components 2>', script)
+
     def test_macos_uninstall_preserves_custom_files(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            paths = ['VST3/Convolver.vst3/Contents/MacOS/Convolver', 'presets/identity.vstpreset']
+            paths = [
+                'VST3/Convolver.vst3/Contents/MacOS/Convolver',
+                'Components/Convolver.component/Contents/MacOS/Convolver',
+                'presets/identity.vstpreset',
+            ]
             # Use a test prefix: exercise the actual generated uninstall script.
             mapping = self.installers.destinations(paths, 'Darwin', prefix=root)
             for dest in mapping.values():

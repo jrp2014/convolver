@@ -14,6 +14,7 @@
 *.WAV   binary
 *.pcm   binary
 *.flac  binary
+*.png   binary
 # Generated fixtures are checked byte for byte against their generator.
 examples/first-use/*/*.cfg -text
 

@@ -37,6 +37,8 @@ TARGETS = {
         ('convolver-cli.dSYM', 'bin/convolver'),
         ('convolver-preset.dSYM', 'bin/convolver-preset'),
         ('convolver-equalizer-apo.dSYM', 'bin/convolver-equalizer-apo'),
+        # The Audio Unit (AU-5); its executable is called Convolver too.
+        ('Convolver-au.dSYM', 'Components/Convolver.component/Contents/MacOS/Convolver'),
     ),
     'Windows': (
         ('Convolver.pdb', 'VST3/Convolver.vst3/Contents/*/Convolver.vst3'),

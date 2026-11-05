@@ -114,7 +114,13 @@ target_link_libraries(convolver_au PRIVATE convolver_au_adapter "-framework AppK
 # Export only the factory, so the host process sees none of the engine's symbols.
 target_link_options(convolver_au PRIVATE "LINKER:-exported_symbol,_ConvolverAUFactory")
 add_dependencies(convolver_au convolver_build_version)
-# Licence notices inside the bundle, then an ad-hoc signature over the whole of it.
+# Preview candidates keep the component's debugging symbols outside the bundle
+# (CONVOLVER_DEBUG_SYMBOLS): Convolver-au.dSYM, apart from the VST3 plug-in's
+# Convolver.dSYM, since both executables are called Convolver. It strips the
+# executable, so it comes before the signature below.
+convolver_keep_symbols(convolver_au NAME Convolver-au)
+# Licence notices inside the bundle, then an ad-hoc signature over the whole of
+# it, the last step that changes the bundle.
 add_custom_command(TARGET convolver_au POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_BUNDLE_CONTENT_DIR:convolver_au>/Resources/licenses"
     COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/NOTICE.txt"

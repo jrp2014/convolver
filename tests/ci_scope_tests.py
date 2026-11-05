@@ -95,11 +95,12 @@ class Classification(unittest.TestCase):
             }
 
         everything = set(ci_scope.WORKFLOWS)
-        self.assertEqual(runs(['plugins/au/effect.hpp', 'tests/au/harness_test.cpp', 'TODO.md']), {'au'})
+        # The candidates package the Audio Unit on macOS (PLUG-5).
+        self.assertEqual(runs(['plugins/au/effect.hpp', 'tests/au/harness_test.cpp', 'TODO.md']), {'au', 'release'})
         self.assertEqual(runs(['plugins/lv2/plugin.cpp']), {'lv2'})
         # The candidates build and package the VST3 plug-in.
         self.assertEqual(runs(['plugins/vst3/processor.cpp']), {'vst3', 'release'})
-        self.assertEqual(runs(['plugins/au/effect.hpp', 'plugins/lv2/plugin.cpp']), {'au', 'lv2'})
+        self.assertEqual(runs(['plugins/au/effect.hpp', 'plugins/lv2/plugin.cpp']), {'au', 'lv2', 'release'})
         # The macOS window, which both the VST3 plug-in and the Audio Unit show (CI-26).
         self.assertEqual(runs(['plugins/editor/mac/setting_rows.mm']), {'vst3', 'au', 'release'})
         self.assertEqual(
@@ -113,7 +114,8 @@ class Classification(unittest.TestCase):
         self.assertEqual(runs(['plugins/au/effect.hpp', 'portable/engine.cpp']), everything)
         self.assertEqual(runs(['plugins/au/effect.hpp', 'tests/plugins/harness.hpp']), everything)
         self.assertEqual(runs(['tests/vst3/fft_symbols.py']), everything)
-        self.assertEqual(ci_scope.decide(['plugins/au/effect.hpp'], 'release'), {'build': False, 'package': False})
+        self.assertEqual(ci_scope.decide(['plugins/au/effect.hpp'], 'release'), {'build': True, 'package': True})
+        self.assertEqual(ci_scope.decide(['plugins/lv2/plugin.cpp'], 'release'), {'build': False, 'package': False})
         self.assertEqual(ci_scope.decide(['plugins/vst3/processor.cpp'], 'release'), {'build': True, 'package': True})
         # Without a workflow name the answer is whether any workflow builds.
         self.assertEqual(ci_scope.decide(['plugins/au/effect.hpp']), {'build': True, 'package': True})
@@ -199,6 +201,9 @@ FORMAT_REFERENCES = {
     },
     'au': {
         'CMakeLists.txt': 'adds plugins/au only with CONVOLVER_BUILD_AU',
+        'cmake/ConvolverPluginPackaging.cmake': 'packages the Audio Unit on macOS, in the candidates',
+        'scripts/release/candidate.py': 'the candidates, which Audio Unit changes run',
+        'tests/release/package_smoke.py': "runs au.bundle's checks on the package, in the candidates",
         'tests/plugins/lifecycle.hpp': 'a comment',
     },
     'editor': {

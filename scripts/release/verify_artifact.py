@@ -76,10 +76,10 @@ def source_record(archive):
     }
 
 
-def used_records(policy, archive, backend):
+def used_records(policy, archive, candidate):
     """The exact dependency releases (CI-6) this build used, from the source archive."""
     resolved = with_records(policy, source_manifest(archive)['dependencies'])
-    used = used_dependencies(resolved, ('vst3',), backend)
+    used = used_dependencies(resolved, candidate['formats'], candidate['backend'])
     return {name: dep for name, dep in resolved['dependencies'].items() if name in used}
 
 
@@ -147,6 +147,12 @@ def inspect(root, candidate, policy):
             records[path.relative_to(root).as_posix()] = inspect_binary(path, candidate, policy)
     if not any(name.startswith('VST3/Convolver.vst3/') for name in records):
         raise ValueError('missing native plug-in binary')
+    # AU-5: the Audio Unit is in macOS packages, and only there.
+    component = 'Components/Convolver.component/Contents/MacOS/Convolver'
+    if 'au' in candidate['formats'] and component not in records:
+        raise ValueError('missing Audio Unit binary: ' + component)
+    if 'au' not in candidate['formats'] and (root / 'Components').exists():
+        raise ValueError('an Audio Unit in a package whose platform does not ship one')
     for tool in ('bin/convolver', 'bin/convolver-preset', 'bin/convolver-equalizer-apo'):
         if tool not in records and tool + '.exe' not in records:
             raise ValueError('missing tool binary: ' + tool)
@@ -159,6 +165,7 @@ def verify(root, manifest, policy, source_archive):
         manifest.get('schema') != 1
         or manifest['version'] != policy['version']
         or manifest['backend'] != candidate['backend']
+        or manifest.get('formats') != candidate['formats']
     ):
         raise ValueError('artifact policy mismatch')
     if source_record(source_archive) != manifest['source']:
@@ -207,6 +214,21 @@ def main():
         ):
             raise ValueError('nonportable release build flags or configuration')
         notices = {'FFTW': ('licenses/fftw.txt',), 'OOURA': ('licenses/Ooura.txt',)}.get(candidate['backend'], ())
+        # The Audio Unit (AU-5): its bundle, its own notices inside it (it is
+        # GPL-3.0-or-later with AudioUnitSDK's Apache-2.0 licence), and the
+        # same notices beside the other licences.
+        component = 'Components/Convolver.component/Contents/'
+        if 'au' in candidate['formats']:
+            notices += (
+                'licenses/audiounitsdk.txt',
+                'licenses/Convolver-AU.txt',
+                'licenses/GPL-3.0.txt',
+                component + 'Info.plist',
+                component + 'Resources/licenses/NOTICE.txt',
+                component + 'Resources/licenses/GPL-3.0.txt',
+                component + 'Resources/licenses/AudioUnitSDK-LICENSE.txt',
+                component + '_CodeSignature/CodeResources',
+            )
         for required in (
             'licenses/Convolver.txt',
             'licenses/DEPENDENCIES.json',
@@ -222,6 +244,9 @@ def main():
             'examples/first-use/stereo/input.wav',
             'examples/first-use/stereo/expected.wav',
             'VST3/Convolver.vst3/Contents/Resources/moduleinfo.json',
+            # PLUG-5: the plug-in's credits and the guides' VST Compatible logo.
+            'VST3/Convolver.vst3/Contents/Resources/NOTICE.txt',
+            'docs/use/images/VST_Compatible_Logo_Steinberg.png',
             'VERSION.txt',
         ):
             if not (root / required).is_file():
@@ -233,10 +258,11 @@ def main():
             'source_commit': build['source_commit'],
             'backend': candidate['backend'],
             'channel': 'developer-preview',
+            'formats': candidate['formats'],
             'source': source,
             'build': build,
             'build_os': platform.platform(),
-            'dependencies': used_records(policy, args.source_archive, candidate['backend']),
+            'dependencies': used_records(policy, args.source_archive, candidate),
             'binaries': inspect(root, candidate, policy),
             'files': inventory(root),
         }

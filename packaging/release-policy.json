@@ -114,6 +114,9 @@
       "os": "Windows",
       "architecture": "x86_64",
       "backend": "OOURA",
+      "formats": [
+        "vst3"
+      ],
       "baseline_candidate": "Windows 11",
       "status": "unverified",
       "evidence": [],
@@ -125,6 +128,10 @@
       "os": "Darwin",
       "architecture": "arm64",
       "backend": "ACCELERATE",
+      "formats": [
+        "vst3",
+        "au"
+      ],
       "baseline_candidate": "macOS 14",
       "status": "unverified",
       "evidence": [],
@@ -136,6 +143,10 @@
       "os": "Darwin",
       "architecture": "x86_64",
       "backend": "ACCELERATE",
+      "formats": [
+        "vst3",
+        "au"
+      ],
       "baseline_candidate": "macOS 14",
       "status": "unverified",
       "evidence": [],
@@ -147,6 +158,9 @@
       "os": "Linux",
       "architecture": "x86_64",
       "backend": "OOURA",
+      "formats": [
+        "vst3"
+      ],
       "baseline_candidate": "Ubuntu 22.04 / glibc 2.35",
       "status": "unverified",
       "evidence": [],

@@ -22,6 +22,7 @@ def destinations(files, system, prefix=Path('/')):
             or path.parts[0]
             not in (
                 'VST3',
+                'Components',
                 'bin',
                 'docs',
                 'examples',
@@ -34,13 +35,18 @@ def destinations(files, system, prefix=Path('/')):
             raise ValueError('path outside installer ownership: ' + name)
         if path.parts[0] == 'VST3' and (len(path.parts) < 3 or path.parts[1] != 'Convolver.vst3'):
             raise ValueError('unowned plug-in: ' + name)
+        # The Audio Unit (AU-5): macOS only.
+        if path.parts[0] == 'Components' and (
+            system != 'Darwin' or len(path.parts) < 3 or path.parts[1] != 'Convolver.component'
+        ):
+            raise ValueError('unowned Audio Unit: ' + name)
         if system == 'Windows':
             base = '$COMMONFILES64' if path.parts[0] == 'VST3' else '$INSTDIR'
             target = base + '\\' + name.replace('/', '\\')
         elif system == 'Darwin':
             base = (
                 prefix / 'Library/Audio/Plug-Ins'
-                if path.parts[0] == 'VST3'
+                if path.parts[0] in ('VST3', 'Components')
                 else prefix / 'Library/Application Support/Convolver'
             )
             target = str(base / name)
@@ -63,7 +69,10 @@ def write_uninstaller(mapping, output):
     for path in mapping.values():
         parent = Path(path).parent
         while parent.name and (
-            parent.name == 'Convolver' or 'Convolver' in parent.parts or 'Convolver.vst3' in parent.parts
+            parent.name == 'Convolver'
+            or 'Convolver' in parent.parts
+            or 'Convolver.vst3' in parent.parts
+            or 'Convolver.component' in parent.parts
         ):
             directories.add(str(parent))
             parent = parent.parent
@@ -106,9 +115,13 @@ def prepare(stage, output, system, policy):
         (output / 'uninstall-files.nsh').write_text('\n'.join(uninstall) + '\n', encoding='utf-8')
         (output / 'version.nsh').write_text(f'!define CONVOLVER_VERSION "{policy["version"]}"\n')
     else:
+        # One payload per installer package: VST3/ and Components/ become
+        # /Library/Audio/Plug-Ins/VST3 and .../Components, the rest Application Support.
         for name in files:
             if name.startswith('VST3/'):
                 target = output / 'plugin-payload' / name[len('VST3/') :]
+            elif name.startswith('Components/'):
+                target = output / 'au-payload' / name[len('Components/') :]
             else:
                 target = output / 'tools-payload' / name
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -118,19 +131,22 @@ def prepare(stage, output, system, policy):
         # Prevent macOS Installer relocating the bundle to an old test build.
         import plistlib  # noqa: PLC0415 (only macOS packages need it)
 
-        with (output / 'component.plist').open('wb') as stream:
-            plistlib.dump(
-                [
-                    {
-                        'BundleHasStrictIdentifier': True,
-                        'BundleIsRelocatable': False,
-                        'BundleIsVersionChecked': True,
-                        'BundleOverwriteAction': 'upgrade',
-                        'RootRelativeBundlePath': 'Convolver.vst3',
-                    }
-                ],
-                stream,
-            )
+        for plist, bundle in (('component.plist', 'Convolver.vst3'), ('au-component.plist', 'Convolver.component')):
+            if not (output / ('plugin-payload' if bundle.endswith('.vst3') else 'au-payload') / bundle).is_dir():
+                continue
+            with (output / plist).open('wb') as stream:
+                plistlib.dump(
+                    [
+                        {
+                            'BundleHasStrictIdentifier': True,
+                            'BundleIsRelocatable': False,
+                            'BundleIsVersionChecked': True,
+                            'BundleOverwriteAction': 'upgrade',
+                            'RootRelativeBundlePath': bundle,
+                        }
+                    ],
+                    stream,
+                )
     return mapping
 
 

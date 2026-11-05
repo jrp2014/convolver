@@ -67,11 +67,12 @@ FORMATS = {
 SHARED = (
     'tests/vst3/fft_symbols.py',  # The LV2 tests run it on the LV2 bundle.
 )
-# The workflows that build each format: the candidates build and package only
-# the VST3 plug-in (scripts/release/candidate.py), with the window on macOS.
+# The workflows that build each format: the candidates build and package the
+# VST3 plug-in, and on macOS the Audio Unit (scripts/release/candidate.py,
+# PLUG-5), with the window.
 FORMAT_WORKFLOWS = {
     'vst3': {'vst3', 'release'},
-    'au': {'au'},
+    'au': {'au', 'release'},
     'lv2': {'lv2'},
     'editor': {'vst3', 'au', 'release'},
 }
