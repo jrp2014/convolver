@@ -1164,6 +1164,14 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
 - [x] **PERF-6 — Decode each filter file once per load.** 24 October 2026,
   PR #70: same errors and limits;
   [startup, reset and loading](docs/develop/fft-backends.md#startup-reset-and-filter-loading).
+- [x] **GAIN-2 — No noise simulation for `--gain-db no-clip`.** 5 November
+  2026, PR #111, from the external review of `91fcf1f` (0.8.13): no-clip
+  ran the whole noise estimate to use only the bound it also returns. It
+  now validates the configuration and takes `worst_case_peak()` directly
+  (0.43 ms rather than 69.5 ms for a 65,536-tap stereo filter in the
+  review's Release measurement); `auto` still filters noise. `native.cli`
+  checks the gain and the rendered output for silent, cancelling, delayed
+  and multichannel configurations.
 - [x] **PLUG-1 — FFT backend for plug-ins.** 21 October 2026;
   [plug-in builds](docs/develop/fft-backends.md#plug-in-builds).
 - [x] **PLUG-2 — Shared adapter test harness.** 22 October 2026, PR #28;

@@ -89,6 +89,11 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- CLI (GAIN-2, from an external review of `91fcf1f`): `--gain-db no-clip`
+  takes the largest possible peak directly instead of also filtering ten
+  filter lengths of noise, so choosing it costs well under a millisecond
+  rather than tens of milliseconds for long filters. The gain it chooses is
+  unchanged; `--gain-db auto` still filters noise.
 - Diagnostics (DIAG-2): every message a user can meet states the problem,
   its cause and the fix, with a note where an environment, host or design
   limit is the reason. `convolver`, `convolver-preset` and the other tools

@@ -271,6 +271,59 @@ def automatic_gain_tests(d):
         _, _, out = floats(dst)
         near(out, [v / 32768 * 0.25 * 10 ** (db / 20) for v in values]) if mode == 'no-clip' else None
     call(['--filter', ir, '--input', src, '--output', dst, '--gain-db', 'loud'], ok=False)
+    # GAIN-2: no-clip takes the bound without filtering noise. Its gain must be
+    # -20 log10 of the largest output any full-scale input can give (per output,
+    # the absolute taps of each input's combined response, summed over inputs;
+    # delays do not change it), and 0 dB when routing is silent or cancels out.
+    pcm(d / 'ag-a.wav', [16384, -8192])  # 0.5, -0.25
+    pcm(d / 'ag-b.wav', [-16384, 8192])  # The same, inverted.
+    pcm(d / 'ag-zero.wav', [0, 0])
+    stereo = d / 'ag-stereo.wav'
+    pcm(stereo, [v for v in values for _ in range(2)], channels=2)
+
+    def path(ir_file, inputs, outputs):
+        return f'{ir_file}\n0\n{inputs}\n{outputs}\n'
+
+    cases = {
+        'silent': ('48000 1 1 0\n0\n0\n' + path('ag-zero.wav', '0', '0'), src, 0.0),
+        'cancelling': (
+            '48000 1 1 0\n0\n0\n' + path('ag-a.wav', '0', '0') + path('ag-b.wav', '0', '0'),
+            src,
+            0.0,
+        ),
+        'delayed': ('48000 1 1 0\n5\n2\n' + path('ag-a.wav', '0', '0'), src, 0.75),
+        # Output 0: input 0 through a (0.75) plus input 1 through a at gain 0.5
+        # (0.375). Output 1: input 1 through b and through a at gain -0.25,
+        # which add to [-0.625, 0.3125] (0.9375), so output 0 is the larger.
+        'multichannel': (
+            '48000 2 2 0\n0 0\n0 0\n'
+            + path('ag-a.wav', '0', '0')
+            + path('ag-a.wav', '1.5', '0')
+            + path('ag-b.wav', '1', '1')
+            + path('ag-a.wav', '1', '-1.25'),
+            stereo,
+            0.75 + 0.375,
+        ),
+    }
+    for name, (text, source, peak) in cases.items():
+        cfg = d / f'ag-{name}.cfg'
+        cfg.write_text(text)
+        p = call(['--filter', cfg, '--input', source, '--output', dst, '--gain-db', 'no-clip'])
+        err = p.stderr.decode()
+        db = float(re.search(r'no-clip attenuation (-?[0-9.]+) dB', err).group(1))
+        want = -20 * math.log10(peak) if peak else 0.0
+        assert abs(db - want) < 0.005, (name, err)
+        _, _, gained = floats(dst)
+        call(['--filter', cfg, '--input', source, '--output', dst, '--gain-db', f'{want:.6f}'])
+        _, _, plain = floats(dst)
+        near(gained, plain)
+    # Coefficients whose bound exceeds the largest float stop before rendering,
+    # as auto stops when the noise response overflows.
+    huge = d / 'ag-huge.wav'
+    float_wave(huge, [(3e38,), (3e38,)])
+    for mode in ('no-clip', 'auto'):
+        p = call(['--filter', huge, '--input', src, '--output', dst, '--gain-db', mode], ok=False)
+        assert b'single-precision' in p.stderr, (mode, p.stderr)
 
 
 def output_selection_tests(d):

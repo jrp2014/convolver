@@ -20,6 +20,7 @@
 #include <locale>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <sys/stat.h>
@@ -532,10 +533,27 @@ int run(int argc, char** argv) {
                            "the filter.",
                            "Choose another output name.");
         if (automatic_gain) {
-            const auto estimate = convolver::estimate_attenuation(config);
             const bool safe = *automatic_gain == "no-clip";
-            const auto db =
-                safe ? estimate.worst_case_attenuation_db : estimate.noise_attenuation_db;
+            // GAIN-2: no-clip needs only the bound, which takes no convolution
+            // (about 0.4 ms rather than 70 ms for 65,536 stereo taps); auto
+            // filters noise. A zero peak (silent routing) gives 0 dB.
+            double peak = 0;
+            if (safe) {
+                convolver::validate_configuration(config);
+                peak = convolver::worst_case_peak(config);
+                // As estimate_attenuation() refuses a noise response that is
+                // not finite in single precision.
+                if (!(peak <= std::numeric_limits<float>::max()))
+                    throw std::overflow_error(convolver::detail::advice_text(
+                        {"cannot choose the no-clip gain: the filter's largest possible peak "
+                         "is too large for single-precision processing",
+                         "The filter coefficients are far above full scale.",
+                         "Check how the filter files are scaled.",
+                         {}}));
+            } else {
+                peak = convolver::estimate_attenuation(config).noise_peak;
+            }
+            const auto db = peak > 0 ? -20 * std::log10(peak) : 0.;
             gain = static_cast<float>(std::pow(10., db / 20.));
             if (!std::isfinite(gain))
                 throw std::invalid_argument(convolver::detail::advice_text(
@@ -547,8 +565,7 @@ int run(int argc, char** argv) {
             std::cerr << "convolver: " << (safe ? "no-clip" : "optimum") << " attenuation "
                       << std::fixed << std::setprecision(2) << db << " dB ("
                       << (safe ? "largest possible peak " : "white-noise peak ")
-                      << std::setprecision(4)
-                      << (safe ? estimate.worst_case_peak : estimate.noise_peak) << ")\n";
+                      << std::setprecision(4) << peak << ")\n";
         }
         convolver::Engine engine(config, block, fft_options);
         // TPDF dither by default below 20 significant bits, and advice on
