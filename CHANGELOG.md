@@ -174,6 +174,10 @@ Until 1.0 the C++ API may change between minor versions.
   end. CI evidence now includes the window test's log, which was missing,
   and the `.old` file each test log rotates to. `au.log_evidence` checks
   collection after an abort and a kill.
+- VST3 adapter (VST3-14, from jrp's review of `276c7dc`): the edit
+  controller moved from `plugins/vst3/processor.cpp` to its own file,
+  `plugins/vst3/controller.cpp`, unchanged, before the window gains more
+  controls.
 - Continuous integration (CI-28, from CI-27's review): `vst3.adapter` and
   `vst3.preset`, which runs the same tests, write their Convolver logs to
   files of their own in the build folder (`convolver-adapter-tests.log`,

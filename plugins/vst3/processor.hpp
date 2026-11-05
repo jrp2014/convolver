@@ -7,6 +7,7 @@
 #include "public.sdk/source/vst/vstaudioeffect.h"
 #include "public.sdk/source/vst/vsteditcontroller.h"
 #include "sound_files.hpp"
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstddef>
@@ -35,6 +36,15 @@ inline constexpr Steinberg::Vst::ParamID bypass_id = identity::vst3_bypass_param
 // controller in a status_message whenever it may have changed.
 inline constexpr Steinberg::Vst::ParamID status_id = identity::vst3_status_parameter_id;
 inline constexpr const char* status_message = "ConvolverStatus";
+// The Status parameter's values, in HostStatus order, and a status as the
+// parameter's normalized value.
+inline constexpr std::array<const char*, 5> status_names{"Playing", "No filter", "Load failed",
+                                                         "Not checked yet", "Fault"};
+static_assert(static_cast<std::size_t>(HostStatus::fault) == status_names.size() - 1);
+constexpr Steinberg::Vst::ParamValue normalized_status(HostStatus status) {
+    return static_cast<Steinberg::Vst::ParamValue>(status) /
+           static_cast<Steinberg::Vst::ParamValue>(status_names.size() - 1);
+}
 // VST3-3: the status_message also carries the PLUG-9 report for the window
 // ("report": report_fields() as UTF-8 name and value pairs, each ended by a
 // zero byte; "report text": report_text(); "format": the log tag), which

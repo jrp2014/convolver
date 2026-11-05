@@ -656,11 +656,6 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   `xvfb-run`. Not reachable by screen readers, which the guide says. A native
   X11 view can replace it later if Linux users need one
   ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#framework-choice)). Needed for the first preview.
-- [ ] **VST3-14 — Separate the controller from the processor's file.**
-  From jrp's review of `276c7dc` (1 November 2026):
-  `plugins/vst3/processor.cpp` (1,041 lines) holds both the processor and
-  the controller. Move `Controller` to its own file, behaviour unchanged,
-  before the VST3 window gains more controls (as AU-10 did for the window).
 - [ ] **VST3-15 — Test the messages through a host's proxy.** From jrp's
   review of `276c7dc`: the tests connect the controller and processor
   directly, and `Controller::load_file` takes `sendMessage()` returning
@@ -1120,6 +1115,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   in its constructor, so out of memory reaches the caller, and
   `estimate_attenuation` refuses a non-finite noise response; tests in
   `native.io` and `native.engine`; [gain](docs/use/command-line.md#gain-and-attenuation).
+- [x] **VST3-14 — Separate the controller from the processor's file.**
+  5 November 2026, from jrp's review of `276c7dc`: `Controller` moved from
+  `plugins/vst3/processor.cpp` (then 1,041 lines, about 780 after) to
+  `plugins/vst3/controller.cpp`, unchanged; the Status values' names, which both use, moved to
+  `processor.hpp`; [implementation map](docs/develop/architecture.md).
 - [x] **VST3-1 — Speaker arrangements, not only channel counts.** 23 October
   2026, PR #42; [channel layouts](docs/develop/plugin-identities.md#channel-layouts).
 - [x] **VST3-3 — Editor messaging between controller and processor.**
