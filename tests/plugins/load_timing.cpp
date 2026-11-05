@@ -130,6 +130,7 @@ fs::path write_file(const fs::path& folder, const std::string& name, const Confi
 struct Callbacks {
     std::size_t count = 0, late = 0, failed = 0;
     Seconds longest{0}, worst_late{0};
+    std::string error; // The first exception a callback threw.
 };
 
 // Calls the driver's process() every `block` frames of real time, as a
@@ -173,9 +174,7 @@ class Renderer final : public Audio {
     void before_next(const std::function<void()>& f) override {
         std::unique_lock lock(mutex_);
         task_ = &f;
-        changed_.wait(lock, [&] { return task_ == nullptr; });
-        const auto after = done_;
-        changed_.wait(lock, [&] { return done_ > after; });
+        changed_.wait(lock, [&] { return task_ == nullptr && done_ >= task_callback_; });
     }
     void wait_callbacks(std::size_t n) override {
         std::unique_lock lock(mutex_);
@@ -190,23 +189,37 @@ class Renderer final : public Audio {
     void loop() {
         auto due = Clock::now();
         while (!stop_) {
-            std::this_thread::sleep_until(due);
+            // Sleeps until just before the callback is due and waits out the
+            // rest: some timers (Windows) wake a millisecond or more late,
+            // which would show as late callbacks the plug-in did not cause.
+            std::this_thread::sleep_until(due - std::chrono::milliseconds(2));
+            while (Clock::now() < due)
+                std::this_thread::yield();
             const std::function<void()>* task = nullptr;
             {
                 std::lock_guard lock(mutex_);
                 std::swap(task, task_);
+                if (task)
+                    task_callback_ = done_ + 1; // before_next returns after it.
             }
             bool ok = true;
-            Clock::time_point begun, end;
+            std::string error;
+            // From before the gate: a callback the host holds back is long.
+            const auto begun = Clock::now();
+            Clock::time_point end;
             {
                 std::lock_guard gate(gate_);
-                begun = Clock::now();
-                if (task) {
-                    (*task)();
-                    std::lock_guard lock(mutex_);
-                    changed_.notify_all();
+                try { // A failure is counted, and the run goes on.
+                    if (task)
+                        (*task)();
+                    ok = driver_.process(ins_, outs_, block_);
+                } catch (const std::exception& e) {
+                    ok = false;
+                    error = e.what();
+                } catch (...) {
+                    ok = false;
+                    error = "an exception that is not a std::exception";
                 }
-                ok = driver_.process(ins_, outs_, block_);
                 end = Clock::now();
             }
             const auto next = due + std::chrono::duration_cast<Clock::duration>(period_);
@@ -214,6 +227,8 @@ class Renderer final : public Audio {
                 std::lock_guard lock(mutex_);
                 ++seen_.count;
                 seen_.failed += ok ? 0 : 1;
+                if (seen_.error.empty())
+                    seen_.error = std::move(error);
                 seen_.longest = std::max<Seconds>(seen_.longest, end - begun);
                 if (end > next) {
                     ++seen_.late;
@@ -235,7 +250,7 @@ class Renderer final : public Audio {
     std::mutex mutex_, gate_;
     std::condition_variable changed_;
     const std::function<void()>* task_ = nullptr;
-    std::size_t done_ = 0;
+    std::size_t done_ = 0, task_callback_ = 0;
     Callbacks seen_;
     std::atomic<bool> stop_{false};
     std::thread thread_;
@@ -249,7 +264,10 @@ void report(const std::string& format, const Workload& w, const std::string& ent
     std::snprintf(line, sizeof line, "%-5s %-5s %-14s %-12s %10s %9zu %6zu %10.2f %10.2f%s\n",
                   format.c_str(), w.name.c_str(), entry.c_str(), phase, time, c.count, c.late,
                   ms(c.worst_late), ms(c.longest), ok ? "" : "  REFUSED OR FAILED");
-    std::cout << line << std::flush;
+    std::cout << line;
+    if (!c.error.empty())
+        std::cout << "      a callback threw: " << c.error << '\n';
+    std::cout << std::flush;
 }
 } // namespace
 
@@ -301,13 +319,17 @@ std::size_t run(lifecycle::Driver& driver, const std::vector<Entry>& entries, co
                 errors += idle.failed;
                 for (const auto* f : {&x, &y}) {
                     Outcome outcome;
-                    const auto begun = Clock::now();
+                    Seconds held{0};
+                    const auto timed = [&] {
+                        const auto begun = Clock::now();
+                        outcome = e.load(*f, audio);
+                        held = outcome.held.value_or(Clock::now() - begun);
+                    };
                     if (e.audio_waits) {
-                        std::lock_guard hold(audio.gate());
-                        outcome = e.load(*f, audio);
+                        std::lock_guard hold(audio.gate()); // Timed once audio has stopped.
+                        timed();
                     } else
-                        outcome = e.load(*f, audio);
-                    const Seconds held = outcome.held.value_or(Clock::now() - begun);
+                        timed();
                     audio.wait_for(settle);
                     const auto seen = audio.take();
                     const bool ok = outcome.accepted && seen.failed == 0;

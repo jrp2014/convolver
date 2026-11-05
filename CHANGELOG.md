@@ -143,7 +143,7 @@ Until 1.0 the C++ API may change between minor versions.
 - The version is now 0.8.0, the minor step for the library change below
   (jrp, 1 November 2026: an incompatible API change before 1.0 needs one).
   CMake consumers now request `find_package(Convolver 0.8)`, and the first
-  preview is cut from the 0.8 series. The LV2 plug-in reports minor version
+  preview is cut from the 0.8 series (now the 0.9 series, above). The LV2 plug-in reports minor version
   8, an even (release) minor again, though odd patch numbers still give a
   micro version LV2 treats as a development one (LV2-5).
 - Library (PLUG-10): `HostSettings` gains `latency` (one of the new

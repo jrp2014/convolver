@@ -180,6 +180,14 @@ jobs:
         run: >-
           ctest --test-dir build-vst3 -C Release --output-on-failure --output-junit junit.xml
           ${{ matrix.tests }}
+      # PERF-9's timings pass whatever they measure, so CTest does not show
+      # them: print them from its log (docs/develop/testing.md#load-timing-perf-9).
+      - name: Load timings (measurement only)
+        if: always()
+        shell: bash
+        run: >-
+          sed -n '/load timing (/,/load timing: /p'
+          build-vst3/Testing/Temporary/LastTest.log || true
       # The newest pluginval beta or release candidate, when one is newer than
       # the release above: what it reports is a warning in the summary, not a
       # failure, since a pre-release only signposts what is coming. The one

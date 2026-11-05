@@ -549,13 +549,16 @@ loading shows the machine's own scheduling noise.
 
 Each line gives the time the caller was held and, for the callbacks in that
 phase, how many there were, how many were late and by how much at worst, and
-the longest. A phase lasts a third of a second after its load, so callbacks
+the longest, counting time a callback was held back (LV2's `restore()`). A phase lasts a third of a second after its load, so callbacks
 do not reach a long filter's steady cost, which grows as input history fills
 (PERF-5); that cost is PERF-3's to measure. The run fails only when a load is refused, the instance does not
-then save the second filter, or a callback reports an error: jrp has not yet
+then save the second filter, or a callback reports an error or throws: jrp has not yet
 set the limits for the caller's time and for late callbacks. Timings are
 representative only in an optimised build without sanitizers, and on a
-machine not running other tests; the first line says which build ran. The
+machine not running other tests (CTest runs them alone, `RUN_SERIAL`); the
+first line says which build ran. The Release jobs of the VST3 and Audio Unit
+workflows print the tables in a "Load timings" step; LV2's run only in its
+sanitizer job. The
 `timing` label selects the three tests. Run a lifecycle executable with
 `--load-timing DIRECTORY --long` (LV2: `BUNDLE DIRECTORY --load-timing --long`)
 to add the 120-second filter jrp loaded in GarageBand.

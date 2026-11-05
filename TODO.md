@@ -814,7 +814,8 @@ the same; no callback was late. LV2's worker took the same time off the
 audio thread, with no late callbacks; LV2's `restore()` held back `run()`
 for as long (about 260 ms with 30 s), and its reset (deactivate, activate)
 for about 200 ms, as the specification has the host stop audio for both.
-The Audio Unit's figures come from macOS CI.
+The Audio Unit's figures come from the "Load timings" step of the Audio
+Unit workflow's Release job.
 
 ### Keeping `host.cpp` manageable
 

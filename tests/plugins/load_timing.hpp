@@ -15,8 +15,9 @@
 // so scheduling noise on the machine is visible.
 //
 // Measurement only: jrp sets the limits for the caller's time and for late
-// callbacks. Until then the run fails only when a load is refused or a
-// callback reports an error. Timings mean something only in an optimised
+// callbacks. Until then the run fails only when a load is refused, a
+// callback reports an error or throws, or the instance does not then save
+// the second filter. Timings mean something only in an optimised
 // build without sanitizers; the report says which build ran.
 #pragma once
 #include "lifecycle.hpp"
@@ -61,7 +62,8 @@ struct Entry {
     std::string name; // As the format names it: "setState", "RestoreState", ...
     std::function<Outcome(const Filter&, Audio&)> load;
     // The host holds back audio callbacks while it runs (LV2's restore(),
-    // which the plug-in does not declare thread-safe): callbacks wait.
+    // which the plug-in does not declare thread-safe): callbacks wait. Such
+    // an entry must not use its Audio, whose callbacks are held back.
     bool audio_waits = false;
 };
 
@@ -84,6 +86,7 @@ std::vector<Workload> workloads(const Options&);
 
 // Runs every entry point on every workload with `driver` (the format's
 // lifecycle driver), prints one line per phase, and returns the number of
-// errors: refused loads and failed callbacks. Timings never fail the run.
+// errors: refused loads, failed callbacks and a wrong filter saved
+// afterwards. Timings never fail the run.
 std::size_t run(lifecycle::Driver& driver, const std::vector<Entry>& entries, const Options&);
 } // namespace convolver::plugin_test::load_timing

@@ -270,8 +270,9 @@ if(CONVOLVER_BUILD_IO)
             endif()
             add_test(NAME vst3.load_timing COMMAND convolver_vst3_lifecycle --load-timing
                 "${PROJECT_BINARY_DIR}/vst3-load-timing")
+            # Alone, so that other tests do not take its machine (RUN_SERIAL).
             set_tests_properties(vst3.load_timing PROPERTIES LABELS "vst3;real-libraries;timing"
-                TIMEOUT 600 COST 60)
+                TIMEOUT 600 RUN_SERIAL TRUE)
             add_dependencies(check convolver_vst3_lifecycle)
         endif()
         add_dependencies(check convolver_vst3_preset)

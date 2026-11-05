@@ -107,7 +107,9 @@ if(CONVOLVER_BUILD_TESTS)
         # The loading-responsiveness timings (TODO.md): measurement only.
         add_test(NAME lv2.load_timing COMMAND convolver_lv2_lifecycle "${lv2_bundle_dir}"
             "${PROJECT_BINARY_DIR}/lv2-load-timing" --load-timing)
-        set_tests_properties(lv2.load_timing PROPERTIES LABELS "lv2;real-libraries;timing" TIMEOUT 600 COST 60)
+        # Alone, so that other tests do not take its machine (RUN_SERIAL).
+        set_tests_properties(lv2.load_timing PROPERTIES LABELS "lv2;real-libraries;timing" TIMEOUT 600
+            RUN_SERIAL TRUE)
         # Everything the lv2.* tests and examples.first_use (the harness's
         # fixtures) run, so CI can build these alone rather than every test.
         add_custom_target(convolver_lv2_tests)
