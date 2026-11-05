@@ -421,7 +421,7 @@ if(CONVOLVER_BUILD_NATIVE)
     install(TARGETS convolver_core convolver_host EXPORT ConvolverCoreTargets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
     install(EXPORT ConvolverCoreTargets NAMESPACE Convolver:: DESTINATION ${package_dir})
-    install(FILES include/convolver/engine.hpp include/convolver/host.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/convolver)
+    install(FILES include/convolver/advice.hpp include/convolver/engine.hpp include/convolver/host.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/convolver)
     if(CONVOLVER_BUILD_IO)
         install(TARGETS convolver_configuration convolver_io EXPORT ConvolverIOTargets
             ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})

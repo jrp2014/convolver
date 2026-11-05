@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "advice.hpp"
 #include "convolver/host.hpp"
 #include "host_log.hpp"
 #include "oracle.hpp"
@@ -48,6 +49,13 @@ using namespace convolver;
 void require(bool value, const char* message) {
     if (!value)
         throw std::runtime_error(message);
+}
+// A message's text, for searching: DIAG-4 records keep their parts.
+const std::string& text_of(const std::string& text) {
+    return text;
+}
+std::string text_of(const Advice& advice) {
+    return detail::advice_text(advice);
 }
 Configuration mono(float gain = 1) {
     return {48000, 1, 1, 0, {}, {}, {{{gain, .25f}, {{0, 1}}, {{0, 1}}}}};
@@ -443,8 +451,8 @@ void filter_contract() {
 // succeeds (or, for a failure found at activation, the next activation).
 void failure_reasons() {
     using Kind = HostFailureKind;
-    const auto contains = [](const std::string& text, const char* part) {
-        return text.find(part) != std::string::npos;
+    const auto contains = [](const auto& text, const char* part) {
+        return text_of(text).find(part) != std::string::npos;
     };
     const auto refused = [](auto&& load) {
         try {
@@ -471,7 +479,7 @@ void failure_reasons() {
                     r.request.source == HostFilterSource::state && r.sample_rate == 44100 &&
                     r.inputs == 2 && r.outputs == 2 && r.silent &&
                     contains(r.message, "44100 Hz") && contains(r.message, "\nFix: ") &&
-                    f.error() == r.message,
+                    f.error() == detail::advice_text(r.message),
                 "failed first load not recorded");
     }
     // Request 2 succeeds and clears it.
@@ -499,17 +507,17 @@ void failure_reasons() {
                 f.failure()->inputs == 9,
             "channel bound not recorded");
     // Requests that fail before decoding, numbered by the adapter or not.
-    f.reject(Kind::state_newer, "it was saved by a newer version of Convolver.");
+    f.reject(Kind::state_newer, {"it was saved by a newer version of Convolver."});
     require(f.failure()->kind == Kind::state_newer && f.failure()->request.number == 6 &&
                 f.failure()->sample_rate == 0 && !f.failure()->silent,
             "newer state not recorded");
-    f.reject(Kind::filter_file, "room.cfg is missing.",
+    f.reject(Kind::filter_file, {"room.cfg is missing."},
              {HostFilterSource::file, "/music/room.cfg", 10});
     require(f.failure()->kind == Kind::filter_file && f.failure()->request.number == 10 &&
                 f.failure()->request.source == HostFilterSource::file &&
                 f.failure()->request.path == "/music/room.cfg",
             "adapter-numbered file request not recorded");
-    f.reject("damaged");
+    f.reject({"damaged"});
     require(f.failure()->kind == Kind::state_unreadable && f.failure()->request.number == 11,
             "numbering does not continue after an adapter's number");
 
@@ -546,17 +554,17 @@ void failure_reasons() {
     // numbering continues after it.
     early.load(HostState{}, std::nullopt, {}, {HostFilterSource::file, "/x.cfg", 9});
     require(!early.failure() && !early.rejection(), "empty state did not clear the failure");
-    early.reject(Kind::filter_file, "missing", {HostFilterSource::file, "/y.cfg", 12});
+    early.reject(Kind::filter_file, {"missing"}, {HostFilterSource::file, "/y.cfg", 12});
     require(early.failure()->request.number == 12 && early.failure()->request.path == "/y.cfg",
             "a supplied request number was not kept");
-    early.reject("damaged");
+    early.reject({"damaged"});
     require(early.failure()->request.number == 13, "numbering does not continue after 12");
     // A number reserved before load() is never reused.
     const auto reserved = early.next_request();
     require(reserved == 14, "next_request does not continue the numbering");
-    early.reject(Kind::filter_file, "missing", {HostFilterSource::file, "/r.cfg", reserved});
+    early.reject(Kind::filter_file, {"missing"}, {HostFilterSource::file, "/r.cfg", reserved});
     require(early.failure()->request.number == 14, "a reserved number was not kept");
-    early.reject("damaged");
+    early.reject({"damaged"});
     require(early.failure()->request.number == 15, "a reserved number was reused");
     // A request abandoned by its install callback changes neither the filter
     // nor the failure (its number is used up all the same).
@@ -598,8 +606,8 @@ void failure_reasons() {
 // VST3-1: a filter's output channel mask is compared with the host's speakers,
 // only ever as advice; channels stay routed by bus index.
 void speaker_notices() {
-    const auto contains = [](const std::string& text, const char* part) {
-        return text.find(part) != std::string::npos;
+    const auto contains = [](const auto& text, const char* part) {
+        return text_of(text).find(part) != std::string::npos;
     };
     Configuration c{48000, 2, 6, 0x3F, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
     const HostLayout back{48000, 2, 6, 0x3, 0x3F}, side{48000, 2, 6, 0x3, 0x60F},
@@ -967,7 +975,7 @@ void unrecorded_failures() {
         HostFilter f(8);
         if (kept)
             f.load(HostState{stereo}, host, install);
-        std::string why = "the filter file could not be read, and this sentence is long";
+        Advice why{"the filter file could not be read, and this sentence is long"};
         HostRequest request{HostFilterSource::file, "/a/folder/with/a/long/name/filter.wav", 0};
         const auto expected = why;
         allocations_left = 0;
@@ -997,7 +1005,7 @@ void unrecorded_failures() {
         require(threw && g.failed() == !kept && g.filter().has_value() == kept && q &&
                     q->kind == HostFailureKind::preparation && q->silent == !kept &&
                     q->message.empty() &&
-                    failure_message(*q).find("memory ran out") != std::string::npos,
+                    failure_message(*q).problem.find("memory ran out") != std::string::npos,
                 ("load() refused with no memory" + label).c_str());
         const auto status = host_status(g, host);
         require(status.status == HostStatus::load_failed,
@@ -1170,7 +1178,7 @@ void processing_faults() {
     f.load(HostState{loud}, layout);
     require(host_status(f, layout).status == HostStatus::playing, "playing before observing");
     const auto fresh = f.observe(host.faults());
-    require(fresh.current.output_overflow == 1 && !fresh.earlier.any() &&
+    require(fresh.faults.output_overflow == 1 && !fresh.changed && !fresh.held &&
                 f.faults().output_overflow == 1,
             "observe");
     auto line = host_status(f, layout);
@@ -1199,11 +1207,15 @@ void processing_faults() {
     f.load(HostState{mono()}, layout);
     require(!f.faults().any() && host_status(f, layout).status == HostStatus::playing,
             "an accepted load clears the fault");
+    // Without a processor passed to load(), faults() counts on from the last
+    // observe(), so the cleared fault does not come back (DIAG-3 review).
+    require(!f.observe(host.faults()).any() && !f.faults().any(),
+            "a load without a processor did not keep the fault cleared");
     // A new processor counts from 0 after activate().
     static_cast<void>(f.activate(layout));
     HostFaults restarted;
     restarted.rejected_input = 1;
-    require(f.observe(restarted).current.rejected_input == 1 &&
+    require(f.observe(restarted).faults.rejected_input == 1 &&
                 host_status(f, layout).text.find("invalid input samples") != std::string::npos,
             "counts after activation");
     HostFaults every{3, 2, 1, 1};
@@ -1218,25 +1230,24 @@ void processing_faults() {
             "every fault explained, on one line");
     HostFilter g(8);
     g.load(HostState{mono()}, layout);
-    // Positional braces fill current, earlier and held in order.
+    // Positional braces fill faults, changed and held in order.
     HostFaults one;
     one.invalid_call = 1;
-    const HostFaultReport braced{every, one};
-    require(braced.current.total() == 7 && braced.earlier.invalid_call == 1 && !braced.held &&
-                braced.any(),
-            "HostFaultReport{current, earlier}");
-    require(fault_message(HostFaultReport{one, {}, false}).find("host's developers") !=
-                std::string::npos,
-            "HostFaultReport{current}");
+    const HostFaultReport braced{every, true};
+    require(braced.faults.total() == 7 && braced.changed && !braced.held && braced.any(),
+            "HostFaultReport{faults, changed}");
+    require(fault_message(HostFaultReport{one}).find("host's developers") != std::string::npos,
+            "HostFaultReport{faults}");
     static_cast<void>(g.observe(every));
     require(host_status(g, layout).text.find("the filter failed while playing") !=
                 std::string::npos,
             "most serious fault first");
 
     // jrp's review of 0.4.43: audio goes on while a replacement is prepared.
-    // A fault in that window is explained, but neither shown against the
-    // filter that replaces it nor signalled by the audio thread, because the
-    // accepted load clears and observes from one snapshot.
+    // A fault in that window is logged, as met around a filter change
+    // (DIAG-3), but neither shown against the filter that replaces it nor
+    // signalled by the audio thread, because both measure from the accepted
+    // load's one snapshot.
     const auto nan = std::numeric_limits<float>::quiet_NaN();
     HostProcessor p(mono(), 64, 8);
     HostFilter h(8);
@@ -1261,16 +1272,17 @@ void processing_faults() {
         {}, &p);
     play(0.f);
     const auto window = h.observe(p.faults());
-    require(window.earlier.rejected_input == 1 && !window.current.any() && !h.faults().any() &&
+    require(window.faults.rejected_input == 1 && window.changed && !h.faults().any() &&
                 host_status(h, layout).status == HostStatus::playing,
             "a fault counted while the replacement was prepared is shown against it");
     require(!window.held, "no load failure holds the report");
     // Its log text must not claim the status shows it.
-    const auto earlier = fault_message(window);
-    require(earlier.find("does not show these") != std::string::npos &&
-                earlier.find("status shows Fault") == std::string::npos &&
-                earlier.find("invalid samples") != std::string::npos,
-            "earlier faults explained as shown");
+    const auto changed = fault_message(window);
+    require(changed.find("around a filter change") != std::string::npos &&
+                changed.find("shows only those met after it took over") != std::string::npos &&
+                changed.find("status shows Fault") == std::string::npos &&
+                changed.find("invalid samples") != std::string::npos,
+            "faults around a filter change explained as shown");
     require(!p.faults_since_clear() && !p.fault_to_signal(),
             "the audio side measures from the same snapshot");
     // The new filter's own fault: shown, and signalled once per clear.
@@ -1279,7 +1291,8 @@ void processing_faults() {
     p.fault_signalled();
     play(nan);
     require(!p.fault_to_signal(), "Fault signalled twice");
-    require(h.observe(p.faults()).current.rejected_input == 2 &&
+    const auto later = h.observe(p.faults());
+    require(later.faults.rejected_input == 2 && !later.changed &&
                 host_status(h, layout).status == HostStatus::fault,
             "new faults not shown");
     // A load failure comes first, on the audio side too.
@@ -1294,7 +1307,7 @@ void processing_faults() {
     require(!p.fault_to_signal() && p.faults_since_clear(), "Fault signalled over Load failed");
     // Nor does the log say Fault shows (the 0.5.2 review).
     const auto held = h.observe(p.faults());
-    require(held.held && held.current.rejected_input == 1 && !held.earlier.any() &&
+    require(held.held && held.faults.rejected_input == 1 && !held.changed &&
                 host_status(h, layout).status == HostStatus::load_failed,
             "a fault after a rejected replacement");
     const auto held_text = fault_message(held);
@@ -1328,7 +1341,7 @@ void processing_faults() {
         audio_thread = false;
     };
     play_q(nan);
-    auto explained = empty.observe(q.faults()).current.rejected_input;
+    auto explained = empty.observe(q.faults()).faults.rejected_input;
     try {
         empty.load(
             HostState{mono()}, layout,
@@ -1343,7 +1356,7 @@ void processing_faults() {
     q.replace(unfiltered_configuration(layout, true)); // As the VST3 and AU adapters do.
     play_q(nan);
     const auto after = empty.observe(q.faults());
-    explained += after.current.rejected_input + after.earlier.rejected_input;
+    explained += after.faults.rejected_input;
     require(explained == 3 && q.faults().rejected_input == 3,
             "a fault while a failed first load was prepared is lost from the log");
 }
@@ -1355,8 +1368,8 @@ std::filesystem::path private_temp(const char* name) {
 // DIAG-1: the status line a host shows, and the Convolver log.
 void status_lines() {
     using Status = HostStatus;
-    const auto contains = [](const std::string& text, const char* part) {
-        return text.find(part) != std::string::npos;
+    const auto contains = [](const auto& text, const char* part) {
+        return text_of(text).find(part) != std::string::npos;
     };
     const auto check = [&](const HostStatusLine& line, Status status, const char* part,
                            const char* what) {
@@ -1430,7 +1443,7 @@ void status_lines() {
         {HostFailureKind::channels, "the filter has other channel counts."},
     }};
     for (const auto& [kind, part] : kinds) {
-        f.reject(kind, "why");
+        f.reject(kind, {"why"});
         check(host_status(f, std::nullopt), Status::load_failed, part, "failure kind");
         check(host_status(f, std::nullopt), Status::load_failed, "previous filter kept",
               "failure kind keeps the filter");
@@ -1544,7 +1557,7 @@ void status_lines() {
     require(!host_log_written(), "unwritable log not noticed");
     {
         HostFilter h(8);
-        h.reject("why");
+        h.reject({"why"});
         require(contains(host_status(h, std::nullopt, host_log_written()).text,
                          "The log could not be written."),
                 "unwritable log not in the status line");

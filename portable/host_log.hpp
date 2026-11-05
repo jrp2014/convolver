@@ -97,17 +97,17 @@ std::string playing_words(const HostFilter&, const HostLayout& host, const HostS
 std::string failure_consequence(const HostFailure&, const HostLayout* host, const HostSettings&);
 // DIAG-2: why saved plug-in state could not be read, for HostFilter::reject(),
 // from decode_host_state()'s exception (NewerHostState gives its own fix).
-std::string state_read_message(const std::exception&);
+Advice state_read_message(const std::exception&);
 // DIAG-2: why a filter could not be prepared (memory, usually); `what` is an
 // exception's own words, or empty.
-std::string preparation_message(const std::string& what);
+Advice preparation_message(const std::string& what);
 // A failure's message, or, for a failure recorded without one because memory
 // ran out (ROBUST-7), a message that says so.
-const std::string& failure_message(const HostFailure&);
+const Advice& failure_message(const HostFailure&);
 // DIAG-2: the most serious fault in `faults` as problem, cause and fix, with
 // any others and when the status clears in its note; `held` as for
 // HostFaultReport. Empty when there are none. For the window (host_report).
-detail::Advice fault_advice(const HostFaults&, bool held);
+Advice fault_advice(const HostFaults&, bool held);
 // After the host starts (activates or initializes) the instance: the rate,
 // channels and block size, then what plays and why (the failure or speaker
 // notice in full), and the settings in use when the adapter has them

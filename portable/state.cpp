@@ -109,7 +109,7 @@ std::size_t word_bytes(std::size_t words) noexcept {
 std::size_t encoded_host_state_size(const HostState& state) noexcept {
     return word_bytes(encoded_words(state));
 }
-std::string host_state_size_error(const HostState& state) {
+Advice host_state_size_error(const HostState& state) {
     // PLUG-13: a fixed room for the settings is kept whether or not the
     // state holds them yet, so a filter accepted at default settings still
     // saves once a VST3 setting changes (jrp's review of 276c7dc), now and
@@ -126,17 +126,16 @@ std::string host_state_size_error(const HostState& state) {
     // Each sample takes 4 bytes; the rest (rates, counts, routes) is small.
     constexpr auto limit_samples = max_host_state_bytes / 4;
     const auto n = state.configuration ? samples(*state.configuration) : 0;
-    return detail::advice_text(
-        {"the filter is too large to save: its " + std::to_string(n) + " samples would take " +
-             std::to_string(size) + " bytes",
-         "Plug-in state and presets hold at most " + std::to_string(max_host_state_bytes) +
-             " bytes (64 MiB), just under " + std::to_string(limit_samples) +
-             " samples of all the impulse responses together, with room kept for the plug-in's "
-             "settings.",
-         "Shorten the impulse responses (most of a long one's end is usually silence) or use "
-         "fewer of them.",
-         "Plug-ins refuse it so that a project never holds a filter it cannot save; the "
-         "convolver command-line tool can still render with it."});
+    return {"the filter is too large to save: its " + std::to_string(n) + " samples would take " +
+                std::to_string(size) + " bytes",
+            "Plug-in state and presets hold at most " + std::to_string(max_host_state_bytes) +
+                " bytes (64 MiB), just under " + std::to_string(limit_samples) +
+                " samples of all the impulse responses together, with room kept for the plug-in's "
+                "settings.",
+            "Shorten the impulse responses (most of a long one's end is usually silence) or use "
+            "fewer of them.",
+            "Plug-ins refuse it so that a project never holds a filter it cannot save; the "
+            "convolver command-line tool can still render with it."};
 }
 std::vector<std::byte> encode_host_state(const HostState& state) {
     if (state.configuration)

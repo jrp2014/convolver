@@ -154,7 +154,7 @@ class Effect final : public ausdk::AUBase {
     // foreign state, or a file that could not be read), as HostFilter::load
     // records its own rejections; then, outside the lock, logs the faults
     // counted before it (observe_faults()) and the refusal, and notifies.
-    void reject(HostFailureKind, const std::string& why, const HostRequest& = {},
+    void reject(HostFailureKind, const Advice& why, const HostRequest& = {},
                 const Configuration* carried = nullptr);
     // Under `control_`, after a request failed: marks it failed
     // (HostFilter::fail_request(), in case it could not be recorded); if it

@@ -67,10 +67,10 @@ class Reference final : public lc::Driver {
             try {
                 state = decode_host_state(bytes);
             } catch (const NewerHostState& e) {
-                filter_->reject(HostFailureKind::state_newer, e.what());
+                filter_->reject(HostFailureKind::state_newer, {e.what()});
                 throw;
             } catch (const std::exception& e) {
-                filter_->reject(HostFailureKind::state_unreadable, e.what());
+                filter_->reject(HostFailureKind::state_unreadable, {e.what()});
                 throw;
             }
             // Contract, replacement and threads: while active, a prepared

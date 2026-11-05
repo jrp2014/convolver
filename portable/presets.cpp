@@ -400,7 +400,7 @@ void check_writable(Format format, const HostState& state, std::string_view name
     }
     // PLUG-12: the plug-ins refuse what they could not save, so no preset holds it.
     if (auto why = host_state_size_error(state); !why.empty())
-        throw std::invalid_argument(why);
+        throw std::invalid_argument(detail::advice_text(why));
     const auto& c = *state.configuration;
     const auto low = static_cast<std::size_t>(identity::min_channels);
     const auto high = static_cast<std::size_t>(identity::max_channels);

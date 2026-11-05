@@ -149,7 +149,7 @@ void cases() {
         {"failed first load, Mix 50%",
          [&] {
              HostFilter f(8);
-             f.reject(HostFailureKind::state_unreadable, "The saved state could not be read.");
+             f.reject(HostFailureKind::state_unreadable, {"The saved state could not be read."});
              return host_report(f, facts(stereo, {0, .5}));
          },
          HostStatus::load_failed,
@@ -488,10 +488,9 @@ void actions() {
     // problem names only the file.
     const std::string path = "/Users/me/Filters/room.cfg";
     HostFilter named(8);
-    named.reject(
-        HostFailureKind::filter_file,
-        detail::advice_text({path + ":2:1: the delay line has 3 values", "A cause.", "A fix.", {}}),
-        {HostFilterSource::file, path, 1});
+    named.reject(HostFailureKind::filter_file,
+                 {path + ":2:1: the delay line has 3 values", "A cause.", "A fix.", {}},
+                 {HostFilterSource::file, path, 1});
     const auto shown = host_report(named, choosing);
     require(shown.problem == "room.cfg:2:1: the delay line has 3 values." &&
                 contains(rejected_line(named, true), path + ":2:1:"),

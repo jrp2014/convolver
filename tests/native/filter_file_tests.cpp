@@ -5,6 +5,7 @@
 // line and Copy diagnostics) must give the refused filter's own rate and
 // counts, never "0 in, 0 out" (jrp's GarageBand run, 30 October 2026: a
 // mono WAV refused on a stereo track read "the filter has 0 in, 0 out").
+#include "advice.hpp"
 #include "convolver/host.hpp"
 #include "convolver/io.hpp"
 #include "filter_file.hpp"
@@ -71,9 +72,10 @@ void run(const fs::path& dir) {
         FilterFileFailure why;
         require(!read_filter_file(path.string(), host, detail::libsndfile_files(), why),
                 path.filename().string() + " was accepted");
-        std::cout << path.filename().string() << ", explained: " << why.message << "\n\n";
-        require(!has(why.message, "--"), "command-line advice: " + why.message);
-        return why.message;
+        const auto text = detail::advice_text(why.message);
+        std::cout << path.filename().string() << ", explained: " << text << "\n\n";
+        require(!has(text, "--"), "command-line advice: " + text);
+        return text;
     };
     // It names no window: the LV2 plug-in has none (review of 8177017).
     const auto mono = explanation(dir / "mono.wav", stereo);
@@ -127,7 +129,7 @@ void run(const fs::path& dir) {
     require(read_filter_file((dir / "stereo.cfg").string(), stereo, detail::libsndfile_files(), why,
                              &files)
                 .has_value(),
-            "stereo.cfg refused: " + why.message);
+            "stereo.cfg refused: " + detail::advice_text(why.message));
     const auto named = [&](const std::string& name) {
         return std::any_of(files.begin(), files.end(),
                            [&](const std::string& f) { return fs::path(f).filename() == name; });
@@ -151,7 +153,7 @@ void run(const fs::path& dir) {
     require(read_filter_file((dir / "watched.txt").string(), stereo, detail::libsndfile_files(),
                              why, &files)
                 .has_value(),
-            "watched.txt refused: " + why.message);
+            "watched.txt refused: " + detail::advice_text(why.message));
     require(files.size() >= 4 && fs::path(files[0]).filename() == "watched.txt" &&
                 fs::path(files[1]).filename() == "fast-missing.cfg" &&
                 fs::path(files[2]).filename() == "stereo.cfg" && named("mono.wav") &&
@@ -169,7 +171,7 @@ void run(const fs::path& dir) {
     // A rejection that carries no filter says only what is known.
     for (const auto kind : {HostFailureKind::channels, HostFailureKind::sample_rate}) {
         HostFilter filter;
-        filter.reject(kind, "unreadable", {});
+        filter.reject(kind, {"unreadable"}, {});
         const auto line = host_status(filter, stereo).text;
         std::cout << "no filter carried: " << line << '\n';
         require(!has(line, "0 in, 0 out") && !has(line, " 0 Hz"), "unknown values shown: " + line);

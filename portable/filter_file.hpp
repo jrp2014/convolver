@@ -35,7 +35,7 @@ HostState filter_file_state(const std::filesystem::path& path,
 // Why a chosen filter file could not be used, for HostFilter::reject().
 struct FilterFileFailure {
     HostFailureKind kind = HostFailureKind::filter_file;
-    std::string message;
+    Advice message;
     // For a single filter (not a list) made for another rate or other
     // channels: its rate and counts, without paths or IRs, to pass to
     // HostFilter::reject().

@@ -115,7 +115,12 @@ is shown is in [status and log](#status-and-log) (DIAG-1):
   later request's success or failure is never confused with it.
 - **The outcome:** a working filter kept, or silence.
 - **The explanatory message,** written as the CLI writes its diagnostics: what
-  failed, why, and what to change.
+  failed, why, and what to change. It is kept in its parts (`Advice` in
+  [`advice.hpp`](../../include/convolver/advice.hpp): problem, cause, fix,
+  note), and each surface formats it where it leaves the library: the log's
+  one line, the window's rows, the text `HostFilter::error()` gives an
+  adapter (DIAG-4). Only exceptions carry it as text, one labelled line per
+  part, which the adapters' and tools' catch blocks read back.
 
 The reason lives on the control side (in `HostFilter` or beside it) and never
 on the audio thread: the audio callback only plays what it was given. Every
@@ -133,8 +138,8 @@ belongs to the request that supplied the filter, comes first while it lasts,
 and clears at the next activation that suits the filter. Restoring a saved
 failed load is a successful request whose instance plays silence, so it keeps
 a reason of its own kind (the original reason is not saved; the state format
-is unchanged). The speaker-layout notice stays a separate string
-(`HostFilter::notice()`): it never changes what plays, and it describes the
+is unchanged). The speaker-layout notice stays a separate record
+(`HostFilter::notice()`, an `Advice` too): it never changes what plays, and it describes the
 host as it is now rather than a request, so it is recomputed at every check
 instead of being kept until a later request succeeds. Adapters log
 `HostFilter::rejection()`, the newest request's own reason, when a load is
@@ -184,7 +189,8 @@ format.
   and its line (`host_status()`), DIAG-2's message in parts (the problem as a
   sentence, what plays (`failure_consequence()` or `playing_words()`), the
   cause, the fix, a note, and the window's action, "choose filter" or "copy
-  diagnostics"), and all of it as one explanation text with `Cause:`, `Fix:`
+  diagnostics"), taken from the failure's or notice's parts as they are
+  (DIAG-4), and all of it as one explanation text with `Cause:`, `Fix:`
   and `Note:` lines ([`advice.hpp`](../../portable/advice.hpp)); then
   the Filter row (the file's name and a note when the newest request was
   refused), the Audio facts in plain words (`HostFact`: sample rate,
@@ -292,9 +298,12 @@ format.
   filter, takes one snapshot of the counts (`HostProcessor::clear_faults()`)
   as both the audio thread's new baseline and the point `observe()` counts
   from. Faults from before the snapshot, the preparation window included, are
-  still returned by the next `observe()` (as `earlier`, logged with their own
-  ending saying the status does not show them), but no longer shown as
-  Fault, and the audio thread signals only faults after it
+  still returned by the next `observe()`, but no longer shown as Fault. That
+  report sets `changed`, and its log text says the faults were met around a
+  filter change and that the status shows only those after it; they are not
+  divided between the two filters (DIAG-3, jrp's simplification review of
+  5 November 2026: exact attribution near a replacement does not change the
+  audio), and the audio thread signals only faults after it
   (`faults_since_clear()`, `fault_to_signal()`, `fault_signalled()`, once per
   baseline). The audio thread never publishes Fault over Load failed: an
   accepted load sets `hold_fault_signal(failure_shown())` before the
@@ -421,9 +430,15 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   ramps linearly over 1.33 ms. The ramps (also bypass and mute) and the
   replacement crossfade last a fixed time at every sample rate (PLUG-17):
   64 and 256 frames at 48 kHz, to the nearest frame elsewhere, so 128 and
-  512 at 96 kHz and 59 and 235 at 44.1 kHz. Every ramp reaches its target
-  exactly on its last frame, also when it is reversed midway: bypass and
-  mute count whole frames rather than summing a float step (PLUG-18). The latency is fixed for a processor's life.
+  512 at 96 kHz and 59 and 235 at 44.1 kHz. A ramp must not click, must
+  finish promptly and must end exactly at its target (silence, the dry
+  signal, or the new gain or mix), also when it is reversed midway; the end
+  may come one frame after the ramp's last (PLUG-19, jrp, 5 November 2026:
+  one frame is about 5.7 µs at 176.4 kHz and inaudible), and
+  `native.host_settings` allows that. Bypass and mute count whole frames, so
+  today they end on the last frame itself (PLUG-18). The allowance is for
+  setting transitions only: the reported latency and the alignment between
+  channels are exact to the sample. The latency is fixed for a processor's life.
 - **Gain** applies to the filtered signal, after convolution and before the
   mix; the dry path stays the untouched input. Range −100 to +24 dB, linear
   in decibels (jrp). During a replacement both filters play at the same gain.

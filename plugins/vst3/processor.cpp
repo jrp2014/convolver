@@ -595,13 +595,12 @@ bool Processor::load_file(std::string_view chosen) {
         const auto* reader = files_ ? files_ : test_file_reader;
         if (!reader) {
             filter_.reject(HostFailureKind::filter_file,
-                           detail::advice_text({"this build of Convolver cannot read filter "
-                                                "files in the plug-in, so " +
-                                                    path + " was not loaded",
-                                                {},
-                                                "Make a preset from it with convolver-preset, "
-                                                "and load the preset instead.",
-                                                {}}),
+                           {"this build of Convolver cannot read filter files in the plug-in, so " +
+                                path + " was not loaded",
+                            {},
+                            "Make a preset from it with convolver-preset, and load the preset "
+                            "instead.",
+                            {}},
                            request);
             throw std::runtime_error("no reader");
         }
@@ -619,7 +618,7 @@ bool Processor::load_file(std::string_view chosen) {
         return false;
     }
 }
-std::string Processor::notice() {
+Advice Processor::notice() {
     std::lock_guard lock(control_);
     return filter_.notice();
 }

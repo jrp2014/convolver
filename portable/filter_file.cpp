@@ -11,11 +11,11 @@ namespace {
 // DIAG-2: the reader's message, always naming the chosen file by its full
 // path, so that the log says which folder's file was refused (the window
 // shows only the file name; host_report.cpp).
-std::string refusal(const std::string& path, const char* what) {
+Advice refusal(const std::string& path, const char* what) {
     auto a = detail::parse_advice(what);
     if (a.problem.find(path) == std::string::npos)
         a.problem = path + ": " + a.problem;
-    return detail::advice_text(a);
+    return a;
 }
 } // namespace
 

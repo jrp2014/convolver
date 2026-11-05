@@ -187,7 +187,7 @@ void Effect::fail_unrecorded() noexcept {
     }
 }
 
-void Effect::reject(HostFailureKind kind, const std::string& why, const HostRequest& request,
+void Effect::reject(HostFailureKind kind, const Advice& why, const HostRequest& request,
                     const Configuration* carried) {
     std::string faults;
     {
@@ -379,10 +379,10 @@ bool Effect::read_state(CFPropertyListRef plist, HostState& next,
                         std::optional<SavedSettings>& saved, bool& settings_unreadable) {
     if (!plist || CFGetTypeID(plist) != CFDictionaryGetTypeID()) {
         reject(HostFailureKind::state_unreadable,
-               detail::advice_text({"the saved state is not an Audio Unit preset dictionary",
-                                    {},
-                                    "Load the filter again, then save the project.",
-                                    {}}));
+               {"the saved state is not an Audio Unit preset dictionary",
+                {},
+                "Load the filter again, then save the project.",
+                {}});
         return false;
     }
     const auto dict = static_cast<CFDictionaryRef>(plist);

@@ -100,12 +100,37 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
-- The version is now 0.9.0, the milestone step before jrp's host smoke tests
-  (HOST-1) and the first preview, which is now cut from the 0.9 series
-  (jrp, 5 November 2026). CMake consumers request
-  `find_package(Convolver 0.9)`. The LV2 plug-in reports minor version 9,
-  which LV2 reads as a development version; LV2 is not in the first preview.
-
+- The version is now 0.10.0 (jrp, 5 November 2026), the minor step for the
+  library changes in DIAG-3 and DIAG-4 below, after 0.9.0. CMake consumers
+  request `find_package(Convolver 0.10)`, and the first preview is cut from
+  the 0.10 series. The LV2 plug-in reports minor version 10, which LV2
+  accepts as a release.
+- 0.9.0 was the milestone step before jrp's host smoke tests (HOST-1), from
+  which the first preview was first to be cut (jrp, 5 November 2026). Its
+  CMake consumers request `find_package(Convolver 0.9)`, and its LV2 plug-in
+  reports minor version 9, which LV2 reads as a development version.
+- Plug-in contract (PLUG-19, from jrp's simplification review of 5 November
+  2026): a setting transition (bypass, mute, gain, mix) may end one frame
+  after its ramp's last frame, which is inaudible (about 5.7 µs at
+  176.4 kHz). It must still end exactly at its target and not click.
+  `native.host_settings` allows that frame, so a later shared ramp helper
+  need not reproduce PLUG-18's frame counting. Reported latency and channel
+  alignment stay exact to the sample. The sound is unchanged.
+- Library and plug-ins (DIAG-3, from jrp's simplification review): faults
+  met while a replacement filter was being prepared are logged together with
+  any met just after it, as "around a filter change", instead of in a
+  sentence of their own. The status still shows only those after the new
+  filter took over. `HostFaultReport` holds `faults`, `changed` and `held`
+  instead of `current`, `earlier` and `held`.
+- Library (DIAG-4, from jrp's simplification review): failure records keep
+  a message in its parts instead of as text. `HostFailure::message`,
+  `HostFilter::notice()`, `speaker_notice()` and `host_state_size_error()`
+  hold a `convolver::Advice` (problem, cause, fix, note, in the new header
+  `convolver/advice.hpp`), and `HostFilter::reject()` takes one.
+  `HostFilter::error()` returns the failure's text by value. The log, the
+  window and the tools format the parts where they leave the library, so
+  the window's report no longer parses text it has just written; exception
+  messages, and the text an adapter hands the log, are still read back. Every message's wording is unchanged.
 - CLI (GAIN-2, from an external review of `91fcf1f`): `--gain-db no-clip`
   takes the largest possible peak directly instead of also filtering ten
   filter lengths of noise, so choosing it costs well under a millisecond
