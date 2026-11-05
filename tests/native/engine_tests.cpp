@@ -29,15 +29,10 @@ void* operator new(std::size_t bytes) {
         return p;
     throw std::bad_alloc();
 }
-void* operator new[](std::size_t bytes) {
-    return ::operator new(bytes);
-}
 void operator delete(void* p) noexcept {
     std::free(p);
 }
-void operator delete[](void* p) noexcept {
-    std::free(p);
-}
+#include "replaced_allocation.hpp"
 
 using namespace convolver;
 namespace {

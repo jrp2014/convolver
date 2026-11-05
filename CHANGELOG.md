@@ -263,6 +263,10 @@ Until 1.0 the C++ API may change between minor versions.
   its first load is refused; the log and window then say memory ran out if
   the reason itself could not be kept. An accepted filter still keeps
   playing when a replacement fails.
+- Tests (CI-30): `native.engine` replaces `operator new` with the array and
+  sized `operator delete` too, from one shared file, so GCC's
+  AddressSanitizer build runs the oracle tests instead of stopping on
+  alloc-dealloc-mismatch.
 - VST3 (VST3-15, from jrp's review of `276c7dc`): with a host that puts a
   proxy between the plug-in's two halves and delivers their messages later,
   a new Latency asked the host to restart before the processor had it, so

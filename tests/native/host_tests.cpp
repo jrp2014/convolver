@@ -38,25 +38,12 @@ void* operator new(std::size_t n) {
         return p;
     throw std::bad_alloc();
 }
-void* operator new[](std::size_t n) {
-    return ::operator new(n);
-}
 void operator delete(void* p) noexcept {
     if (audio_thread && p)
         std::abort();
     std::free(p);
 }
-void operator delete[](void* p) noexcept {
-    ::operator delete(p);
-}
-// Sized forms too, so library code (std::filesystem) never frees with the
-// runtime's own delete what this operator new allocated.
-void operator delete(void* p, std::size_t) noexcept {
-    ::operator delete(p);
-}
-void operator delete[](void* p, std::size_t) noexcept {
-    ::operator delete(p);
-}
+#include "replaced_allocation.hpp"
 using namespace convolver;
 void require(bool value, const char* message) {
     if (!value)

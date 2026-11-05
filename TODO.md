@@ -1005,6 +1005,13 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   reads it; the build and test jobs have time limits. No automatic re-runs;
   CI-24 and CI-25 continue;
   [intermittent failures](docs/develop/testing.md#intermittent-failures).
+- [x] **CI-30 — Complete the tests' replaced allocation functions.**
+  5 November 2026, PR #111, from the external review of `91fcf1f` (0.8.13):
+  `native.engine` replaced `operator new` without the sized `operator
+  delete`, so with GCC's library AddressSanitizer stopped it with
+  alloc-dealloc-mismatch before the oracle tests ran. The array and sized
+  forms are now one shared file, `tests/native/replaced_allocation.hpp`,
+  used by every native test that watches allocation.
 - [x] **CI-29 — Use LLVM's parallel clang-tidy runner.** 5 November 2026,
   PR #108, from the project review of that day: CI runs `run-clang-tidy.py`,
   which the clang-tidy package installs, in place of our
