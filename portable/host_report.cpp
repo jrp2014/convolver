@@ -86,7 +86,7 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         m.note = a.note;
     };
     if (failure) {
-        auto a = detail::parse_advice(failure->message);
+        auto a = detail::parse_advice(failure_message(*failure));
         a.problem = short_problem(std::move(a.problem), *failure);
         take(a);
         m.plays = failure_consequence(*failure, layout, facts.settings);

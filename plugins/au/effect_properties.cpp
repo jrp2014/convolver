@@ -574,7 +574,10 @@ OSStatus Effect::SetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
             return kAudioUnitErr_InvalidPropertyValue;
         try {
             return load_file(file_path(path));
-        } catch (...) { // Out of memory before anything changed.
+        } catch (...) {
+            // Out of memory before the failure could be recorded (ROBUST-7);
+            // an accepted file has a filter, which this leaves playing.
+            fail_unrecorded();
             return kAudioUnitErr_InvalidPropertyValue;
         }
     }

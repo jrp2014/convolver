@@ -4,11 +4,16 @@
 // model of the shared adapter contract.
 #include "../plugins/audio_guard.hpp"
 #include "../plugins/lifecycle.hpp"
+#include "../plugins/load_timing.hpp"
 #include "processor.hpp"
 #include "public.sdk/source/common/memorystream.h"
 #include "public.sdk/source/vst/hosting/hostclasses.h"
 #include "public.sdk/source/vst/hosting/parameterchanges.h"
+#if defined(CONVOLVER_VST3_TESTS_IO) && !defined(__APPLE__)
+#include "sound_files.hpp"
+#endif
 #include <array>
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -18,6 +23,7 @@ using namespace Steinberg;
 using namespace Steinberg::Vst;
 namespace lc = convolver::plugin_test::lifecycle;
 namespace guard = convolver::plugin_test::audio_guard;
+namespace timing = convolver::plugin_test::load_timing;
 
 namespace {
 void check(bool condition, const char* what) {
@@ -167,6 +173,18 @@ class Vst3 final : public lc::Driver {
     std::size_t max_block() const override {
         return 512;
     }
+    // The window's Choose Filter, as the controller sends it (load_message),
+    // on the calling thread. True if the processor accepted the file.
+    bool load_file(const std::string& path) {
+        IPtr<HostMessage> message = owned(new HostMessage);
+        message->setMessageID(convolver::vst3::load_message);
+        auto* attributes = message->getAttributes();
+        check(attributes && attributes->setBinary("path", path.data(),
+                                                  static_cast<uint32>(path.size())) == kResultOk,
+              "load message");
+        attributes->setInt("request", ++requests_);
+        return processor_->notify(message) == kResultOk;
+    }
 
   private:
     bool call(std::span<const float* const> in, std::span<float* const> out, std::size_t frames,
@@ -202,11 +220,38 @@ class Vst3 final : public lc::Driver {
     std::size_t inputs_ = 2, outputs_ = 2;
     bool active_ = false;
     std::optional<std::pair<std::size_t, bool>> starve_; // For restore_starved.
+    int64 requests_ = 0;                                 // load_file's message numbers.
 };
+
+// The loading-responsiveness timings (tests/plugins/load_timing.hpp): the
+// host's setState and the window's file, each on the host's thread.
+int load_timing(int argc, char** argv) {
+    timing::Options options;
+    options.work_directory = argc > 2 ? argv[2] : "vst3-load-timing";
+    options.long_filters = argc > 3 && std::strcmp(argv[3], "--long") == 0;
+    Vst3 driver;
+    std::vector<timing::Entry> entries{{"setState", [&](const timing::Filter& f, timing::Audio&) {
+                                            return timing::Outcome{driver.restore(f.state)};
+                                        }}};
+#if defined(CONVOLVER_VST3_TESTS_IO) && !defined(__APPLE__)
+    // Plug-in builds here read no files; the tests lend it the tools' reader.
+    convolver::vst3::test_file_reader = &convolver::detail::libsndfile_files();
+#endif
+#if defined(__APPLE__) || defined(CONVOLVER_VST3_TESTS_IO)
+    entries.push_back({"window file", [&](const timing::Filter& f, timing::Audio&) {
+                           return timing::Outcome{driver.load_file(f.file.string())};
+                       }});
+#else
+    std::cout << "VST3: this build reads no filter files, so the window's file is not timed\n";
+#endif
+    return timing::run(driver, entries, options) ? 1 : 0;
+}
 } // namespace
 
 int main(int argc, char** argv) {
     try {
+        if (argc > 1 && std::strcmp(argv[1], "--load-timing") == 0)
+            return load_timing(argc, argv);
         lc::Options options;
         if (argc > 1)
             options.length = std::stoul(argv[1]);

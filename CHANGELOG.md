@@ -12,6 +12,17 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Tests (PERF-9): `vst3.load_timing`, `au.load_timing` and `lv2.load_timing`
+  time each plug-in format's own load entry points (VST3 `setState` and the
+  window's file, the Audio Unit's `RestoreState` and load property, LV2's
+  `restore()` and worker) with filters of 1 to 30 seconds while another
+  thread renders at the host's pace, and report how long the caller was held
+  and how late audio callbacks were. In optimised builds they fail above
+  jrp's limits for the loading-responsiveness gate: no late callback, and
+  the host's thread held at most 100 ms with filters up to 10 s and 250 ms
+  with 30 s; an entry over them runs up to three times, and the last run
+  counts. Tests only: no change to the plug-ins or the sound.
+
 - `convolver --compare OUTPUT EXPECTED` (REL-5) checks a render, such as a
   plug-in host's, against the file it should match, sample for sample. It
   prints the largest difference relative to the expected peak, matches within
@@ -89,6 +100,17 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- The version is now 0.9.0, the milestone step before jrp's host smoke tests
+  (HOST-1) and the first preview, which is now cut from the 0.9 series
+  (jrp, 5 November 2026). CMake consumers request
+  `find_package(Convolver 0.9)`. The LV2 plug-in reports minor version 9,
+  which LV2 reads as a development version; LV2 is not in the first preview.
+
+- CLI (GAIN-2, from an external review of `91fcf1f`): `--gain-db no-clip`
+  takes the largest possible peak directly instead of also filtering ten
+  filter lengths of noise, so choosing it costs well under a millisecond
+  rather than tens of milliseconds for long filters. The gain it chooses is
+  unchanged; `--gain-db auto` still filters noise.
 - Diagnostics (DIAG-2): every message a user can meet states the problem,
   its cause and the fix, with a note where an environment, host or design
   limit is the reason. `convolver`, `convolver-preset` and the other tools
@@ -123,7 +145,7 @@ Until 1.0 the C++ API may change between minor versions.
 - The version is now 0.8.0, the minor step for the library change below
   (jrp, 1 November 2026: an incompatible API change before 1.0 needs one).
   CMake consumers now request `find_package(Convolver 0.8)`, and the first
-  preview is cut from the 0.8 series. The LV2 plug-in reports minor version
+  preview is cut from the 0.8 series (now the 0.9 series, above). The LV2 plug-in reports minor version
   8, an even (release) minor again, though odd patch numbers still give a
   micro version LV2 treats as a development one (LV2-5).
 - Library (PLUG-10): `HostSettings` gains `latency` (one of the new
@@ -255,6 +277,33 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Plug-ins (ROBUST-7, from an external review of `91fcf1f`): when memory ran
+  out while a refused first load was being recorded, VST3, the Audio Unit
+  and LV2 could go on passing the unfiltered input, and saved state did not
+  record the failure. The failure is now marked before anything is
+  allocated, so the instance plays silence and saves the failure whenever
+  its first load is refused; the log and window then say memory ran out if
+  the reason itself could not be kept. An accepted filter still keeps
+  playing when a replacement fails.
+- Plug-ins (PLUG-18, from the same review): bypass and mute now end exactly
+  at the dry signal or silence on their last frame. Since PLUG-17 they
+  could leave about 2.4e-6 of the signal (-112 dB) for one frame at some
+  rates (176.4 kHz, for example). At 48 kHz and 96 kHz the output is
+  unchanged sample for sample; elsewhere it differs only by float rounding
+  during the 1.33 ms ramp.
+- Audio Unit (AU-13, from the same review): if the Latency work's
+  semaphore could not be created when a unit opened, the unit released a
+  dispatch source that had never been activated, which Apple documents as
+  undefined. The source is now created last, so a failure there leaves
+  nothing to undo, and opening the unit fails cleanly.
+- Tests (CI-31): the shared double-precision oracle works out each route's
+  invariant parts once, with the same arithmetic, so `native.host_settings`
+  takes about 4 seconds rather than 90 under GCC's AddressSanitizer, where
+  it had passed its time limit.
+- Tests (CI-30): `native.engine` replaces `operator new` with the array and
+  sized `operator delete` too, from one shared file, so GCC's
+  AddressSanitizer build runs the oracle tests instead of stopping on
+  alloc-dealloc-mismatch.
 - VST3 (VST3-15, from jrp's review of `276c7dc`): with a host that puts a
   proxy between the plug-in's two halves and delivers their messages later,
   a new Latency asked the host to restart before the processor had it, so

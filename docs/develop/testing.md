@@ -25,6 +25,7 @@ below. A test list is coverage information; a pass claim needs an actual run.
 Contents: [native tests](#native-production-tests),
 [plug-in comparisons](#plug-in-comparisons-plug-2),
 [lifecycle sequences](#lifecycle-sequences-plug-7),
+[load timing](#load-timing-perf-9),
 [historical tests](#historical-tests-run-with-cmakectest) and
 [their coverage](#historical-coverage), [limits](#validation-limits-and-release-work),
 [documentation checks](#documentation-checks), [fuzzing](#fuzz-smoke-tests-and-longer-campaigns),
@@ -525,6 +526,57 @@ twenty times slower. LV2, with about twice as many operations, uses one fewer
 its last argument. On one machine in October 2026, `vst3.lifecycle` (Debug,
 no sanitizers) ran 31,170 sequences per layout (31,152 enumerated, the rest
 fixed and seeded), for both layouts in about 30 seconds.
+
+## Load timing (PERF-9)
+
+The [loading-responsiveness gate](../../TODO.md#loading-responsiveness)
+measures, rather than judges by hand in a host, how long each format's own
+load entry points hold the thread that calls them, and whether audio
+callbacks running meanwhile on another thread finish in time.
+[`tests/plugins/load_timing.hpp`](../../tests/plugins/load_timing.hpp) drives
+each format's lifecycle driver: a thread calls `process` every 512 frames of
+real time at 48 kHz, as an audio device would, while the test thread loads a
+stereo filter of 1, 10 and 30 seconds into an empty instance, replaces it with
+another as long, and then resets processing from the audio thread. A callback
+is late when it finishes after the next one was due. A baseline with nothing
+loading shows the machine's own scheduling noise.
+
+| Test | Entry points timed |
+| --- | --- |
+| `vst3.load_timing` | `setState`, and the window's file (the controller's load message to `notify`) where the build reads files: macOS, and elsewhere with libsndfile lent as in `vst3.adapter` |
+| `au.load_timing` | `RestoreState` (ClassInfo) and the window's load property, macOS only |
+| `lv2.load_timing` | `restore()`, with `run()` held back meanwhile because the plug-in does not declare `state:threadSafeRestore`, and a file chosen on the filter parameter, timed as the worker's `work()` |
+
+Each line gives the time the caller was held and, for the callbacks in that
+phase, how many there were, how many were late and by how much at worst, and
+the longest, counting time a callback was held back (LV2's `restore()`). A phase lasts a third of a second after its load, so callbacks
+do not reach a long filter's steady cost, which grows as input history fills
+(PERF-5); that cost is PERF-3's to measure.
+
+The limits (jrp, 5 November 2026) hold only in an optimised build without
+sanitizers, the only build whose timings mean something; other builds print
+what would exceed them. While a load, a replacement or a reset runs on
+another thread, no callback may be late or take more than half its period
+(5.3 ms here); where the host stops audio (LV2's `restore()` and its reset)
+the callbacks are reported only. A load may hold the host's thread at most
+100 ms with filters up to 10 s and 250 ms with 30 s (100 ms feels instant;
+250 ms is where Apple's tools count an application as hung); the 120 s
+filter and LV2's worker are reported only. A phase whose baseline already
+had late callbacks is inconclusive rather than failed: the machine was busy.
+A shared CI runner can also stall a single run without a late baseline (on
+Windows CI the 30 s filter once held the host's thread for about 265 ms,
+where the run before took 55 ms), so in an optimised build an entry with a
+phase over the limits runs again, up to three times, and only the last run
+counts; a slow adapter is over the limits every time.
+In every build the run also fails when a load is refused, the instance does
+not then save the second filter, or a callback reports an error or throws.
+CTest runs the three alone (`RUN_SERIAL`); the first line says which build
+ran. The Release jobs of the VST3 and Audio Unit
+workflows print the tables in a "Load timings" step; LV2's run only in its
+sanitizer job. The
+`timing` label selects the three tests. Run a lifecycle executable with
+`--load-timing DIRECTORY --long` (LV2: `BUNDLE DIRECTORY --load-timing --long`)
+to add the 120-second filter jrp loaded in GarageBand.
 
 ## Plug-in format tests
 

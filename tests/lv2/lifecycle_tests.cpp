@@ -9,10 +9,12 @@
 // that overtakes one the worker is preparing, and a host with no worker.
 #include "../plugins/audio_guard.hpp"
 #include "../plugins/lifecycle.hpp"
+#include "../plugins/load_timing.hpp"
 #include "convolver/io.hpp"
 #include "host.hpp"
 #include "plugin.hpp"
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -25,6 +27,7 @@ using namespace convolver;
 namespace lc = convolver::plugin_test::lifecycle;
 namespace guard = convolver::plugin_test::audio_guard;
 namespace host = convolver::lv2_test;
+namespace timing = convolver::plugin_test::load_timing;
 namespace fs = std::filesystem;
 
 namespace {
@@ -223,6 +226,20 @@ class Lv2 final : public lc::Driver {
         worker.join();
     }
 
+    // The filter parameter, as a host's generic UI sets it: the request
+    // arrives in the next run(), and the host's worker, this thread, loads
+    // it. Held: the worker's time; true once the file plays.
+    timing::Outcome request_file(const fs::path& path, timing::Audio& audio) {
+        audio.before_next([&] { plugin_->set_filter(path.string()); });
+        if (plugin_->queued_work() != 1)
+            return {};
+        const auto begun = std::chrono::steady_clock::now();
+        plugin_->run_deferred_work();
+        const std::chrono::duration<double> held = std::chrono::steady_clock::now() - begun;
+        audio.wait_callbacks(2); // The answer arrives after the next run().
+        return {saved_path() == path.string(), held};
+    }
+
     // The guard must see the plug-in's own allocations and locks, which only
     // happens if the plug-in library resolves them to this executable.
     void check_guard() {
@@ -262,14 +279,41 @@ class Lv2 final : public lc::Driver {
 };
 } // namespace
 
+// The loading-responsiveness timings (tests/plugins/load_timing.hpp): state
+// restored while the host holds back run() (restore() is not thread-safe),
+// and a file chosen on the filter parameter, loaded by the worker.
+int load_timing(host::World& world, const fs::path& work, bool long_filters) {
+    timing::Options options;
+    options.work_directory = work;
+    options.long_filters = long_filters;
+    options.reset_holds_audio = true; // Deactivate and activate.
+    Lv2 driver(world, host::Worker::deferred);
+    // Neither holds the host's own thread while audio plays: the host stops
+    // audio for restore(), and the worker has its own thread.
+    const std::vector<timing::Entry> entries{{"restore",
+                                              [&](const timing::Filter& f, timing::Audio&) {
+                                                  return timing::Outcome{driver.restore(f.state)};
+                                              },
+                                              true, false},
+                                             {"worker",
+                                              [&](const timing::Filter& f, timing::Audio& audio) {
+                                                  return driver.request_file(f.file, audio);
+                                              },
+                                              false, false}};
+    return timing::run(driver, entries, options) ? 1 : 0;
+}
+
 int main(int argc, char** argv) {
     if (argc < 3) {
-        std::cerr << "usage: " << argv[0] << " BUNDLE_DIRECTORY WORK_DIRECTORY [LENGTH]\n";
+        std::cerr << "usage: " << argv[0]
+                  << " BUNDLE_DIRECTORY WORK_DIRECTORY [LENGTH | --load-timing [--long]]\n";
         return 2;
     }
     try {
         host::World world(argv[1]);
         const fs::path work = argv[2];
+        if (argc > 3 && std::strcmp(argv[3], "--load-timing") == 0)
+            return load_timing(world, work, argc > 4 && std::strcmp(argv[4], "--long") == 0);
         lc::Options options;
         options.length = argc > 3 ? std::stoul(argv[3]) : 3;
         // Found by these sequences: a refused first load right after an empty

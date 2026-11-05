@@ -154,7 +154,7 @@ struct Instance {
     std::size_t reported_length = 0;
     bool notify = false; // Send patch:Set with the reported path at the end of run().
 
-    void update_status() {
+    void update_status() noexcept {
         auto s = Status::no_filter;
         // A failure stays recorded until a later load succeeds (PLUG-8).
         // failed() also covers a record that could not be built.
@@ -199,34 +199,47 @@ struct Instance {
     }
     // After a rejection: a failed first load plays silence rather than the
     // unfiltered input, without allocating, as memory may have run out
-    // (ROBUST-3).
+    // (ROBUST-3), maybe before the failure could be recorded (ROBUST-7).
     void silence_failed_first_load(bool was_failed) noexcept {
+        filter.fail_request();
         if (host && filter.failed() && !was_failed)
             host->silence();
     }
+    // ROBUST-7: a request that failed before its failure could be recorded
+    // (memory ran out building the message) still fails a first load.
+    // `was_failed`: filter.failed() from before the request.
+    void fail_unrecorded(bool was_failed) noexcept {
+        silence_failed_first_load(was_failed);
+        update_status();
+    }
     // Records a request run() could not hand to the worker, unless a newer
     // one has been recorded since. Control side, under the lock.
-    void record_dropped() {
+    void record_dropped() noexcept {
         const auto d = dropped.exchange(0, std::memory_order_acq_rel);
         const auto generation = d >> 1;
         if (!d || generation <= handled)
             return;
         handled = generation;
         const bool was_failed = filter.failed();
-        filter.reject(HostFailureKind::filter_file,
-                      (d & 1) != 0
-                          ? detail::advice_text(
-                                {"this host gives Convolver no worker thread, so it cannot load "
-                                 "a filter file",
-                                 "Loading a filter file needs the LV2 worker extension.",
-                                 "Load a preset or a saved session instead, or use a host that "
-                                 "supports the worker.",
-                                 {}})
-                          : detail::advice_text({"the host could not start loading the filter file",
-                                                 "Its worker queue was full.",
-                                                 "Choose the file again.",
-                                                 {}}),
-                      {HostFilterSource::file, "", generation});
+        try { // The message needs memory: a first load fails all the same (ROBUST-7).
+            filter.reject(
+                HostFailureKind::filter_file,
+                (d & 1) != 0
+                    ? detail::advice_text(
+                          {"this host gives Convolver no worker thread, so it cannot load "
+                           "a filter file",
+                           "Loading a filter file needs the LV2 worker extension.",
+                           "Load a preset or a saved session instead, or use a host that "
+                           "supports the worker.",
+                           {}})
+                    : detail::advice_text({"the host could not start loading the filter file",
+                                           "Its worker queue was full.",
+                                           "Choose the file again.",
+                                           {}}),
+                {HostFilterSource::file, "", generation});
+        } catch (...) {
+            filter.fail_request();
+        }
         silence_failed_first_load(was_failed);
         update_status();
         log_rejection();
@@ -418,8 +431,8 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
         return Outcome::superseded; // Rapid loads coalesce to the newest.
     const HostRequest request{HostFilterSource::file, path, r.generation};
     // Copied before anything is published, so recording what plays below
-    // cannot run out of memory. Running out here, like the copy above, leaves
-    // work() to answer with nothing recorded or changed.
+    // cannot run out of memory. Running out here, like the copy above, fails
+    // the request in work() (ROBUST-7).
     std::string kept_path = path;
     p.log_faults(); // Explained under the filter that played; a load clears them.
     const bool was_failed = p.filter.failed();
@@ -528,23 +541,37 @@ LV2_Worker_Status work(LV2_Handle handle, LV2_Worker_Respond_Function respond,
     answer.generation = r.generation;
     std::vector<std::byte> reply;
     try {
-        const std::string path =
-            damaged ? std::string()
-                    : std::string(static_cast<const char*>(data) + sizeof r, r.length);
         std::lock_guard lock(p.control);
         if (p.closing)
             return LV2_WORKER_SUCCESS;
-        p.record_dropped();
-        answer.outcome = load_request(p, r, path, damaged);
-        if (p.host)
-            p.host->collect();
-        answer.installed = p.installed;
-        answer.length =
-            static_cast<std::uint32_t>(std::min(p.installed_path.size(), max_path_bytes));
-        reply.resize(sizeof answer + answer.length);
-        std::memcpy(reply.data(), &answer, sizeof answer);
-        std::memcpy(reply.data() + sizeof answer, p.installed_path.data(), answer.length);
-    } catch (...) {
+        const bool was_failed = p.filter.failed();
+        try {
+            const std::string path =
+                damaged ? std::string()
+                        : std::string(static_cast<const char*>(data) + sizeof r, r.length);
+            p.record_dropped();
+            answer.outcome = load_request(p, r, path, damaged);
+            if (p.host)
+                p.host->collect();
+            answer.installed = p.installed;
+            answer.length =
+                static_cast<std::uint32_t>(std::min(p.installed_path.size(), max_path_bytes));
+            reply.resize(sizeof answer + answer.length);
+            std::memcpy(reply.data(), &answer, sizeof answer);
+            std::memcpy(reply.data() + sizeof answer, p.installed_path.data(), answer.length);
+        } catch (...) {
+            // ROBUST-7: memory ran out, maybe before the failure could be
+            // recorded. Unless a newer request has overtaken it, the request
+            // fails (an accepted filter, which has a filter, is unchanged).
+            if (r.generation >= p.requested.load(std::memory_order_acquire)) {
+                p.handled = std::max(p.handled, r.generation);
+                p.fail_unrecorded(was_failed);
+            }
+            answer.installed = 0;
+            answer.length = 0;
+            reply.clear();
+        }
+    } catch (...) { // The lock could not be taken.
         answer.installed = 0;
         answer.length = 0;
         reply.clear();
@@ -1023,8 +1050,14 @@ LV2_State_Status restore(LV2_Handle handle, LV2_State_Retrieve_Function retrieve
     auto& p = *static_cast<Instance*>(handle);
     try {
         std::lock_guard lock(p.control);
-        return restore_locked(p, retrieve, state, features);
-    } catch (...) {
+        const bool was_failed = p.filter.failed();
+        try {
+            return restore_locked(p, retrieve, state, features);
+        } catch (...) { // ROBUST-7: out of memory, maybe before the failure was recorded.
+            p.fail_unrecorded(was_failed);
+            return LV2_STATE_ERR_UNKNOWN;
+        }
+    } catch (...) { // The lock could not be taken.
         return LV2_STATE_ERR_UNKNOWN;
     }
 }

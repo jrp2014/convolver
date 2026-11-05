@@ -84,7 +84,9 @@ class Reference final : public lc::Driver {
         } catch (...) {
             // Contract, loading and failure: a failed first load plays
             // silence, never the unfiltered input.
-            // ROBUST-3: without allocating, as memory may have run out.
+            // ROBUST-3: without allocating, as memory may have run out;
+            // ROBUST-7: maybe before the failure could be recorded.
+            filter_->fail_request();
             if (processor_ && filter_->failed() && !was_failed)
                 processor_->silence();
             return false;

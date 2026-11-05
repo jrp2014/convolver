@@ -639,8 +639,11 @@ class Runner {
             expect(filter_of(saved) == before, "a load that ran out of memory after " +
                                                    std::to_string(allowed) +
                                                    " allocations changed the saved filter");
-            // A failed first load plays silence once its failure is recorded;
-            // recording it needs memory too, so it may not be.
+            // ROBUST-7: however early memory ran out, a failed first load
+            // fails the instance (silence, saved as failed), recorded or not.
+            expect(m.filter.has_value() || saved.failed,
+                   "a first load that ran out of memory after " + std::to_string(allowed) +
+                       " allocations did not fail the instance");
             if (saved.failed && !m.failed)
                 reject(m, HostFailureKind::preparation, ++m.requests);
             m.numbers_unknown = true;
@@ -670,14 +673,19 @@ class Runner {
             expect(!*accepted, "malformed state was accepted");
             const auto after = driver_.failure();
             const auto saved = driver_.saved();
+            // ROBUST-7: failed however early memory ran out, recorded or not.
+            expect(m.filter.has_value() || saved.failed,
+                   "malformed state that ran out of memory after " + std::to_string(allowed) +
+                       " allocations did not fail the instance");
             if (saved.failed && !m.failed)
                 reject(m, HostFailureKind::state_unreadable, ++m.requests);
             m.numbers_unknown = true;
             if (m.active)
                 listen(x, m);
             if (after && after->kind == HostFailureKind::state_unreadable &&
+                !after->message.empty() &&
                 (!before || after->request.number > before->request.number))
-                break; // Recorded: later attempts repeat this one.
+                break; // Recorded in full: later attempts repeat this one.
         }
         apply(x, m, op);
     }

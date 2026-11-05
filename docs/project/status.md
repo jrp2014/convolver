@@ -26,7 +26,7 @@ run the Audio Unit and its window in GarageBand; the VST3 hosts (REAPER,
 Audacity) have not been run, and no independent user has followed the
 instructions. The next milestone is end-to-end testing of a fixed feature
 set: an independent user installing and using an exact preview package, cut
-from the 0.8 series that `main` is now in.
+from the 0.9 series that `main` is now in.
 [What still blocks it](#what-still-blocks-the-first-preview) lists the
 remaining work by TODO item.
 
@@ -133,7 +133,7 @@ the preset tool, with the editor's settings and window in both plug-in
 formats (until 25 October 2026 the Audio Unit was to join a later
 preview). LV2 joins a later preview once its own journeys are demonstrated.
 
-The first preview is cut from a 0.8.x tag.
+The first preview is cut from a 0.9.x tag.
 
 | Condition | Source | Item | Status |
 | --- | --- | --- | --- |
@@ -172,8 +172,10 @@ detail.
    Linux (VST3-12, VST3-13); the gain modes, computed gains and meters
    (PLUG-9, PLUG-10, AU-7); the Audio Unit's pluginval run and component in
    the package (AU-3, AU-5); the remaining checks under AU-6 and VST3-11; and
-   the [loading responsiveness](../../TODO.md#loading-responsiveness) gate.
-5. **jrp's decisions:** who the REL-3 tester is, and the wording of the VST
+   the [loading responsiveness](../../TODO.md#loading-responsiveness) gate,
+   whose timing test now runs with jrp's limits (PERF-9); on CI a 30 s
+   filter holds the host's thread 28 to 154 ms, within its 250 ms limit.
+5. **jrp's decisions:** who the REL-3 tester is and the wording of the VST
    trademark notice (PLUG-5). The LV2 version mapping (LV2-5) is needed only
    before LV2 joins a preview.
 

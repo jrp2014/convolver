@@ -67,6 +67,7 @@ if(CONVOLVER_BUILD_TESTS)
                 list(APPEND sources "${PROJECT_SOURCE_DIR}/tests/plugins/harness.cpp")
             elseif(name STREQUAL "lifecycle")
                 list(APPEND sources "${PROJECT_SOURCE_DIR}/tests/plugins/lifecycle.cpp"
+                    "${PROJECT_SOURCE_DIR}/tests/plugins/load_timing.cpp"
                     "${PROJECT_SOURCE_DIR}/tests/plugins/audio_guard.cpp")
             endif()
             add_executable(convolver_lv2_${name} ${sources})
@@ -103,6 +104,12 @@ if(CONVOLVER_BUILD_TESTS)
         add_test(NAME lv2.lifecycle COMMAND convolver_lv2_lifecycle "${lv2_bundle_dir}"
             "${PROJECT_BINARY_DIR}/lv2-test" ${CONVOLVER_LV2_LIFECYCLE_LENGTH})
         set_tests_properties(lv2.lifecycle PROPERTIES LABELS "lv2;real-libraries;plug7" TIMEOUT 600 COST 25)
+        # The loading-responsiveness timings (TODO.md): measurement only.
+        add_test(NAME lv2.load_timing COMMAND convolver_lv2_lifecycle "${lv2_bundle_dir}"
+            "${PROJECT_BINARY_DIR}/lv2-load-timing" --load-timing)
+        # Alone, so that other tests do not take its machine (RUN_SERIAL).
+        set_tests_properties(lv2.load_timing PROPERTIES LABELS "lv2;real-libraries;timing" TIMEOUT 600
+            RUN_SERIAL TRUE)
         # Everything the lv2.* tests and examples.first_use (the harness's
         # fixtures) run, so CI can build these alone rather than every test.
         add_custom_target(convolver_lv2_tests)

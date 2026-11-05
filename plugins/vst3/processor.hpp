@@ -204,7 +204,7 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // VST3-3, a load_message: reads the filter file at `path` (UTF-8) for
     // the host's rate and channels, as convolver-preset does, and loads it
     // as a state restore would. True if it was accepted.
-    bool load_file(const std::string& path);
+    bool load_file(std::string_view path);
     // VST3-3, under control_: the window's report. The report_message looks
     // for unexplained faults at most every report_fault_interval, so an open
     // window does not log a line twice a second, as in the Audio Unit.

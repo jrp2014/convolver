@@ -58,9 +58,26 @@ bool same(const HostLayout& a, const HostLayout& b) {
 // not once each. Cancelling stops further runs, and the cancel handler runs
 // once a run in progress has finished, which the destructor waits for.
 struct Effect::LatencyQueue {
+    // AU-13: the source is created last, so that a failure (dispatch_*_create
+    // returns NULL) never leaves an inactive source to release: releasing the
+    // last reference to an inactive object is undefined (dispatch_activate's
+    // documentation). Once activated, the source is released only after it
+    // is cancelled and its cancel handler has run.
     explicit LatencyQueue(Effect& e) : effect(e) {
-        if (!queue || !source || !ended) { // dispatch_*_create returns NULL on failure.
-            release();
+        const auto fail = latency_queue_failure_for_tests;
+        ended = fail == 1 ? nullptr : dispatch_semaphore_create(0);
+        if (ended)
+            queue = fail == 2 ? nullptr
+                              : dispatch_queue_create("Convolver Audio Unit Latency",
+                                                      DISPATCH_QUEUE_SERIAL);
+        if (queue)
+            source = fail == 3 ? nullptr
+                               : dispatch_source_create(DISPATCH_SOURCE_TYPE_DATA_OR, 0, 0, queue);
+        if (!source) {
+            if (queue)
+                dispatch_release(queue);
+            if (ended)
+                dispatch_release(ended);
             throw std::bad_alloc();
         }
         dispatch_set_context(source, this);
@@ -76,25 +93,18 @@ struct Effect::LatencyQueue {
     ~LatencyQueue() {
         dispatch_source_cancel(source);
         dispatch_semaphore_wait(ended, DISPATCH_TIME_FOREVER);
-        release();
+        dispatch_release(source);
+        dispatch_release(queue);
+        dispatch_release(ended);
     }
     void request() noexcept {
         dispatch_source_merge_data(source, 1);
     }
-    void release() noexcept {
-        if (source)
-            dispatch_release(source);
-        if (queue)
-            dispatch_release(queue);
-        if (ended)
-            dispatch_release(ended);
-    }
 
     Effect& effect;
-    dispatch_queue_t queue =
-        dispatch_queue_create("Convolver Audio Unit Latency", DISPATCH_QUEUE_SERIAL);
-    dispatch_source_t source = dispatch_source_create(DISPATCH_SOURCE_TYPE_DATA_OR, 0, 0, queue);
-    dispatch_semaphore_t ended = dispatch_semaphore_create(0);
+    dispatch_semaphore_t ended = nullptr;
+    dispatch_queue_t queue = nullptr;
+    dispatch_source_t source = nullptr;
 };
 
 Effect::Effect(AudioComponentInstance instance)

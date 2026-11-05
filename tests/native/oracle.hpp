@@ -29,19 +29,26 @@ inline std::vector<double> oracle(const Configuration& c, const std::vector<floa
     const auto count = input.size() / c.input_channels;
     std::vector<double> output((count + tail(c) + b + 2 * b) * c.output_channels);
     // Deliberately direct double-precision route-by-route convolution, independent of FFT
-    // partitioning.
+    // partitioning. The loop-invariant parts are worked out once, with the same
+    // arithmetic in the same order, so that unoptimised sanitizer builds stay within
+    // the tests' time limits (the GCC AddressSanitizer build took 90 s in
+    // native.host_settings).
+    const auto stride = c.output_channels;
     for (const auto& p : c.paths)
         for (const auto& i : p.inputs)
-            for (const auto& o : p.outputs)
-                for (std::size_t t = 0; t < count; ++t)
-                    for (std::size_t k = 0; k < p.impulse.size(); ++k) {
-                        const auto when =
-                            b + t + k + (c.input_delays.empty() ? 0 : c.input_delays[i.channel]) +
-                            (c.output_delays.empty() ? 0 : c.output_delays[o.channel]);
-                        output[when * c.output_channels + o.channel] +=
-                            static_cast<double>(input[t * c.input_channels + i.channel]) * i.gain *
-                            p.impulse[k] * o.gain;
-                    }
+            for (const auto& o : p.outputs) {
+                const auto start = b + (c.input_delays.empty() ? 0 : c.input_delays[i.channel]) +
+                                   (c.output_delays.empty() ? 0 : c.output_delays[o.channel]);
+                const float* impulse = p.impulse.data();
+                const auto taps = p.impulse.size();
+                for (std::size_t t = 0; t < count; ++t) {
+                    const double x =
+                        static_cast<double>(input[t * c.input_channels + i.channel]) * i.gain;
+                    double* out = output.data() + (start + t) * stride + o.channel;
+                    for (std::size_t k = 0; k < taps; ++k)
+                        out[k * stride] += x * impulse[k] * o.gain;
+                }
+            }
     return output;
 }
 } // namespace convolver::test

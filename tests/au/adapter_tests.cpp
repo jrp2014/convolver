@@ -1271,6 +1271,36 @@ void status_parameter() {
     unit.uninitialize();
 }
 
+// AU-13: when the Latency work's semaphore, queue or dispatch source cannot be
+// created, opening the unit fails cleanly (no crash, hang or inactive source
+// released). Closing a unit while Latency work is queued or running finishes.
+void latency_queue_lifetime() {
+    for (int which = 1; which <= 3; ++which) {
+        AudioComponentInstance unit = nullptr;
+        au::latency_queue_failure_for_tests = which;
+        const auto status = AudioComponentInstanceNew(au_test::component(), &unit);
+        au::latency_queue_failure_for_tests = 0;
+        if (status == noErr && unit)
+            AudioComponentInstanceDispose(unit);
+        require(status != noErr, "the unit opened although dispatch object " +
+                                     std::to_string(which) + " could not be created");
+    }
+    Configuration one{48000, 2, 2, 0, {}, {}, {}};
+    for (std::size_t ch = 0; ch < 2; ++ch)
+        one.paths.push_back({{1.f}, {{ch, 1}}, {{ch, 1}}});
+    for (int round = 0; round < 20; ++round) {
+        Unit unit;
+        check(unit.configure(48000, 2, 2, 512), "formats before closing");
+        check(unit.load(state_of(one)), "filter before closing");
+        if (round % 2)
+            check(unit.initialize(), "initialization before closing");
+        // Each choice wakes the Latency work; the unit closes while it is
+        // queued or running.
+        for (int i = 0; i < 4; ++i)
+            set_parameter(unit, au::latency_parameter, static_cast<float>((round + i) % 7));
+    }
+}
+
 int main(int argc, char** argv) {
     process_log = au_test::use_test_log("convolver-adapter-tests.log");
     if (argc == 3 && std::string(argv[1]) == "--end-abruptly")
@@ -1289,6 +1319,7 @@ int main(int argc, char** argv) {
         status_parameter();
         settings_parameters();
         latency_parameter();
+        latency_queue_lifetime();
         settings_in_diagnostics();
         std::cout << "Audio Unit adapter checks passed\n";
         return 0;

@@ -303,7 +303,17 @@ format.
   empty instance's first load fails, every adapter silences the processor
   that plays with `HostProcessor::silence()` (ROBUST-3) rather than
   `activate()`, which would restart the fault count; it neither allocates
-  nor fails, so the silence holds even when memory has run out. The audio
+  nor fails, so the silence holds even when memory has run out. A first
+  load that runs out of memory before its failure is recorded still fails
+  (ROBUST-7): `HostFilter` marks the instance failed (`fail_request()`)
+  before it allocates anything for the record, which then keeps the kind
+  and request number but may lack the message (`failure_message()` gives
+  general advice instead) or the path. The adapters call `fail_request()`
+  for a request that throws before `HostFilter` records it: VST3 in
+  `refused()`, the Audio Unit in `fail_unrecorded()`, and LV2 in
+  `restore()`, `work()` and `record_dropped()`. The allocation-starvation
+  lifecycle tests cover restored state on all three formats; the
+  file-loading paths are checked by review only. The audio
   thread shows a new fault at once without logging: VST3 writes Fault to the
   Status parameter as an output parameter change, and when the host passes it
   to the controller (`setParamNormalized`), the controller sends
@@ -411,9 +421,9 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   ramps linearly over 1.33 ms. The ramps (also bypass and mute) and the
   replacement crossfade last a fixed time at every sample rate (PLUG-17):
   64 and 256 frames at 48 kHz, to the nearest frame elsewhere, so 128 and
-  512 at 96 kHz and 59 and 235 at 44.1 kHz. Bypass and mute step by the
-  reciprocal of that length, so at a few rates (11.025, 16, 176.4, 352.8
-  and 705.6 kHz) float rounding makes them a frame longer. The latency is fixed for a processor's life.
+  512 at 96 kHz and 59 and 235 at 44.1 kHz. Every ramp reaches its target
+  exactly on its last frame, also when it is reversed midway: bypass and
+  mute count whole frames rather than summing a float step (PLUG-18). The latency is fixed for a processor's life.
 - **Gain** applies to the filtered signal, after convolution and before the
   mix; the dry path stays the untouched input. Range −100 to +24 dB, linear
   in decibels (jrp). During a replacement both filters play at the same gain.

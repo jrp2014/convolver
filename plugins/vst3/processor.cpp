@@ -439,11 +439,7 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
             return kInvalidArgument;
         int64 request = 0;
         attributes->getInt("request", request);
-        bool accepted = false;
-        try {
-            accepted = load_file(std::string(static_cast<const char*>(data), size));
-        } catch (...) { // Out of memory for the path: nothing changed.
-        }
+        const bool accepted = load_file({static_cast<const char*>(data), size});
         write_log();
         send_status({.load_request = request, .accepted = accepted});
         return accepted ? kResultOk : kResultFalse;
@@ -572,7 +568,9 @@ void Processor::install(HostState next, const HostRequest& request, bool restore
 }
 void Processor::refused(bool was_failed) noexcept {
     // A failed first load plays silence rather than the unfiltered input,
-    // without allocating: memory may have run out (ROBUST-3).
+    // without allocating: memory may have run out (ROBUST-3), maybe before
+    // the failure could be recorded (ROBUST-7).
+    filter_.fail_request();
     if (host_ && filter_.failed() && !was_failed)
         host_->silence();
     if (!host_ && filter_.failed())
@@ -583,12 +581,13 @@ void Processor::refused(bool was_failed) noexcept {
     } catch (...) { // Out of memory for the line: it is dropped.
     }
 }
-bool Processor::load_file(const std::string& path) {
+bool Processor::load_file(std::string_view chosen) {
     std::lock_guard lock(control_);
     observe_faults();
     const bool was_failed = filter_.failed();
-    HostRequest request{HostFilterSource::file, path, 0};
-    try {
+    try { // Copying the path needs memory too: a first load that runs out fails (ROBUST-7).
+        const std::string path(chosen);
+        HostRequest request{HostFilterSource::file, path, 0};
         // Before the host has started the plug-in, a list chooses its entry
         // for the rate and channels the host has proposed so far, and the
         // filter is checked again at activation, as for restored state.

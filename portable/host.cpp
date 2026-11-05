@@ -136,6 +136,15 @@ std::string preparation_message(const std::string& what) {
          {}});
 }
 
+const std::string& failure_message(const HostFailure& f) {
+    static const std::string unrecorded =
+        advice_text({"the load failed, and memory ran out before Convolver could record why",
+                     "Memory had run out.",
+                     "Close other projects or programs, then load the filter again.",
+                     {}});
+    return f.message.empty() ? unrecorded : f.message;
+}
+
 std::string state_read_message(const std::exception& e) {
     auto a = detail::parse_advice(e.what());
     a.problem = "the saved state could not be read: " + a.problem;
@@ -213,23 +222,38 @@ HostRequest HostFilter::numbered(HostRequest request) {
     return request;
 }
 
-void HostFilter::record(HostFailureKind kind, std::string why, const HostRequest& request,
-                        const Configuration* carried) {
-    // Build everything first, so running out of memory changes nothing.
-    HostFailure f;
+void HostFilter::fail_request() noexcept {
+    if (!filter_)
+        failed_ = true;
+}
+
+HostFailure& HostFilter::record_unexplained(HostFailureKind kind, const HostRequest& request,
+                                            const Configuration* carried) noexcept {
+    // ROBUST-7: what needs no memory, so that running out afterwards still
+    // leaves the request failed: an instance with no filter fails (plays
+    // silence, saves the failure), and the record names the request and the
+    // kind of failure, without the message or the file's path.
+    fail_request();
+    HostFailure& f = load_failure_.emplace(); // Empty strings: nothing allocated.
     f.kind = kind;
-    f.request = request;
+    f.request.source = request.source;
+    f.request.number = request.number;
     if (carried) {
         f.sample_rate = carried->sample_rate;
         f.inputs = carried->input_channels;
         f.outputs = carried->output_channels;
     }
     f.silent = !filter_;
+    return f;
+}
+
+void HostFilter::record(HostFailureKind kind, std::string why, const HostRequest& request,
+                        const Configuration* carried) {
+    auto& f = record_unexplained(kind, request, carried);
     // DIAG-2: what failed, why and what to do; what plays instead follows
     // from `silent` (failure_consequence() in host_log.hpp).
     f.message = std::move(why);
-    failed_ = f.silent;
-    load_failure_ = std::move(f);
+    f.request = request; // May run out of memory; the record above stands.
 }
 
 namespace {
@@ -346,7 +370,13 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     } catch (const SupersededRequest&) {
         throw;
     } catch (...) {
-        // Out of memory building a message, or a non-standard exception.
+        // Out of memory building a message, or a non-standard exception:
+        // recorded first without a message, in case that fails too (ROBUST-7).
+        // A record refuse() made for this request stands: only copying its
+        // message into the exception, or its path, ran out.
+        if (load_failure_ && load_failure_->request.number == request.number)
+            throw;
+        record_unexplained(HostFailureKind::preparation, request, carried);
         refuse(HostFailureKind::preparation, preparation_message({}), request, carried);
     }
     // The commit, which cannot throw.
@@ -378,8 +408,11 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
 }
 
 void HostFilter::reject(HostFailureKind kind, std::string why, HostRequest request,
-                        const Configuration* carried) {
-    record(kind, std::move(why), numbered(std::move(request)), carried);
+                        const Configuration* carried) noexcept {
+    try {
+        record(kind, std::move(why), numbered(std::move(request)), carried);
+    } catch (...) { // Out of memory for the path: recorded without it (ROBUST-7).
+    }
 }
 
 Configuration HostFilter::activate(const HostLayout& host) {
@@ -709,7 +742,6 @@ struct HostProcessor::Impl {
     // PLUG-17: the ramps' and the crossfade's lengths at this rate.
     const std::size_t setting_ramp = frames_at(rate, setting_ramp_at_reference);
     const std::size_t crossfade = frames_at(rate, crossfade_at_reference);
-    const float setting_ramp_step = 1.f / static_cast<float>(setting_ramp);
     Prepared* current = nullptr;
     Prepared* previous = nullptr;
     std::atomic<Prepared*> pending{nullptr}, retired{nullptr};
@@ -740,11 +772,18 @@ struct HostProcessor::Impl {
     std::size_t gain_ramp = 0, mix_ramp = 0;
     float set_gain = 1, gain = 1, gain_target = 1, gain_step = 0;
     float mix_setting = 1, mix = 1, mix_target = 1, mix_step = 0;
-    float dry_mix = 0;
+    // Bypass and mute ramp by whole frames, counted out of setting_ramp, so
+    // they end exactly at 0 and 1 at every rate (PLUG-18): a float step
+    // summed setting_ramp times can miss by about 1e-6.
+    // The dry signal's share: setting_ramp under bypass, 0 otherwise.
+    std::size_t dry_frames = 0;
     // mute(): the current filter's level ramps to 0; the level of the filter
-    // being faded out keeps ramping if it was muted. Exactly 1 otherwise, so
-    // an unmuted filter's output is unchanged.
-    float level = 1, previous_level = 1;
+    // being faded out keeps ramping if it was muted. Exactly setting_ramp
+    // (level 1) otherwise, so an unmuted filter's output is unchanged.
+    std::size_t level_frames = setting_ramp, previous_level_frames = setting_ramp;
+    float share(std::size_t frames) const noexcept {
+        return static_cast<float>(frames) / static_cast<float>(setting_ramp);
+    }
     bool muted = false, previous_muted = false;
     // Publications up to this number were made before mute(): adopting one
     // keeps the silence. Only a filter published after it ends the silence.
@@ -842,14 +881,14 @@ struct HostProcessor::Impl {
             previous = nullptr;
         }
         current->engine.reset();
-        level = muted ? 0.f : 1.f;
-        previous_level = 1;
+        level_frames = muted ? 0 : setting_ramp;
+        previous_level_frames = setting_ramp;
         previous_muted = false;
         std::fill(dry.begin(), dry.end(), 0.f);
         dry_position = 0;
         warm = 0;
         fade = 0;
-        dry_mix = bypass ? 1.f : 0.f;
+        dry_frames = bypass ? setting_ramp : 0;
         // The stream starts again: the settings apply at once, without ramps.
         gain = gain_target = set_gain;
         mix = mix_target = target_mix();
@@ -866,7 +905,7 @@ struct HostProcessor::Impl {
         muted = true;
         muted_through = std::max(muted_through, through);
         if (!started)
-            level = 0;
+            level_frames = 0;
     }
     template <class T>
     bool process(std::span<const T* const> in, std::span<T* const> out,
@@ -885,7 +924,7 @@ struct HostProcessor::Impl {
             if (auto next = pending.exchange(nullptr, std::memory_order_acq_rel)) {
                 if (started) {
                     previous = current;
-                    previous_level = level;
+                    previous_level_frames = level_frames;
                     previous_muted = muted;
                     warm = block;
                     fade = 0;
@@ -900,7 +939,7 @@ struct HostProcessor::Impl {
                 // published filter takes over; PLUG-7 found the adoption of an
                 // earlier publication lifting it).
                 muted = muted && next->number <= muted_through;
-                level = muted ? 0.f : 1.f;
+                level_frames = muted ? 0 : setting_ramp;
             }
         }
         retarget();
@@ -942,8 +981,10 @@ struct HostProcessor::Impl {
                     blend = static_cast<float>(fade) / crossfade;
                 }
             }
-            dry_mix =
-                std::clamp(dry_mix + (bypass ? setting_ramp_step : -setting_ramp_step), 0.f, 1.f);
+            if (bypass && dry_frames < setting_ramp)
+                ++dry_frames;
+            else if (!bypass && dry_frames)
+                --dry_frames;
             if (gain_ramp && --gain_ramp)
                 gain += gain_step;
             else
@@ -952,10 +993,12 @@ struct HostProcessor::Impl {
                 mix += mix_step;
             else
                 mix = mix_target;
-            if (muted)
-                level = std::max(0.f, level - setting_ramp_step);
-            if (previous_muted)
-                previous_level = std::max(0.f, previous_level - setting_ramp_step);
+            if (muted && level_frames)
+                --level_frames;
+            if (previous_muted && previous_level_frames)
+                --previous_level_frames;
+            const float dry_mix = share(dry_frames), level = share(level_frames),
+                        previous_level = share(previous_level_frames);
             for (std::size_t c = 0; c < outputs; ++c) {
                 // Bypass passes input c to output c when the counts are equal. With
                 // unequal counts it plays silence on every output (owner's decision,
@@ -991,7 +1034,7 @@ struct HostProcessor::Impl {
         if (previous && !warm && fade == crossfade) {
             retire(previous);
             previous = nullptr;
-            previous_level = 1;
+            previous_level_frames = setting_ramp;
             previous_muted = false;
         }
         return true;

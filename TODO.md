@@ -7,7 +7,7 @@ implemented. Finished items are listed briefly under [done](#done); what they
 delivered is described in the guides and the [CHANGELOG](CHANGELOG.md).
 
 **In short:** the next milestone is end-to-end testing: an independent user
-running an exact preview package from the 0.8 series. The
+running an exact preview package from the 0.9 series. The
 [order of work](#execution-priorities) gets there in four steps: finish the
 open fixes (done), run jrp's host smoke tests (HOST-1), finish the package
 and the user journeys (PLUG-5, REL-2; the CLI and the journey presets are in
@@ -40,7 +40,7 @@ request before starting so independent tasks do not duplicate changes.
 22 October 2026): an independent user installs and uses an exact preview
 package, following only the documentation. This is the end-to-end test. "Ready" means the
 REL-2 journeys work, not that a set of items is ticked. The first preview is
-cut from the 0.8 series and holds the VST3 plug-in, the Audio Unit (macOS),
+cut from the 0.9 series and holds the VST3 plug-in, the Audio Unit (macOS),
 the `convolver` CLI and the preset tool, with the editor's settings and window
 in both plug-in formats; LV2 joins a later preview once
 its own journeys are demonstrated. What still blocks it, with the evidence, is in
@@ -58,7 +58,7 @@ boundary and C++20 in the core.
 | 3. Alongside step 2 | **PLUG-5** first-preview contents: the VST trademark notice (the `convolver` CLI and the first-use presets are in the package since PR #101). **REL-2:** the 2→6 crossover and CLI journeys written in `docs/use/` (the stereo journey is written) | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
 | Early walkthrough (macOS) (done) | **REL-5**: an explicitly limited walkthrough of an exact candidate on macOS, the stereo journey only | Done on 1 November 2026 as a package and command-line check only, by jrp's choice ([done](#done)); its host steps moved to HOST-1's REAPER smoke test and REL-3. It did not change the first preview's contents and does not replace REL-3. |
 | 4. Settings, windows and the Audio Unit | The **HOST-2** editor, which jrp wants in the first preview with the Audio Unit: **PLUG-9** and **PLUG-10**, then **VST3-3**, **VST3-4**, **AU-7** and the first half of **AU-6**, then the windows **VST3-11** (macOS, shared with the Audio Unit in **AU-6**), **VST3-12** (Windows) and **VST3-13** (Linux, VSTGUI stop-gap); and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview) | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the supported workloads (PERF-3), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
-| 5. The milestone | A candidate from a 0.8.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
+| 5. The milestone | A candidate from a 0.9.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
 | 6. Later previews | **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need; the loading-responsiveness gate uses its workloads. |
 | Supporting, cheap | **VST3-9**, **FFMPEG-1**, **PERF-1**, **HOST-4** | VST3-9 affects only hosts running at a pull-down rate such as 47952 Hz, which the journeys do not use. It does not block the first preview; it moves up if a tester meets it. HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
@@ -125,7 +125,9 @@ is superseded.
   it worked, where they hesitated and what they could not do without help.
   Fix the guides or the product for each finding and repeat the affected
   steps. This is the exit criterion of the
-  [next milestone](#execution-priorities). jrp chooses the tester.
+  [next milestone](#execution-priorities). jrp chooses the tester. Record
+  the evidence HOST-1 lists (package hash, host and OS versions, expected
+  outputs, recovery from a refused filter) for each journey.
 - [ ] **REL-4 — Make the preview findable.** Room-correction users and the
   `.cfg` format's existing users should find Convolver from search, the old
   SourceForge site, KVR and their forums. Done on the repository side: a README
@@ -153,6 +155,16 @@ is superseded.
   without side effects: the controller asks the host to reread every
   parameter (`restartComponent(kParamValuesChanged)`, which the SDK meant
   for program changes) whenever the status changes. Not yet run.
+  The external review of `91fcf1f` (0.8.13, 5 November 2026) asks that
+  HOST-1, AU-4, AU-3/AU-5, PLUG-5, REL-2 and REL-3 come before further
+  conveniences, all against one exact candidate, and stay separate from
+  automated library tests passing. Each record keeps: the package's SHA-256
+  and the candidate run, the host's and the system's versions, the expected
+  output each step was compared with (`expected.wav` and the
+  `convolver --compare` result), and recovery from a refused filter (a
+  preset for another rate or channel count: the status and message shown,
+  silence or the previous filter as the contract says, then a fitting
+  filter loads, and saving and reopening keep it).
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
   now requested (progress below). Write adapters against the
@@ -303,8 +315,9 @@ LV2 (Linux first; also PipeWire system audio):
   loads the highest (minor, micro) it finds, so 1.0.0 mapped this way would
   lose to an old 0.4.x left in `~/.lv2`. The mapping must keep increasing,
   with minor even and non-zero and micro even for releases. Mapped this way,
-  0.8.x builds are minor 8, which LV2 accepts, but every odd patch number
-  is a micro version LV2 reads as a development version.
+  0.9.x builds are minor 9, which LV2 reads as a development version, as it
+  does every odd patch number (0.8.x was minor 8; LV2 is not in the first
+  preview).
 - [ ] **LV2-6 — Editor report and UI (optional).** Only if Linux users show a
   need: generic UIs already offer the `filter` file chooser and the status
   port. The report as `patch:Set` atoms on the notify port, prepared in
@@ -723,7 +736,16 @@ so the preset file path is not needed).
   peak memory and preparation time during loading, replacement and reset,
   across realistic routing and callback sizes, before further substantial
   DSP changes; those results decide whether more complex partitioning is
-  justified.
+  justified. The external review of `91fcf1f` (0.8.13, 5 November 2026)
+  agrees (keep shared forward transforms, prepared buffers and control-side
+  retirement; nothing yet calls for another engine or nonuniform
+  partitioning) and sets the acceptance: on named machines, realistic 6- and
+  8-channel filters, small callbacks, 48 and 96 kHz and repeated
+  replacements, measure preparation time, peak memory while decoded
+  configurations and several prepared engines coexist, and callback
+  percentiles and maxima during replacement and reset; publish the
+  supported workloads with those percentiles and maxima, and decide from
+  them whether PERF-2, PERF-7 or PERF-8 is worth doing.
 - [ ] **PERF-7 — One input check on the plug-in audio path.** From the
   project review of 5 November 2026, after PERF-3: each `HostProcessor`
   call copies planar host buffers into an interleaved buffer and replaces
@@ -769,6 +791,60 @@ about 1.4 s and 1.7 s including the observation's own overhead. Those are
 not isolated preparation timings, and whether the interface stayed
 responsive and the audio free of dropouts was not verified. jrp deferred
 load-performance work for now; that is not a qualification of either.
+
+The external review of `91fcf1f` (0.8.13, 5 November 2026) asks for this to
+become an executable gate before the preview. Acceptance: an automated test
+times each adapter's own load and restore entry point (VST3 `setState` and
+the window's load, the Audio Unit's `RestoreState` and load property, LV2's
+`restore` and worker) while a test host renders audio on another thread, on
+the PERF-3 workloads, and records how long the caller is blocked and how
+late each callback is. jrp sets the threshold for both; the gate passes when
+every adapter meets it. If one does not, preparation moves to a worker, with
+the adapter (as LV2 does) owning request order, overtaken requests,
+publication and shutdown.
+
+PERF-9 (done, PR #111) built that test on interim workloads, with jrp's
+limits (5 November 2026): in optimised builds, no late callback and none
+over half its period while a load runs on another thread, and the host's
+thread held at most 100 ms with filters up to 10 s and 250 ms with 30 s
+([load timing](docs/develop/testing.md#load-timing-perf-9)). What remains:
+the PERF-3 workloads in place of the interim ones, and, if the 30 s case
+ever exceeds 250 ms on a supported platform, jrp's choice between
+background preparation in VST3 and the Audio Unit (VST3-5) and a higher
+limit with the pause documented.
+First optimised-build figures (Linux cloud VM, 4 cores, clang Release with
+Ooura, 5 November 2026; stereo 48 kHz, 512-frame callbacks): VST3 `setState`
+held the host's thread for 4 ms with a 1 s filter, 43 to 61 ms with 10 s,
+about 235 ms with 30 s and about 600 ms with 120 s, the window's file about
+the same; no callback was late. LV2's worker took the same time off the
+audio thread, with no late callbacks; LV2's `restore()` held back `run()`
+for as long (about 260 ms with 30 s), and its reset (deactivate, activate)
+for about 200 ms, as the specification has the host stop audio for both.
+CI on `d1e1443` (5 November 2026, the "Load timings" steps) held the host's
+thread far less with the 30 s filter: 45 to 65 ms for VST3 on Linux, about
+55 ms on Windows, 51 to 154 ms for VST3 on macOS and 28 to 51 ms for the
+Audio Unit (macos-15); the cloud VM above is the slow outlier. Every
+callback on Linux CI was on time. On the macOS and Windows runners even the
+baselines were late, by 3 to 57 ms with callbacks taking under 1 ms, so the
+callback checks there were inconclusive: in practice only Linux CI enforces
+them. On `1290b81` the Windows runner held the host's thread for about
+265 ms with the 30 s filter (a clean baseline, then late callbacks during
+the load), so an entry over the limits now runs up to three times and the
+last run counts.
+
+### Keeping `host.cpp` manageable
+
+Guidance, not an item (external review of `91fcf1f`, 0.8.13, 5 November
+2026): `portable/host.cpp` combines filter acceptance, failure policy,
+diagnostic wording, status text and the real-time `HostProcessor`. When one
+of these next changes, move the control-side filter policy apart from
+`HostProcessor`'s audio code, as VST3-14 and AU-11 moved code out of the
+adapters, with public APIs and ownership unchanged; and keep diagnostics as
+their structured parts (problem, cause, fix) inside, formatting text only
+where it leaves the library, rather than formatting and parsing it again.
+No new general framework. Such moves keep saved state, diagnostic text,
+allocation guards and numerical results unchanged, and never share a pull
+request with a DSP change.
 
 ## Developer tooling
 
@@ -852,6 +928,15 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   worker's tests, the watchdog workflow and `scripts/ci_watchdog_probe.py`
   went with it ([archived](docs/archive/reviews/2026-11-05-request-worker.md));
   [Audio Unit settings](docs/develop/plugin-contract.md).
+- [x] **AU-13 — Safe partial construction of the Latency work.** 5 November
+  2026, PR #111, from the external review of `91fcf1f` (0.8.13), a source
+  review: AU-12 created the dispatch source before the semaphore, so if the
+  semaphore could not be created an inactive source was released, which
+  `dispatch_activate`'s documentation calls undefined. The semaphore and
+  queue are now created first and the source last, and an activated source
+  is released only after it is cancelled. `au.adapter` makes each creation
+  fail in turn (`latency_queue_failure_for_tests`) and closes units while
+  Latency work is queued or running; it runs on macOS CI only.
 - [x] **AU-11 — Separate file watching from the window.** 5 November 2026,
   from jrp's review of `276c7dc`: following the playing filter's files and
   deciding when a change is due to reload moved from
@@ -959,6 +1044,20 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   reads it; the build and test jobs have time limits. No automatic re-runs;
   CI-24 and CI-25 continue;
   [intermittent failures](docs/develop/testing.md#intermittent-failures).
+- [x] **CI-30 — Complete the tests' replaced allocation functions.**
+  5 November 2026, PR #111, from the external review of `91fcf1f` (0.8.13):
+  `native.engine` replaced `operator new` without the sized `operator
+  delete`, so with GCC's library AddressSanitizer stopped it with
+  alloc-dealloc-mismatch before the oracle tests ran. The array and sized
+  forms are now one shared file, `tests/native/replaced_allocation.hpp`,
+  used by every native test that watches allocation.
+- [x] **CI-31 — Keep `native.host_settings` within its time limit under
+  sanitizers.** 5 November 2026, PR #111: the external review of `91fcf1f`
+  (0.8.13) saw it time out in a GCC AddressSanitizer build. The shared
+  double-precision oracle (`tests/native/oracle.hpp`) spent 90 of its 91
+  seconds there; it now works out each route's invariant parts once, with
+  the same arithmetic in the same order (worst errors unchanged), and the
+  test takes about 4 seconds.
 - [x] **CI-29 — Use LLVM's parallel clang-tidy runner.** 5 November 2026,
   PR #108, from the project review of that day: CI runs `run-clang-tidy.py`,
   which the clang-tidy package installs, in place of our
@@ -1102,6 +1201,21 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
 - [x] **PERF-6 — Decode each filter file once per load.** 24 October 2026,
   PR #70: same errors and limits;
   [startup, reset and loading](docs/develop/fft-backends.md#startup-reset-and-filter-loading).
+- [x] **PERF-9 — Load timing test.** 5 November 2026, PR #111, from the
+  external review of `91fcf1f` (0.8.13), on jrp's go-ahead: `vst3.load_timing`,
+  `au.load_timing` and `lv2.load_timing` time each format's load entry points
+  while another thread renders at the host's pace, and report how long the
+  caller was held and how late callbacks were, failing above jrp's limits
+  in optimised builds ([loading responsiveness](#loading-responsiveness));
+  [load timing](docs/develop/testing.md#load-timing-perf-9).
+- [x] **GAIN-2 — No noise simulation for `--gain-db no-clip`.** 5 November
+  2026, PR #111, from the external review of `91fcf1f` (0.8.13): no-clip
+  ran the whole noise estimate to use only the bound it also returns. It
+  now validates the configuration and takes `worst_case_peak()` directly
+  (0.43 ms rather than 69.5 ms for a 65,536-tap stereo filter in the
+  review's Release measurement); `auto` still filters noise. `native.cli`
+  checks the gain and the rendered output for silent, cancelling, delayed
+  and multichannel configurations.
 - [x] **PLUG-1 — FFT backend for plug-ins.** 21 October 2026;
   [plug-in builds](docs/develop/fft-backends.md#plug-in-builds).
 - [x] **PLUG-2 — Shared adapter test harness.** 22 October 2026, PR #28;
@@ -1142,6 +1256,13 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   96 kHz and above as at 48 kHz, which plays exactly as before;
   `native.host_settings` checks the lengths at 44.1, 48 and 96 kHz;
   [contract](docs/develop/plugin-contract.md#settings).
+- [x] **PLUG-18 — Exact bypass and mute ramp endpoints.** 5 November 2026,
+  PR #111, from the external review of `91fcf1f` (0.8.13): PLUG-17's bypass
+  and mute ramps summed a float step, so at 176.4 kHz they left about
+  2.4e-6 of unit input for one frame after their 235 frames. They now count
+  frames and reach exactly 0 or 1 on the last frame, also when reversed;
+  `native.host_settings` checks 8 kHz to 768 kHz;
+  [settings](docs/develop/plugin-contract.md#settings).
 - [x] **PLUG-16 — Name the transition lengths.** 5 November 2026, PR #108,
   from the project review of that day: `HostProcessor`'s 64-frame setting,
   bypass and mute ramps and its 256-frame crossfade are named constants in
@@ -1169,6 +1290,18 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   allocate or fail, in VST3, the Audio Unit and LV2; lifecycle sequence
   `state-malformed-starved`;
   [replacement and threads](docs/develop/plugin-contract.md#replacement-and-threads).
+- [x] **ROBUST-7 — A failed first load fails however early memory runs
+  out.** 5 November 2026, PR #111, from the external review of `91fcf1f`
+  (0.8.13), which reproduced it: `HostFilter::record` copied the request
+  before marking the instance failed, so with allocations failing a refused
+  first load left `failed()` false and the adapters let the input through.
+  The failure is now marked first without allocating
+  (`HostFilter::fail_request()`), with a record of its kind and request
+  number; `reject()` never throws; VST3, the Audio Unit and LV2 also mark it
+  when memory runs out building the message; an accepted filter is kept.
+  Lifecycle sequences now require it after every starved attempt
+  (`native.host` `unrecorded_failures` too);
+  [status and log](docs/develop/plugin-contract.md#status-and-log).
 - [x] **ROBUST-4 — Low-memory quantizer and non-finite gain estimates.**
   24 October 2026, PR #72, from jrp's review of 0.4.43: `Quantizer` allocates
   in its constructor, so out of memory reaches the caller, and

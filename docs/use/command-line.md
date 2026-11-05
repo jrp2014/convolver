@@ -83,10 +83,11 @@ positive values amplify. Two offline estimates are also available:
   then take the largest output sum. The gain is `-20 log10(bound)`, or 0 dB for
   silent routing. It assumes every input sample has magnitude at most 1.
 
-Both report the chosen gain on stderr and may take time before rendering.
-Both stop with an error, before rendering, when the filter's coefficients are
-so large that filtering the noise overflows single precision; check how the
-filter files are scaled. The
+Both report the chosen gain on stderr. `auto` may take time before rendering,
+as it filters the noise; `no-clip` only adds up the taps. Both stop with an
+error, before rendering, when the filter's coefficients are too large for
+single precision (filtering the noise overflows, or the bound exceeds the
+largest float); check how the filter files are scaled. The
 bound applies to ideal linear filtering, not input above full scale or additional
 quantizer noise. Floating-point error, dither, noise shaping and the largest
 positive integer value (one step short of full scale) need a little more

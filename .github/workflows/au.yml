@@ -91,6 +91,14 @@ jobs:
         run: >-
           ctest --test-dir build-au --output-on-failure --output-junit junit.xml
           -LE 'repository|consumer'
+      # PERF-9's timings pass whatever they measure, so CTest does not show
+      # them: print them from its log (docs/develop/testing.md#load-timing-perf-9).
+      - name: Load timings (measurement only)
+        if: always()
+        shell: bash
+        run: >-
+          sed -n '/load timing (/,/load timing: /p'
+          build-au/Testing/Temporary/LastTest.log || true
       - name: Install for this user
         run: |
           components="$HOME/Library/Audio/Plug-Ins/Components"

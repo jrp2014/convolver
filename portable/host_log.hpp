@@ -101,6 +101,9 @@ std::string state_read_message(const std::exception&);
 // DIAG-2: why a filter could not be prepared (memory, usually); `what` is an
 // exception's own words, or empty.
 std::string preparation_message(const std::string& what);
+// A failure's message, or, for a failure recorded without one because memory
+// ran out (ROBUST-7), a message that says so.
+const std::string& failure_message(const HostFailure&);
 // DIAG-2: the most serious fault in `faults` as problem, cause and fix, with
 // any others and when the status clears in its note; `held` as for
 // HostFaultReport. Empty when there are none. For the window (host_report).
