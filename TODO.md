@@ -1335,14 +1335,20 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   from jrp's review of `db54160` ("test shutdown at explicit stages rather
   than hoping repeated runs encounter the troublesome interleaving"):
   `lv2.adapter` holds `work()` at each of its pause points (read, prepared,
-  checked) while another thread deactivates the instance, then releases it:
-  reactivated, the new filter plays and is reported and saved; closed with
-  a newer request queued, nothing is used after it is freed. `au.adapter`
+  checked) while another thread deactivates the instance, and releases it
+  only once `deactivate()` has signalled from inside that it is waiting for
+  `work()` (jrp's review of `5f47ecb`: otherwise the worker could finish
+  before deactivation began): reactivated, the new filter plays and is
+  reported and saved; closed with a newer request queued, nothing is used
+  after it is freed. `au.adapter`
   holds a run of the Latency work through a new test-only hook
   (`latency_started_for_tests`) while the unit closes, alone and with a
-  change queued. A 60 s watchdog stops either test, naming the stage. With
-  the lock in LV2's `deactivate()` removed, the staged case fails under ASan
-  while the earlier repeated loop passes. Loading and replacement ordering
+  change queued, releasing it only once closing has cancelled the work and
+  is about to wait for the run (a second hook, `latency_closing_for_tests`);
+  the queued run must then never start. A 60 s watchdog stops either test,
+  naming the stage. With the lock in LV2's `deactivate()` removed, the
+  staged case fails (before the handshake, under ASan, with a heap use
+  after free) while the earlier repeated loop passes. Loading and replacement ordering
   was already tested this way (the preparation-window cases). Found: LV2-8.
 - [x] **PERF-13 — Load-timing records as JSON.** 5 November 2026, from
   jrp's review of `db54160`: each timing test writes every run's records

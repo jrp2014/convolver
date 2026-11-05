@@ -1250,9 +1250,18 @@ void worker_loads(host::World& world, const fs::path& work) {
     // PLUG-20 (jrp's review of db54160): deactivation and teardown at each stage
     // of a load, chosen by the worker's pause points rather than left to
     // chance as in the loop above. A is held at `point` while the original
-    // plays; the host deactivates on another thread (deactivate() waits for a
-    // work() call in progress), and the held work is released. A watchdog
-    // stops the test, naming the stage, if a step never finishes.
+    // plays; the host deactivates on another thread, and the held work is
+    // released only once deactivate() has signalled, from inside, that it
+    // found work() holding the lock and is waiting for it (jrp's review of
+    // 5f47ecb: otherwise the worker could finish before deactivation began).
+    // A watchdog stops the test, naming the stage, if a step never finishes.
+    const auto held_while_deactivating = [](host::Plugin& p, std::future<void>& deactivated,
+                                            const std::string& label) {
+        finish_within(std::async(std::launch::async, [&p] { p.wait_until_deactivation_waits(); }),
+                      label + "deactivation reaching the held work");
+        check(deactivated.wait_for(std::chrono::seconds(0)) != std::future_status::ready,
+              label + "deactivation returned while work() held the lock");
+    };
     const std::pair<WorkerPoint, const char*> points[] = {
         {WorkerPoint::read, "read"},
         {WorkerPoint::prepared, "prepared"},
@@ -1269,6 +1278,7 @@ void worker_loads(host::World& world, const fs::path& work) {
               label + "the original plays while A is held");
         auto* host = p.get();
         auto deactivated = std::async(std::launch::async, [host] { host->deactivate(); });
+        held_while_deactivating(*p, deactivated, label);
         p->resume();
         finish_within(deactivated, label + "deactivation");
         finish_within(std::async(std::launch::async, [host] { host->wait_for_worker(); }),
@@ -1295,6 +1305,7 @@ void worker_loads(host::World& world, const fs::path& work) {
         p->run_empty();
         auto* host = p.get();
         auto deactivated = std::async(std::launch::async, [host] { host->deactivate(); });
+        held_while_deactivating(*p, deactivated, label);
         p->resume();
         finish_within(deactivated, label + "deactivation");
         finish_within(std::async(std::launch::async, [&p] { p.reset(); }), label + "teardown");

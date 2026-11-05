@@ -899,7 +899,9 @@ AU-4.
   failed read overtaken the same way; restore with an answer outstanding;
   teardown with work queued; deactivation and teardown at each pause point
   (PLUG-20: `work()` held after reading, after preparation and after its
-  last check while another thread deactivates, then released; reactivated,
+  last check while another thread deactivates, and released only once
+  `deactivate()` has signalled, through the same test-only extension, that
+  it found `work()` holding the lock and is waiting; reactivated,
   the new filter plays and is reported and saved; closed, with a newer
   request queued, nothing is used after it is freed; a 60 s watchdog names
   a stage that never finishes); a request a host drops at deactivation;

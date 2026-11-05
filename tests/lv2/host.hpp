@@ -195,6 +195,9 @@ class Plugin {
     void pause_at(lv2::WorkerPoint point);
     void wait_until_paused();
     void resume();
+    // PLUG-20: returns once deactivate() has found work() holding the
+    // plug-in's lock and is waiting for it (WorkerPoint::deactivate_waits).
+    void wait_until_deactivation_waits();
     std::size_t responses_delivered() const {
         return delivered_;
     }
@@ -237,7 +240,7 @@ class Plugin {
     std::mutex pause_mutex_;
     std::condition_variable pause_changed_;
     std::optional<lv2::WorkerPoint> armed_;
-    bool paused_ = false, released_ = false;
+    bool paused_ = false, released_ = false, deactivation_waits_ = false;
     std::size_t pauses_ = 0;
     std::vector<std::uint32_t> inputs_, outputs_;
     std::vector<LV2_Options_Option> options_;

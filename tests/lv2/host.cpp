@@ -315,6 +315,11 @@ void Plugin::drop_queued_work() {
 void Plugin::pause_hook(void* context, lv2::WorkerPoint point) {
     auto& h = *static_cast<Plugin*>(context);
     std::unique_lock lock(h.pause_mutex_);
+    if (point == lv2::WorkerPoint::deactivate_waits) { // A signal, never a pause.
+        h.deactivation_waits_ = true;
+        h.pause_changed_.notify_all();
+        return;
+    }
     if (h.armed_ != point)
         return;
     h.armed_.reset();
@@ -329,6 +334,11 @@ void Plugin::pause_hook(void* context, lv2::WorkerPoint point) {
 void Plugin::pause_at(lv2::WorkerPoint point) {
     std::lock_guard lock(pause_mutex_);
     armed_ = point;
+}
+void Plugin::wait_until_deactivation_waits() {
+    std::unique_lock lock(pause_mutex_);
+    pause_changed_.wait(lock, [&] { return deactivation_waits_; });
+    deactivation_waits_ = false;
 }
 void Plugin::wait_until_paused() {
     std::unique_lock lock(pause_mutex_);

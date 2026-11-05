@@ -146,11 +146,12 @@ Until 1.0 the C++ API may change between minor versions.
   chosen stages instead of by repetition. `lv2.adapter` holds the worker's
   `work()` after reading the file, after preparation and after its last
   check, deactivates or closes the instance from another thread, and
-  releases it; `au.adapter` holds a run of the Latency work while the unit
-  closes. With LV2's `deactivate()` lock removed, the staged case fails
-  under ASan (heap use after free) while the earlier repeated loop passes.
-  The Audio Unit gains a test-only hook, null in the component; no change to
-  the sound.
+  releases it once deactivation signals from inside that it is waiting for
+  the held work; `au.adapter` holds a run of the Latency work while the
+  unit closes, releasing it once closing has cancelled the work. With LV2's
+  `deactivate()` lock removed, the staged case fails while the earlier
+  repeated loop passes. Both plug-ins gain test-only hooks, null in the
+  components; no change to the sound.
 
 - The version is now 0.10.0 (jrp, 5 November 2026), the minor step for the
   library changes in DIAG-3 and DIAG-4 below, after 0.9.0. CMake consumers

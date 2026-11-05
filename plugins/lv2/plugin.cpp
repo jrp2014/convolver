@@ -786,7 +786,11 @@ void run(LV2_Handle handle, std::uint32_t frames) {
 void deactivate(LV2_Handle handle) {
     auto& p = *static_cast<Instance*>(handle);
     try {
-        std::lock_guard lock(p.control);
+        std::unique_lock lock(p.control, std::try_to_lock);
+        if (!lock.owns_lock()) { // work() or save() in progress: wait for it.
+            pause_at(p, WorkerPoint::deactivate_waits); // The tests' signal.
+            lock.lock();
+        }
         p.record_dropped();
         p.log_faults();
         p.host.reset();
