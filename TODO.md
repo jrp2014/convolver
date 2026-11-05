@@ -827,10 +827,10 @@ limits (5 November 2026): in optimised builds, no late callback and none
 over half its period while a load runs on another thread, and the host's
 thread held at most 100 ms with filters up to 10 s and 250 ms with 30 s
 ([load timing](docs/develop/testing.md#load-timing-perf-9)). What remains:
-the PERF-3 workloads in place of the interim ones, and jrp's choice for the
-30 s case if it does not keep within 250 ms on every platform: background
-preparation in VST3 and the Audio Unit (VST3-5), or a higher limit with the
-pause documented.
+the PERF-3 workloads in place of the interim ones, and, if the 30 s case
+ever exceeds 250 ms on a supported platform, jrp's choice between
+background preparation in VST3 and the Audio Unit (VST3-5) and a higher
+limit with the pause documented.
 First optimised-build figures (Linux cloud VM, 4 cores, clang Release with
 Ooura, 5 November 2026; stereo 48 kHz, 512-frame callbacks): VST3 `setState`
 held the host's thread for 4 ms with a 1 s filter, 43 to 61 ms with 10 s,
@@ -839,8 +839,17 @@ the same; no callback was late. LV2's worker took the same time off the
 audio thread, with no late callbacks; LV2's `restore()` held back `run()`
 for as long (about 260 ms with 30 s), and its reset (deactivate, activate)
 for about 200 ms, as the specification has the host stop audio for both.
-The Audio Unit's figures come from the "Load timings" step of the Audio
-Unit workflow's Release job.
+CI on `d1e1443` (5 November 2026, the "Load timings" steps) held the host's
+thread far less with the 30 s filter: 45 to 65 ms for VST3 on Linux, about
+55 ms on Windows, 51 to 154 ms for VST3 on macOS and 28 to 51 ms for the
+Audio Unit (macos-15); the cloud VM above is the slow outlier. Every
+callback on Linux CI was on time. On the macOS and Windows runners even the
+baselines were late, by 3 to 57 ms with callbacks taking under 1 ms, so the
+callback checks there were inconclusive: in practice only Linux CI enforces
+them. On `1290b81` the Windows runner held the host's thread for about
+265 ms with the 30 s filter (a clean baseline, then late callbacks during
+the load), so an entry over the limits now runs up to three times and the
+last run counts.
 
 ### Keeping `host.cpp` manageable
 

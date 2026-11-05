@@ -22,7 +22,9 @@
 // - a load holds the host's thread at most 100 ms with filters up to 10 s,
 //   and 250 ms with 30 s; the 120 s filter is reported only.
 // A phase is inconclusive, not failed, when the baseline before it already
-// had late callbacks: the machine was busy. In every build the run also
+// had late callbacks: the machine was busy. An entry with a phase over the
+// limits runs again, up to three times, and only the last run counts, as a
+// shared machine can stall one run without a late baseline. In every build the run also
 // fails when a load is refused, a callback reports an error or throws, or
 // the instance does not then save the second filter.
 #pragma once

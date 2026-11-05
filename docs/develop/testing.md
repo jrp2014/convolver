@@ -563,6 +563,11 @@ the callbacks are reported only. A load may hold the host's thread at most
 250 ms is where Apple's tools count an application as hung); the 120 s
 filter and LV2's worker are reported only. A phase whose baseline already
 had late callbacks is inconclusive rather than failed: the machine was busy.
+A shared CI runner can also stall a single run without a late baseline (on
+Windows CI the 30 s filter once held the host's thread for about 265 ms,
+where the run before took 55 ms), so in an optimised build an entry with a
+phase over the limits runs again, up to three times, and only the last run
+counts; a slow adapter is over the limits every time.
 In every build the run also fails when a load is refused, the instance does
 not then save the second filter, or a callback reports an error or throws.
 CTest runs the three alone (`RUN_SERIAL`); the first line says which build
