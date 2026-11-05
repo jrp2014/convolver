@@ -188,10 +188,22 @@ void verdicts() {
         // Slow only on the first run (its two loads): run 1 fails and is kept;
         // the next is not held (its callbacks are the machine's).
         const auto r = run({"slow on the first run only", 400ms, 0ms, false, false, true, 2});
-        check(r.runs.size() >= 2 && r.runs[0].verdict == timing::Verdict::failed &&
-                  r.runs[1].why.find("held the host's thread") == std::string::npos &&
+        check(r.runs.size() >= 2 && r.runs[0].hold == timing::Verdict::failed &&
+                  r.runs[1].hold == timing::Verdict::passed &&
                   (r.passed == 0 || r.passed_after_failure == 1),
               "slow on the first run only: " + text(r));
+    }
+    {
+        // As on a busy macOS runner: the hold stalled on the first run only,
+        // and every callback is late, the baseline's too. The hold limit is
+        // met by the later runs, the callbacks cannot be judged: not
+        // qualified, not failed.
+        const auto r = run({"slow once, every callback late", 400ms, 12ms, false, false, true, 1});
+        check(r.not_qualified == 1 && r.failed == 0 && r.runs.size() == 3 &&
+                  r.runs[0].hold == timing::Verdict::failed &&
+                  r.runs[1].hold == timing::Verdict::passed &&
+                  timing::exit_code(r) == timing::not_qualified_exit,
+              "slow once with late callbacks: " + text(r));
     }
     {
         // The review's reproduction: a slow loader with every callback late,

@@ -574,11 +574,17 @@ Each run of an entry (one entry point with one filter) gets a verdict
 An entry that did not pass runs again, up to three times, because a shared
 CI runner can stall one run without a late baseline (on Windows CI the 30 s
 filter once held the host's thread for about 265 ms, where the run before
-took 55 ms). The entry passes if a run passed, fails if none passed and one
-failed, is reported only if every run was, and otherwise is not qualified.
-A summary at the end lists every entry with every run that did not pass, so
-the failed attempts stay in the evidence, and its last line counts the
-entries that passed only after a failed run. The test passes only when
+took 55 ms). Across an entry's runs each limit is judged on its own: it is
+met if one run met it, failed if none met it and one failed it, and
+otherwise not qualified (or does not apply). The entry then fails if a limit
+failed or a run had an error, is not qualified if a limit was, and passes
+otherwise. So a hold that stalled once and stayed within the limit on the
+next run is met, while that run's late callbacks after a late baseline
+still leave the entry not qualified (the macOS VST3 job on 5 November 2026:
+281.6 ms on the first run, 25 to 39 ms on the next two). A summary at the
+end lists every entry with every run that did not pass, so the failed
+attempts stay in the evidence, and its last line counts the entries that
+passed only after a run that did not. The test passes only when
 every entry passed or was reported only; it fails if one failed, and exits
 77 when one was not qualified, which CTest reports as skipped
 (`SKIP_RETURN_CODE`), never as passed. So sanitizer and debug jobs show the

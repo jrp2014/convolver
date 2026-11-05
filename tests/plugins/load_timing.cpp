@@ -357,16 +357,21 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
                 // Held back by a busy machine before anything loaded: late
                 // callbacks while loading then say nothing about the plug-in.
                 bool busy = false;
-                bool judged = false; // A limit applied to some phase.
+                // Each limit applied to some phase; each was exceeded.
+                bool hold_judged = false, callbacks_judged = false;
+                bool hold_over = false, callbacks_over = false;
                 std::vector<std::string> failed, unqualified;
                 // Judges one phase by jrp's limits; returns the note for its line.
                 const auto judge = [&](const char* phase, std::optional<Seconds> held,
                                        const Callbacks& c, bool audio_held) {
                     std::vector<std::string> over, noisy;
-                    judged = judged || !audio_held || (held && e.host_thread && w.held_limit);
                     // The hold is the plug-in's own time on the caller's
                     // thread, judged whatever the audio thread saw.
-                    if (held && e.host_thread && w.held_limit && *held > *w.held_limit) {
+                    const bool hold_limited = held && e.host_thread && w.held_limit;
+                    hold_judged = hold_judged || hold_limited;
+                    callbacks_judged = callbacks_judged || !audio_held;
+                    if (hold_limited && *held > *w.held_limit) {
+                        hold_over = true;
                         char text[96];
                         std::snprintf(text, sizeof text,
                                       "held the host's thread %.1f ms, over %.0f ms", ms(*held),
@@ -382,6 +387,7 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
                                      std::string("a callback took over half its period");
                     if (!callbacks.empty())
                         (busy ? noisy : over).push_back(callbacks);
+                    callbacks_over = callbacks_over || (!callbacks.empty() && !busy);
                     std::string note;
                     for (const auto& v : over) {
                         failed.push_back(std::string(phase) + ": " + v);
@@ -459,29 +465,40 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
                         text += (text.empty() ? "" : "; ") + s;
                     return text;
                 };
-                if (result.errors != errors_before) {
+                // Each limit separately: the hold of the host's thread, then
+                // the callbacks.
+                r.hold = !hold_judged ? Verdict::reported_only
+                         : hold_over  ? Verdict::failed
+                                      : Verdict::passed;
+                r.callbacks = !callbacks_judged      ? Verdict::reported_only
+                              : callbacks_over       ? Verdict::failed
+                              : !unqualified.empty() ? Verdict::not_qualified
+                                                     : Verdict::passed;
+                r.error = result.errors != errors_before;
+                if (r.error) {
                     // A defect, not timing: judged in every build, never rerun.
                     r.verdict = Verdict::failed;
                     r.why = std::to_string(result.errors - errors_before) +
                             " errors (a refused load, a failed callback or the wrong filter "
                             "saved)";
                 } else if (!o.enforce) {
-                    r.verdict = Verdict::not_qualified;
+                    r.verdict = r.hold = r.callbacks = Verdict::not_qualified;
                     r.why = "limits not enforced in this build";
                     if (!failed.empty())
                         r.why += "; would fail: " + join(failed);
-                } else if (!failed.empty()) {
-                    r.verdict = Verdict::failed;
+                } else {
+                    r.verdict = combine(r.hold, r.callbacks);
                     r.why = join(failed);
-                } else if (!unqualified.empty()) {
-                    r.verdict = Verdict::not_qualified;
-                    r.why = join(unqualified);
-                } else if (!judged)
-                    r.verdict = Verdict::reported_only;
+                    if (!unqualified.empty())
+                        r.why += (r.why.empty() ? "" : "; ") + std::string("not judged: ") +
+                                 join(unqualified);
+                }
                 result.runs.push_back(r);
-                if (o.enforce &&
-                    (r.verdict == Verdict::failed || r.verdict == Verdict::not_qualified) &&
-                    result.errors == errors_before && attempt < o.attempts) {
+                // The entry so far: run again while it has not passed.
+                const auto so_far = verdict(result.runs.end() - attempt, result.runs.end());
+                if (o.enforce && !r.error &&
+                    (so_far == Verdict::failed || so_far == Verdict::not_qualified) &&
+                    attempt < o.attempts) {
                     std::cout << "      run " << attempt << " of " << o.attempts << " "
                               << describe(r.verdict) << "; running " << e.name << " with the "
                               << w.name << " filter again\n";
@@ -536,20 +553,36 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
                                                          : "PASSED";
     std::cout << format << " load timing: " << overall << " (" << result.passed << " passed";
     if (result.passed_after_failure)
-        std::cout << ", " << result.passed_after_failure << " of them after a failed run";
+        std::cout << ", " << result.passed_after_failure << " of them after a run that did not";
     std::cout << "; " << result.failed << " failed, " << result.not_qualified << " not qualified, "
               << result.reported_only << " reported only; " << result.errors << " errors)\n";
     return result;
 }
 
-Verdict verdict(std::vector<Run>::const_iterator first, std::vector<Run>::const_iterator last) {
-    if (std::any_of(first, last, [](const Run& r) { return r.verdict == Verdict::passed; }))
-        return Verdict::passed;
-    if (std::any_of(first, last, [](const Run& r) { return r.verdict == Verdict::failed; }))
+Verdict combine(Verdict hold, Verdict callbacks) {
+    if (hold == Verdict::failed || callbacks == Verdict::failed)
         return Verdict::failed;
-    if (std::all_of(first, last, [](const Run& r) { return r.verdict == Verdict::reported_only; }))
+    if (hold == Verdict::not_qualified || callbacks == Verdict::not_qualified)
+        return Verdict::not_qualified;
+    if (hold == Verdict::reported_only && callbacks == Verdict::reported_only)
         return Verdict::reported_only;
-    return Verdict::not_qualified;
+    return Verdict::passed;
+}
+
+Verdict verdict(std::vector<Run>::const_iterator first, std::vector<Run>::const_iterator last) {
+    if (std::any_of(first, last, [](const Run& r) { return r.error; }))
+        return Verdict::failed;
+    // One limit across the runs: met if one run met it.
+    const auto across = [&](Verdict Run::* limit) {
+        const auto any = [&](Verdict v) {
+            return std::any_of(first, last, [&](const Run& r) { return r.*limit == v; });
+        };
+        return any(Verdict::passed)          ? Verdict::passed
+               : any(Verdict::failed)        ? Verdict::failed
+               : any(Verdict::not_qualified) ? Verdict::not_qualified
+                                             : Verdict::reported_only;
+    };
+    return combine(across(&Run::hold), across(&Run::callbacks));
 }
 
 int exit_code(const Result& r) {

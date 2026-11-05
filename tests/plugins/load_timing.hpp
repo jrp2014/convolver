@@ -33,10 +33,10 @@
 // - reported only: no limit applies to any of its phases;
 // - passed: none of these.
 // An entry that did not pass runs again, up to three times, as a shared
-// machine can stall one run; it passes if a run passed, and the summary
-// keeps every run that did not. The test exits 1 if an entry failed,
-// not_qualified_exit (CTest reports it as skipped) if one did not qualify,
-// and 0 only when every entry passed or was reported only.
+// machine can stall one run; each limit is then met if one run met it (see
+// verdict()), and the summary keeps every run that did not pass. The test exits 1 if an entry
+// failed, not_qualified_exit (CTest reports it as skipped) if one did not qualify, and 0 only when
+// every entry passed or was reported only.
 #pragma once
 #include "lifecycle.hpp"
 #include <chrono>
@@ -131,18 +131,27 @@ const char* describe(Verdict);
 struct Run {
     std::string workload, entry;
     int attempt = 1;
-    Verdict verdict = Verdict::passed;
-    std::string why; // What was over the limits, or could not be judged.
+    Verdict verdict = Verdict::passed; // combine(hold, callbacks), or failed on an error.
+    std::string why;                   // What was over the limits, or could not be judged.
+    // Each limit on its own: the hold of the host's thread, and the callbacks.
+    Verdict hold = Verdict::reported_only, callbacks = Verdict::reported_only;
+    bool error = false; // A refused load, a failed callback or the wrong filter saved.
 };
+// A run's verdict from its two limits: failed if either failed, else not
+// qualified if either was, else reported only if neither applied, else passed.
+Verdict combine(Verdict hold, Verdict callbacks);
 struct Result {
     std::size_t errors = 0; // Refused loads, failed callbacks, a wrong filter saved.
     std::vector<Run> runs;  // Every run, those repeated included, in order.
     // Entries (one workload, one entry point) by their verdict().
     std::size_t passed = 0, failed = 0, not_qualified = 0, reported_only = 0;
-    std::size_t passed_after_failure = 0; // Of `passed`: an earlier run failed.
+    std::size_t passed_after_failure = 0; // Of `passed`: an earlier run did not pass.
 };
-// An entry's verdict from its runs: passed if one run passed, else failed if
-// one failed, else reported only if every run was, else not qualified.
+// An entry's verdict from its runs: failed if a run had an error; otherwise
+// each limit is met if one run met it, else failed if one run failed it,
+// else not qualified if one could not judge it, else does not apply; and
+// the two combine as for a run. So a run whose hold stalled once, followed
+// by runs within it, meets the hold limit.
 Verdict verdict(std::vector<Run>::const_iterator first, std::vector<Run>::const_iterator last);
 
 // Runs every entry point on every workload with `driver` (the format's

@@ -1285,7 +1285,9 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   limits after a late baseline, or the build does not enforce them; the test
   exits 77 (CTest: skipped) rather than 0 when an entry did not qualify; an
   entry no limit applies to is reported only, not passed; the summary keeps
-  every run that did not pass and counts passes after a failed run. `native.load_timing_harness`
+  every run that did not pass and counts passes after a run that did not;
+  across reruns the hold and the callbacks are judged separately.
+  `native.load_timing_harness`
   drives the harness with a mock adapter: slow loads fail, with late
   callbacks too (the review's reproduction), late callbacks with a late
   baseline do not qualify, a refused load fails;
