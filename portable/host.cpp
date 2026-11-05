@@ -269,13 +269,6 @@ HostFaults since(const HostFaults& now, const HostFaults& before) noexcept {
     fresh.invalid_call = since(now.invalid_call, before.invalid_call);
     return fresh;
 }
-HostFaults& operator+=(HostFaults& a, const HostFaults& b) noexcept {
-    a.rejected_input += b.rejected_input;
-    a.output_overflow += b.output_overflow;
-    a.processing_failure += b.processing_failure;
-    a.invalid_call += b.invalid_call;
-    return a;
-}
 // A rejection load() has already recorded, told apart from any other
 // std::invalid_argument thrown while checking.
 class Refused : public std::invalid_argument {
@@ -392,18 +385,19 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     activation_failure_.reset();
     notice_ = std::move(notice);
     // A new filter, or a new start for the same one: Fault clears. One
-    // snapshot of the processor's counts is both the audio side's new
-    // baseline and the one observe() measures from, so faults counted while
-    // the filter was prepared are not shown later against the new filter
-    // (jrp's review of 0.4.43). They are still explained by the next observe().
+    // snapshot of the processor's counts is the baseline of both the audio
+    // side's signal and faults(), so faults counted while the filter was
+    // prepared are not shown against the new filter (jrp's review of 0.4.43).
+    // The next observe() still logs them, as met around a filter change.
     faults_ = {};
     if (counting) {
         // Held first, so the audio side never shows Fault over a restored
         // load failure, even before the adapter updates its status.
         counting->hold_fault_signal(failure_shown());
-        const auto snapshot = counting->clear_faults();
-        unshown_ += since(snapshot, observed_);
-        observed_ = snapshot;
+        cleared_ = counting->clear_faults();
+        changed_ = changed_ || since(cleared_, observed_).any();
+    } else {
+        cleared_ = observed_; // faults() counts on from what observe() last saw.
     }
 }
 
@@ -418,8 +412,8 @@ void HostFilter::reject(HostFailureKind kind, std::string why, HostRequest reque
 Configuration HostFilter::activate(const HostLayout& host) {
     notice_.clear();
     activation_failure_.reset();
-    faults_ = {};
-    observed_ = {}; // The adapter builds a new processor, which counts from 0.
+    faults_ = cleared_ = observed_ = {}; // The adapter builds a new processor, which counts from 0.
+    changed_ = false;
     if (!filter_)
         return unfiltered_configuration(host, failed_);
     if (auto m = mismatch(*filter_, host, "the saved filter")) {
@@ -468,12 +462,11 @@ std::string times(std::uint64_t n) {
 } // namespace
 
 HostFaultReport HostFilter::observe(const HostFaults& totals) noexcept {
-    const auto current = since(totals, observed_);
+    HostFaultReport report{since(totals, observed_), changed_, failure_shown()};
     observed_ = totals;
-    faults_ += current;
-    const auto earlier = unshown_; // Counted before the accepted load: explained, not shown.
-    unshown_ = {};
-    return {current, earlier, failure_shown()};
+    faults_ = since(totals, cleared_);
+    changed_ = false;
+    return report;
 }
 
 namespace {
@@ -549,17 +542,15 @@ std::string fault_message(const HostFaults& f) {
 }
 
 std::string fault_message(const HostFaultReport& r) {
-    std::string text;
-    if (r.earlier.any())
-        text = "While the filter now playing was being loaded, the audio before it met a "
-               "problem: " +
-               fault_lines(r.earlier) +
-               " The new filter starts afresh, so the status does not show these.";
-    if (r.current.any())
-        text += (text.empty() ? "" : " ") +
-                (r.held ? "While audio played: " + fault_lines(r.current) + " " + fault_held
-                        : fault_message(r.current));
-    return text;
+    if (!r.any())
+        return {};
+    if (r.held)
+        return "While audio played: " + fault_lines(r.faults) + " " + fault_held;
+    if (r.changed)
+        return "While audio played around a filter change: " + fault_lines(r.faults) +
+               " The new filter started afresh, so the status shows only those met after it took "
+               "over.";
+    return fault_message(r.faults);
 }
 
 namespace {

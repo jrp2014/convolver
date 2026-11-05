@@ -1170,7 +1170,7 @@ void processing_faults() {
     f.load(HostState{loud}, layout);
     require(host_status(f, layout).status == HostStatus::playing, "playing before observing");
     const auto fresh = f.observe(host.faults());
-    require(fresh.current.output_overflow == 1 && !fresh.earlier.any() &&
+    require(fresh.faults.output_overflow == 1 && !fresh.changed && !fresh.held &&
                 f.faults().output_overflow == 1,
             "observe");
     auto line = host_status(f, layout);
@@ -1199,11 +1199,15 @@ void processing_faults() {
     f.load(HostState{mono()}, layout);
     require(!f.faults().any() && host_status(f, layout).status == HostStatus::playing,
             "an accepted load clears the fault");
+    // Without a processor passed to load(), faults() counts on from the last
+    // observe(), so the cleared fault does not come back (DIAG-3 review).
+    require(!f.observe(host.faults()).any() && !f.faults().any(),
+            "a load without a processor did not keep the fault cleared");
     // A new processor counts from 0 after activate().
     static_cast<void>(f.activate(layout));
     HostFaults restarted;
     restarted.rejected_input = 1;
-    require(f.observe(restarted).current.rejected_input == 1 &&
+    require(f.observe(restarted).faults.rejected_input == 1 &&
                 host_status(f, layout).text.find("invalid input samples") != std::string::npos,
             "counts after activation");
     HostFaults every{3, 2, 1, 1};
@@ -1218,25 +1222,24 @@ void processing_faults() {
             "every fault explained, on one line");
     HostFilter g(8);
     g.load(HostState{mono()}, layout);
-    // Positional braces fill current, earlier and held in order.
+    // Positional braces fill faults, changed and held in order.
     HostFaults one;
     one.invalid_call = 1;
-    const HostFaultReport braced{every, one};
-    require(braced.current.total() == 7 && braced.earlier.invalid_call == 1 && !braced.held &&
-                braced.any(),
-            "HostFaultReport{current, earlier}");
-    require(fault_message(HostFaultReport{one, {}, false}).find("host's developers") !=
-                std::string::npos,
-            "HostFaultReport{current}");
+    const HostFaultReport braced{every, true};
+    require(braced.faults.total() == 7 && braced.changed && !braced.held && braced.any(),
+            "HostFaultReport{faults, changed}");
+    require(fault_message(HostFaultReport{one}).find("host's developers") != std::string::npos,
+            "HostFaultReport{faults}");
     static_cast<void>(g.observe(every));
     require(host_status(g, layout).text.find("the filter failed while playing") !=
                 std::string::npos,
             "most serious fault first");
 
     // jrp's review of 0.4.43: audio goes on while a replacement is prepared.
-    // A fault in that window is explained, but neither shown against the
-    // filter that replaces it nor signalled by the audio thread, because the
-    // accepted load clears and observes from one snapshot.
+    // A fault in that window is logged, as met around a filter change
+    // (DIAG-3), but neither shown against the filter that replaces it nor
+    // signalled by the audio thread, because both measure from the accepted
+    // load's one snapshot.
     const auto nan = std::numeric_limits<float>::quiet_NaN();
     HostProcessor p(mono(), 64, 8);
     HostFilter h(8);
@@ -1261,16 +1264,17 @@ void processing_faults() {
         {}, &p);
     play(0.f);
     const auto window = h.observe(p.faults());
-    require(window.earlier.rejected_input == 1 && !window.current.any() && !h.faults().any() &&
+    require(window.faults.rejected_input == 1 && window.changed && !h.faults().any() &&
                 host_status(h, layout).status == HostStatus::playing,
             "a fault counted while the replacement was prepared is shown against it");
     require(!window.held, "no load failure holds the report");
     // Its log text must not claim the status shows it.
-    const auto earlier = fault_message(window);
-    require(earlier.find("does not show these") != std::string::npos &&
-                earlier.find("status shows Fault") == std::string::npos &&
-                earlier.find("invalid samples") != std::string::npos,
-            "earlier faults explained as shown");
+    const auto changed = fault_message(window);
+    require(changed.find("around a filter change") != std::string::npos &&
+                changed.find("shows only those met after it took over") != std::string::npos &&
+                changed.find("status shows Fault") == std::string::npos &&
+                changed.find("invalid samples") != std::string::npos,
+            "faults around a filter change explained as shown");
     require(!p.faults_since_clear() && !p.fault_to_signal(),
             "the audio side measures from the same snapshot");
     // The new filter's own fault: shown, and signalled once per clear.
@@ -1279,7 +1283,8 @@ void processing_faults() {
     p.fault_signalled();
     play(nan);
     require(!p.fault_to_signal(), "Fault signalled twice");
-    require(h.observe(p.faults()).current.rejected_input == 2 &&
+    const auto later = h.observe(p.faults());
+    require(later.faults.rejected_input == 2 && !later.changed &&
                 host_status(h, layout).status == HostStatus::fault,
             "new faults not shown");
     // A load failure comes first, on the audio side too.
@@ -1294,7 +1299,7 @@ void processing_faults() {
     require(!p.fault_to_signal() && p.faults_since_clear(), "Fault signalled over Load failed");
     // Nor does the log say Fault shows (the 0.5.2 review).
     const auto held = h.observe(p.faults());
-    require(held.held && held.current.rejected_input == 1 && !held.earlier.any() &&
+    require(held.held && held.faults.rejected_input == 1 && !held.changed &&
                 host_status(h, layout).status == HostStatus::load_failed,
             "a fault after a rejected replacement");
     const auto held_text = fault_message(held);
@@ -1328,7 +1333,7 @@ void processing_faults() {
         audio_thread = false;
     };
     play_q(nan);
-    auto explained = empty.observe(q.faults()).current.rejected_input;
+    auto explained = empty.observe(q.faults()).faults.rejected_input;
     try {
         empty.load(
             HostState{mono()}, layout,
@@ -1343,7 +1348,7 @@ void processing_faults() {
     q.replace(unfiltered_configuration(layout, true)); // As the VST3 and AU adapters do.
     play_q(nan);
     const auto after = empty.observe(q.faults());
-    explained += after.current.rejected_input + after.earlier.rejected_input;
+    explained += after.faults.rejected_input;
     require(explained == 3 && q.faults().rejected_input == 3,
             "a fault while a failed first load was prepared is lost from the log");
 }

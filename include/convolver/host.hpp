@@ -201,21 +201,22 @@ struct HostFaults {
 // What happened, why and what to change, for the log: one sentence per kind
 // of fault. Empty when there are none.
 std::string fault_message(const HostFaults&);
-// What HostFilter::observe() found. `current`: faults met by the filter that
-// plays now, which faults() (and so the status) shows. `earlier`: faults
-// counted before an accepted load replaced the filter they met, while the new
-// one was prepared; logged, but never shown. `held`: the status shows a load
-// failure, which comes before Fault (HostFilter::failure_shown()), so it does
-// not show `current` either.
+// What HostFilter::observe() found: the faults no earlier call returned.
+// `changed`: an accepted load came between the last call and this one, and
+// some of `faults` were counted before it, so they belong to the filter it
+// replaced and the status does not show them (DIAG-3: they are reported as
+// met around a filter change, not divided between the filters). `held`: the
+// status shows a load failure, which comes before Fault
+// (HostFilter::failure_shown()), so it shows none of them.
 struct HostFaultReport {
-    HostFaults current, earlier;
-    bool held = false;
+    HostFaults faults;
+    bool changed = false, held = false;
     bool any() const noexcept {
-        return current.any() || earlier.any();
+        return faults.any();
     }
 };
-// The log text for both parts, each with its own ending, so the log never
-// says the status shows Fault for faults it does not show.
+// The log text, whose ending never says the status shows Fault for faults
+// it does not show.
 std::string fault_message(const HostFaultReport&);
 
 // Control side of the shared adapter contract, for every plug-in format
@@ -332,13 +333,11 @@ class HostFilter {
         return faults_;
     }
     // Takes the processor's counts (HostProcessor::faults(), totals since it
-    // was built) and returns the faults that no earlier call returned, for the
-    // adapter to log; they are added to faults(). activate() starts the count
-    // again for a new processor, so call this before discarding the old one,
-    // and before load(): an accepted load clears faults(). Faults counted
-    // between the last call and an accepted load (while it was prepared) are
-    // returned as `earlier`, for the log, and not added to faults(). `held`
-    // is failure_shown().
+    // was built), updates faults() from them and returns the faults that no
+    // earlier call returned, for the adapter to log. activate() starts the
+    // count again for a new processor, so call this before discarding the old
+    // one. An accepted load clears faults(); the faults it leaves unreturned
+    // are returned by the next call with `changed` set.
     HostFaultReport observe(const HostFaults& totals) noexcept;
 
   private:
@@ -356,8 +355,10 @@ class HostFilter {
     bool failed_ = false;
     std::optional<HostFailure> load_failure_, activation_failure_;
     std::string notice_;
-    HostFaults faults_, observed_; // Shown since the last clear; processor totals seen.
-    HostFaults unshown_; // Counted before an accepted load and not yet returned by observe().
+    // faults(); the processor's totals at the last clear (the audio side's
+    // baseline too) and at the last observe().
+    HostFaults faults_, cleared_, observed_;
+    bool changed_ = false; // HostFaultReport::changed for the next observe().
 };
 
 // DIAG-1: what a host's status display shows for an instance, for formats

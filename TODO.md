@@ -1120,6 +1120,16 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   look in a host is part of HOST-1;
   [troubleshooting](docs/use/troubleshooting.md),
   [plan](docs/archive/plans/2026-11-05-actionable-diagnostics.md).
+- [x] **DIAG-3 — Report faults around a filter change together.** 5
+  November 2026, from jrp's simplification review: faults counted while a
+  replacement was prepared are logged once, as met around a filter change,
+  rather than split from the new filter's own; `HostFaultReport` holds
+  `faults`, `changed` and `held`, and `HostFilter` keeps no separate tally
+  of them. Kept, because each protects something users see: one snapshot as
+  the baseline of both the status and the audio thread's signal (new faults
+  show, old ones do not), Fault signalled once per baseline, and the hold
+  that stops Fault replacing Load failed;
+  [contract](docs/develop/plugin-contract.md#status-and-log).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;

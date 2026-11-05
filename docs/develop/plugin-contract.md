@@ -292,9 +292,12 @@ format.
   filter, takes one snapshot of the counts (`HostProcessor::clear_faults()`)
   as both the audio thread's new baseline and the point `observe()` counts
   from. Faults from before the snapshot, the preparation window included, are
-  still returned by the next `observe()` (as `earlier`, logged with their own
-  ending saying the status does not show them), but no longer shown as
-  Fault, and the audio thread signals only faults after it
+  still returned by the next `observe()`, but no longer shown as Fault. That
+  report sets `changed`, and its log text says the faults were met around a
+  filter change and that the status shows only those after it; they are not
+  divided between the two filters (DIAG-3, jrp's simplification review of
+  5 November 2026: exact attribution near a replacement does not change the
+  audio), and the audio thread signals only faults after it
   (`faults_since_clear()`, `fault_to_signal()`, `fault_signalled()`, once per
   baseline). The audio thread never publishes Fault over Load failed: an
   accepted load sets `hold_fault_signal(failure_shown())` before the

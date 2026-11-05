@@ -110,6 +110,12 @@ Until 1.0 the C++ API may change between minor versions.
   `native.host_settings` allows that frame, so a later shared ramp helper
   need not reproduce PLUG-18's frame counting. Reported latency and channel
   alignment stay exact to the sample. The sound is unchanged.
+- Library and plug-ins (DIAG-3, from jrp's simplification review): faults
+  met while a replacement filter was being prepared are logged together with
+  any met just after it, as "around a filter change", instead of in a
+  sentence of their own. The status still shows only those after the new
+  filter took over. `HostFaultReport` holds `faults`, `changed` and `held`
+  instead of `current`, `earlier` and `held`.
 - CLI (GAIN-2, from an external review of `91fcf1f`): `--gain-db no-clip`
   takes the largest possible peak directly instead of also filtering ten
   filter lengths of noise, so choosing it costs well under a millisecond
