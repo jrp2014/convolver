@@ -120,6 +120,13 @@ class PolicyTests(unittest.TestCase):
             ):
                 self.contract.validate_policy(policy, ROOT)
 
+    def test_system_formats(self):
+        # A corresponding-source rebuild makes what the candidates ship.
+        self.assertEqual(self.contract.system_formats(self.policy, 'Darwin'), ['vst3', 'au'])
+        self.assertEqual(self.contract.system_formats(self.policy, 'Linux'), ['vst3'])
+        with self.assertRaisesRegex(ValueError, 'no packages'):
+            self.contract.system_formats(self.policy, 'FreeBSD')
+
     def test_tested_without_evidence(self):
         policy = copy.deepcopy(self.policy)
         policy['platforms'][0]['status'] = 'tested'

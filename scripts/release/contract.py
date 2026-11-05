@@ -185,3 +185,13 @@ def with_records(policy, records):
 
 def platform_policy(policy, identifier):
     return next(p for p in policy['platforms'] if p['id'] == identifier)
+
+
+def system_formats(policy, system):
+    """The plug-in formats the policy ships for an operating system (for example
+    VST3 and the Audio Unit on Darwin), so a rebuild of the corresponding source
+    makes the same plug-ins as the candidate."""
+    formats = {f for p in policy['platforms'] if p['os'] == system for f in p['formats']}
+    if not formats:
+        raise ValueError(f'the release policy ships no packages for {system}')
+    return sorted(formats, key=lambda f: (f != 'vst3', f))

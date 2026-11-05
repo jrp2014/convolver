@@ -70,8 +70,11 @@ set_target_properties(convolver_au_adapter PROPERTIES CXX_EXTENSIONS OFF POSITIO
 # VST3 plug-in shows too (plugins/editor/mac/), with the Audio Unit's view
 # factory, compiled into the component and the window test. Objective-C
 # classes share one namespace per process, so their names carry the version:
-# two Convolver builds loaded in one host keep their own windows.
-enable_language(OBJCXX)
+# two Convolver builds loaded in one host keep their own windows. The .mm
+# files compile as CXX, as the VST3 plug-in's do (its CMakeLists.txt):
+# enabling OBJCXX here breaks a build with both plug-ins, such as the preview
+# candidates, because the VST3 SDK's directory, added before, has no rules for
+# it.
 string(REPLACE "." "_" au_class_version "${Convolver_VERSION}")
 set(au_view_factory "ConvolverAUViewFactory_${au_class_version}")
 set(mac_editor "${PROJECT_SOURCE_DIR}/plugins/editor/mac")
@@ -106,7 +109,7 @@ endif()
 math(EXPR CONVOLVER_AU_VERSION "(${Convolver_VERSION_MAJOR} << 16) | (${au_minor} << 8) | ${au_patch}")
 
 add_library(convolver_au MODULE factory.cpp ${au_view_sources})
-set_target_properties(convolver_au PROPERTIES OBJCXX_STANDARD 20 OBJCXX_EXTENSIONS OFF
+set_target_properties(convolver_au PROPERTIES
     BUNDLE TRUE BUNDLE_EXTENSION component OUTPUT_NAME Convolver
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in"
     CXX_EXTENSIONS OFF CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
@@ -168,7 +171,7 @@ if(CONVOLVER_BUILD_TESTS)
         COMPILE_OPTIONS "-fobjc-arc"
         COMPILE_DEFINITIONS "CONVOLVER_DIAGNOSTIC_VIEW=ConvolverDiagnosticView_${au_class_version};CONVOLVER_SETTING_ROWS=ConvolverSettingRows_${au_class_version};CONVOLVER_AU_VIEW_FACTORY=${au_view_factory}"
         INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR};${mac_editor}")
-    set_target_properties(convolver_au_editor_tests PROPERTIES OBJCXX_STANDARD 23 OBJCXX_EXTENSIONS OFF)
+    set_target_properties(convolver_au_editor_tests PROPERTIES CXX_STANDARD 23 CXX_EXTENSIONS OFF)
     target_link_libraries(convolver_au_editor_tests PRIVATE convolver_au_adapter convolver_presets
         "-framework AppKit")
     add_test(NAME au.editor COMMAND convolver_au_editor_tests)
