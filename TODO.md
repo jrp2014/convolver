@@ -827,7 +827,10 @@ Audio Unit (macos-15); the cloud VM above is the slow outlier. Every
 callback on Linux CI was on time. On the macOS and Windows runners even the
 baselines were late, by 3 to 57 ms with callbacks taking under 1 ms, so the
 callback checks there were inconclusive: in practice only Linux CI enforces
-them.
+them. On `1290b81` the Windows runner held the host's thread for about
+265 ms with the 30 s filter (a clean baseline, then late callbacks during
+the load), so an entry over the limits now runs up to three times and the
+last run counts.
 
 ### Keeping `host.cpp` manageable
 

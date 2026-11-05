@@ -43,6 +43,8 @@ constexpr const char* build = "debug";
 // The limits hold only where timings mean something: an optimised build
 // without sanitizers.
 constexpr bool enforced = build == nullptr;
+// Runs of an entry before a phase over the limits counts.
+constexpr int attempts = 3;
 
 Seconds period(const Workload& w) {
     return Seconds(static_cast<double>(w.block) / w.host.sample_rate);
@@ -322,85 +324,101 @@ std::size_t run(lifecycle::Driver& driver, const std::vector<Entry>& entries, co
             f->state = encode_host_state(s);
             f->file = write_file(o.work_directory, format + "-" + f->name, f->configuration);
         }
-        for (const auto& e : entries) {
-            bool busy = false; // The baseline was late: the machine was busy.
-            // What exceeds jrp's limits, or nothing.
-            const auto over = [&](std::optional<Seconds> held, const Callbacks& c,
-                                  bool audio_held) {
-                std::string why;
-                const auto add = [&](const std::string& s) {
-                    why += (why.empty() ? "" : "; ") + s;
-                };
-                if (held && e.host_thread && w.held_limit && *held > *w.held_limit)
-                    add("held the host's thread over " +
-                        std::to_string(std::lround(ms(*w.held_limit))) + " ms");
-                if (!audio_held && c.late)
-                    add("late callbacks");
-                if (!audio_held && c.longest > period(w) / 2)
-                    add("a callback took over half its period");
-                if (!why.empty() && busy) {
-                    ++inconclusive;
-                    return "inconclusive, the baseline was late too: " + why;
-                }
-                if (why.empty())
-                    return why;
-                ++over_limits;
-                return (enforced ? "OVER THE LIMIT: " : "over the limit (not enforced here): ") +
-                       why;
-            };
-            driver.create(w.host, true);
-            if (!driver.start())
-                throw std::runtime_error(format + ": the instance did not start");
-            {
-                Renderer audio(driver, w);
-                const auto settle = Seconds(0.3); // Beyond any crossfade.
-                audio.wait_for(settle);
-                audio.take();
-                audio.wait_for(Seconds(0.25));
-                const auto idle = audio.take();
-                busy = idle.late != 0;
-                report(format, w, e.name, "baseline", std::nullopt, idle, idle.failed == 0,
-                       busy ? "note: the machine was busy, so this entry's phases are inconclusive"
-                            : "");
-                errors += idle.failed;
-                for (const auto* f : {&x, &y}) {
-                    Outcome outcome;
-                    Seconds held{0};
-                    const auto timed = [&] {
-                        const auto begun = Clock::now();
-                        outcome = e.load(*f, audio);
-                        held = outcome.held.value_or(Clock::now() - begun);
+        for (const auto& e : entries)
+            // A shared machine can stall any one run, so an optimised build
+            // runs an entry again when a phase is over the limits, and judges
+            // the last run: a slow adapter is over every time.
+            for (int attempt = 1;; ++attempt) {
+                bool busy = false; // The baseline was late: the machine was busy.
+                std::size_t over_here = 0, inconclusive_here = 0;
+                // What exceeds jrp's limits, or nothing.
+                const auto over = [&](std::optional<Seconds> held, const Callbacks& c,
+                                      bool audio_held) {
+                    std::string why;
+                    const auto add = [&](const std::string& s) {
+                        why += (why.empty() ? "" : "; ") + s;
                     };
-                    if (e.audio_waits) {
-                        std::lock_guard hold(audio.gate()); // Timed once audio has stopped.
-                        timed();
-                    } else
-                        timed();
+                    if (held && e.host_thread && w.held_limit && *held > *w.held_limit)
+                        add("held the host's thread over " +
+                            std::to_string(std::lround(ms(*w.held_limit))) + " ms");
+                    if (!audio_held && c.late)
+                        add("late callbacks");
+                    if (!audio_held && c.longest > period(w) / 2)
+                        add("a callback took over half its period");
+                    if (!why.empty() && busy) {
+                        ++inconclusive_here;
+                        return "inconclusive, the baseline was late too: " + why;
+                    }
+                    if (why.empty())
+                        return why;
+                    ++over_here;
+                    return (enforced ? "OVER THE LIMIT: "
+                                     : "over the limit (not enforced here): ") +
+                           why;
+                };
+                driver.create(w.host, true);
+                if (!driver.start())
+                    throw std::runtime_error(format + ": the instance did not start");
+                {
+                    Renderer audio(driver, w);
+                    const auto settle = Seconds(0.3); // Beyond any crossfade.
                     audio.wait_for(settle);
-                    const auto seen = audio.take();
-                    const bool ok = outcome.accepted && seen.failed == 0;
-                    report(format, w, e.name, f == &x ? "first load" : "replacement", held, seen,
-                           ok, over(held, seen, e.audio_waits));
-                    errors += ok ? 0 : 1;
+                    audio.take();
+                    audio.wait_for(Seconds(0.25));
+                    const auto idle = audio.take();
+                    busy = idle.late != 0;
+                    report(
+                        format, w, e.name, "baseline", std::nullopt, idle, idle.failed == 0,
+                        busy ? "note: the machine was busy, so this entry's phases are inconclusive"
+                             : "");
+                    errors += idle.failed;
+                    for (const auto* f : {&x, &y}) {
+                        Outcome outcome;
+                        Seconds held{0};
+                        const auto timed = [&] {
+                            const auto begun = Clock::now();
+                            outcome = e.load(*f, audio);
+                            held = outcome.held.value_or(Clock::now() - begun);
+                        };
+                        if (e.audio_waits) {
+                            std::lock_guard hold(audio.gate()); // Timed once audio has stopped.
+                            timed();
+                        } else
+                            timed();
+                        audio.wait_for(settle);
+                        const auto seen = audio.take();
+                        const bool ok = outcome.accepted && seen.failed == 0;
+                        report(format, w, e.name, f == &x ? "first load" : "replacement", held,
+                               seen, ok, over(held, seen, e.audio_waits));
+                        errors += ok ? 0 : 1;
+                    }
+                    audio.before_next([&] { driver.reset(); });
+                    audio.wait_for(settle);
+                    const auto reset = audio.take();
+                    report(format, w, e.name, "reset", std::nullopt, reset, reset.failed == 0,
+                           over(std::nullopt, reset, o.reset_holds_audio));
+                    errors += reset.failed;
+                    // The filter that plays is the replacement, as saved.
+                    const auto saved = driver.saved();
+                    if (!saved.configuration || saved.configuration->paths.at(0).impulse !=
+                                                    y.configuration.paths[0].impulse) {
+                        std::cout << format << ": after " << e.name
+                                  << " the instance does not save " << w.name << " filter y\n";
+                        ++errors;
+                    }
                 }
-                audio.before_next([&] { driver.reset(); });
-                audio.wait_for(settle);
-                const auto reset = audio.take();
-                report(format, w, e.name, "reset", std::nullopt, reset, reset.failed == 0,
-                       over(std::nullopt, reset, o.reset_holds_audio));
-                errors += reset.failed;
-                // The filter that plays is the replacement, as saved.
-                const auto saved = driver.saved();
-                if (!saved.configuration ||
-                    saved.configuration->paths.at(0).impulse != y.configuration.paths[0].impulse) {
-                    std::cout << format << ": after " << e.name << " the instance does not save "
-                              << w.name << " filter y\n";
-                    ++errors;
+                driver.stop();
+                driver.destroy();
+                if (enforced && over_here != 0 && attempt < attempts) {
+                    std::cout << "      " << e.name << " with the " << w.name
+                              << " filter was over the limits on run " << attempt << " of "
+                              << attempts << "; running it again\n";
+                    continue;
                 }
+                over_limits += over_here;
+                inconclusive += inconclusive_here;
+                break;
             }
-            driver.stop();
-            driver.destroy();
-        }
         fs::remove(x.file);
         fs::remove(y.file);
         fs::remove(fs::path(x.file).replace_extension(".wav"));

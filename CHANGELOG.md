@@ -20,7 +20,8 @@ Until 1.0 the C++ API may change between minor versions.
   and how late audio callbacks were. In optimised builds they fail above
   jrp's limits for the loading-responsiveness gate: no late callback, and
   the host's thread held at most 100 ms with filters up to 10 s and 250 ms
-  with 30 s. Tests only: no change to the plug-ins or the sound.
+  with 30 s; an entry over them runs up to three times, and the last run
+  counts. Tests only: no change to the plug-ins or the sound.
 
 - `convolver --compare OUTPUT EXPECTED` (REL-5) checks a render, such as a
   plug-in host's, against the file it should match, sample for sample. It
