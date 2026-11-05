@@ -211,11 +211,16 @@ void set_host_rate(HostLayout& host, double hertz) noexcept {
 std::string host_rate_text(const HostLayout& host) {
     if (host.fractional_rate == 0)
         return std::to_string(host.sample_rate) + " Hz";
-    // Ten significant digits: 47952.04795 for 48000/1.001.
+    // Ten significant digits: 47952.04795 for 48000/1.001. A rate so close
+    // to whole hertz that those read as whole gets every digit it needs, so
+    // it never reads as the whole rate.
     std::array<char, 32> text{};
-    const auto [end, error] = std::to_chars(text.data(), text.data() + text.size(),
-                                            host.fractional_rate, std::chars_format::general, 10);
-    return std::string(text.data(), error == std::errc() ? end : text.data()) + " Hz";
+    auto* const last = text.data() + text.size();
+    auto written =
+        std::to_chars(text.data(), last, host.fractional_rate, std::chars_format::general, 10);
+    if (written.ec == std::errc() && std::find(text.data(), written.ptr, '.') == written.ptr)
+        written = std::to_chars(text.data(), last, host.fractional_rate);
+    return std::string(text.data(), written.ec == std::errc() ? written.ptr : text.data()) + " Hz";
 }
 
 bool same_rate(const HostLayout& a, const HostLayout& b) noexcept {

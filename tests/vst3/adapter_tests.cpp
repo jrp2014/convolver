@@ -740,6 +740,10 @@ void failure_records() {
 // This process's Convolver log, chosen once in main() (CI-28).
 std::filesystem::path process_log;
 // A file name of this process's own, so that concurrent runs never share it.
+std::filesystem::path private_temp(const char* name) {
+    return std::filesystem::temp_directory_path() /
+           (std::string(name) + "-" + std::to_string(std::random_device{}()));
+}
 // VST3-9: a host rate that is not a whole number of hertz (48000/1.001, a
 // pull-down rate) is accepted, and matched strictly: no filter suits it, so
 // the plug-in keeps its filter, plays silence (bypass still plays the input),
@@ -845,6 +849,15 @@ void fractional_rates() {
             "a replacement accepted at a fractional rate");
     p.setProcessing(false);
     require(p.setActive(false) == kResultOk, "fractional deactivate");
+    // Proposed at the whole part after running at the fractional rate: the
+    // host's rate is not known again until activation, so state for another
+    // rate is kept to be checked then, as at any proposed rate.
+    setup.sampleRate = 47952;
+    MemoryStream proposed;
+    write_state(&proposed, saved);
+    proposed.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setupProcessing(setup) == kResultOk && p.setState(&proposed) == kResultOk,
+            "the whole part taken as the fractional rate already known");
     // Another fractional rate is a change of rate too.
     setup.sampleRate = 44100 / 1.001;
     require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk &&
@@ -873,10 +886,6 @@ void fractional_rates() {
             "a nearby rate treated as the filter's");
     p.setActive(false);
     p.terminate();
-}
-std::filesystem::path private_temp(const char* name) {
-    return std::filesystem::temp_directory_path() /
-           (std::string(name) + "-" + std::to_string(std::random_device{}()));
 }
 // DIAG-1: the Status parameter shows each failure in one line, and the
 // Convolver log holds the full explanation.
@@ -943,9 +952,9 @@ void status_and_log() {
                                  "output channels; Convolver takes 1 to 8 of each.") &&
                 count(log_text(), "Refused the host's channel layout") == 1,
             "refused layout not logged once");
-    ProcessSetup odd{kRealtime, kSample32, 64, 0.5};
+    ProcessSetup odd{kRealtime, kSample32, 64, 768000.5};
     require(p.setupProcessing(odd) == kInvalidArgument &&
-                contains(log_text(), "Refused the host's processing settings (0.5 Hz, "
+                contains(log_text(), "Refused the host's processing settings (768000.5 Hz, "
                                      "blocks of up to 64 samples): the sample rate must be "
                                      "from 1 to 768000 Hz."),
             "refused rate not logged");

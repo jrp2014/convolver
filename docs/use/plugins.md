@@ -132,7 +132,9 @@ another rate, since filters are made for a whole number of hertz and
 Convolver never resamples. Status and the log give both rates. The filter
 stays loaded, and plays again when the host returns to its rate. Only a
 difference far smaller than any real rate change, the rounding of a whole
-rate, counts as that rate.
+rate, counts as that rate. The Audio Unit and LV2 plug-ins still refuse such
+a rate: the Audio Unit refuses the stream format, and an LV2 host cannot
+create the plug-in.
 
 Convolver never falls back to unfiltered audio when a filter fails: a room
 correction or crossover that quietly plays unfiltered audio can be worse than

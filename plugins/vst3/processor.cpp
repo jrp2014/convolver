@@ -8,6 +8,7 @@
 #include "pluginterfaces/vst/ivstparameterchanges.h"
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cmath>
 #include <cstdio>
 #include <stdexcept>
@@ -224,9 +225,12 @@ tresult PLUGIN_API Processor::setupProcessing(ProcessSetup& setup) {
             why = "samples must be 32-bit or 64-bit floating point.";
         if (!why.empty()) {
             try {
-                char rate[32];
-                std::snprintf(rate, sizeof rate, "%.6g", setup.sampleRate);
-                log(std::string("Refused the host's processing settings (") + rate +
+                // Every digit the rate needs (VST3-9): 768000.4 Hz is not 768000 Hz.
+                std::array<char, 32> rate{};
+                const auto [end, error] =
+                    std::to_chars(rate.data(), rate.data() + rate.size(), setup.sampleRate);
+                log(std::string("Refused the host's processing settings (") +
+                    std::string(rate.data(), error == std::errc() ? end : rate.data()) +
                     " Hz, blocks of up to " + std::to_string(setup.maxSamplesPerBlock) +
                     " samples): " + why +
                     " The host may report the plug-in as unusable, or offer other settings.");
