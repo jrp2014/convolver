@@ -6,7 +6,6 @@
 #include "convolver/host.hpp"
 #include "convolver_identities.hpp"
 #include "host_report.hpp"
-#include "request_worker.hpp"
 #include "view_properties.hpp"
 #include <AudioUnitSDK/AUBase.h>
 #include <array>
@@ -70,7 +69,7 @@ inline void (*load_started_for_tests)() noexcept = nullptr;
 //
 // Derived from AUBase rather than AUEffectBase on purpose: AUEffectBase's
 // bypass copies input to output, skipping Convolver's latency-aligned dry
-// path and 64-sample ramp, and does not handle unequal channel counts. Here
+// path and 1.33 ms ramp, and does not handle unequal channel counts. Here
 // the bypass property only stores a flag; Render applies it through
 // HostProcessor::set_bypass.
 //
@@ -196,17 +195,19 @@ class Effect final : public ausdk::AUBase {
     static constexpr std::chrono::seconds report_fault_interval{10};
     // AU-7: stores a Gain, Mix or Latency value clamped to its range.
     void store(AudioUnitParameterID, AudioUnitParameterValue) noexcept;
-    // PLUG-10: a new Latency is applied only by the unit's own worker thread
-    // (latency_worker_), never by the thread that chose it: SetParameter can
+    // PLUG-10: a new Latency is applied only on the unit's own serial queue
+    // (latency_queue_), never by the thread that chose it: SetParameter can
     // arrive on any thread, including an audio thread or inside a render
-    // callback, so it only stores the value and wakes the worker (an atomic
-    // store and notify, which neither allocates nor waits). RestoreState
-    // wakes it too. Uninitialized, the worker makes the reported latency
-    // follow the choice. Initialized, it builds a processor with the chosen
+    // callback, so it only stores the value and wakes the queue (AU-12:
+    // dispatch_source_merge_data: an atomic OR, then a wake-up that may make a
+    // system call to ask for a thread; the open-source libdispatch neither
+    // allocates nor takes a user-space lock there. Apple does not call it
+    // real-time safe, which jrp accepted). RestoreState wakes it too. Uninitialized, the work makes
+    // the reported latency follow the choice. Initialized, it builds a processor with the chosen
     // block size and hands it to Render, which switches at its next call: the
     // new one starts with no history, so the sound has a gap (the new latency
     // plus the filter's own delay). The host is told of the new latency and
-    // tail, from the worker thread, and the log says what happened. A Latency
+    // tail, from the queue, and the log says what happened. A Latency
     // that cannot be built is tried again only when chosen again.
     void request_latency() noexcept;
     void apply_latency() noexcept;
@@ -244,7 +245,7 @@ class Effect final : public ausdk::AUBase {
     std::chrono::steady_clock::time_point
         report_faults_at_{}; // Last report_locked() look; under control_.
     // AU-6: the last report read, for a read while another call holds
-    // `control_` (a load or the Latency worker preparing a filter, which can
+    // `control_` (a load or the Latency work preparing a filter, which can
     // take a while). update_status() forgets it whenever what the unit plays
     // changes, so a read after a load never gets the report from before it;
     // a read with no copy waits for the lock.
@@ -253,8 +254,12 @@ class Effect final : public ausdk::AUBase {
     std::mutex logging_;
     std::string logged_;    // The last line log() wrote, under logging_.
     const std::string tag_; // "Audio Unit #n": this instance in the Convolver log.
-    // The Latency worker (request_latency()), stopped in the destructor.
-    // Started at the end of the constructor, after every member it uses.
-    RequestWorker latency_worker_;
+    // AU-12: the Latency work (request_latency()), on a serial dispatch
+    // queue woken by a DISPATCH_SOURCE_TYPE_DATA_OR source; defined in
+    // effect.cpp, so that no Objective-C file sees a dispatch object. Made at
+    // the end of the constructor, after every member it uses, and ended in
+    // the destructor, which waits for work already running.
+    struct LatencyQueue;
+    std::unique_ptr<LatencyQueue> latency_queue_;
 };
 } // namespace convolver::au

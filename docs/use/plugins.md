@@ -423,8 +423,8 @@ defaults play exactly as Convolver did before the settings existed.
 | **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. With different input and output counts there is no dry signal, so the mix stays at 100%. Like bypass, the input share still plays when a filter fails to load and the filtered sound is silent. |
 | **Latency** | 64, 128, 256, 512, 1024, 2048 or 4096 frames | 256 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. Smaller values mean less delay and more processor load; larger values the opposite. It is the old Convolver's partitions setting in modern form, and the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
 
-- Gain and Mix changes fade over 64 samples, so automating them does not
-  click. Latency cannot be automated.
+- Gain and Mix changes fade over 1.3 ms (64 samples at 48 kHz, 128 at
+  96 kHz), so automating them does not click. Latency cannot be automated.
 - The host saves the settings in the project and in presets it saves itself.
   A preset made by `convolver-preset` holds the filter only, so loading it
   leaves the settings as they are. The
@@ -474,7 +474,7 @@ of a region may cut it off: render with a little silence after the audio.
 
 ## Bypass
 
-The host's bypass switch fades over 64 samples to the input, delayed by the
+The host's bypass switch fades over 1.3 ms to the input, delayed by the
 latency so nothing jumps in time, and back. The filter keeps running
 underneath, so switching back loses nothing.
 
@@ -490,7 +490,7 @@ a preset leaves the switch as it is.
 
 Loading a preset while audio plays prepares the new filter in the background,
 lets it run for the latency (256 samples by default), then crossfades to it
-over 256 samples. The new
+over 5.3 ms (256 samples at 48 kHz). The new
 filter starts with no history, so it cannot filter audio that played before
 it was loaded. When the host stops and restarts processing, a pending filter
 is installed at once.
@@ -520,7 +520,7 @@ URIs are `https://github.com/jrp2014/convolver/lv2#discrete-N-M`.
 
 | Index | Symbol | Kind | Meaning |
 | --- | --- | --- | --- |
-| 0 | `enabled` | Control input | 1 processes, 0 bypasses (a 64-sample fade) |
+| 0 | `enabled` | Control input | 1 processes, 0 bypasses (a 1.3 ms fade) |
 | 1 | `latency` | Control output | 256 samples |
 | 2 | `status` | Control output | 0 Running, 1 No filter, 2 Load failed, 3 Loading, 4 Fault |
 | 3… | `in_1` … `in_N` | Audio input | Input channels in order |

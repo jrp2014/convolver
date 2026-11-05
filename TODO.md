@@ -285,14 +285,6 @@ Shared work, done once for all three formats:
   If FFTW-built plug-ins go ahead, FFTW 3.3.5's
   `fftwf_make_planner_thread_safe` is FFTW's answer for plug-ins in one
   process that cannot share a lock (its manual calls it a last resort).
-- [ ] **PLUG-17 — Ramps measured in time rather than frames (jrp decides).**
-  From the project review of 5 November 2026: `HostProcessor`'s gain, mix,
-  bypass and mute ramps last 64 frames and a replacement's crossfade 256
-  frames at every sample rate (PLUG-16 named them), so at 48 kHz they take
-  1.3 ms and 5.3 ms, and at 384 kHz 0.17 ms and 0.67 ms. Fixed times would
-  make the higher rates as smooth as 48 kHz, but they change the sound at
-  every rate except the one chosen, so jrp decides; the review recommends
-  keeping frames for the first preview.
 
 LV2 (Linux first; also PipeWire system audio):
 
@@ -507,15 +499,6 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   plays at once (a new processor handed to Render). Not yet checked in
   GarageBand (AU-4's step 10). Remaining, with PLUG-10's deferred parts:
   Gain mode (1002).
-- [ ] **AU-12 — Wake the Latency work with a dispatch source.** From the
-  project review of 5 November 2026: `portable/request_worker.hpp`, a thread
-  of our own that only the Audio Unit uses, applies a new Latency. libdispatch
-  has the same coalescing wake-up: a `DISPATCH_SOURCE_TYPE_DATA_OR` source on
-  a serial queue, which `dispatch_source_merge_data` wakes with an atomic OR.
-  Apple documents the merge as atomic but not as safe on an audio thread, so
-  jrp decides whether to try it; if `au.adapter`'s allocation counts and the
-  macOS jobs then pass, the worker, its tests, the watchdog workflow and
-  `scripts/ci_watchdog_probe.py` go, and CI-24 and CI-25 close.
 
 ## FFmpeg integration
 
@@ -600,13 +583,6 @@ means a patched FFmpeg build with `--enable-gpl`.
   with tests for gain, delay, length and reported metadata; retain mismatch errors
   by default. Compare [libsamplerate](https://libsndfile.github.io/libsamplerate/)
   and other suitable implementations before choosing a dependency.
-- [ ] **IO-9 — Shortest float text from the standard library.** From the
-  project review of 5 November 2026: `equalizer_apo.cpp` and
-  `inspection_cli.cpp` search for the shortest text that reads back as the
-  same float with `snprintf` and `strtof`, because macOS before 13.3 lacks
-  floating-point `std::to_chars`. Builds for macOS 14 (PLUG-15) have it.
-  Waits for jrp: using it means Convolver can no longer be built for macOS
-  11 to 13.2 from source.
 - [ ] **GAIN-1 — Define no-clip headroom precisely.** Test the exact full-scale
   endpoints with floating-point rounding, integer quantization, dither and noise
   shaping. The current filter bound assumes input magnitude at most 1 and does
@@ -812,33 +788,6 @@ load-performance work for now; that is not a qualification of either.
   of 0.5.2. See
   [pre-releases and newer upstream versions](docs/develop/build.md#pre-releases-and-newer-upstream-versions).
 
-- [ ] **CI-24 — Find why `native.request_worker` timed out on Windows.**
-  In the Ooura build on PR #102 (1 November 2026), while two package
-  consumer builds ran beside it, and again in the Ooura build on PR #105,
-  beside `native.kernel_divergence` and `native.host_lifecycle`; the main
-  and core-only builds' tests passed in about 0.5 s earlier in each job. A
-  stall on a busy runner and a lost wake looked alike in the old report.
-  CI-22's watchdog now reports what each thread was doing, with their
-  stacks: when it fires again, read that and fix the cause, in the worker
-  or in the test's scheduling. Do not raise the limit
-  or replace the worker before then (jrp, 1 November 2026). See
-  [intermittent failures](docs/develop/testing.md#intermittent-failures).
-- [ ] **CI-25 — Find why the watchdog check hung on the macOS arm64
-  candidate.** On PR #104 (1 November 2026) `native.request_worker.watchdog`
-  started on `macos-15` and never finished, past its CTest timeout of 120 s,
-  until the run was cancelled after 18 minutes; it passed on the same image
-  in the Audio Unit job. The supervisor then killed lldb but not the
-  `debugserver` that holds the test; it now kills both, and the candidates
-  leave the check out. `native.request_worker` still runs in the
-  candidates, where a real stall takes the same lldb path, bounded only by
-  the step's 40 minutes. The Watchdog stacks check then caught a stall on
-  `macos-26`, consistent with lldb's attach stopping the test (SIGSTOP)
-  and nothing resuming it; the supervisor now sends SIGCONT however the
-  debugger ends, until `debugserver` has detached. Left open: why CTest's 120 s timeout did not end the
-  stopped test on the candidate. Read the
-  [Watchdog stacks check](docs/develop/testing.md#watchdog-stacks-check)
-  runs; if a run overruns, its process listing says what held the test.
-
 ## Documented limitations
 
 This inventory gathers constraints stated across the guides. Some are deliberate
@@ -890,6 +839,19 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   made one function each and Core Foundation values owned by `cf_owned`; no
   behaviour changes (CHANGELOG has the one out-of-memory exception);
   [implementation map](docs/develop/architecture.md).
+- [x] **AU-12 — Wake the Latency work with a dispatch source.** 5 November
+  2026, PR #109, from the project review of that day, on jrp's go-ahead:
+  the Audio Unit applies a new Latency on a serial dispatch queue woken by a
+  `DISPATCH_SOURCE_TYPE_DATA_OR` source, in place of
+  `portable/request_worker.hpp`, a thread of our own. Apple does not
+  document `dispatch_source_merge_data` as real-time safe; it is an atomic
+  OR, then a wake-up that may make a system call to ask for a thread, and
+  the open-source libdispatch neither allocates nor takes a user-space lock
+  there (`au.adapter` counts only C++ allocations, so it cannot see one
+  inside libdispatch). The
+  worker's tests, the watchdog workflow and `scripts/ci_watchdog_probe.py`
+  went with it ([archived](docs/archive/reviews/2026-11-05-request-worker.md));
+  [Audio Unit settings](docs/develop/plugin-contract.md).
 - [x] **AU-11 — Separate file watching from the window.** 5 November 2026,
   from jrp's review of `276c7dc`: following the playing filter's files and
   deciding when a change is due to reload moved from
@@ -1002,6 +964,14 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   which the clang-tidy package installs, in place of our
   `scripts/clang_tidy.py` and its tests;
   [lint checks](CONTRIBUTING.md#formatting-and-analysis).
+- [x] **CI-24 — Find why `native.request_worker` timed out on Windows.**
+  Closed 5 November 2026 without a cause, PR #109: AU-12 removed the worker
+  and its test; the evidence is
+  [archived](docs/archive/reviews/2026-11-05-request-worker.md).
+- [x] **CI-25 — Find why the watchdog check hung on the macOS arm64
+  candidate.** Closed 5 November 2026 without a cause, PR #109: AU-12
+  removed the check, its workflow and its supervisor; the evidence is
+  [archived](docs/archive/reviews/2026-11-05-request-worker.md).
 - [x] **CI-28 — Keep `vst3.adapter`'s Status and log case's log as
   evidence.** 5 November 2026, from CI-27's review: the case pointed
   `CONVOLVER_LOG` at a temporary file with `setenv` while the processor
@@ -1093,6 +1063,18 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [RAW streams](docs/use/command-line.md#raw-streams).
 - [x] **IO-7 — Dither defaults by output resolution.** 25 October 2026, PR #79;
   [integer output](docs/use/command-line.md#integer-formats-dither-and-noise-shaping).
+- [x] **IO-9 — Shortest float text from the standard library.** 5 November
+  2026, PR #109, from the project review of that day, on jrp's "Do io-9":
+  the Equalizer APO exporter formats gains with `std::to_chars` instead of
+  trying 1 to 160 decimal places with `snprintf` and `strtof`. Compared for
+  every positive finite float with libstdc++ and libc++, the text is the
+  same except for ±2^-96 (about −578 dB), which `to_chars` writes with one
+  digit fewer; both texts read back as the same float. The inspection report keeps its
+  9-step `%g` search: `std::to_chars`' general format switches to exponents
+  at another point than `%g`, so using it would change that report. The
+  exporter now needs macOS 13.3 or later to build;
+  [building for macOS before 14](docs/develop/build.md#building-for-macos-before-14)
+  says what older targets need.
 - [x] **IO-6 — FLAC in the preview packages.** 24 October 2026, PR #60:
   decided not to ship the codec libraries; limitation and workarounds in
   [FLAC and Ogg](docs/use/command-line.md#flac-and-ogg).
@@ -1141,6 +1123,14 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   in place of the VST3 and Audio Unit folders forcing 11.0 after it, so
   every Mac build targets what the packages do;
   [build options](docs/develop/build.md#build-options).
+- [x] **PLUG-17 — Ramps measured in time rather than frames.** 5 November
+  2026, PR #109: jrp chose "whichever is easier to use, for the final
+  user". `HostProcessor`'s gain, mix, bypass and mute ramps last 1.33 ms and
+  a replacement's crossfade 5.33 ms at every sample rate (64 and 256 frames
+  at 48 kHz, to the nearest frame elsewhere), so they are as smooth at
+  96 kHz and above as at 48 kHz, which plays exactly as before;
+  `native.host_settings` checks the lengths at 44.1, 48 and 96 kHz;
+  [contract](docs/develop/plugin-contract.md#settings).
 - [x] **PLUG-16 — Name the transition lengths.** 5 November 2026, PR #108,
   from the project review of that day: `HostProcessor`'s 64-frame setting,
   bypass and mute ramps and its 256-frame crossfade are named constants in

@@ -75,10 +75,9 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      # gdb prints the thread stacks of a request_worker timeout (CI-22).
       - name: Linux dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libsndfile1-dev serdi gdb
+        run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libsndfile1-dev serdi
       - name: macOS dependencies
         if: runner.os == 'macOS'
         run: brew install fftw libsndfile

@@ -239,6 +239,48 @@ void ramps() {
             "gain after a reset should apply without a ramp");
 }
 
+// PLUG-17: the ramps and the crossfade last the same time at every rate:
+// 64 and 256 frames at 48 kHz, so 59 and 235 at 44.1 kHz and 128 and 512 at
+// 96 kHz. Each ramp's last step reaches its target, and none before.
+void ramps_follow_time() {
+    struct Rate {
+        int hz;
+        std::size_t ramp, crossfade;
+    };
+    for (const auto r : {Rate{44100, 59, 235}, Rate{48000, 64, 256}, Rate{96000, 128, 512}}) {
+        const auto at = " at " + std::to_string(r.hz) + " Hz";
+        // A gain ramp: the output falls each frame until frame ramp - 1.
+        HostProcessor host(tap_filter(1, r.hz), 1, HostSettings{0, 1, 64});
+        per_sample(host, 200);
+        host.set_gain_db(-20);
+        auto out = per_sample(host, r.ramp + 10);
+        for (std::size_t t = 1; t + 1 < r.ramp; ++t)
+            require(out[t] < out[t - 1] && out[t] > .1f + 1e-6f,
+                    "gain ramp ended early" + at + ", frame " + std::to_string(t));
+        require(std::abs(out[r.ramp - 1] - .1f) < 1e-6, "gain ramp not done after its length" + at);
+        // Bypass: the output moves from the wet 0.1 to the dry input 1 over
+        // the same length (a step a frame, so to within a frame of rounding).
+        host.set_bypass(true);
+        out = per_sample(host, r.ramp + 10);
+        require(out[r.ramp - 3] < 1 - 1e-4f && std::abs(out[r.ramp] - 1) < 1e-5,
+                "bypass ramp length" + at);
+        host.set_bypass(false);
+        per_sample(host, r.ramp + 10);
+        // A replacement plays the old filter for one Latency block (64), then
+        // crossfades for the rate's crossfade length.
+        host.set_gain_db(0);
+        per_sample(host, 200);
+        host.replace(tap_filter(.5f, r.hz));
+        out = per_sample(host, 64 + r.crossfade + 10);
+        require(std::abs(out[63] - 1) < 1e-6,
+                "the old filter did not play for the Latency block" + at);
+        require(out[64 + r.crossfade - 2] > .5f + 1e-6f &&
+                    std::abs(out[64 + r.crossfade - 1] - .5f) < 1e-6,
+                "crossfade length" + at);
+        host.collect();
+    }
+}
+
 // With unequal counts there is no dry signal, so the mix stays 100% wet.
 void unequal_mix() {
     Configuration c{48000, 1, 2, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}, {1, 1}}}}};
@@ -515,6 +557,7 @@ int main() {
         defaults_unchanged();
         gain_and_mix_against_oracle();
         ramps();
+        ramps_follow_time();
         unequal_mix();
         latency_choices();
         settings_text();
