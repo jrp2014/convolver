@@ -9,10 +9,6 @@ if(NOT EXISTS "${CONVOLVER_AU_SDK}/include/AudioUnitSDK/AUBase.h")
         "scripts/release/sources.py --latest --fetch ... audiounitsdk unpacks the newest release "
         "(docs/develop/build.md#supporting-libraries)")
 endif()
-if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
-    # AudioUnitSDK supports macOS 11 and later.
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "macOS deployment target" FORCE)
-endif()
 
 # The SDK as published, compiled as C++23 (it needs std::expected).
 file(GLOB ausdk_sources CONFIGURE_DEPENDS "${CONVOLVER_AU_SDK}/src/AudioUnitSDK/*.cpp")

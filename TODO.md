@@ -1078,6 +1078,12 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   size check keeps 256 bytes free for the settings whether or not they are
   in use;
   [host state](docs/develop/plugin-contract.md#host-state).
+- [x] **PLUG-15 — One macOS deployment target.** 5 November 2026, PR #108,
+  from the project review of that day: the top-level `CMakeLists.txt` sets
+  `CMAKE_OSX_DEPLOYMENT_TARGET` to 14.0 before `project()`, as CMake asks,
+  in place of the VST3 and Audio Unit folders forcing 11.0 after it, so
+  every Mac build targets what the packages do;
+  [build options](docs/develop/build.md#build-options).
 - [x] **REL-5 — Early limited walkthrough on macOS.** 1 November 2026,
   PR #101. An assisted check for jrp, not by an independent tester, of the
   stereo journey's package and command-line steps on the pull request's

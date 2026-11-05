@@ -1,5 +1,12 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 cmake_minimum_required(VERSION 3.20)
+# PLUG-15: every Mac build targets the macOS the packages are built for, unless
+# the command line or MACOSX_DEPLOYMENT_TARGET says otherwise. CMake reads it
+# before the first project() (its CMAKE_OSX_DEPLOYMENT_TARGET documentation).
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET AND
+   NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET})
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "Oldest macOS the binaries run on")
+endif()
 include(cmake/ConvolverVersion.cmake)
 project(Convolver VERSION ${CONVOLVER_VERSION} LANGUAGES CXX)
 

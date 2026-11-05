@@ -190,6 +190,12 @@ Until 1.0 the C++ API may change between minor versions.
   case reads what it added from there, rather than switching to a temporary file for that case and
   deleting it, so a crash in the case keeps its log. The Audio Unit and VST3
   tests share the log helper (`tests/plugins/test_log.hpp`).
+- Build (PLUG-15): macOS builds target macOS 14.0 unless the first configure
+  sets `CMAKE_OSX_DEPLOYMENT_TARGET` or `MACOSX_DEPLOYMENT_TARGET` says
+  otherwise, the same for every target and the preview packages. The VST3
+  and Audio Unit folders used to force 11.0 for their own targets after
+  `project()`, so a developer's plug-in build targeted another macOS than
+  the packages and the core it links.
 
 ### Fixed
 
