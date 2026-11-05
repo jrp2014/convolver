@@ -98,6 +98,12 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- The version is now 0.9.0, the milestone step before jrp's host smoke tests
+  (HOST-1) and the first preview, which is now cut from the 0.9 series
+  (jrp, 5 November 2026). CMake consumers request
+  `find_package(Convolver 0.9)`. The LV2 plug-in reports minor version 9,
+  which LV2 reads as a development version; LV2 is not in the first preview.
+
 - CLI (GAIN-2, from an external review of `91fcf1f`): `--gain-db no-clip`
   takes the largest possible peak directly instead of also filtering ten
   filter lengths of noise, so choosing it costs well under a millisecond

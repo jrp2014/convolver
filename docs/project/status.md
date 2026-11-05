@@ -26,7 +26,7 @@ run the Audio Unit and its window in GarageBand; the VST3 hosts (REAPER,
 Audacity) have not been run, and no independent user has followed the
 instructions. The next milestone is end-to-end testing of a fixed feature
 set: an independent user installing and using an exact preview package, cut
-from the 0.8 series that `main` is now in.
+from the 0.9 series that `main` is now in.
 [What still blocks it](#what-still-blocks-the-first-preview) lists the
 remaining work by TODO item.
 
@@ -133,7 +133,7 @@ the preset tool, with the editor's settings and window in both plug-in
 formats (until 25 October 2026 the Audio Unit was to join a later
 preview). LV2 joins a later preview once its own journeys are demonstrated.
 
-The first preview is cut from a 0.8.x tag.
+The first preview is cut from a 0.9.x tag.
 
 | Condition | Source | Item | Status |
 | --- | --- | --- | --- |
