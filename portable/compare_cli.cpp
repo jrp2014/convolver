@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "compare_cli.hpp"
+#include "advice.hpp"
 #include "convolver/io.hpp"
 #include <algorithm>
 #include <array>
@@ -259,10 +260,10 @@ int run_comparison(int argc, char** argv) {
                      "filter, and that nothing else on the track changed the sound.\n";
         return 1;
     } catch (const Usage& error) {
-        std::cerr << "convolver: " << error.what() << '\n';
+        std::cerr << detail::cli_error("convolver", error.what());
         return 2;
     } catch (const std::exception& error) {
-        std::cerr << "convolver: " << error.what() << '\n';
+        std::cerr << detail::cli_error("convolver", error.what());
         return 1;
     }
 }

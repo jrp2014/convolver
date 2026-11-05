@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/io.hpp"
+#include "advice.hpp"
 #include "bytes.hpp"
 #include "sound_files.hpp"
 #include <algorithm>
@@ -192,18 +193,45 @@ SNDFILE* open_or_throw(const std::filesystem::path& path, int mode, SF_INFO& inf
     const std::lock_guard lock(opening());
     SNDFILE* file = open(path, mode, info);
     if (!file) {
-        auto failure = std::string(error(action + " " + path.string(), nullptr).what());
-        // DIAG-1: when libsndfile read the file and refused its content, say
-        // what to do. sf_error() gives libsndfile's own detailed codes, which
-        // include the public ones: a system error (missing file, no
-        // permission) explains itself, and an encoding it lacks is not damage.
-        if (mode == SFM_READ) {
-            const int code = sf_error(nullptr);
-            if (code != SF_ERR_NO_ERROR && code != SF_ERR_SYSTEM &&
-                code != SF_ERR_UNSUPPORTED_ENCODING)
-                failure += " (" + std::string(detail::damaged_file_advice) + ")";
+        // DIAG-2: the problem, then why and what to do, in place of
+        // libsndfile's own words ("System error : No such file or
+        // directory."), which the cause keeps only when nothing better is
+        // known. sf_error() gives libsndfile's detailed codes, which include
+        // the public ones.
+        const int code = sf_error(nullptr);
+        const std::string library = sf_strerror(nullptr);
+        detail::Advice a{action + " " + path.string(), {}, {}, {}};
+        std::error_code ec;
+        const auto folder =
+            path.has_parent_path() ? path.parent_path() : std::filesystem::path(".");
+        if (path == "-") {
+            a.cause = "libsndfile could not use the standard stream: " + library;
+            a.fix = "Check the command the stream comes from or goes to.";
+        } else if (mode == SFM_WRITE && !std::filesystem::is_directory(folder, ec)) {
+            a.cause = "Its folder " + folder.string() + " does not exist.";
+            a.fix = "Create the folder, or choose an output in an existing folder.";
+        } else if (mode == SFM_WRITE) {
+            a.cause = "The system refused to create it (" + library + ").";
+            a.fix = "Check that the folder is writable and that the file is not open in "
+                    "another program, or choose another place.";
+        } else if (!std::filesystem::exists(path, ec)) {
+            a.cause = "There is no file at that path.";
+            a.fix = "Check the name and folder.";
+            a.note = "Letter case counts on Linux and on case-sensitive macOS volumes.";
+        } else if (code == SF_ERR_SYSTEM) {
+            a.cause = "The file is there, but the system refused to open it (" + library + ").";
+            a.fix = "Check the file's permissions, and that it is a file, not a folder.";
+        } else if (code == SF_ERR_UNSUPPORTED_ENCODING) {
+            a.cause = "libsndfile reads this kind of file, but not the encoding inside it (" +
+                      library + ").";
+            a.fix = "Convert it to WAV (PCM or float), for example with SoX or FFmpeg.";
+        } else {
+            // DIAG-1: the content was refused, so say what to do.
+            a.cause = "The file is damaged or incomplete, or is not a sound file (libsndfile: " +
+                      library + ").";
+            a.fix = "Export it again from the program that made it.";
         }
-        throw std::runtime_error(failure);
+        throw std::runtime_error(detail::advice_text(a));
     }
     return file;
 }
@@ -533,16 +561,17 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
         if (!raw && path != "-" && std::filesystem::is_regular_file(path, regular_error) &&
             !available(Container::flac))
             if (const auto codec = compressed_codec(path))
-                throw std::runtime_error(std::string(e.what()) + " (this is " + codec +
-                                         ", but this Convolver's libsndfile was built without "
-                                         "FLAC and Ogg; convert it to WAV first, for example "
-                                         "with " +
-                                         (std::string_view(codec) == "a FLAC file"
-                                              ? "'flac --decode', SoX or FFmpeg"
-                                              : "oggdec, SoX or FFmpeg") +
-                                         ", or build Convolver "
-                                         "against a libsndfile that has them: see 'FLAC and "
-                                         "Ogg' in the command-line guide)");
+                throw std::runtime_error(detail::advice_text(
+                    {detail::advice_problem(e.what()),
+                     std::string("This is ") + codec +
+                         ", but this Convolver's libsndfile was built without FLAC and Ogg.",
+                     std::string("Convert it to WAV first, for example with ") +
+                         (std::string_view(codec) == "a FLAC file"
+                              ? "'flac --decode', SoX or FFmpeg"
+                              : "oggdec, SoX or FFmpeg") +
+                         ".",
+                     "Or build Convolver against a libsndfile that has them: see 'FLAC and Ogg' "
+                     "in the command-line guide."}));
         throw;
     }
     if (raw) {
@@ -718,9 +747,12 @@ AudioWriter::AudioWriter(const std::filesystem::path& path, AudioInfo info, Outp
     : impl_(std::make_unique<Impl>()) {
     validate(info);
     if (supported(encoding) && !available(encoding.container))
-        throw std::runtime_error("this build of Convolver cannot write FLAC: its libsndfile was "
-                                 "built without FLAC support. Choose another container, such "
-                                 "as wav or rf64, or use a build whose libsndfile includes FLAC");
+        throw std::runtime_error(detail::advice_text(
+            {"this build of Convolver cannot write FLAC",
+             "Its libsndfile was built without FLAC support.",
+             "Choose another container, such as wav or rf64, or use a build whose libsndfile "
+             "includes FLAC.",
+             {}}));
     validate_speakers(metadata.channel_mask, info.channels, encoding.container);
     SF_INFO sf{};
     sf.samplerate = info.sample_rate;

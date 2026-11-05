@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "host_report.hpp"
+#include "advice.hpp"
 #include "convolver_version.hpp"
 #include "host_log.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <string>
 
 namespace convolver {
+using detail::advice_text;
 namespace {
 std::string ports(std::size_t inputs, std::size_t outputs) {
     return std::to_string(inputs) + " in, " + std::to_string(outputs) + " out";
@@ -34,49 +37,116 @@ bool latency_waits(const HostReportFacts& facts) {
     return facts.latency_frames && facts.settings.latency != facts.latency_frames;
 }
 
-// What plays, why, and what to change, in full.
-std::string explanation(const HostFilter& filter, const HostReportFacts& facts) {
+// DIAG-2: what the window shows above the form, from the most important
+// thing to know: a load failure, then a fault, then a speaker notice, then
+// what plays (docs/use/plugins.md#convolvers-window).
+struct Message {
+    std::string problem, plays, cause, fix, note, action;
+};
+void add_note(Message& m, const std::string& sentence) {
+    if (!sentence.empty())
+        m.note += (m.note.empty() ? "" : " ") + sentence;
+}
+// DIAG-2: a refused file's problem starts with its full path, for the log;
+// the window names it by its file name (the reference lines keep the path).
+std::string short_problem(std::string problem, const HostFailure& failure) {
+    const auto& path = failure.request.path;
+    if (failure.request.source != HostFilterSource::file || path.empty() ||
+        !problem.starts_with(path))
+        return problem;
+    const auto name = std::filesystem::path(std::u8string(path.begin(), path.end())).filename();
+    const auto u8 = name.u8string();
+    if (!u8.empty())
+        problem.replace(0, path.size(), std::string(u8.begin(), u8.end()));
+    return problem;
+}
+// What the window says to do with no filter loaded.
+std::string load_fix(bool chooses_files) {
+    return chooses_files
+               ? "Choose a .cfg, configuration list or sound file (or drop one on this window), "
+                 "or load a Convolver preset (made with convolver-preset) from the host's preset "
+                 "menu."
+               : "Load a Convolver preset (made with convolver-preset) from the host's preset "
+                 "menu.";
+}
+// Failures the window's Choose Filter… puts right.
+bool chosen_away(HostFailureKind kind) {
+    return kind != HostFailureKind::preparation && kind != HostFailureKind::activation;
+}
+Message message(const HostFilter& filter, const HostReportFacts& facts) {
     const auto& host = facts.host;
+    const auto* layout = host ? &*host : nullptr;
     const auto& failure = filter.failure();
-    std::string text;
-    if (failure && !failure->silent) {
-        // A refused replacement: the previous filter still plays.
-        text = failure->message;
-        if (host)
-            text += " " + playing_words(filter, *host, facts.settings);
-    } else if (host) {
-        text = playing_words(filter, *host, facts.settings);
+    const auto choose = facts.chooses_files ? "choose filter" : "";
+    Message m;
+    const auto take = [&](const detail::Advice& a) {
+        m.problem = detail::as_sentence(a.problem);
+        m.cause = a.cause;
+        m.fix = a.fix;
+        m.note = a.note;
+    };
+    if (failure) {
+        auto a = detail::parse_advice(failure->message);
+        a.problem = short_problem(std::move(a.problem), *failure);
+        take(a);
+        m.plays = failure_consequence(*failure, layout, facts.settings);
+        if (chosen_away(failure->kind))
+            m.action = choose;
+        // Faults the load failure hides from the status.
+        if (filter.faults().any())
+            add_note(m, detail::as_sentence("While audio played: " +
+                                            detail::advice_problem(
+                                                advice_text(fault_advice(filter.faults(), true)))));
+    } else if (filter.faults().any() && !filter.failed()) {
+        take(fault_advice(filter.faults(), false));
+        if (filter.filter()) {
+            m.plays = "The filter keeps playing.";
+        } else {
+            // Faults are counted with no filter too (the host's samples).
+            m.plays = host ? playing_words(filter, *host, facts.settings)
+                           : std::string("No filter is loaded.");
+            add_note(m, load_fix(facts.chooses_files));
+            m.action = choose;
+        }
+        if (filter.faults().processing_failure)
+            m.action = "copy diagnostics";
+    } else if (const auto& c = filter.filter()) {
+        m.plays = host ? "A filter for " + filter_words(*c) + "."
+                       : "A filter for " + filter_words(*c) +
+                             " is loaded. It is checked against the host's sample rate and "
+                             "channels when the host starts the plug-in.";
+        if (host && !filter.notice().empty())
+            take(detail::parse_advice(filter.notice()));
+    } else if (filter.failed()) {
+        m.plays = host ? playing_words(filter, *host, facts.settings)
+                       : std::string("Silent after a failed load.");
+        m.fix = "Load a filter made for the host's sample rate and channels.";
+        m.action = choose;
     } else {
-        if (failure)
-            text = failure->message;
-        else if (const auto& c = filter.filter())
-            text = "A filter for " + filter_words(*c) +
-                   " is loaded. It is checked against the host's sample rate and channels when "
-                   "the host starts the plug-in.";
-        else if (filter.failed())
-            text = "Silent after a failed load.";
-        else
-            text = "No filter is loaded.";
-        text += " The host has not started the plug-in yet.";
+        m.plays = host ? playing_words(filter, *host, facts.settings)
+                       : std::string("No filter is loaded.");
+        m.fix = load_fix(facts.chooses_files);
+        m.action = choose;
     }
-    // playing_words() gives the mono-track hint for a silent failure; a
-    // refused replacement gets it here.
-    if (failure && !failure->silent && host)
-        text += mono_track_hint(*failure, *host);
-    if (filter.faults().any())
-        text += " " + fault_message(HostFaultReport{filter.faults(), {}, filter.failure_shown()});
+    if (!host && !(filter.filter() && !failure))
+        m.plays += " The host has not started the plug-in yet.";
     if (latency_waits(facts))
-        text += " Latency " + std::to_string(facts.settings.latency) +
-                " frames is chosen but not in use yet, so the plug-in keeps " +
-                std::to_string(facts.latency_frames) +
-                " frames for now. If it could not be applied, the Convolver log says why.";
-    if (!filter.filter() && !failure && !filter.failed())
-        text += facts.chooses_files
-                    ? " To filter the audio, choose a filter file (Choose… beside Filter, or drop "
-                      "a .cfg or sound file on this window), or load a Convolver preset (made with "
-                      "convolver-preset) from the host's preset menu."
-                    : " To filter the audio, load a Convolver preset (made with convolver-preset) "
-                      "from the host's preset menu.";
+        add_note(m, "Latency " + std::to_string(facts.settings.latency) +
+                        " frames is chosen but not in use yet, so the plug-in keeps " +
+                        std::to_string(facts.latency_frames) +
+                        " frames for now. If it could not be applied, the Convolver log says "
+                        "why.");
+    return m;
+}
+
+// The message as text: the problem and what plays, then the labelled parts.
+std::string explanation(const Message& m) {
+    auto text =
+        m.problem.empty() || m.plays.empty() ? m.problem + m.plays : m.problem + " " + m.plays;
+    const std::string* parts[] = {&m.cause, &m.fix, &m.note};
+    for (std::size_t i = 0; i < 3; ++i)
+        if (!parts[i]->empty())
+            text += "\n" + std::string(detail::advice_labels[i]) + *parts[i];
     return text;
 }
 
@@ -296,13 +366,14 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
               (program.empty() ? ""
                : service       ? std::string(" in the host's plug-in process")
                                : " in " + program);
-    r.explanation = explanation(filter, facts);
-    r.headline = r.explanation;
-    if (r.status.status == HostStatus::playing && r.headline.rfind("Playing ", 0) == 0) {
-        r.headline.erase(0, 8);
-        if (!r.headline.empty() && r.headline[0] >= 'a' && r.headline[0] <= 'z')
-            r.headline[0] = static_cast<char>(r.headline[0] - 'a' + 'A');
-    }
+    const auto m = message(filter, facts);
+    r.problem = m.problem;
+    r.plays = m.plays;
+    r.cause = m.cause;
+    r.fix = m.fix;
+    r.note = m.note;
+    r.action = m.action;
+    r.explanation = explanation(m);
 
     const auto& c = filter.filter();
     const auto& failure = filter.failure();
@@ -387,7 +458,12 @@ std::vector<std::pair<std::string, std::string>> report_fields(const HostReport&
             {"summary", r.status.text},
             {"title", r.title},
             {"explanation", r.explanation},
-            {"headline", r.headline},
+            {"problem", r.problem},
+            {"plays", r.plays},
+            {"cause", r.cause},
+            {"fix", r.fix},
+            {"note", r.note},
+            {"action", r.action},
             {"filter name", r.filter_name},
             {"filter note", r.filter_note},
             {"filter path", r.filter_path},

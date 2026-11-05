@@ -39,9 +39,9 @@ using IncludeChain = std::vector<SourceLocation>;
 
 std::string utf8_string(const std::filesystem::path&);
 
-// Expected configuration failures. what() is
-// "invalid configuration: FILE:LINE:COLUMN: REASON" plus "; included from LIST:LINE"
-// for each enclosing list, innermost first.
+// Expected configuration failures. what() is "FILE:LINE:COLUMN: PROBLEM" plus
+// "; included from LIST:LINE" for each enclosing list, innermost first, then
+// the reason's Cause, Fix and Note lines (portable/advice.hpp).
 class ConfigurationError : public std::runtime_error {
   public:
     ConfigurationError(std::string code, SourceLocation, std::string reason);

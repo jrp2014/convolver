@@ -437,7 +437,7 @@ void diagnostics_follow_settings() {
          {},
          0,
          "Silent: the filter is for 44100 Hz",
-         "so Convolver plays silence",
+         "Convolver plays silence. The filter is for 44100 Hz",
          HostStatus::load_failed},
         {"refused first load, mix 50%",
          mono,
@@ -446,8 +446,8 @@ void diagnostics_follow_settings() {
          {0, .5},
          .25f,
          "Load failed, only the dry signal plays: the filter is for 44100 Hz",
-         "With Mix at 50% wet, though, the dry signal still plays instead of silence: the input "
-         "at -6.0 dB.",
+         "With Mix at 50% wet, only the dry signal plays: the input at -6.0 dB. The filter is for "
+         "44100 Hz",
          HostStatus::load_failed},
         {"refused first load, gain +24 dB, mix 0%",
          mono,
@@ -456,8 +456,7 @@ void diagnostics_follow_settings() {
          {24, 0},
          .5f,
          "Load failed, only the dry signal plays:",
-         "With Mix at 0% wet, though, the dry signal still plays instead of silence: the input "
-         "unchanged.",
+         "With Mix at 0% wet, only the dry signal plays: the input unchanged.",
          HostStatus::load_failed},
         {"refused first load, 1 in 2 out, mix 50%",
          split,
@@ -466,7 +465,7 @@ void diagnostics_follow_settings() {
          {0, .5},
          0,
          "Silent: ",
-         "so Convolver plays silence",
+         "Convolver plays silence.",
          HostStatus::load_failed},
         {"filter, mix 0%",
          mono,
@@ -521,7 +520,7 @@ void diagnostics_follow_settings() {
         // The audible words never contradict the level heard.
         require(c.heard == 0 || (!contains(line.text, "Silent") &&
                                  (!contains(started, "plays silence") ||
-                                  contains(started, "still plays instead of silence"))),
+                                  contains(started, "only the dry signal plays"))),
                 std::string(c.what) + ": says silent, but " + std::to_string(c.heard) +
                     " is heard");
         require(c.heard == .5f || c.filter_loaded || !contains(line.text, "unchanged"),

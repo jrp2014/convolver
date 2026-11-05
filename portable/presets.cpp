@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "presets.hpp"
+#include "advice.hpp"
 #include "bytes.hpp"
 #include "file.hpp"
 #include <algorithm>
@@ -358,27 +359,43 @@ void check_writable(Format format, const HostState& state, std::string_view name
     // LV2 presets need one that XML and Turtle can hold.
     if (format != Format::vst3) {
         if (name.empty())
-            throw std::invalid_argument("the preset name is empty; give one with --name");
-        if (!valid_utf8(name))
             throw std::invalid_argument(
-                "the preset name (by default the file name) is not valid Unicode text, or "
-                "holds characters that AU and LV2 presets cannot store; give one with --name");
+                detail::advice_text({"the preset name is empty",
+                                     "AU and LV2 presets store a name, which hosts show in "
+                                     "their preset menus.",
+                                     "Give one with --name.",
+                                     {}}));
+        if (!valid_utf8(name))
+            throw std::invalid_argument(detail::advice_text(
+                {"the preset name (by default the file name) cannot be stored",
+                 "It is not valid Unicode text, or holds characters that AU and LV2 presets "
+                 "cannot store.",
+                 "Give a plain name with --name.",
+                 {}}));
         if (std::any_of(name.begin(), name.end(),
                         [](char c) { return static_cast<unsigned char>(c) < 0x20 || c == 0x7F; }))
-            throw std::invalid_argument(
-                "the preset name (by default the file name) contains control characters such "
-                "as tabs or line breaks; give a plain one with --name");
+            throw std::invalid_argument(detail::advice_text(
+                {"the preset name (by default the file name) contains control characters",
+                 "AU and LV2 presets cannot store tabs, line breaks or other control characters "
+                 "in a name.",
+                 "Give a plain name with --name.",
+                 {}}));
     }
     if (state.failed)
-        throw std::invalid_argument(
-            "this preset was saved after a filter failed to load, so it holds no filter to "
-            "convert (a plug-in loading it plays silence); make the preset from the IR, .cfg or "
-            "configuration list instead");
+        throw std::invalid_argument(detail::advice_text(
+            {"this preset holds no filter to convert",
+             "It was saved after a filter failed to load, so a plug-in loading it plays "
+             "silence.",
+             "Make the preset from the IR, .cfg or configuration list instead.",
+             {}}));
     if (!state.configuration) {
         if (format == Format::lv2)
-            throw std::invalid_argument(
-                "this preset holds no filter (an empty plug-in), so it has no channel counts "
-                "to choose an LV2 plug-in by");
+            throw std::invalid_argument(detail::advice_text(
+                {"this preset holds no filter, so it cannot become an LV2 preset",
+                 "Each LV2 preset belongs to the LV2 plug-in for its channel counts, and an "
+                 "empty plug-in has none.",
+                 "Make the LV2 preset from the IR, .cfg or configuration list instead.",
+                 {}}));
         return;
     }
     // PLUG-12: the plug-ins refuse what they could not save, so no preset holds it.
@@ -392,13 +409,16 @@ void check_writable(Format format, const HostState& state, std::string_view name
         throw ChannelLimit(label + " presets support " + std::to_string(low) + " to " +
                            std::to_string(high) + " input and output channels; this filter has " +
                            channels_text(c.input_channels, c.output_channels));
+    // The tool adds the cause and fix to ChannelLimit (preset_main.cpp).
     if (format == Format::lv2 && !lv2_layout(c.input_channels, c.output_channels))
-        throw std::invalid_argument(
-            "the LV2 plug-in comes in fixed channel layouts (inputs->outputs: " +
-            lv2_layout_list() + "), and this filter has " +
-            channels_text(c.input_channels, c.output_channels) +
-            ". Use the VST3 or AU plug-in for it, or ask for the layout to be added "
-            "(docs/develop/plugin-identities.md).");
+        throw std::invalid_argument(detail::advice_text(
+            {"no LV2 plug-in takes this filter's " +
+                 channels_text(c.input_channels, c.output_channels),
+             "The LV2 plug-in comes in fixed channel layouts (inputs->outputs: " +
+                 lv2_layout_list() + ").",
+             "Use the VST3 or AU plug-in for this filter, or ask for the layout to be added "
+             "(docs/develop/plugin-identities.md).",
+             {}}));
 }
 
 void write_preset(Format format, const HostState& state, const std::filesystem::path& path,
@@ -422,7 +442,7 @@ void write_preset(Format format, const HostState& state, const std::filesystem::
         const auto preset = lv2_preset(state, name);
         std::error_code error;
         if (!std::filesystem::create_directory(path, error) || error)
-            throw std::runtime_error("cannot create the LV2 preset folder (must be a new path)");
+            throw std::runtime_error("cannot create the LV2 preset folder");
         try {
             detail::write_new_file(path / "manifest.ttl", bytes(preset.manifest));
             detail::write_new_file(path / "preset.ttl", bytes(preset.preset));

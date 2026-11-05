@@ -181,10 +181,11 @@ format.
   (`host_log_written()` is false), the text says so instead of pointing to it.
 - **The editor report** (PLUG-9, [`host_report.hpp`](../../portable/host_report.hpp)):
   for a window and its Copy diagnostics, `host_report()` gathers the status
-  and its line (`host_status()`), the full explanation of what plays, why
-  and what to change (the failure's message, or `playing_words()`, the same
-  words the log's start line uses, with any fault explanation), a headline
-  for under the status word (the explanation without a leading "Playing"),
+  and its line (`host_status()`), DIAG-2's message in parts (the problem as a
+  sentence, what plays (`failure_consequence()` or `playing_words()`), the
+  cause, the fix, a note, and the window's action, "choose filter" or "copy
+  diagnostics"), and all of it as one explanation text with `Cause:`, `Fix:`
+  and `Note:` lines ([`advice.hpp`](../../portable/advice.hpp)); then
   the Filter row (the file's name and a note when the newest request was
   refused), the Audio facts in plain words (`HostFact`: sample rate,
   channels and speakers, routing, filter length, added delay, ring-out,
@@ -194,7 +195,9 @@ format.
   `execution_line()` and the log. Everything a window says about the
   filter and the audio comes from here, so the VST3 windows (VST3-11 to
   VST3-13) show the same; the control labels, hints and tooltips are the
-  view's own.
+  view's own. Messages passed to `HostFilter::reject()` and the other
+  failure records use the same parts (the problem, then labelled lines);
+  `host_log()` and the LV2 log join them into one line.
   `report_fields()` gives it as named text values for a format's
   transport, `report_text()` as plain text, and `diagnostics_text()` adds
   this instance's recent log lines (`host_log_recent()`, at most the last

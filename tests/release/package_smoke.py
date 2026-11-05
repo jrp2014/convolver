@@ -119,7 +119,9 @@ def check(root, validator=None, probe=None):
         result = subprocess.run(
             [str(tool), str(bad), str(relocated / 'bad.vstpreset')], capture_output=True, check=False
         )
-        assert result.returncode and b'invalid configuration' in result.stderr, result.stderr
+        # DIAG-2: the problem names the file and line, and a Fix line follows.
+        assert result.returncode and b'malformed.cfg:1' in result.stderr, result.stderr
+        assert b'\n  Fix: ' in result.stderr, result.stderr
         assert not (relocated / 'bad.vstpreset').exists(), 'malformed input left an output'
         result = subprocess.run(
             [str(exporter), str(bad), str(relocated / 'bad export')], capture_output=True, check=False

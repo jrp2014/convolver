@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "advice.hpp"
 #include "convolver/host.hpp"
 #include <cstddef>
 #include <filesystem>
@@ -18,7 +19,8 @@ namespace convolver {
 // $XDG_STATE_HOME/convolver/convolver.log (default ~/.local/state) elsewhere.
 // Empty when there is nowhere to write.
 std::filesystem::path host_log_path();
-// Appends one dated line, "<time> Convolver <version> <format> in <program>:
+// Appends one dated line (a message in several lines, as advice.hpp writes
+// them, is joined into one with advice_line()), "<time> Convolver <version> <format> in <program>:
 // <message>" (the host's program name, where the platform gives it),
 // creating the folder if needed. When the file has grown past 1 MB it is first renamed
 // with ".old" added (replacing an older one). On macOS the message also goes
@@ -51,9 +53,11 @@ void set_host_log_sdk(const char* description) noexcept;
 // against the host yet. Both are numbered with the request ("Request 3: "),
 // so a sequence of loads can be followed.
 std::string loaded_line(const HostFilter&, bool host_known);
-// After a rejected load: HostFilter::rejection()'s message, numbered as
-// loaded_line() numbers accepted ones ("Request 3: "); empty if there is none.
-std::string rejected_line(const HostFilter&);
+// After a rejected load: what plays instead and HostFilter::rejection()'s
+// message, numbered as loaded_line() numbers accepted ones ("Request 3: ");
+// empty if there is none. `started` says whether the host has started the
+// plug-in, so that a kept filter is said to play only once it can.
+std::string rejected_line(const HostFilter&, bool started);
 // DIAG-1: logged when the host's save call fails, which hosts may not report.
 inline constexpr const char* save_failure_message =
     "Saving failed: the plug-in's state could not be written for the host (out of memory, or "
@@ -86,11 +90,21 @@ std::string settings_words(const HostSettings&, bool equal_counts);
 // host's rate, channels and block size; the editor report (PLUG-9) uses it
 // too, so the window and the log say the same.
 std::string playing_words(const HostFilter&, const HostLayout& host, const HostSettings&);
-// " Hosts run an effect with one channel on a mono track ...": for a stereo
-// filter (2 in, 2 out) refused by a host running the plug-in with 1 in and
-// 1 out, the usual way to meet it; empty otherwise. playing_words() ends a
-// silent failure with it.
-std::string mono_track_hint(const HostFailure&, const HostLayout& host);
+// DIAG-2: what plays because of a failure, as a sentence: "The previous
+// filter keeps playing.", "Convolver plays silence.", or with equal counts
+// and Mix below 100%, what of the dry signal still plays. `host` null: not
+// started yet, so Mix's share is not known.
+std::string failure_consequence(const HostFailure&, const HostLayout* host, const HostSettings&);
+// DIAG-2: why saved plug-in state could not be read, for HostFilter::reject(),
+// from decode_host_state()'s exception (NewerHostState gives its own fix).
+std::string state_read_message(const std::exception&);
+// DIAG-2: why a filter could not be prepared (memory, usually); `what` is an
+// exception's own words, or empty.
+std::string preparation_message(const std::string& what);
+// DIAG-2: the most serious fault in `faults` as problem, cause and fix, with
+// any others and when the status clears in its note; `held` as for
+// HostFaultReport. Empty when there are none. For the window (host_report).
+detail::Advice fault_advice(const HostFaults&, bool held);
 // After the host starts (activates or initializes) the instance: the rate,
 // channels and block size, then what plays and why (the failure or speaker
 // notice in full), and the settings in use when the adapter has them

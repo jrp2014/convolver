@@ -136,17 +136,21 @@ preset loads on any host arrangement with 2 inputs and 6 outputs.
 
 ## Messages
 
-| Message | What to do |
+Each message gives the problem, then its cause and the fix on their own lines
+([reading Convolver's messages](troubleshooting.md#reading-convolvers-messages)).
+The problems, with what lies behind them:
+
+| Problem | Behind it |
 | --- | --- |
-| `choose the preset format by the name's ending` | End the output name in `.vstpreset`, `.aupreset` or `.preset.lv2` |
-| `… already exists` | Choose a new name, or remove the old preset |
-| `the LV2 plug-in comes in fixed channel layouts …` | LV2 has only the [listed layouts](plugins.md#lv2-channel-layouts). Use the VST3 or AU plug-in, or ask for the layout to be added |
-| `The filter is too large to save …` | Plug-in state and presets hold at most 64 MiB, just under 16,777,216 samples counting every impulse response together ([size limit](plugins.md#when-a-filter-does-not-fit)). Shorten the impulse responses, or render with the CLI |
+| `NAME: the preset format is not known from this name` | The format follows the name's ending: `.vstpreset`, `.aupreset` or `.preset.lv2` |
+| `NAME already exists` | The tool never replaces a preset: choose a new name, or remove the old one |
+| `no LV2 plug-in takes this filter's …` | LV2 has only the [listed layouts](plugins.md#lv2-channel-layouts). Use the VST3 or AU plug-in, or ask for the layout to be added |
+| `the filter is too large to save …` | Plug-in state and presets hold at most 64 MiB, just under 16,777,216 samples counting every impulse response together ([size limit](plugins.md#when-a-filter-does-not-fit)). Shorten the impulse responses, or render with the CLI |
 | `… presets support 1 to 8 input and output channels` | The plug-ins have at most 8 channels on each side; use the CLI for wider filters |
 | `this VST3 preset belongs to another plug-in` | Only Convolver's own presets can be converted |
-| `a .vstpreset already holds one filter` | Leave out `--sample-rate`, `--input-channels` and `--output-channels` |
-| `the preset name … contains control characters`, `… is not valid Unicode text` | AU and LV2 presets store a name, by default the first AU or LV2 file name. Give a plain one with `--name` |
-| `NAME: cannot create output file …` | The folder for that output must exist and be writable. Nothing from the run is kept, so fix it and run the same command again |
+| `--sample-rate, --input-channels and --output-channels cannot choose from a .vstpreset` | A `.vstpreset` already holds one filter: leave out those options |
+| `the preset name (by default the file name) contains control characters`, `… cannot be stored` | AU and LV2 presets store a name, by default the first AU or LV2 file name. Give a plain one with `--name` |
+| `NAME: cannot create output file (must be a new path)` | The folder for that output must exist and be writable. Nothing from the run is kept, so fix it and run the same command again |
 
 Problems with the filter itself (a missing IR, a list with no matching entry)
 give the same explanations as `convolver`; see

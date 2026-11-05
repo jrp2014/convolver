@@ -280,9 +280,9 @@ except the Audio Unit build, which runs in a source checkout.
 8. While the echo plays, import `presets/identity-44100-stereo/filter.vstpreset`.
    The echo keeps playing. Status reads `Load failed, previous filter kept:
    the filter is for 44100 Hz, the host runs at 48000 Hz. Details in the
-   Convolver log.`, and the log has a line starting `Filter not loaded; the
-   previous filter is kept.` that says to load a 48000 Hz filter or set the
-   host to 44100 Hz. Record what REAPER itself shows, if anything.
+   Convolver log.`, and the log has a line `Request N: Not loaded; the
+   previous filter keeps playing: …` whose `Fix:` says to load a 48000 Hz
+   filter or set the host to 44100 Hz. Record what REAPER itself shows, if anything.
 9. Set *File › Project settings* and the device to 44100 Hz and play: silence,
    with Status `Silent: the filter is for 48000 Hz, the host runs at 44100 Hz.`
    and a log line `Started at 44100 Hz, ...` explaining it. Set both back to
@@ -340,8 +340,9 @@ except the Audio Unit build, which runs in a source checkout.
    `identity-44100-stereo`. The echo keeps playing. Stop and start playback:
    the echo must still play, not silence or unfiltered sound. Record what
    Audacity shows. Status should name the 44100 Hz filter, and the log should
-   say what each playing copy did: a `Filter not loaded; the previous filter
-   is kept.` line, or, if playback went silent, a `Started at 48000 Hz, ...`
+   say what each playing copy did: a `Not loaded; the previous filter keeps
+   playing:` line (`is kept:` for a copy the host had not started), or, if
+   playback went silent, a `Started at 48000 Hz, ...`
    line saying the filter does not suit the host. Copy the log into the
    report; this step is where the window's copy and the playing copy can
    disagree.

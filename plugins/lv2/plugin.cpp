@@ -179,14 +179,23 @@ struct Instance {
         return totals.total();
     }
     // Why the newest request failed, or the saved failure it restored.
-    void log_rejection() {
-        if (const auto& r = filter.rejection())
-            log_error(r->message);
+    void log_rejection() noexcept {
+        try {
+            if (filter.rejection())
+                log_error(rejected_line(filter, host != nullptr));
+        } catch (...) { // Out of memory for the line: the status port still shows it.
+        }
     }
-    void log_error(const std::string& message) {
+    // Never throws, so a line that cannot be built (out of memory) never
+    // interrupts the state change it explains; the line is then dropped.
+    void log_error(const std::string& message) noexcept {
         // Without the host's log feature this prints to stderr, which is
-        // also where LV2 hosts send a plug-in's unlogged diagnostics.
-        lv2_log_error(&logger, "Convolver: %s\n", message.c_str());
+        // also where LV2 hosts send a plug-in's unlogged diagnostics. One
+        // line per event (DIAG-2).
+        try {
+            lv2_log_error(&logger, "Convolver: %s\n", detail::advice_line(message).c_str());
+        } catch (...) {
+        }
     }
     // After a rejection: a failed first load plays silence rather than the
     // unfiltered input, without allocating, as memory may have run out
@@ -206,11 +215,17 @@ struct Instance {
         const bool was_failed = filter.failed();
         filter.reject(HostFailureKind::filter_file,
                       (d & 1) != 0
-                          ? "This host does not give Convolver a worker thread (the LV2 worker "
-                            "extension), which loading a filter file needs. Load a preset or a "
-                            "saved session instead, or use a host that supports the worker."
-                          : "The host could not start loading the filter file (its worker queue "
-                            "was full). Choose the file again.",
+                          ? detail::advice_text(
+                                {"this host gives Convolver no worker thread, so it cannot load "
+                                 "a filter file",
+                                 "Loading a filter file needs the LV2 worker extension.",
+                                 "Load a preset or a saved session instead, or use a host that "
+                                 "supports the worker.",
+                                 {}})
+                          : detail::advice_text({"the host could not start loading the filter file",
+                                                 "Its worker queue was full.",
+                                                 "Choose the file again.",
+                                                 {}}),
                       {HostFilterSource::file, "", generation});
         silence_failed_first_load(was_failed);
         update_status();
@@ -417,16 +432,22 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
     };
     if (damaged) {
         p.filter.reject(HostFailureKind::filter_file,
-                        "The host damaged the filter request on its way to its worker thread, so "
-                        "the file was not loaded. Choose the file again; if this repeats, report "
-                        "it to the host's developers.",
+                        detail::advice_text({"the host damaged the filter request on its way to "
+                                             "Convolver's worker thread",
+                                             {},
+                                             "Choose the file again; if this repeats, report it "
+                                             "to the host's developers.",
+                                             {}}),
                         request);
         return failed();
     }
     if (r.too_long) {
         p.filter.reject(HostFailureKind::filter_file,
-                        "The filter file's path is longer than " + std::to_string(max_path_bytes) +
-                            " bytes. Move the file to a folder with a shorter path.",
+                        detail::advice_text({"the filter file's path is longer than " +
+                                                 std::to_string(max_path_bytes) + " bytes",
+                                             {},
+                                             "Move the file to a folder with a shorter path.",
+                                             {}}),
                         request);
         return failed();
     }
@@ -854,8 +875,11 @@ std::optional<HostState> read_state(Instance& p, const void* value, std::size_t 
     if (type != p.uris.chunk) {
         status = LV2_STATE_ERR_BAD_TYPE;
         p.filter.reject(HostFailureKind::state_unreadable,
-                        "The saved state has the wrong type; it should be a chunk of bytes "
-                        "(atom:Chunk, or xsd:base64Binary in a preset file).",
+                        detail::advice_text({"the saved state has the wrong type",
+                                             "It should be a chunk of bytes (atom:Chunk, or "
+                                             "xsd:base64Binary in a preset file).",
+                                             "Load the filter again, then save the session.",
+                                             {}}),
                         request);
         return std::nullopt;
     }
@@ -865,11 +889,9 @@ std::optional<HostState> read_state(Instance& p, const void* value, std::size_t 
                                         std::to_string(max_host_state_bytes) + " bytes");
         return decode_host_state(std::span(static_cast<const std::byte*>(value), size));
     } catch (const NewerHostState& e) {
-        p.filter.reject(HostFailureKind::state_newer,
-                        std::string("The saved state could not be read: ") + e.what(), request);
+        p.filter.reject(HostFailureKind::state_newer, state_read_message(e), request);
     } catch (const std::exception& e) {
-        p.filter.reject(HostFailureKind::state_unreadable,
-                        std::string("The saved state could not be read: ") + e.what(), request);
+        p.filter.reject(HostFailureKind::state_unreadable, state_read_message(e), request);
     }
     return std::nullopt;
 }
@@ -881,8 +903,11 @@ std::optional<std::string> read_path(Instance& p, const void* value, std::size_t
                                      const HostRequest& request) {
     if (type != p.uris.path && type != p.uris.string && type != 0) {
         p.filter.reject(HostFailureKind::state_unreadable,
-                        "The saved filter path has the wrong type; it should be a path "
-                        "(atom:Path) or a string.",
+                        detail::advice_text({"the saved filter path has the wrong type",
+                                             "It should be a path (atom:Path) or a string.",
+                                             "Choose the filter file again, then save the "
+                                             "session.",
+                                             {}}),
                         request);
         return std::nullopt;
     }
@@ -892,8 +917,12 @@ std::optional<std::string> read_path(Instance& p, const void* value, std::size_t
         path = paths.absolute(path);
     if (path.size() > max_path_bytes) {
         p.filter.reject(HostFailureKind::filter_file,
-                        "The saved filter path is longer than " + std::to_string(max_path_bytes) +
-                            " bytes. Move the file to a folder with a shorter path.",
+                        detail::advice_text({"the saved filter path is longer than " +
+                                                 std::to_string(max_path_bytes) + " bytes",
+                                             {},
+                                             "Move the file to a folder with a shorter path, then "
+                                             "choose it again.",
+                                             {}}),
                         request);
         return std::nullopt;
     }

@@ -141,18 +141,32 @@ std::string request_words(const HostRequest& r) {
 std::string loaded_line(const HostFilter& filter, bool host_known) {
     const auto request = request_words(filter.accepted());
     if (const auto& f = filter.failure(); f && f->kind == HostFailureKind::saved_failure)
-        return request + "Loaded saved state that records a failed load. " + f->message;
+        return request +
+               "Loaded saved state that records a failed load, so Convolver plays "
+               "silence: " +
+               detail::advice_line(f->message);
     if (const auto& c = filter.filter())
         return request + "Loaded " + filter_words(*c) +
                (!host_known               ? "; it is checked when the host starts the plug-in."
                 : filter.notice().empty() ? "."
-                                          : ". " + filter.notice());
+                                          : "; " + detail::advice_line(filter.notice()));
     return request + "Loaded state with no filter.";
 }
 
-std::string rejected_line(const HostFilter& filter) {
+std::string rejected_line(const HostFilter& filter, bool started) {
     const auto& r = filter.rejection();
-    return r ? request_words(r->request) + r->message : std::string();
+    if (!r)
+        return {};
+    // A kept filter the host could not start (failure() comes from
+    // activation) is kept, but does not play.
+    const auto& shown = filter.failure();
+    return request_words(r->request) +
+           (r->silent                ? "Not loaded, so Convolver plays silence: "
+            : shown && shown->silent ? "Not loaded; the previous filter is kept (it does "
+                                       "not play): "
+            : started                ? "Not loaded; the previous filter keeps playing: "
+                                     : "Not loaded; the previous filter is kept: ") +
+           detail::advice_line(r->message);
 }
 
 std::string setting_text(double value, double low, double high) {
@@ -191,15 +205,20 @@ std::string settings_words(const HostSettings& s, bool equal_counts) {
     return gain + ", mix " + setting_text(100 * s.mix, 0, 100) + "% wet" + latency;
 }
 
-std::string mono_track_hint(const HostFailure& failure, const HostLayout& host) {
-    // GarageBand runs effects with one channel on a mono track (jrp's first
-    // GarageBand run, 25 October 2026). Only a stereo filter is fixed by a
-    // stereo track.
-    if (failure.kind != HostFailureKind::channels || host.inputs != 1 || host.outputs != 1 ||
-        failure.inputs != 2 || failure.outputs != 2)
-        return {};
-    return " Hosts run an effect with one channel on a mono track (GarageBand does): put "
-           "Convolver on a stereo track instead.";
+std::string failure_consequence(const HostFailure& failure, const HostLayout* host,
+                                const HostSettings& used) {
+    if (!failure.silent)
+        return host ? "The previous filter keeps playing." : "The previous filter is kept.";
+    // A filter the adapter could not start has no processor, so nothing
+    // plays, not even Mix's dry share (as host_status() says).
+    if (!host || host->inputs != host->outputs || failure.kind == HostFailureKind::activation)
+        return "Convolver plays silence.";
+    const auto s = unfiltered_sound(used, false);
+    if (s.silent)
+        return "Convolver plays silence.";
+    const auto mix = setting_text(100 * std::clamp(used.mix, 0.0, 1.0), 0, 100) + "%";
+    return "With Mix at " + mix + " wet, only the dry signal plays: the input " +
+           (s.unchanged ? std::string("unchanged") : "at " + s.level) + ".";
 }
 
 std::string playing_words(const HostFilter& filter, const HostLayout& host,
@@ -213,20 +232,13 @@ std::string playing_words(const HostFilter& filter, const HostLayout& host,
     const auto dry_words = [](const UnfilteredSound& s) {
         return s.unchanged ? std::string("unchanged") : "at " + s.level;
     };
-    if (const auto& f = filter.failure(); f && f->silent) {
-        auto line = f->message + mono_track_hint(*f, host);
-        if (const auto s = sound(false); !s.silent) {
-            const auto mix = setting_text(100 * std::clamp(used.mix, 0.0, 1.0), 0, 100) + "%";
-            line += " With Mix at " + mix +
-                    " wet, though, the dry signal still plays instead of silence: the input " +
-                    dry_words(s) + ".";
-        }
-        return line;
-    }
+    if (const auto& f = filter.failure(); f && f->silent)
+        return failure_consequence(*f, &host, used) + " " +
+               detail::as_sentence(detail::advice_line(f->message));
     if (const auto& c = filter.filter()) {
         auto line = "Playing " + filter_words(*c) + ".";
         if (!filter.notice().empty())
-            line += " " + filter.notice();
+            line += " " + detail::as_sentence(detail::advice_line(filter.notice()));
         return line;
     }
     if (filter.failed()) {
@@ -274,18 +286,21 @@ std::filesystem::path host_log_path() {
 #endif
 }
 
-void host_log(const char* format, const std::string& message, bool problem) noexcept {
-    if (message.empty())
+void host_log(const char* format, const std::string& lines, bool problem) noexcept {
+    if (lines.empty())
         return;
-#ifndef __APPLE__
-    static_cast<void>(problem); // Only the unified log has levels.
-#else
-    if (problem)
-        os_log_error(OS_LOG_DEFAULT, "Convolver %{public}s: %{public}s", format, message.c_str());
-    else
-        os_log(OS_LOG_DEFAULT, "Convolver %{public}s: %{public}s", format, message.c_str());
-#endif
     try {
+        // DIAG-2: one line per event, whatever the message's own lines.
+        const auto message = detail::advice_line(lines);
+#ifndef __APPLE__
+        static_cast<void>(problem); // Only the unified log has levels.
+#else
+        if (problem)
+            os_log_error(OS_LOG_DEFAULT, "Convolver %{public}s: %{public}s", format,
+                         message.c_str());
+        else
+            os_log(OS_LOG_DEFAULT, "Convolver %{public}s: %{public}s", format, message.c_str());
+#endif
         // One writer at a time within the process; each line is one write.
         static std::mutex writing;
         std::lock_guard lock(writing);

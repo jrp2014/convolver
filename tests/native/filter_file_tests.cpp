@@ -86,7 +86,8 @@ void run(const fs::path& dir) {
         cfg << "44100 2 6 0\n0 0\n0 0 0 0 0 0\nmono.wav\n0\n0\n0\n";
     }
     require(has(explanation(dir / "crossover.cfg", stereo),
-                "give the plug-in 6 output channels in the host's track or routing settings"),
+                "Give the plug-in 2 input channels and 6 output channels in the host's track or "
+                "routing settings"),
             "the output-count advice names the host");
     {
         std::ofstream list(dir / "list.txt");

@@ -78,7 +78,7 @@ void cases() {
              return host_report(f, facts(std::nullopt));
          },
          HostStatus::no_filter,
-         {"No filter is loaded.", "has not started", "load a Convolver preset"},
+         {"No filter is loaded.", "has not started", "Fix: Load a Convolver preset"},
          {"Silent"}},
         // The Audio Unit's window has Choose Filter.
         {"empty, the window chooses files",
@@ -95,7 +95,7 @@ void cases() {
              return r;
          },
          HostStatus::no_filter,
-         {"choose a filter file (Choose… beside Filter", "load a Convolver preset"},
+         {"Fix: Choose a .cfg, configuration list or sound file", "load a Convolver preset"},
          {"Silent"}},
         {"empty, Gain -20 dB",
          [&] {
@@ -103,7 +103,7 @@ void cases() {
              return host_report(f, facts(stereo, {-20, 1}));
          },
          HostStatus::no_filter,
-         {"audio passes at -20", "load a Convolver preset"},
+         {"audio passes at -20", "Load a Convolver preset"},
          {"unchanged"}},
         // jrp's GarageBand run: a stereo preset on a mono track plays silence.
         {"stereo filter on a mono track",
@@ -114,8 +114,12 @@ void cases() {
              return host_report(f, facts(mono));
          },
          HostStatus::load_failed,
-         {"does not suit the host", "plays silence", "Give the plug-in 2 inputs and 2 outputs",
-          "load a filter made for 1 input and 1 output", "put Convolver on a stereo track"},
+         {"The saved filter has 2 inputs and 2 outputs, and the plug-in has 1 input and 1 "
+          "output. Convolver plays silence.",
+          "Fix: Give the plug-in 2 inputs and 2 outputs",
+          "load a filter made for 1 input and 1 output",
+          "Note: Hosts run an effect with one channel on a mono track",
+          "put Convolver on a stereo track"},
          {"load a Convolver preset"}},
         // The independent review: a stereo track cannot fix a 6-channel filter.
         {"6-channel filter on a mono track",
@@ -136,7 +140,10 @@ void cases() {
              return host_report(f, facts(HostLayout{44100, 2, 2}));
          },
          HostStatus::load_failed,
-         {"made for 48000 Hz", "load a filter made for 44100 Hz, or set the host to 48000 Hz"},
+         {"The saved filter is for 48000 Hz, and the host runs at 44100 Hz.",
+          "Cause: Convolver never resamples",
+          "Fix: Load a filter made for 44100 Hz, or set the host's project or audio device to "
+          "48000 Hz."},
          {"stereo track"}},
         // jrp's review of 0.5.5: a rejected first load with Mix 50% is not silent.
         {"failed first load, Mix 50%",
@@ -146,7 +153,8 @@ void cases() {
              return host_report(f, facts(stereo, {0, .5}));
          },
          HostStatus::load_failed,
-         {"could not be read", "the dry signal still plays"},
+         {"The saved state could not be read. With Mix at 50% wet, only the dry signal plays: "
+          "the input at -6.0 dB."},
          {"load a Convolver preset"}},
         {"refused replacement",
          [&] {
@@ -159,7 +167,8 @@ void cases() {
              return host_report(f, facts(stereo));
          },
          HostStatus::load_failed,
-         {"previous filter is kept", "made for 48000 Hz", "Playing a filter for 44100 Hz"},
+         {"The filter is for 48000 Hz, and the host runs at 44100 Hz. The previous filter keeps "
+          "playing."},
          {}},
         {"playing",
          [&] {
@@ -168,8 +177,8 @@ void cases() {
              return host_report(f, facts(stereo));
          },
          HostStatus::playing,
-         {"Playing a filter for 44100 Hz, 2 in, 2 out."},
-         {"preset menu"}},
+         {"A filter for 44100 Hz, 2 in, 2 out."},
+         {"preset menu", "Fix:"}},
         {"not checked yet",
          [] {
              HostFilter f(8);
@@ -177,8 +186,8 @@ void cases() {
              return host_report(f, facts(std::nullopt));
          },
          HostStatus::unchecked,
-         {"is loaded", "checked against the host's sample rate and channels", "has not started"},
-         {}},
+         {"is loaded", "checked against the host's sample rate and channels"},
+         {"has not started"}},
         {"fault",
          [&] {
              HostFilter f(8);
@@ -189,7 +198,8 @@ void cases() {
              return host_report(f, facts(stereo));
          },
          HostStatus::fault,
-         {"Playing a filter", "invalid samples", "3 times"},
+         {"The host sent invalid samples (3 times). The filter keeps playing.",
+          "Fix: Bypass the plug-ins before Convolver", "Note: The status shows Fault until"},
          {}},
     };
     for (const auto& c : all) {
@@ -215,9 +225,11 @@ void cases() {
                 name + ": report text");
         const auto fields = report_fields(r);
         for (const char* key :
-             {"status", "status name", "summary", "title", "explanation", "headline", "filter name",
-              "filter note", "filter path", "filter files", "sample rate", "latency waits", "audio",
-              "reference", "log path", "log written"}) {
+             {"status",      "status name",   "summary",     "title",       "explanation",
+              "problem",     "plays",         "cause",       "fix",         "note",
+              "action",      "filter name",   "filter note", "filter path", "filter files",
+              "sample rate", "latency waits", "audio",       "reference",   "log path",
+              "log written"}) {
             bool found = false;
             for (const auto& [k, v] : fields)
                 found = found || k == key;
@@ -273,8 +285,11 @@ void cases() {
                 contains(report_text(r), "Sample rate: 44100 Hz (the filter's rate too)\n") &&
                 contains(report_text(r), "Filter file: a saved project or preset, request 1\n"),
             "report text:\n" + report_text(r));
-    // Playing: the status word says it, so the headline does not repeat it.
-    require(r.headline == "A filter for 44100 Hz, 2 in, 2 out.", "headline: " + r.headline);
+    // Playing: the status word says it; nothing is wrong, so there is no
+    // problem, fix or action.
+    require(r.plays == "A filter for 44100 Hz, 2 in, 2 out." && r.problem.empty() &&
+                r.fix.empty() && r.action.empty(),
+            "playing message: " + r.explanation);
 
     // Before the host starts: what is known.
     const auto unstarted = host_report(HostFilter(8), facts(std::nullopt));
@@ -283,7 +298,8 @@ void cases() {
                 !has_fact(unstarted, "Loudest peak") && !has_fact(unstarted, "Host blocks") &&
                 fact(unstarted, "Added delay").value == "256 frames",
             "facts before start");
-    require(unstarted.filter_name == "None" && unstarted.headline == unstarted.explanation,
+    require(unstarted.filter_name == "None" && unstarted.problem.empty() &&
+                unstarted.plays == "No filter is loaded. The host has not started the plug-in yet.",
             "empty filter row");
 
     // A refused file while the previous filter plays: the problem shows in
@@ -341,8 +357,9 @@ void cases() {
     // could not be), and the window says so.
     require(!contains(r.explanation, "is chosen"), "a latency in use reads as waiting");
     const auto waiting = host_report(f, facts(stereo, {0, 1, 1024}));
-    require(contains(waiting.explanation, "Latency 1024 frames is chosen but not in use yet, so "
-                                          "the plug-in keeps 256 frames for now."),
+    require(waiting.note.starts_with("Latency 1024 frames is chosen but not in use yet, so "
+                                     "the plug-in keeps 256 frames for now.") &&
+                contains(waiting.explanation, "\nNote: Latency 1024 frames"),
             "waiting latency explanation: " + waiting.explanation);
     require(waiting.latency_waits && !r.latency_waits && waiting.sample_rate == 44100,
             "latency waits field");
@@ -414,6 +431,72 @@ void diagnostics() {
     set_log_variable(earlier);
     std::filesystem::remove_all(folder);
 }
+// DIAG-2: the window's action button for each kind of message: Choose
+// Filter… where a new filter puts it right and the window can choose one,
+// Copy Diagnostics for a Convolver bug, none otherwise.
+void actions() {
+    const HostLayout stereo{44100, 2, 2};
+    auto choosing = facts(stereo);
+    choosing.chooses_files = true;
+    HostFilter empty(8);
+    require(host_report(empty, choosing).action == "choose filter" &&
+                host_report(empty, facts(stereo)).action.empty(),
+            "no filter: Choose Filter… only where the window chooses files");
+    HostFilter refused(8);
+    refused.load(HostState{filter(44100, 2)}, stereo, [](const Configuration&) {});
+    try {
+        refused.load(HostState{filter(48000, 2)}, stereo, [](const Configuration&) {});
+    } catch (const std::invalid_argument&) {
+    }
+    require(host_report(refused, choosing).action == "choose filter", "refused file");
+    HostFilter unprepared(8);
+    try {
+        unprepared.load(HostState{filter(44100, 2)}, stereo,
+                        [](const Configuration&) { throw std::bad_alloc(); });
+    } catch (const std::invalid_argument&) {
+    }
+    const auto prepared = host_report(unprepared, choosing);
+    require(prepared.action.empty() && contains(prepared.problem, "could not be prepared") &&
+                contains(prepared.fix, "Close other projects or programs"),
+            "preparation failure: " + prepared.explanation);
+    HostFilter bug(8);
+    bug.load(HostState{filter(44100, 2)}, stereo, [](const Configuration&) {});
+    HostFaults totals;
+    totals.processing_failure = 2;
+    totals.rejected_input = 1;
+    static_cast<void>(bug.observe(totals));
+    const auto faulted = host_report(bug, choosing);
+    require(faulted.action == "copy diagnostics" &&
+                faulted.problem == "The filter failed while processing (2 times)." &&
+                contains(faulted.cause, "fault in Convolver") &&
+                faulted.note.starts_with("Also: the host sent invalid samples (once). The status "
+                                         "shows Fault until"),
+            "processing failure: " + faulted.explanation);
+    // Faults are counted with no filter too: the window then says no filter
+    // plays and still offers to choose one.
+    HostFilter unfiltered(8);
+    static_cast<void>(unfiltered.activate(stereo));
+    HostFaults input;
+    input.rejected_input = 3;
+    static_cast<void>(unfiltered.observe(input));
+    const auto bare = host_report(unfiltered, choosing);
+    require(bare.status.status == HostStatus::fault && bare.action == "choose filter" &&
+                !contains(bare.explanation, "filter keeps playing") &&
+                contains(bare.plays, "No filter") && contains(bare.note, "Choose a .cfg"),
+            "fault with no filter: " + bare.explanation);
+    // A refused file's message names its full path, for the log; the window's
+    // problem names only the file.
+    const std::string path = "/Users/me/Filters/room.cfg";
+    HostFilter named(8);
+    named.reject(
+        HostFailureKind::filter_file,
+        detail::advice_text({path + ":2:1: the delay line has 3 values", "A cause.", "A fix.", {}}),
+        {HostFilterSource::file, path, 1});
+    const auto shown = host_report(named, choosing);
+    require(shown.problem == "room.cfg:2:1: the delay line has 3 values." &&
+                contains(rejected_line(named, true), path + ":2:1:"),
+            "refused file's name: " + shown.problem);
+}
 // The log's start line gives the same corrective action as the window.
 void log_agrees() {
     const HostLayout mono{44100, 1, 1};
@@ -434,6 +517,7 @@ void log_agrees() {
 int main() {
     try {
         cases();
+        actions();
         log_agrees();
         diagnostics();
     } catch (const std::exception& e) {

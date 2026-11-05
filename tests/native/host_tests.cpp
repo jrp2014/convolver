@@ -376,8 +376,11 @@ void filter_contract() {
     require(!first.filter() && !first.failed() && first.error().empty(), "fresh filter state");
     expect_rejection([&] { first.load(HostState{other_rate}, stereo); }, "wrong rate accepted");
     require(first.failed() && !first.filter(), "failed initial load not recorded");
-    require(first.error().find("44100 Hz") != std::string::npos &&
-                first.error().find("plays silence") != std::string::npos,
+    // DIAG-2: the problem, cause and fix; what plays instead follows from
+    // `silent` (failure_consequence()).
+    require(first.error().find("the filter is for 44100 Hz") == 0 &&
+                first.error().find("\nFix: Load a filter made for 48000 Hz") != std::string::npos &&
+                first.failure()->silent,
             "failed initial load not explained");
     require(first.activate(stereo).paths[0].impulse == std::vector<float>{0},
             "failed initial load does not play silence");
@@ -426,7 +429,12 @@ void filter_contract() {
         "failed preparation accepted");
     require(installs == 1 && !running.failed() && running.filter()->sample_rate == 48000,
             "failed replacement lost the working filter");
-    require(running.error().find("previous filter is kept") != std::string::npos,
+    require(running.error().find("the filter could not be prepared") == 0 &&
+                !running.failure()->silent &&
+                failure_consequence(*running.failure(), &stereo, {}) ==
+                    "The previous filter keeps playing." &&
+                failure_consequence(*running.failure(), nullptr, {}) ==
+                    "The previous filter is kept.",
             "failed replacement not explained");
 
     // Restored before the host is configured: kept, checked at activation.
@@ -475,7 +483,7 @@ void failure_reasons() {
         require(r.kind == Kind::sample_rate && r.request.number == 1 &&
                     r.request.source == HostFilterSource::state && r.sample_rate == 44100 &&
                     r.inputs == 2 && r.outputs == 2 && r.silent &&
-                    contains(r.message, "44100 Hz") && contains(r.message, "plays silence") &&
+                    contains(r.message, "44100 Hz") && contains(r.message, "\nFix: ") &&
                     f.error() == r.message,
                 "failed first load not recorded");
     }
@@ -487,7 +495,7 @@ void failure_reasons() {
     refused([&] { f.load(HostState{crossover}, stereo); });
     require(f.failure()->kind == Kind::channels && f.failure()->request.number == 3 &&
                 !f.failure()->silent && f.failure()->outputs == 6 &&
-                contains(f.error(), "previous filter is kept"),
+                contains(f.error(), "the filter has 2 inputs and 6 outputs"),
             "failed replacement not recorded");
     require(f.activate(stereo).paths.size() == 1 && f.failure() && f.failure()->request.number == 3,
             "activation cleared a rejected request's failure");
@@ -527,7 +535,7 @@ void failure_reasons() {
     require(early.activate(stereo).paths[0].impulse == std::vector<float>{0}, "mismatch played");
     require(early.failure()->kind == Kind::sample_rate && early.failure()->request.number == 1 &&
                 early.failure()->silent && early.failure()->sample_rate == 44100 &&
-                contains(early.error(), "does not suit the host"),
+                contains(early.error(), "the saved filter is for 44100 Hz"),
             "mismatch at activation not recorded");
     // A request rejected while the activation failure lasts: failure() still
     // explains the silence, rejection() explains the new request (to log it).
@@ -593,7 +601,8 @@ void failure_reasons() {
     reopened.load(failed_state, stereo);
     require(reopened.failure()->kind == Kind::saved_failure &&
                 reopened.failure()->request.number == 1 && reopened.failure()->silent &&
-                contains(reopened.error(), "failed to load before this state was saved"),
+                contains(reopened.error(), "had failed to load when this project or preset was "
+                                           "saved"),
             "saved failure not recorded");
     require(reopened.activate(stereo).paths[0].impulse == std::vector<float>{0} &&
                 reopened.failure()->kind == Kind::saved_failure,
@@ -1157,11 +1166,13 @@ void processing_faults() {
     HostFaults every{3, 2, 1, 1};
     const auto all = fault_message(every);
     require(all.find("(2 times)") != std::string::npos &&
-                all.find("invalid samples (not a number, infinite, or beyond the 32-bit float "
-                         "range) 3 times") != std::string::npos &&
-                all.find("Convolver bug") != std::string::npos &&
-                all.find("host's developers") != std::string::npos,
-            "every fault explained");
+                all.find("the host sent invalid samples (3 times). Cause: Samples that are not a "
+                         "number, infinite or beyond the 32-bit float range") !=
+                    std::string::npos &&
+                all.find("fault in Convolver") != std::string::npos &&
+                all.find("host's developers") != std::string::npos &&
+                all.find('\n') == std::string::npos,
+            "every fault explained, on one line");
     HostFilter g(8);
     g.load(HostState{mono()}, layout);
     // Positional braces fill current, earlier and held in order.
@@ -1411,17 +1422,25 @@ void status_lines() {
     require(loaded_line(g, false) == "Request 1: Loaded a filter for 44100 Hz, 2 in, 2 out; it is "
                                      "checked when the host starts the plug-in.",
             "unchecked load line");
-    require(rejected_line(g).empty(), "rejected line without a rejection");
+    require(rejected_line(g, true).empty(), "rejected line without a rejection");
     try {
         g.load(HostState{crossover}, stereo);
     } catch (const std::invalid_argument&) {
     }
-    require(rejected_line(g).rfind("Request 2: Filter not loaded; the previous filter is kept.",
-                                   0) == 0,
+    require(rejected_line(g, true).rfind("Request 2: Not loaded; the previous filter keeps "
+                                         "playing: the filter has 2 inputs and 6 outputs, and "
+                                         "the plug-in has 2 inputs and 2 outputs. Cause: ",
+                                         0) == 0 &&
+                rejected_line(g, true).find('\n') == std::string::npos,
             "rejected line");
+    // Before the host starts the plug-in, the kept filter does not play yet.
+    require(rejected_line(g, false).rfind("Request 2: Not loaded; the previous filter is kept: ",
+                                          0) == 0,
+            "rejected line before the host starts the plug-in");
     static_cast<void>(g.activate(stereo));
-    require(contains(started_line(g, stereo, 64), "does not suit the host") &&
-                contains(started_line(g, stereo, 64), "Convolver does not resample"),
+    require(contains(started_line(g, stereo, 64),
+                     "Convolver plays silence. The saved filter is for 44100 Hz") &&
+                contains(started_line(g, stereo, 64), "Convolver never resamples"),
             "silent start line does not explain");
     g.load(saved_failure, stereo);
     require(contains(loaded_line(g, true), "records a failed load") &&

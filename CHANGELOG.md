@@ -89,6 +89,20 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Diagnostics (DIAG-2): every message a user can meet states the problem,
+  its cause and the fix, with a note where an environment, host or design
+  limit is the reason. `convolver`, `convolver-preset` and the other tools
+  print `program: error: problem` and then labelled `Cause:`, `Fix:` and
+  `Note:` lines; the Convolver log keeps one line per message. Messages that
+  had no fix (a syntax error, a bad option value, a missing output folder)
+  now have one. In the macOS window the problem is in bold, followed by what
+  plays, Cause and Fix rows, a button that carries out the fix when the
+  window can (Choose Filter… or Copy Diagnostics) and a Note row; Bypass
+  moved to the end of the title row, and Copy Diagnostics and Show Log to the
+  "File, software and log" row. The shared report (`portable/host_report`)
+  replaces `headline` with `problem`, `plays`, `cause`, `fix`, `note` and
+  `action`, which `report_fields()` also gives. Scripts that matched the old one-paragraph
+  wording must match the new lines; exit codes are unchanged.
 - The macOS window's files moved from `plugins/au/` to `plugins/editor/mac/`
   (VST3-11), shared by the Audio Unit and VST3, which each build them with
   class names of their own. The setting rows can now mark the start and end

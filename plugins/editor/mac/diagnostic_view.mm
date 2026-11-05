@@ -128,6 +128,62 @@ NSAttributedString* reference_text(NSString* lines) {
     return text;
 }
 
+// DIAG-2: the message under the status word (docs/use/plugins.md#convolvers-window):
+// the problem in semibold, then what plays, then the cause and the fix as rows
+// whose labels sit right-aligned in the form's label column, as Filter: and
+// Gain: do, the Fix label in bold as the part to act on. Empty parts are left out.
+NSAttributedString* message_text(NSString* problem, NSString* plays, NSString* cause,
+                                 NSString* fix) {
+    NSMutableParagraphStyle* plain = [[NSMutableParagraphStyle alloc] init];
+    plain.paragraphSpacing = 4;
+    NSMutableParagraphStyle* row = [[NSMutableParagraphStyle alloc] init];
+    row.tabStops = @[
+        [[NSTextTab alloc] initWithTextAlignment:NSTextAlignmentRight
+                                        location:form_label
+                                         options:@{}],
+        [[NSTextTab alloc] initWithTextAlignment:NSTextAlignmentLeft
+                                        location:form_label + 10
+                                         options:@{}]
+    ];
+    row.headIndent = form_label + 10;
+    row.paragraphSpacing = 4;
+    NSFont* semibold = [NSFont systemFontOfSize:[NSFont systemFontSize]
+                                         weight:NSFontWeightSemibold];
+    NSMutableAttributedString* text = [[NSMutableAttributedString alloc] init];
+    const auto add = [&](NSString* part, NSFont* font, NSColor* colour, NSParagraphStyle* style) {
+        [text appendAttributedString:[[NSAttributedString alloc]
+                                         initWithString:part
+                                             attributes:@{
+                                                 NSFontAttributeName : font,
+                                                 NSForegroundColorAttributeName : colour,
+                                                 NSParagraphStyleAttributeName : style
+                                             }]];
+    };
+    const auto end_paragraph = [&](NSParagraphStyle* style) {
+        if (text.length)
+            add(@"\n", body_font(), [NSColor labelColor], style);
+    };
+    if (problem.length)
+        add(problem, semibold, [NSColor labelColor], plain);
+    if (plays.length) {
+        if (problem.length)
+            add(@" ", body_font(), [NSColor labelColor], plain);
+        add(plays, body_font(), [NSColor labelColor], plain);
+    }
+    if (cause.length) {
+        end_paragraph(row);
+        add(@"\tCause:\t", body_font(), [NSColor secondaryLabelColor], row);
+        add(cause, body_font(), [NSColor labelColor], row);
+    }
+    if (fix.length) {
+        end_paragraph(row);
+        add(@"\tFix:\t", [NSFont boldSystemFontOfSize:[NSFont systemFontSize]],
+            [NSColor labelColor], row);
+        add(fix, body_font(), [NSColor labelColor], row);
+    }
+    return text;
+}
+
 // The first file dropped on the window, as if chosen.
 NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSArray<NSURL*>* urls =
@@ -152,7 +208,9 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSStackView* stack_;                  // Everything, top to bottom.
     NSScrollView* scroll_;
     NSLayoutConstraint* scrollHeight_;
-    NSStackView* audio_; // The Audio facts' rows, rebuilt when they change.
+    NSStackView* audio_;     // The Audio facts' rows, rebuilt when they change.
+    NSStackView* noteRow_;   // "Note:" and the note, hidden without one.
+    NSStackView* actionRow_; // The fix's button, hidden without one.
     NSTimer* timer_;
     NSString* shown_; // The text last shown, so a refresh keeps a selection.
     NSString* logPath_;
@@ -194,11 +252,22 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
         [stack_.widthAnchor constraintEqualToConstant:width]
     ]];
 
-    // Which instance this is, then the status: symbol, word, and under them
-    // what plays, why and what to change.
+    // Which instance this is, with Bypass at the trailing end of the same
+    // line (jrp, 5 November 2026: nothing on the window's bottom edge), then
+    // the status: symbol, word, and under them what plays, why and what to do.
     _titleField = label(small_font(), [NSColor secondaryLabelColor]);
-    fixed_width(_titleField, inner);
-    [self add:_titleField after:4];
+    stretches(_titleField);
+    _bypassButton = [NSButton checkboxWithTitle:@"Bypass"
+                                         target:self
+                                         action:@selector(bypassClicked:)];
+    _bypassButton.toolTip = @"Lets the audio through without the filter, as the host's own "
+                            @"bypass does; the host records the change like any other.";
+    _bypassButton.hidden = bypass_ == nil;
+    NSStackView* title_row = stack(@[], NSUserInterfaceLayoutOrientationHorizontal, 8);
+    [title_row addView:_titleField inGravity:NSStackViewGravityLeading];
+    [title_row addView:_bypassButton inGravity:NSStackViewGravityTrailing];
+    fixed_width(title_row, inner);
+    [self add:title_row after:4];
 
     _statusSymbol = [[NSImageView alloc] init];
     _statusSymbol.translatesAutoresizingMaskIntoConstraints = NO;
@@ -240,11 +309,40 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _explanationView.horizontallyResizable = NO;
     _explanationView.textContainer.containerSize = NSMakeSize(inner, CGFLOAT_MAX);
     _explanationView.textContainer.widthTracksTextView = YES;
-    _explanationView.accessibilityLabel = @"What Convolver plays, why, and what to change";
+    _explanationView.accessibilityLabel = @"What Convolver plays, why, and what to do";
     // A file dropped on the text goes to the window, not into the text.
     [_explanationView unregisterDraggedTypes];
     scroll_.documentView = _explanationView;
-    [self add:scroll_ after:12];
+    [self add:scroll_ after:8];
+
+    // DIAG-2: the one button that carries out the fix, when the window can
+    // (Choose Filter… or Copy Diagnostics), under the fix and aligned with
+    // its text; an ordinary push button, so Return still goes to the host.
+    // Then the note, in the small secondary font.
+    _actionButton = [NSButton buttonWithTitle:@"" target:self action:nil];
+    _actionButton.hidden = YES;
+    NSView* action_indent = [[NSView alloc] init];
+    fixed_width(action_indent, form_label);
+    [action_indent.heightAnchor constraintEqualToConstant:1].active = YES;
+    actionRow_ =
+        stack(@[ action_indent, _actionButton ], NSUserInterfaceLayoutOrientationHorizontal, 10);
+    actionRow_.hidden = YES;
+    fixed_width(actionRow_, inner);
+    [self add:actionRow_ after:8];
+    NSTextField* note_label = label(small_font(), [NSColor secondaryLabelColor]);
+    note_label.stringValue = @"Note:";
+    note_label.alignment = NSTextAlignmentRight;
+    note_label.selectable = NO;
+    fixed_width(note_label, form_label);
+    _noteField = wrapping(small_font(), [NSColor secondaryLabelColor], inner - form_label - 10);
+    _noteField.accessibilityLabel = @"Note";
+    stretches(_noteField);
+    noteRow_ = stack(@[ note_label, _noteField ], NSUserInterfaceLayoutOrientationHorizontal, 10);
+    noteRow_.alignment = NSLayoutAttributeFirstBaseline;
+    noteRow_.distribution = NSStackViewDistributionFill;
+    noteRow_.hidden = YES;
+    fixed_width(noteRow_, inner);
+    [self add:noteRow_ after:8];
     [self add:separator() after:12];
 
     // The form. Filter: the file's name with Choose… beside it, as
@@ -345,22 +443,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSTextField* caption = label(small_font(), [NSColor secondaryLabelColor]);
     caption.stringValue = @"File, software and log";
     caption.selectable = NO;
-    [self add:stack(@[ _referenceButton, caption ], NSUserInterfaceLayoutOrientationHorizontal, 4)
-        after:4];
-    _referenceField = wrapping(small_font(), [NSColor secondaryLabelColor], inner);
-    _referenceField.allowsEditingTextAttributes = YES; // Keeps the tab stops when selected.
-    _referenceField.hidden = YES;
-    fixed_width(_referenceField, inner);
-    [self add:_referenceField after:8];
-
-    // Bypass at the bottom left, as a checkbox; the buttons at the bottom
-    // right, Show Log rightmost.
-    _bypassButton = [NSButton checkboxWithTitle:@"Bypass"
-                                         target:self
-                                         action:@selector(bypassClicked:)];
-    _bypassButton.toolTip = @"Lets the audio through without the filter, as the host's own "
-                            @"bypass does; the host records the change like any other.";
-    _bypassButton.hidden = bypass_ == nil;
+    // Copy Diagnostics and Show Log on the same row as the section they
+    // belong with, Show Log rightmost, rather than in a bar along the bottom.
     _diagnosticsButton = [NSButton buttonWithTitle:@"Copy Diagnostics"
                                             target:self
                                             action:@selector(putDiagnosticsOnPasteboard:)];
@@ -369,12 +453,19 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
         @"into a problem report.";
     _logButton = [NSButton buttonWithTitle:@"Show Log" target:self action:@selector(showLog:)];
     _logButton.toolTip = @"Shows the Convolver log file in the Finder.";
-    NSStackView* buttons = stack(@[], NSUserInterfaceLayoutOrientationHorizontal, 12);
-    [buttons addView:_bypassButton inGravity:NSStackViewGravityLeading];
-    [buttons addView:_diagnosticsButton inGravity:NSStackViewGravityTrailing];
-    [buttons addView:_logButton inGravity:NSStackViewGravityTrailing];
-    fixed_width(buttons, inner);
-    [self add:buttons after:0];
+    NSStackView* disclosure = stack(@[], NSUserInterfaceLayoutOrientationHorizontal, 4);
+    [disclosure addView:_referenceButton inGravity:NSStackViewGravityLeading];
+    [disclosure addView:caption inGravity:NSStackViewGravityLeading];
+    [disclosure addView:_diagnosticsButton inGravity:NSStackViewGravityTrailing];
+    [disclosure addView:_logButton inGravity:NSStackViewGravityTrailing];
+    [disclosure setCustomSpacing:12 afterView:_diagnosticsButton];
+    fixed_width(disclosure, inner);
+    [self add:disclosure after:8];
+    _referenceField = wrapping(small_font(), [NSColor secondaryLabelColor], inner);
+    _referenceField.allowsEditingTextAttributes = YES; // Keeps the tab stops when selected.
+    _referenceField.hidden = YES;
+    fixed_width(_referenceField, inner);
+    [self add:_referenceField after:0];
 
     [self refresh];
     return self;
@@ -533,14 +624,16 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 
 - (void)refresh {
     NSDictionary<NSString*, NSString*>* report = report_ ? report_() : nil;
-    NSString *headline, *audio, *reference, *name, *note;
+    NSString *problem, *plays, *cause, *fix, *advice, *action, *audio, *reference, *name, *note;
     if (!report) {
         _titleField.stringValue = @"Convolver";
         _statusField.stringValue = @"Not available";
         _statusField.textColor = [NSColor labelColor];
         _statusSymbol.image = nil;
-        headline = @"Convolver could not read its report from the plug-in. The Convolver log "
-                   @"has the details.";
+        problem = @"Convolver could not read its report from the plug-in.";
+        plays = cause = advice = action = @"";
+        fix = @"Close this window and open it again. If it keeps happening, the Convolver log "
+              @"has the details.";
         audio = reference = name = note = @"";
         logPath_ = nil;
     } else {
@@ -553,7 +646,12 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
         _statusSymbol.contentTintColor = status == 0 || status == 2 || status == 4
                                              ? status_colour(status)
                                              : [NSColor secondaryLabelColor];
-        headline = field(report, @"headline");
+        problem = field(report, @"problem");
+        plays = field(report, @"plays");
+        cause = field(report, @"cause");
+        fix = field(report, @"fix");
+        advice = field(report, @"note");
+        action = field(report, @"action");
         audio = field(report, @"audio");
         reference = field(report, @"reference");
         name = field(report, @"filter name");
@@ -573,18 +671,39 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     if (loader_)
         note = note.length ? [note stringByAppendingString:@" Or drop a file on this window."]
                            : @"Or drop a .cfg or sound file on this window.";
-    NSString* text = [@[ headline, name, note, audio, reference ] componentsJoinedByString:@"\v"];
+    // Choose Filter… only where the window can choose a file.
+    if ([action isEqualToString:@"choose filter"] && !loader_)
+        action = @"";
+    NSString* text = [@[ problem, plays, cause, fix, advice, action, name, note, audio, reference ]
+        componentsJoinedByString:@"\v"];
     if ([text isEqualToString:shown_])
         return;
     shown_ = text;
-    _explanationView.string = headline;
-    _explanationView.font = body_font(); // Plain text: the view's own font and colour.
-    _explanationView.textColor = [NSColor labelColor];
+    [_explanationView.textStorage setAttributedString:message_text(problem, plays, cause, fix)];
+    [self showAction:action];
+    _noteField.stringValue = advice;
+    noteRow_.hidden = advice.length == 0;
     _filterNameField.stringValue = name;
     _filterNoteField.stringValue = note;
     [self showAudio:audio];
     _referenceField.attributedStringValue = reference_text(reference);
     [self fit];
+}
+
+// The fix's button: Choose Filter… (as Choose…) or Copy Diagnostics, or none.
+- (void)showAction:(NSString*)action {
+    if ([action isEqualToString:@"choose filter"]) {
+        _actionButton.title = @"Choose Filter…";
+        _actionButton.action = @selector(chooseFilter:);
+        _actionButton.toolTip = _chooseButton.toolTip;
+    } else if ([action isEqualToString:@"copy diagnostics"]) {
+        _actionButton.title = @"Copy Diagnostics";
+        _actionButton.action = @selector(putDiagnosticsOnPasteboard:);
+        _actionButton.toolTip = _diagnosticsButton.toolTip;
+    }
+    _actionButton.hidden = !([action isEqualToString:@"choose filter"] ||
+                             [action isEqualToString:@"copy diagnostics"]);
+    actionRow_.hidden = _actionButton.hidden;
 }
 
 - (BOOL)checkForChanges {
@@ -784,11 +903,15 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     }
     [_pasteboard clearContents];
     [_pasteboard setString:text forType:NSPasteboardTypeString];
-    _diagnosticsButton.title = @"Copied";
-    __weak CONVOLVER_DIAGNOSTIC_VIEW* weakSelf = self;
+    // The button pressed (this one or the fix's) says so for two seconds.
+    NSButton* pressed = sender == _actionButton ? _actionButton : _diagnosticsButton;
+    pressed.title = @"Copied";
+    __weak NSButton* weakPressed = pressed;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, static_cast<int64_t>(2 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-                     weakSelf.diagnosticsButton.title = @"Copy Diagnostics";
+                     NSButton* button = weakPressed;
+                     if ([button.title isEqualToString:@"Copied"])
+                         button.title = @"Copy Diagnostics";
                    });
 }
 

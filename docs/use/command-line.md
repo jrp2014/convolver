@@ -289,7 +289,8 @@ the program starts: never redirect stdout onto an input/configuration/IR file.
 An existing output file is replaced without asking, as command-line tools on
 macOS and Linux usually do; `convolver-preset` and `convolver-equalizer-apo`
 write only to new paths. Failures return a nonzero exit code and a diagnostic
-on stderr. Writing is not transactional: after a failure once the output is
+on stderr: `convolver: error:` and the problem, then indented `Cause:`, `Fix:`
+and `Note:` lines ([reading Convolver's messages](troubleshooting.md#reading-convolvers-messages)). Writing is not transactional: after a failure once the output is
 open (an unreadable or invalid input sample, an overflow, a write error), the
 CLI says that the output is incomplete, and the file holds only the audio
 written before the failure. An invalid input sample (not a number, or

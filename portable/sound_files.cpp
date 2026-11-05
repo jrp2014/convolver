@@ -2,6 +2,7 @@
 // The parts of reading filter files that need no sound-file library, shared by
 // the libsndfile reader (io.cpp) and the AudioToolbox reader (audio_toolbox.cpp).
 #include "sound_files.hpp"
+#include "advice.hpp"
 #include "bytes.hpp"
 #include <algorithm>
 #include <array>
@@ -108,8 +109,11 @@ void validate_wave(const std::filesystem::path& path) {
     try {
         check_wave(path);
     } catch (const std::runtime_error& e) {
-        throw std::runtime_error("cannot read audio file " + path.string() + ": " + e.what() +
-                                 " (" + std::string(damaged_file_advice) + ")");
+        throw std::runtime_error(
+            advice_text({"cannot read audio file " + path.string() + ": " + e.what(),
+                         "The file is damaged or incomplete, or is not a sound file.",
+                         "Export it again from the program that made it.",
+                         {}}));
     }
 }
 std::string sample_position(std::uint64_t frame, std::size_t channel, int sample_rate) {
@@ -123,18 +127,25 @@ std::string invalid_sample_message(const std::filesystem::path& path, std::uint6
                                    std::size_t channel, int sample_rate,
                                    std::optional<RawEncoding> raw) {
     const bool stream = path == "-";
-    auto text = std::string(stream ? "cannot read audio from standard input"
-                                   : "cannot read audio file " + path.string()) +
-                ": invalid sample (not a number, or infinite) " +
-                sample_position(frame, channel, sample_rate) + ".";
-    if (raw)
-        return text + " Headerless samples were read as " + raw_encoding_name(*raw) +
-               "; if they are stored in another type, say which (--raw-format for --input, "
-               "--raw-filter-format for a filter). Otherwise the program that wrote them "
-               "produced invalid samples.";
-    return text + " Sound files should hold only finite samples: the file is damaged, or the "
-                  "program that made it wrote invalid samples; export it again from that "
-                  "program.";
+    Advice a{std::string(stream ? "cannot read audio from standard input"
+                                : "cannot read audio file " + path.string()) +
+                 ": invalid sample (not a number, or infinite) " +
+                 sample_position(frame, channel, sample_rate),
+             {},
+             {},
+             {}};
+    if (raw) {
+        a.cause = "Headerless samples were read as " + raw_encoding_name(*raw) +
+                  ", and these bytes are not a valid sample of that type.";
+        a.fix = "If they are stored in another type, say which (--raw-format for --input, "
+                "--raw-filter-format for a filter).";
+        a.note = "Otherwise the program that wrote them produced invalid samples.";
+    } else {
+        a.cause = "Sound files should hold only finite samples: the file is damaged, or the "
+                  "program that made it wrote invalid samples.";
+        a.fix = "Export it again from that program.";
+    }
+    return advice_text(a);
 }
 std::size_t raw_sample_bytes(SampleType sample) {
     switch (sample) {

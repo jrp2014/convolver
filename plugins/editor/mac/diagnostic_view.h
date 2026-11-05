@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // AU-6, VST3-11: Convolver's window on macOS, laid out as jrp approved on 1 November 2026
-// (docs/use/plugins.md#convolvers-window): the status as a symbol, a word and what
-// plays, why and what to change; a form with the Filter (its file name and
+// (docs/use/plugins.md#convolvers-window), with DIAG-2's message: the title line
+// with Bypass at its end; the status as a symbol and a word; the problem, what
+// plays, its cause and the fix, a button that carries out the fix when the window
+// can (Choose Filter… or Copy Diagnostics), and a note; a form with the Filter (its file name and
 // Choose…), Gain and Mix (slider, typed value, unit; Option-click resets) and
-// Latency (menu and the time it adds); the Audio facts in plain words; the
-// file, software and log lines folded away; and Copy Diagnostics and Show
-// Log. A filter file can also be dropped on it, picked from the recent files,
+// Latency (menu and the time it adds); the Audio facts in plain words; and the
+// file, software and log lines folded away, with Copy Diagnostics and Show Log
+// on their row. A filter file can also be dropped on it, picked from the recent files,
 // and reloaded, by hand or when it changes while the window is open (VST3-11). Native AppKit
 // controls in stack views (auto layout), so screen readers, keyboard use, dark mode and text
 // scaling come from the system. It reads and sets everything through blocks a format supplies (the
@@ -43,7 +45,7 @@ typedef BOOL (^ConvolverFileLoader)(NSString* path);
 // `settings` (Gain, Mix and Latency, described in setting_rows.h) appear
 // as rows of the form under the Filter row: a host that shows this window
 // shows it instead of its generic controls. `bypass`, when a format gives
-// it, is a Bypass checkbox at the bottom left, for the format's own bypass:
+// it, is a Bypass checkbox at the end of the title line, for the format's own bypass:
 // a dictionary with @"get" (ConvolverSettingGetter: 1 bypassed, 0 not, NAN
 // when unknown) and @"set" (ConvolverSettingSetter), and optionally
 // @"begin" and @"end" (ConvolverSettingGesture) around each click, so the
@@ -94,8 +96,14 @@ typedef BOOL (^ConvolverFileLoader)(NSString* path);
 @property(readonly, nonatomic) NSTextField* titleField;
 @property(readonly, nonatomic) NSImageView* statusSymbol;
 @property(readonly, nonatomic) NSTextField* statusField;
-// What plays, why and what to change: the report's headline.
+// The report's problem (semibold) and what plays, then its cause and fix as
+// labelled rows.
 @property(readonly, nonatomic) NSTextView* explanationView;
+// The fix's button, hidden when the report names no action the window can
+// take: Choose Filter… (as Choose…) or Copy Diagnostics.
+@property(readonly, nonatomic) NSButton* actionButton;
+// The report's note, in its own row ("Note:"), hidden when there is none.
+@property(readonly, nonatomic) NSTextField* noteField;
 @property(readonly, nonatomic) NSTextField* filterNameField;
 @property(readonly, nonatomic) NSTextField* filterNoteField;
 @property(readonly, nonatomic) NSButton* chooseButton;
@@ -112,7 +120,8 @@ typedef BOOL (^ConvolverFileLoader)(NSString* path);
 // The Audio section: one label and one value (value and note) per fact.
 @property(readonly, nonatomic) NSArray<NSTextField*>* audioLabels;
 @property(readonly, nonatomic) NSArray<NSTextField*>* audioValues;
-// The file, software and log lines and their disclosure button.
+// The file, software and log lines and their disclosure button, with Copy
+// Diagnostics and Show Log on the same row.
 @property(readonly, nonatomic) NSButton* referenceButton;
 @property(readonly, nonatomic) NSTextField* referenceField;
 @property(readonly, nonatomic) NSButton* diagnosticsButton;

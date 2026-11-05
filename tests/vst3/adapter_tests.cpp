@@ -725,7 +725,7 @@ void failure_records() {
             "activate at 44.1 kHz");
     f = p.failure();
     require(f && f->kind == HostFailureKind::sample_rate && f->request.number == 4 && f->silent &&
-                f->message.find("does not suit the host") != std::string::npos,
+                f->message.find("the saved filter is for 48000 Hz") == 0,
             "mismatch at activation not recorded");
     require(p.setActive(false) == kResultOk, "failure-record deactivate again");
     setup.sampleRate = 48000;
@@ -845,9 +845,9 @@ void status_and_log() {
                        "in the Convolver log." &&
                 status() == convolver::HostStatus::load_failed,
             "failed first load not shown");
-    require(contains(log_text(), "Filter not loaded, so Convolver plays silence. The filter was "
-                                 "made for 44100 Hz, but the host runs at 48000 Hz. Convolver "
-                                 "does not resample"),
+    require(contains(log_text(), "Not loaded, so Convolver plays silence: the filter is for "
+                                 "44100 Hz, and the host runs at 48000 Hz. Cause: Convolver "
+                                 "never resamples"),
             "failed first load not logged");
     require(p.setState(stream(good).get()) == kResultOk &&
                 shown() == "Filter loaded: 48000 Hz, 2 in, 2 out." &&
@@ -858,7 +858,8 @@ void status_and_log() {
     require(
         p.setState(stream(wrong).get()) == kResultFalse &&
             contains(shown(), "Load failed, previous filter kept: the filter is for 44100 Hz") &&
-            contains(log_text(), "Filter not loaded; the previous filter is kept."),
+            contains(log_text(), "Not loaded; the previous filter keeps playing: the filter is "
+                                 "for 44100 Hz"),
         "refused replacement not shown or logged");
     MemoryStream damaged;
     const std::array<unsigned char, 16> junk{12, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
@@ -866,7 +867,7 @@ void status_and_log() {
     damaged.seek(0, IBStream::kIBSeekSet, nullptr);
     require(p.setState(&damaged) == kResultFalse &&
                 contains(shown(), "the preset or saved state could not be read") &&
-                contains(log_text(), "The saved state could not be read"),
+                contains(log_text(), "the saved state could not be read: "),
             "damaged state not shown or logged");
     // DIAG-1, jrp's reproduction: extreme but finite input and filter values
     // overflow the output. The audio thread writes Fault to the Status
@@ -920,7 +921,7 @@ void status_and_log() {
                 shown() == "Fault: output too large, silenced and the filter restarted. Details "
                            "in the Convolver log.",
             "fault not shown");
-    require(contains(log_text(), "The output became too large to represent (") &&
+    require(contains(log_text(), "the output became too large to represent (") &&
                 contains(log_text(), "Lower the level going into Convolver"),
             "fault not logged");
     // Stopping playback explains nothing: setProcessing may run on the audio
@@ -958,7 +959,7 @@ void status_and_log() {
         require(changes.getParameterCount() == 0, "Fault written again while shown");
         MemoryStream saved;
         require(p.getState(&saved) == kResultOk &&
-                    count(log_text(), "The output became too large to represent (") == 2,
+                    count(log_text(), "the output became too large to represent (") == 2,
                 "second fault episode not logged on save");
     }
     // jrp's review of 0.4.43: a load failure comes before Fault on the audio
@@ -1019,7 +1020,8 @@ void status_and_log() {
             "status activate at 44.1 kHz");
     require(contains(shown(), "Silent: the filter is for 48000 Hz, the host runs at 44100 Hz") &&
                 contains(log_text(), "Started at 44100 Hz, 2 in, 2 out, blocks of up to 64 "
-                                     "frames. The saved filter does not suit the host"),
+                                     "frames. Convolver plays silence. The saved filter is for "
+                                     "48000 Hz"),
             "mismatch at activation not shown or logged");
     // Restarting the same way again does not repeat the line.
     const auto before = log_text();
