@@ -141,9 +141,9 @@ whoever he names) qualifies it on a named machine (REL-6 in
 6. **The evidence.** Keep every `*-load-timing.json` file (each names the
    version, build, compiler, FFT backend and machine), the printed tables
    and the machine record, with the candidate's run link, in the project's
-   release evidence. State the result in the pre-release notes:
-   "Responsiveness qualified on" and the machine or "Responsiveness not
-   qualified", with the entries that did not pass.
+   release evidence. State the result in the pre-release notes: qualified,
+   naming the machine, or not qualified, naming the entries that did not
+   pass.
 
 ## Publishing an unsigned preview
 
