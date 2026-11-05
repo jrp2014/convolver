@@ -106,7 +106,7 @@ class Classification(unittest.TestCase):
             runs(['plugins/editor/mac/setting_rows.mm', 'tests/au/editor_tests.mm']), {'vst3', 'au', 'release'}
         )
         self.assertEqual(runs(['plugins/editor/mac/setting_rows.mm', 'plugins/identities.json']), everything)
-        self.assertEqual(runs(['plugins/editor/mac/setting_rows.mm', 'portable/request_worker.hpp']), everything)
+        self.assertEqual(runs(['plugins/editor/mac/setting_rows.mm', 'portable/host.cpp']), everything)
         self.assertEqual(runs(['plugins/au/effect.hpp', 'docs/use/plugins.md']), {'au', 'release'})
         self.assertEqual(runs(['.github/workflows/fuzz.yml']), {'fuzz'})
         self.assertEqual(runs(['.github/workflows/lint.yml']), set())

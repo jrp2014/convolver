@@ -218,6 +218,15 @@ Until 1.0 the C++ API may change between minor versions.
   `scripts/clang_tidy.py` (removed with its tests and pre-commit hook). The
   checks and the file list are unchanged; a listed file the build does not
   compile is now skipped rather than reported.
+- Audio Unit (AU-12): a new Latency is applied on a serial dispatch queue
+  woken by a `DISPATCH_SOURCE_TYPE_DATA_OR` source, Apple's coalescing
+  wake-up, in place of Convolver's own thread (`portable/request_worker.hpp`).
+  Behaviour is unchanged: the choice still plays at once, wakes that arrive
+  together run the work once, and closing the unit waits for work in
+  progress. The worker's tests (`native.request_worker` and its watchdog
+  check), `.github/workflows/watchdog.yml` and `scripts/ci_watchdog_probe.py`
+  are removed, the Linux CI jobs no longer install gdb, and CI-24 and CI-25
+  close without a cause; their evidence is archived.
 
 ### Fixed
 

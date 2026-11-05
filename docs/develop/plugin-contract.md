@@ -443,18 +443,22 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   at once ([decisions](../project/decisions.md#plug-in-behaviour): GarageBand
   starts the unit before it restores a project, so waiting for the next
   `Initialize` would leave a saved Latency unused). Only the unit's own
-  worker thread applies a choice: `SetParameter` may arrive on any thread,
-  including an audio thread, a pre-render notification or the input
-  callback inside Render, so it stores the value and wakes the worker with
-  an atomic store and notify (no allocation, lock or wait); `RestoreState`
-  wakes it too. The worker reads the settings once, builds a processor with
-  the new block size and hands it to Render through an atomic pointer, and
-  the reported latency is the installed processor's. Render marks the
-  processor it uses for the length of each call, and the worker frees the
-  replaced one, without holding the control lock, as soon as Render no
-  longer marks it, waiting at most for the rest of one render call.
-  Uninitialized, `kAudioUnitProperty_Latency` simply follows the choice. The
-  host is told of the new latency and tail from the worker thread, and the
+  serial dispatch queue applies a choice: `SetParameter` may arrive on any
+  thread, including an audio thread, a pre-render notification or the input
+  callback inside Render, so it stores the value and wakes the queue
+  through a `DISPATCH_SOURCE_TYPE_DATA_OR` source (AU-12).
+  `dispatch_source_merge_data` is an atomic OR and a lock-free wake-up that
+  does not allocate, though Apple does not document it as real-time safe;
+  wakes that arrive before the work runs coalesce into one run.
+  `RestoreState` wakes it too. The work reads the settings once, builds a
+  processor with the new block size and hands it to Render through an
+  atomic pointer, and the reported latency is the installed processor's.
+  Render marks the processor it uses for the length of each call, and the
+  work frees the replaced one, without holding the control lock, as soon as
+  Render no longer marks it, waiting at most for the rest of one render
+  call. Destroying the unit cancels the source and waits for work already
+  running. Uninitialized, `kAudioUnitProperty_Latency` simply follows the
+  choice. The host is told of the new latency and tail from the queue, and the
   log says what changed; the log line is best effort, so running out of
   memory while writing it does not undo or misreport a change. The new
   processor starts the fault count again, so the window's fault totals

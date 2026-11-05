@@ -237,7 +237,7 @@ HostReport Effect::report() {
     std::string faults;
     HostReport r;
     {
-        // A load or the Latency worker holds the lock while it prepares a
+        // A load or the Latency work holds the lock while it prepares a
         // filter, which can take a while: the window then gets the last
         // report at once rather than waiting, and rereads when the load
         // notifies (TODO AU-6). The copy is forgotten whenever what plays
@@ -372,7 +372,7 @@ OSStatus Effect::SetParameter(AudioUnitParameterID id, AudioUnitScope scope,
     store(id, value);
     AUSDK_RT_UNSAFE_END
     // Whatever thread this is (an audio thread, a render callback), the
-    // unit's worker applies a Latency (request_latency()).
+    // unit's Latency queue applies it (request_latency()).
     if (id == latency_parameter)
         request_latency();
     return noErr;

@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <dispatch/dispatch.h>
 #include <exception>
 #include <span>
 #include <thread>
@@ -49,6 +50,42 @@ bool same(const HostLayout& a, const HostLayout& b) {
 }
 } // namespace
 
+// AU-12: Apple's coalescing wake-up ("Dispatch Sources" in the Dispatch
+// documentation). Merging data into a DISPATCH_SOURCE_TYPE_DATA_OR source
+// runs its handler on the serial queue; merges made before the handler runs
+// are combined, so requests made while the work runs make it run once more,
+// not once each. Cancelling stops further runs, and the cancel handler runs
+// once a run in progress has finished, which the destructor waits for.
+struct Effect::LatencyQueue {
+    explicit LatencyQueue(Effect& e) : effect(e) {
+        dispatch_set_context(source, this);
+        dispatch_source_set_event_handler_f(
+            source, [](void* self) { static_cast<LatencyQueue*>(self)->effect.apply_latency(); });
+        dispatch_source_set_cancel_handler_f(source, [](void* self) {
+            dispatch_semaphore_signal(static_cast<LatencyQueue*>(self)->ended);
+        });
+        dispatch_activate(source);
+    }
+    LatencyQueue(const LatencyQueue&) = delete;
+    LatencyQueue& operator=(const LatencyQueue&) = delete;
+    ~LatencyQueue() {
+        dispatch_source_cancel(source);
+        dispatch_semaphore_wait(ended, DISPATCH_TIME_FOREVER);
+        dispatch_release(source);
+        dispatch_release(queue);
+        dispatch_release(ended);
+    }
+    void request() noexcept {
+        dispatch_source_merge_data(source, 1);
+    }
+
+    Effect& effect;
+    dispatch_queue_t queue =
+        dispatch_queue_create("Convolver Audio Unit Latency", DISPATCH_QUEUE_SERIAL);
+    dispatch_source_t source = dispatch_source_create(DISPATCH_SOURCE_TYPE_DATA_OR, 0, 0, queue);
+    dispatch_semaphore_t ended = dispatch_semaphore_create(0);
+};
+
 Effect::Effect(AudioComponentInstance instance)
     : AUBase(instance, 1, 1), status_(host_status(filter_, std::nullopt)), tag_(next_tag()) {
     set_host_log_sdk(CONVOLVER_SDK_DESCRIPTION); // The Convolver log names the SDK (CI-6).
@@ -61,11 +98,11 @@ Effect::Effect(AudioComponentInstance instance)
     Globals()->SetParameter(mix_parameter,
                             static_cast<AudioUnitParameterValue>(100 * defaults.mix));
     Globals()->SetParameter(latency_parameter, default_latency_index);
-    latency_worker_.start([this] { apply_latency(); });
+    latency_queue_ = std::make_unique<LatencyQueue>(*this);
 }
 
 Effect::~Effect() {
-    latency_worker_.stop();
+    latency_queue_.reset(); // Waits for Latency work already running.
 }
 
 HostLayout Effect::layout() {
@@ -250,7 +287,8 @@ void Effect::release_processor(std::unique_ptr<HostProcessor> previous) noexcept
 }
 
 void Effect::request_latency() noexcept {
-    latency_worker_.request();
+    if (latency_queue_) // Absent only before the constructor's end and in the destructor.
+        latency_queue_->request();
 }
 
 void Effect::apply_latency() noexcept {
@@ -261,7 +299,7 @@ void Effect::apply_latency() noexcept {
         std::lock_guard lock(control_);
         // The settings are read once: what is built and what is reported
         // both come from this one reading, even if the host changes the
-        // parameter meanwhile (that wakes the worker again).
+        // parameter meanwhile (that wakes the queue again).
         const auto current = settings();
         const auto chosen = current.latency;
         if (!host_) {
