@@ -126,9 +126,10 @@ Until 1.0 the C++ API may change between minor versions.
   record each audio callback (when it was due, when the thread woke, when
   the plug-in was entered and returned, and the thread's CPU time where the
   platform gives it) and print the latest wake and the longest call into the
-  plug-in. A callback late only because its thread woke late, or slow while
-  descheduled, is not judged and leaves the run not qualified rather than
-  failed. `native.load_timing_harness` tests the verdicts on made-up records
+  plug-in. A callback late only because its thread woke late is not judged
+  and leaves the run not qualified rather than failed; a slow call with
+  little CPU time is judged, since a call blocked on a lock looks the same
+  as a descheduled one. `native.load_timing_harness` tests the verdicts on made-up records
   instead of sleeping, in about 9 seconds rather than 40 to 60. Tests only:
   no change to the plug-ins or the sound.
 - Tests (AU-14, from jrp's review of `db54160`): `au.adapter` waits for the

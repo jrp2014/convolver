@@ -387,21 +387,22 @@ Callbacks summarise(const std::vector<CallbackRecord>& records, double period) {
         c.longest = std::max(c.longest, own);
         c.longest_call = std::max(c.longest_call, call);
         c.worst_wake = std::max(c.worst_wake, r.woke - r.due);
-        // Slow with little CPU time: the thread was descheduled in the call.
-        const bool descheduled = r.cpu >= 0 && r.cpu <= half && call > half;
         if (r.returned > r.due + period) {
             ++c.late;
             const double by = r.returned - (r.due + period);
             c.worst_late = std::max(c.worst_late, by);
             c.missed += static_cast<std::size_t>(std::ceil(by / period));
             // Started on time, it would have finished on time.
-            if (own <= period || descheduled)
+            if (own <= period)
                 ++c.late_scheduling;
         }
         if (call > half) {
             ++c.slow;
-            if (descheduled)
-                ++c.slow_scheduling;
+            // Little CPU time in a slow call: blocked (on a lock, say) or
+            // descheduled; the records cannot tell which (jrp's review of
+            // 5f47ecb), so it is reported and still counts as the plug-in's.
+            if (r.cpu >= 0 && r.cpu <= half)
+                ++c.slow_off_cpu;
         }
     }
     return c;
@@ -449,17 +450,22 @@ Judged judge(const RunRecord& rec, const Limits& l) {
         }
         if (!p.audio_held) {
             callbacks_judged = true;
-            const auto own = callbacks_text(c.late - c.late_scheduling, c.slow - c.slow_scheduling);
+            auto own = callbacks_text(c.late - c.late_scheduling, c.slow);
+            if (c.slow_off_cpu)
+                own += " (" + std::to_string(c.slow_off_cpu) +
+                       (c.slow_off_cpu == 1 ? " slow call" : " slow calls") +
+                       " mostly off the CPU: blocked or descheduled, which the records cannot "
+                       "tell apart)";
             if (!own.empty() && busy)
                 noisy.push_back(own + " (a baseline was late too)");
             else if (!own.empty()) {
                 over.push_back(own);
                 callbacks_over = true;
             }
-            const auto scheduling = callbacks_text(c.late_scheduling, c.slow_scheduling);
+            const auto scheduling = callbacks_text(c.late_scheduling, 0);
             if (!scheduling.empty())
-                noisy.push_back(scheduling + " (the thread woke late or was descheduled; the "
-                                             "plug-in's own time was within the limits)");
+                noisy.push_back(scheduling + " (the thread woke late; started on time, each "
+                                             "would have finished on time)");
         }
         std::string note;
         for (const auto& v : over) {
@@ -621,7 +627,7 @@ void write_records(std::ostream& out, const std::string& format, const Result& r
                 << ", \"dropped\": " << p.dropped << ", \"error\": " << quoted(p.error)
                 << ",\n       \"summary\": {\"count\": " << c.count << ", \"failed\": " << c.failed
                 << ", \"late\": " << c.late << ", \"late_scheduling\": " << c.late_scheduling
-                << ", \"slow\": " << c.slow << ", \"slow_scheduling\": " << c.slow_scheduling
+                << ", \"slow\": " << c.slow << ", \"slow_off_cpu\": " << c.slow_off_cpu
                 << ", \"missed\": " << c.missed << ", \"worst_late\": " << number(c.worst_late)
                 << ", \"worst_wake\": " << number(c.worst_wake)
                 << ", \"longest\": " << number(c.longest)
@@ -652,8 +658,8 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
                                   " build: timings not representative, limits reported only")
               << ")\n"
               << "held: ms the calling thread was held; late: callbacks that finished after the "
-                 "next was due; sched.: of those, late only because the thread woke late or was "
-                 "descheduled; worst: ms past the next deadline at worst; wake: the latest start, "
+                 "next was due; sched.: of those, late only because the thread woke late; worst: "
+                 "ms past the next deadline at worst; wake: the latest start, "
                  "ms after due; call: ms of the longest call into the plug-in\n";
     char header[256];
     std::snprintf(header, sizeof header, "%-5s %-5s %-14s %-11s %8s %9s %5s %6s %8s %8s %8s\n", "",

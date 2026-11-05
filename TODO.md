@@ -1326,9 +1326,12 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   records each callback (due, wake, entry into and return from the plug-in,
   and the thread's CPU time where the platform gives it), and a pure
   `judge()` gives a run's verdict from those records. A callback that missed
-  its deadline only because the thread woke late, or that was slow with
-  little CPU time (descheduled), is not the plug-in's own time: not judged, so the run is
-  not qualified rather than failed. `native.load_timing_harness` checks the
+  its deadline only because the thread woke late is not the plug-in's own
+  time: not judged, so the run is not qualified rather than failed. A slow
+  call with little CPU time was at first excused as descheduled too; after
+  jrp's review of `5f47ecb` (a call blocked on a lock in the plug-in looks
+  the same) it is judged as the plug-in's, and its note says the records
+  cannot tell blocked from descheduled. `native.load_timing_harness` checks the
   rules on made-up records (deadline missed with a fast callback, slow
   callback, loader over budget, unsuitable baseline, functional errors,
   mixed results across runs) and keeps only a few short real-thread runs:

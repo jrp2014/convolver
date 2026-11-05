@@ -567,8 +567,12 @@ left the plug-in, and the thread's CPU time in the call (not on Windows,
 whose thread times move only at the scheduler's tick). Each line gives the
 time the caller was held and, for the callbacks in that phase, how many there
 were, how many were late, how many of those were late only because of the
-thread waking late or being descheduled (`sched.`), by how much the worst was late, the latest
-wake after its due time, and the longest call into the plug-in. A phase
+thread waking late (`sched.`), by how much the worst was late, the latest
+wake after its due time, and the longest call into the plug-in. A slow call
+with little CPU time is still the plug-in's: the thread may have been
+descheduled or blocked on a lock in the plug-in, which the records cannot
+tell apart (jrp's review of `5f47ecb`), so the note says so and the
+callback is judged. A phase
 lasts a third of a second after its load, so callbacks
 do not reach a long filter's steady cost, which grows as input history fills
 (PERF-5); that cost is PERF-3's to measure.
@@ -587,7 +591,7 @@ Each run of an entry (one entry point with one filter) gets a verdict
 | Verdict | When |
 | --- | --- |
 | Failed | A load was refused, a callback failed or threw, or the instance did not then save the second filter (in every build, and not run again); or the host's thread was held over its limit, whatever the audio thread saw; or callbacks broke their limits by the plug-in's own time while both baselines were on time |
-| Not qualified | Callbacks broke their limits, but a baseline was late too, so the run's timing could not be qualified (the trailing baseline plays a loaded filter, so a late callback there shows uncertainty, not that the machine alone was busy); or they broke them only because the audio thread was scheduled late, which these measurements cannot pin on the plug-in: late although, started on time, the callback would have finished on time (the thread woke late), or slow with under half a period of CPU time (descheduled); and every run in a build that does not enforce the limits (anything but an optimised build without sanitizers, which only prints what would exceed them) |
+| Not qualified | Callbacks broke their limits, but a baseline was late too, so the run's timing could not be qualified (the trailing baseline plays a loaded filter, so a late callback there shows uncertainty, not that the machine alone was busy); or they broke them only because the audio thread woke late (late although, started on time, the callback would have finished on time), which these measurements cannot pin on the plug-in; and every run in a build that does not enforce the limits (anything but an optimised build without sanitizers, which only prints what would exceed them) |
 | Reported only | No limit applies to any of its phases: LV2's `restore()`, for which the host stops audio, and its reset (the 120 s filter's hold is reported only, but its callbacks are judged, so its entries are not) |
 | Passed | None of these |
 

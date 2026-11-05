@@ -34,9 +34,11 @@
 //   (the trailing one plays a loaded filter, so this is uncertainty, not
 //   proof of a busy machine): timing could not be qualified; or only
 //   because the audio thread woke late (started on time, the callback would
-//   have finished on time) or was descheduled (slow with little CPU time),
-//   which these measurements cannot pin on the plug-in; and every run in a build that does not
-//   enforce the limits;
+//   have finished on time), which these measurements cannot pin on the
+//   plug-in; and every run in a build that does not enforce the limits. A
+//   slow call with little CPU time still counts as the plug-in's: it may
+//   have been descheduled or blocked on a lock, which the records cannot
+//   tell apart (jrp's review of 5f47ecb), so it is reported as such;
 // - reported only: no limit applies to any of its phases;
 // - passed: none of these.
 // An entry that did not pass runs again, up to three times, as a shared
@@ -146,13 +148,14 @@ struct CallbackRecord {
 
 // What the audio thread saw in one phase, from its records. A callback is
 // late when it returns after the next one was due, and slow when the call
-// takes more than half its period. Some are not the plug-in's own time: late although it would have
-// been on time had it started on time (the thread woke late), or slow while the thread had little
-// CPU time (it was descheduled).
+// takes more than half its period. A late callback is not the plug-in's own
+// time if it would have been on time had it started on time (the thread
+// woke late). A slow call with little CPU time is counted apart, but is
+// still the plug-in's: blocked or descheduled, the records cannot tell.
 struct Callbacks {
     std::size_t count = 0, failed = 0;
-    std::size_t late = 0, late_scheduling = 0; // Of late: woke late or descheduled.
-    std::size_t slow = 0, slow_scheduling = 0; // Of slow: descheduled.
+    std::size_t late = 0, late_scheduling = 0; // Of late: the thread woke late.
+    std::size_t slow = 0, slow_off_cpu = 0;    // Of slow: under half a period of CPU time.
     std::size_t missed = 0;                    // Deadlines that passed while a late callback ran.
     double worst_late = 0;                     // Seconds past the next deadline, at worst.
     double worst_wake = 0;                     // Seconds from due to the start, at worst.
@@ -212,8 +215,8 @@ struct Limits {
 // PERF-12: a run's verdict from its records alone, without timing anything
 // (see Run): errors fail it; a hold over the limit fails it whatever the
 // audio thread saw; late or slow callbacks that are the plug-in's fail it
-// while both baselines were on time, and are not judged otherwise; late or
-// slow callbacks that are not the plug-in's own time are not judged. `notes` has a line
+// while both baselines were on time, and are not judged otherwise; late
+// callbacks only because the thread woke late are not judged. `notes` has a line
 // for each phase, empty where there is nothing to say.
 struct Judged {
     Run run;

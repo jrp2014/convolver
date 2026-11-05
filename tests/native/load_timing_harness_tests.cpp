@@ -211,7 +211,7 @@ void summaries() {
         {0.01, 0.010, 0.010, 0.0450, -1, true},    // The plug-in's: late by 25 ms, 3 deadlines.
         {0.05, 0.062, 0.062, 0.0625, -1, true},    // Woke 12 ms late, fast: scheduling.
         {0.07, 0.070, 0.070, 0.0760, -1, true},    // Slow: 6 ms of a 10 ms period.
-        {0.08, 0.080, 0.080, 0.0860, 0.001, true}, // As long, 1 ms of CPU: descheduled.
+        {0.08, 0.080, 0.080, 0.0860, 0.001, true}, // As long, 1 ms of CPU: off the CPU.
         {0.09, 0.090, 0.090, 0.0905, -1, false},   // Failed.
     };
     const auto c = timing::summarise(v, period);
@@ -219,9 +219,9 @@ void summaries() {
     check(c.count == 6 && c.failed == 1, "summary: count and failures");
     check(c.late == 2 && c.late_scheduling == 1, "summary: two late, one of them scheduling");
     check(c.missed == 3 + 1, "summary: deadlines missed " + std::to_string(c.missed));
-    check(c.slow == 3 && c.slow_scheduling == 1, "summary: three slow (" + std::to_string(c.slow) +
-                                                     "), one descheduled (" +
-                                                     std::to_string(c.slow_scheduling) + ")");
+    check(c.slow == 3 && c.slow_off_cpu == 1, "summary: three slow (" + std::to_string(c.slow) +
+                                                  "), one mostly off the CPU (" +
+                                                  std::to_string(c.slow_off_cpu) + ")");
     check(near(c.worst_late, 0.025) && near(c.worst_wake, 0.012) && near(c.longest, 0.035) &&
               near(c.longest_call, 0.035),
           "summary: worst late, wake, longest");
@@ -242,7 +242,7 @@ void records() {
         s.loading = steady(30, 0.012);
         const auto r = judged(s);
         check(r.verdict == timing::Verdict::not_qualified && r.hold == timing::Verdict::passed &&
-                  says(r, "woke late or was descheduled"),
+                  says(r, "the thread woke late"),
               "late wake, fast callback: " + text(r));
     }
     {
@@ -255,11 +255,21 @@ void records() {
               "slow callback: " + text(r));
     }
     {
-        // As long, with little CPU time: descheduled, not the plug-in's.
+        // As long, with little CPU time: blocked on a lock inside the plug-in
+        // or descheduled, which the records cannot tell apart (jrp's review
+        // of 5f47ecb). It is the plug-in's, so it fails, and says so.
         Spec s;
         s.loading = steady(30, 0, 0.006, 0.001);
-        const auto r = judged(s);
-        check(r.verdict == timing::Verdict::not_qualified, "descheduled callback: " + text(r));
+        auto r = judged(s);
+        check(r.verdict == timing::Verdict::failed && r.callbacks == timing::Verdict::failed &&
+                  says(r, "mostly off the CPU: blocked or descheduled"),
+              "slow callback with little CPU time: " + text(r));
+        // A callback blocked past the next deadline, with almost no CPU time.
+        s.loading = steady(30, 0, 0.025, 0.0001);
+        r = judged(s);
+        check(r.verdict == timing::Verdict::failed && says(r, "late callback") &&
+                  says(r, "mostly off the CPU"),
+              "blocked callback: " + text(r));
     }
     {
         // Late by its own time: started on time, it still ends past the next deadline.
