@@ -246,9 +246,8 @@ Shared work, done once for all three formats:
   ([what a package holds](docs/develop/releasing.md#what-a-package-holds)).
   Still needed for the first preview, all outside the pipeline: HOST-1 and
   AU-4 from one exact candidate, REL-3's walkthrough of its files, and jrp's
-  publication. Open question for jrp: Steinberg's guidelines say the logo
-  *should* appear in an About box or equivalent; Convolver's window has
-  none, so for now the notice is in the bundle's credits only. Later: LV2 in
+  publication. The logo in the window (an About box) is follow-up work,
+  PLUG-20, not needed for the preview. Later: LV2 in
   a later preview (LV2-5), and Developer ID signing, notarization and
   Authenticode at the production gate (REL-1).
 - [ ] **PLUG-9 — Editor report and loading from a file.** Phase 1 of the
@@ -316,6 +315,16 @@ Shared work, done once for all three formats:
 
 LV2 (Linux first; also PipeWire system audio):
 
+- [ ] **PLUG-20 — The VST logo in the window (optional).** Steinberg's usage
+  guidelines say the VST Compatible logo *should* appear in an About box or
+  equivalent; where there is no room, the attribution notice is enough.
+  Convolver's window has no About box, so the preview carries the notice in
+  the VST3 bundle's credits (`NOTICE.txt`) and the macOS installer text, and
+  the logo in every packaged guide (PLUG-5,
+  [trademarks](packaging/trademarks/README.md)). jrp, 5 November 2026: keep
+  it as follow-up work after the preview. Done when the macOS window (shared
+  by VST3 and the Audio Unit) shows the logo and notice somewhere a user can
+  find them, without crowding the settings, and its tests cover it.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
