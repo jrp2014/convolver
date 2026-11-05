@@ -1359,7 +1359,7 @@ void latency_queue_lifetime() {
     }
 }
 
-// PLUG-20 (jrp's reviews of db54160 and 5f47ecb): the Latency work held at
+// PLUG-21 (jrp's reviews of db54160 and 5f47ecb): the Latency work held at
 // the start of a run (au::latency_started_for_tests) for one chosen unit,
 // rather than left to chance as above. A watchdog stops the test, naming the
 // step, if one never finishes.

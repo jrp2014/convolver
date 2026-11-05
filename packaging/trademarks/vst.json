@@ -1,0 +1,16 @@
+{
+  "about": "The one source of Convolver's VST trademark wording (PLUG-5). scripts/trademarks.py writes it into the README, the user guides that mention VST and the installer text, and checks them; CMake writes it into the VST3 bundle's NOTICE.txt. See README.md beside this file.",
+  "support": "Convolver supports VST® 3.",
+  "notice": "VST is a registered trademark of Steinberg Media Technologies GmbH.",
+  "logo": {
+    "file": "docs/use/images/VST_Compatible_Logo_Steinberg.png",
+    "alt": "VST Compatible logo",
+    "width": 120,
+    "sha256": "54a3ff4b89dd3e63be1a51772c531008258f02a0b61fbe428c8285d83dc08a83",
+    "upstream": "https://github.com/steinbergmedia/vst3_doc",
+    "path": "artwork/VST_Compatible_Logo_Steinberg.png",
+    "tag": "v3.8.1_build_84",
+    "revision": "8bfca19d3b76a61d093951ba9297047f544caea1"
+  },
+  "guidelines": "https://steinbergmedia.github.io/vst3_dev_portal/pages/VST%2B3%2BLicensing/Usage%2Bguidelines.html"
+}

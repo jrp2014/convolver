@@ -79,7 +79,7 @@ inline int latency_queue_failure_for_tests = 0;
 // set it only while no unit is open.
 inline void (*latency_progress_for_tests)(AudioComponentInstance unit, std::uint64_t requested,
                                           std::uint64_t done) noexcept = nullptr;
-// For the tests only (PLUG-20): when set, each run of a unit's Latency work
+// For the tests only (PLUG-21): when set, each run of a unit's Latency work
 // calls it first, on the work's queue, so that au.adapter can hold a run;
 // and closing a unit calls the second once it has cancelled the work and
 // before it waits for a run in progress, so that the test releases a held

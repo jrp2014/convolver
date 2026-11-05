@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import platform
 import subprocess
 import sys
 import tempfile
@@ -11,11 +12,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts/release'))
 from build_dependencies import add_jobs_option, parallel
 from build_dependencies import build as build_dependencies
-from contract import load_policy, sha256, with_records
+from contract import load_policy, sha256, system_formats, with_records
 from sources import extract
 
 
-def run(source, sdk, prefix, backend, cmake, *, exclude_validator=False, license_dir=None, jobs=None):
+def run(source, sdk, prefix, backend, cmake, *, exclude_validator=False, license_dir=None, au_sdk=None, jobs=None):
     with tempfile.TemporaryDirectory(prefix='convolver-source-build-') as temporary:
         build = Path(temporary) / 'build'
         configure = [
@@ -33,6 +34,9 @@ def run(source, sdk, prefix, backend, cmake, *, exclude_validator=False, license
             '-DFETCHCONTENT_FULLY_DISCONNECTED=ON',
             '-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0',
         ]
+        if au_sdk:
+            # AU-5: the macOS packages hold the Audio Unit too.
+            configure += ['-DCONVOLVER_BUILD_AU=ON', '-DCONVOLVER_AU_SDK=' + str(au_sdk)]
         if license_dir:
             configure += ['-DCONVOLVER_PACKAGE_PLUGINS=ON', '-DCONVOLVER_DISTRIBUTION_LICENSE_DIR=' + str(license_dir)]
         if exclude_validator:
@@ -70,6 +74,7 @@ if __name__ == '__main__':
         default='AUTO',
         help='CONVOLVER_FFT_BACKEND; AUTO is Ooura, or Accelerate on macOS, for plug-in builds',
     )
+    parser.add_argument('--au-sdk', type=Path, help='AudioUnitSDK, to build the Audio Unit too (macOS)')
     parser.add_argument('--cmake', default='cmake')
     parser.add_argument('--exclude-validator', action='store_true')
     add_jobs_option(parser)
@@ -92,9 +97,19 @@ if __name__ == '__main__':
                 load_policy(source / 'convolver/packaging/release-policy.json'), manifest['dependencies']
             )
             work = root / 'dependencies-build'
+            # The plug-ins this system's packages hold: VST3, and on macOS the Audio Unit.
+            formats = system_formats(policy, platform.system())
             sdk, prefix = build_dependencies(
-                policy, source / 'dependencies', work, args.cmake, fetch=False, backend=args.backend, jobs=args.jobs
+                policy,
+                source / 'dependencies',
+                work,
+                args.cmake,
+                fetch=False,
+                backend=args.backend,
+                formats=formats,
+                jobs=args.jobs,
             )
+            au_sdk = work / 'sources' / policy['dependencies']['audiounitsdk']['directory'] if 'au' in formats else None
             run(
                 source / 'convolver',
                 sdk,
@@ -103,6 +118,7 @@ if __name__ == '__main__':
                 args.cmake,
                 exclude_validator=args.exclude_validator,
                 license_dir=work / 'licenses',
+                au_sdk=au_sdk,
                 jobs=args.jobs,
             )
     else:
@@ -115,5 +131,6 @@ if __name__ == '__main__':
             args.backend,
             args.cmake,
             exclude_validator=args.exclude_validator,
+            au_sdk=args.au_sdk,
             jobs=args.jobs,
         )

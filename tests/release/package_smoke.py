@@ -2,13 +2,21 @@
 """Check a staged distribution after relocation; optionally run SDK tools."""
 
 import argparse
+import hashlib
 import json
 import platform
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'scripts'))
+import trademarks  # noqa: E402
+
+COMPONENT = 'Components/Convolver.component'
 
 
 def staged_tool(root, name):
@@ -17,6 +25,56 @@ def staged_tool(root, name):
         tool = tool.with_suffix('.exe')
     assert tool.is_file(), f'missing staged tool: bin/{name}'
     return tool
+
+
+def check_trademarks(root):
+    """PLUG-5: the VST trademark wording and the unmodified VST Compatible
+    logo, from packaging/trademarks/vst.json, in the plug-in's credits and in
+    every packaged guide that mentions VST, with each logo link resolving
+    inside the package."""
+    wording = trademarks.load(ROOT)
+    logo = root / wording['logo']['file']
+    assert logo.is_file(), f'missing packaged logo: {wording["logo"]["file"]}'
+    assert hashlib.sha256(logo.read_bytes()).hexdigest() == wording['logo']['sha256'], 'packaged logo differs'
+    notice = (root / 'VST3/Convolver.vst3/Contents/Resources/NOTICE.txt').read_text(encoding='utf-8')
+    assert wording['support'] in notice and wording['notice'] in notice, 'plug-in credits lack the VST wording'
+    marked = 0
+    for page in sorted((root / 'docs/use').glob('*.md')):
+        text = page.read_text(encoding='utf-8')
+        first = trademarks.first_mention_marked(trademarks.prose(text))
+        if first is None:
+            continue
+        name = page.relative_to(root).as_posix()
+        assert first, f'{name}: first mention of VST without ®'
+        assert trademarks.block(wording, name) in text, f'{name}: no VST trademark block'
+        for source in re.findall(r'<img\s[^>]*?src="([^"]+)"', text):
+            assert (page.parent / source).is_file(), f'{name}: image {source} is not in the package'
+        marked += 1
+    assert marked >= 2, 'expected the VST notice in several packaged guides'
+
+
+def check_audio_unit(root):
+    """AU-5: macOS packages hold the signed component, as au.bundle checks
+    a build's (identities, version, one exported symbol, macOS libraries
+    only, licence notices, signature); other packages hold none."""
+    if platform.system() != 'Darwin':
+        assert not (root / 'Components').exists(), 'Audio Unit outside a macOS package'
+        return
+    component = root / COMPONENT
+    assert component.is_dir(), f'missing staged distribution content: {COMPONENT}'
+    subprocess.run(['codesign', '--verify', '--deep', '--strict', str(component)], check=True)
+    version = (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
+    subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / 'tests/au/bundle_tests.py'),
+            str(ROOT / 'plugins/identities.json'),
+            str(component),
+            version,
+            'system-only',
+        ],
+        check=True,
+    )
 
 
 def check(root, validator=None, probe=None):
@@ -29,12 +87,16 @@ def check(root, validator=None, probe=None):
         'docs/use/first-sound-in-a-host.md',
         'docs/use/presets.md',
         'docs/use/equalizer-apo.md',
+        'docs/use/images/VST_Compatible_Logo_Steinberg.png',
+        'VST3/Convolver.vst3/Contents/Resources/NOTICE.txt',
         'licenses/Convolver.txt',
         'VERSION.txt',
     ):
         assert (root / name).exists(), f'missing staged distribution content: {name}'
     if platform.system() == 'Darwin':
         subprocess.run(['codesign', '--verify', '--deep', '--strict', str(root / 'VST3/Convolver.vst3')], check=True)
+    check_audio_unit(root)
+    check_trademarks(root)
     cli, tool, exporter = (
         staged_tool(root, name) for name in ('convolver', 'convolver-preset', 'convolver-equalizer-apo')
     )
@@ -131,6 +193,7 @@ def check(root, validator=None, probe=None):
             subprocess.run(
                 ['codesign', '--verify', '--deep', '--strict', str(relocated / 'VST3/Convolver.vst3')], check=True
             )
+            subprocess.run(['codesign', '--verify', '--deep', '--strict', str(relocated / COMPONENT)], check=True)
         if validator:
             subprocess.run(
                 [

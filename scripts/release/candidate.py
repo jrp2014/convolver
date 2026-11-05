@@ -93,6 +93,9 @@ def build(archive, identifier, work, output, cmake, nsis=None, jobs=None):
     if platform.system() != candidate['os']:
         raise ValueError('candidate must be built on its target OS')
     deps = work / 'deps'
+    # The plug-in formats this platform ships (the policy's "formats"): VST3
+    # everywhere, and the Audio Unit on macOS (AU-5).
+    formats = candidate['formats']
     sdk, prefix = build_dependencies(
         policy,
         bundle / 'dependencies',
@@ -100,6 +103,7 @@ def build(archive, identifier, work, output, cmake, nsis=None, jobs=None):
         cmake,
         architecture=candidate['architecture'] if platform.system() == 'Darwin' else None,
         backend=candidate['backend'],
+        formats=formats,
         jobs=jobs,
     )
     build_dir = work / 'build'
@@ -124,6 +128,11 @@ def build(archive, identifier, work, output, cmake, nsis=None, jobs=None):
         # Everything comes from the archive; nothing may be downloaded.
         '-DFETCHCONTENT_FULLY_DISCONNECTED=ON',
     ]
+    if 'au' in formats:
+        # The Audio Unit reads filter files with AudioToolbox and uses
+        # Accelerate (the defaults), so it links nothing beyond macOS.
+        au_sdk = deps / 'sources' / policy['dependencies']['audiounitsdk']['directory']
+        configure += ['-DCONVOLVER_BUILD_AU=ON', '-DCONVOLVER_AU_SDK=' + str(au_sdk)]
     # Linux keeps CMake's default generator (Unix Makefiles), which someone
     # building the corresponding source gets; macOS uses Ninja, so the
     # candidates cover both (CI-10).
@@ -253,6 +262,23 @@ def build(archive, identifier, work, output, cmake, nsis=None, jobs=None):
                 generated / 'Convolver-vst3.pkg',
             ]
         )
+        if 'au' in formats:
+            run(
+                [
+                    'pkgbuild',
+                    '--root',
+                    generated / 'au-payload',
+                    '--component-plist',
+                    generated / 'au-component.plist',
+                    '--identifier',
+                    identities['au_package_id'],
+                    '--version',
+                    policy['version'],
+                    '--install-location',
+                    '/Library/Audio/Plug-Ins/Components',
+                    generated / 'Convolver-au.pkg',
+                ]
+            )
         run(
             [
                 'pkgbuild',
@@ -289,6 +315,7 @@ def build(archive, identifier, work, output, cmake, nsis=None, jobs=None):
     record = {
         'id': identifier,
         'artifact': zip_path.name,
+        'formats': formats,
         'source_commit': manifest['source_commit'],
         'source': source_archive.name,
         'notices': True,

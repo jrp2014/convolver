@@ -195,7 +195,7 @@ class Plugin {
     void pause_at(lv2::WorkerPoint point);
     void wait_until_paused();
     void resume();
-    // PLUG-20: returns once deactivate() has found work() holding the
+    // PLUG-21: returns once deactivate() has found work() holding the
     // plug-in's lock and is waiting for it (WorkerPoint::deactivate_waits).
     void wait_until_deactivation_waits();
     std::size_t responses_delivered() const {

@@ -63,7 +63,7 @@ enum class WorkerPoint : int {
     prepared = 1, // The new filter is prepared; the final generation check is next.
     checked = 2,  // The final check passed; publication is next.
     read = 3,     // The file was read (or failed to read); nothing is recorded yet.
-    // Not a pause (PLUG-20): deactivate() found the control lock held (work()
+    // Not a pause (PLUG-21): deactivate() found the control lock held (work()
     // in progress) and is about to wait for it. Called without the lock; the
     // hook must return at once.
     deactivate_waits = 4,

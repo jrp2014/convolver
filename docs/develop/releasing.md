@@ -18,6 +18,7 @@ publishing, jrp tells the people who already use the `.cfg` format where to
 find it.
 
 Contents: [candidates](#candidates) ·
+[what a package holds](#what-a-package-holds) ·
 [responsiveness qualification](#responsiveness-qualification) ·
 [publishing an unsigned preview](#publishing-an-unsigned-preview) ·
 [after publishing](#after-publishing-make-it-findable) ·
@@ -49,14 +50,57 @@ build, runtime dependency inventory, source commit, source-archive checksum and
 file hashes. The CI logs and artifact manifests are the authoritative record.
 The source bundle holds the SDK, FFTW and libsndfile sources it was built from
 (its `source-manifest.json` records each release, commit and checksum), the
-build materials and notices, and rebuilds without fetching anything. The
-candidate record names the NSIS release that made the Windows installer.
+build materials and notices, and rebuilds without fetching anything; it holds
+every SDK in the policy, AudioUnitSDK included, whichever packages use it. The
+candidate record names the NSIS release that made the Windows installer, and
+the plug-in formats its package holds (the policy's `formats`).
+
+### What a package holds
+
+Every package holds the VST® 3 plug-in (`VST3/Convolver.vst3`), the tools in
+`bin/` (`convolver`, `convolver-preset`, `convolver-equalizer-apo`), the
+example presets in `presets/`, the first-use examples in `examples/first-use/`,
+every user guide in `docs/use/` with its images in `docs/use/images/`, licence
+notices in `licenses/` and `VERSION.txt`. The two macOS packages also hold the
+Audio Unit, `Components/Convolver.component` (AU-5), with its own notices
+inside it and in `licenses/` (`Convolver-AU.txt`, `GPL-3.0.txt`,
+`audiounitsdk.txt`). LV2 joins a later preview.
+
+The macOS installer (`…-unsigned.pkg`) has three packages, each with a
+permanent receipt identity in
+[`identities.json`](../../plugins/identities.json): the VST3 plug-in into
+`/Library/Audio/Plug-Ins/VST3`, the Audio Unit into
+`/Library/Audio/Plug-Ins/Components`, and everything else, with
+`uninstall.sh`, into `/Library/Application Support/Convolver`. The Windows
+installer (`…-unsigned-setup.exe`) puts the plug-in in the all-users VST3
+folder and the rest in the folder chosen.
+
+The VST trademark wording jrp approved, and Steinberg's VST Compatible logo,
+are in the README, every packaged guide that mentions VST, the VST3 bundle's
+`Contents/Resources/NOTICE.txt` and the macOS installer's text; their one
+source and the rules are in [trademarks](../../packaging/trademarks/README.md).
+
+What the candidates check automatically, on the runner that built each one:
+
+| Check | What it shows |
+| --- | --- |
+| `release.stage` and `package_smoke.py` (staged, then after the ZIP is unpacked into a folder with spaces and `ü`) | Every file above is present; the tools run from the moved folder and reproduce the shipped presets and first-use renders; the VST3 validator and probe load each example preset; on macOS both bundles' signatures hold and the component passes `au.bundle`'s checks (identities, version, one exported symbol, macOS libraries only, notices); the logo is Steinberg's file and each guide that mentions VST shows it from inside the package; the plug-in's credits carry the wording |
+| `verify_artifact.py` | The file inventory and checksums, the architecture, macOS 14 or glibc 2.35 as the floor, no libraries beyond the system's in any binary (the component's included), the corresponding-source archive, and the required notices for the platform's formats |
+| `symbols.py` | Each packaged binary's [debugging symbols](#debugging-symbols) match it |
+| `macos_installer.py` (macOS only) | The `.pkg` installs exactly the ZIP's files in the places above, byte for byte, with three receipts; the installed bundles' signatures hold; the installed Audio Unit passes `au.bundle`'s checks and `auval -strict`, which also lists its window; the installed CLI runs; `uninstall.sh` removes every installed file |
+| `windows_installer.py` (Windows only) | Upgrade and locked-file recovery of the NSIS installer |
+
+These are package checks on CI runners. They do not replace a clean
+installation from a download on a Mac or PC that never had Convolver (with
+the quarantine and SmartScreen warnings a user meets), the named-host smoke
+tests (HOST-1, AU-4) or the independent walkthrough (REL-3).
 
 ### Debugging symbols
 
 Each candidate also uploads `symbols-<platform>`: the debugging symbols of the
-packaged binaries (the VST3 plug-in, `convolver-preset` and
-`convolver-equalizer-apo`), kept outside the package and its inventory
+packaged binaries (the VST3 plug-in, the Audio Unit on macOS, the `convolver`
+CLI, `convolver-preset` and `convolver-equalizer-apo`), kept outside the
+package and its inventory
 (DIAG-1, jrp's review of 24 October 2026). The candidate build sets
 `CONVOLVER_DEBUG_SYMBOLS` ([build options](build.md#build-options)): Release
 code is compiled with debug information, which does not change the generated
@@ -66,7 +110,10 @@ package, `candidate.py` checks each packaged binary against its symbols
 the symbols must exist, hold debugging information and carry the binary's
 identity in the table below. It fails, naming each problem, if any binary's
 symbols are missing, empty, without debugging information or from another
-build. The artifact's `README.txt` lists the identity of each file.
+build. The artifact's `README.txt` lists the identity of each file. Both
+plug-ins' executables are called `Convolver`, so the Audio Unit's symbols are
+`Convolver-au.dSYM` (its DWARF file inside is still `Convolver`) and the
+VST3 plug-in's `Convolver.dSYM`; the CLI's are `convolver-cli.*`.
 
 | Platform | Symbols | Matched by | Debugging information checked |
 | --- | --- | --- | --- |
@@ -82,8 +129,8 @@ address> <addresses>`, or let the crash reporter find it by UUID; on Linux, use
 `gdb -s <file>.debug -e <binary>` or `eu-addr2line -e <file>.debug`; on
 Windows, add the folder to the debugger's symbol path.
 
-Which formats a package contains is decided by PLUG-5 in [TODO](../../TODO.md);
-where each dependency comes from is in
+Which formats a package contains is the `formats` of each platform in the
+release policy (above); where each dependency comes from is in
 [`release-policy.json`](../../packaging/release-policy.json), and how builds
 choose and record releases in [build from source](build.md#supporting-libraries).
 
@@ -238,10 +285,14 @@ and `sign-windows.ps1`.
 Convolver, and FFTW when a build selects it, are GPL-2.0-or-later; the Audio
 Unit is distributed under GPL-3.0-or-later because of AudioUnitSDK's Apache-2.0
 licence ([Audio Unit licence](../use/plugins.md#audio-unit-licence));
-libsndfile is LGPL-2.1-or-later; the VST3 SDK is MIT; the built-in Ooura
+libsndfile is LGPL-2.1-or-later; the VST3 SDK is MIT; AudioUnitSDK is
+Apache-2.0 (`licenses/audiounitsdk.txt` in macOS packages); the built-in Ooura
 FFT has a permissive notice, shipped as `licenses/Ooura.txt`. Packages include
 the upstream author and licence files, and FFTW's notice only in builds that use
-it.
+it. The VST Compatible logo is Steinberg's, from the VST 3 SDK's documentation
+(MIT), used under Steinberg's
+[usage guidelines](https://steinbergmedia.github.io/vst3_dev_portal/pages/VST%2B3%2BLicensing/Usage%2Bguidelines.html)
+([trademarks](../../packaging/trademarks/README.md)).
 
 Preview libraries are static and libsndfile's optional codecs are disabled. The
 complete source and build scripts allow rebuilding and relinking with modified

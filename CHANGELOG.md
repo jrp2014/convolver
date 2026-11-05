@@ -33,6 +33,26 @@ Until 1.0 the C++ API may change between minor versions.
   audio that started late starts at time zero, as the guide warns. It runs
   where CMake finds `ffmpeg` and `ffprobe`; the Linux g++ Release CI job
   installs them.
+- macOS preview packages (AU-5, PLUG-5) hold the Audio Unit,
+  `Components/Convolver.component`, beside the VST3 plug-in, with its
+  licence notices in `licenses/` (`Convolver-AU.txt`, `GPL-3.0.txt`,
+  `audiounitsdk.txt`). The macOS installer has a third package that puts it
+  in `/Library/Audio/Plug-Ins/Components` (receipt
+  `io.github.jrp2014.convolver.pkg.au`), and `uninstall.sh` removes it. The
+  candidates keep its debugging symbols as `Convolver-au.dSYM`, require it
+  in `verify_artifact.py`, `release.stage` and the promotion gate, and on
+  each macOS runner install the `.pkg`, check every installed path and
+  signature, and run `auval -strict` on the installed component.
+- The VST trademark notice (PLUG-5), in the wording jrp approved: ® on the
+  first mention of VST, "Convolver supports VST® 3." and "VST is a
+  registered trademark of Steinberg Media Technologies GmbH.", with
+  Steinberg's unmodified VST Compatible logo, in the README, every user guide
+  that mentions VST, the VST3 bundle's new `Contents/Resources/NOTICE.txt`
+  (its credits) and the macOS installer's text. One source,
+  `packaging/trademarks/vst.json`; `scripts/trademarks.py` checks it in
+  pre-commit and writes the guides' closing block with `--fix`. Packages ship
+  `docs/use/images/`, and `package_docs.py` refuses an image a packaged
+  guide could not show offline.
 
 - Tests (PERF-9): `vst3.load_timing`, `au.load_timing` and `lv2.load_timing`
   time each plug-in format's own load entry points (VST3 `setState` and the
@@ -155,7 +175,7 @@ Until 1.0 the C++ API may change between minor versions.
   filter's full cost, and shows half a second of each filter at that cost
   (reported only). Not in CI (filling takes minutes). Tests only; no change
   to the sound.
-- Tests (PLUG-20, from jrp's review of `db54160`): teardown is tested at
+- Tests (PLUG-21, from jrp's review of `db54160`): teardown is tested at
   chosen stages instead of by repetition. `lv2.adapter` holds the worker's
   `work()` after reading the file, after preparation and after its last
   check, deactivates or closes the instance from another thread, and

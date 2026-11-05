@@ -809,7 +809,7 @@ Five CTest tests run when the adapter is built (label `au`):
   the unit it changed; a second unit's finished work does not count, which
   a two-unit case checks with the first unit's run held. The wait's 10 s
   deadline only catches a deadlock. Closing the unit is also tested at
-  chosen stages (PLUG-20): a run of the Latency work is held at its start
+  chosen stages (PLUG-21): a run of the Latency work is held at its start
   through `latency_started_for_tests`, alone and with another change queued
   behind it, while another thread closes the unit; the run is released only
   once closing has cancelled the work and is about to wait for it
@@ -911,7 +911,7 @@ AU-4.
   preparation and after its last check while a newer request arrives, and a
   failed read overtaken the same way; restore with an answer outstanding;
   teardown with work queued; deactivation and teardown at each pause point
-  (PLUG-20: `work()` held after reading, after preparation and after its
+  (PLUG-21: `work()` held after reading, after preparation and after its
   last check while another thread deactivates, and released only once
   `deactivate()` has signalled, through the same test-only extension, that
   it found `work()` holding the lock and is waiting; reactivated,
@@ -1168,7 +1168,14 @@ examples (`convolver`, `convolver-preset` and `convolver-equalizer-apo` from a
 relocated copy, never replacing existing outputs), a render of each packaged
 first-use example by the packaged `convolver` that `--compare` must match with
 its `expected.wav`, the shipped first-use presets against the converter's
-output, and real SDK validation. Windows also compiles a fixture installer and exercises
+output, the VST trademark materials (Steinberg's logo file, the block in each
+packaged guide that mentions VST, the VST3 bundle's `NOTICE.txt`), and real
+SDK validation. The macOS candidates also build and package the Audio Unit:
+`package_smoke.py` runs `au.bundle`'s checks on the packaged component, and
+`macos_installer.py` installs the `.pkg` on the runner, compares every
+installed file with the ZIP, verifies both installed bundles' signatures,
+runs `auval -strict` on the installed component and uninstalls it
+([what a package holds](releasing.md#what-a-package-holds)). Windows also compiles a fixture installer and exercises
 changed-directory upgrades and locked-file uninstall recovery. The Linux
 candidate is built with networking disabled, from the archive alone, with
 CMake's default generator (Unix Makefiles). Until 27 October 2026 the
@@ -1360,7 +1367,7 @@ workflow. Anything else in the same pull request runs everything.
 | Files changed | Workflows that build and test |
 | --- | --- |
 | `plugins/vst3/`, `tests/vst3/` | VST3 and the [candidates](#plug-in-candidate-checks), which build and package the VST3 plug-in |
-| `plugins/au/`, `tests/au/` | Audio Unit |
+| `plugins/au/`, `tests/au/` | Audio Unit and the [candidates](#plug-in-candidate-checks), which package the Audio Unit on macOS |
 | `plugins/lv2/`, `tests/lv2/` | LV2 |
 | `plugins/editor/mac/` (the macOS window, CI-26) | VST3, Audio Unit and the candidates: only those builds compile it, and their `editor_tests.mm` test it |
 | `.github/workflows/NAME.yml` | that workflow |

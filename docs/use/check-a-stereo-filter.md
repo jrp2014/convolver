@@ -7,7 +7,7 @@ You will install the package, render the stereo example through the plug-in,
 check the result with a command, save and reopen the project, and see what
 happens when a preset does not fit.
 
-**In short:** check the package's checksum, install the VST3 plug-in, load
+**In short:** check the package's checksum, install the VST® 3 plug-in, load
 `examples/first-use/stereo/filter.vstpreset` on a stereo track at 48000 Hz,
 render `input.wav` through it, and run
 `./bin/convolver --compare host-render.wav examples/first-use/stereo/expected.wav`.
@@ -146,3 +146,11 @@ so the example's WAV and `.cfg` files are not needed once it is loaded.
   [command-line reference](command-line.md#comparing-two-files).
 - To make a preset from your own filter, see
   [your first sound in a host](first-sound-in-a-host.md#make-a-preset-from-your-own-filter).
+
+<!-- VST trademark notice: written by scripts/trademarks.py from packaging/trademarks/vst.json -->
+
+<img src="images/VST_Compatible_Logo_Steinberg.png" alt="VST Compatible logo" width="120">
+
+Convolver supports VST® 3. VST is a registered trademark of Steinberg Media Technologies GmbH.
+
+<!-- End of the VST trademark notice -->

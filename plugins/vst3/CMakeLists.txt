@@ -321,6 +321,21 @@ if(CONVOLVER_BUILD_TESTS AND CONVOLVER_PACKAGE_PLUGINS)
     endif()
 endif()
 
+# The plug-in's credits (PLUG-5): NOTICE.txt in the bundle's resources, with
+# the VST trademark wording from its one source, packaging/trademarks/vst.json.
+file(READ "${PROJECT_SOURCE_DIR}/packaging/trademarks/vst.json" vst_trademarks)
+string(JSON CONVOLVER_VST_SUPPORT GET "${vst_trademarks}" support)
+string(JSON CONVOLVER_VST_NOTICE GET "${vst_trademarks}" notice)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/packaging/trademarks/vst.json")
+configure_file(NOTICE.txt.in "${CMAKE_CURRENT_BINARY_DIR}/NOTICE.txt" @ONLY)
+get_target_property(vst3_bundle convolver_vst3 SMTG_PLUGIN_PACKAGE_PATH)
+if(APPLE)
+    set(vst3_bundle "$<TARGET_BUNDLE_DIR:convolver_vst3>")
+endif()
+add_custom_command(TARGET convolver_vst3 POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_BINARY_DIR}/NOTICE.txt"
+        "${vst3_bundle}/Contents/Resources/NOTICE.txt"
+    VERBATIM)
 # Preview candidates keep the plug-in's debugging symbols outside the bundle
 # (CONVOLVER_DEBUG_SYMBOLS), before the bundle is signed below.
 convolver_keep_symbols(convolver_vst3 SDK_STRIPPED)

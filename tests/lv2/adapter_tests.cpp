@@ -55,7 +55,7 @@ void check(bool condition, const std::string& what) {
 }
 constexpr std::size_t latency = 256;
 
-// PLUG-20: waits for a step that must finish once nothing holds it back. A
+// PLUG-21: waits for a step that must finish once nothing holds it back. A
 // deadlock cannot be unwound (a thread is stuck), so the test stops at once,
 // naming the step; the watchdog is generous and is not a timing check.
 void finish_within(std::future<void>&& step, const std::string& what) {
@@ -1247,7 +1247,7 @@ void worker_loads(host::World& world, const fs::path& work) {
         // The destructor deactivates, stops the worker and cleans up.
     }
 
-    // PLUG-20 (jrp's review of db54160): deactivation and teardown at each stage
+    // PLUG-21 (jrp's review of db54160): deactivation and teardown at each stage
     // of a load, chosen by the worker's pause points rather than left to
     // chance as in the loop above. A is held at `point` while the original
     // plays; the host deactivates on another thread, and the held work is

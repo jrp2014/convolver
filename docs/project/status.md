@@ -77,7 +77,7 @@ documentation alone.
 | Equalizer APO export ([guide](../use/equalizer-apo.md)) | Yes | Yes: against a model of Equalizer APO 1.4.2, and on Windows CI in Equalizer APO's own `Benchmark.exe` (`export.equalizer_apo.runtime`) | Not yet checked on a real Windows device (HOST-4) | No; in the preview package since PR #38, not yet published |
 | VST3 plug-in ([guide](../use/plugins.md)) | Yes: 1–8 in, 1–8 out; Gain, Mix and Latency (VST3-4); the window on macOS (VST3-11), not yet on Windows or Linux | Yes: SDK validator, pluginval at strictness 10, `vst3.harness` (against the oracle and the CLI) and `vst3.adapter` on Linux, macOS and Windows; `vst3.editor` and pluginval's editor tests on macOS | None yet (HOST-1: REAPER and Audacity chosen, not yet run) | No; preview candidates are CI artifacts only |
 | LV2 plug-in ([guide](../use/plugins.md)) | Yes: adapter and layouts (LV2-1); filter files through the worker and saved paths (LV2-2) | Yes: `lv2.harness`, `lv2.adapter` and `lv2lint` on Linux | None | No; joins a later preview |
-| Audio Unit ([guide](../use/plugins.md)) | Yes, built from source: adapter, state and `.aupreset` loading (AU-1, AU-2; a named host's preset menu is checked under AU-4); Gain, Mix and Latency (AU-7); Convolver's window with Choose… and file dropping (AU-6) | Yes: `au.harness`, `au.adapter`, `au.lifecycle`, `au.editor`, `au.bundle` and `auval -strict` on macOS | GarageBand: jrp's checks of the settings (25 October 2026) and of the window up to its redesign (`bbf94c5`, 1 November) passed (DIAG-2 has since reworded its messages and moved Bypass and the diagnostics buttons, not yet seen in a host); the full smoke test, including Latency, is not yet recorded (AU-4; what was checked is under AU-6) | No; in the first preview (AU-5), not yet in the package |
+| Audio Unit ([guide](../use/plugins.md)) | Yes: adapter, state and `.aupreset` loading (AU-1, AU-2; a named host's preset menu is checked under AU-4); Gain, Mix and Latency (AU-7); Convolver's window with Choose… and file dropping (AU-6) | Yes: `au.harness`, `au.adapter`, `au.lifecycle`, `au.editor`, `au.bundle` and `auval -strict` on macOS; in each macOS candidate, `au.bundle`'s checks on the packaged component and `auval -strict` after installing the `.pkg` | GarageBand: jrp's checks of the settings (25 October 2026) and of the window up to its redesign (`bbf94c5`, 1 November) passed (DIAG-2 has since reworded its messages and moved Bypass and the diagnostics buttons, not yet seen in a host); the full smoke test, including Latency, is not yet recorded (AU-4; what was checked is under AU-6) | No; in the macOS preview packages since PR #115 (AU-5), not yet published |
 | C++ libraries ([CMake package](../develop/library.md)) | Yes | Yes: installed and source-tree consumer tests | Not applicable | Source only |
 | FFmpeg pipe ([example](../use/command-line.md#with-ffmpeg)) | Documented | Yes: `native.ffmpeg_pipe` runs the example with Ubuntu's FFmpeg in the Linux g++ Release CI job (FFMPEG-1) | Not applicable | Not applicable |
 
@@ -142,8 +142,8 @@ The first preview is cut from a 0.10.x tag.
 | The edge cases from jrp's review of 0.4.43 fixed | jrp's review | DIAG-1, ROBUST-4 | Done ([PR #72](https://github.com/jrp2014/convolver/pull/72), [PR #73](https://github.com/jrp2014/convolver/pull/73), [PR #96](https://github.com/jrp2014/convolver/pull/96)) |
 | The defects from jrp's later reviews fixed | jrp's reviews of `6920a45` and `276c7dc` | PLUG-12, ROBUST-3, PLUG-13 | Done ([PR #91](https://github.com/jrp2014/convolver/pull/91), [PR #105](https://github.com/jrp2014/convolver/pull/105)) |
 | Smoke test of VST3 in at least one named host | Proposed with the milestone; the preview gate in [releasing](../develop/releasing.md#publishing-an-unsigned-preview) | HOST-1 | Not run. Steps written for REAPER (with the window) and Audacity on jrp's Mac ([smoke tests](../develop/host-testing.md#smoke-test-in-each-first-host)) |
-| The Audio Unit validated, smoke-tested in a named host and in the package | jrp | AU-3, AU-4, AU-5 | `auval -strict` and `au.editor` run in CI. Remaining: pluginval for the component (AU-3), GarageBand's [smoke test](../develop/host-testing.md#garageband-audio-unit) (AU-4) and the component in the package (AU-5) |
-| An exact preview package: VST3, the CLI, the preset tool, examples and guides | jrp's milestone | PLUG-5 | In progress: the package holds the preset tool, the Equalizer APO export, the CLI and the first-use examples with their presets. Remaining: the VST trademark notice |
+| The Audio Unit validated, smoke-tested in a named host and in the package | jrp | AU-3, AU-4, AU-5 | `auval -strict` and `au.editor` run in CI, and the component is in both macOS candidates, where `auval -strict` runs on it after the `.pkg` installs it (AU-5, PR #115; first passed on both Macs in candidates [run 42108659224](https://github.com/jrp2014/convolver/actions/runs/42108659224)). Remaining: pluginval for the component (AU-3) and GarageBand's [smoke test](../develop/host-testing.md#garageband-audio-unit) from that candidate (AU-4) |
+| An exact preview package: VST3 (and the Audio Unit on macOS), the CLI, the preset tool, examples and guides | jrp's milestone | PLUG-5 | The candidates hold everything the preview is to ship: the VST3 plug-in, the Audio Unit on macOS, the CLI, the preset tool, the Equalizer APO export, the first-use examples with their presets, the guides, and the VST trademark notice with the logo jrp approved (PR #115); the automated package checks are in [releasing](../develop/releasing.md#what-a-package-holds) and first passed on all four platforms in candidates [run 42108659224](https://github.com/jrp2014/convolver/actions/runs/42108659224). Remaining: the named-host smoke tests (HOST-1, AU-4) and the independent walkthrough (REL-3) of one exact candidate, then jrp's publication |
 | Settings (gain, mix, latency) and a window in each VST3 build and the Audio Unit | jrp | PLUG-9, PLUG-10, VST3-3, VST3-4, VST3-11 to VST3-13, AU-6, AU-7 | In progress: both formats have Gain, Mix and Latency and share the macOS window (the Audio Unit's checked by jrp in GarageBand, VST3's not yet in a host). Remaining: the Windows and Linux VST3 windows (VST3-12, VST3-13); the gain modes, computed gains and meters (PLUG-9, PLUG-10, AU-7); the host checks listed under AU-6 and VST3-11 |
 | Journeys written as steps, with the presets they need in the package | jrp's milestone | REL-2 | In progress: the stereo journey is written ([check a stereo filter in a host](../use/check-a-stereo-filter.md)). Remaining: the 2→6 crossover and CLI journeys |
 | An independent user completes the journeys from those exact files | jrp's milestone | REL-3 | Not started; uses the candidate's files before upload |
@@ -166,18 +166,17 @@ detail.
 2. **jrp's host smoke tests** on his Mac, from the latest candidate:
    HOST-1 (VST3 in REAPER, with the window, and Audacity) and AU-4 (the
    Audio Unit in GarageBand, with Latency). They can start now.
-3. **The journeys and the package:** the 2→6 crossover and CLI journeys
-   (REL-2), the VST trademark notice (PLUG-5).
+3. **The journeys:** the 2→6 crossover and CLI journeys (REL-2). The
+   package holds everything the preview ships (PLUG-5, PR #115).
 4. **Settings, windows and the Audio Unit:** the VST3 windows on Windows and
    Linux (VST3-12, VST3-13); the gain modes, computed gains and meters
-   (PLUG-9, PLUG-10, AU-7); the Audio Unit's pluginval run and component in
-   the package (AU-3, AU-5); the remaining checks under AU-6 and VST3-11; and
+   (PLUG-9, PLUG-10, AU-7); the Audio Unit's pluginval run (AU-3); the
+   remaining checks under AU-6 and VST3-11; and
    the [loading responsiveness](../../TODO.md#loading-responsiveness) gate,
    whose timing test now runs with jrp's limits (PERF-9); on CI a 30 s
    filter holds the host's thread 28 to 154 ms, within its 250 ms limit.
-5. **jrp's decisions:** who the REL-3 tester is and the wording of the VST
-   trademark notice (PLUG-5). The LV2 version mapping (LV2-5) is needed only
-   before LV2 joins a preview.
+5. **jrp's decisions:** who the REL-3 tester is. The LV2 version mapping
+   (LV2-5) is needed only before LV2 joins a preview.
 
 jrp's review of `276c7dc` (1 November 2026): qualify this fixed feature set
 against explicit acceptance criteria before adding further conveniences or

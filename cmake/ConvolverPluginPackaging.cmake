@@ -1,11 +1,16 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Optional distribution, separate from the C++ library package and exports.
-# The package ships the CLI (PLUG-5) and the shared tools (PLUG-3 presets, HOST-4
-# Equalizer APO export). convolver-vst3-preset stays a source-build alias.
+# The package ships the VST3 plug-in, on macOS the Audio Unit too (PLUG-5,
+# AU-5), the CLI and the shared tools (PLUG-3 presets, HOST-4 Equalizer APO
+# export). convolver-vst3-preset stays a source-build alias.
 if(NOT TARGET convolver_vst3 OR NOT TARGET convolver_cli OR NOT TARGET convolver_preset_tool
    OR NOT TARGET convolver_equalizer_apo)
     message(FATAL_ERROR "CONVOLVER_PACKAGE_PLUGINS requires VST3, I/O and the CLI tools "
         "(CONVOLVER_BUILD_VST3, CONVOLVER_BUILD_IO and CONVOLVER_BUILD_CLI)")
+endif()
+if(APPLE AND NOT TARGET convolver_au)
+    message(FATAL_ERROR "CONVOLVER_PACKAGE_PLUGINS on macOS also packages the Audio Unit: add "
+        "-DCONVOLVER_BUILD_AU=ON and CONVOLVER_AU_SDK (docs/develop/build.md#audio-unit)")
 endif()
 set(convolver_packaged_tools convolver_cli convolver_preset_tool convolver_equalizer_apo)
 # CONVOLVER_DEBUG_SYMBOLS (the VST3 bundle's own CMakeLists keeps its). The
@@ -20,7 +25,11 @@ if(APPLE)
     # TARGET_BUNDLE_DIR follows the actual configuration under Ninja Multi-Config too.
     set(convolver_bundle "$<TARGET_BUNDLE_DIR:convolver_vst3>")
 endif()
-set_target_properties(convolver_vst3 ${convolver_packaged_tools} PROPERTIES
+set(convolver_packaged_plugins convolver_vst3)
+if(TARGET convolver_au)
+    list(APPEND convolver_packaged_plugins convolver_au)
+endif()
+set_target_properties(${convolver_packaged_plugins} ${convolver_packaged_tools} PROPERTIES
     SKIP_BUILD_RPATH TRUE INSTALL_RPATH "" INSTALL_RPATH_USE_LINK_PATH FALSE)
 set(CONVOLVER_DISTRIBUTION_LICENSE_DIR "" CACHE PATH "Notices produced by build_dependencies.py")
 if(CONVOLVER_DISTRIBUTION_LICENSE_DIR)
@@ -47,6 +56,17 @@ file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/release-build-info-$<CONFIG>.json" CON
 "{\n  \"version\": \"${PROJECT_VERSION}\",\n  \"source_dirty\": ${source_dirty},\n  \"source_commit\": \"${source_commit}\",\n  \"backend\": \"${fft_backend}\",\n  \"compiler\": \"${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}\",\n  \"configuration\": \"$<CONFIG>\",\n  \"flags\": \"${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}\",\n  \"runtime\": \"${CMAKE_MSVC_RUNTIME_LIBRARY}\"\n}\n")
 # The SDK supplies the whole bundle path, including configuration expressions.
 install(DIRECTORY "${convolver_bundle}" DESTINATION VST3 COMPONENT PluginDistribution USE_SOURCE_PERMISSIONS)
+if(TARGET convolver_au)
+    # The installers put Components/ in /Library/Audio/Plug-Ins/Components.
+    # The bundle is signed when it is built, and copying it keeps the signature.
+    install(DIRECTORY "$<TARGET_BUNDLE_DIR:convolver_au>" DESTINATION Components
+        COMPONENT PluginDistribution USE_SOURCE_PERMISSIONS)
+    # The component as a whole is GPL-3.0-or-later (its NOTICE.txt explains why).
+    install(FILES "${PROJECT_SOURCE_DIR}/plugins/au/NOTICE.txt" DESTINATION licenses
+        RENAME Convolver-AU.txt COMPONENT PluginDistribution)
+    install(FILES "${PROJECT_SOURCE_DIR}/plugins/au/GPL-3.0.txt" DESTINATION licenses
+        COMPONENT PluginDistribution)
+endif()
 install(TARGETS ${convolver_packaged_tools} RUNTIME DESTINATION bin COMPONENT PluginDistribution)
 set(examples_dir "${CMAKE_CURRENT_BINARY_DIR}/plugin-presets/$<CONFIG>")
 add_custom_command(OUTPUT "${examples_dir}/examples.json"
@@ -90,17 +110,22 @@ foreach(guide IN LISTS guide_sources)
     file(RELATIVE_PATH guide_path "${PROJECT_SOURCE_DIR}" "${guide}")
     list(APPEND packaged_guides "${guide_path}")
 endforeach()
+# Their images (the VST Compatible logo) ship at the same path, so the guides
+# show them offline; package_docs.py refuses an image link it cannot resolve.
+file(GLOB guide_images CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/docs/use/images/*")
 set(guides_dir "${CMAKE_CURRENT_BINARY_DIR}/packaged-docs")
 add_custom_command(OUTPUT "${guides_dir}.stamp"
     COMMAND "${CMAKE_COMMAND}" -E rm -rf "${guides_dir}"
     COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/release/package_docs.py"
         --source "${PROJECT_SOURCE_DIR}" --output "${guides_dir}" --version "${PROJECT_VERSION}"
-        --revision "${source_commit}" --stamp "${guides_dir}.stamp"
+        --revision "${source_commit}" --stamp "${guides_dir}.stamp" --packaged-dir docs/use/images
         ${packaged_guides}
-    DEPENDS ${guide_sources} "${PROJECT_SOURCE_DIR}/scripts/release/package_docs.py"
+    DEPENDS ${guide_sources} ${guide_images} "${PROJECT_SOURCE_DIR}/scripts/release/package_docs.py"
     VERBATIM)
 add_custom_target(convolver_packaged_guides ALL DEPENDS "${guides_dir}.stamp")
 install(DIRECTORY "${guides_dir}/" DESTINATION docs COMPONENT PluginDistribution)
+install(DIRECTORY "${PROJECT_SOURCE_DIR}/docs/use/images/" DESTINATION docs/use/images
+    COMPONENT PluginDistribution)
 install(FILES "${PROJECT_SOURCE_DIR}/COPYING" DESTINATION licenses RENAME Convolver.txt COMPONENT PluginDistribution)
 if(fft_backend STREQUAL "OOURA")
     # The vendored Ooura FFT's notice and provenance, which quote its licence.
@@ -128,7 +153,8 @@ if(CONVOLVER_BUILD_TESTS)
     add_dependencies(check convolver_plugin_examples convolver_first_use_presets convolver_vst3_package_probe)
     # release.stage carries the vst3 label and installs the whole distribution.
     add_dependencies(convolver_vst3_suite convolver_vst3_package_probe convolver_plugin_examples
-        convolver_first_use_presets convolver_packaged_guides ${convolver_packaged_tools})
+        convolver_first_use_presets convolver_packaged_guides ${convolver_packaged_plugins}
+        ${convolver_packaged_tools})
 endif()
 set(CPACK_PACKAGE_NAME Convolver)
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")

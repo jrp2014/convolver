@@ -581,6 +581,12 @@ ctest --preset release-vst3
 cmake --install build/presets/release-vst3 --config Release --prefix stage --component PluginDistribution
 ```
 
+On macOS the package holds the Audio Unit too (AU-5), and configuring a
+package without it stops with an error. Add `--formats vst3 au` to the
+`build_dependencies.py` command, so that it unpacks AudioUnitSDK, and add
+`-DCONVOLVER_BUILD_AU=ON -DCONVOLVER_AU_SDK="$PWD/build/deps/sources/AudioUnitSDK"`
+to the `cmake --preset` command.
+
 Use `$PWD` in PowerShell or
 absolute paths in cmd. `--latest` takes the newest release of each library
 and `--fetch` explicitly permits downloading them; `--lock FILE` instead
@@ -599,9 +605,10 @@ recorded ones again). Then
 `python3 tests/release/source_build.py --archive build/Convolver-source.tar.gz`
 rebuilds dependencies, core, tools and SDK from a fresh extraction without
 fetching, using exactly the releases its manifest records, and runs their tests (the CMake package consumers, which nothing
-shipped uses, run in native CI instead). Its `--backend` defaults to `AUTO`, as above;
-`--sdk`, `--prefix` and `--backend` also check a fresh build against an SDK and
-dependencies you supply. A failed validator remains a release blocker.
+shipped uses, run in native CI instead). It builds the plug-ins this system's
+packages hold, so on macOS the Audio Unit too. Its `--backend` defaults to `AUTO`, as above;
+`--sdk`, `--prefix` and `--backend` (and `--au-sdk` for the Audio Unit) also
+check a fresh build against SDKs and dependencies you supply. A failed validator remains a release blocker.
 
 `build_dependencies.py`, `source_build.py` and `scripts/release/candidate.py`
 build and test with every CPU, as CI does. On a machine with little memory

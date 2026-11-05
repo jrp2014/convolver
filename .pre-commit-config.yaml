@@ -84,6 +84,18 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: vst-trademark
+        name: VST trademark wording, first-mention ® and logo (PLUG-5)
+        entry: python scripts/trademarks.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: vst-trademark-tests
+        name: VST trademark checker tests
+        entry: python tests/trademarks_tests.py
+        language: python
+        pass_filenames: false
+        files: ^(scripts/trademarks\.py|tests/trademarks_tests\.py|packaging/trademarks/)
       - id: plugin-identities
         name: Permanent plug-in identities (PLUG-4 registry)
         entry: python tests/identities_tests.py
