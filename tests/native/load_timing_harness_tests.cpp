@@ -81,9 +81,13 @@ void verdict_table() {
     const std::vector<Row> rows{
         {"one clean run", {{P, P}}, P, 1, 1},
         {"stalled hold, then clean", {{F, P}, {P, P}}, P, 2, 1},
-        // macOS VST3, 5 November 2026: the later runs cannot judge callbacks,
-        // the first met them, and the second broke no limit.
-        {"stalled hold, then unjudged callbacks", {{F, P}, {P, N}}, P, 2, 1},
+        // jrp's review of cc2ebde: each limit was met in some run, but no
+        // run met both, so no run qualified.
+        {"stalled hold, then unjudged callbacks", {{F, P}, {P, N}}, N, 2, 1},
+        {"unjudged callbacks, then stalled hold", {{P, N}, {F, P}}, N, 1, 2},
+        {"stalled hold, unjudged, then clean", {{F, P}, {P, N}, {P, P}}, P, 2, 1},
+        // A limit broken with evidence and never met fails.
+        {"late callbacks, then unjudged", {{P, F}, {P, N}}, F, 1, 0},
         {"stalled hold, every baseline late", {{F, N}, {P, N}, {P, N}}, N, 2, 0},
         // Each run broke a limit with evidence: not a pass.
         {"stalled hold, then late callbacks", {{F, P}, {P, F}}, F, 2, 1},

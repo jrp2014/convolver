@@ -1286,9 +1286,10 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   exits 77 (CTest: skipped) rather than 0 when an entry did not qualify; an
   entry no limit applies to is reported only, not passed; the summary keeps
   every run that did not pass and counts passes after a run that did not;
-  across reruns the hold and the callbacks are judged separately, but an
-  entry passes only if one run broke neither, and the summary names the run
-  that met each; a test where nothing was judged (every entry reported only)
+  an entry passes only if one run met both limits (jrp's review of
+  `cc2ebde`: limits met in different runs are not qualified, or failed when
+  every run broke one), and the summary names the run that met each limit
+  for an entry that did not pass; a test where nothing was judged (every entry reported only)
   is skipped, not passed. `native.load_timing_harness` checks the verdict
   rules on made-up runs, and drives the harness with a mock adapter: slow
   loads fail, with late callbacks too (the review's reproduction); a load

@@ -33,12 +33,10 @@
 // - reported only: no limit applies to any of its phases;
 // - passed: none of these.
 // An entry that did not pass runs again, up to three times, as a shared
-// machine can stall one run; each limit is then met if one run met it, as
-// long as one run broke neither (see verdict()), and the summary keeps every
-// run that did not pass. The test exits 1 if an entry failed,
-// not_qualified_exit (CTest reports it as skipped) if one did not qualify or
-// none was judged, and 0 only when an entry passed and every other passed or
-// was reported only.
+// machine can stall one run. It passes only if one run passed, meeting both
+// limits (see verdict()), and the summary keeps every run that did not. The test exits 1 if an
+// entry failed, not_qualified_exit (CTest reports it as skipped) if one did not qualify or none was
+// judged, and 0 only when an entry passed and every other passed or was reported only.
 #pragma once
 #include "lifecycle.hpp"
 #include <chrono>
@@ -149,17 +147,17 @@ struct Result {
     std::size_t passed = 0, failed = 0, not_qualified = 0, reported_only = 0;
     std::size_t passed_after_failure = 0; // Of `passed`: an earlier run did not pass.
 };
-// An entry's verdict from its runs: failed if a run had an error; otherwise
-// each limit is met if one run met it, else failed if one run failed it,
-// else not qualified if one could not judge it, else does not apply; and
-// the two combine as for a run. A pass also needs one run that broke
-// neither limit: a run whose hold stalled once, followed by one within it
-// whose callbacks could not be judged, passes on the first run's callbacks;
-// a stalled hold in one run and late callbacks after an on-time baseline in
-// the other fail.
+// An entry's verdict from its runs (jrp, review of cc2ebde: one complete
+// qualifying run): failed if a run had an error; passed if one run passed;
+// failed if a limit was broken with evidence in one run and met in none, or
+// if every run broke a limit; reported only if no limit applied to any run;
+// otherwise not qualified. So a run whose hold stalled, followed by one
+// within the hold whose callbacks could not be judged, is not qualified,
+// although each limit was met in some run.
 Verdict verdict(std::vector<Run>::const_iterator first, std::vector<Run>::const_iterator last);
 // The attempt that first met `limit` (&Run::hold or &Run::callbacks) among
-// an entry's runs, or 0 if none did.
+// an entry's runs, or 0 if none did: the summary gives it for an entry that
+// did not pass.
 int met_on(std::vector<Run>::const_iterator first, std::vector<Run>::const_iterator last,
            Verdict Run::* limit);
 

@@ -525,8 +525,8 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
         std::snprintf(line, sizeof line, "  %-5s %-14s %s", result.runs[i].workload.c_str(),
                       result.runs[i].entry.c_str(), describe(v));
         std::cout << line << " (" << (j - i) << (j - i == 1 ? " run" : " runs");
-        if (v == Verdict::passed && j - i > 1) {
-            // Which run met each limit, as they can differ.
+        if (v != Verdict::passed && j - i > 1) {
+            // Which run met each limit, when no run met both.
             const auto a = result.runs.begin() + static_cast<std::ptrdiff_t>(i),
                        b = result.runs.begin() + static_cast<std::ptrdiff_t>(j);
             for (const auto& [name, limit] :
@@ -583,7 +583,11 @@ Verdict combine(Verdict hold, Verdict callbacks) {
 Verdict verdict(std::vector<Run>::const_iterator first, std::vector<Run>::const_iterator last) {
     if (std::any_of(first, last, [](const Run& r) { return r.error; }))
         return Verdict::failed;
-    // One limit across the runs: met if one run met it.
+    // A pass needs one complete qualifying run: one that met both limits
+    // (or met one where the other does not apply).
+    if (std::any_of(first, last, [](const Run& r) { return r.verdict == Verdict::passed; }))
+        return Verdict::passed;
+    // Otherwise each limit across the runs: met if one run met it.
     const auto across = [&](Verdict Run::* limit) {
         const auto any = [&](Verdict v) {
             return std::any_of(first, last, [&](const Run& r) { return r.*limit == v; });
@@ -593,16 +597,20 @@ Verdict verdict(std::vector<Run>::const_iterator first, std::vector<Run>::const_
                : any(Verdict::not_qualified) ? Verdict::not_qualified
                                              : Verdict::reported_only;
     };
-    const auto v = combine(across(&Run::hold), across(&Run::callbacks));
-    // Limits met in different runs pass only if one run broke neither: a
-    // hold over the limit in one run and late callbacks after an on-time
-    // baseline in the other is two failures, not a pass.
+    const auto hold = across(&Run::hold), callbacks = across(&Run::callbacks);
+    // Failed: a limit that no run met and one run broke with evidence, or
+    // every run broke one (a stalled hold in one, late callbacks after an
+    // on-time baseline in the other).
     const auto broke = [](const Run& r) {
         return r.hold == Verdict::failed || r.callbacks == Verdict::failed;
     };
-    if (v == Verdict::passed && std::all_of(first, last, broke))
+    if (hold == Verdict::failed || callbacks == Verdict::failed || std::all_of(first, last, broke))
         return Verdict::failed;
-    return v;
+    if (hold == Verdict::reported_only && callbacks == Verdict::reported_only)
+        return Verdict::reported_only;
+    // Each limit met in some run, or one could not be judged, but no run
+    // met both: not qualified.
+    return Verdict::not_qualified;
 }
 
 int met_on(std::vector<Run>::const_iterator first, std::vector<Run>::const_iterator last,

@@ -574,21 +574,21 @@ Each run of an entry (one entry point with one filter) gets a verdict
 An entry that did not pass runs again, up to three times, because a shared
 CI runner can stall one run without a late baseline (on Windows CI the 30 s
 filter once held the host's thread for about 265 ms, where the run before
-took 55 ms). Across an entry's runs each limit is judged on its own: it is
-met if one run met it, failed if none met it and one failed it, and
-otherwise not qualified (or does not apply). The entry then fails if a limit
-failed or a run had an error, is not qualified if a limit was, is reported
-only if neither limit applies, and passes otherwise; but a pass also needs
-one run that broke neither limit, so a stalled hold in one run and late
-callbacks after an on-time baseline in another fail. A hold that stalled
-once and stayed within the limit on the next run is met, while that run's
-late callbacks after a late baseline still leave the entry not qualified
-(the macOS VST3 job on 5 November 2026: 281.6 ms on the first run, 25 to
-39 ms on the next two). A summary at the end lists every entry with every
-run that did not pass, so the failed attempts stay in the evidence; for an
-entry that passed after more than one run it names the run that met each
-limit; and its last line counts the entries that passed only after a run
-that did not. The test passes only when an entry passed and every other
+took 55 ms). The entry passes only if one run passed: one complete
+qualifying run that met both limits (jrp's review of `cc2ebde`). Otherwise
+it fails if a run had an error, if a limit was broken with evidence in one
+run and met in none, or if every run broke a limit (a stalled hold in one,
+late callbacks after an on-time baseline in another); it is reported only
+if no limit applied; and it is otherwise not qualified. So limits met in
+different runs do not add up to a pass: a hold that stalled on the first
+run and stayed within the limit on the next, whose callbacks could not be
+judged after a late baseline, leaves the entry not qualified (the macOS
+VST3 job on 5 November 2026: 281.6 ms on the first run, 25 to 39 ms on the
+next two). A summary at the end lists every entry with every run that did
+not pass, so the failed attempts stay in the evidence; for an entry that
+did not pass after more than one run it names the run that met each limit;
+and its last line counts the entries that passed only after a run that did
+not. The test passes only when an entry passed and every other
 passed or was reported only; it fails if one failed, and exits 77 when one
 was not qualified or none was judged, which CTest reports as skipped
 (`SKIP_RETURN_CODE`), never as passed. So sanitizer and debug jobs show the
@@ -596,8 +596,9 @@ three tests as skipped.
 
 `native.load_timing_harness` tests the harness itself with a mock adapter
 whose loads and callbacks take as long as each case says, after checking the
-verdict rules on made-up runs (a stalled hold then late callbacks fails; an
-error after a pass fails; nothing judged is skipped): a loader that holds
+verdict rules on made-up runs (a stalled hold then unjudged callbacks is not
+qualified; a stalled hold then late callbacks fails; an error after a pass
+fails; nothing judged is skipped): a loader that holds
 the thread for 400 ms fails on all three runs, also when every callback,
 the baseline's included, is late (the review's reproduction, which the first
 version passed); one slow only on its first run meets the hold limit on the
