@@ -583,13 +583,6 @@ means a patched FFmpeg build with `--enable-gpl`.
   with tests for gain, delay, length and reported metadata; retain mismatch errors
   by default. Compare [libsamplerate](https://libsndfile.github.io/libsamplerate/)
   and other suitable implementations before choosing a dependency.
-- [ ] **IO-9 — Shortest float text from the standard library.** From the
-  project review of 5 November 2026: `equalizer_apo.cpp` and
-  `inspection_cli.cpp` search for the shortest text that reads back as the
-  same float with `snprintf` and `strtof`, because macOS before 13.3 lacks
-  floating-point `std::to_chars`. Builds for macOS 14 (PLUG-15) have it.
-  Waits for jrp: using it means Convolver can no longer be built for macOS
-  11 to 13.2 from source.
 - [ ] **GAIN-1 — Define no-clip headroom precisely.** Test the exact full-scale
   endpoints with floating-point rounding, integer quantization, dither and noise
   shaping. The current filter bound assumes input magnitude at most 1 and does
@@ -1068,6 +1061,16 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [RAW streams](docs/use/command-line.md#raw-streams).
 - [x] **IO-7 — Dither defaults by output resolution.** 25 October 2026, PR #79;
   [integer output](docs/use/command-line.md#integer-formats-dither-and-noise-shaping).
+- [x] **IO-9 — Shortest float text from the standard library.** 5 November
+  2026, PR #109, from the project review of that day, on jrp's "Do io-9":
+  the Equalizer APO exporter formats gains with `std::to_chars` instead of
+  trying 1 to 160 decimal places with `snprintf` and `strtof`; the text is
+  the same (compared for 600,000 floats). The inspection report keeps its
+  9-step `%g` search: `std::to_chars`' general format switches to exponents
+  at another point than `%g`, so using it would change that report. The
+  exporter now needs macOS 13.3 or later to build;
+  [building for macOS before 14](docs/develop/build.md#building-for-macos-before-14)
+  says what older targets need.
 - [x] **IO-6 — FLAC in the preview packages.** 24 October 2026, PR #60:
   decided not to ship the codec libraries; limitation and workarounds in
   [FLAC and Ogg](docs/use/command-line.md#flac-and-ogg).
