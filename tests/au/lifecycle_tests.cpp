@@ -3,6 +3,7 @@
 // the Audio Unit API by the lifecycle sequences of tests/plugins/lifecycle.hpp,
 // against the reference model of the shared adapter contract. Filters arrive
 // as ClassInfo dictionaries, as .aupreset files and saved sessions hold them.
+#include "advice.hpp"
 #include "au/au_host.hpp"
 #include "plugins/audio_guard.hpp"
 #include "plugins/lifecycle.hpp"
@@ -152,7 +153,9 @@ class AudioUnitDriver final : public lc::Driver {
         f.kind = static_cast<HostFailureKind>(t.kind);
         f.request.number = t.request;
         f.silent = t.silent != 0;
-        f.message = t.message; // Empty while memory ran out for it (ROBUST-7).
+        // The property carries the message as text: empty while memory ran
+        // out for it (ROBUST-7).
+        f.message = convolver::detail::parse_advice(t.message);
         return f;
     }
     std::size_t max_block() const override {

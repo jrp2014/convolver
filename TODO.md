@@ -823,9 +823,9 @@ Guidance, not an item (external review of `91fcf1f`, 0.8.13, 5 November
 diagnostic wording, status text and the real-time `HostProcessor`. When one
 of these next changes, move the control-side filter policy apart from
 `HostProcessor`'s audio code, as VST3-14 and AU-11 moved code out of the
-adapters, with public APIs and ownership unchanged; and keep diagnostics as
-their structured parts (problem, cause, fix) inside, formatting text only
-where it leaves the library, rather than formatting and parsing it again.
+adapters, with public APIs and ownership unchanged. Diagnostics already stay
+in their structured parts (problem, cause, fix) inside and are formatted
+only where they leave the library (DIAG-4).
 No new general framework. Such moves keep saved state, diagnostic text,
 allocation guards and numerical results unchanged, and never share a pull
 request with a DSP change.
@@ -1130,6 +1130,16 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   show, old ones do not), Fault signalled once per baseline, and the hold
   that stops Fault replacing Load failed;
   [contract](docs/develop/plugin-contract.md#status-and-log).
+- [x] **DIAG-4 — Keep messages in their parts inside the library.** 5
+  November 2026, from jrp's simplification review: `HostFailure::message`,
+  `HostFilter::notice()`, `speaker_notice()`, `host_state_size_error()` and
+  the readers' `FilterFileFailure` hold an `Advice` (problem, cause, fix,
+  note; new public header `convolver/advice.hpp`), and `reject()` takes one.
+  The log, the window and `HostFilter::error()` format it where it leaves
+  the library, so the report no longer parses text it had just written.
+  Only exception messages are still parsed, as they must be. The wording is
+  unchanged;
+  [failure reasons](docs/develop/plugin-contract.md#failure-reasons).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;

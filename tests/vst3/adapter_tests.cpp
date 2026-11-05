@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "../plugins/test_log.hpp"
+#include "advice.hpp"
 #include "host_log.hpp"
 #include "processor.hpp"
 #include "public.sdk/source/common/memorystream.h"
@@ -434,7 +435,7 @@ void speaker_arrangements() {
     require(write_state(&state, saved), "encode 7.1 state");
     state.seek(0, IBStream::kIBSeekSet, nullptr);
     require(p.setState(&state) == kResultOk, "7.1 filter refused on 7.1 Cine");
-    const auto notice = p.notice();
+    const auto notice = convolver::detail::advice_text(p.notice());
     require(notice.find("output 7 is filtered for the side left (SL) speaker but plays on the "
                         "front left-centre (FLC)") != std::string::npos &&
                 notice.find("output 8 is filtered for the side right (SR)") != std::string::npos,
@@ -688,7 +689,7 @@ void failure_records() {
     require(p.setState(stream(wrong).get()) == kResultFalse, "wrong-rate state accepted");
     auto f = p.failure();
     require(f && f->kind == HostFailureKind::sample_rate && f->request.number == 1 && f->silent &&
-                f->sample_rate == 44100 && f->message.find("44100 Hz") != std::string::npos,
+                f->sample_rate == 44100 && f->message.problem.find("44100 Hz") != std::string::npos,
             "wrong-rate first load not recorded");
     MemoryStream damaged;
     const std::array<unsigned char, 16> junk{12, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
@@ -706,7 +707,7 @@ void failure_records() {
     require(p.setState(&newer) == kResultFalse, "newer state accepted");
     f = p.failure();
     require(f && f->kind == HostFailureKind::state_newer && f->request.number == 3 &&
-                f->message.find("newer version of Convolver") != std::string::npos,
+                f->message.problem.find("newer version of Convolver") != std::string::npos,
             "newer state not recorded");
     require(p.setState(stream(good).get()) == kResultOk && !p.failure(),
             "a good state did not clear the failure");
@@ -725,7 +726,7 @@ void failure_records() {
             "activate at 44.1 kHz");
     f = p.failure();
     require(f && f->kind == HostFailureKind::sample_rate && f->request.number == 4 && f->silent &&
-                f->message.find("the saved filter is for 48000 Hz") == 0,
+                f->message.problem.find("the saved filter is for 48000 Hz") == 0,
             "mismatch at activation not recorded");
     require(p.setActive(false) == kResultOk, "failure-record deactivate again");
     setup.sampleRate = 48000;
@@ -1605,7 +1606,7 @@ void report_and_files() {
     // A build with no reader refuses, and says why.
     require(!c.load_file(good.string()) && handler.dirty == 0, "a file loaded without a reader");
     const auto f = p.failure();
-    require(f && f->message.find("cannot read filter files") != std::string::npos,
+    require(f && f->message.problem.find("cannot read filter files") != std::string::npos,
             "no reader not explained");
 #endif
     convolver::vst3::test_file_reader = reader;

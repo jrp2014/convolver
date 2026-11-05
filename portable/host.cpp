@@ -27,7 +27,7 @@ using detail::Advice;
 using detail::advice_text;
 struct Mismatch {
     HostFailureKind kind;
-    std::string why;
+    Advice why;
 };
 // DIAG-2: why a filter does not suit the host, or nothing if it does, as
 // problem, cause and fix (advice.hpp). `filter` names it: "the filter", or
@@ -39,12 +39,11 @@ std::optional<Mismatch> mismatch(const Configuration& c, const HostLayout& host,
                    runs = std::to_string(host.sample_rate) + " Hz";
         return Mismatch{
             HostFailureKind::sample_rate,
-            advice_text({filter + " is for " + made + ", and the host runs at " + runs,
-                         "Convolver never resamples, so a filter plays only at the "
-                         "rate it was made for.",
-                         "Load a filter made for " + runs +
-                             ", or set the host's project or audio device to " + made + ".",
-                         {}})};
+            {filter + " is for " + made + ", and the host runs at " + runs,
+             "Convolver never resamples, so a filter plays only at the rate it was made for.",
+             "Load a filter made for " + runs + ", or set the host's project or audio device to " +
+                 made + ".",
+             {}}};
     }
     if (c.input_channels != host.inputs || c.output_channels != host.outputs) {
         const auto made = counts(c.input_channels, c.output_channels),
@@ -62,7 +61,7 @@ std::optional<Mismatch> mismatch(const Configuration& c, const HostLayout& host,
             c.output_channels == 2)
             a.note = "Hosts run an effect with one channel on a mono track (GarageBand does): "
                      "put Convolver on a stereo track instead.";
-        return Mismatch{HostFailureKind::channels, advice_text(a)};
+        return Mismatch{HostFailureKind::channels, std::move(a)};
     }
     return std::nullopt;
 }
@@ -126,33 +125,32 @@ std::string hex(std::uint32_t n) {
 }
 } // namespace
 
-std::string preparation_message(const std::string& what) {
-    return advice_text(
-        {"the filter could not be prepared" +
-             (what.empty() ? std::string() : ": " + detail::advice_problem(what)),
-         "Memory may have run out, or the filter is too long for this computer.",
-         "Close other projects or programs, then load the filter again; a shorter filter needs "
-         "less memory. If it keeps failing, copy the diagnostics and report it.",
-         {}});
+Advice preparation_message(const std::string& what) {
+    return {"the filter could not be prepared" +
+                (what.empty() ? std::string() : ": " + detail::advice_problem(what)),
+            "Memory may have run out, or the filter is too long for this computer.",
+            "Close other projects or programs, then load the filter again; a shorter filter needs "
+            "less memory. If it keeps failing, copy the diagnostics and report it.",
+            {}};
 }
 
-const std::string& failure_message(const HostFailure& f) {
-    static const std::string unrecorded =
-        advice_text({"the load failed, and memory ran out before Convolver could record why",
-                     "Memory had run out.",
-                     "Close other projects or programs, then load the filter again.",
-                     {}});
+const Advice& failure_message(const HostFailure& f) {
+    static const Advice unrecorded{
+        "the load failed, and memory ran out before Convolver could record why",
+        "Memory had run out.",
+        "Close other projects or programs, then load the filter again.",
+        {}};
     return f.message.empty() ? unrecorded : f.message;
 }
 
-std::string state_read_message(const std::exception& e) {
+Advice state_read_message(const std::exception& e) {
     auto a = detail::parse_advice(e.what());
     a.problem = "the saved state could not be read: " + a.problem;
     if (a.fix.empty()) {
         a.cause = "The project or preset is damaged, or was not saved by Convolver.";
         a.fix = "Load the filter again, then save the project.";
     }
-    return advice_text(a);
+    return a;
 }
 
 std::string speaker_names(std::uint32_t mask, std::size_t channels) {
@@ -164,7 +162,7 @@ std::string speaker_names(std::uint32_t mask, std::size_t channels) {
     return names;
 }
 
-std::string speaker_notice(const Configuration& c, const HostLayout& host) {
+Advice speaker_notice(const Configuration& c, const HostLayout& host) {
     const auto filter = c.channel_mask, bus = host.output_speakers;
     if (c.output_channels != host.outputs || !names_speakers(filter, c.output_channels) ||
         !names_speakers(bus, host.outputs))
@@ -178,17 +176,17 @@ std::string speaker_notice(const Configuration& c, const HostLayout& host) {
                            " speaker but plays on the " + speaker_name(theirs[i]);
     if (differences.empty())
         return {};
-    return advice_text(
-        {"the filter's speaker labels differ from the host's output bus",
-         "The filter's outputs are labelled for the speakers " + speaker_list(filter) +
-             " (channel mask " + hex(filter) + " in its .cfg), and the host's output bus carries " +
-             speaker_list(bus) + ". Convolver sends output channels to the bus in order, so " +
-             differences + ".",
-         "If the outputs feed speakers, set the host's track or bus to " + speaker_list(filter) +
-             ". If they are not speakers (crossover bands, for example), set the channel mask at "
-             "the end of the .cfg's first line to 0, then load the .cfg again (or make the preset "
-             "again from it) and save the project.",
-         "The filter plays as loaded either way."});
+    return Advice{
+        "the filter's speaker labels differ from the host's output bus",
+        "The filter's outputs are labelled for the speakers " + speaker_list(filter) +
+            " (channel mask " + hex(filter) + " in its .cfg), and the host's output bus carries " +
+            speaker_list(bus) + ". Convolver sends output channels to the bus in order, so " +
+            differences + ".",
+        "If the outputs feed speakers, set the host's track or bus to " + speaker_list(filter) +
+            ". If they are not speakers (crossover bands, for example), set the channel mask at "
+            "the end of the .cfg's first line to 0, then load the .cfg again (or make the preset "
+            "again from it) and save the project.",
+        "The filter plays as loaded either way."};
 }
 
 Configuration unfiltered_configuration(const HostLayout& host, bool failed) {
@@ -206,10 +204,9 @@ Configuration unfiltered_configuration(const HostLayout& host, bool failed) {
     return c;
 }
 
-const std::string& HostFilter::error() const noexcept {
-    static const std::string none;
+std::string HostFilter::error() const {
     const auto& f = failure();
-    return f ? f->message : none;
+    return f ? advice_text(f->message) : std::string();
 }
 
 std::uint64_t HostFilter::next_request() noexcept {
@@ -247,7 +244,7 @@ HostFailure& HostFilter::record_unexplained(HostFailureKind kind, const HostRequ
     return f;
 }
 
-void HostFilter::record(HostFailureKind kind, std::string why, const HostRequest& request,
+void HostFilter::record(HostFailureKind kind, Advice why, const HostRequest& request,
                         const Configuration* carried) {
     auto& f = record_unexplained(kind, request, carried);
     // DIAG-2: what failed, why and what to do; what plays instead follows
@@ -277,10 +274,10 @@ class Refused : public std::invalid_argument {
 };
 } // namespace
 
-void HostFilter::refuse(HostFailureKind kind, std::string why, const HostRequest& request,
+void HostFilter::refuse(HostFailureKind kind, Advice why, const HostRequest& request,
                         const Configuration* carried) {
     record(kind, std::move(why), request, carried);
-    throw Refused(load_failure_->message);
+    throw Refused(advice_text(load_failure_->message));
 }
 
 void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
@@ -294,30 +291,29 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     // whole, and nothing after publication can throw: what plays and what is
     // saved never part (jrp's review of 0.4.30). Without the host's
     // configuration, activation checks the speakers.
-    std::string notice;
+    Advice notice;
     std::optional<HostFailure> saved_failure;
     double peak = 0;
     try {
         if (state.failed && next)
             refuse(HostFailureKind::state_unreadable,
-                   advice_text({"the saved state is inconsistent: it records a failed load and "
-                                "also holds a filter",
-                                "The state was damaged, or written by another program.",
-                                "Load the filter again, then save the project.",
-                                {}}),
+                   {"the saved state is inconsistent: it records a failed load and also holds a "
+                    "filter",
+                    "The state was damaged, or written by another program.",
+                    "Load the filter again, then save the project.",
+                    {}},
                    request, carried);
         if (next && (!next->input_channels || !next->output_channels ||
                      next->input_channels > max_channels_ || next->output_channels > max_channels_))
             refuse(HostFailureKind::channels,
-                   advice_text({"the filter has " +
-                                    counts(next->input_channels, next->output_channels) +
-                                    ", which this plug-in cannot take",
-                                "This plug-in takes 1 to " + std::to_string(max_channels_) +
-                                    " channels on each side.",
-                                "Load a filter with 1 to " + std::to_string(max_channels_) +
-                                    " inputs and outputs, or render with the command-line tool, "
-                                    "convolver, which takes more.",
-                                {}}),
+                   {"the filter has " + counts(next->input_channels, next->output_channels) +
+                        ", which this plug-in cannot take",
+                    "This plug-in takes 1 to " + std::to_string(max_channels_) +
+                        " channels on each side.",
+                    "Load a filter with 1 to " + std::to_string(max_channels_) +
+                        " inputs and outputs, or render with the command-line tool, convolver, "
+                        "which takes more.",
+                    {}},
                    request, carried);
         // PLUG-12: what is accepted is saved, so a filter the saved state
         // cannot hold is refused here, before it plays.
@@ -338,12 +334,11 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
             f.kind = HostFailureKind::saved_failure;
             f.request = request;
             f.silent = true;
-            f.message =
-                advice_text({"a filter had failed to load when this project or preset was saved",
-                             "The saved state records the failure, not a filter.",
-                             "Load a filter made for the host's sample rate and channels, then "
-                             "save again.",
-                             {}});
+            f.message = {"a filter had failed to load when this project or preset was saved",
+                         "The saved state records the failure, not a filter.",
+                         "Load a filter made for the host's sample rate and channels, then save "
+                         "again.",
+                         {}};
             saved_failure = std::move(f);
         }
         if (host && install) {
@@ -376,7 +371,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     static_assert(std::is_nothrow_move_assignable_v<std::optional<Configuration>> &&
                   std::is_nothrow_move_assignable_v<HostRequest> &&
                   std::is_nothrow_move_assignable_v<std::optional<HostFailure>> &&
-                  std::is_nothrow_move_assignable_v<std::string>);
+                  std::is_nothrow_move_assignable_v<Advice>);
     filter_ = std::move(next);
     peak_ = peak;
     failed_ = state.failed;
@@ -401,7 +396,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     }
 }
 
-void HostFilter::reject(HostFailureKind kind, std::string why, HostRequest request,
+void HostFilter::reject(HostFailureKind kind, Advice why, HostRequest request,
                         const Configuration* carried) noexcept {
     try {
         record(kind, std::move(why), numbered(std::move(request)), carried);
@@ -410,7 +405,7 @@ void HostFilter::reject(HostFailureKind kind, std::string why, HostRequest reque
 }
 
 Configuration HostFilter::activate(const HostLayout& host) {
-    notice_.clear();
+    notice_ = {};
     activation_failure_.reset();
     faults_ = cleared_ = observed_ = {}; // The adapter builds a new processor, which counts from 0.
     changed_ = false;
@@ -442,16 +437,15 @@ void HostFilter::fail_activation(std::string why) {
         f.outputs = filter_->output_channels;
     }
     f.silent = true;
-    f.message = advice_text(
-        {"the filter could not be started when the host started the plug-in" +
-             (why.empty() ? std::string() : ": " + detail::advice_problem(why)),
-         why.empty() ? "Memory may have run out."
-                     : "Usually memory has run out; the words after the colon are the reason "
-                       "given.",
-         "Close other projects or programs, then restart playback or load the filter again. If "
-         "it keeps failing, copy the diagnostics and report it.",
-         {}});
-    notice_.clear();
+    f.message = {"the filter could not be started when the host started the plug-in" +
+                     (why.empty() ? std::string() : ": " + detail::advice_problem(why)),
+                 why.empty() ? "Memory may have run out."
+                             : "Usually memory has run out; the words after the colon are the "
+                               "reason given.",
+                 "Close other projects or programs, then restart playback or load the filter "
+                 "again. If it keeps failing, copy the diagnostics and report it.",
+                 {}};
+    notice_ = {};
     activation_failure_ = std::move(f);
 }
 
@@ -509,7 +503,7 @@ std::vector<Advice> fault_kinds(const HostFaults& f) {
 std::string fault_lines(const HostFaults& f) {
     std::string text;
     for (const auto& kind : fault_kinds(f))
-        text += (text.empty() ? "" : " ") + detail::advice_line(advice_text(kind));
+        text += (text.empty() ? "" : " ") + detail::advice_line(kind);
     return text;
 }
 constexpr const char* fault_clears =
@@ -521,7 +515,7 @@ constexpr const char* fault_held =
     "faults are cleared when a filter is loaded or the host restarts the plug-in.";
 } // namespace
 
-detail::Advice fault_advice(const HostFaults& f, bool held) {
+Advice fault_advice(const HostFaults& f, bool held) {
     auto kinds = fault_kinds(f);
     if (kinds.empty())
         return {};

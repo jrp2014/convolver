@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "convolver/advice.hpp"
 #include "convolver/engine.hpp"
 #include <array>
 #include <cstddef>
@@ -68,14 +69,14 @@ std::vector<std::byte> encode_host_state(const HostState&);
 // counted without encoding or allocating. It may exceed max_host_state_bytes;
 // such state cannot be saved (saturates at SIZE_MAX).
 std::size_t encoded_host_state_size(const HostState&) noexcept;
-// PLUG-12: why this state is too large to save, in full sentences saying what
-// to change, or empty when it fits. HostFilter::load refuses such a filter
+// PLUG-12: why this state is too large to save and what to change, or empty
+// when it fits. HostFilter::load refuses such a filter
 // before accepting it, so a plug-in never plays a filter it cannot save, and
 // convolver-preset refuses to write it. PLUG-13: a filter fits only with
 // host_settings_room_bytes to spare, counted in place of any settings the
 // state holds, so changing a VST3 setting never makes an accepted filter
 // unsaveable.
-std::string host_state_size_error(const HostState&);
+Advice host_state_size_error(const HostState&);
 // Throws NewerHostState for state from a newer Convolver, std::length_error
 // above the size limit, and std::invalid_argument for anything else malformed.
 HostState decode_host_state(std::span<const std::byte>);
@@ -103,7 +104,7 @@ struct HostLayout {
 // speakers, SL and SR count as BL and BR (5.1 is written as 0x3F or 0x60F).
 // Never a reason to reject a filter: channels are routed by bus index whatever
 // the labels say (docs/develop/plugin-identities.md#channel-layouts).
-std::string speaker_notice(const Configuration&, const HostLayout&);
+Advice speaker_notice(const Configuration&, const HostLayout&);
 
 // What an instance plays without a usable filter, under the shared adapter
 // contract: identity (input c to output c) for an empty instance with equal
@@ -160,7 +161,8 @@ struct HostFailure {
     // True: the instance plays silence. False: a working filter keeps playing.
     bool silent = false;
     // What failed, why and what to change, as the CLI explains its errors.
-    std::string message;
+    // Empty when memory ran out before it could be recorded (ROBUST-7).
+    Advice message;
 };
 
 // Thrown by a HostFilter::load install callback to abandon a request that a
@@ -255,8 +257,9 @@ class HostFilter {
     const std::optional<HostFailure>& failure() const noexcept {
         return activation_failure_ ? activation_failure_ : load_failure_;
     }
-    // failure()'s message, or empty.
-    const std::string& error() const noexcept;
+    // failure()'s message as text, one labelled line per part after the
+    // problem (as exceptions carry it), for an adapter to log; empty if none.
+    std::string error() const;
     // Why the newest request failed (or the saved failure it restored), even
     // while a failure found at activation comes first in failure(). This is
     // what to log when a load is rejected.
@@ -275,7 +278,7 @@ class HostFilter {
     // the last check against the host (speaker_notice); empty if none. It
     // describes the host as of the last load() with a host or activate(); an
     // adapter that shows it must recheck after the host changes its buses.
-    const std::string& notice() const noexcept {
+    const Advice& notice() const noexcept {
         return notice_;
     }
     // Load decoded state: a filter, none to return to an empty instance, or a
@@ -305,10 +308,10 @@ class HostFilter {
     // `carried`, when given, is the filter the request held (a readable file
     // made for another rate or other channels): the failure keeps its rate
     // and counts for the short status text. Its paths are not used.
-    void reject(HostFailureKind, std::string why, HostRequest request = {},
+    void reject(HostFailureKind, Advice why, HostRequest request = {},
                 const Configuration* carried = nullptr) noexcept;
     // The same, as unreadable state.
-    void reject(std::string why) noexcept {
+    void reject(Advice why) noexcept {
         reject(HostFailureKind::state_unreadable, std::move(why));
     }
     // ROBUST-7: a request failed, recorded or not. Without an accepted filter
@@ -342,9 +345,8 @@ class HostFilter {
 
   private:
     HostRequest numbered(HostRequest);
-    [[noreturn]] void refuse(HostFailureKind, std::string why, const HostRequest&,
-                             const Configuration*);
-    void record(HostFailureKind, std::string why, const HostRequest&, const Configuration*);
+    [[noreturn]] void refuse(HostFailureKind, Advice why, const HostRequest&, const Configuration*);
+    void record(HostFailureKind, Advice why, const HostRequest&, const Configuration*);
     HostFailure& record_unexplained(HostFailureKind, const HostRequest&,
                                     const Configuration*) noexcept;
     std::size_t max_channels_;
@@ -354,7 +356,7 @@ class HostFilter {
     std::uint64_t requests_ = 0;
     bool failed_ = false;
     std::optional<HostFailure> load_failure_, activation_failure_;
-    std::string notice_;
+    Advice notice_;
     // faults(); the processor's totals at the last clear (the audio side's
     // baseline too) and at the last observe().
     HostFaults faults_, cleared_, observed_;

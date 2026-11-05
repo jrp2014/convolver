@@ -890,7 +890,7 @@ void worker_loads(host::World& world, const fs::path& work) {
                   r->request.source == HostFilterSource::file &&
                   r->request.path == files.missing.string() &&
                   p->log.contains(LV2_LOG__Error, detail::advice_line(r->message)) &&
-                  r->message.find("missing.cfg") != std::string::npos,
+                  r->message.problem.find("missing.cfg") != std::string::npos,
               "missing file: recorded as filter_file and logged with its path");
         check(silent(play_constant(*p, 1024)), "missing file as the first load plays silence");
         check(decode_host_state(p->save().bytes).failed && saved_path(*p).empty(),
@@ -918,8 +918,8 @@ void worker_loads(host::World& world, const fs::path& work) {
             // names no window, as LV2 has none.
             check((kind != HostFailureKind::sample_rate || r->sample_rate == 44100) &&
                       (kind != HostFailureKind::channels || (r->inputs == 1 && r->outputs == 1)) &&
-                      r->message.find("--") == std::string::npos &&
-                      r->message.find("window") == std::string::npos,
+                      detail::advice_text(r->message).find("--") == std::string::npos &&
+                      detail::advice_text(r->message).find("window") == std::string::npos,
                   "failed replacement with " + path + ": its rate and counts, host advice");
             check(near(play_constant(*p, 1024).back(), .5f) && reported(*p) == original &&
                       saved_path(*p) == original,
@@ -931,7 +931,7 @@ void worker_loads(host::World& world, const fs::path& work) {
         r = p->failure();
         check(p->status == as_float(Status::load_failed) && r &&
                   r->kind == HostFailureKind::filter_file &&
-                  r->message.find("longer than") != std::string::npos,
+                  r->message.problem.find("longer than") != std::string::npos,
               "too long a path: load failed, explained");
         // An atom:String value is accepted too.
         p->set_filter(b, world.urids().map(LV2_ATOM__String));
@@ -1262,7 +1262,7 @@ void oversized_files(host::World& world, const fs::path& work) {
         const auto r = p.failure();
         check(p.status == as_float(Status::load_failed) && r &&
                   r->kind == HostFailureKind::too_large && r->silent == silent &&
-                  r->message.find("too large to save") != std::string::npos &&
+                  r->message.problem.find("too large to save") != std::string::npos &&
                   p.log.contains(LV2_LOG__Error, "too large to save"),
               label + "refused as too large to save, and explained");
     };

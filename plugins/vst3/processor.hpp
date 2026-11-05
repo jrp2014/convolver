@@ -152,7 +152,7 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     Steinberg::tresult PLUGIN_API notify(Steinberg::Vst::IMessage*) override;
     // The filter's advisory notice (HostFilter::notice), for example output
     // speakers that differ from the host's arrangement; logged when it changes.
-    std::string notice();
+    Advice notice();
     // Why the last load failed or the instance plays silence (PLUG-8), as
     // HostFilter::failure() keeps it; logged in full, summarised by status().
     std::optional<HostFailure> failure();

@@ -116,6 +116,15 @@ Until 1.0 the C++ API may change between minor versions.
   sentence of their own. The status still shows only those after the new
   filter took over. `HostFaultReport` holds `faults`, `changed` and `held`
   instead of `current`, `earlier` and `held`.
+- Library (DIAG-4, from jrp's simplification review): failure records keep
+  a message in its parts instead of as text. `HostFailure::message`,
+  `HostFilter::notice()`, `speaker_notice()` and `host_state_size_error()`
+  hold a `convolver::Advice` (problem, cause, fix, note, in the new header
+  `convolver/advice.hpp`), and `HostFilter::reject()` takes one.
+  `HostFilter::error()` returns the failure's text by value. The log, the
+  window and the tools format the parts where they leave the library, so
+  the window's report no longer parses text it has just written; exception
+  messages, and the text an adapter hands the log, are still read back. Every message's wording is unchanged.
 - CLI (GAIN-2, from an external review of `91fcf1f`): `--gain-db no-clip`
   takes the largest possible peak directly instead of also filtering ten
   filter lengths of noise, so choosing it costs well under a millisecond

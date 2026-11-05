@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "convolver/advice.hpp"
 #include <string>
 #include <string_view>
 
-// DIAG-2: every message a user can meet has the same parts
-// (docs/project/plans/2026-11-05-actionable-diagnostics.md): the problem in
-// one sentence, then its cause, the fix and, where an environment, host or
-// design limit is the reason, a note. Messages travel as plain text (in
-// exceptions, HostFailure::message and the log), with each part after the
-// problem on its own line starting "Cause: ", "Fix: " or "Note: ". A part can
-// go on over more lines (an example .cfg, say); those lines start with
+// DIAG-2: every message a user can meet has the same parts (Advice, in
+// convolver/advice.hpp; docs/archive/plans/2026-11-05-actionable-diagnostics.md):
+// the problem in one sentence, then its cause, the fix and, where an
+// environment, host or design limit is the reason, a note. DIAG-4: failure
+// records (HostFailure::message, HostFilter::notice()) keep the parts, and
+// only exceptions carry them as text (advice_text()), with each part after
+// the problem on its own line starting "Cause: ", "Fix: " or "Note: ". A part
+// can go on over more lines (an example .cfg, say); those lines start with
 // spaces. Text without labels is all problem, so older messages still read
-// as before. Internal to Convolver's tools and adapters.
+// as before. parse_advice() recovers the parts from an exception's text.
+// Internal to Convolver's tools and adapters.
 namespace convolver::detail {
-struct Advice {
-    std::string problem, cause, fix, note;
-};
+using convolver::Advice;
 
 inline constexpr std::string_view advice_labels[] = {"Cause: ", "Fix: ", "Note: "};
 
@@ -79,32 +80,38 @@ inline bool ends_sentence(std::string_view text) {
 // One line, for the Convolver log: "problem. Cause: ... Fix: ... Note: ...".
 // Lines that go on (an example .cfg) are joined with " / ", which keeps them
 // apart.
-inline std::string advice_line(std::string_view text) {
+inline std::string advice_line(const Advice& a) {
     std::string line;
-    line.reserve(text.size() + 1);
-    bool in_problem = true;
-    for (std::size_t i = 0; i < text.size(); ++i) {
-        if (text[i] != '\n') {
-            line += text[i];
-            continue;
+    const auto join = [&](std::string_view part) {
+        for (std::size_t i = 0; i < part.size(); ++i) {
+            if (part[i] != '\n') {
+                line += part[i];
+                continue;
+            }
+            // A continued line: drop its indentation.
+            while (i + 1 < part.size() && part[i + 1] == ' ')
+                ++i;
+            line += " / ";
         }
-        const auto next = text.substr(i + 1);
-        bool labelled = false;
-        for (const auto label : advice_labels)
-            labelled = labelled || next.starts_with(label);
-        if (labelled) {
-            if (in_problem && !ends_sentence(line))
-                line += '.';
-            in_problem = false;
-            line += ' ';
+    };
+    join(a.problem);
+    const std::string* parts[] = {&a.cause, &a.fix, &a.note};
+    bool first = true;
+    for (std::size_t i = 0; i < 3; ++i) {
+        if (parts[i]->empty())
             continue;
-        }
-        // A continued line: drop its indentation.
-        while (i + 1 < text.size() && text[i + 1] == ' ')
-            ++i;
-        line += " / ";
+        if (first && !ends_sentence(line))
+            line += '.';
+        first = false;
+        line += ' ';
+        line += advice_labels[i];
+        join(*parts[i]);
     }
     return line;
+}
+// The same for text that may hold labelled lines (an exception's message).
+inline std::string advice_line(std::string_view text) {
+    return advice_line(parse_advice(text));
 }
 
 // A problem phrase as a sentence of its own, for the plug-in window and the

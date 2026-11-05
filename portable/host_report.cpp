@@ -11,7 +11,6 @@
 #include <string>
 
 namespace convolver {
-using detail::advice_text;
 namespace {
 std::string ports(std::size_t inputs, std::size_t outputs) {
     return std::to_string(inputs) + " in, " + std::to_string(outputs) + " out";
@@ -86,7 +85,7 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         m.note = a.note;
     };
     if (failure) {
-        auto a = detail::parse_advice(failure_message(*failure));
+        auto a = failure_message(*failure);
         a.problem = short_problem(std::move(a.problem), *failure);
         take(a);
         m.plays = failure_consequence(*failure, layout, facts.settings);
@@ -95,8 +94,7 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         // Faults the load failure hides from the status.
         if (filter.faults().any())
             add_note(m, detail::as_sentence("While audio played: " +
-                                            detail::advice_problem(
-                                                advice_text(fault_advice(filter.faults(), true)))));
+                                            fault_advice(filter.faults(), true).problem));
     } else if (filter.faults().any() && !filter.failed()) {
         take(fault_advice(filter.faults(), false));
         if (filter.filter()) {
@@ -116,7 +114,7 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
                              " is loaded. It is checked against the host's sample rate and "
                              "channels when the host starts the plug-in.";
         if (host && !filter.notice().empty())
-            take(detail::parse_advice(filter.notice()));
+            take(filter.notice());
     } else if (filter.failed()) {
         m.plays = host ? playing_words(filter, *host, facts.settings)
                        : std::string("Silent after a failed load.");

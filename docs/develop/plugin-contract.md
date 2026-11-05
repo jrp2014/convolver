@@ -115,7 +115,12 @@ is shown is in [status and log](#status-and-log) (DIAG-1):
   later request's success or failure is never confused with it.
 - **The outcome:** a working filter kept, or silence.
 - **The explanatory message,** written as the CLI writes its diagnostics: what
-  failed, why, and what to change.
+  failed, why, and what to change. It is kept in its parts (`Advice` in
+  [`advice.hpp`](../../include/convolver/advice.hpp): problem, cause, fix,
+  note), and each surface formats it where it leaves the library: the log's
+  one line, the window's rows, the text `HostFilter::error()` gives an
+  adapter (DIAG-4). Only exceptions carry it as text, one labelled line per
+  part, which the adapters' and tools' catch blocks read back.
 
 The reason lives on the control side (in `HostFilter` or beside it) and never
 on the audio thread: the audio callback only plays what it was given. Every
@@ -133,8 +138,8 @@ belongs to the request that supplied the filter, comes first while it lasts,
 and clears at the next activation that suits the filter. Restoring a saved
 failed load is a successful request whose instance plays silence, so it keeps
 a reason of its own kind (the original reason is not saved; the state format
-is unchanged). The speaker-layout notice stays a separate string
-(`HostFilter::notice()`): it never changes what plays, and it describes the
+is unchanged). The speaker-layout notice stays a separate record
+(`HostFilter::notice()`, an `Advice` too): it never changes what plays, and it describes the
 host as it is now rather than a request, so it is recomputed at every check
 instead of being kept until a later request succeeds. Adapters log
 `HostFilter::rejection()`, the newest request's own reason, when a load is
@@ -184,7 +189,8 @@ format.
   and its line (`host_status()`), DIAG-2's message in parts (the problem as a
   sentence, what plays (`failure_consequence()` or `playing_words()`), the
   cause, the fix, a note, and the window's action, "choose filter" or "copy
-  diagnostics"), and all of it as one explanation text with `Cause:`, `Fix:`
+  diagnostics"), taken from the failure's or notice's parts as they are
+  (DIAG-4), and all of it as one explanation text with `Cause:`, `Fix:`
   and `Note:` lines ([`advice.hpp`](../../portable/advice.hpp)); then
   the Filter row (the file's name and a note when the newest request was
   refused), the Audio facts in plain words (`HostFact`: sample rate,
