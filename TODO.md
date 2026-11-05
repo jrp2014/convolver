@@ -1021,6 +1021,13 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   alloc-dealloc-mismatch before the oracle tests ran. The array and sized
   forms are now one shared file, `tests/native/replaced_allocation.hpp`,
   used by every native test that watches allocation.
+- [x] **CI-31 — Keep `native.host_settings` within its time limit under
+  sanitizers.** 5 November 2026, PR #111: the external review of `91fcf1f`
+  (0.8.13) saw it time out in a GCC AddressSanitizer build. The shared
+  double-precision oracle (`tests/native/oracle.hpp`) spent 90 of its 91
+  seconds there; it now works out each route's invariant parts once, with
+  the same arithmetic in the same order (worst errors unchanged), and the
+  test takes about 4 seconds.
 - [x] **CI-29 — Use LLVM's parallel clang-tidy runner.** 5 November 2026,
   PR #108, from the project review of that day: CI runs `run-clang-tidy.py`,
   which the clang-tidy package installs, in place of our

@@ -279,6 +279,10 @@ Until 1.0 the C++ API may change between minor versions.
   dispatch source that had never been activated, which Apple documents as
   undefined. The source is now created last, so a failure there leaves
   nothing to undo, and opening the unit fails cleanly.
+- Tests (CI-31): the shared double-precision oracle works out each route's
+  invariant parts once, with the same arithmetic, so `native.host_settings`
+  takes about 4 seconds rather than 90 under GCC's AddressSanitizer, where
+  it had passed its time limit.
 - Tests (CI-30): `native.engine` replaces `operator new` with the array and
   sized `operator delete` too, from one shared file, so GCC's
   AddressSanitizer build runs the oracle tests instead of stopping on
