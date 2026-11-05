@@ -989,6 +989,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   reads it; the build and test jobs have time limits. No automatic re-runs;
   CI-24 and CI-25 continue;
   [intermittent failures](docs/develop/testing.md#intermittent-failures).
+- [x] **CI-29 — Use LLVM's parallel clang-tidy runner.** 5 November 2026,
+  PR #108, from the project review of that day: CI runs `run-clang-tidy.py`,
+  which the clang-tidy package installs, in place of our
+  `scripts/clang_tidy.py` and its tests;
+  [lint checks](CONTRIBUTING.md#formatting-and-analysis).
 - [x] **CI-28 — Keep `vst3.adapter`'s Status and log case's log as
   evidence.** 5 November 2026, from CI-27's review: the case pointed
   `CONVOLVER_LOG` at a temporary file with `setenv` while the processor

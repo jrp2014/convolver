@@ -1382,8 +1382,8 @@ are one list in the top-level `CMakeLists.txt`, before the `check` target,
 which skips a name no longer defined, so rename a test there too. On `main` at
 b9381e4 (25 October 2026, VST3 run 40236000059), Windows `vst3.lifecycle`
 took 100 s and began 21 s into its step, which then took 122 s. Static
-analysis runs [`clang_tidy.py`](../../scripts/clang_tidy.py), which analyses
-the same file list one file per CPU and lists every file that failed
+analysis runs LLVM's `run-clang-tidy.py`, which analyses the same file list
+one file per CPU and fails if any file did
 ([lint checks](../../CONTRIBUTING.md#formatting-and-analysis)).
 
 ### Compiler cache

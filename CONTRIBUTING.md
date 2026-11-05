@@ -78,10 +78,12 @@ Apple SDKs. CI upgrades the standalone clang-tidy package before each analysis
 run and prints its version. Fix real diagnostics rather than adding blanket suppressions. These tools are development dependencies;
 library consumers need neither tool.
 
-`scripts/clang_tidy.py` takes the same `-p` and file list and analyses the
-files side by side, one per CPU (`--jobs N` to change it). It prints each
-file's output whole, in the order given, lists the files that failed, and
-fails if any did; CI runs the portable list this way.
+To analyse the files side by side, one per CPU, run LLVM's
+`run-clang-tidy.py` (installed with the clang-tidy package) with `-quiet` and
+the same `-p` and file list; CI runs the portable list this way. It prints
+each file's output whole and fails if any file did. Each name is a pattern
+matched against `compile_commands.json`, so a file the build does not compile
+is skipped rather than reported.
 
 ### Python formatting and lint
 
@@ -184,7 +186,7 @@ regression tests on every invocation. A further hook checks the
 [permanent plug-in identities](docs/develop/plugin-identities.md#changing-the-registry),
 another tests which files let a pull request
 [skip the builds](docs/develop/testing.md#documentation-only-pull-requests),
-another tests the parallel clang-tidy runner, and another, whenever
+and another, whenever
 `scripts/fuzz_campaigns.sh` or its test changes, the
 [fuzz scheduler](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns)'s
 failure paths (it needs bash 4.3 or later and is skipped on macOS's bash 3.2).
@@ -198,7 +200,6 @@ python3 tests/repository_checks_tests.py
 python3 tests/identities_tests.py
 python3 tests/ci_scope_tests.py
 python3 tests/ci_evidence_tests.py
-python3 tests/clang_tidy_tests.py
 python3 tests/fuzz/scheduler_tests.py
 ```
 

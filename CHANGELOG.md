@@ -211,6 +211,11 @@ Until 1.0 the C++ API may change between minor versions.
   since the Latency setting arrived; the page now says so. In
   `HostProcessor` the 64-frame ramps and the crossfade are named constants;
   the sound is unchanged.
+- Continuous integration (CI-29): static analysis runs LLVM's
+  `run-clang-tidy.py`, installed with clang-tidy, in place of
+  `scripts/clang_tidy.py` (removed with its tests and pre-commit hook). The
+  checks and the file list are unchanged; a listed file the build does not
+  compile is now skipped rather than reported.
 
 ### Fixed
 

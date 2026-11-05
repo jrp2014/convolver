@@ -105,7 +105,9 @@ jobs:
         run: |
           python -m pip install --upgrade clang-tidy
           clang-tidy --version
-          python scripts/clang_tidy.py -p build portable/engine.cpp portable/kernels.cpp portable/kernels_avx2.cpp \
+          # run-clang-tidy.py comes with the clang-tidy package; each name is a
+          # pattern matched against the build's compile_commands.json.
+          run-clang-tidy.py -quiet -p build portable/engine.cpp portable/kernels.cpp portable/kernels_avx2.cpp \
             portable/attenuation.cpp portable/config.cpp \
             portable/config_parse.cpp portable/sound_files.cpp portable/inspection.cpp \
             portable/inspection_cli.cpp portable/compare_cli.cpp \
