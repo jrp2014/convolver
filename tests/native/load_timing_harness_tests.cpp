@@ -534,7 +534,8 @@ void integration() {
     }
     {
         // PERF-14: warm phases are filled faster than real time, shown and
-        // not judged.
+        // not judged. The verdict itself depends on the runner's scheduling
+        // (macOS CI's thread woke late), so only the hold is checked.
         Mock mock;
         const auto r = run(mock, 1, 100ms, true);
         std::string names;
@@ -545,7 +546,8 @@ void integration() {
         }
         check(names == "baseline, first load, warm first, replacement, warm second, reset, idle "
                        "after" &&
-                  reported_only_warm && r.runs.at(0).verdict == timing::Verdict::passed,
+                  reported_only_warm && !r.runs.at(0).error &&
+                  r.runs.at(0).hold == timing::Verdict::passed,
               "warm phases: " + names + "; " + text(r.runs.at(0)));
         // Two fills of 49 callbacks, plus the paced ones (about 3.5 s of them).
         check(mock.calls.load() >= 2 * 49 + 250,
