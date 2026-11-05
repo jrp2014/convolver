@@ -91,9 +91,10 @@ jobs:
         run: >-
           ctest --test-dir build-au --output-on-failure --output-junit junit.xml
           -LE 'repository|consumer'
-      # PERF-9's timings pass whatever they measure, so CTest does not show
-      # them: print them from its log (docs/develop/testing.md#load-timing-perf-9).
-      - name: Load timings (measurement only)
+      # CTest shows the timing tests' output only when they fail: print the
+      # tables and the summary from its log, also when they passed or were
+      # skipped as not qualified (docs/develop/testing.md#load-timing-perf-9).
+      - name: Load timings
         if: always()
         shell: bash
         run: >-

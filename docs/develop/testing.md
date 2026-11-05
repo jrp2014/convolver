@@ -568,31 +568,41 @@ Each run of an entry (one entry point with one filter) gets a verdict
 | --- | --- |
 | Failed | A load was refused, a callback failed or threw, or the instance did not then save the second filter (in every build, and not run again); or the host's thread was held over its limit, whatever the audio thread saw; or callbacks broke their limits after an on-time baseline |
 | Not qualified | Callbacks broke their limits, but the baseline before them was already late, so the machine was busy and the run shows nothing either way; and every run in a build that does not enforce the limits (anything but an optimised build without sanitizers, which only prints what would exceed them) |
-| Passed | Neither |
+| Reported only | No limit applies to any of its phases: LV2's `restore()`, for which the host stops audio, and its reset |
+| Passed | None of these |
 
 An entry that did not pass runs again, up to three times, because a shared
 CI runner can stall one run without a late baseline (on Windows CI the 30 s
 filter once held the host's thread for about 265 ms, where the run before
 took 55 ms). The entry passes if a run passed, fails if none passed and one
-failed, and otherwise is not qualified. A summary at the end lists every
-entry with every run that did not pass, so the failed attempts stay in the
-evidence. The test passes only when every entry passed; it fails if one
-failed, and exits 77 when one was not qualified, which CTest reports as
-skipped (`SKIP_RETURN_CODE`), never as passed. So sanitizer and debug jobs
-show the three tests as skipped.
+failed, is reported only if every run was, and otherwise is not qualified.
+A summary at the end lists every entry with every run that did not pass, so
+the failed attempts stay in the evidence, and its last line counts the
+entries that passed only after a failed run. The test passes only when
+every entry passed or was reported only; it fails if one failed, and exits
+77 when one was not qualified, which CTest reports as skipped
+(`SKIP_RETURN_CODE`), never as passed. So sanitizer and debug jobs show the
+three tests as skipped.
 
 `native.load_timing_harness` tests the harness itself with a mock adapter
 whose loads and callbacks take as long as each case says: a loader that holds
 the thread for 400 ms fails on all three runs, also when every callback,
 the baseline's included, is late (the review's reproduction, which the first
-version passed); late callbacks with a late baseline are not qualified; late
-callbacks only while loading never pass; a build that does not enforce the
-limits never passes; a refused load fails at once. It also checks the input
+version passed); one slow only on its first run passes on a later run, with
+the failed run kept and counted; late callbacks with a late baseline are not
+qualified; late callbacks only while loading never pass; a build that does
+not enforce the limits never passes; a load no limit applies to is reported
+only, however slow; a refused load fails at once. A quick adapter's
+callbacks are not checked there, since they depend on the machine. It also checks the input
 the audio thread plays: noise from -0.1 to 0.1 of both signs (PERF-11; the
 first version wrapped its negative half to about 1.8e15).
 
 CTest runs the three alone (`RUN_SERIAL`); the first line says which build
-ran, and the last gives the overall result. The Release jobs of the VST3 and Audio Unit
+ran, and the last gives the overall result. The plug-in candidates leave
+them out (`-LE timing` in `candidate.py`), because they run the other tests
+alongside: on 5 November 2026 the macOS x86-64 candidate, with the runner
+that busy, held the host's thread for about 267 ms with the 10 s filter on
+all three runs. The Release jobs of the VST3 and Audio Unit
 workflows print the tables in a "Load timings" step; LV2's run only in its
 sanitizer job. The
 `timing` label selects the three tests. Run a lifecycle executable with

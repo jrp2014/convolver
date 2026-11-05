@@ -30,12 +30,13 @@
 // - not qualified: callbacks broke the limits, but the baseline before them
 //   was already late (a busy machine), so the run shows nothing either way;
 //   and every run in a build that does not enforce the limits;
-// - passed: neither.
+// - reported only: no limit applies to any of its phases;
+// - passed: none of these.
 // An entry that did not pass runs again, up to three times, as a shared
 // machine can stall one run; it passes if a run passed, and the summary
 // keeps every run that did not. The test exits 1 if an entry failed,
 // not_qualified_exit (CTest reports it as skipped) if one did not qualify,
-// and 0 only when every entry passed.
+// and 0 only when every entry passed or was reported only.
 #pragma once
 #include "lifecycle.hpp"
 #include <chrono>
@@ -122,7 +123,10 @@ std::vector<Workload> workloads(const Options&);
 
 // PERF-10: what one run of an entry with one workload showed. "Not qualified"
 // is not a pass: the run could not show that the limits hold.
-enum class Verdict { passed, failed, not_qualified };
+// "Reported only": no limit applies to any of the run's phases (LV2's
+// restore(), for which the host stops audio; the worker's own time), so it
+// neither passes nor fails.
+enum class Verdict { passed, failed, not_qualified, reported_only };
 const char* describe(Verdict);
 struct Run {
     std::string workload, entry;
@@ -134,10 +138,11 @@ struct Result {
     std::size_t errors = 0; // Refused loads, failed callbacks, a wrong filter saved.
     std::vector<Run> runs;  // Every run, those repeated included, in order.
     // Entries (one workload, one entry point) by their verdict().
-    std::size_t passed = 0, failed = 0, not_qualified = 0;
+    std::size_t passed = 0, failed = 0, not_qualified = 0, reported_only = 0;
+    std::size_t passed_after_failure = 0; // Of `passed`: an earlier run failed.
 };
 // An entry's verdict from its runs: passed if one run passed, else failed if
-// one failed, else not qualified.
+// one failed, else reported only if every run was, else not qualified.
 Verdict verdict(std::vector<Run>::const_iterator first, std::vector<Run>::const_iterator last);
 
 // Runs every entry point on every workload with `driver` (the format's

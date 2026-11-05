@@ -308,8 +308,10 @@ Until 1.0 the C++ API may change between minor versions.
   a pass. The hold of the host's thread is now judged whatever the audio
   thread saw; a run whose late callbacks follow a late baseline, or that ran
   in a build that does not enforce the limits, is "not qualified", and the
-  test then exits 77, which CTest reports as skipped, not passed. The
-  summary lists every run that did not pass, also when a later run did.
+  test then exits 77, which CTest reports as skipped, not passed. An entry
+  no limit applies to (LV2's `restore()`) is "reported only" rather than
+  passed. The summary lists every run that did not pass, also when a later
+  run did, and counts entries that passed only after a failed run.
   `native.load_timing_harness` checks these verdicts with a mock adapter.
   Tests only: no change to the plug-ins or the sound.
 - Tests (PERF-11, from jrp's review of `59ac8e0`): the load-timing tests

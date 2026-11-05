@@ -313,6 +313,8 @@ const char* describe(Verdict v) {
         return "FAILED";
     case Verdict::not_qualified:
         return "not qualified";
+    case Verdict::reported_only:
+        return "reported only";
     }
     return "?";
 }
@@ -355,11 +357,13 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
                 // Held back by a busy machine before anything loaded: late
                 // callbacks while loading then say nothing about the plug-in.
                 bool busy = false;
+                bool judged = false; // A limit applied to some phase.
                 std::vector<std::string> failed, unqualified;
                 // Judges one phase by jrp's limits; returns the note for its line.
                 const auto judge = [&](const char* phase, std::optional<Seconds> held,
                                        const Callbacks& c, bool audio_held) {
                     std::vector<std::string> over, noisy;
+                    judged = judged || !audio_held || (held && e.host_thread && w.held_limit);
                     // The hold is the plug-in's own time on the caller's
                     // thread, judged whatever the audio thread saw.
                     if (held && e.host_thread && w.held_limit && *held > *w.held_limit) {
@@ -472,10 +476,12 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
                 } else if (!unqualified.empty()) {
                     r.verdict = Verdict::not_qualified;
                     r.why = join(unqualified);
-                }
+                } else if (!judged)
+                    r.verdict = Verdict::reported_only;
                 result.runs.push_back(r);
-                if (o.enforce && r.verdict != Verdict::passed && result.errors == errors_before &&
-                    attempt < o.attempts) {
+                if (o.enforce &&
+                    (r.verdict == Verdict::failed || r.verdict == Verdict::not_qualified) &&
+                    result.errors == errors_before && attempt < o.attempts) {
                     std::cout << "      run " << attempt << " of " << o.attempts << " "
                               << describe(r.verdict) << "; running " << e.name << " with the "
                               << w.name << " filter again\n";
@@ -502,20 +508,37 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
                       result.runs[i].entry.c_str(), describe(v));
         std::cout << line << " (" << (j - i) << (j - i == 1 ? " run)\n" : " runs)\n");
         for (auto k = i; k < j; ++k)
-            if (result.runs[k].verdict != Verdict::passed)
+            if (result.runs[k].verdict != Verdict::passed &&
+                result.runs[k].verdict != Verdict::reported_only)
                 std::cout << "        run " << result.runs[k].attempt << " "
                           << describe(result.runs[k].verdict) << ": " << result.runs[k].why << '\n';
-        ++(v == Verdict::passed   ? result.passed
-           : v == Verdict::failed ? result.failed
-                                  : result.not_qualified);
+        switch (v) {
+        case Verdict::passed:
+            ++result.passed;
+            if (j - i > 1)
+                ++result.passed_after_failure; // Runs stop at the first pass.
+            break;
+        case Verdict::failed:
+            ++result.failed;
+            break;
+        case Verdict::not_qualified:
+            ++result.not_qualified;
+            break;
+        case Verdict::reported_only:
+            ++result.reported_only;
+            break;
+        }
         i = j;
     }
     const char* overall = result.errors || result.failed ? "FAILED"
                           : result.not_qualified         ? "NOT QUALIFIED"
+                          : result.passed == 0           ? "REPORTED ONLY"
                                                          : "PASSED";
-    std::cout << format << " load timing: " << overall << " (" << result.passed << " passed, "
-              << result.failed << " failed, " << result.not_qualified << " not qualified; "
-              << result.errors << " errors)\n";
+    std::cout << format << " load timing: " << overall << " (" << result.passed << " passed";
+    if (result.passed_after_failure)
+        std::cout << ", " << result.passed_after_failure << " of them after a failed run";
+    std::cout << "; " << result.failed << " failed, " << result.not_qualified << " not qualified, "
+              << result.reported_only << " reported only; " << result.errors << " errors)\n";
     return result;
 }
 
@@ -524,6 +547,8 @@ Verdict verdict(std::vector<Run>::const_iterator first, std::vector<Run>::const_
         return Verdict::passed;
     if (std::any_of(first, last, [](const Run& r) { return r.verdict == Verdict::failed; }))
         return Verdict::failed;
+    if (std::all_of(first, last, [](const Run& r) { return r.verdict == Verdict::reported_only; }))
+        return Verdict::reported_only;
     return Verdict::not_qualified;
 }
 

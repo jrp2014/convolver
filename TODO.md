@@ -1283,8 +1283,9 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   passed, failed or not qualified; the host thread's hold is judged whatever
   the audio thread saw; a run is not qualified only when callbacks broke the
   limits after a late baseline, or the build does not enforce them; the test
-  exits 77 (CTest: skipped) rather than 0 when an entry did not qualify; the
-  summary keeps every run that did not pass. `native.load_timing_harness`
+  exits 77 (CTest: skipped) rather than 0 when an entry did not qualify; an
+  entry no limit applies to is reported only, not passed; the summary keeps
+  every run that did not pass and counts passes after a failed run. `native.load_timing_harness`
   drives the harness with a mock adapter: slow loads fail, with late
   callbacks too (the review's reproduction), late callbacks with a late
   baseline do not qualify, a refused load fails;

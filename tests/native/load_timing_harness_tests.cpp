@@ -53,6 +53,7 @@ class Mock final : public lc::Driver {
   public:
     Ms load{0}, callback{0};
     bool slow_only_while_loading = false;
+    int slow_loads = -1; // How many loads take `load`: all, if negative.
     bool refuse = false;
 
     lc::Format format() const override {
@@ -67,7 +68,10 @@ class Mock final : public lc::Driver {
     void destroy() override {}
     bool restore(std::span<const std::byte> state) override {
         loading_ = true;
-        std::this_thread::sleep_for(load);
+        if (slow_loads != 0)
+            std::this_thread::sleep_for(load);
+        if (slow_loads > 0)
+            --slow_loads;
         loading_ = false;
         if (refuse)
             return false;
@@ -80,8 +84,13 @@ class Mock final : public lc::Driver {
     void stop() override {}
     bool process(std::span<const float* const> in, std::span<float* const> out,
                  std::size_t frames) override {
-        if (!slow_only_while_loading || loading_)
-            std::this_thread::sleep_for(callback);
+        // Spins rather than sleeps: a sleep can take many times longer
+        // (175 ms for 25 ms on a macOS runner), which only slows the test.
+        if (callback.count() && (!slow_only_while_loading || loading_)) {
+            const auto until = std::chrono::steady_clock::now() + callback;
+            while (std::chrono::steady_clock::now() < until) {
+            }
+        }
         for (std::size_t c = 0; c < out.size(); ++c)
             std::copy_n(in[c % in.size()], frames, out[c]);
         return true;
@@ -106,10 +115,18 @@ class Mock final : public lc::Driver {
     std::atomic<bool> loading_{false};
 };
 
+// A folder of its own, so that builds testing at once do not share one.
+std::filesystem::path scratch() {
+    return std::filesystem::temp_directory_path() /
+           ("convolver-load-timing-harness-" +
+            std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+}
+
 struct Case {
     const char* name;
     Ms load, callback;
     bool slow_only_while_loading = false, refuse = false, enforce = true;
+    int slow_loads = -1;
 };
 
 timing::Result run(const Case& c) {
@@ -119,8 +136,9 @@ timing::Result run(const Case& c) {
     mock.callback = c.callback;
     mock.slow_only_while_loading = c.slow_only_while_loading;
     mock.refuse = c.refuse;
+    mock.slow_loads = c.slow_loads;
     timing::Options o;
-    o.work_directory = std::filesystem::temp_directory_path() / "convolver-load-timing-harness";
+    o.work_directory = scratch();
     o.enforce = c.enforce;
     // A short filter: the mock does not prepare it, and a 100 ms limit.
     const std::vector<timing::Workload> list{{"tiny", {48000, 2, 2}, 0.01, 512, 100ms}};
@@ -135,17 +153,23 @@ timing::Result run(const Case& c) {
 
 std::string text(const timing::Result& r) {
     return std::to_string(r.passed) + " passed, " + std::to_string(r.failed) + " failed, " +
-           std::to_string(r.not_qualified) + " not qualified, " + std::to_string(r.errors) +
-           " errors, exit " + std::to_string(timing::exit_code(r));
+           std::to_string(r.not_qualified) + " not qualified, " + std::to_string(r.reported_only) +
+           " reported only, " + std::to_string(r.errors) + " errors, exit " +
+           std::to_string(timing::exit_code(r));
 }
 
 // PERF-10: the harness judges what it measured, and says so.
 void verdicts() {
     {
-        // A quick adapter on a quiet machine passes; a busy machine may leave
-        // it unqualified, never failed.
+        // A quick adapter never fails on its hold. Its callbacks are the
+        // machine's: one stalled run after another, other tests running
+        // alongside, can fail them, so they are not checked here.
         const auto r = run({"quick loads and callbacks", 0ms, 0ms});
-        check(r.errors == 0 && r.failed == 0 && r.passed + r.not_qualified == 1,
+        check(r.errors == 0 && std::none_of(r.runs.begin(), r.runs.end(),
+                                            [](const timing::Run& run) {
+                                                return run.why.find("held the host's thread") !=
+                                                       std::string::npos;
+                                            }),
               "quick adapter: " + text(r));
     }
     {
@@ -161,16 +185,25 @@ void verdicts() {
               "slow loader: the run says the host's thread was held");
     }
     {
+        // Slow only on the first run (its two loads): run 1 fails and is kept;
+        // the next is not held (its callbacks are the machine's).
+        const auto r = run({"slow on the first run only", 400ms, 0ms, false, false, true, 2});
+        check(r.runs.size() >= 2 && r.runs[0].verdict == timing::Verdict::failed &&
+                  r.runs[1].why.find("held the host's thread") == std::string::npos &&
+                  (r.passed == 0 || r.passed_after_failure == 1),
+              "slow on the first run only: " + text(r));
+    }
+    {
         // The review's reproduction: a slow loader with every callback late,
         // the baseline included, still fails on the hold.
-        const auto r = run({"slow loader, every callback late", 400ms, 25ms});
+        const auto r = run({"slow loader, every callback late", 400ms, 12ms});
         check(r.failed == 1 && timing::exit_code(r) == 1,
               "slow loader with late callbacks: " + text(r));
     }
     {
         // Late callbacks with a late baseline show nothing: not qualified,
         // and the test is skipped rather than passed.
-        const auto r = run({"every callback late, quick loader", 0ms, 25ms});
+        const auto r = run({"every callback late, quick loader", 0ms, 12ms});
         check(r.not_qualified == 1 && r.passed == 0 && r.failed == 0 &&
                   timing::exit_code(r) == timing::not_qualified_exit,
               "late callbacks throughout: " + text(r));
@@ -178,7 +211,7 @@ void verdicts() {
     {
         // Callbacks late only while loading fail (or, on a busy machine, do
         // not qualify); they never pass.
-        const auto r = run({"callbacks late while loading", 50ms, 25ms, true});
+        const auto r = run({"callbacks late while loading", 50ms, 12ms, true});
         check(r.passed == 0 && timing::exit_code(r) != 0,
               "callbacks late while loading: " + text(r));
     }
@@ -188,6 +221,28 @@ void verdicts() {
         check(r.not_qualified == 1 && r.runs.size() == 1 &&
                   timing::exit_code(r) == timing::not_qualified_exit,
               "limits not enforced: " + text(r));
+    }
+    {
+        // An entry no limit applies to (the host stops audio for the load,
+        // which is not on its thread) is reported only, however slow.
+        Mock mock;
+        mock.load = 400ms;
+        timing::Options o;
+        o.work_directory = scratch();
+        o.enforce = true;
+        o.reset_holds_audio = true;
+        std::cout << "\ncase: reported only\n";
+        const auto r = timing::run(mock,
+                                   {{"held back",
+                                     [&](const timing::Filter& f, timing::Audio&) {
+                                         return timing::Outcome{mock.restore(f.state)};
+                                     },
+                                     true, false}},
+                                   {{"tiny", {48000, 2, 2}, 0.01, 512, 100ms}}, o);
+        std::filesystem::remove_all(o.work_directory);
+        check(r.reported_only == 1 && r.passed == 0 && r.runs.size() == 1 &&
+                  timing::exit_code(r) == 0,
+              "reported only: " + text(r));
     }
     {
         // A refused load is an error in any build.
