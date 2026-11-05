@@ -125,7 +125,9 @@ is superseded.
   it worked, where they hesitated and what they could not do without help.
   Fix the guides or the product for each finding and repeat the affected
   steps. This is the exit criterion of the
-  [next milestone](#execution-priorities). jrp chooses the tester.
+  [next milestone](#execution-priorities). jrp chooses the tester. Record
+  the evidence HOST-1 lists (package hash, host and OS versions, expected
+  outputs, recovery from a refused filter) for each journey.
 - [ ] **REL-4 — Make the preview findable.** Room-correction users and the
   `.cfg` format's existing users should find Convolver from search, the old
   SourceForge site, KVR and their forums. Done on the repository side: a README
@@ -153,6 +155,16 @@ is superseded.
   without side effects: the controller asks the host to reread every
   parameter (`restartComponent(kParamValuesChanged)`, which the SDK meant
   for program changes) whenever the status changes. Not yet run.
+  The external review of `91fcf1f` (0.8.13, 5 November 2026) asks that
+  HOST-1, AU-4, AU-3/AU-5, PLUG-5, REL-2 and REL-3 come before further
+  conveniences, all against one exact candidate, and stay separate from
+  automated library tests passing. Each record keeps: the package's SHA-256
+  and the candidate run, the host's and the system's versions, the expected
+  output each step was compared with (`expected.wav` and the
+  `convolver --compare` result), and recovery from a refused filter (a
+  preset for another rate or channel count: the status and message shown,
+  silence or the previous filter as the contract says, then a fitting
+  filter loads, and saving and reopening keep it).
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
   now requested (progress below). Write adapters against the
@@ -723,7 +735,16 @@ so the preset file path is not needed).
   peak memory and preparation time during loading, replacement and reset,
   across realistic routing and callback sizes, before further substantial
   DSP changes; those results decide whether more complex partitioning is
-  justified.
+  justified. The external review of `91fcf1f` (0.8.13, 5 November 2026)
+  agrees (keep shared forward transforms, prepared buffers and control-side
+  retirement; nothing yet calls for another engine or nonuniform
+  partitioning) and sets the acceptance: on named machines, realistic 6- and
+  8-channel filters, small callbacks, 48 and 96 kHz and repeated
+  replacements, measure preparation time, peak memory while decoded
+  configurations and several prepared engines coexist, and callback
+  percentiles and maxima during replacement and reset; publish the
+  supported workloads with those percentiles and maxima, and decide from
+  them whether PERF-2, PERF-7 or PERF-8 is worth doing.
 - [ ] **PERF-7 — One input check on the plug-in audio path.** From the
   project review of 5 November 2026, after PERF-3: each `HostProcessor`
   call copies planar host buffers into an interleaved buffer and replaces
@@ -769,6 +790,31 @@ about 1.4 s and 1.7 s including the observation's own overhead. Those are
 not isolated preparation timings, and whether the interface stayed
 responsive and the audio free of dropouts was not verified. jrp deferred
 load-performance work for now; that is not a qualification of either.
+
+The external review of `91fcf1f` (0.8.13, 5 November 2026) asks for this to
+become an executable gate before the preview. Acceptance: an automated test
+times each adapter's own load and restore entry point (VST3 `setState` and
+the window's load, the Audio Unit's `RestoreState` and load property, LV2's
+`restore` and worker) while a test host renders audio on another thread, on
+the PERF-3 workloads, and records how long the caller is blocked and how
+late each callback is. jrp sets the threshold for both; the gate passes when
+every adapter meets it. If one does not, preparation moves to a worker, with
+the adapter (as LV2 does) owning request order, overtaken requests,
+publication and shutdown.
+
+### Keeping `host.cpp` manageable
+
+Guidance, not an item (external review of `91fcf1f`, 0.8.13, 5 November
+2026): `portable/host.cpp` combines filter acceptance, failure policy,
+diagnostic wording, status text and the real-time `HostProcessor`. When one
+of these next changes, move the control-side filter policy apart from
+`HostProcessor`'s audio code, as VST3-14 and AU-11 moved code out of the
+adapters, with public APIs and ownership unchanged; and keep diagnostics as
+their structured parts (problem, cause, fix) inside, formatting text only
+where it leaves the library, rather than formatting and parsing it again.
+No new general framework. Such moves keep saved state, diagnostic text,
+allocation guards and numerical results unchanged, and never share a pull
+request with a DSP change.
 
 ## Developer tooling
 
