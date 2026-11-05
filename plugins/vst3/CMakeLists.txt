@@ -73,16 +73,17 @@ endif()
 # (plugins/editor/mac/) behind the SDK's EditorView, in Objective-C++ with
 # ARC; its classes carry the format and version in their names, so two
 # Convolver builds or formats in one host keep their own windows. No window
-# elsewhere yet (VST3-12, VST3-13). Every target that compiles processor.cpp
-# takes these sources (convolver_vst3_editor below). The .mm files compile as
-# CXX, as the SDK's own .mm files do: enabling OBJCXX here would turn the
-# SDK's .mm files, in a directory added before, into a language that
-# directory has no rules for.
+# elsewhere yet (VST3-12, VST3-13). Every target that compiles the adapter
+# (vst3_adapter_sources) takes these sources (convolver_vst3_editor below).
+# The .mm files compile as CXX, as the SDK's own .mm files do: enabling
+# OBJCXX here would turn the SDK's .mm files, in a directory added before,
+# into a language that directory has no rules for.
 if(APPLE)
     string(REPLACE "." "_" vst3_class_version "${Convolver_VERSION}")
     set(mac_editor "${PROJECT_SOURCE_DIR}/plugins/editor/mac")
     set(vst3_editor_sources "${CMAKE_CURRENT_SOURCE_DIR}/editor.mm"
-        "${mac_editor}/diagnostic_view.mm" "${mac_editor}/setting_rows.mm")
+        "${mac_editor}/diagnostic_view.mm" "${mac_editor}/setting_rows.mm"
+        "${mac_editor}/file_watch.mm")
     set(vst3_view_classes "CONVOLVER_DIAGNOSTIC_VIEW=ConvolverVST3View_${vst3_class_version};CONVOLVER_SETTING_ROWS=ConvolverVST3SettingRows_${vst3_class_version}")
     set_source_files_properties(${vst3_editor_sources} PROPERTIES
         COMPILE_OPTIONS "-fobjc-arc;-Wall;-Wextra"
@@ -91,13 +92,16 @@ if(APPLE)
 else()
     set(vst3_editor_sources "${CMAKE_CURRENT_SOURCE_DIR}/editor_none.cpp")
 endif()
+# VST3-14: the processor and the edit controller, each in its own file.
+set(vst3_adapter_sources "${CMAKE_CURRENT_SOURCE_DIR}/processor.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/controller.cpp")
 function(convolver_vst3_editor target)
     target_sources(${target} PRIVATE ${vst3_editor_sources})
     if(APPLE)
         target_link_libraries(${target} PRIVATE "-framework AppKit")
     endif()
 endfunction()
-smtg_add_vst3plugin(convolver_vst3 PACKAGE_NAME Convolver SOURCES_LIST processor.cpp factory.cpp
+smtg_add_vst3plugin(convolver_vst3 PACKAGE_NAME Convolver SOURCES_LIST ${vst3_adapter_sources} factory.cpp
     ${vst3_editor_sources})
 if(CONVOLVER_SDK_STRIP)
     set(CMAKE_STRIP "${convolver_strip}")
@@ -122,7 +126,7 @@ if(APPLE)
 endif()
 if(CONVOLVER_BUILD_TESTS)
     add_executable(convolver_vst3_tests "${PROJECT_SOURCE_DIR}/tests/vst3/adapter_tests.cpp"
-        processor.cpp "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
+        ${vst3_adapter_sources} "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
     target_include_directories(convolver_vst3_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable"
         "${Convolver_BINARY_DIR}/generated")
     target_link_libraries(convolver_vst3_tests PRIVATE Convolver::host sdk sdk_hosting
@@ -147,7 +151,7 @@ if(CONVOLVER_BUILD_TESTS)
         # VST3-11: the window, created, attached to an off-screen window and
         # removed as a host does.
         add_executable(convolver_vst3_editor_tests "${PROJECT_SOURCE_DIR}/tests/vst3/editor_tests.mm"
-            processor.cpp "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
+            ${vst3_adapter_sources} "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
         set_source_files_properties("${PROJECT_SOURCE_DIR}/tests/vst3/editor_tests.mm" PROPERTIES
             COMPILE_OPTIONS "-fobjc-arc"
             COMPILE_DEFINITIONS "${vst3_view_classes}"
@@ -205,7 +209,7 @@ if(CONVOLVER_BUILD_IO)
         find_package(Python3 REQUIRED COMPONENTS Interpreter)
         # The SDK-free writer against Steinberg's PresetFile, both directions.
         add_executable(convolver_vst3_preset_format "${PROJECT_SOURCE_DIR}/tests/vst3/preset_format_tests.cpp"
-            processor.cpp "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
+            ${vst3_adapter_sources} "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
         target_include_directories(convolver_vst3_preset_format PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${SDK_ROOT}")
         target_link_libraries(convolver_vst3_preset_format PRIVATE convolver_presets sdk
             ${vst3_file_libraries})
@@ -228,7 +232,7 @@ if(CONVOLVER_BUILD_IO)
         # that examples.first_use leaves behind.
         if(TARGET convolver_cli AND CONVOLVER_BUILD_NATIVE)
             add_executable(convolver_vst3_harness "${PROJECT_SOURCE_DIR}/tests/vst3/harness_tests.cpp"
-                "${PROJECT_SOURCE_DIR}/tests/plugins/harness.cpp" processor.cpp
+                "${PROJECT_SOURCE_DIR}/tests/plugins/harness.cpp" ${vst3_adapter_sources}
                 "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
             target_include_directories(convolver_vst3_harness PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
                 "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable" "${Convolver_BINARY_DIR}/generated")
@@ -246,7 +250,7 @@ if(CONVOLVER_BUILD_IO)
             # PLUG-7: lifecycle sequences against the reference model.
             add_executable(convolver_vst3_lifecycle "${PROJECT_SOURCE_DIR}/tests/vst3/lifecycle_tests.cpp"
                 "${PROJECT_SOURCE_DIR}/tests/plugins/lifecycle.cpp"
-                "${PROJECT_SOURCE_DIR}/tests/plugins/audio_guard.cpp" processor.cpp
+                "${PROJECT_SOURCE_DIR}/tests/plugins/audio_guard.cpp" ${vst3_adapter_sources}
                 "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
             target_include_directories(convolver_vst3_lifecycle PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
                 "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable" "${Convolver_BINARY_DIR}/generated")
@@ -296,7 +300,7 @@ endif()
 
 if(CONVOLVER_BUILD_TESTS AND CONVOLVER_PACKAGE_PLUGINS)
     add_executable(convolver_vst3_package_probe "${PROJECT_SOURCE_DIR}/tests/vst3/package_probe.cpp"
-        processor.cpp "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
+        ${vst3_adapter_sources} "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
     target_include_directories(convolver_vst3_package_probe PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable"
         "${Convolver_BINARY_DIR}/generated")
     target_link_libraries(convolver_vst3_package_probe PRIVATE Convolver::host sdk sdk_hosting
@@ -320,7 +324,19 @@ if(APPLE)
 endif()
 
 # DIAG-1: tests write the Convolver log in the build folder, never the user's.
+# vst3.adapter and vst3.preset run the adapter tests, which read what their
+# log gained and that no other process wrote to it meanwhile, so each has a
+# file of its own (CI-28).
 get_property(convolver_vst3_tests_here DIRECTORY PROPERTY TESTS)
+foreach(test_and_log IN ITEMS "vst3.adapter;adapter" "vst3.preset;preset")
+    list(GET test_and_log 0 own_log_test)
+    list(GET test_and_log 1 own_log_name)
+    if(TEST ${own_log_test})
+        list(REMOVE_ITEM convolver_vst3_tests_here ${own_log_test})
+        set_property(TEST ${own_log_test} APPEND PROPERTY ENVIRONMENT
+            "CONVOLVER_LOG=${CMAKE_CURRENT_BINARY_DIR}/convolver-${own_log_name}-tests.log")
+    endif()
+endforeach()
 if(convolver_vst3_tests_here)
     set_property(TEST ${convolver_vst3_tests_here} APPEND PROPERTY ENVIRONMENT
         "CONVOLVER_LOG=${CMAKE_CURRENT_BINARY_DIR}/convolver-tests.log")

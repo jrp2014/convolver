@@ -80,7 +80,8 @@ string(REPLACE "." "_" au_class_version "${Convolver_VERSION}")
 set(au_view_factory "ConvolverAUViewFactory_${au_class_version}")
 set(mac_editor "${PROJECT_SOURCE_DIR}/plugins/editor/mac")
 set(au_view_sources "${CMAKE_CURRENT_SOURCE_DIR}/view_factory.mm"
-    "${mac_editor}/diagnostic_view.mm" "${mac_editor}/setting_rows.mm")
+    "${mac_editor}/diagnostic_view.mm" "${mac_editor}/setting_rows.mm"
+    "${mac_editor}/file_watch.mm")
 set_source_files_properties(${au_view_sources} PROPERTIES
     COMPILE_OPTIONS "-fobjc-arc;-Wall;-Wextra"
     COMPILE_DEFINITIONS "CONVOLVER_AU_VIEW_FACTORY=${au_view_factory};CONVOLVER_DIAGNOSTIC_VIEW=ConvolverDiagnosticView_${au_class_version};CONVOLVER_SETTING_ROWS=ConvolverSettingRows_${au_class_version}"

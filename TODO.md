@@ -493,12 +493,6 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   plays at once (a new processor handed to Render). Not yet checked in
   GarageBand (AU-4's step 10). Remaining, with PLUG-10's deferred parts:
   Gain mode (1002).
-- [ ] **AU-11 — Separate file watching from the window.** From jrp's review
-  of `276c7dc` (1 November 2026): the macOS window shared by the Audio Unit
-  and VST3, `plugins/editor/mac/diagnostic_view.mm`, is 860 lines again.
-  Move watching filter files and coordinating reloads to their own file, as
-  AU-10 moved the setting rows, behaviour unchanged, before the window
-  gains more controls.
 
 ## FFmpeg integration
 
@@ -656,23 +650,6 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   `xvfb-run`. Not reachable by screen readers, which the guide says. A native
   X11 view can replace it later if Linux users need one
   ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#framework-choice)). Needed for the first preview.
-- [ ] **VST3-14 — Separate the controller from the processor's file.**
-  From jrp's review of `276c7dc` (1 November 2026):
-  `plugins/vst3/processor.cpp` (1,041 lines) holds both the processor and
-  the controller. Move `Controller` to its own file, behaviour unchanged,
-  before the VST3 window gains more controls (as AU-10 did for the window).
-- [ ] **VST3-15 — Test the messages through a host's proxy.** From jrp's
-  review of `276c7dc`: the tests connect the controller and processor
-  directly, and `Controller::load_file` takes `sendMessage()` returning
-  `kResultOk` to mean the processor accepted the filter. The SDK lets a host
-  put a proxy between the components
-  ([`IConnectionPoint`](https://steinbergmedia.github.io/vst3_doc/vstinterfaces/classSteinberg_1_1Vst_1_1IConnectionPoint.html)),
-  which may deliver later or report success on its own. Add tests that
-  connect through a forwarding proxy and a deferring one, and make the
-  window's load result not depend on direct delivery if they fail. A
-  compatibility assumption to check, not a seen host failure; do it before
-  extending the messages.
-
 Not relevant to a convolver unless the product changes: MIDI and note
 interfaces (`IMidiMapping2`, `IMidiLearn2`, note expression, MIDI 2.0
 articulations), `ITransportControl`, `IPrefetchableSupport`,
@@ -816,16 +793,6 @@ load-performance work for now; that is not a qualification of either.
   [Watchdog stacks check](docs/develop/testing.md#watchdog-stacks-check)
   runs; if a run overruns, its process listing says what held the test.
 
-- [ ] **CI-28 — Keep `vst3.adapter`'s Status and log case's log as
-  evidence.** Found in CI-27's review (2 November 2026): `status_and_log`
-  in `tests/vst3/adapter_tests.cpp` points `CONVOLVER_LOG` at a temporary
-  file for the case, with `setenv` while the processor exists, and deletes
-  it afterwards, so a crash in that case loses its log, as `au.adapter`'s
-  did. Give `vst3.adapter` a log of its own in the build folder, set once,
-  read from an offset as the Audio Unit tests do (CI-27); check on Windows,
-  where the variable is wide. See
-  [evidence from failed CI runs](docs/develop/testing.md#evidence-from-failed-ci-runs).
-
 ## Documented limitations
 
 This inventory gathers constraints stated across the guides. Some are deliberate
@@ -877,6 +844,13 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   made one function each and Core Foundation values owned by `cf_owned`; no
   behaviour changes (CHANGELOG has the one out-of-memory exception);
   [implementation map](docs/develop/architecture.md).
+- [x] **AU-11 — Separate file watching from the window.** 5 November 2026,
+  from jrp's review of `276c7dc`: following the playing filter's files and
+  deciding when a change is due to reload moved from
+  `plugins/editor/mac/diagnostic_view.mm` (now 811 lines) to
+  `plugins/editor/mac/file_watch.mm`, a C++ class, so it needs no versioned
+  Objective-C name; behaviour unchanged, checked by `vst3.editor` and
+  `au.editor` on macOS; [shared macOS window](docs/develop/architecture.md#the-shared-macos-window).
 - [x] **AU-10 — Separate the window's setting editing from its layout.**
   1 November 2026, PR #100, from jrp's review of PR #98: the Gain, Mix and
   Latency rows and everything the user does with them (dragging, reset,
@@ -977,6 +951,15 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   reads it; the build and test jobs have time limits. No automatic re-runs;
   CI-24 and CI-25 continue;
   [intermittent failures](docs/develop/testing.md#intermittent-failures).
+- [x] **CI-28 — Keep `vst3.adapter`'s Status and log case's log as
+  evidence.** 5 November 2026, from CI-27's review: the case pointed
+  `CONVOLVER_LOG` at a temporary file with `setenv` while the processor
+  existed, and deleted it. `vst3.adapter` and `vst3.preset` (which runs the
+  same tests) now each have a log of their own in the build folder, set once
+  in `main` (wide on Windows), and the case reads it from
+  an offset with the helper the Audio Unit tests use, moved to
+  `tests/plugins/test_log.hpp`;
+  [evidence from failed CI runs](docs/develop/testing.md#evidence-from-failed-ci-runs).
 - [x] **CI-27 — Keep the Audio Unit adapter test's log after a crash.** 2
   November 2026, from jrp's review of `f2dc691`: the test kept its Convolver
   log in a private temporary file and copied it to the build folder only on
@@ -1121,6 +1104,23 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   in its constructor, so out of memory reaches the caller, and
   `estimate_attenuation` refuses a non-finite noise response; tests in
   `native.io` and `native.engine`; [gain](docs/use/command-line.md#gain-and-attenuation).
+- [x] **VST3-15 — Test the messages through a host's proxy.** 5 November
+  2026, from jrp's review of `276c7dc`: `vst3.adapter` connects the
+  components through a forwarding proxy and a deferring one
+  (`IConnectionPoint`). The deferring one showed two assumptions of direct
+  delivery: the host was asked to restart for a new Latency before the
+  processor had it, and a refused file marked the project changed. The
+  processor's `ConvolverStatus` now answers each load and Latency by its
+  request number, and the controller acts on those answers (a restart only
+  for the last Latency chosen) rather than on
+  `sendMessage()`'s result; a deferred load returns before its answer and
+  the report shows it;
+  [messages](docs/develop/plugin-contract.md#status-and-log).
+- [x] **VST3-14 — Separate the controller from the processor's file.**
+  5 November 2026, from jrp's review of `276c7dc`: `Controller` moved from
+  `plugins/vst3/processor.cpp` (then 1,041 lines, about 780 after) to
+  `plugins/vst3/controller.cpp`, unchanged; the Status values' names, which both use, moved to
+  `processor.hpp`; [implementation map](docs/develop/architecture.md).
 - [x] **VST3-1 — Speaker arrangements, not only channel counts.** 23 October
   2026, PR #42; [channel layouts](docs/develop/plugin-identities.md#channel-layouts).
 - [x] **VST3-3 — Editor messaging between controller and processor.**

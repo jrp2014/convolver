@@ -2,7 +2,6 @@
 #include "processor.hpp"
 #include "bytes.hpp"
 #include "convolver_sdk.hpp"
-#include "editor.hpp"
 #include "filter_file.hpp"
 #include "host_log.hpp"
 #include "pluginterfaces/base/ibstream.h"
@@ -367,7 +366,7 @@ HostReport Processor::report_locked() const {
         facts.file_reader = "macOS AudioToolbox";
     return host_report(filter_, facts);
 }
-void Processor::send_status() noexcept {
+void Processor::send_status(const StatusAnswer& answer) noexcept {
     try {
         HostStatusLine line;
         std::string fields, text;
@@ -392,6 +391,12 @@ void Processor::send_status() noexcept {
         attributes->setBinary("report", fields.data(), static_cast<uint32>(fields.size()));
         attributes->setBinary("report text", text.data(), static_cast<uint32>(text.size()));
         attributes->setBinary("format", tag_.data(), static_cast<uint32>(tag_.size()));
+        if (answer.load_request) {
+            attributes->setInt("load request", answer.load_request);
+            attributes->setInt("accepted", answer.accepted ? 1 : 0);
+        }
+        if (answer.latency_request)
+            attributes->setInt("latency request", answer.latency_request);
         sendMessage(message);
     } catch (...) { // Out of memory: the controller keeps the previous status.
     }
@@ -412,12 +417,14 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
         if (!attributes || attributes->getInt("frames", frames) != kResultOk ||
             std::find(host_latencies.begin(), host_latencies.end(), frames) == host_latencies.end())
             return kInvalidArgument;
+        int64 request = 0;
+        attributes->getInt("request", request);
         {
             std::lock_guard lock(control_);
             choose_latency(static_cast<std::size_t>(frames));
         }
         write_log();
-        send_status();
+        send_status({.latency_request = request});
         return kResultOk;
     }
     if (id == load_message) {
@@ -426,13 +433,15 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
         auto* attributes = message->getAttributes();
         if (!attributes || attributes->getBinary("path", data, size) != kResultOk || !size || !data)
             return kInvalidArgument;
+        int64 request = 0;
+        attributes->getInt("request", request);
         bool accepted = false;
         try {
             accepted = load_file(std::string(static_cast<const char*>(data), size));
         } catch (...) { // Out of memory for the path: nothing changed.
         }
         write_log();
-        send_status();
+        send_status({.load_request = request, .accepted = accepted});
         return accepted ? kResultOk : kResultFalse;
     }
     if (id == report_message) {
@@ -645,15 +654,6 @@ tresult PLUGIN_API Processor::getState(IBStream* stream) {
         send_status();
     return result;
 }
-namespace {
-// The Status parameter's values, in HostStatus order.
-constexpr std::array<const char*, 5> status_names{"Playing", "No filter", "Load failed",
-                                                  "Not checked yet", "Fault"};
-static_assert(static_cast<std::size_t>(HostStatus::fault) == status_names.size() - 1);
-constexpr ParamValue normalized(HostStatus status) {
-    return static_cast<ParamValue>(status) / static_cast<ParamValue>(status_names.size() - 1);
-}
-} // namespace
 template <class T> bool Processor::segment(ProcessData& d, int32 start, int32 count) noexcept {
     std::array<const T*, max_bus_channels> in{};
     std::array<T*, max_bus_channels> out{};
@@ -781,261 +781,7 @@ void Processor::signal_faults(ProcessData& d) noexcept {
         return;
     int32 index = 0, point = 0;
     if (auto* queue = d.outputParameterChanges->addParameterData(status_id, index);
-        queue && queue->addPoint(0, normalized(HostStatus::fault), point) == kResultOk)
+        queue && queue->addPoint(0, normalized_status(HostStatus::fault), point) == kResultOk)
         host_->fault_signalled();
-}
-namespace {
-void copy(const std::string& text, String128 out) {
-    std::size_t i = 0;
-    for (; i < text.size() && i < 127; ++i) // ASCII (HostStatusLine), widened.
-        out[i] = static_cast<TChar>(static_cast<unsigned char>(text[i]));
-    out[i] = 0;
-}
-} // namespace
-tresult PLUGIN_API Controller::initialize(FUnknown* context) {
-    auto result = EditController::initialize(context);
-    if (result == kResultOk) {
-        // VST3-4: the settings first, as generic host views list them in
-        // this order (the Audio Unit lists the same).
-        auto* gain = new RangeParameter(STR16("Gain"), gain_id, STR16("dB"), min_gain_db,
-                                        max_gain_db, 0, 0, ParameterInfo::kCanAutomate);
-        gain->setPrecision(1);
-        parameters.addParameter(gain);
-        auto* mix = new RangeParameter(STR16("Mix"), mix_id, STR16("%"), 0, 100, 100, 0,
-                                       ParameterInfo::kCanAutomate);
-        mix->setPrecision(0);
-        parameters.addParameter(mix);
-        // Not automatable: a new Latency restarts the component.
-        auto* latency =
-            new StringListParameter(STR16("Latency"), latency_id, nullptr, ParameterInfo::kIsList);
-        for (const auto frames : host_latencies) {
-            String128 text{};
-            copy(std::to_string(frames) + " frames", text);
-            latency->appendString(text);
-        }
-        latency->setNormalized(normalized_latency(default_host_latency));
-        latency->getInfo().defaultNormalizedValue = latency->getNormalized();
-        parameters.addParameter(latency);
-        parameters.addParameter(STR16("Bypass"), nullptr, 1, 0,
-                                ParameterInfo::kCanAutomate | ParameterInfo::kIsBypass, bypass_id);
-        auto* status = new StringListParameter(STR16("Status"), status_id, nullptr,
-                                               ParameterInfo::kIsReadOnly | ParameterInfo::kIsList);
-        for (const auto* name : status_names) {
-            String128 text{};
-            copy(name, text);
-            status->appendString(text);
-        }
-        status->setNormalized(status->toNormalized(static_cast<ParamValue>(HostStatus::no_filter)));
-        status->getInfo().defaultNormalizedValue = status->getNormalized();
-        parameters.addParameter(status);
-    }
-    return result;
-}
-tresult PLUGIN_API Controller::notify(IMessage* message) {
-    if (!message || !message->getMessageID() ||
-        std::string_view(message->getMessageID()) != status_message)
-        return EditController::notify(message);
-    auto* attributes = message->getAttributes();
-    int64 status = 0;
-    const void* data = nullptr;
-    uint32 size = 0;
-    if (!attributes || attributes->getInt("status", status) != kResultOk || status < 0 ||
-        status >= static_cast<int64>(status_names.size()) ||
-        attributes->getBinary("text", data, size) != kResultOk || (size && !data))
-        return kInvalidArgument;
-    std::string text, report_text, format;
-    std::vector<std::pair<std::string, std::string>> report;
-    try {
-        text.assign(static_cast<const char*>(data), size);
-        // VST3-3: the window's report, when the message carries it.
-        const auto binary = [&](const char* id) -> std::optional<std::string> {
-            const void* bytes = nullptr;
-            uint32 length = 0;
-            if (attributes->getBinary(id, bytes, length) != kResultOk || (length && !bytes))
-                return std::nullopt;
-            return std::string(static_cast<const char*>(bytes), length);
-        };
-        if (const auto fields = binary("report")) {
-            report = decode_report(*fields);
-            report_text = binary("report text").value_or("");
-            format = binary("format").value_or("");
-        }
-    } catch (...) {
-        return kOutOfMemory;
-    }
-    auto* parameter = getParameterObject(status_id);
-    if (!parameter) // Not initialized, or terminated: nothing to show it on.
-        return kResultFalse;
-    bool changed = false;
-    {
-        std::lock_guard lock(status_lock_);
-        changed = status_text_ != text || status_value_ != static_cast<int>(status);
-        status_text_.swap(text);
-        status_value_ = static_cast<int>(status);
-        if (!report.empty()) {
-            report_.swap(report);
-            report_text_.swap(report_text);
-            format_.swap(format);
-        }
-    }
-    // A window asks for the report twice a second; only a new status line
-    // is news for the host.
-    if (!changed)
-        return kResultOk;
-    EditController::setParamNormalized(status_id,
-                                       parameter->toNormalized(static_cast<ParamValue>(status)));
-    // Ask the host to read the parameters again (the status is not edited
-    // by the user, so performEdit does not apply). Hosts may ignore this.
-    if (componentHandler)
-        componentHandler->restartComponent(kParamValuesChanged);
-    return kResultOk;
-}
-void Controller::latency_chosen(std::size_t frames) {
-    if (auto message = owned(allocateMessage())) {
-        message->setMessageID(latency_message);
-        if (auto* attributes = message->getAttributes()) {
-            attributes->setInt("frames", static_cast<int64>(frames));
-            sendMessage(message);
-        }
-    }
-    // The SDK's way to report a new latency: the host deactivates the
-    // component, reads getLatencySamples() and activates it again.
-    if (componentHandler)
-        componentHandler->restartComponent(kLatencyChanged);
-}
-tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) {
-    if (id == latency_id) {
-        const auto before = latency_frames(getParamNormalized(latency_id));
-        const auto result = EditController::setParamNormalized(id, value);
-        const auto after = latency_frames(getParamNormalized(latency_id));
-        if (result == kResultOk && after != before)
-            latency_chosen(after);
-        return result;
-    }
-    const auto result = EditController::setParamNormalized(id, value);
-    if (id != status_id || result != kResultOk || value != normalized(HostStatus::fault))
-        return result;
-    {
-        std::lock_guard lock(status_lock_);
-        if (status_value_ == static_cast<int>(HostStatus::fault))
-            return result; // The processor has explained it already.
-    }
-    // Outside the lock: the processor answers with its status_message.
-    if (auto message = owned(allocateMessage())) {
-        message->setMessageID(faults_message);
-        sendMessage(message);
-    }
-    return result;
-}
-tresult PLUGIN_API Controller::getParamStringByValue(ParamID id, ParamValue value,
-                                                     String128 string) {
-    if (id == status_id && value == getParamNormalized(status_id)) {
-        std::lock_guard lock(status_lock_);
-        // The text belongs to the status the processor sent last; a Fault
-        // value from the audio thread reads as its name until it explains.
-        if (!status_text_.empty() && value == normalized(static_cast<HostStatus>(status_value_))) {
-            copy(status_text_, string);
-            return kResultOk;
-        }
-    }
-    return EditController::getParamStringByValue(id, value, string);
-}
-tresult PLUGIN_API Controller::getParamValueByString(ParamID id, TChar* string, ParamValue& value) {
-    if (!string)
-        return kInvalidArgument;
-    if (id == bypass_id) {
-        // Case-insensitive ASCII comparison of the host's UTF-16 text.
-        auto is = [string](const char* word) {
-            std::size_t i = 0;
-            for (; word[i]; ++i) {
-                auto c = string[i];
-                if (c >= u'A' && c <= u'Z')
-                    c = static_cast<TChar>(c - u'A' + u'a');
-                if (c != static_cast<TChar>(word[i]))
-                    return false;
-            }
-            return string[i] == 0;
-        };
-        if (is("off") || is("0")) {
-            value = 0;
-            return kResultOk;
-        }
-        if (is("on") || is("1")) {
-            value = 1;
-            return kResultOk;
-        }
-        // Not the SDK's conversion: it reads any text as 0 on macOS and
-        // leaves the value unset on Windows.
-        return kResultFalse;
-    }
-    return EditController::getParamValueByString(id, string, value);
-}
-tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
-    HostState state;
-    try {
-        state = read_state(stream);
-    } catch (...) {
-        return kResultFalse;
-    }
-    const auto saved = state.settings.value_or(HostSettings{});
-    EditController::setParamNormalized(gain_id, normalized_gain(saved.gain_db));
-    EditController::setParamNormalized(mix_id, std::clamp(saved.mix, 0.0, 1.0));
-    // The processor has the Latency from the same state: no message, but the
-    // host is asked to read it again when it changed.
-    const auto before = latency_frames(getParamNormalized(latency_id));
-    EditController::setParamNormalized(latency_id, normalized_latency(saved.latency));
-    if (latency_frames(getParamNormalized(latency_id)) != before && componentHandler)
-        componentHandler->restartComponent(kLatencyChanged);
-    return EditController::setParamNormalized(bypass_id, state.bypass ? 1 : 0);
-}
-IPlugView* PLUGIN_API Controller::createView(FIDString name) {
-    if (!name || std::string_view(name) != ViewType::kEditor)
-        return nullptr;
-    return create_editor(*this);
-}
-std::vector<std::pair<std::string, std::string>> Controller::report() {
-    // Outside the lock: the processor answers with its status_message.
-    if (auto message = owned(allocateMessage())) {
-        message->setMessageID(report_message);
-        sendMessage(message);
-    }
-    std::lock_guard lock(status_lock_);
-    return report_;
-}
-std::string Controller::diagnostics() {
-    std::string text, format;
-    {
-        std::lock_guard lock(status_lock_);
-        text = report_text_;
-        format = format_;
-    }
-    if (format.empty())
-        return {};
-    return diagnostics_text(text, format);
-}
-bool Controller::load_file(const std::string& path) {
-    auto message = owned(allocateMessage());
-    if (!message || path.empty())
-        return false;
-    message->setMessageID(load_message);
-    auto* attributes = message->getAttributes();
-    if (!attributes ||
-        attributes->setBinary("path", path.data(), static_cast<uint32>(path.size())) != kResultOk)
-        return false;
-    const bool accepted = sendMessage(message) == kResultOk;
-    // The component state now holds the file's filter: the host saves it
-    // only if it knows the project changed.
-    if (accepted)
-        setDirty(true); // IComponentHandler2, where the host offers it.
-    return accepted;
-}
-tresult PLUGIN_API Controller::getParameterIDFromFunctionName(UnitID unit, FIDString name,
-                                                              ParamID& id) {
-    if (unit == kRootUnitId && name && std::string_view(name) == FunctionNameType::kDryWetMix) {
-        id = mix_id;
-        return kResultTrue;
-    }
-    id = kNoParamId;
-    return kResultFalse;
 }
 } // namespace convolver::vst3

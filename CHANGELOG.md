@@ -174,9 +174,35 @@ Until 1.0 the C++ API may change between minor versions.
   end. CI evidence now includes the window test's log, which was missing,
   and the `.old` file each test log rotates to. `au.log_evidence` checks
   collection after an abort and a kill.
+- VST3 adapter (VST3-14, from jrp's review of `276c7dc`): the edit
+  controller moved from `plugins/vst3/processor.cpp` to its own file,
+  `plugins/vst3/controller.cpp`, unchanged, before the window gains more
+  controls.
+- macOS window (AU-11, from jrp's review of `276c7dc`): Reload When the File
+  Changes, following the playing filter's files, moved from the window's
+  layout (`plugins/editor/mac/diagnostic_view.mm`) to its own file
+  (`plugins/editor/mac/file_watch.mm`), unchanged, before the window gains
+  more controls.
+- Continuous integration (CI-28, from CI-27's review): `vst3.adapter` and
+  `vst3.preset`, which runs the same tests, write their Convolver logs to
+  files of their own in the build folder (`convolver-adapter-tests.log`,
+  `convolver-preset-tests.log`), set once at start, and the Status and log
+  case reads what it added from there, rather than switching to a temporary file for that case and
+  deleting it, so a crash in the case keeps its log. The Audio Unit and VST3
+  tests share the log helper (`tests/plugins/test_log.hpp`).
 
 ### Fixed
 
+- VST3 (VST3-15, from jrp's review of `276c7dc`): with a host that puts a
+  proxy between the plug-in's two halves and delivers their messages later,
+  a new Latency asked the host to restart before the processor had it, so
+  the old latency stayed in use, and a filter file refused in the window
+  still marked the project changed. The controller now waits for the
+  processor's answer: the restart is asked for once the processor has the
+  Latency, and only an accepted file marks the project changed. Hosts that
+  connect the halves directly, or forward messages at once, behave as
+  before. Not seen in a host; found by new tests that connect through such
+  proxies.
 - Plug-ins (PLUG-13): a filter that filled the saved state at default
   settings could no longer be saved once a VST3 setting changed (jrp's review
   of `276c7dc`: Gain to −6 dB, then `getState()` failed), because settings

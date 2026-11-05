@@ -594,7 +594,11 @@ second instance, with one sample more refused. And the window's messages
 change, no request for the host to reread the parameters while the
 Status line stays the same, a chosen WAV accepted (the project marked changed, the status
 Playing, the filter named and saved) or refused for its rate, an empty path,
-and a build with no file reader. Where the build has no reader of its own
+and a build with no file reader. The messages also go through a forwarding
+proxy and a deferring one, as a host may connect the components (VST3-15):
+the report, a new Latency (the host asked to restart only once the processor
+has it, and after three quick changes only for the last) and a chosen file accepted and refused (the project marked changed
+only for the accepted one). Where the build has no reader of its own
 (Linux and Windows), the test lends the processor libsndfile.
 
 On macOS `vst3.editor` opens the window (VST3-11) as a host does:
@@ -1082,10 +1086,9 @@ A test's Convolver log should be the file CTest names in the build folder
 deleted, so a crash, a sanitizer abort or a timeout that kills the test
 leaves it for the collector; a test that copied its log at exit would lose
 it then (CI-27, from jrp's review of `f2dc691`). The Audio Unit adapter and
-window tests work this way, set `CONVOLVER_LOG` only when run by hand
-without it, and read what each case added from an offset
-(`LogSince` in `tests/au/au_host.hpp`). `vst3.adapter`'s Status and log
-case still uses a temporary log of its own (CI-28). `au.log_evidence`
+window tests and `vst3.adapter` work this way (CI-28), set `CONVOLVER_LOG`
+once, only when run by hand without it, and read what each case added from
+an offset (`LogSince` in `tests/plugins/test_log.hpp`). `au.log_evidence`
 checks the adapter test's log after an abort and a kill, and
 `tests/ci_evidence_tests.py` (in pre-commit) what the collector takes.
 

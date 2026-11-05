@@ -333,13 +333,26 @@ separate processes, so each carries values, never pointers:
   answers with a fresh `ConvolverStatus`, so faults the audio thread counted
   appear as they do in the Audio Unit's twice-a-second read. It looks for new
   faults at most every 10 seconds, as the Audio Unit does.
-- `ConvolverLoad` carries a chosen file's UTF-8 path. The processor reads it
-  with `read_filter_file()` for the current rate and channels (macOS
-  AudioToolbox, as the Audio Unit reads; builds with no reader refuse it with
-  a reason) and installs it as `setState` does, or records the refusal; the
-  controller then calls `setDirty(true)` for an accepted file, so the host
-  marks the project changed. Reading happens on the thread that delivered the
-  message, never in `process()`.
+- `ConvolverLoad` carries a chosen file's UTF-8 path and a request number.
+  The processor reads it with `read_filter_file()` for the current rate and
+  channels (macOS AudioToolbox, as the Audio Unit reads; builds with no
+  reader refuse it with a reason) and installs it as `setState` does, or
+  records the refusal; its `ConvolverStatus` answer names the request and
+  whether the file was accepted, and the controller then calls
+  `setDirty(true)` for an accepted file, so the host marks the project
+  changed. Reading happens on the thread that delivered the message, never
+  in `process()`.
+- A host may put a proxy between the two components
+  ([`IConnectionPoint`](https://steinbergmedia.github.io/vst3_doc/vstinterfaces/classSteinberg_1_1Vst_1_1IConnectionPoint.html))
+  that delivers a message after `sendMessage()` returns and answers
+  `kResultOk` itself (VST3-15). The controller therefore acts on the
+  processor's answers, not on `sendMessage()`'s result: a load is refused at
+  once only when the answer came during the call (a direct connection or a
+  forwarding proxy, such as the SDK's `ConnectionProxy`); otherwise the
+  window's report shows the result when the answer arrives, and only an
+  accepted answer marks the project changed. `ConvolverLatency` carries a
+  request number too, and only the answer to the last one sent asks the
+  host to restart (below).
 
 ## Initial restoration and live replacement
 
@@ -466,8 +479,10 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   cannot send 0 dB exactly, and a project reset to the default must still
   save as version 1 or 2. A new Latency follows
   the SDK's documented route: the controller tells the processor
-  (`ConvolverLatency` message) and asks the host to restart the component
-  (`restartComponent(kLatencyChanged)`); the next `setActive(true)` builds
+  (`ConvolverLatency` message) and, once the processor's `ConvolverStatus`
+  answer says it has the new Latency, asks the host to restart the component
+  (`restartComponent(kLatencyChanged)`), so a host that delivers messages
+  late still reads the new latency (VST3-15); the next `setActive(true)` builds
   the processor with it, and `getLatencySamples()` reports the latency the
   running processor has (the choice while inactive), as the SDK says a host
   reads it after `setActive(true)`.
