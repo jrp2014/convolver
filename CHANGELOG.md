@@ -142,6 +142,15 @@ Until 1.0 the C++ API may change between minor versions.
   machine, to `FORMAT-load-timing.json` in its work folder; the VST3 and
   Audio Unit Release jobs keep them as an artifact. Tests only: no change to
   the plug-ins or the sound.
+- Tests (PLUG-20, from jrp's review of `db54160`): teardown is tested at
+  chosen stages instead of by repetition. `lv2.adapter` holds the worker's
+  `work()` after reading the file, after preparation and after its last
+  check, deactivates or closes the instance from another thread, and
+  releases it; `au.adapter` holds a run of the Latency work while the unit
+  closes. With LV2's `deactivate()` lock removed, the staged case fails
+  under ASan (heap use after free) while the earlier repeated loop passes.
+  The Audio Unit gains a test-only hook, null in the component; no change to
+  the sound.
 
 - The version is now 0.10.0 (jrp, 5 November 2026), the minor step for the
   library changes in DIAG-3 and DIAG-4 below, after 0.9.0. CMake consumers

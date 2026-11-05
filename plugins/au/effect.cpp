@@ -314,6 +314,8 @@ void Effect::request_latency() noexcept {
 }
 
 void Effect::apply_latency() noexcept {
+    if (const auto hook = latency_started_for_tests)
+        hook();
     // Before the settings are read: the requests this run is sure to see.
     const auto seen = latency_requests_for_tests.load();
     std::string message, faults;

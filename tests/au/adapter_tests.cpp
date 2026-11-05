@@ -10,12 +10,15 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <csignal>
 #include <cstdlib>
 #include <filesystem>
+#include <future>
 #include <iostream>
 #include <limits>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <new>
 #include <optional>
@@ -1319,6 +1322,70 @@ void latency_queue_lifetime() {
     }
 }
 
+// PLUG-20 (jrp's review of db54160): closing a unit at each stage of its
+// Latency work, held by latency_started_for_tests rather than left to chance
+// as above: a run in progress, and a run in progress with another change
+// queued behind it. Closing waits for the held run (the destructor cancels
+// the work and waits for its cancel handler); the queued run may or may not
+// start, depending on whether the cancel came first. A watchdog stops the test,
+// naming the stage, if a step never finishes.
+struct LatencyHold {
+    std::mutex mutex;
+    std::condition_variable changed;
+    bool released = false;
+    int runs = 0;
+};
+LatencyHold* latency_hold = nullptr;
+void hold_latency() noexcept {
+    auto& h = *latency_hold;
+    std::unique_lock lock(h.mutex);
+    ++h.runs;
+    h.changed.notify_all();
+    h.changed.wait(lock, [&] { return h.released; });
+}
+void finish_within(std::future<void>&& step, const std::string& what) {
+    if (step.wait_for(std::chrono::seconds(60)) != std::future_status::ready) {
+        std::cerr << what << " did not finish within 60 s (deadlock)" << std::endl;
+        std::_Exit(1);
+    }
+    step.get();
+}
+void latency_staged_closing() {
+    for (const bool queued : {false, true}) {
+        const std::string label = std::string("closing with a Latency run held") +
+                                  (queued ? " and one queued" : "") + ": ";
+        auto unit = std::make_unique<Unit>();
+        check(unit->configure(48000, 2, 2, 512), "formats before closing");
+        check(unit->load(state_of(stereo(48000))), "filter before closing");
+        check(unit->initialize(), "initialization before closing");
+        // The restore wakes the Latency work too; only the change below is held.
+        require(latency_settled(), label + "the restore's Latency run did not finish");
+        LatencyHold hold;
+        latency_hold = &hold;
+        au::latency_started_for_tests = hold_latency;
+        set_parameter(*unit, au::latency_parameter, 3.f);
+        finish_within(std::async(std::launch::async,
+                                 [&] {
+                                     std::unique_lock lock(hold.mutex);
+                                     hold.changed.wait(lock, [&] { return hold.runs > 0; });
+                                 }),
+                      label + "the Latency run starting");
+        if (queued)
+            set_parameter(*unit, au::latency_parameter, 5.f);
+        auto closed = std::async(std::launch::async, [&] { unit.reset(); });
+        {
+            std::lock_guard lock(hold.mutex);
+            hold.released = true;
+        }
+        hold.changed.notify_all();
+        finish_within(std::move(closed), label + "closing");
+        au::latency_started_for_tests = nullptr;
+        latency_hold = nullptr;
+        require(hold.runs >= 1 && hold.runs <= (queued ? 2 : 1),
+                label + std::to_string(hold.runs) + " runs of the Latency work");
+    }
+}
+
 int main(int argc, char** argv) {
     process_log = au_test::use_test_log("convolver-adapter-tests.log");
     if (argc == 3 && std::string(argv[1]) == "--end-abruptly")
@@ -1338,6 +1405,7 @@ int main(int argc, char** argv) {
         settings_parameters();
         latency_parameter();
         latency_queue_lifetime();
+        latency_staged_closing();
         settings_in_diagnostics();
         std::cout << "Audio Unit adapter checks passed\n";
         return 0;

@@ -796,7 +796,12 @@ Five CTest tests run when the adapter is built (label `au`):
   the host, records the number it had seen when it began
   (`latency_requests_for_tests` and `latency_done_for_tests` in
   `plugins/au/effect.hpp`; a lock-free increment per request in the
-  component). The wait's 10 s deadline only catches a deadlock.
+  component). The wait's 10 s deadline only catches a deadlock. Closing the
+  unit is also tested at chosen stages (PLUG-20): a run of the Latency work
+  is held at its start through `latency_started_for_tests`, alone and with
+  another change queued behind it, while another thread closes the unit;
+  closing must finish once the run is released, and a 60 s watchdog names
+  the stage that did not.
 - `au.log_evidence`: the adapter test's Convolver log, the file CTest
   names in the build folder (`convolver-adapter-tests.log`), reaches the
   [CI evidence](#evidence-from-failed-ci-runs) after the test aborts, as a
@@ -892,7 +897,13 @@ AU-4.
   with `work()` paused (through a second test-only extension) after
   preparation and after its last check while a newer request arrives, and a
   failed read overtaken the same way; restore with an answer outstanding;
-  teardown with work queued; state with a path (mapped, PipeWire's bare value,
+  teardown with work queued; deactivation and teardown at each pause point
+  (PLUG-20: `work()` held after reading, after preparation and after its
+  last check while another thread deactivates, then released; reactivated,
+  the new filter plays and is reported and saved; closed, with a newer
+  request queued, nothing is used after it is freed; a 60 s watchdog names
+  a stage that never finishes); a request a host drops at deactivation;
+  state with a path (mapped, PipeWire's bare value,
   an unusable embedded copy, lilv's own state files); and lifecycle
   sequences, one scripted and several seeded (loads, file loads, failed
   loads, audio, bypass, reset, reopening a saved session, an empty state

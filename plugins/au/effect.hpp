@@ -78,6 +78,11 @@ inline int latency_queue_failure_for_tests = 0;
 // increment is all a request adds, on any thread.
 inline std::atomic<std::uint64_t> latency_requests_for_tests{0};
 inline std::atomic<std::uint64_t> latency_done_for_tests{0};
+// For the tests only (PLUG-20): when set, each run of the Latency work calls
+// it first, on the work's queue, so that au.adapter can hold a run and close
+// the unit at that stage. Null in the component; set it only while no unit
+// is open.
+inline void (*latency_started_for_tests)() noexcept = nullptr;
 
 // One input bus and one output bus, 1 to 8 channels each (counts may differ),
 // following the shared adapter contract

@@ -330,6 +330,14 @@ LV2 (Linux first; also PipeWire system audio):
   older sessions restored with defaults in Ardour, Carla and PipeWire
   `filter-chain`.
 
+- [ ] **LV2-8 — Status after a request the host drops.** Found by PLUG-20:
+  a host whose worker drops queued requests at deactivation (the tests'
+  deferred worker can) leaves the status port at Loading until another
+  load is answered; the original filter keeps playing and stays saved.
+  Whether any real host drops requests has not been checked, so this may be
+  marginal: check the hosts first (Ardour, Carla, Jalv, PipeWire), and fix
+  only if one does.
+
 AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 
 - [ ] **AU-3 — Validation.** `auval` and pluginval in macOS CI. `auval -strict`
@@ -1323,6 +1331,19 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   mixed results across runs) and keeps only a few short real-thread runs:
   about 9 s instead of 40 to 60;
   [load timing](docs/develop/testing.md#load-timing-perf-9).
+- [x] **PLUG-20 — Teardown tested at chosen stages.** 5 November 2026,
+  from jrp's review of `db54160` ("test shutdown at explicit stages rather
+  than hoping repeated runs encounter the troublesome interleaving"):
+  `lv2.adapter` holds `work()` at each of its pause points (read, prepared,
+  checked) while another thread deactivates the instance, then releases it:
+  reactivated, the new filter plays and is reported and saved; closed with
+  a newer request queued, nothing is used after it is freed. `au.adapter`
+  holds a run of the Latency work through a new test-only hook
+  (`latency_started_for_tests`) while the unit closes, alone and with a
+  change queued. A 60 s watchdog stops either test, naming the stage. With
+  the lock in LV2's `deactivate()` removed, the staged case fails under ASan
+  while the earlier repeated loop passes. Loading and replacement ordering
+  was already tested this way (the preparation-window cases). Found: LV2-8.
 - [x] **PERF-13 — Load-timing records as JSON.** 5 November 2026, from
   jrp's review of `db54160`: each timing test writes every run's records
   (each callback's due, wake, entry, return, CPU time and success; each

@@ -19,10 +19,12 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <future>
 #include <iostream>
 #include <limits>
 #include <lv2/atom/atom.h>
@@ -52,6 +54,20 @@ void check(bool condition, const std::string& what) {
     }
 }
 constexpr std::size_t latency = 256;
+
+// PLUG-20: waits for a step that must finish once nothing holds it back. A
+// deadlock cannot be unwound (a thread is stuck), so the test stops at once,
+// naming the step; the watchdog is generous and is not a timing check.
+void finish_within(std::future<void>&& step, const std::string& what) {
+    if (step.wait_for(std::chrono::seconds(60)) != std::future_status::ready) {
+        std::cout << "FAIL  " << what << " did not finish within 60 s (deadlock)" << std::endl;
+        std::_Exit(1);
+    }
+    step.get();
+}
+void finish_within(std::future<void>& step, const std::string& what) {
+    finish_within(std::move(step), what);
+}
 
 std::vector<float> read_audio(const fs::path& path) {
     AudioReader reader(path);
@@ -1229,6 +1245,87 @@ void worker_loads(host::World& world, const fs::path& work) {
         if (i % 2)
             p->deactivate();
         // The destructor deactivates, stops the worker and cleans up.
+    }
+
+    // PLUG-20 (jrp's review of db54160): deactivation and teardown at each stage
+    // of a load, chosen by the worker's pause points rather than left to
+    // chance as in the loop above. A is held at `point` while the original
+    // plays; the host deactivates on another thread (deactivate() waits for a
+    // work() call in progress), and the held work is released. A watchdog
+    // stops the test, naming the stage, if a step never finishes.
+    const std::pair<WorkerPoint, const char*> points[] = {
+        {WorkerPoint::read, "read"},
+        {WorkerPoint::prepared, "prepared"},
+        {WorkerPoint::checked, "checked"},
+    };
+    for (const auto& [point, name] : points) {
+        const std::string label = std::string("deactivated with A held at ") + name + ": ";
+        auto p = with_original();
+        p->pause_at(point);
+        p->set_filter(a);
+        p->run_empty();
+        p->wait_until_paused();
+        check(near(play_constant(*p, 1024).back(), .5f),
+              label + "the original plays while A is held");
+        auto* host = p.get();
+        auto deactivated = std::async(std::launch::async, [host] { host->deactivate(); });
+        p->resume();
+        finish_within(deactivated, label + "deactivation");
+        finish_within(std::async(std::launch::async, [host] { host->wait_for_worker(); }),
+                      label + "the worker");
+        p->activate();
+        settle(*p);
+        const auto out = play_constant(*p, 1024);
+        check(near(out[300], .25f) && near(out.back(), .25f), label + "reactivated, A plays");
+        check(p->status == as_float(Status::running) && reported(*p) == a && saved_path(*p) == a,
+              label + "the status, path and saved state follow A");
+    }
+    // Closing at each stage: A held, B queued behind it; the host deactivates,
+    // the held work is released, and the instance is destroyed (its worker
+    // stops and drops B, A's answer is never delivered, then cleanup()). The
+    // sanitizer build checks that nothing is used after it is freed or leaks.
+    for (const auto& [point, name] : points) {
+        const std::string label = std::string("closed with A held at ") + name + ": ";
+        auto p = with_original();
+        p->pause_at(point);
+        p->set_filter(a);
+        p->run_empty();
+        p->wait_until_paused();
+        p->set_filter(b);
+        p->run_empty();
+        auto* host = p.get();
+        auto deactivated = std::async(std::launch::async, [host] { host->deactivate(); });
+        p->resume();
+        finish_within(deactivated, label + "deactivation");
+        finish_within(std::async(std::launch::async, [&p] { p.reset(); }), label + "teardown");
+    }
+    // A host that drops queued work on deactivation: the original keeps
+    // playing and stays the saved filter. The status port stays at Loading
+    // for the dropped request until another load is answered (LV2-8, open);
+    // this does not check it.
+    {
+        const std::string label = "a load dropped at deactivation: ";
+        host::Features features;
+        features.worker = Worker::deferred;
+        auto p = std::make_unique<host::Plugin>(world, world.plugin(2, 2), 48000, features);
+        p->activate();
+        p->set_filter(original);
+        p->run_empty();
+        p->run_deferred_work();
+        p->run_empty();
+        p->run_empty();
+        p->set_filter(a);
+        p->run_empty();
+        check(p->queued_work() == 1 && p->status == as_float(Status::loading),
+              label + "A is queued");
+        p->deactivate();
+        p->drop_queued_work();
+        p->activate();
+        p->run_empty();
+        p->run_empty();
+        check(near(play_constant(*p, 1024)[300], .5f), label + "the original plays");
+        check(reported(*p) == original && saved_path(*p) == original,
+              label + "the path and saved state stay the original");
     }
 }
 
