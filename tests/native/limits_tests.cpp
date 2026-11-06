@@ -6,6 +6,7 @@
 #include "convolver/host.hpp"
 #include "convolver/inspection.hpp"
 #include "convolver/io.hpp"
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
@@ -273,6 +274,119 @@ void run(const fs::path& dir) {
                     contains(report.diagnostics.back().message, "44 further"),
                 "diagnostic cap and marker");
         require(!report.valid, "dropped errors still invalidate the report");
+    }
+    // ROBUST-2: one --all-configurations check stops, with one error, before
+    // the next entry once the entries checked have decoded the sample limit,
+    // or before an entry that would take the reported paths past theirs; the
+    // production limits are 1 Gi samples and 16384 paths. Each match.cfg
+    // entry decodes one sample and reports one path.
+    {
+        std::string list;
+        for (int i = 0; i < 5; ++i)
+            list += "match.cfg\n";
+        text_file(dir / "five.txt", list);
+        InspectionOptions all;
+        all.all_configurations = true;
+        static_assert(max_inspected_samples == 16 * max_decoded_samples &&
+                      max_inspected_paths == 4 * max_filter_paths &&
+                      max_inspected_routes == 32 * max_routes);
+        require(InspectionLimits{}.samples == max_inspected_samples &&
+                    InspectionLimits{}.paths == max_inspected_paths &&
+                    InspectionLimits{}.routes == max_inspected_routes,
+                "the default inspection limits are the production ones");
+        for (const auto& [limits, what] :
+             {std::pair{InspectionLimits{4, max_inspected_paths}, "decoded"},
+              std::pair{InspectionLimits{max_inspected_samples, 4}, "past 4"}}) {
+            const auto report = detail::inspect_configuration(dir / "five.txt", all, limits);
+            require(!report.valid && report.configurations.size() == 4 &&
+                        report.traversal.size() == 6 && report.traversal.back().outcome == "failed",
+                    std::string("an all-entry check stops at the fifth entry: ") + what);
+            const auto& d = report.diagnostics.back();
+            require(report.diagnostics.size() == 1 && d.code == "limit" &&
+                        contains(d.message, what) && contains(d.message, "smaller lists") &&
+                        d.include_chain.size() == 1 && d.include_chain[0].line == 5,
+                    std::string("one located limit diagnostic: ") + what);
+            require(contains(report.selection_reason, "until a limit"),
+                    "the selection reason says the check stopped");
+        }
+        text_file(dir / "four.txt", "match.cfg\nmatch.cfg\nmatch.cfg\nmatch.cfg\n");
+        for (const auto& limits :
+             {InspectionLimits{4, max_inspected_paths}, InspectionLimits{max_inspected_samples, 4}})
+            require(detail::inspect_configuration(dir / "four.txt", all, limits).valid,
+                    "an all-entry check reaching a limit exactly passes");
+        // The entry that crosses the sample limit is checked in full: with
+        // three samples an entry and a limit of 4, the second runs (6
+        // samples) and the third is stopped.
+        {
+            AudioWriter w(dir / "ir3.wav", {48000, 1}, OutputFormat::wav_float);
+            const std::vector<float> three{1, 0.5F, 0.25F};
+            w.write(three);
+            w.close();
+        }
+        text_file(dir / "three.cfg", "48000 1 1 0\n0\n0\nir3.wav\n0\n0\n0\n");
+        text_file(dir / "threes.txt", "three.cfg\nthree.cfg\nthree.cfg\n");
+        const auto crossed =
+            detail::inspect_configuration(dir / "threes.txt", all, {4, max_inspected_paths});
+        require(!crossed.valid && crossed.configurations.size() == 2 &&
+                    contains(crossed.diagnostics.back().message, "decoded 6 IR samples"),
+                "the entry that crosses the sample limit is checked, the next stopped");
+        // Routes count on their own (jrp's review of 7b4cb7a): one path can
+        // have thousands, so a list of one-path entries with many routes made a
+        // large report within the path limit. Each wide.cfg entry has one path
+        // and five routes (one input, four outputs).
+        text_file(dir / "wide.cfg", "48000 1 4 0\n0\n0 0 0 0\nir.wav\n0\n0\n0 1 2 3\n");
+        text_file(dir / "wides.txt", "wide.cfg\nwide.cfg\nwide.cfg\nwide.cfg\nwide.cfg\n");
+        const InspectionLimits twenty{max_inspected_samples, max_inspected_paths, 20};
+        const auto wide = detail::inspect_configuration(dir / "wides.txt", all, twenty);
+        require(!wide.valid && wide.configurations.size() == 4 && wide.diagnostics.size() == 1 &&
+                    wide.diagnostics.back().code == "limit" &&
+                    contains(wide.diagnostics.back().message, "routes reported past 20") &&
+                    wide.diagnostics.back().include_chain[0].line == 5,
+                "an all-entry check stops before the entry past the route limit");
+        text_file(dir / "wides4.txt", "wide.cfg\nwide.cfg\nwide.cfg\nwide.cfg\n");
+        require(detail::inspect_configuration(dir / "wides4.txt", all, twenty).valid,
+                "an all-entry check reaching the route limit exactly passes");
+        // The limit error survives the 256-diagnostic cap.
+        std::string noisy;
+        for (int i = 0; i < 300; ++i)
+            noisy += "absent.cfg\n";
+        noisy += "wide.cfg\nwide.cfg\n";
+        text_file(dir / "noisy.txt", noisy);
+        const auto capped = detail::inspect_configuration(
+            dir / "noisy.txt", all, {max_inspected_samples, max_inspected_paths, 5});
+        const auto has = [&](const char* code) {
+            return std::any_of(capped.diagnostics.begin(), capped.diagnostics.end(),
+                               [&](const auto& d) { return d.code == code; });
+        };
+        require(!capped.valid && capped.configurations.size() == 1 &&
+                    has("diagnostics-truncated") && has("limit") &&
+                    std::any_of(capped.diagnostics.begin(), capped.diagnostics.end(),
+                                [](const auto& d) { return d.code == "limit"; }),
+                "the limit error is kept past the diagnostic cap");
+    }
+    // ROBUST-2: a no-match message names at most ten of a list's rates.
+    {
+        std::string list;
+        for (int i = 0; i < 12; ++i) {
+            const auto name = "rate" + std::to_string(i) + ".cfg";
+            text_file(dir / name, std::to_string(1000 + i) + " 1 1 0\n0\n0\nabsent.wav\n0\n0\n0\n");
+            list += name + "\n";
+        }
+        text_file(dir / "rates.txt", list);
+        const auto message =
+            rejection([&] { load_configuration(dir / "rates.txt", 48000); }, "no rate matches");
+        require(contains(message, "1000 Hz, 1001 Hz") &&
+                    contains(message, "1009 Hz or one of "
+                                      "the list's 2 other "
+                                      "rates") &&
+                    !contains(message, "1010 Hz"),
+                "the rates named in a no-match message are bounded: " + message);
+        list.erase(list.rfind("rate11.cfg"));
+        text_file(dir / "rates11.txt", list);
+        const auto eleven =
+            rejection([&] { load_configuration(dir / "rates11.txt", 48000); }, "eleven rates");
+        require(contains(eleven, "1009 Hz or the list's one other rate"),
+                "one rate beyond the ten named is singular: " + eleven);
     }
     // 64 MiB of encoded host state.
     {

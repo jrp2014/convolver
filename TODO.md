@@ -10,8 +10,9 @@ delivered is described in the guides and the [CHANGELOG](CHANGELOG.md).
 running an exact preview package from the 0.10 series. The
 [order of work](#execution-priorities) gets there in four steps: finish the
 open fixes (done), run jrp's host smoke tests (HOST-1), finish the package
-and the user journeys (PLUG-5, REL-2; the CLI, the journey presets, the Audio
-Unit and the VST trademark notice are in the package), then the independent
+and the user journeys (PLUG-5, REL-2; the journeys are written, and the CLI,
+the journey presets, the Audio Unit and the VST trademark notice are in the
+package), then the independent
 walkthrough (REL-3).
 [Status](docs/project/status.md) shows what users can run now and what still
 blocks the preview, and [decisions](docs/project/decisions.md) what jrp has
@@ -56,7 +57,7 @@ boundary and C++20 in the core.
 | --- | --- | --- |
 | 1. Finish the open fixes (done) | **DIAG-1** fault state after reloads and Load failed before Fault ([PR #73](https://github.com/jrp2014/convolver/pull/73)); from jrp's review of `6920a45` (31 October 2026), **PLUG-12** (a filter that loads but cannot be saved) and **ROBUST-3** (silence after a failed first load that cannot run out of memory); from his review of `276c7dc` (1 November 2026), **PLUG-13** (room for the settings in saved state, [PR #105](https://github.com/jrp2014/convolver/pull/105)) | DIAG-1 done: merged on 25 October 2026 (`7ed7e38`), and the "Plug-in distribution candidates" run on that commit passed ([run](https://github.com/jrp2014/convolver/actions/runs/40145929436)). PLUG-12 and ROBUST-3 done: merged on 31 October 2026 ([PR #91](https://github.com/jrp2014/convolver/pull/91), `7542576`), each with a test of the sequence that failed. |
 | 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, the Audio Unit from the same candidate, which holds it since PR #115) at the same sitting | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 and AU-4 both gate the first preview, which holds the Audio Unit too. Needs no CLI in the package, so it can start now that step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
-| 3. Alongside step 2 | **PLUG-5** first-preview contents: in the candidates since PR #115 (the Audio Unit on macOS, the VST trademark notice; the `convolver` CLI and the first-use presets since PR #101); what remains is qualifying one exact candidate (HOST-1, AU-4, REL-3) and jrp's publication. **REL-2:** the 2→6 crossover and CLI journeys written in `docs/use/` (the stereo journey is written) | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
+| 3. Alongside step 2 | **PLUG-5** first-preview contents: in the candidates since PR #115 (the Audio Unit on macOS, the VST trademark notice; the `convolver` CLI and the first-use presets since PR #101); what remains is qualifying one exact candidate (HOST-1, AU-4, REL-3) and jrp's publication. **REL-2** (done): the stereo, 2→6 crossover and CLI journeys are written in `docs/use/` | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
 | Early walkthrough (macOS) (done) | **REL-5**: an explicitly limited walkthrough of an exact candidate on macOS, the stereo journey only | Done on 1 November 2026 as a package and command-line check only, by jrp's choice ([done](#done)); its host steps moved to HOST-1's REAPER smoke test and REL-3. It did not change the first preview's contents and does not replace REL-3. |
 | 4. Settings, windows and the Audio Unit | The **HOST-2** editor, which jrp wants in the first preview with the Audio Unit: **PLUG-9** and **PLUG-10**, then **VST3-3**, **VST3-4**, **AU-7** and the first half of **AU-6**, then the windows **VST3-11** (macOS, shared with the Audio Unit in **AU-6**), **VST3-12** (Windows) and **VST3-13** (Linux, VSTGUI stop-gap); and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview, in the macOS candidates since PR #115) | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the supported workloads (PERF-3), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
 | 5. The milestone | A candidate from a 0.10.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
@@ -67,7 +68,7 @@ boundary and C++20 in the core.
 | Optional editor work | **PLUG-11** (FFT planning in FFTW-built plug-ins), **LV2-6** (an LV2 window, only if Linux users ask) | Not needed for any preview. |
 | On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **PERF-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
 
-DOC-2 automation and the CFG-1, IO-1, IO-2, IO-5, GAIN-1 and ROBUST-1/2 items
+The CFG-1, IO-1, IO-2 and ROBUST-1 items
 remain open supporting work; take them up when a reproducible defect or the milestone
 needs them. This table owns the current ordering; the dated
 [21 October review order](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#recommended-order)
@@ -75,11 +76,6 @@ is superseded.
 
 ## User experience and distribution
 
-- [ ] **DOC-2 — Maintain documentation automatically.** Extend checks to build
-  options and executable CLI examples in CI. Local Markdown links/anchors and
-  checker regression tests now run through pre-commit; the separate
-  `documentation` CTest protects the historical website. See the
-  [check scope](docs/develop/documentation.md#automated-checks).
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The candidate workflow
   builds unsigned packages with pinned dependencies, corresponding source,
   staging, installers, artifact verification and promotion gates
@@ -91,31 +87,6 @@ is superseded.
   release assets ([production gates](docs/develop/releasing.md#production-gates)).
   The 18 October [distribution plan](docs/archive/plans/2026-10-18-plugin-distribution.md)
   is archived as superseded.
-- [ ] **REL-2 — Define the first release by user journeys.** Write three
-  journeys as numbered steps for a reader who has never seen the repository:
-  stereo room correction and a 2→6 crossover in a plug-in host, and offline
-  file rendering with the CLI, using the DOC-1 filters. Each journey covers
-  download and checksum, installation, loading the filter, checking the
-  expected output, saving and reopening, and recovering from a wrong preset
-  (wrong rate or channel count), and states the expected result of every step.
-  Saving and reopening and recovering from a wrong preset apply to the
-  plug-in journeys; the CLI journey instead covers a filter that does not fit
-  the input (wrong rate or channel count) and the message that explains it.
-  Each journey must say how a user checks the output, for example the host's
-  offline render of `input.wav` compared with `expected.wav` by a stated
-  command, with a listening check only where no comparison is possible.
-  Write them once in the user guides that ship in the package
-  (`docs/use/`, starting from its two first-use tutorials), with per-platform
-  differences marked, and make the
-  package contain what they need: presets made from the stereo and 2→6
-  filters, the preset tool and the `convolver` CLI, which the first preview
-  ships. See
-  [status](docs/project/status.md#user-journeys-for-the-first-preview).
-  Progress (1 November 2026, PR #101): the stereo journey in a host is
-  written ([check a stereo filter in a host](docs/use/check-a-stereo-filter.md)),
-  with `convolver --compare` as its check; the package holds the first-use
-  examples and their presets, and `bin/convolver`. The 2→6 crossover and
-  CLI journeys remain.
 - [ ] **REL-3 — Independent walkthrough of an exact preview.** Someone who
   did not write the code or the guides follows the REL-2 journeys from the
   exact preview files (identified by their SHA-256 sums), on their own
@@ -623,25 +594,13 @@ means a patched FFmpeg build with `--enable-gpl`.
   Progress (23 October 2026, PR #60): RF64, W64, CAF, FLAC and raw output have
   no 4 GiB limit; WAV and AIFF stop with an error at it. Tests at the boundary
   sizes remain.
-- [ ] **IO-5 — Speaker labels beyond WAV.** Carry `--speaker-map` labels into
-  the channel layouts of the other containers (WAVE_FORMAT_EXTENSIBLE in RF64
-  and W64, FLAC's `WAVEFORMATEXTENSIBLE_CHANNEL_MASK` tag, CAF and AIFF channel
-  layouts). Check what libsndfile can write and what readers honour first; a
-  rejected layout must fail as WAV does, not fall back to a default.
 - [ ] **IO-2 — Optional offline IR resampling.** Only add as an explicit operation
   with tests for gain, delay, length and reported metadata; retain mismatch errors
   by default. Compare [libsamplerate](https://libsndfile.github.io/libsamplerate/)
   and other suitable implementations before choosing a dependency.
-- [ ] **GAIN-1 — Define no-clip headroom precisely.** Test the exact full-scale
-  endpoints with floating-point rounding, integer quantization, dither and noise
-  shaping. The current filter bound assumes input magnitude at most 1 and does
-  not reserve separate quantizer headroom; distinguish that from a limiter.
 - [ ] **ROBUST-1 — Longer fuzz and transition stress.** Keep discovered inputs as
   regressions. Measure worst callback times and exercise repeated filter changes;
   allocation guards and average throughput are not a deadline guarantee.
-- [ ] **ROBUST-2 — Bound report output.** Review traversal/report growth after the
-  configuration-visit limit and diagnostic truncation, including huge invalid
-  lists. Bound reporting work as well as file reads.
 
 ## VST3 SDK features not yet used
 
@@ -1010,12 +969,12 @@ with compatibility tests; linked IDs point to open work above.
 | Core processing uses interleaved float buffers that must not overlap | Use `HostProcessor` for planar/in-place float/double host buffers; internal DSP remains float. | [Engine API](docs/develop/library.md#engine-api) |
 | Latency and filter replacement are not instantaneous | Core latency is B; the plug-ins' default is 256 frames. Replacement starts with fresh history and warms/crossfades; reset work scales with the block buffers and delay lines, not the filter length (PERF-5). | [Replacement](docs/develop/plugin-contract.md#replacement-and-threads) |
 | Callback safety has a defined thread contract | One audio thread per instance; serialized control calls; teardown requires stopped audio. Stress/deadline evidence remains ROBUST-1. | [Implementation invariants](docs/develop/architecture.md#invariants-to-preserve) |
-| Resource limits cap channels, paths, delays, text, IRs and state | Intentional bounds; assess any increase with memory/overflow tests. Report-size follow-up is ROBUST-2. | [Core limits](docs/develop/library.md#resource-limits), [tests](docs/develop/testing.md) |
+| Resource limits cap channels, paths, delays, text, IRs and state | Intentional bounds; assess any increase with memory/overflow tests. | [Core limits](docs/develop/library.md#resource-limits), [tests](docs/develop/testing.md) |
 | The configuration format is not identical across consumers | No external consumer has verified this corpus yet; CFG-1. Older bundled configs may need delay lines and portable paths. | [Compatibility matrix](docs/use/other-programs.md#what-convolver-accepts) |
 | Path portability checks are partial | No drive/share remapping; a clean profile is not certification for Windows or another reader. Extend checks only with fixtures. | [Profiles](docs/use/other-programs.md#check-that-a-configuration-will-travel) |
-| Output is WAV, RF64, W64, AIFF, CAF, FLAC or headerless raw; speaker labels and reduced valid bits are WAV-only | Input codecs and FLAC output depend on the libsndfile build; the preview packages have no FLAC or Ogg, by decision ([workarounds](docs/use/command-line.md#flac-and-ogg)). Boundary-size tests remain IO-1; labels in other containers are IO-5. RAW has no embedded rate/channel metadata. | [Output formats](docs/use/command-line.md#output-formats) |
+| Output is WAV, RF64, W64, AIFF, CAF, FLAC or headerless raw; speaker labels are WAV and RF64 only, reduced valid bits WAV only | Input codecs and FLAC output depend on the libsndfile build; the preview packages have no FLAC or Ogg, by decision ([workarounds](docs/use/command-line.md#flac-and-ogg)). Boundary-size tests remain IO-1; libsndfile cannot write labels in the other containers (IO-5). RAW has no embedded rate/channel metadata. | [Output formats](docs/use/command-line.md#output-formats) |
 | Output writes are not transactional | An I/O or numerical failure leaves a partial file, which the CLI says is incomplete; deleting it or publishing through a temporary file was not chosen ([decisions](docs/project/decisions.md#diagnostics)). Never promise rollback for pipes. | [Output safety](docs/use/command-line.md#output-safety) |
-| Gain estimation is not a limiter; float samples can exceed full scale | Integer samples clip; strict quantizer headroom is GAIN-1. | [Gain](docs/use/command-line.md#gain-and-attenuation) |
+| Gain estimation is not a limiter; float samples can exceed full scale | Integer samples clip; `no-clip` reserves no quantizer headroom, for which the guide gives a safe bound (GAIN-1). | [Gain](docs/use/command-line.md#gain-and-attenuation) |
 | Dither/shaping/valid bits apply to integer file output only | Float/RAW output rejects those options; the plug-ins exchange floats, so the host does any final conversion. | [Integer output](docs/use/command-line.md#integer-formats-dither-and-noise-shaping) |
 | C++ packages are static development libraries, not self-contained installers or a stable binary ABI | Rebuild with compatible toolchains; shared dependencies must be deployed. REL-1 covers end-user bundles. | [Package guide](docs/develop/library.md) |
 | Source tags and configured CI do not prove a release is qualified | Tie results to exact commits; named hosts, clean machines and signatures remain release evidence. | [Versioning](docs/develop/versioning.md), [testing](docs/develop/testing.md) |
@@ -1415,6 +1374,25 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   `native.load_timing_harness` checks the range (-0.1 to 0.1) and that both
   signs occur; it failed with the old generator. The loading timings were
   measured again with it ([loading responsiveness](#loading-responsiveness)).
+- [x] **DOC-2 — Maintain documentation automatically.** 6 November 2026, PR #118:
+  `check_repository.py` (pre-commit and lint CI) checks every CMake `-D`
+  option in the guides, workflows and scripts against the build, with its
+  allowed values, and that the build guide describes every option; and
+  every option shown with a Convolver tool against the options its source
+  parses, and that each tool's guide names them all. The packaged guide's
+  marked examples already ran in the candidates workflow (PR #101). Links
+  and anchors were already checked;
+  [automated checks](docs/develop/documentation.md#automated-checks).
+- [x] **GAIN-1 — Define no-clip headroom precisely.** 6 November 2026, PR #118: with
+  the no-clip gain, the input reaching the bound stays within full scale up
+  to float rounding (largest sample 0.99999994, `native.engine`); integer
+  output never clips within ±(1 − H / 2^(B−1)), H = (1 + S)(½ + D) + ½
+  steps for dither D and shaper coefficient sum S (a safe bound with half a
+  step of margin), checked for 8, 16 and
+  24 bits, every dither and shaper (`native.io`, which detects clipping by
+  comparing with a quantizer one bit wider), with the exact undithered
+  endpoints. No change to the sound: `no-clip` still reserves no quantizer
+  headroom; [gain](docs/use/command-line.md#gain-and-attenuation).
 - [x] **PERF-12 — Load-timing verdicts from records, tested without
   timing.** 5 November 2026, from jrp's review of `db54160`: the renderer
   records each callback (due, wake, entry into and return from the plug-in,
@@ -1540,6 +1518,21 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   `portable/host.cpp`, with the same values, and the plug-in contract says a
   replacement plays for one Latency block before the crossfade, as it has
   since PLUG-10; [contract](docs/develop/plugin-contract.md).
+- [x] **REL-2 — Define the first release by user journeys.** 6 November
+  2026, PR #118: the three journeys are written in `docs/use/` as numbered steps with
+  the expected result of each, from download and checksum:
+  [check a stereo filter in a host](docs/use/check-a-stereo-filter.md)
+  (PR #101), [check a crossover in a host](docs/use/check-a-crossover-in-a-host.md)
+  (2→6 in REAPER, VST3 and the Audio Unit) and
+  [check file rendering with the command line](docs/use/check-files-with-the-command-line.md)
+  (the three examples, each checked with `--compare`, and filters refused
+  for another rate or channel count, whose messages the guide quotes). The
+  package holds what they use, now also required by `verify_artifact.py` for
+  the crossover; the release tests run the guides' commands, and since this
+  change also check each quoted refusal (`<!-- refused-example -->`). No
+  journey has been followed in a host yet: the host steps, and REAPER's
+  routing of an effect with 2 inputs and 6 outputs in particular, are for
+  HOST-1 and REL-3 to demonstrate.
 - [x] **REL-6 — Responsiveness qualification before a release.** 5
   November 2026, from jrp's review of `db54160`: CI's timing tests run on
   shared runners and report "not qualified" when they cannot judge, which
@@ -1590,6 +1583,29 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   in its constructor, so out of memory reaches the caller, and
   `estimate_attenuation` refuses a non-finite noise response; tests in
   `native.io` and `native.engine`; [gain](docs/use/command-line.md#gain-and-attenuation).
+- [x] **IO-5 — Speaker labels beyond WAV.** 6 November 2026, PR #118: checked with
+  libsndfile 1.2.2 and FFmpeg's reader. RF64 now carries `--speaker-map`
+  labels in its WAVE_FORMAT_EXTENSIBLE header, any mask, read back exactly
+  by both. libsndfile writes no labels in W64 or FLAC; in CAF and AIFF it
+  writes only Apple layouts, refusing side-speaker 5.1 and 7.1 and turning
+  WAVE's back speakers into surround ones that FFmpeg reads as side, so
+  those containers, like W64 and FLAC, refuse a map before the output is
+  created. Tests in `native.io` and `native.cli`;
+  [speaker labels](docs/use/command-line.md#speaker-labels).
+- [x] **ROBUST-2 — Bound report output.** 6 November 2026, PR #118: traversal and
+  diagnostics were already bounded (4096 visits, 256 diagnostics), but
+  `--inspect --all-configurations` gives each entry a render's decoding
+  budget, so a 20 KB list naming a 64 MB filter 4095 times kept it busy for
+  about 18 minutes, and a 16 MiB list of 4096-path configurations made a
+  533 MB JSON report using 2.9 GB. One check now stops, with one error,
+  before the next entry once it has decoded 1 Gi samples, or before an entry
+  that would take it past 16,384 reported paths (4.2 s and 4 MB on the same
+  lists) or 131,072 reported routes (jrp's review of `7b4cb7a`: 128 entries
+  of one path with 8192 routes made a 37 MB report; now 4.6 MB, about 1 s
+  and 130 MiB under ASan); a no-match message
+  names at most ten sample rates, as it already did entries. Tests in
+  `native.limits`;
+  [resource limits](docs/develop/library.md#resource-limits).
 - [x] **ROBUST-6 — State the shared limits once.** 5 November 2026, PR #108,
   from the project review of that day: the sample-rate, channel, block and
   impulse limits are `constexpr` values in `convolver/engine.hpp`, used by

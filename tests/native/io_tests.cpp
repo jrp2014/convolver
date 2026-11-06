@@ -172,7 +172,9 @@ WaveFormat wave_format(const fs::path& p) {
             v = v << 8 | static_cast<unsigned char>(bytes.at(at + i));
         return v;
     };
-    require(bytes.compare(0, 4, "RIFF") == 0 && bytes.compare(8, 4, "WAVE") == 0, "RIFF header");
+    require((bytes.compare(0, 4, "RIFF") == 0 || bytes.compare(0, 4, "RF64") == 0) &&
+                bytes.compare(8, 4, "WAVE") == 0,
+            "RIFF or RF64 header");
     for (std::size_t at = 12; at + 8 <= bytes.size();) {
         const auto length = u(at + 4, 4);
         if (bytes.compare(at, 4, "fmt ") == 0) {
@@ -196,18 +198,25 @@ void speaker_tests(const fs::path& dir) {
     struct Case {
         std::size_t channels;
         std::uint32_t mask;
-        OutputFormat format;
+        OutputEncoding format;
         unsigned tag, bits;
     };
-    for (const auto& c : {Case{2, 0x3, OutputFormat::wav_float, 3, 32},
-                          Case{2, 0x3, OutputFormat::wav_pcm16, 1, 16},
-                          Case{6, 0x3f, OutputFormat::wav_float, 3, 32},
-                          Case{6, 0x3f, OutputFormat::wav_pcm24, 1, 24},
-                          Case{4, 0x603, OutputFormat::wav_pcm32, 1, 32},
-                          Case{1, 0x20000, OutputFormat::wav_float, 3, 32},
-                          Case{18, 0x3ffff, OutputFormat::wav_float, 3, 32}}) {
+    constexpr auto wav = Container::wav, rf64 = Container::rf64;
+    // IO-5: RF64 carries any mask too, in its own WAVE_FORMAT_EXTENSIBLE header.
+    for (const auto& c : {Case{2, 0x3, {wav, SampleType::float32}, 3, 32},
+                          Case{2, 0x3, {wav, SampleType::pcm16}, 1, 16},
+                          Case{6, 0x3f, {wav, SampleType::float32}, 3, 32},
+                          Case{6, 0x3f, {wav, SampleType::pcm24}, 1, 24},
+                          Case{4, 0x603, {wav, SampleType::pcm32}, 1, 32},
+                          Case{1, 0x20000, {wav, SampleType::float32}, 3, 32},
+                          Case{18, 0x3ffff, {wav, SampleType::float32}, 3, 32},
+                          Case{1, 0x4, {rf64, SampleType::pcm16}, 1, 16},
+                          Case{6, 0x60f, {rf64, SampleType::pcm24}, 1, 24},
+                          Case{8, 0x63f, {rf64, SampleType::float32}, 3, 32},
+                          Case{18, 0x3ffff, {rf64, SampleType::float64}, 3, 64}}) {
         const auto out = dir / ("speakers-" + std::to_string(c.channels) + "-" +
-                                std::to_string(static_cast<int>(c.format)) + ".wav");
+                                std::to_string(static_cast<int>(c.format.container)) + "-" +
+                                std::to_string(static_cast<int>(c.format.sample)) + ".wav");
         // Two frames per channel: an impulse identifying the channel, then its negation.
         std::vector<float> samples;
         for (int frame = 0; frame < 2; ++frame)
@@ -267,6 +276,22 @@ void speaker_tests(const fs::path& dir) {
             threw = true;
         }
         require(threw && !fs::exists(out), "invalid speaker mask rejected before opening");
+    }
+    // IO-5: libsndfile writes no labels in W64 or FLAC, and CAF and AIFF layouts
+    // would turn WAVE's back speakers into surround ones read as side.
+    for (const auto container :
+         {Container::w64, Container::flac, Container::caf, Container::aiff}) {
+        if (!available(container))
+            continue; // A libsndfile without FLAC refuses FLAC output first.
+        const auto out = dir / "speakers-container";
+        std::string message;
+        try {
+            AudioWriter(out, {48000, 6}, {container, SampleType::pcm16}, {}, {0x3f});
+        } catch (const std::invalid_argument& e) {
+            message = e.what();
+        }
+        require(message.find("WAV or RF64") != std::string::npos && !fs::exists(out),
+                "a speaker map in another container is refused before opening");
     }
 }
 std::vector<std::int16_t> pcm16_samples(const fs::path& p) {
@@ -680,6 +705,65 @@ void quantizer_tests(const fs::path& dir) {
         q.reset();
         q.quantize(music, pieces);
         require(whole == pieces, "reset clears the shaper");
+    }
+
+    // GAIN-1: integer headroom. Within the B-bit range the quantizer gives
+    // the same integers as one of B + 1 bits fed half the sample (the target
+    // and its rounding errors are identical), so any difference is clipping.
+    // Output never clips while |sample| <= 1 - H / 2^(B-1), with
+    // H = (1 + S)(1/2 + D) + 1/2 steps: D the largest dither (0, 1/2, 1) and S
+    // the sum of the shaper's coefficient magnitudes. The dB figures in
+    // docs/use/command-line.md#gain-and-attenuation come from this H.
+    {
+        const auto clipped = [](unsigned bits, QuantizationOptions o, const std::vector<float>& x) {
+            std::vector<float> half(x.size());
+            for (std::size_t i = 0; i < x.size(); ++i)
+                half[i] = x[i] / 2;
+            return quantize_bits(bits, o, x) != quantize_bits(bits + 1, o, half);
+        };
+        for (unsigned bits : {8u, 16u, 24u}) {
+            const double scale = std::ldexp(1.0, static_cast<int>(bits) - 1);
+            for (auto d : {Dither::none, Dither::rectangular, Dither::triangular,
+                           Dither::triangular_highpass}) {
+                const double largest = d == Dither::none ? 0 : d == Dither::rectangular ? 0.5 : 1;
+                for (auto shaping : {NoiseShaping::none, NoiseShaping::simple,
+                                     NoiseShaping::second_order, NoiseShaping::third_order,
+                                     NoiseShaping::ninth_order, NoiseShaping::sony_sbm}) {
+                    double sum = 0;
+                    for (const double c : shaper_coefficients(shaping))
+                        sum += std::abs(c);
+                    const double steps = (1 + sum) * (0.5 + largest) + 0.5;
+                    // Rounded towards zero, so the bound holds for the float.
+                    const auto a = std::nextafter(static_cast<float>(1 - steps / scale), 0.f);
+                    std::vector<std::vector<float>> signals(5, std::vector<float>(4000));
+                    std::uint64_t state = 99;
+                    for (std::size_t i = 0; i < 4000; ++i) {
+                        signals[0][i] = a;
+                        signals[1][i] = -a;
+                        signals[2][i] = i % 2 ? a : -a;
+                        state = state * 6364136223846793005ULL + 1442695040888963407ULL;
+                        signals[3][i] = state >> 63 ? a : -a;
+                        signals[4][i] = a * static_cast<float>(std::sin(0.003 * double(i)));
+                    }
+                    const QuantizationOptions o{d, 7, shaping};
+                    for (const auto& x : signals)
+                        require(!clipped(bits, o, x), "no clipping within the stated headroom");
+                    // Full scale clips the positive end for every option.
+                    require(clipped(bits, o, std::vector<float>(64, 1.f)),
+                            "full-scale positive input clips");
+                }
+            }
+            // Undithered and unshaped, the exact endpoints: from 1 - 1/2^B up,
+            // a sample rounds to 2^(B-1) and clips by one step; at the negative
+            // end, -1 itself and down to -(1 + 1/2^B) (the float nearest it)
+            // round to -2^(B-1) and do not clip.
+            const auto top = static_cast<float>(1 - 0.5 / scale);
+            const auto bottom = static_cast<float>(-1 - 0.5 / scale);
+            require(clipped(bits, {}, {top}) && !clipped(bits, {}, {std::nextafter(top, 0.f)}) &&
+                        !clipped(bits, {}, {bottom}) &&
+                        clipped(bits, {}, {std::nextafter(bottom, -2.f)}),
+                    "exact undithered endpoints");
+        }
     }
 
     // Writers: every integer format stores exactly the quantizer's samples,

@@ -8,15 +8,17 @@ For jrp and anyone asking what is ready, what is not, and where the project is
 going. [TODO](../../TODO.md) is the backlog and owns the order of work; the
 linked guides own the behaviour.
 
-**In short:** status checked on 1 November 2026 against `main` at `276c7dc`
-(0.8.6), whose last source change is `e3336e9`
-([PR #103](https://github.com/jrp2014/convolver/pull/103)). Every workflow
-that runs on `main` passed on `e3336e9`, including
-[Native and historical tests](https://github.com/jrp2014/convolver/actions/runs/41360889002),
-[VST3 compatibility](https://github.com/jrp2014/convolver/actions/runs/41360888968),
-[Audio Unit](https://github.com/jrp2014/convolver/actions/runs/41360888965)
+**In short:** status checked on 6 November 2026 against `main` at
+`77e3061` (0.10.4), whose last source change is `a6995f7`
+([PR #116](https://github.com/jrp2014/convolver/pull/116), which separates
+correctness tests, performance measurement and release qualification).
+Every workflow that runs on `main` passed on the previous source change,
+`5d500a0` ([PR #115](https://github.com/jrp2014/convolver/pull/115)),
+including
+[Native and historical tests](https://github.com/jrp2014/convolver/actions/runs/42126811218)
 and the
-[Plug-in distribution candidates](https://github.com/jrp2014/convolver/actions/runs/41360888979).
+[Plug-in distribution candidates](https://github.com/jrp2014/convolver/actions/runs/42126810576);
+the runs on `a6995f7` were still going when this was written.
 Nothing has been published yet: there are no GitHub releases, and
 preview packages exist only as temporary CI artifacts. The command-line
 renderer, the preset tool, the Equalizer APO export and the VST3, Audio Unit
@@ -47,6 +49,7 @@ Contents: [evidence levels](#evidence-levels) ·
 [user journeys](#user-journeys-for-the-first-preview) ·
 [next milestone](#next-milestone-an-independent-user-runs-a-preview) ·
 [what still blocks it](#what-still-blocks-the-first-preview) ·
+[performance](#performance-what-is-measured) ·
 [compatibility guarantees](#compatibility-guarantees) ·
 [what the tests do not establish](#what-the-tests-do-not-establish) ·
 [direction](#direction)
@@ -112,8 +115,8 @@ not fit its input instead of saving and presets.
 | Journey | Filter | Surfaces | Status |
 | --- | --- | --- | --- |
 | Stereo room correction | [`examples/first-use/stereo`](../../examples/first-use/README.md) | VST3 and the Audio Unit in named hosts; CLI | CLI commands run in CI (`examples.first_use`). The package holds the example and a preset made from it, and the journey is written ([check a stereo filter in a host](../use/check-a-stereo-filter.md)), checked with `convolver --compare`; the release tests render it with the packaged CLI. On 1 November its package and command-line steps passed on a macOS arm64 candidate (REL-5). Not demonstrated in a host: that is part of the REAPER smoke test (HOST-1). |
-| 2→6 crossover | [`examples/first-use/crossover`](../../examples/first-use/README.md) | VST3 and the Audio Unit in named hosts; CLI | CLI commands run in CI. The package holds the example and a 2→6 preset; the journey is not written. GarageBand offers only mono and stereo effects, so the Audio Unit's 2→6 journey needs a second host, still to be chosen in AU-4. Not demonstrated. |
-| Offline file rendering | All three first-use filters | CLI from the preview package | Run from the source tree in CI; the release tests also run the packaged `bin/convolver` on all three examples. The journey is not written. Not demonstrated. |
+| 2→6 crossover | [`examples/first-use/crossover`](../../examples/first-use/README.md) | VST3 and the Audio Unit in named hosts; CLI | CLI commands run in CI, and the release tests run the packaged CLI on it. The package holds the example and a 2→6 preset, and the journey is written for REAPER, with the VST3 plug-in and the Audio Unit ([check a crossover in a host](../use/check-a-crossover-in-a-host.md)), checked with `convolver --compare`. GarageBand and Audacity offer only mono and stereo effects. Not demonstrated: how REAPER gives an effect 2 inputs and 6 outputs is unchecked. |
+| Offline file rendering | All three first-use filters | CLI from the preview package | The journey is written ([check file rendering with the command line](../use/check-files-with-the-command-line.md)): it renders and compares all three examples and shows the messages for a filter at another rate or channel count. The release tests run every command in it from the packaged `bin/convolver`, including the two refusals and their messages. Not demonstrated by a user. |
 
 Recovering from a wrong preset is the step to watch. VST3 keeps the working
 filter but can report the rejection to the host only as `kResultFalse`, which
@@ -145,7 +148,7 @@ The first preview is cut from a 0.10.x tag.
 | The Audio Unit validated, smoke-tested in a named host and in the package | jrp | AU-3, AU-4, AU-5 | `auval -strict` and `au.editor` run in CI, and the component is in both macOS candidates, where `auval -strict` runs on it after the `.pkg` installs it (AU-5, PR #115; first passed on both Macs in candidates [run 42108659224](https://github.com/jrp2014/convolver/actions/runs/42108659224)). Remaining: pluginval for the component (AU-3) and GarageBand's [smoke test](../develop/host-testing.md#garageband-audio-unit) from that candidate (AU-4) |
 | An exact preview package: VST3 (and the Audio Unit on macOS), the CLI, the preset tool, examples and guides | jrp's milestone | PLUG-5 | The candidates hold everything the preview is to ship: the VST3 plug-in, the Audio Unit on macOS, the CLI, the preset tool, the Equalizer APO export, the first-use examples with their presets, the guides, and the VST trademark notice with the logo jrp approved (PR #115); the automated package checks are in [releasing](../develop/releasing.md#what-a-package-holds) and first passed on all four platforms in candidates [run 42108659224](https://github.com/jrp2014/convolver/actions/runs/42108659224). Remaining: the named-host smoke tests (HOST-1, AU-4) and the independent walkthrough (REL-3) of one exact candidate, then jrp's publication |
 | Settings (gain, mix, latency) and a window in each VST3 build and the Audio Unit | jrp | PLUG-9, PLUG-10, VST3-3, VST3-4, VST3-11 to VST3-13, AU-6, AU-7 | In progress: both formats have Gain, Mix and Latency and share the macOS window (the Audio Unit's checked by jrp in GarageBand, VST3's not yet in a host). Remaining: the Windows and Linux VST3 windows (VST3-12, VST3-13); the gain modes, computed gains and meters (PLUG-9, PLUG-10, AU-7); the host checks listed under AU-6 and VST3-11 |
-| Journeys written as steps, with the presets they need in the package | jrp's milestone | REL-2 | In progress: the stereo journey is written ([check a stereo filter in a host](../use/check-a-stereo-filter.md)). Remaining: the 2→6 crossover and CLI journeys |
+| Journeys written as steps, with the presets they need in the package | jrp's milestone | REL-2 | Done, 6 November 2026: the stereo, 2→6 crossover and CLI journeys are written (table above); the host steps are demonstrated by HOST-1 and REL-3 |
 | An independent user completes the journeys from those exact files | jrp's milestone | REL-3 | Not started; uses the candidate's files before upload |
 
 At publication, and before the next preview: COMPAT-1 keeps presets, a host
@@ -158,7 +161,7 @@ notarization (the production gate, REL-1 and PLUG-5), resource budgets
 ## What still blocks the first preview
 
 In the order of [TODO's priorities](../../TODO.md#execution-priorities), on
-1 November 2026. Each line names only what remains; the items hold the
+6 November 2026. Each line names only what remains; the items hold the
 detail.
 
 1. **Open fixes:** none. The defects from jrp's reviews are fixed (table
@@ -166,15 +169,16 @@ detail.
 2. **jrp's host smoke tests** on his Mac, from the latest candidate:
    HOST-1 (VST3 in REAPER, with the window, and Audacity) and AU-4 (the
    Audio Unit in GarageBand, with Latency). They can start now.
-3. **The journeys:** the 2→6 crossover and CLI journeys (REL-2). The
-   package holds everything the preview ships (PLUG-5, PR #115).
+3. **The journeys:** written (REL-2), and the package holds everything the
+   preview ships (PLUG-5, PR #115). They still have to be followed in a host
+   (HOST-1, REL-3).
 4. **Settings, windows and the Audio Unit:** the VST3 windows on Windows and
    Linux (VST3-12, VST3-13); the gain modes, computed gains and meters
    (PLUG-9, PLUG-10, AU-7); the Audio Unit's pluginval run (AU-3); the
    remaining checks under AU-6 and VST3-11; and
-   the [loading responsiveness](../../TODO.md#loading-responsiveness) gate,
-   whose timing test now runs with jrp's limits (PERF-9); on CI a 30 s
-   filter holds the host's thread 28 to 154 ms, within its 250 ms limit.
+   the [loading responsiveness](../../TODO.md#loading-responsiveness) gate
+   and the long-filter workloads ([performance](#performance-what-is-measured)
+   below).
 5. **jrp's decisions:** who the REL-3 tester is. The LV2 version mapping
    (LV2-5) is needed only before LV2 joins a preview.
 
@@ -182,6 +186,31 @@ jrp's review of `276c7dc` (1 November 2026): qualify this fixed feature set
 against explicit acceptance criteria before adding further conveniences or
 DSP optimisation. A smaller, macOS-first preview would need jrp to revise
 the agreed scope.
+
+## Performance: what is measured
+
+Two kinds of measurement, of different things; neither qualifies a
+workload on its own ([release qualification](../develop/releasing.md) runs
+them on the intended machine, REL-6). The figures and their sources are in
+[loading responsiveness](../../TODO.md#loading-responsiveness).
+
+- **Loading, from a cold start** (PERF-9 to PERF-11, 5 November 2026): how
+  long a load holds the host's thread, with a newly loaded filter that has
+  heard little input. With the 30 s filter, CI held it 28 to 154 ms and the
+  Linux cloud VM 227 to 254 ms, against jrp's 250 ms limit. A run whose
+  callbacks cannot be judged (late baselines, as on the macOS and Windows
+  runners) counts as not qualified, never as passed.
+- **Playing at full history** (PERF-14, 5 November 2026, PR #116): the
+  same filters after their whole length of audio, which is a long filter's
+  sustained cost. On the cloud VM (512-frame callbacks, 10.7 ms apart) the
+  10 s filter took about 3 ms a callback and the 30 s filter 25 to 43 ms,
+  every callback late, because its tail decays into subnormal numbers;
+  flushing them (PERF-15, in draft
+  [PR #117](https://github.com/jrp2014/convolver/pull/117)) brings it to 6 to
+  7 ms, still over half the period there (jrp's callback limit while a load
+  runs; no limit for steady playing is decided). So the 30 s workload is not
+  qualified on that machine, which neither condemns the engine nor shows
+  that loading needs to move to the background.
 
 ## Compatibility guarantees
 

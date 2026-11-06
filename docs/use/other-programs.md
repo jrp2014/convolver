@@ -79,7 +79,7 @@ configurations in that program.
 | Selected IR channel | yes | not tested | not tested | not tested |
 | Delays, truncated to frames | yes | not tested | not tested | not tested |
 | Unequal IR lengths (the 4.4 specification required equal lengths) | yes, extension | unknown | unknown | unknown |
-| Hex channel mask | yes, parsed and reported; written as WAV speaker labels only with `--speaker-map config` | not tested | not tested | not tested |
+| Hex channel mask | yes, parsed and reported; written as WAV or RF64 speaker labels only with `--speaker-map config` | not tested | not tested | not tested |
 | `//` comments and blank lines | yes | not tested | not tested | not tested |
 | UTF-8 BOM, CRLF line endings | yes | not tested | not tested | not tested |
 | Relative paths beside the configuration | yes | documented (required) | not tested | not tested |

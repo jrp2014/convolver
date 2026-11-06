@@ -12,6 +12,24 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- User guides (REL-2): [check a crossover in a host](docs/use/check-a-crossover-in-a-host.md),
+  the 2→6 crossover journey in REAPER with the VST3 plug-in or the Audio
+  Unit, and [check file rendering with the command line](docs/use/check-files-with-the-command-line.md),
+  the CLI journey from download to the three examples checked with
+  `--compare` and the messages for a filter at another rate or channel
+  count. With the stereo journey, the three first-preview journeys are
+  written; none has yet been followed in a host. The release tests run the
+  new guides' commands from the package and check that each refusal they
+  quote (`<!-- refused-example -->`) fails with that message and writes no
+  file; the package must hold the crossover's preset, input and expected
+  output.
+- CLI (IO-5): `--speaker-map config` also labels `rf64-` output, with any
+  mask, in RF64's WAVE_FORMAT_EXTENSIBLE header (so `5.1(side)` and `7.1`
+  files larger than 4 GiB can be labelled). W64, FLAC, CAF and AIFF still
+  refuse a map before the output is created, now saying why: libsndfile
+  cannot write labels in W64 or FLAC, and CAF and AIFF layouts would change
+  the labels' meaning. The library's `AudioWriter` accepts a mask for
+  `Container::rf64` the same way.
 - VST3 (VST3-9): host rates that are not a whole number of hertz, such as a
   pull-down 48000 ÷ 1.001 ≈ 47952.04795 Hz, are accepted rather than refused
   by `setupProcessing` (which made hosts report the plug-in unusable). They
@@ -142,6 +160,25 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Repository checks (DOC-2): `scripts/check_repository.py` now fails when a
+  guide, workflow or script names a CMake `-DCONVOLVER_…` option the build
+  does not define (or a value it does not allow, such as an unknown FFT
+  backend), when the build guide leaves an option out, when a command shown
+  with `convolver`, `convolver-preset` or `convolver-equalizer-apo` uses an
+  option the tool does not parse, or when a tool's guide leaves out one it
+  does. The presets and Equalizer APO guides now mention `--help` and
+  `--version`.
+- Documentation (GAIN-1): the command-line guide states a safe bound for the
+  headroom integer output needs after `--gain-db no-clip`: none for float
+  output, beyond float rounding; for B-bit integers, H = (1 + S)(½ + D) + ½
+  steps for the dither and noise shaping chosen, from 0.0003 dB (16 bits,
+  no dither) to 0.0095 dB (16 bits, triangular dither and ninth-order
+  shaping) and 2.9 dB at 8 bits, with half a step of margin; lower the
+  reported gain by that and 0.01 dB more, as the report is rounded.
+  `native.io` checks the bound for 8, 16
+  and 24 bits with every dither and shaper, and the exact undithered
+  endpoints; `native.engine` checks that the no-clip gain keeps the input
+  that reaches the bound within full scale. The sound is unchanged.
 - Tests (PERF-12, from jrp's review of `db54160`): the load-timing tests
   record each audio callback (when it was due, when the thread woke, when
   the plug-in was entered and returned, and the thread's CPU time where the
@@ -399,6 +436,19 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Inspection (ROBUST-2): `--inspect` and `--validate` with
+  `--all-configurations` decode and prepare every entry of a list, so a
+  small list naming one long filter thousands of times kept them busy for
+  many minutes, and a list of configurations with thousands of paths made
+  a report of hundreds of megabytes. One check now stops, with a `limit`
+  error, before the next entry once it has decoded 1 Gi IR samples (16
+  renders of the largest filter), or before an entry that would take it past
+  16,384 reported filter paths or 131,072 reported routes (a path can have
+  8192, so 128 one-path entries made a 37 MB report; now 4.6 MB). A
+  message saying no list entry has the wanted sample rate now names at
+  most ten of the list's rates, as it already did entries; it had named
+  every rate, which a plug-in's log and window then showed. The `limit`
+  error is kept even when the report's 256 diagnostics are already used.
 - Tests (PERF-10, from jrp's review of `59ac8e0`): the load-timing tests
   passed when they could not judge a run: a late baseline made every
   violation, an over-long load included, "inconclusive", which counted as
