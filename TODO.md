@@ -1014,6 +1014,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   (jrp's review of `5f47ecb`, reproduced with two units); a two-unit case
   now checks this. The component's only addition is a lock-free increment
   per request and a null test hook. It runs on macOS CI only.
+- [x] **AU-15 — Render through AVAudioEngine.** 6 November 2026, on john's
+  request for unattended host checks: the Audio Unit workflow plays the
+  three first-use fixtures through the installed unit with Apple's
+  AVAudioEngine and checks them against the oracle
+  ([AVAudioEngine render](docs/develop/testing.md#avaudioengine-render)).
 - [x] **AU-13 — Safe partial construction of the Latency work.** 5 November
   2026, PR #111, from the external review of `91fcf1f` (0.8.13), a source
   review: AU-12 created the dispatch source before the semaphore, so if the

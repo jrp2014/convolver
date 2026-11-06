@@ -816,8 +816,8 @@ python3 tests/plugins/pluginval.py validate /path/to/pluginval \
 Both workflows use the newest full release for the formal result and run
 the newest pre-release afterwards as a warning only; on macOS the
 pre-release adds `--rtcheck relaxed`. These runs load the plug-ins without a
-filter; audio with a filter loaded is checked by the PLUG-2 harnesses and the
-VST3 acceptance test.
+filter; audio with a filter loaded is checked by the PLUG-2 harnesses, the
+VST3 acceptance test and the Audio Unit's [AVAudioEngine render](#avaudioengine-render).
 
 ### Audio Unit tests
 
@@ -941,6 +941,31 @@ fallbacks (`CONVOLVER_AU_FILE_READER=LIBSNDFILE`, `CONVOLVER_FFT_BACKEND=FFTW`)
 so that they keep working. Named
 host results (Logic, GarageBand, SoundSource, Live, REAPER, FL Studio) are
 AU-4.
+
+### AVAudioEngine render
+
+After installing the component, the Audio Unit workflow plays the
+[first-use fixtures](#plug-in-comparisons-plug-2) through it with Apple's own
+hosting stack (AU-15): AVAudioEngine in offline manual rendering mode, with
+the unit as an `AVAudioUnitEffect`. This shares no code with Convolver's
+tests or with pluginval.
+[`tests/au/avaudioengine_render.swift`](../../tests/au/avaudioengine_render.swift)
+applies an `.aupreset` from `convolver-preset` through `ClassInfo` before the
+engine starts, as a host restores a project, then feeds the input through
+the engine's input node and renders. Each fixture uses a block size that is
+not a multiple of the 256-frame partition: mono (1 in, 1 out) at 61 frames,
+the stereo cross-feed (2 in, 2 out) at 300 and the crossover (2 in, 6 out,
+discrete channels) at 1000.
+[`tests/au/avaudioengine_tests.py`](../../tests/au/avaudioengine_tests.py)
+checks that the unit reports 256 frames of latency and that nothing comes out
+before them. After them, the output must match the fixture's
+`expected.wav` from the direct double-precision oracle within 1e-5. It
+prints the worst error. To run it on a Mac with the component installed
+and Xcode's command-line tools:
+
+```sh
+python3 tests/au/avaudioengine_tests.py build-au/convolver-preset
+```
 
 ### LV2 tests
 

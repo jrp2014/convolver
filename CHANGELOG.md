@@ -51,6 +51,11 @@ Until 1.0 the C++ API may change between minor versions.
   command line with the VST3 tests in `tests/plugins/pluginval.py`. Given
   a bundle, pluginval tests only its first LV2 plug-in, so each is copied
   into a bundle of its own first.
+- Tests (AU-15): the Audio Unit workflow plays the three first-use
+  fixtures through the installed unit with Apple's AVAudioEngine (offline
+  manual rendering, the filter loaded as an `.aupreset` through
+  `ClassInfo`, block sizes 61, 300 and 1000) and checks the 256-frame
+  latency and the output against the oracle within 1e-5.
 - Tests (FFMPEG-1): `native.ffmpeg_pipe` runs the
   [FFmpeg pipe](docs/use/command-line.md#with-ffmpeg) as the guide writes
   it, on a short film with two audio tracks: the second track is chosen,

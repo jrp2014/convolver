@@ -3,7 +3,8 @@
 # The Audio Unit adapter (AU-1, AU-2): built against the newest AudioUnitSDK
 # release (CI-6; its version, commit and checksum are in the job summary),
 # tested through the Audio Unit API and the shared PLUG-2 harness, then
-# installed for the user and checked by auval and pluginval (AU-3).
+# installed for the user, checked by auval and pluginval (AU-3), and played
+# through AVAudioEngine (AU-15).
 name: Audio Unit
 
 'on':
@@ -152,6 +153,11 @@ jobs:
         run: |
           auval -strict -v aufx Conv CONV | tee auval.txt
           grep -q "Cocoa Views Available: 1" auval.txt
+      # AU-15: Apple's own hosting stack, AVAudioEngine offline rendering,
+      # plays the first-use examples through the installed unit with each
+      # filter loaded as an .aupreset, and checks them against the oracle.
+      - name: AVAudioEngine renders the first-use examples
+        run: python tests/au/avaudioengine_tests.py build-au/convolver-preset
       # AU-3: pluginval, a JUCE host, on the installed component, with its
       # editor tests opening the window. The formal check uses the newest
       # full release (CI-6).
