@@ -190,8 +190,8 @@ void cases() {
              return host_report(f, bypassed);
          },
          HostStatus::bypassed,
-         {"The input plays unfiltered.", "Fix: Turn bypass off to hear the filter."},
-         {"silent"}},
+         {"The input plays unfiltered. Turn bypass off to hear the filter."},
+         {"silent", "Fix:"}},
         {"bypassed, unequal counts",
          [&] {
              const HostLayout two_to_four{44100, 2, 4, 0, 0};
@@ -287,7 +287,9 @@ void cases() {
     check(fact(r, "Channels"), "2 in, 2 out", "");
     check(fact(r, "Routing"), "In 1 → Out 1, In 2 → Out 2", "");
     check(fact(r, "Filter length"), "0.1 ms", "(3 taps)");
-    check(fact(r, "Added delay"), "5.8 ms", "(256 frames, reported to the host)");
+    // PLUG-22: the Latency setting shows the time it adds, so the Audio
+    // section does not repeat it.
+    require(!has_fact(r, "Added delay"), "the latency repeated as a fact");
     check(fact(r, "Ring-out"), "2 frames", "after the input stops");
     // The identity paths have peak 1.75 (1 + .5 + .25): +4.9 dB. Gain
     // scales only the filtered path, which Mix then adds to the dry input:
@@ -333,8 +335,7 @@ void cases() {
     const auto unstarted = host_report(HostFilter(8), facts(std::nullopt));
     require(contains(fact(unstarted, "Sample rate").value, "not known until the host starts") &&
                 fact(unstarted, "Routing").value == "none" &&
-                !has_fact(unstarted, "Loudest peak") && !has_fact(unstarted, "Host blocks") &&
-                fact(unstarted, "Added delay").value == "256 frames",
+                !has_fact(unstarted, "Loudest peak") && !has_fact(unstarted, "Host blocks"),
             "facts before start");
     require(unstarted.filter_name == "None" && unstarted.problem.empty() &&
                 unstarted.plays == "No filter is loaded. The host has not started the plug-in yet.",
@@ -415,9 +416,6 @@ void cases() {
             "waiting latency explanation: " + waiting.explanation);
     require(waiting.latency_waits && !r.latency_waits && waiting.sample_rate == 44100,
             "latency waits field");
-    require(fact(waiting, "Added delay").note ==
-                "(256 frames, reported to the host); 23.2 ms chosen, not in use yet",
-            "waiting latency fact: " + fact(waiting, "Added delay").note);
 }
 
 std::optional<std::string> log_variable() {

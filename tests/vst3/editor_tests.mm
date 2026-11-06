@@ -245,7 +245,7 @@ void window() {
                 p.getLatencySamples() == 1024,
             "restart");
     [shown refresh];
-    require([shown.settingValues[2].stringValue isEqualToString:@"21.3 ms"],
+    require([shown.settingValues[2].stringValue isEqualToString:@"adds 21.3 ms"],
             "Latency note after the restart " + text(shown.settingValues[2].stringValue));
 
     // Bypass: a click is one edit of the bypass parameter, and the host's

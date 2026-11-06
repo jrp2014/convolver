@@ -366,7 +366,7 @@ void window() {
             contains(fact("Channels").stringValue, "\u26A0\uFE0E") &&
             contains(fact("Channels").stringValue, "the filter has 2 in, 2 out") &&
             fact("Channels").toolTip.length > 0 && fact("Routing") != nil &&
-            fact("Added delay") != nil,
+            fact("Added delay") == nil,
         "Audio facts: " +
             text([[view.audioLabels valueForKey:@"stringValue"] componentsJoinedByString:@", "]) +
             "\n" +
@@ -587,12 +587,12 @@ void window() {
 
     // Latency as a menu of block sizes (PLUG-10). A choice sets the
     // parameter, the unit's worker thread applies it at once, and the
-    // Latency row and the Added delay fact show it.
-    const auto shows = [&](NSString* time, const char* frames) {
+    // Latency row shows the time it adds, without "not in use yet" once the
+    // unit uses it.
+    const auto shows = [&](NSString* time) {
         for (int i = 0; i < 500; ++i) {
             [view refresh];
-            if ([view.settingValues[2].stringValue isEqualToString:time] &&
-                contains(fact("Added delay").stringValue, frames))
+            if ([view.settingValues[2].stringValue isEqualToString:time])
                 return true;
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
@@ -603,20 +603,19 @@ void window() {
                 [latency.itemTitles[6] isEqualToString:@"4096 frames"] &&
                 latency.indexOfSelectedItem == 2 &&
                 [latency.accessibilityLabel isEqualToString:@"Latency"] &&
-                [view.settingValues[2].stringValue isEqualToString:@"5.8 ms"],
+                [view.settingValues[2].stringValue isEqualToString:@"adds 5.8 ms"],
             "Latency menu: " + text([latency.itemTitles componentsJoinedByString:@", "]));
     [latency selectItemAtIndex:3];
     [latency sendAction:latency.action to:latency.target];
     check(AudioUnitGetParameter(unit.get(), au::latency_parameter, kAudioUnitScope_Global, 0, &now),
           "Latency value");
     require(now == 3, "the Latency menu did not set Latency: " + std::to_string(now));
-    require(shows(@"11.6 ms", "512 frames") && !contains(view.explanationView.string, "is chosen"),
+    require(shows(@"adds 11.6 ms") && !contains(view.explanationView.string, "is chosen"),
             "the window does not show the new Latency in use:\n" +
-                text(view.explanationView.string) + "\n" + text(view.settingValues[2].stringValue) +
-                "\n" + text(fact("Added delay").stringValue));
+                text(view.explanationView.string) + "\n" + text(view.settingValues[2].stringValue));
     check(AudioUnitSetParameter(unit.get(), au::latency_parameter, kAudioUnitScope_Global, 0, 2, 0),
           "Latency from the host");
-    require(shows(@"5.8 ms", "256 frames") && latency.indexOfSelectedItem == 2 &&
+    require(shows(@"adds 5.8 ms") && latency.indexOfSelectedItem == 2 &&
                 !contains(view.explanationView.string, "is chosen"),
             "the Latency menu did not follow the host");
 

@@ -111,12 +111,13 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
     } else if (facts.bypassed && filter.filter()) {
         // PLUG-22: as HostProcessor bypasses, the input for equal counts,
         // otherwise silence.
-        m.plays = !host ? std::string("No filter is applied while bypassed.")
-                  : host->inputs == host->outputs
-                      ? std::string("The input plays unfiltered.")
-                      : "The outputs are silent: with " + ports(host->inputs, host->outputs) +
-                            " there is no unfiltered signal to play.";
-        m.fix = "Turn bypass off to hear the filter.";
+        // Nothing is wrong, so turning it off is part of the sentence, not a fix.
+        m.plays = (!host ? std::string("No filter is applied while bypassed.")
+                   : host->inputs == host->outputs
+                       ? std::string("The input plays unfiltered.")
+                       : "The outputs are silent: with " + ports(host->inputs, host->outputs) +
+                             " there is no unfiltered signal to play.") +
+                  " Turn bypass off to hear the filter.";
     } else if (const auto& c = filter.filter()) {
         // PLUG-22: while it plays, the window's heading names the filter and
         // the Audio section describes it, so nothing is said here.
@@ -297,21 +298,9 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
                          "Which input feeds which output through the filter."});
     }
 
+    // PLUG-22: the latency is not a fact here; the Latency setting shows the
+    // time it adds, and the note says when a choice is not in use yet.
     const auto frames = [](std::size_t n) { return std::to_string(n) + " frames"; };
-    HostFact delay{"Added delay",
-                   rate ? duration(facts.latency_frames, rate) : frames(facts.latency_frames),
-                   rate ? "(" + frames(facts.latency_frames) + ", reported to the host)"
-                        : "(reported to the host)",
-                   false,
-                   "Convolver's latency, set by the Latency menu. It is reported to the host, "
-                   "which can delay other tracks to keep them in time."};
-    if (latency_waits(facts))
-        delay.note +=
-            "; " +
-            (rate ? duration(facts.settings.latency, rate) : frames(facts.settings.latency)) +
-            " chosen, not in use yet";
-    audio.push_back(std::move(delay));
-
     audio.push_back({"Ring-out",
                      facts.tail_frames == 0 ? std::string("none")
                      // Under 0.05 ms reads as frames, not "0.0 ms".

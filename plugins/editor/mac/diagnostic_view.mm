@@ -18,6 +18,9 @@ constexpr CGFloat margin = 20;
 constexpr CGFloat inner = width - 2 * margin;
 constexpr CGFloat form_label = 64;  // "Latency:" and the other form labels.
 constexpr CGFloat fact_label = 104; // "Filter length" and the other Audio labels.
+constexpr CGFloat icon = 18;        // The document symbol before the filter's name.
+constexpr CGFloat padding = 10;     // Inside the box round a problem.
+constexpr CGFloat text_width = inner - 2 * padding;
 constexpr CGFloat most_text =
     200; // A longer explanation scrolls (a list .cfg explains each entry).
 constexpr NSTimeInterval refresh_interval = 0.5;
@@ -32,13 +35,13 @@ NSString* field(NSDictionary<NSString*, NSString*>* report, NSString* key) {
 // beside them, so neither is the only signal. Values are HostStatus numbers.
 NSColor* status_colour(NSInteger status) {
     switch (status) {
-    case 0: // Playing
+    case 0: // Active
         return [NSColor systemGreenColor];
     case 2: // Load failed
         return [NSColor systemRedColor];
     case 4: // Fault
         return [NSColor systemOrangeColor];
-    default: // No filter, Not checked yet
+    default: // No filter, Not checked yet, Bypassed
         return [NSColor labelColor];
     }
 }
@@ -52,9 +55,16 @@ NSString* status_symbol(NSInteger status) {
         return @"clock";
     case 4:
         return @"exclamationmark.triangle.fill";
+    case 5:
+        return @"pause.circle";
     default:
         return @"circle.dashed";
     }
+}
+// Whether the status has a colour of its own (the others are drawn in the
+// secondary colour).
+bool coloured(NSInteger status) {
+    return status == 0 || status == 2 || status == 4;
 }
 
 NSBox* separator() {
@@ -208,9 +218,11 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSStackView* stack_;                  // Everything, top to bottom.
     NSScrollView* scroll_;
     NSLayoutConstraint* scrollHeight_;
-    NSStackView* audio_;     // The Audio facts' rows, rebuilt when they change.
-    NSStackView* noteRow_;   // "Note:" and the note, hidden without one.
-    NSStackView* actionRow_; // The fix's button, hidden without one.
+    NSStackView* audio_;        // The Audio facts' rows, rebuilt when they change.
+    NSBox* message_;            // The message, in a box when it is a problem; hidden when empty.
+    NSStackView* messageStack_; // Its text, button and note.
+    NSStackView* noteRow_;      // "Note:" and the note, hidden without one.
+    NSStackView* actionRow_;    // The fix's button, hidden without one.
     NSTimer* timer_;
     NSString* shown_; // The text last shown, so a refresh keeps a selection.
     NSString* logPath_;
@@ -253,8 +265,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     ]];
 
     // Which instance this is, with Bypass at the trailing end of the same
-    // line (jrp, 5 November 2026: nothing on the window's bottom edge), then
-    // the status: symbol, word, and under them what plays, why and what to do.
+    // line (jrp, 5 November 2026: nothing on the window's bottom edge).
     _titleField = label(small_font(), [NSColor secondaryLabelColor]);
     stretches(_titleField);
     _bypassButton = [NSButton checkboxWithTitle:@"Bypass"
@@ -267,32 +278,69 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [title_row addView:_titleField inGravity:NSStackViewGravityLeading];
     [title_row addView:_bypassButton inGravity:NSStackViewGravityTrailing];
     fixed_width(title_row, inner);
-    [self add:title_row after:4];
+    [self add:title_row after:6];
 
+    // PLUG-22 (jrp, 6 November 2026): the heading is the filter's file name,
+    // with its extension, and beside it the status as a symbol and a word
+    // (Active, Bypassed, Load failed...). A long name loses its middle, so
+    // the extension stays; its tooltip has all of it.
+    NSImageView* document = [[NSImageView alloc] init];
+    document.image = [NSImage imageWithSystemSymbolName:@"doc" accessibilityDescription:nil];
+    document.contentTintColor = [NSColor secondaryLabelColor];
+    document.imageScaling = NSImageScaleProportionallyUpOrDown;
+    document.accessibilityElement = NO;
+    fixed_width(document, icon);
+    [document.heightAnchor constraintEqualToConstant:icon].active = YES;
+    _filterNameField = label([NSFont boldSystemFontOfSize:17], [NSColor labelColor]);
+    _filterNameField.lineBreakMode = NSLineBreakByTruncatingMiddle;
+    _filterNameField.accessibilityLabel = @"Filter";
+    [_filterNameField
+        setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow
+                                 forOrientation:NSLayoutConstraintOrientationHorizontal];
     _statusSymbol = [[NSImageView alloc] init];
     _statusSymbol.translatesAutoresizingMaskIntoConstraints = NO;
     _statusSymbol.imageScaling = NSImageScaleProportionallyUpOrDown;
     _statusSymbol.accessibilityElement = NO; // The status word says it.
     [NSLayoutConstraint activateConstraints:@[
-        [_statusSymbol.widthAnchor constraintEqualToConstant:22],
-        [_statusSymbol.heightAnchor constraintEqualToConstant:22]
+        [_statusSymbol.widthAnchor constraintEqualToConstant:16],
+        [_statusSymbol.heightAnchor constraintEqualToConstant:16]
     ]];
-    _statusField = label([NSFont boldSystemFontOfSize:17], [NSColor labelColor]);
+    _statusField = label([NSFont systemFontOfSize:[NSFont systemFontSize]
+                                           weight:NSFontWeightSemibold],
+                         [NSColor labelColor]);
     _statusField.accessibilityLabel = @"Status";
-    [self add:stack(@[ _statusSymbol, _statusField ], NSUserInterfaceLayoutOrientationHorizontal, 8)
-        after:4];
+    [_statusField setContentCompressionResistancePriority:NSLayoutPriorityRequired
+                                           forOrientation:NSLayoutConstraintOrientationHorizontal];
+    NSStackView* badge =
+        stack(@[ _statusSymbol, _statusField ], NSUserInterfaceLayoutOrientationHorizontal, 4);
+    NSStackView* name_row = stack(@[ document, _filterNameField, badge ],
+                                  NSUserInterfaceLayoutOrientationHorizontal, 6);
+    [name_row setCustomSpacing:14 afterView:_filterNameField];
+    [name_row.widthAnchor constraintLessThanOrEqualToConstant:inner].active = YES;
+    [self add:name_row after:2];
+    // Under the name, a refused file and the drop hint, in the small font.
+    _filterNoteField = wrapping(small_font(), [NSColor secondaryLabelColor], inner - icon - 6);
+    NSView* note_indent = [[NSView alloc] init];
+    fixed_width(note_indent, icon);
+    [note_indent.heightAnchor constraintEqualToConstant:1].active = YES;
+    [self add:stack(@[ note_indent, _filterNoteField ], NSUserInterfaceLayoutOrientationHorizontal,
+                    6)
+        after:10];
 
-    // No border or box: the text reads as part of the panel. It scrolls only
-    // when it is longer than most_text.
-    scroll_ = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, inner, 40)];
+    // DIAG-2's message, shown only when there is something to say: the
+    // problem, what plays, its cause and fix, the button that carries out
+    // the fix and a note. A problem sits in a box tinted with the status
+    // colour; Bypassed's line and a note are plain text. No scroller unless
+    // it is longer than most_text.
+    scroll_ = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, text_width, 40)];
     scroll_.hasVerticalScroller = YES;
     scroll_.autohidesScrollers = YES;
     scroll_.borderType = NSNoBorder;
     scroll_.drawsBackground = NO;
-    fixed_width(scroll_, inner);
+    fixed_width(scroll_, text_width);
     scrollHeight_ = [scroll_.heightAnchor constraintEqualToConstant:40];
     scrollHeight_.active = YES;
-    _explanationView = [[NSTextView alloc] initWithFrame:NSMakeRect(0, 0, inner, 40)];
+    _explanationView = [[NSTextView alloc] initWithFrame:NSMakeRect(0, 0, text_width, 40)];
     _explanationView.editable = NO;
     _explanationView.selectable = YES;
     _explanationView.richText = NO;
@@ -307,18 +355,17 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _explanationView.autoresizingMask = NSViewWidthSizable;
     _explanationView.verticallyResizable = YES;
     _explanationView.horizontallyResizable = NO;
-    _explanationView.textContainer.containerSize = NSMakeSize(inner, CGFLOAT_MAX);
+    _explanationView.textContainer.containerSize = NSMakeSize(text_width, CGFLOAT_MAX);
     _explanationView.textContainer.widthTracksTextView = YES;
     _explanationView.accessibilityLabel = @"What Convolver plays, why, and what to do";
     // A file dropped on the text goes to the window, not into the text.
     [_explanationView unregisterDraggedTypes];
     scroll_.documentView = _explanationView;
-    [self add:scroll_ after:8];
 
-    // DIAG-2: the one button that carries out the fix, when the window can
-    // (Choose Filter… or Copy Diagnostics), under the fix and aligned with
-    // its text; an ordinary push button, so Return still goes to the host.
-    // Then the note, in the small secondary font.
+    // The one button that carries out the fix, when the window can (Choose
+    // Filter… or Copy Diagnostics), aligned with the fix's text; an
+    // ordinary push button, so Return still goes to the host. Then the
+    // note, in the small secondary font.
     _actionButton = [NSButton buttonWithTitle:@"" target:self action:nil];
     _actionButton.hidden = YES;
     NSView* action_indent = [[NSView alloc] init];
@@ -327,56 +374,50 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     actionRow_ =
         stack(@[ action_indent, _actionButton ], NSUserInterfaceLayoutOrientationHorizontal, 10);
     actionRow_.hidden = YES;
-    fixed_width(actionRow_, inner);
-    [self add:actionRow_ after:8];
     NSTextField* note_label = label(small_font(), [NSColor secondaryLabelColor]);
     note_label.stringValue = @"Note:";
     note_label.alignment = NSTextAlignmentRight;
     note_label.selectable = NO;
     fixed_width(note_label, form_label);
-    _noteField = wrapping(small_font(), [NSColor secondaryLabelColor], inner - form_label - 10);
+    _noteField =
+        wrapping(small_font(), [NSColor secondaryLabelColor], text_width - form_label - 10);
     _noteField.accessibilityLabel = @"Note";
     stretches(_noteField);
     noteRow_ = stack(@[ note_label, _noteField ], NSUserInterfaceLayoutOrientationHorizontal, 10);
     noteRow_.alignment = NSLayoutAttributeFirstBaseline;
     noteRow_.distribution = NSStackViewDistributionFill;
     noteRow_.hidden = YES;
-    fixed_width(noteRow_, inner);
-    [self add:noteRow_ after:8];
-    [self add:separator() after:12];
+    fixed_width(noteRow_, text_width);
+    NSStackView* message =
+        stack(@[ scroll_, actionRow_, noteRow_ ], NSUserInterfaceLayoutOrientationVertical, 8);
+    messageStack_ = message;
+    message_ = [[NSBox alloc] init];
+    message_.boxType = NSBoxCustom;
+    message_.titlePosition = NSNoTitle;
+    message_.cornerRadius = 6;
+    message_.contentViewMargins = NSZeroSize;
+    message_.translatesAutoresizingMaskIntoConstraints = NO;
+    [message_.contentView addSubview:message];
+    [NSLayoutConstraint activateConstraints:@[
+        [message.topAnchor constraintEqualToAnchor:message_.contentView.topAnchor],
+        [message.bottomAnchor constraintEqualToAnchor:message_.contentView.bottomAnchor],
+        [message.leadingAnchor constraintEqualToAnchor:message_.contentView.leadingAnchor],
+        [message.trailingAnchor constraintEqualToAnchor:message_.contentView.trailingAnchor]
+    ]];
+    fixed_width(message_, inner);
+    [self add:message_ after:10];
 
-    // The form. Filter: the file's name with Choose… beside it, as
-    // convolution reverbs show their impulse response; a file dropped
-    // anywhere on the window does the same.
-    NSImageView* document = [[NSImageView alloc] init];
-    document.image = [NSImage imageWithSystemSymbolName:@"doc" accessibilityDescription:nil];
-    document.contentTintColor = [NSColor secondaryLabelColor];
-    document.accessibilityElement = NO;
-    fixed_width(document, 16);
-    _filterNameField = label([NSFont systemFontOfSize:[NSFont systemFontSize]
-                                               weight:NSFontWeightSemibold],
-                             [NSColor labelColor]);
-    _filterNameField.accessibilityLabel = @"Filter";
-    _filterNoteField = wrapping(small_font(), [NSColor secondaryLabelColor], 300);
-    NSStackView* names =
-        stack(@[ _filterNameField, _filterNoteField ], NSUserInterfaceLayoutOrientationVertical, 1);
-    stretches(names);
+    // Choose…, the recent files, Reload, and reloading when the file
+    // changes (for someone refining a filter in another program), under the
+    // heading; a file dropped anywhere on the window does what Choose… does.
     _chooseButton = [NSButton buttonWithTitle:@"Choose…"
                                        target:self
                                        action:@selector(chooseFilter:)];
     _chooseButton.accessibilityLabel = @"Choose Filter";
     _chooseButton.toolTip =
         @"Loads a Convolver configuration (.cfg) or a sound file as the filter; you can also "
-        @"drop the file on this window. The project keeps the filter itself, as a preset does, "
-        @"so moving the file later does not change it.";
-    _chooseButton.hidden = loader_ == nil;
-    NSStackView* filter_row =
-        stack(@[ document, names, _chooseButton ], NSUserInterfaceLayoutOrientationHorizontal, 8);
-    filter_row.distribution = NSStackViewDistributionFill;
-    [self add:[self formRow:@"Filter" content:filter_row] after:12];
-
-    // Under it: the recent files, Reload, and reloading when the file
-    // changes, for someone refining a filter in another program.
+        @"drop the file on this window. The project keeps the filter itself and its file's "
+        @"name, as a preset does, so moving the file later does not change it.";
     _recentButton = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:YES];
     _recentButton.translatesAutoresizingMaskIntoConstraints = NO;
     [_recentButton addItemWithTitle:@"Recent"];
@@ -398,12 +439,15 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _watchButton.toolTip = @"While this window is open, reads the filter again when its file, "
                            @"or a file a .cfg names, changes.";
     if (loader_) {
-        NSStackView* reload_row = stack(@[ _recentButton, _reloadButton, _watchButton ],
-                                        NSUserInterfaceLayoutOrientationHorizontal, 8);
-        [self add:[self formRow:@"" content:reload_row] after:12];
+        NSStackView* file_row =
+            stack(@[ _chooseButton, _recentButton, _reloadButton, _watchButton ],
+                  NSUserInterfaceLayoutOrientationHorizontal, 8);
+        [self add:[self formRow:@"" content:file_row] after:12];
         [self registerForDraggedTypes:@[ NSPasteboardTypeFileURL ]];
     }
     [self updateRecentMenu];
+    if (settings.count)
+        [self add:separator() after:12];
 
     // The settings (setting_rows.h), each a row of the form.
     __weak CONVOLVER_DIAGNOSTIC_VIEW* weakSelf = self;
@@ -625,6 +669,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 - (void)refresh {
     NSDictionary<NSString*, NSString*>* report = report_ ? report_() : nil;
     NSString *problem, *plays, *cause, *fix, *advice, *action, *audio, *reference, *name, *note;
+    NSInteger status = -1;
     if (!report) {
         _titleField.stringValue = @"Convolver";
         _statusField.stringValue = @"Not available";
@@ -637,15 +682,14 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
         audio = reference = name = note = @"";
         logPath_ = nil;
     } else {
-        const NSInteger status = field(report, @"status").integerValue;
+        status = field(report, @"status").integerValue;
         _titleField.stringValue = field(report, @"title");
         _statusField.stringValue = field(report, @"status name");
         _statusField.textColor = status_colour(status);
         _statusSymbol.image = [NSImage imageWithSystemSymbolName:status_symbol(status)
                                         accessibilityDescription:nil];
-        _statusSymbol.contentTintColor = status == 0 || status == 2 || status == 4
-                                             ? status_colour(status)
-                                             : [NSColor secondaryLabelColor];
+        _statusSymbol.contentTintColor =
+            coloured(status) ? status_colour(status) : [NSColor secondaryLabelColor];
         problem = field(report, @"problem");
         plays = field(report, @"plays");
         cause = field(report, @"cause");
@@ -674,8 +718,10 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     // Choose Filter… only where the window can choose a file.
     if ([action isEqualToString:@"choose filter"] && !loader_)
         action = @"";
-    NSString* text = [@[ problem, plays, cause, fix, advice, action, name, note, audio, reference ]
-        componentsJoinedByString:@"\v"];
+    NSString* text = [@[
+        @(status).stringValue, problem, plays, cause, fix, advice, action, name, note, audio,
+        reference
+    ] componentsJoinedByString:@"\v"];
     if ([text isEqualToString:shown_])
         return;
     shown_ = text;
@@ -683,11 +729,29 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [self showAction:action];
     _noteField.stringValue = advice;
     noteRow_.hidden = advice.length == 0;
+    [self showMessage:problem status:status];
     _filterNameField.stringValue = name;
+    _filterNameField.toolTip = name.length ? name : nil;
     _filterNoteField.stringValue = note;
     [self showAudio:audio];
     _referenceField.attributedStringValue = reference_text(reference);
     [self fit];
+}
+
+// The message under the heading: hidden when there is nothing to say, in a
+// box tinted with the status colour when it states a problem, and plain text
+// otherwise (Bypassed's line, a note).
+- (void)showMessage:(NSString*)problem status:(NSInteger)status {
+    const BOOL text = _explanationView.string.length > 0;
+    scroll_.hidden = !text;
+    message_.hidden = !text && actionRow_.hidden && noteRow_.hidden;
+    const BOOL boxed = problem.length > 0;
+    NSColor* tint = coloured(status) ? status_colour(status) : [NSColor secondaryLabelColor];
+    message_.fillColor = boxed ? [tint colorWithAlphaComponent:0.08] : [NSColor clearColor];
+    message_.borderColor = boxed ? [tint colorWithAlphaComponent:0.4] : [NSColor clearColor];
+    message_.borderWidth = boxed ? 1 : 0;
+    messageStack_.edgeInsets =
+        boxed ? NSEdgeInsetsMake(padding, padding, padding, padding) : NSEdgeInsetsMake(0, 0, 0, 0);
 }
 
 // The fix's button: Choose Filter… (as Choose…) or Copy Diagnostics, or none.
