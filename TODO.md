@@ -62,7 +62,7 @@ boundary and C++20 in the core.
 | 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, the Audio Unit from the same candidate, which holds it since PR #115) at the same sitting | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 and AU-4 both gate the first preview, which holds the Audio Unit too. Needs no CLI in the package, so it can start now that step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
 | 3. Alongside step 2 | **PLUG-5** first-preview contents: in the candidates since PR #115 (the Audio Unit on macOS, the VST trademark notice; the `convolver` CLI and the first-use presets since PR #101); what remains is qualifying one exact candidate (HOST-1, AU-4, REL-3) and jrp's publication. **REL-2** (done): the stereo, 2→6 crossover and CLI journeys are written in `docs/use/` | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
 | Early walkthrough (macOS) (done) | **REL-5**: an explicitly limited walkthrough of an exact candidate on macOS, the stereo journey only | Done on 1 November 2026 as a package and command-line check only, by jrp's choice ([done](#done)); its host steps moved to HOST-1's REAPER smoke test and REL-3. It did not change the first preview's contents and does not replace REL-3. |
-| 4. Settings, windows and the Audio Unit | The **HOST-2** editor as the macOS-only first preview has it: **PLUG-9** and **PLUG-10** (Gain, Mix and Latency), **VST3-3**, **VST3-4**, **AU-7**, and the window **VST3-11** shared with the Audio Unit in **AU-6**; and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview, in the macOS candidates since PR #115). For later previews: **VST3-12** (Windows), **VST3-13** (Linux), and PLUG-9, PLUG-10 and AU-7's remaining gain modes and meters | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items) the first preview needs, each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the [preview workloads](#loading-responsiveness), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
+| 4. Settings, windows and the Audio Unit | The **HOST-2** editor as the macOS-only first preview has it: **PLUG-9** (the report and loading from a file) and **PLUG-10** (Gain, Mix and Latency), **VST3-3**, **VST3-4**, **AU-7**, and the window **VST3-11** shared with the Audio Unit in **AU-6**; and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview, in the macOS candidates since PR #115). For later previews: **VST3-12** (Windows), **VST3-13** (Linux), and PLUG-9, PLUG-10 and AU-7's remaining gain modes and meters | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items) the first preview needs, each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the [preview workloads](#loading-responsiveness), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). |
 | 5. The milestone | A candidate from a 0.10.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
 | 6. Later previews | Windows and Linux (**VST3-12**, **VST3-13**), the remaining gain modes and meters (**PLUG-9**, **PLUG-10**, **AU-7**), PERF-3's supported workloads; **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need. Not a first-preview gate: the loading-responsiveness gate uses the finite preview workloads instead. |
@@ -357,7 +357,8 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 - [ ] **AU-3 — Validation.** `auval` and pluginval in macOS CI. `auval -strict`
   runs since PR #44; still to add: pluginval on the component, and a
   ThreadSanitizer build of `au.adapter` (bypass switched while rendering).
-  Needed for the first preview.
+  Needed for the first preview; whether the ThreadSanitizer build still is,
+  now that further hardening waits for the first walkthrough, is jrp's to say.
   Progress (6 November 2026): pluginval validates the installed component
   at strictness 10, editor tests included, in the Audio Unit workflow
   ([pluginval](docs/develop/testing.md#pluginval)); the ThreadSanitizer build
@@ -875,7 +876,8 @@ reset, through each adapter's load and restore entry points. PERF-3's wider
 measurements (6- and 8-channel routing, 96 kHz, other block sizes, memory)
 become stated supported workloads after the first preview; they are not a
 preview gate. What remains for the gate: the release qualification run on
-the intended machine ([REL-6](docs/develop/releasing.md#responsiveness-qualification)) and, if the 30 s case
+the intended machine ([REL-6](docs/develop/releasing.md#responsiveness-qualification);
+whether it gates the first preview is jrp's to say) and, if the 30 s case
 exceeds 250 ms on a supported platform, jrp's choice between background
 preparation in VST3 and the Audio Unit (VST3-5) and a higher limit with the
 pause documented.
@@ -1358,20 +1360,16 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [LV2 tests](docs/develop/testing.md#lv2-tests).
 - [x] **LV2-2 — Loading filters.** 23 October 2026, PR #48;
   [loading a filter](docs/use/plugins.md#loading-a-filter), [LV2 tests](docs/develop/testing.md#lv2-tests).
-- [x] **LV2-8 — Status after a request the host drops.** 6 November 2026:
-  closed without a change, because none of the four hosts named drops a
-  queued request in a way that would leave the status at Loading. Read in
-  each host's current source on 6 November 2026 (Jalv `main`, Ardour
-  `master`, Carla `main`, PipeWire `master`): Ardour's LV2 worker thread
-  lives as long as the plug-in and keeps its queue across `deactivate()`
-  and `activate()`; Carla runs queued requests from its idle callback
-  whether or not the plug-in is active, and only creates the queue when it
-  loads the plug-in; PipeWire's filter chain runs each request on its main
-  loop and waits for queued work before freeing the instance; Jalv does
-  drop queued requests, but only when it deactivates to quit, after which
-  the instance is freed and its status is never read. The tests' deferred
-  worker stays as a stress case. Reopen if a host is found that drops
-  requests and reactivates.
+- [x] **LV2-8 — Status after a request the host drops.** 6 November 2026,
+  PR #122: closed without a change. In their current source (Jalv `main`,
+  Ardour `master`, Carla `main`, PipeWire `master`; released versions and
+  other hosts not checked), none drops a queued request and then
+  reactivates: Ardour and Carla keep the queue across deactivation,
+  PipeWire waits for queued work before freeing the instance in its normal
+  configuration, and Jalv drops requests only when it quits. The tests'
+  deferred worker stays as a stress case; reopen if a host is found that
+  drops requests and reactivates
+  ([worker lifecycle](docs/project/plans/2026-10-21-plugin-formats.md#lv2-adapter-design)).
 - [x] **PERF-4 — Compiler flags and CPU-specific kernels.** 24 October 2026,
   PR #61: run-time AVX2+FMA kernels, with FMA by jrp's decision and a divergence test; [compiler flags and AVX2 kernels](docs/develop/fft-backends.md#compiler-flags-and-avx2-kernels).
 - [x] **PERF-5 — Track valid input history.** 24 October 2026, PR #70: paths

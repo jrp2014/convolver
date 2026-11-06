@@ -9,20 +9,22 @@ going. [TODO](../../TODO.md) is the backlog and owns the order of work; the
 linked guides own the behaviour.
 
 **In short:** status checked on 6 November 2026 against `main` at
-`13fe61a` (0.10.8), whose last source change is `4c5baef`
-([PR #120](https://github.com/jrp2014/convolver/pull/120): pluginval on the
-LV2 plug-ins and the Audio Unit, the Audio Unit rendered through
-AVAudioEngine, and the LV2 plug-in played in a headless Ardour session).
+`68578a5` (0.10.9), whose last source change is `1822877`
+([PR #121](https://github.com/jrp2014/convolver/pull/121): `--gain-db
+no-clip` reserves the headroom that integer output needs, GAIN-3).
 Since 0.10.4, subnormal numbers are flushed while processing (PERF-15,
-[PR #117](https://github.com/jrp2014/convolver/pull/117)), and
+[PR #117](https://github.com/jrp2014/convolver/pull/117));
 [PR #118](https://github.com/jrp2014/convolver/pull/118) and
 [PR #119](https://github.com/jrp2014/convolver/pull/119) bounded
-`--all-configurations` reports, defined the `no-clip` headroom and wrote the
-crossover and command-line journeys. Every workflow that runs on `main`
-passed on `4c5baef`, including
-[Native and historical tests](https://github.com/jrp2014/convolver/actions/runs/42230640141)
+`--all-configurations` reports, labelled RF64 output's speakers (IO-5),
+defined the `no-clip` headroom and wrote the crossover and command-line
+journeys; and [PR #120](https://github.com/jrp2014/convolver/pull/120) added
+pluginval on the LV2 plug-ins and the Audio Unit, rendered the Audio Unit
+through AVAudioEngine and played the LV2 plug-in in a headless Ardour
+session. Every workflow that runs on `main` passed on `1822877`, including
+[Native and historical tests](https://github.com/jrp2014/convolver/actions/runs/42235474538)
 and the
-[Plug-in distribution candidates](https://github.com/jrp2014/convolver/actions/runs/42230640102).
+[Plug-in distribution candidates](https://github.com/jrp2014/convolver/actions/runs/42235474383).
 Nothing has been published yet: there are no GitHub releases, and
 preview packages exist only as temporary CI artifacts. The command-line
 renderer, the preset tool, the Equalizer APO export and the VST3, Audio Unit
@@ -187,14 +189,18 @@ detail.
    on its finite preview workloads (stereo filters of 1, 10 and 30 s),
    qualified on the intended machine ([performance](#performance-what-is-measured)
    below).
-5. **jrp's decisions:** who the REL-3 tester is. The LV2 version mapping
+5. **jrp's decisions:** who the REL-3 tester is, and whether the
+   Audio Unit's ThreadSanitizer build and the qualification of the loading
+   gate on the intended machine (REL-6) stay first-preview gates now that
+   further hardening waits for the first walkthrough. The LV2 version mapping
    (LV2-5) is needed only before LV2 joins a preview.
 
 jrp's review of `276c7dc` (1 November 2026): qualify this fixed feature set
 against explicit acceptance criteria before adding further conveniences or
 DSP optimisation. His review of 0.10.8 (6 November 2026) narrowed the first
-preview to macOS ([decisions](decisions.md#plug-in-behaviour)): the strongest
-next check is someone using Convolver without help.
+preview to macOS and held optional features and further hardening until the
+first independent walkthrough ([decisions](decisions.md#plug-in-behaviour)):
+the strongest next check is someone using Convolver without help.
 
 ## Performance: what is measured
 

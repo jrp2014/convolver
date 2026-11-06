@@ -181,9 +181,9 @@ Until 1.0 the C++ API may change between minor versions.
 ### Changed
 
 - LV2 (LV2-8): closed without a change. Jalv, Ardour, Carla and PipeWire,
-  read in their current source, do not drop a queued worker request and
-  then reactivate the plug-in, so the status cannot be left at Loading in
-  them.
+  read in their current source and in their normal configuration, do not
+  drop a queued worker request and then reactivate the plug-in, so the
+  status cannot be left at Loading in them.
 - CLI (GAIN-3): `--gain-db no-clip` now also reserves the headroom that
   integer output needs, so input within full scale cannot clip even after
   rounding, dither and noise shaping. **Integer output with `no-clip` is

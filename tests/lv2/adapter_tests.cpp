@@ -1313,8 +1313,8 @@ void worker_loads(host::World& world, const fs::path& work) {
     }
     // A host that drops queued work on deactivation: the original keeps
     // playing and stays the saved filter. The status port stays at Loading
-    // for the dropped request until another load is answered (LV2-8, open);
-    // this does not check it.
+    // for the dropped request until another load is answered; this does not
+    // check it (LV2-8 found no host that drops requests and reactivates).
     {
         const std::string label = "a load dropped at deactivation: ";
         host::Features features;

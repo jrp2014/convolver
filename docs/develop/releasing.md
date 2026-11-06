@@ -207,7 +207,12 @@ jrp, and has not been done yet:
    `collect` job) and check every file against the `SHA256SUMS` file it
    contains. These are the files you will attach, unchanged. The first
    preview is macOS-only ([decisions](../project/decisions.md#plug-in-behaviour)),
-   so attach only the two macOS packages, with the [corresponding source](#licences-and-corresponding-source). For
+   so attach only the macOS files: for arm64 and for x86-64, the ZIP archive
+   and the `-unsigned.pkg` installer, with the
+   [corresponding source](#licences-and-corresponding-source)
+   (`Convolver-source.tar.gz`). `SHA256SUMS` and the candidate record also
+   list the Windows and Linux files; the release notes give only the sums of
+   the files attached. For
    the first preview, the independent walkthrough (REL-3 in
    [TODO](../../TODO.md)) uses these same files before they are uploaded.
 3. Run the [smoke test](host-testing.md#smoke-test-for-an-unsigned-preview) in
@@ -220,7 +225,7 @@ jrp, and has not been done yet:
    [unsigned previews](../use/install.md#unsigned-previews)) in the release
    notes.
 5. Check it worked: download each asset from the published pre-release and
-   compare it with `SHA256SUMS`, and read the release page as a user would.
+   compare it with its line in `SHA256SUMS`, and read the release page as a user would.
    Never replace or edit an asset after publication; a fix gets a new version.
 
 `production_enabled` stays false for a preview. Previews are unsigned on macOS
