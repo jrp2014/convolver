@@ -1074,6 +1074,9 @@ entries written before 7 November 2026, with their evidence, are
   2026, PR #111.
 - [x] **CI-31 — Keep `native.host_settings` within its time limit under
   sanitizers.** 5 November 2026, PR #111.
+- [x] **CI-33 — Compare audio, not file bytes, in the no-clip test.** 6
+  November 2026, PR #124; [intermittent
+  failures](docs/develop/testing.md#intermittent-failures).
 - [x] **CI-29 — Use LLVM's parallel clang-tidy runner.** 5 November 2026, PR
   #108; [formatting and analysis](CONTRIBUTING.md#formatting-and-analysis).
 - [x] **CI-24 — Find why `native.request_worker` timed out on Windows.** 5

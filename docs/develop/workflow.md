@@ -193,6 +193,11 @@ Report only problems you can point to in the diff, with file and line.
   checker does not read (`git grep -n 'old/path'`).
 - [ ] **Tests:** a test would fail if the change were wrong; tolerances are
   fixed and justified; new tests are registered in CTest and run by CI.
+  Every assertion checks a user-visible contract or a meaningful internal
+  invariant, and a failure names what broke. Exact audio reproduction
+  qualifies ([how to compare audio](testing.md#intermittent-failures));
+  incidental metadata, such as a time stamp a library writes into a file,
+  does not.
 - [ ] **Claims:** commands and results in the description match what was run;
   "passes" means it was run, on the stated platform.
 - [ ] **Documentation and tracking:** as in the [definition of done](#definition-of-done),
