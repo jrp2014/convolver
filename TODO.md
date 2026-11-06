@@ -1600,7 +1600,9 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   533 MB JSON report using 2.9 GB. One check now stops, with one error,
   before the next entry once it has decoded 1 Gi samples, or before an entry
   that would take it past 16,384 reported paths (4.2 s and 4 MB on the same
-  lists); a no-match message
+  lists) or 131,072 reported routes (jrp's review of `7b4cb7a`: 128 entries
+  of one path with 8192 routes made a 37 MB report; now 4.6 MB, about 1 s
+  and 130 MiB under ASan); a no-match message
   names at most ten sample rates, as it already did entries. Tests in
   `native.limits`;
   [resource limits](docs/develop/library.md#resource-limits).

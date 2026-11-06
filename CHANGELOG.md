@@ -443,7 +443,8 @@ Until 1.0 the C++ API may change between minor versions.
   a report of hundreds of megabytes. One check now stops, with a `limit`
   error, before the next entry once it has decoded 1 Gi IR samples (16
   renders of the largest filter), or before an entry that would take it past
-  16,384 reported filter paths. A
+  16,384 reported filter paths or 131,072 reported routes (a path can have
+  8192, so 128 one-path entries made a 37 MB report; now 4.6 MB). A
   message saying no list entry has the wanted sample rate now names at
   most ten of the list's rates, as it already did entries; it had named
   every rate, which a plug-in's log and window then showed. The `limit`

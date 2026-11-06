@@ -33,9 +33,11 @@ inline constexpr std::size_t max_routes = 4096;
 // Configuration/list text read by one resolution; a shared sublist counts each read.
 inline constexpr std::size_t max_total_text_bytes = 16 * 1024 * 1024;
 // One --all-configurations inspection (ROBUST-2): IR samples decoded by all the
-// entries it verifies (16 renders' worth), and filter paths it reports.
+// entries it verifies (16 renders' worth), and the filter paths and routes it
+// reports. A path can have thousands of routes, so routes count on their own.
 inline constexpr std::size_t max_inspected_samples = 16 * max_decoded_samples;
 inline constexpr std::size_t max_inspected_paths = 4 * max_filter_paths;
+inline constexpr std::size_t max_inspected_routes = 32 * max_routes;
 
 // Physical 1-based line and byte column (a UTF-8 BOM is not counted). Zero means
 // the location is unknown or the whole file.
@@ -260,6 +262,7 @@ class Resolver {
 struct InspectionLimits {
     std::size_t samples = max_inspected_samples;
     std::size_t paths = max_inspected_paths;
+    std::size_t routes = max_inspected_routes;
 };
 InspectionReport inspect_configuration(const std::filesystem::path&, const InspectionOptions&,
                                        InspectionLimits);

@@ -438,8 +438,10 @@ convolver --inspect room.cfg --syntax-only --json
   Each entry is decoded and prepared as a render would, so one check stops,
   with an error, before the next entry once the entries checked have decoded
   1 Gi IR samples (16 renders at the largest filter), or before an entry that
-  would take the filter paths reported past 16,384; check a list that large
-  in parts.
+  would take the filter paths reported past 16,384 or their routes past
+  131,072; check a list that large in parts. A single configuration with
+  more routes than that can still be inspected without
+  `--all-configurations`.
 - `--syntax-only` reads one configuration file's text, checks grammar, routes and
   delays and resolves references lexically, without opening IRs. Coefficient,
   latency, tail and storage fields are null, and the result says so.

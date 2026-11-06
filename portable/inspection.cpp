@@ -184,7 +184,7 @@ class Inspector {
         }
         SelectionStep step{l.path, chain(l.chain), "", rate, inputs, outputs};
         candidates_.push_back({l.path, l.audio != nullptr, rate, inputs, outputs});
-        if (options_.all_configurations && over_limit(l, result.paths.size())) {
+        if (options_.all_configurations && over_limit(l, result)) {
             step.outcome = "failed";
             report_.traversal.push_back(std::move(step));
             return true; // Stops the traversal; the entries left are not checked.
@@ -248,8 +248,13 @@ class Inspector {
     // configurations build a report of millions of paths. It stops, with one
     // error, before the next entry once the entries checked have decoded the
     // sample limit (the entry that crosses it is checked in full), or before
-    // an entry that would take the paths reported past their limit.
-    bool over_limit(const detail::Resolver::Leaf& l, std::size_t paths) {
+    // an entry that would take the paths or routes reported past their limit,
+    // so the report never holds them.
+    bool over_limit(const detail::Resolver::Leaf& l, const InspectedConfiguration& entry) {
+        const auto paths = entry.paths.size();
+        std::size_t routes = 0;
+        for (const auto& p : entry.paths)
+            routes += p.inputs.size() + p.outputs.size();
         std::string problem, cause;
         if (samples_ >= limits_.samples) {
             problem = "the entries checked so far decoded " + std::to_string(samples_) +
@@ -263,8 +268,15 @@ class Inspector {
                       ", the most one --all-configurations check reports";
             cause = "Every path of every entry is reported, so a long list of configurations "
                     "with many paths would make a very large report.";
+        } else if (routes > limits_.routes - routes_) {
+            problem = "this entry would take the routes reported past " +
+                      std::to_string(limits_.routes) +
+                      ", the most one --all-configurations check reports";
+            cause = "Every route of every path is reported, so a long list of configurations "
+                    "with many routes would make a very large report.";
         } else {
             paths_ += paths;
+            routes_ += routes;
             return false;
         }
         limited_ = true;
@@ -523,7 +535,7 @@ class Inspector {
     std::size_t errors_ = 0, dropped_ = 0;
     detail::InspectionLimits limits_;
     std::size_t budget_ = 0;
-    std::size_t samples_ = 0, paths_ = 0; // --all-configurations totals (ROBUST-2).
+    std::size_t samples_ = 0, paths_ = 0, routes_ = 0; // --all-configurations totals (ROBUST-2).
     bool limited_ = false;
     std::vector<detail::SelectionCandidate> candidates_; // Leaves visited, for no-match help.
 };
