@@ -525,9 +525,12 @@ Until 1.0 the C++ API may change between minor versions.
   differed. It now checks the format, rate, channel count and frame count
   one by one and every sample exactly, with an explicit dither seed, and
   reports the first differing sample and the largest difference. The
-  [command-line reference](docs/use/command-line.md) now promises the same
-  samples, not byte-identical files, for a given seed. The review checklist
-  says assertions test contracts and invariants, not incidental metadata.
+  [command-line reference](docs/use/command-line.md) now promises
+  byte-identical samples, not byte-identical files, for a given seed (with
+  the default FFT planning or a wisdom file), as jrp
+  [decided](docs/project/decisions.md#configuration-and-sound). The review
+  checklist says assertions test contracts and invariants, not incidental
+  metadata.
 - Inspection (ROBUST-2): `--inspect` and `--validate` with
   `--all-configurations` decode and prepare every entry of a list, so a
   small list naming one long filter thousands of times kept them busy for

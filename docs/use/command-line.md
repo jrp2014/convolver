@@ -86,7 +86,7 @@ positive values amplify. Two offline estimates are also available:
   noise shaping cannot clip either (below).
 
 Both report the chosen gain on stderr, with every digit needed to give the
-same figure back to `--gain-db` and get the same file. `auto` may take time
+same figure back to `--gain-db` and get the same samples. `auto` may take time
 before rendering, as it filters the noise; `no-clip` only adds up the taps. Both stop with an
 error, before rendering, when the filter's coefficients are too large for
 single precision (filtering the noise overflows, or the bound exceeds the
@@ -221,15 +221,19 @@ amplitude with a high-pass spectrum, so a little less audible) or `none`.
 `--dither none` below 20 bits draws a warning, and dither or shaping given
 from 20 bits draws a warning that it is pointless; both are still applied.
 `--dither-seed N` (default 0) seeds the generator, and says so when there is
-no dither to seed. The same seed, input and channel count give the same
-samples regardless of buffering, on the same build and CPU; float WAV and
-AIFF files also record the time they were written, so two such files can
-differ in that field alone. On
-x86-64, CPUs with and without AVX2 and FMA use different processing code,
-whose output differs at float-rounding level (below -120 dBFS), so a dithered
-or integer render can differ in its lowest bit between such machines
+no dither to seed. The same seed, input and channel count give
+byte-identical samples regardless of buffering, on the same build and CPU,
+with the default FFT planning or the same FFTW wisdom file:
+`--fft-plan measure`, `patient` or `exhaustive` without wisdom can choose a
+different plan each run, whose rounding differs. On x86-64, CPUs with and without AVX2
+and FMA use different processing code, whose output differs at
+float-rounding level (below -120 dBFS), so a dithered or integer render can
+differ in its lowest bit between such machines
 ([measurements](../develop/fft-backends.md#avx2-kernels-chosen-at-run-time)).
-Float and double formats reject dither, noise shaping and valid bits.
+Convolver does not promise identical metadata: float and double WAV and
+AIFF files record the time they were written, so two such files can differ
+in that field alone. Float and double formats reject dither, noise shaping
+and valid bits.
 
 `--noise-shaping` selects one of the historical engine's error-feedback
 shapers: `simple` (first order), `third-order`, `ninth-order` or `none`

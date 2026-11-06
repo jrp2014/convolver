@@ -1406,14 +1406,14 @@ workflow runs, 25 October to 1 November, with their re-run attempts):
 - `native.cli` (PR #123, `ec631a8`, Ooura build): the no-clip case for
   float output compared two renders byte for byte, and libsndfile writes
   the second a float WAV file was made into its `PEAK` chunk, so renders
-  either side of a second differed. The test now compares the decoded
-  samples and the format fields (CI-33).
+  either side of a second differed. The test now compares the sample data
+  as stored and the format fields (CI-33).
 - The Audio Unit's former Latency worker (`native.request_worker`, CI-24,
   and its watchdog check, CI-25) was removed by AU-12; its tests and the
   evidence from its failures are [archived](../archive/reviews/2026-11-05-request-worker.md).
 
-To check that two renders hold the same audio, compare the decoded samples
-exactly and check the format, sample rate, channel count and frame count one
+To check that two renders hold the same audio, compare the sample data
+exactly as stored and check the format, sample rate, channel count and frame count one
 by one (`same_audio` in `tests/native/cli_tests.py`), and on failure report
 the first differing sample and the largest difference. Compare file bytes,
 or any other metadata, only where a requirement says what it must contain.
