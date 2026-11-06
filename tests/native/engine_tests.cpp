@@ -420,6 +420,50 @@ void invalid() {
     // Rejections must leave the processing state untouched.
     close(run(engine, {1}, oracle(mono(), {1}, 3).size(), {1}), oracle(mono(), {1}, 3), 3);
 }
+// GAIN-1: the no-clip gain, rounded to float as the CLI applies it, keeps the
+// input that reaches the bound (each input the sign of its time-reversed
+// kernel) within full scale up to the convolution's float rounding. Prints
+// the largest output sample, which docs/use/command-line.md quotes.
+void no_clip_endpoint() {
+    std::mt19937 random(17);
+    std::uniform_real_distribution<float> uniform(-1, 1);
+    constexpr std::size_t taps = 3000;
+    Configuration c{48000, 2, 2, 0, {0, 0}, {0, 0}, {}};
+    for (std::size_t o = 0; o < 2; ++o)
+        for (std::size_t i = 0; i < 2; ++i) {
+            std::vector<float> h(taps);
+            for (std::size_t n = 0; n < taps; ++n)
+                h[n] = uniform(random) * std::exp(-static_cast<float>(n) / 600);
+            c.paths.push_back({std::move(h), {{i, 1}}, {{o, 1}}});
+        }
+    c.paths.push_back({{1}, {{0, 1}}, {{1, 0.5f}}}); // A Dirac too, on output 1.
+    const double bound = worst_case_peak(c);
+    const auto gain = static_cast<float>(std::pow(10., -20 * std::log10(bound) / 20));
+    double reached = 0;
+    for (const std::size_t block : {64u, 256u, 1024u})
+        for (std::size_t o = 0; o < 2; ++o) {
+            std::vector<float> in(taps * 2);
+            for (std::size_t i = 0; i < 2; ++i) {
+                std::vector<double> k(taps);
+                for (const auto& p : c.paths)
+                    if (p.inputs[0].channel == i && p.outputs[0].channel == o)
+                        for (std::size_t n = 0; n < p.impulse.size(); ++n)
+                            k[n] += p.outputs[0].gain * p.impulse[n];
+                for (std::size_t t = 0; t < taps; ++t)
+                    in[t * 2 + i] = k[taps - 1 - t] > 0 ? 1.f : k[taps - 1 - t] < 0 ? -1.f : 0.f;
+            }
+            Engine engine(c, block);
+            const auto out = run(engine, in, taps + block, {block});
+            for (std::size_t t = 0; t < taps + block; ++t) {
+                const double y = std::abs(static_cast<double>(out[t * 2 + o] * gain));
+                reached = std::max(reached, y);
+            }
+        }
+    std::cout << "no-clip gain on the worst-case input: largest output " << std::setprecision(9)
+              << reached << '\n';
+    require(reached > 1 - 1e-5 && reached < 1 + 1e-5,
+            "the no-clip gain reaches full scale within float rounding");
+}
 void attenuation() {
     // Two inputs, two outputs. Output 0 combines a cancelling pair on input 0
     // (kernel {0, 0.5, 0.25}) and a scaled path from input 1; output 1 mirrors.
@@ -486,6 +530,7 @@ void attenuation() {
         overflowed = true;
     }
     require(overflowed, "non-finite noise response is refused");
+    no_clip_endpoint();
 }
 // PERF-4: the AVX2 set uses fused multiply-add (owner's decision, 24 October
 // 2026), so it may round differently from the baseline set, but each set must

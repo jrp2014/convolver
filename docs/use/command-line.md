@@ -87,13 +87,37 @@ Both report the chosen gain on stderr. `auto` may take time before rendering,
 as it filters the noise; `no-clip` only adds up the taps. Both stop with an
 error, before rendering, when the filter's coefficients are too large for
 single precision (filtering the noise overflows, or the bound exceeds the
-largest float); check how the filter files are scaled. The
-bound applies to ideal linear filtering, not input above full scale or additional
-quantizer noise. Floating-point error, dither, noise shaping and the largest
-positive integer value (one step short of full scale) need a little more
-headroom if clipping must be strictly avoided. Neither option is a limiter.
-The noise estimate is the old Windows Convolver's "optimum attenuation"
-method.
+largest float); check how the filter files are scaled. The noise estimate is
+the old Windows Convolver's "optimum attenuation" method.
+
+Neither option is a limiter: the bound holds for input within full scale, so
+louder input can still clip. With `no-clip`, the input that reaches the bound
+comes out within full scale, up to the float rounding of the convolution (a
+largest sample of 0.99999994 in the test). Integer output needs slightly more
+room, because rounding, dither and noise shaping add to each sample. It never
+clips while every sample stays within ±(1 − H / 2^(B−1)), where B is the
+number of significant bits and H = (1 + S)(½ + D) + ½ steps. D is the largest
+dither value: 0 with `--dither none` and 1 with either triangular dither. S is
+the sum of the shaper's coefficient magnitudes: 0 without shaping, 1 for
+`simple`, 2.13 for `third-order` and 22.6 for `ninth-order`.
+
+| Dither and shaping | H (steps) | At 16 bits | At 8 bits |
+| --- | --- | --- | --- |
+| None | 1 | 0.0003 dB | 0.07 dB |
+| Triangular | 2 | 0.0005 dB | 0.14 dB |
+| Triangular, `third-order` | 5.2 | 0.0014 dB | 0.36 dB |
+| Triangular, `ninth-order` | 36 | 0.0095 dB | 2.9 dB |
+
+At 24 bits every case needs less than 0.0001 dB. H is a safe bound, not the
+exact limit: its last half step is margin, so that a sample exactly at the
+bound does not clip either. Without dither or shaping the exact limit is that
+half step: a sample from 1 − 2^−B up rounds to 2^(B−1) and clips by one step,
+since the largest positive integer is one step short of full scale, while −1
+does not clip. To keep integer output strictly unclipped, give `--gain-db` the
+figure that `--gain-db no-clip` reports, lowered by the table's value and by
+another 0.01 dB, since the report is rounded to 0.01 dB: for example
+`--gain-db -3.54` where it reported -3.52 dB, at 16 bits with ninth-order
+shaping.
 
 ### Output formats
 

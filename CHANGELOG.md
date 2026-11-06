@@ -142,6 +142,17 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Documentation (GAIN-1): the command-line guide states a safe bound for the
+  headroom integer output needs after `--gain-db no-clip`: none for float
+  output, beyond float rounding; for B-bit integers, H = (1 + S)(½ + D) + ½
+  steps for the dither and noise shaping chosen, from 0.0003 dB (16 bits,
+  no dither) to 0.0095 dB (16 bits, triangular dither and ninth-order
+  shaping) and 2.9 dB at 8 bits, with half a step of margin; lower the
+  reported gain by that and 0.01 dB more, as the report is rounded.
+  `native.io` checks the bound for 8, 16
+  and 24 bits with every dither and shaper, and the exact undithered
+  endpoints; `native.engine` checks that the no-clip gain keeps the input
+  that reaches the bound within full scale. The sound is unchanged.
 - Tests (PERF-12, from jrp's review of `db54160`): the load-timing tests
   record each audio callback (when it was due, when the thread woke, when
   the plug-in was entered and returned, and the thread's CPU time where the

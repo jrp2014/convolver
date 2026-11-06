@@ -682,6 +682,65 @@ void quantizer_tests(const fs::path& dir) {
         require(whole == pieces, "reset clears the shaper");
     }
 
+    // GAIN-1: integer headroom. Within the B-bit range the quantizer gives
+    // the same integers as one of B + 1 bits fed half the sample (the target
+    // and its rounding errors are identical), so any difference is clipping.
+    // Output never clips while |sample| <= 1 - H / 2^(B-1), with
+    // H = (1 + S)(1/2 + D) + 1/2 steps: D the largest dither (0, 1/2, 1) and S
+    // the sum of the shaper's coefficient magnitudes. The dB figures in
+    // docs/use/command-line.md#gain-and-attenuation come from this H.
+    {
+        const auto clipped = [](unsigned bits, QuantizationOptions o, const std::vector<float>& x) {
+            std::vector<float> half(x.size());
+            for (std::size_t i = 0; i < x.size(); ++i)
+                half[i] = x[i] / 2;
+            return quantize_bits(bits, o, x) != quantize_bits(bits + 1, o, half);
+        };
+        for (unsigned bits : {8u, 16u, 24u}) {
+            const double scale = std::ldexp(1.0, static_cast<int>(bits) - 1);
+            for (auto d : {Dither::none, Dither::rectangular, Dither::triangular,
+                           Dither::triangular_highpass}) {
+                const double largest = d == Dither::none ? 0 : d == Dither::rectangular ? 0.5 : 1;
+                for (auto shaping : {NoiseShaping::none, NoiseShaping::simple,
+                                     NoiseShaping::second_order, NoiseShaping::third_order,
+                                     NoiseShaping::ninth_order, NoiseShaping::sony_sbm}) {
+                    double sum = 0;
+                    for (const double c : shaper_coefficients(shaping))
+                        sum += std::abs(c);
+                    const double steps = (1 + sum) * (0.5 + largest) + 0.5;
+                    // Rounded towards zero, so the bound holds for the float.
+                    const auto a = std::nextafter(static_cast<float>(1 - steps / scale), 0.f);
+                    std::vector<std::vector<float>> signals(5, std::vector<float>(4000));
+                    std::uint64_t state = 99;
+                    for (std::size_t i = 0; i < 4000; ++i) {
+                        signals[0][i] = a;
+                        signals[1][i] = -a;
+                        signals[2][i] = i % 2 ? a : -a;
+                        state = state * 6364136223846793005ULL + 1442695040888963407ULL;
+                        signals[3][i] = state >> 63 ? a : -a;
+                        signals[4][i] = a * static_cast<float>(std::sin(0.003 * double(i)));
+                    }
+                    const QuantizationOptions o{d, 7, shaping};
+                    for (const auto& x : signals)
+                        require(!clipped(bits, o, x), "no clipping within the stated headroom");
+                    // Full scale clips the positive end for every option.
+                    require(clipped(bits, o, std::vector<float>(64, 1.f)),
+                            "full-scale positive input clips");
+                }
+            }
+            // Undithered and unshaped, the exact endpoints: from 1 - 1/2^B up,
+            // a sample rounds to 2^(B-1) and clips by one step; at the negative
+            // end, -1 itself and down to -(1 + 1/2^B) (the float nearest it)
+            // round to -2^(B-1) and do not clip.
+            const auto top = static_cast<float>(1 - 0.5 / scale);
+            const auto bottom = static_cast<float>(-1 - 0.5 / scale);
+            require(clipped(bits, {}, {top}) && !clipped(bits, {}, {std::nextafter(top, 0.f)}) &&
+                        !clipped(bits, {}, {bottom}) &&
+                        clipped(bits, {}, {std::nextafter(bottom, -2.f)}),
+                    "exact undithered endpoints");
+        }
+    }
+
     // Writers: every integer format stores exactly the quantizer's samples,
     // left-justified for reduced valid bits, with matching header fields.
     struct Case {

@@ -67,7 +67,7 @@ boundary and C++20 in the core.
 | Optional editor work | **PLUG-11** (FFT planning in FFTW-built plug-ins), **LV2-6** (an LV2 window, only if Linux users ask) | Not needed for any preview. |
 | On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **PERF-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
 
-DOC-2 automation and the CFG-1, IO-1, IO-2, IO-5, GAIN-1 and ROBUST-1/2 items
+DOC-2 automation and the CFG-1, IO-1, IO-2, IO-5 and ROBUST-1 items
 remain open supporting work; take them up when a reproducible defect or the milestone
 needs them. This table owns the current ordering; the dated
 [21 October review order](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#recommended-order)
@@ -632,10 +632,6 @@ means a patched FFmpeg build with `--enable-gpl`.
   with tests for gain, delay, length and reported metadata; retain mismatch errors
   by default. Compare [libsamplerate](https://libsndfile.github.io/libsamplerate/)
   and other suitable implementations before choosing a dependency.
-- [ ] **GAIN-1 — Define no-clip headroom precisely.** Test the exact full-scale
-  endpoints with floating-point rounding, integer quantization, dither and noise
-  shaping. The current filter bound assumes input magnitude at most 1 and does
-  not reserve separate quantizer headroom; distinguish that from a limiter.
 - [ ] **ROBUST-1 — Longer fuzz and transition stress.** Keep discovered inputs as
   regressions. Measure worst callback times and exercise repeated filter changes;
   allocation guards and average throughput are not a deadline guarantee.
@@ -1012,7 +1008,7 @@ with compatibility tests; linked IDs point to open work above.
 | Path portability checks are partial | No drive/share remapping; a clean profile is not certification for Windows or another reader. Extend checks only with fixtures. | [Profiles](docs/use/other-programs.md#check-that-a-configuration-will-travel) |
 | Output is WAV, RF64, W64, AIFF, CAF, FLAC or headerless raw; speaker labels and reduced valid bits are WAV-only | Input codecs and FLAC output depend on the libsndfile build; the preview packages have no FLAC or Ogg, by decision ([workarounds](docs/use/command-line.md#flac-and-ogg)). Boundary-size tests remain IO-1; labels in other containers are IO-5. RAW has no embedded rate/channel metadata. | [Output formats](docs/use/command-line.md#output-formats) |
 | Output writes are not transactional | An I/O or numerical failure leaves a partial file, which the CLI says is incomplete; deleting it or publishing through a temporary file was not chosen ([decisions](docs/project/decisions.md#diagnostics)). Never promise rollback for pipes. | [Output safety](docs/use/command-line.md#output-safety) |
-| Gain estimation is not a limiter; float samples can exceed full scale | Integer samples clip; strict quantizer headroom is GAIN-1. | [Gain](docs/use/command-line.md#gain-and-attenuation) |
+| Gain estimation is not a limiter; float samples can exceed full scale | Integer samples clip; `no-clip` reserves no quantizer headroom, for which the guide gives a safe bound (GAIN-1). | [Gain](docs/use/command-line.md#gain-and-attenuation) |
 | Dither/shaping/valid bits apply to integer file output only | Float/RAW output rejects those options; the plug-ins exchange floats, so the host does any final conversion. | [Integer output](docs/use/command-line.md#integer-formats-dither-and-noise-shaping) |
 | C++ packages are static development libraries, not self-contained installers or a stable binary ABI | Rebuild with compatible toolchains; shared dependencies must be deployed. REL-1 covers end-user bundles. | [Package guide](docs/develop/library.md) |
 | Source tags and configured CI do not prove a release is qualified | Tie results to exact commits; named hosts, clean machines and signatures remain release evidence. | [Versioning](docs/develop/versioning.md), [testing](docs/develop/testing.md) |
@@ -1412,6 +1408,16 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   `native.load_timing_harness` checks the range (-0.1 to 0.1) and that both
   signs occur; it failed with the old generator. The loading timings were
   measured again with it ([loading responsiveness](#loading-responsiveness)).
+- [x] **GAIN-1 — Define no-clip headroom precisely.** 6 November 2026, PR #118: with
+  the no-clip gain, the input reaching the bound stays within full scale up
+  to float rounding (largest sample 0.99999994, `native.engine`); integer
+  output never clips within ±(1 − H / 2^(B−1)), H = (1 + S)(½ + D) + ½
+  steps for dither D and shaper coefficient sum S (a safe bound with half a
+  step of margin), checked for 8, 16 and
+  24 bits, every dither and shaper (`native.io`, which detects clipping by
+  comparing with a quantizer one bit wider), with the exact undithered
+  endpoints. No change to the sound: `no-clip` still reserves no quantizer
+  headroom; [gain](docs/use/command-line.md#gain-and-attenuation).
 - [x] **PERF-12 — Load-timing verdicts from records, tested without
   timing.** 5 November 2026, from jrp's review of `db54160`: the renderer
   records each callback (due, wake, entry into and return from the plug-in,
