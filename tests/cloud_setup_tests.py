@@ -34,7 +34,7 @@ class CloudSetupTests(unittest.TestCase):
                 path.chmod(0o755)
             source = (ROOT / '.claude/hooks/session-start.sh').read_text()
             # Exercise the real hook-install function with an isolated tool prefix.
-            source = source[source.index('install_lint_hook() {') : source.index('# Neither step')]
+            source = source[source.index('install_lint_hook() {') : source.index('# No step')]
             original = 'local venv="${HOME}/.cache/convolver-lint"'
             self.assertEqual(source.count(original), 1)
             source = source.replace(original, 'local venv=' + shlex.quote(str(venv)))

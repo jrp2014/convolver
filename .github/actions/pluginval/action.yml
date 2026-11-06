@@ -1,0 +1,65 @@
+---
+# SPDX-License-Identifier: GPL-2.0-or-later
+name: Fetch pluginval
+description: >-
+  Downloads and unpacks the newest pluginval release, or with prerelease
+  'true' the newest beta or release candidate when one is newer than that
+  release (CI-6). The job summary records its version and checksum. Used by
+  the LV2 and Audio Unit workflows (LV2-3, AU-3); the VST3 workflow keeps its
+  own steps because its tests are configured through CMake.
+inputs:
+  prerelease:
+    description: "'true' for the newest pre-release instead of the newest release"
+    default: 'false'
+  github-token:
+    description: Token for GitHub's release API, which limits anonymous requests
+    default: ${{ github.token }}
+outputs:
+  available:
+    description: >-
+      'true' when there is a pluginval to run; 'false' when prerelease is
+      'true' and no pre-release is newer than the newest release
+    value: ${{ steps.fetch.outputs.available }}
+  path:
+    description: The pluginval executable
+    value: ${{ steps.fetch.outputs.path }}
+  version:
+    description: Its version, for example 1.0.4
+    value: ${{ steps.fetch.outputs.version }}
+runs:
+  using: composite
+  steps:
+    - name: Fetch and unpack
+      id: fetch
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        PRERELEASE: ${{ inputs.prerelease }}
+      run: |
+        case "$RUNNER_OS" in
+          Linux) executable=pluginval ;;
+          macOS) executable=pluginval.app/Contents/MacOS/pluginval ;;
+          Windows) executable=pluginval.exe ;;
+        esac
+        options=()
+        directory="$RUNNER_TEMP/pluginval-release"
+        if [ "$PRERELEASE" = true ]; then
+          options+=(--prerelease)
+          directory="$RUNNER_TEMP/pluginval-prerelease"
+        fi
+        record="$directory.env"
+        python3 scripts/release/resolve.py tool pluginval "${options[@]}" --cache "$directory" \
+          --os "$RUNNER_OS" --github-output "$record"
+        if ! grep -qx 'available=true' "$record"; then
+          echo 'available=false' >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        archive=$(sed -n 's/^archive=//p' "$record")
+        version=$(sed -n 's/^version=//p' "$record")
+        (cd "$directory" && unzip -q -o "$archive")
+        test -x "$directory/$executable"
+        {
+          echo 'available=true'
+          echo "path=$directory/$executable"
+          echo "version=$version"
+        } >> "$GITHUB_OUTPUT"

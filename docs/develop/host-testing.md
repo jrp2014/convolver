@@ -14,7 +14,7 @@ below. An unsigned preview needs the smoke test; a signed production release
 needs the full qualification. Every report records the exact package, host,
 system and settings.
 
-Contents: [first hosts](#first-hosts) ·
+Contents: [first hosts](#first-hosts) · [hosts in CI](#hosts-in-ci) ·
 [Steinberg's SDK hosts](#steinbergs-sdk-hosts) · [every report](#every-report) ·
 [smoke test](#smoke-test-for-an-unsigned-preview) ·
 [smoke test in each first host](#smoke-test-in-each-first-host) ·
@@ -112,6 +112,19 @@ macOS 14 or later. Checked on 23 October 2026:
 - **GarageBand:** the version from the App Store for your macOS is native on
   both architectures. Build the Audio Unit on the Mac that runs GarageBand, so
   it matches.
+
+## Hosts in CI
+
+Three independent hosts play the plug-ins unattended in CI: pluginval
+(JUCE) validates all three formats, AVAudioEngine (Apple's own hosting
+stack) renders the Audio Unit, and a headless Ardour session records,
+restores and exports the LV2 plug-in. Each checks its audio against the
+oracle where it renders
+([testing](testing.md#pluginval), [AVAudioEngine](testing.md#avaudioengine-render),
+[Ardour](testing.md#ardour-headless)). They make the named-host tests below
+less likely to find a defect, but do not replace them: none of them is a
+host that users run as they would, with windows, devices and saved
+projects of their own.
 
 ## Steinberg's SDK hosts
 

@@ -43,6 +43,26 @@ Until 1.0 the C++ API may change between minor versions.
   and `same_rate()` in `convolver/host.hpp`. Added, so existing code
   compiles unchanged.
 
+- Tests (LV2-3, AU-3): pluginval, at the VST3 job's strictness (10, the
+  highest), validates each of the eight LV2 plug-ins in the Release bundle
+  and the installed Audio Unit, its editor tests opening the window, in the
+  LV2 and Audio Unit workflows. The newest full release decides; a newer
+  pre-release runs afterwards as a warning only. Both formats share the
+  command line with the VST3 tests in `tests/plugins/pluginval.py`. Given
+  a bundle, pluginval tests only its first LV2 plug-in, so each is copied
+  into a bundle of its own first.
+- Tests (AU-15): the Audio Unit workflow plays the three first-use
+  fixtures through the installed unit with Apple's AVAudioEngine (offline
+  manual rendering, the filter loaded as an `.aupreset` through
+  `ClassInfo`, block sizes 61, 300 and 1000) and checks the 256-frame
+  latency and the output against the oracle within 1e-5.
+- Tests (HOST-5): the LV2 workflow plays the three first-use fixtures in
+  headless Ardour 8 sessions on the Dummy backend: the preset loaded from
+  Ardour's preset list, white noise recorded, the session saved, then
+  restored and exported by `ardour8-export` in a second process. Each
+  export must match the oracle applied to the recorded take within 1e-5,
+  with Ardour's latency compensation leaving no offset; the worst error was
+  4.7e-8.
 - Tests (FFMPEG-1): `native.ffmpeg_pipe` runs the
   [FFmpeg pipe](docs/use/command-line.md#with-ffmpeg) as the guide writes
   it, on a short film with two audio tracks: the second track is chosen,

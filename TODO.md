@@ -178,6 +178,17 @@ is superseded.
   Windows device in the [guide](docs/develop/testing.md#equalizer-apo-export-tests)
   (device rate and channel count reach the configuration; exclusive mode
   bypasses it), done by anyone with a Windows computer, with the result recorded there.
+- [ ] **HOST-6 — Explain an Ardour export 16 frames early.** On 6 November
+  2026, 1 of about 300 local mono exports in the
+  [Ardour test](docs/develop/testing.md#ardour-headless) (HOST-5) came out
+  16 frames earlier than the recorded take plus the reported 256 frames of
+  latency; it was not reproduced in 180 more runs, some under full CPU load.
+  It is not yet known whether Ardour 8.4 or Convolver moved it. The test
+  fails on such an export, never retries it, and prints the shift that
+  matches best and the region's position. Next time: keep the session
+  (`CONVOLVER_ARDOUR_KEEP`), check the region position and whether the
+  plug-in's filter loaded during the export, and repeat with a plug-in
+  that reports latency and has no worker.
 
 ## Plug-ins: VST3, LV2 and AU
 
@@ -306,6 +317,9 @@ LV2 (Linux first; also PipeWire system audio):
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
   CI came with LV2-1; pluginval and named layouts remain.
+  Progress (6 November 2026): pluginval validates each of the eight plug-ins
+  at strictness 10 in the LV2 workflow
+  ([pluginval](docs/develop/testing.md#pluginval)); named layouts remain.
 - [ ] **LV2-4 — User guide and host matrix.** LV2 in `docs/use/plugins.md` and
   `docs/use/install.md` (written in DOC-4), plus a PipeWire configuration; Ardour, REAPER, Carla, Qtractor and PipeWire results.
 - [ ] **LV2-5 — Release bundles.** Linux tarball, then distro packages; macOS and
@@ -346,6 +360,10 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   runs since PR #44; still to add: pluginval on the component, and a
   ThreadSanitizer build of `au.adapter` (bypass switched while rendering).
   Needed for the first preview.
+  Progress (6 November 2026): pluginval validates the installed component
+  at strictness 10, editor tests included, in the Audio Unit workflow
+  ([pluginval](docs/develop/testing.md#pluginval)); the ThreadSanitizer build
+  remains.
 - [ ] **AU-4 — User guide and host matrix.** The Audio Unit in
   `docs/use/plugins.md` and `docs/use/install.md` (written in DOC-4); Logic, GarageBand,
   SoundSource, Live, REAPER and FL Studio results, including loading an
@@ -1027,6 +1045,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   (jrp's review of `5f47ecb`, reproduced with two units); a two-unit case
   now checks this. The component's only addition is a lock-free increment
   per request and a null test hook. It runs on macOS CI only.
+- [x] **AU-15 — Render through AVAudioEngine.** 6 November 2026, on john's
+  request for unattended host checks: the Audio Unit workflow plays the
+  three first-use fixtures through the installed unit with Apple's
+  AVAudioEngine and checks them against the oracle
+  ([AVAudioEngine render](docs/develop/testing.md#avaudioengine-render)).
 - [x] **AU-13 — Safe partial construction of the Latency work.** 5 November
   2026, PR #111, from the external review of `91fcf1f` (0.8.13), a source
   review: AU-12 created the dispatch source before the semaphore, so if the
@@ -1327,6 +1350,15 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
 - [x] **IO-6 — FLAC in the preview packages.** 24 October 2026, PR #60:
   decided not to ship the codec libraries; limitation and workarounds in
   [FLAC and Ogg](docs/use/command-line.md#flac-and-ogg).
+- [x] **HOST-5 — A headless Ardour session in CI.** 6 November 2026, on
+  john's request for unattended host checks: the LV2 workflow records,
+  saves, restores and exports the three first-use fixtures through the
+  plug-in in Ardour 8 and checks the exports against the oracle
+  ([Ardour, headless](docs/develop/testing.md#ardour-headless)). Ardour
+  8.4's export aborts in about 1 export in 10 with any plug-in, Ardour's
+  own included, and now and then hangs, so an export killed by a signal or
+  hung for 2 minutes is tried again with a warning; a newer Ardour on the
+  runners can drop the retry. One unexplained early export is HOST-6.
 - [x] **LV2-1 — Adapter and headless test.** 22 October 2026, PR #43;
   [LV2 tests](docs/develop/testing.md#lv2-tests).
 - [x] **LV2-2 — Loading filters.** 23 October 2026, PR #48;

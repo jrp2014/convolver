@@ -16,16 +16,13 @@ share.
              double-precision convolution. Needs pluginval 2's `test`
              command; with pluginval 1 it is skipped (exit code 77).
 
-pluginval 1 and 2 take different command lines; the version is read from
-`pluginval --version`.
+pluginval 1 and 2 take different command lines; tests/plugins/pluginval.py,
+which the other formats use too, reads the version from `pluginval --version`.
 """
 
 import json
 import math
-import os
 import pathlib
-import re
-import shutil
 import struct
 import subprocess
 import sys
@@ -43,44 +40,9 @@ from fixtures import (  # noqa: E402
     sparse_ir,
     write_float_wav,
 )
-
-
-def run_pluginval(pluginval, arguments, **kwargs):
-    command = [pluginval, *arguments]
-    # JUCE needs an X server to load plug-ins on Linux.
-    if sys.platform.startswith('linux') and not os.environ.get('DISPLAY'):
-        xvfb = shutil.which('xvfb-run')
-        if xvfb is None:
-            sys.exit('pluginval needs DISPLAY or xvfb-run on Linux')
-        command = [xvfb, '--auto-servernum', *command]
-    print('+', ' '.join(command), flush=True)
-    check = kwargs.pop('check', False)
-    return subprocess.run(command, check=check, **kwargs)
-
+from pluginval import major_version, run_pluginval, validate  # noqa: E402
 
 SKIPPED = 77  # CTest's SKIP_RETURN_CODE for this test.
-
-
-def major_version(pluginval):
-    """pluginval's major version, from `pluginval --version` ("pluginval - 1.0.4")."""
-    output = subprocess.run([pluginval, '--version'], capture_output=True, text=True, timeout=120, check=False).stdout
-    match = re.search(r'(\d+)\.\d+', output)
-    if not match:
-        sys.exit(f'cannot read a version from `{pluginval} --version`: {output.strip()!r}')
-    return int(match[1])
-
-
-def validate_command(major, bundle, extra, platform=sys.platform):
-    """pluginval 2 has a `validate` command; pluginval 1 takes options and --validate.
-
-    The editor tests run only on macOS, the one system with a window so far
-    (VST3-11; Windows and Linux follow in VST3-12 and VST3-13).
-    """
-    gui = [] if platform == 'darwin' else ['--skip-gui-tests']
-    options = ['--strictness-level', '10', *gui, *extra]
-    if major >= 2:
-        return ['validate', *options, bundle]
-    return [*options, '--validate', bundle]
 
 
 def component_state(preset):
@@ -198,10 +160,7 @@ def main():
     mode = sys.argv[1]
     if mode == 'validate':
         pluginval, bundle, *extra = sys.argv[2:]
-        major = major_version(pluginval)
-        print(f'pluginval {major}.x', flush=True)
-        result = run_pluginval(pluginval, validate_command(major, bundle, extra))
-        sys.exit(result.returncode)
+        sys.exit(validate(pluginval, bundle, extra))
     if mode == 'acceptance':
         pluginval, bundle, preset_tool = sys.argv[2:]
         major = major_version(pluginval)

@@ -62,7 +62,7 @@ TOP_LEVEL = {
 }
 
 # Files whose license line is required. Data, fixtures and generated inputs are not.
-SPDX_SUFFIXES = {'.c', '.cpp', '.h', '.hpp', '.mm', '.py', '.sh', '.ps1', '.cmake', '.yml', '.yaml'}
+SPDX_SUFFIXES = {'.c', '.cpp', '.h', '.hpp', '.mm', '.swift', '.lua', '.py', '.sh', '.ps1', '.cmake', '.yml', '.yaml'}
 SPDX_EXEMPT = ('portable/third_party/', 'tests/fuzz/seeds/', 'tests/fuzz/regressions/', 'docs/benchmarks/')
 
 # DOC-2: where each Convolver tool's options are parsed, and the page that

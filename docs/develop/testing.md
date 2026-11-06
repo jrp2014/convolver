@@ -795,6 +795,30 @@ release can run it yet
 on Linux, Windows and macOS. None of this proves hard real-time deadlines or
 compatibility with every DAW; see [host testing](host-testing.md).
 
+The Audio Unit and LV2 plug-ins get the same validation at the same
+strictness, 10, the highest, as steps of their workflows rather than CTest
+tests, because pluginval must load a Release build: the Audio Unit as
+installed for the runner's user (AU-3), and every LV2 plug-in in the
+Release bundle (LV2-3). Both go through
+[`tests/plugins/pluginval.py`](../../tests/plugins/pluginval.py), which
+holds the shared command line; the VST3 script uses it too. Given a bundle,
+pluginval tests only the first LV2 plug-in it lists, so
+[`tests/lv2/pluginval_tests.py`](../../tests/lv2/pluginval_tests.py) copies
+each plug-in into a bundle of its own and validates each. To run them
+locally:
+
+```sh
+python3 tests/lv2/pluginval_tests.py /path/to/pluginval build/lv2/convolver.lv2
+python3 tests/plugins/pluginval.py validate /path/to/pluginval \
+  ~/Library/Audio/Plug-Ins/Components/Convolver.component
+```
+
+Both workflows use the newest full release for the formal result and run
+the newest pre-release afterwards as a warning only; on macOS the
+pre-release adds `--rtcheck relaxed`. These runs load the plug-ins without a
+filter; audio with a filter loaded is checked by the PLUG-2 harnesses, the
+VST3 acceptance test and the Audio Unit's [AVAudioEngine render](#avaudioengine-render).
+
 ### Audio Unit tests
 
 Five CTest tests run when the adapter is built (label `au`):
@@ -911,12 +935,38 @@ Five CTest tests run when the adapter is built (label `au`):
 The tests register the unit inside the test process with
 `AudioComponentRegister`, so they need no installation. The
 [Audio Unit workflow](../../.github/workflows/au.yml) runs them on macOS, then
-installs the component for the runner's user and runs `auval -strict`; its
-`au-sanitizers` job runs them again with ASan and UBSan, built with the
+installs the component for the runner's user and runs `auval -strict` and
+[pluginval](#pluginval); its `au-sanitizers` job runs them again with ASan and UBSan, built with the
 fallbacks (`CONVOLVER_AU_FILE_READER=LIBSNDFILE`, `CONVOLVER_FFT_BACKEND=FFTW`)
 so that they keep working. Named
 host results (Logic, GarageBand, SoundSource, Live, REAPER, FL Studio) are
 AU-4.
+
+### AVAudioEngine render
+
+After installing the component, the Audio Unit workflow plays the
+[first-use fixtures](#plug-in-comparisons-plug-2) through it with Apple's own
+hosting stack (AU-15): AVAudioEngine in offline manual rendering mode, with
+the unit as an `AVAudioUnitEffect`. This shares no code with Convolver's
+tests or with pluginval. It is a workflow step, not a CTest test, because it
+needs the component installed for the runner's user, as pluginval does.
+[`tests/au/avaudioengine_render.swift`](../../tests/au/avaudioengine_render.swift)
+applies an `.aupreset` from `convolver-preset` through `ClassInfo` before the
+engine starts, as a host restores a project, then feeds the input through
+the engine's input node and renders. Each fixture uses a block size that is
+not a multiple of the 256-frame partition: mono (1 in, 1 out) at 61 frames,
+the stereo cross-feed (2 in, 2 out) at 300 and the crossover (2 in, 6 out,
+discrete channels) at 1000.
+[`tests/au/avaudioengine_tests.py`](../../tests/au/avaudioengine_tests.py)
+checks that the unit reports 256 frames of latency and that nothing comes out
+before them. After them, the output must match the fixture's
+`expected.wav` from the direct double-precision oracle within 1e-5. It
+prints the worst error. To run it on a Mac with the component installed
+and Xcode's command-line tools:
+
+```sh
+python3 tests/au/avaudioengine_tests.py build-au/convolver-preset
+```
 
 ### LV2 tests
 
@@ -963,13 +1013,65 @@ AU-4.
 
 The [LV2 workflow](../../.github/workflows/lv2.yml) runs these under ASan and
 UBSan, runs `lv2.adapter` again under ThreadSanitizer for the worker's threads,
-and runs `lv2lint` on every plug-in in the bundle, with the
-newest [packages](build.md#supporting-libraries). The three run as
+and runs `lv2lint` and [pluginval](#pluginval) on every plug-in in the
+Release bundle, with the newest [packages](build.md#supporting-libraries). The three run as
 separate jobs side by side; the sanitizer jobs build only what their tests run
 (the `convolver_lv2_tests` target, or the adapter test and the preset tool).
 lilv's `lv2apply` cannot host Convolver: it offers plug-ins no features, and
 Convolver needs `urid:map` for its state (lv2apply 0.24.22 then crashes rather
 than reporting the refusal).
+
+### Ardour, headless
+
+A further job of the LV2 workflow plays the plug-in in Ardour, a full DAW
+whose LV2 host is its own code rather than lilv's or JUCE's (HOST-5). It is
+a job of its own, not a CTest test, because it needs Ardour, a large package
+that the other LV2 jobs do not install.
+[`tests/lv2/ardour_tests.py`](../../tests/lv2/ardour_tests.py) uses Ardour's
+headless tools from Ubuntu's `ardour` package (8.4 on Ubuntu 24.04) on
+each [first-use fixture](#plug-in-comparisons-plug-2): mono (1 in, 1 out),
+the stereo cross-feed (2 in, 2 out) and the crossover (2 in, 6 out).
+
+1. `convolver-preset` makes an LV2 preset from the fixture's filter, and
+   `ardour8-new_session` makes a session whose master bus has one channel
+   per plug-in output.
+2. [`ardour_session.lua`](../../tests/lv2/ardour_session.lua), run by
+   `ardour8-lua` on Ardour's Dummy backend, adds a track with the plug-in,
+   loads the preset from Ardour's preset list, records the backend's white
+   noise onto the track, turns off the region's fades and bypasses the
+   panners. It then starts the take 9600 frames into the session, after
+   the ramp Ardour's gain stages make at the start of an export (0.3 % low
+   after 1000 frames), and saves the session.
+3. `ardour8-export`, a second process, restores the session, plug-in state
+   included, and exports it offline with Ardour's latency compensation.
+4. The export must match the direct double-precision oracle applied to the
+   recorded take within 1e-5, with no offset (Ardour compensates the
+   reported 256 frames) and with the whole tail.
+
+The worst error was 4.7e-8 when the test was written (Linux, Ardour 8.4).
+
+Ardour 8.4's export sometimes corrupts its heap and aborts at the end
+("double free or corruption") when a track has a plug-in, whichever plug-in
+it is. On 2026-11-06, with the mono session, this happened in 4 of 40
+exports with Convolver, 3 of 30 with Ardour's own a-delay plug-in instead
+and 3 of 30 with Convolver and no filter loaded, and in none of 40 with no
+plug-in; valgrind found no error in Convolver. The corrupted heap can also
+leave the export hung (once in about 100 exports). So an export that Ardour
+kills by a signal, or that has not finished after 2 minutes, is tried again,
+up to three attempts in all, and each retry is a warning in the log and, in
+CI, an annotation on the run. Any other failure, and any difference from the
+oracle, fails at once. A failing comparison prints the shift at which the
+export matches best and the region's position in the session file; one
+local export came out 16 frames early, unexplained so far (HOST-6).
+
+Ardour's configuration goes to a temporary folder;
+`CONVOLVER_ARDOUR_KEEP=DIR` keeps the sessions and exports in `DIR`, a new
+or empty folder, to inspect. To run it:
+
+```sh
+sudo apt-get install --no-install-recommends ardour
+python3 tests/lv2/ardour_tests.py build/lv2/convolver.lv2 build/convolver-preset
+```
 
 ## Equalizer APO export tests
 
