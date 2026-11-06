@@ -221,10 +221,11 @@ amplitude with a high-pass spectrum, so a little less audible) or `none`.
 `--dither none` below 20 bits draws a warning, and dither or shaping given
 from 20 bits draws a warning that it is pointless; both are still applied.
 `--dither-seed N` (default 0) seeds the generator, and says so when there is
-no dither to seed. The same seed, input and channel count give the same
-samples regardless of buffering, on the same build and CPU; float WAV and
-AIFF files also record the time they were written, so two such files can
-differ in that field alone. On
+no dither to seed. The same seed, input and channel count give
+byte-identical samples regardless of buffering, on the same build and CPU.
+The files' metadata is not reproducible: float WAV and AIFF files also record
+the time they were written, so two such files can differ in that field
+alone. On
 x86-64, CPUs with and without AVX2 and FMA use different processing code,
 whose output differs at float-rounding level (below -120 dBFS), so a dithered
 or integer render can differ in its lowest bit between such machines
