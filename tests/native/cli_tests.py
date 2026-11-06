@@ -326,6 +326,71 @@ def automatic_gain_tests(d):
         assert b'single-precision' in p.stderr, (mode, p.stderr)
 
 
+def no_clip_headroom_tests(d):
+    """GAIN-3: for integer output no-clip also reserves the quantizer's headroom.
+
+    The input that reaches the filter's bound (+-1, alternating, against
+    alternating taps) must stay within +-(1 - H / 2^(B-1)), H = (1 + S)(1/2 + D)
+    + 1/2 steps, where native.io shows the quantizer cannot clip; float output
+    keeps the bound alone. The same render as float, at the reported gain,
+    stays within that range too, and the reported figure, given back to
+    --gain-db, reproduces the file byte for byte.
+    """
+    taps = [12000, -9000, 5000, -2000, 700]
+    ir = d / 'nc-ir.wav'
+    pcm(ir, taps)
+    bound = sum(abs(t) for t in taps) / 32768
+    src = d / 'nc-in.wav'
+    float_wave(src, [((-1.0) ** i,) for i in range(2000)])
+    shaper_sums = {'none': 0.0, 'simple': 1.0, 'third-order': 1.329 + 0.735 + 0.0646}
+    shaper_sums['ninth-order'] = 2.203 + 3.210 + 3.970 + 4.404 + 3.668 + 2.656 + 1.644 + 0.767 + 0.118
+    cases = [
+        ('wav-float', [], None, 0.0, 'none'),
+        ('wav-pcm16', [], 16, 1.0, 'none'),  # Triangular dither by default below 20 bits.
+        ('wav-pcm16', ['--noise-shaping', 'ninth-order'], 16, 1.0, 'ninth-order'),
+        ('wav-pcm8', ['--noise-shaping', 'third-order'], 8, 1.0, 'third-order'),
+        ('wav-pcm8', ['--dither', 'none'], 8, 0.0, 'none'),
+        ('wav-pcm8', ['--dither', 'triangular-highpass'], 8, 1.0, 'none'),
+        ('wav-pcm16', ['--dither', 'none', '--noise-shaping', 'simple'], 16, 0.0, 'simple'),
+        ('wav-pcm24', [], 24, 0.0, 'none'),
+        ('wav-pcm24', ['--valid-bits', '18', '--noise-shaping', 'simple'], 18, 1.0, 'simple'),
+        ('wav-pcm32', [], 32, 0.0, 'none'),
+    ]
+    for i, (fmt, extra, bits, dither, shaper) in enumerate(cases):
+        a, b = d / f'nc-{i}a.wav', d / f'nc-{i}b.wav'
+        args = ['--filter', ir, '--input', src, '--output-format', fmt, *extra]
+        err = call([*args, '--output', a, '--gain-db', 'no-clip']).stderr.decode()
+        text = re.search(r'no-clip attenuation (-?[0-9.]+) dB', err).group(1)
+        db = float(text)
+        gain = struct.unpack('<f', struct.pack('<f', 10 ** (db / 20)))[0]
+        if bits is None:
+            assert abs(db + 20 * math.log10(bound)) < 1e-12, err
+            assert 'headroom' not in err, err
+        else:
+            steps = (1 + shaper_sums[shaper]) * (0.5 + dither) + 0.5
+            limit = 1 - steps / 2 ** (bits - 1)
+            assert bound * gain <= limit, (fmt, extra, bound * gain, limit)
+            # The only extra attenuation is that headroom and the 2^-16
+            # allowance for float rounding.
+            want = -20 * math.log10(bound) + 20 * math.log10(limit / (1 + 2**-16))
+            assert abs(db - want) < 1e-9, (fmt, extra, db, want)
+            assert f'headroom for {bits}-bit output' in err, err
+            assert ('dither' in err.split('headroom')[1]) == (dither > 0), err
+            # The engine's own rounding: the same render as float, at the
+            # printed gain, stays within the range the quantizer cannot clip.
+            f = d / f'nc-{i}f.wav'
+            call(['--filter', ir, '--input', src, '--output', f, '--gain-db', text])
+            peak = max(abs(v) for v in floats(f)[2])
+            assert bound * gain * (1 - 2**-20) < peak <= limit, (fmt, extra, peak, limit)
+        call([*args, '--output', b, '--gain-db', text])
+        assert a.read_bytes() == b.read_bytes(), (fmt, extra, text)
+    # A numeric gain is applied as given, with no headroom.
+    err = call(
+        ['--filter', ir, '--input', src, '--output', d / 'nc-n.wav', '--output-format', 'wav-pcm16', '--gain-db', '-1']
+    ).stderr
+    assert b'headroom' not in err, err
+
+
 def output_selection_tests(d):
     """--output-channels selects list entries by output count, as the historical engine did."""
     ir = d / 'os-ir.wav'
@@ -877,6 +942,7 @@ def main():
         call(['--filter', ir, '--input', src, '--output', dst, '--dither', 'none'])
         integer_format_tests(d)
         automatic_gain_tests(d)
+        no_clip_headroom_tests(d)
         output_selection_tests(d)
         # Errors must be failures, not successful silent output.
         for extra in (['--block-size', '0'], ['--block-size', '-1'], ['--gain-db', 'nan'], ['--unknown']):

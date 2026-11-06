@@ -726,6 +726,7 @@ void quantizer_tests(const fs::path& dir) {
             for (auto d : {Dither::none, Dither::rectangular, Dither::triangular,
                            Dither::triangular_highpass}) {
                 const double largest = d == Dither::none ? 0 : d == Dither::rectangular ? 0.5 : 1;
+                // GAIN-3: the library's figure, which --gain-db no-clip uses.
                 for (auto shaping : {NoiseShaping::none, NoiseShaping::simple,
                                      NoiseShaping::second_order, NoiseShaping::third_order,
                                      NoiseShaping::ninth_order, NoiseShaping::sony_sbm}) {
@@ -733,6 +734,8 @@ void quantizer_tests(const fs::path& dir) {
                     for (const double c : shaper_coefficients(shaping))
                         sum += std::abs(c);
                     const double steps = (1 + sum) * (0.5 + largest) + 0.5;
+                    require(quantization_headroom({d, 7, shaping}) == steps,
+                            "quantization_headroom gives H");
                     // Rounded towards zero, so the bound holds for the float.
                     const auto a = std::nextafter(static_cast<float>(1 - steps / scale), 0.f);
                     std::vector<std::vector<float>> signals(5, std::vector<float>(4000));

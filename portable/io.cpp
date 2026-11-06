@@ -407,6 +407,26 @@ std::vector<double> shaping_coefficients(NoiseShaping shaping) {
     throw std::invalid_argument("unknown noise shaping");
 }
 } // namespace
+double quantization_headroom(const QuantizationOptions& options) {
+    double largest = 0;
+    switch (options.dither) {
+    case Dither::none:
+        break;
+    case Dither::rectangular:
+        largest = 0.5;
+        break;
+    case Dither::triangular:
+    case Dither::triangular_highpass:
+        largest = 1;
+        break;
+    default:
+        throw std::invalid_argument("unknown dither");
+    }
+    double sum = 0;
+    for (const double c : shaping_coefficients(options.noise_shaping))
+        sum += std::abs(c);
+    return (1 + sum) * (0.5 + largest) + 0.5;
+}
 Quantizer::Quantizer(std::size_t channels, unsigned bits, QuantizationOptions options)
     : channels_(channels), bits_(bits), options_(options), state_(options.seed) {
     if (channels == 0 || channels > max_channel_count)

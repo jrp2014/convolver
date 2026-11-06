@@ -461,6 +461,8 @@ void no_clip_endpoint() {
         }
     std::cout << "no-clip gain on the worst-case input: largest output " << std::setprecision(9)
               << reached << '\n';
+    // GAIN-3's float-rounding allowance for integer output (2^-16, main.cpp)
+    // is above this tolerance.
     require(reached > 1 - 1e-5 && reached < 1 + 1e-5,
             "the no-clip gain reaches full scale within float rounding");
 }
