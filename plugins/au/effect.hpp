@@ -67,6 +67,26 @@ inline void (*load_started_for_tests)() noexcept = nullptr;
 // au.adapter can check that the unit then fails to open cleanly. 0 in the
 // component.
 inline int latency_queue_failure_for_tests = 0;
+// For the tests only (AU-14, from jrp's reviews of db54160 and 5f47ecb): a
+// witness that a unit's Latency work has finished, in place of a sleep. Each
+// unit numbers its requests (request_latency()) from 1. When set, a unit
+// calls this with itself and `requested` after each request (`done` 0), on
+// the requesting thread, and with `done` at the end of each run of its work
+// (logged, the host told), the newest number that run had seen when it
+// began (`requested` 0), on the work's queue. A test that waits until a
+// unit's `done` reaches the `requested` of its change knows that a run of
+// that unit's work that saw the change has finished. Null in the component;
+// change it only while no unit's Latency work is running.
+inline void (*latency_progress_for_tests)(AudioComponentInstance unit, std::uint64_t requested,
+                                          std::uint64_t done) noexcept = nullptr;
+// For the tests only (PLUG-21): when set, each run of a unit's Latency work
+// calls it first, on the work's queue, so that au.adapter can hold a run;
+// and closing a unit calls the second once it has cancelled the work and
+// before it waits for a run in progress, so that the test releases a held
+// run only after closing has reached that point. Null in the component;
+// change them only while no unit's Latency work is running.
+inline void (*latency_started_for_tests)(AudioComponentInstance unit) noexcept = nullptr;
+inline void (*latency_closing_for_tests)(AudioComponentInstance unit) noexcept = nullptr;
 
 // One input bus and one output bus, 1 to 8 channels each (counts may differ),
 // following the shared adapter contract
@@ -275,5 +295,6 @@ class Effect final : public ausdk::AUBase {
     // the destructor, which waits for work already running.
     struct LatencyQueue;
     std::unique_ptr<LatencyQueue> latency_queue_;
+    std::atomic<std::uint64_t> latency_requests_{0}; // Numbers the requests (AU-14).
 };
 } // namespace convolver::au

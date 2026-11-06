@@ -355,6 +355,14 @@ LV2 (Linux first; also PipeWire system audio):
   older sessions restored with defaults in Ardour, Carla and PipeWire
   `filter-chain`.
 
+- [ ] **LV2-8 — Status after a request the host drops.** Found by PLUG-21:
+  a host whose worker drops queued requests at deactivation (the tests'
+  deferred worker can) leaves the status port at Loading until another
+  load is answered; the original filter keeps playing and stays saved.
+  Whether any real host drops requests has not been checked, so this may be
+  marginal: check the hosts first (Ardour, Carla, Jalv, PipeWire), and fix
+  only if one does.
+
 AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 
 - [ ] **AU-3 — Validation.** `auval` and pluginval in macOS CI. `auval -strict`
@@ -768,7 +776,53 @@ so the preset file path is not needed).
   configurations and several prepared engines coexist, and callback
   percentiles and maxima during replacement and reset; publish the
   supported workloads with those percentiles and maxima, and decide from
-  them whether PERF-2, PERF-7 or PERF-8 is worth doing.
+  them whether PERF-2, PERF-7 or PERF-8 is worth doing. PERF-14 lets the
+  load-timing tests start the replacement and the reset from a full history
+  (`--warm`); still to do here: 6- and 8-channel routing, 96 kHz, peak
+  memory and enough observations for tail percentiles.
+- [ ] **PERF-15 — Denormal numbers while processing.** Found by PERF-14 (5
+  November 2026): the load-timing tests' 30 s filter decays below the
+  smallest normal float, and on the Linux cloud VM (clang Release, Ooura,
+  stereo 48 kHz, 512-frame callbacks, 10.7 ms apart) each callback at full
+  history took 25 to 43 ms; with flush-to-zero and denormals-are-zero set on
+  the audio thread, 6 to 7 ms. Neither the engine nor the plug-ins set
+  them; most hosts do on their audio threads, but not all, and a reverb tail
+  fading to silence reaches the same numbers. jrp decided
+  ([decision](docs/project/decisions.md#configuration-and-sound)) that
+  Convolver flushes them itself, in its own pull request: one small
+  RAII helper sets flush-to-zero (and denormals-are-zero on x86-64; FPCR on
+  Apple Silicon) for each processing call and restores the caller's mode,
+  covering `Engine::process` (the CLI) and the whole `HostProcessor` call
+  (conversion, gain and mixing too). Tests: restoration on normal return,
+  early return, exceptions, nested scopes and a caller that already
+  flushes; the oracle tests with the worst error reported; subnormal input
+  and a decaying tail; the `--warm` runs with the incoming mode on and off.
+  Document that subnormal results are flushed (no promise of IEEE gradual
+  underflow). With flushing, the 30 s filter's 6 to 7 ms still exceeds half
+  the 10.7 ms period on that VM: the fix does not qualify that workload
+  there, and the limit stays.
+- [ ] **PERF-16 — Loading stages timed inside the plug-in.** From jrp's
+  review of `db54160`: the load-timing records give a load's whole hold;
+  split it into reading and decoding, validation, FFT preparation,
+  publication and notification, recorded outside the audio path (no
+  logging, allocation or locks there) and written with the PERF-13 records.
+  A failed run should name the stage that did not progress.
+- [ ] **PERF-17 — Platform audio scheduling in the measurement host.** From
+  the same review: the load-timing renderer is an ordinary thread that
+  sleeps and yields, unlike a host's audio callback. For final deadline
+  measurements, a small platform layer in the test host only (Apple audio
+  workgroups on macOS, MMCSS on Windows), never priority changes inside the
+  plug-in. The portable renderer stays for concurrency tests.
+- [ ] **PERF-18 — Performance regressions measured apart from CI.** From
+  the same review: correctness, ordering, audio output and allocation and
+  locking contracts block every pull request; performance regressions are
+  measured on optimised builds by base and head runs interleaved on one
+  machine, with a sampling policy fixed in advance and every result kept,
+  as an explicit report rather than "retry until one passes"; responsiveness
+  is qualified before a release (REL-6). Background preparation (VST3-5,
+  and the Audio Unit's equivalent) only if qualified measurements show
+  loading pauses, keeping coherent state restoration, request order,
+  cancellation, the previous filter and shutdown ownership.
 - [ ] **PERF-7 — One input check on the plug-in audio path.** From the
   project review of 5 November 2026, after PERF-3: each `HostProcessor`
   call copies planar host buffers into an interleaved buffer and replaces
@@ -890,6 +944,20 @@ November 2026), the figures above hold: VST3 `setState` 4 to 6 ms with
 256 to 264 ms. No VST3 callback was late. Loading time does not depend on
 the input, which only the callbacks play.
 
+jrp's review of `db54160` (5 November 2026) separates correctness tests,
+performance measurement and release qualification: PERF-12 and PERF-13 (records
+and verdicts), AU-14 and PLUG-21 (completion witnesses and staged
+teardown), PERF-14 (warm workloads), REL-6 (the qualification procedure),
+and the open PERF-15 to PERF-18. The 100 ms and 250 ms limits and the
+callback limits stay. With `--warm` (PERF-14, same cloud VM and build), the
+10 s filter at full history took about 3 ms a callback and the 30 s filter
+25 to 43 ms, every callback late, so its replacement and reset failed on
+callbacks while the hold (167 to 192 ms) met its limit; with flush-to-zero
+on the audio thread, 6 to 7 ms and no late callback (PERF-15). The
+archived request worker's Windows timeout
+([archived](docs/archive/reviews/2026-11-05-request-worker.md)) was never
+explained; AU-12 removed that worker, which is not a diagnosis.
+
 ### Keeping `host.cpp` manageable
 
 Guidance, not an item (external review of `91fcf1f`, 0.8.13, 5 November
@@ -987,6 +1055,19 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   worker's tests, the watchdog workflow and `scripts/ci_watchdog_probe.py`
   went with it ([archived](docs/archive/reviews/2026-11-05-request-worker.md));
   [Audio Unit settings](docs/develop/plugin-contract.md).
+- [x] **AU-14 — A completion witness for the Latency work.** 5 November
+  2026, from jrp's review of `db54160`: `au.adapter` slept 100 ms to show
+  that an unchanged Latency choice sent no second notification, and 20 ms
+  "for its log line" after an allocation failure, although the work logs
+  after releasing the lock the test had waited for. Each unit now numbers
+  its requests, and each finished run (logged, the host told) reports the
+  number it had seen when it began, with the unit; the test waits until a
+  run of the unit it changed that saw its change has finished, with a 10 s
+  deadline that only catches a deadlock. The first version counted for the
+  whole process, so one unit's finished work satisfied another's check
+  (jrp's review of `5f47ecb`, reproduced with two units); a two-unit case
+  now checks this. The component's only addition is a lock-free increment
+  per request and a null test hook. It runs on macOS CI only.
 - [x] **AU-13 — Safe partial construction of the Latency work.** 5 November
   2026, PR #111, from the external review of `91fcf1f` (0.8.13), a source
   review: AU-12 created the dispatch source before the semaphore, so if the
@@ -1334,6 +1415,62 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   `native.load_timing_harness` checks the range (-0.1 to 0.1) and that both
   signs occur; it failed with the old generator. The loading timings were
   measured again with it ([loading responsiveness](#loading-responsiveness)).
+- [x] **PERF-12 — Load-timing verdicts from records, tested without
+  timing.** 5 November 2026, from jrp's review of `db54160`: the renderer
+  records each callback (due, wake, entry into and return from the plug-in,
+  and the thread's CPU time where the platform gives it), and a pure
+  `judge()` gives a run's verdict from those records. A callback that missed
+  its deadline only because the thread woke late is not the plug-in's own
+  time: not judged, so the run is not qualified rather than failed. A slow
+  call with little CPU time was at first excused as descheduled too; after
+  jrp's review of `5f47ecb` (a call blocked on a lock in the plug-in looks
+  the same) it is judged as the plug-in's, and its note says the records
+  cannot tell blocked from descheduled. `native.load_timing_harness` checks the
+  rules on made-up records (deadline missed with a fast callback, slow
+  callback, loader over budget, unsuitable baseline, functional errors,
+  mixed results across runs) and keeps only a few short real-thread runs:
+  about 9 s instead of 40 to 60;
+  [load timing](docs/develop/testing.md#load-timing-perf-9).
+- [x] **PERF-14 — Load timing from a full history.** 5 November 2026,
+  from jrp's review of `db54160`: a newly loaded long filter is cheap
+  because the engine processes only the parts that have heard input, so the
+  timing tests measured startup, not a long filter's sustained cost. With
+  `--warm`, the renderer plays the filter's length of audio unpaced before
+  the replacement and before the reset, and shows half a second of each
+  filter at full history ("warm first", "warm second", reported only: no
+  limit for steady playing is decided). Opt-in because filling takes
+  minutes with the 30 s filter; CI keeps the cold runs, and REL-6 runs it.
+  `native.load_timing_harness` checks the phases with a mock. It found
+  PERF-15 at once; [loading responsiveness](#loading-responsiveness).
+- [x] **PLUG-21 — Teardown tested at chosen stages.** 5 November 2026
+  (first committed as PLUG-20, which main then gave to the VST logo),
+  from jrp's review of `db54160` ("test shutdown at explicit stages rather
+  than hoping repeated runs encounter the troublesome interleaving"):
+  `lv2.adapter` holds `work()` at each of its pause points (read, prepared,
+  checked) while another thread deactivates the instance, and releases it
+  only once `deactivate()` has signalled from inside that it is waiting for
+  `work()` (jrp's review of `5f47ecb`: otherwise the worker could finish
+  before deactivation began): reactivated, the new filter plays and is
+  reported and saved; closed with a newer request queued, nothing is used
+  after it is freed. `au.adapter`
+  holds a run of the Latency work through a new test-only hook
+  (`latency_started_for_tests`) while the unit closes, alone and with a
+  change queued, releasing it only once closing has cancelled the work and
+  is about to wait for the run (a second hook, `latency_closing_for_tests`);
+  the queued run must then never start. A 60 s watchdog stops either test,
+  naming the stage. With the lock in LV2's `deactivate()` removed, the
+  staged case fails (before the handshake, under ASan, with a heap use
+  after free) while the earlier repeated loop passes. Loading and replacement ordering
+  was already tested this way (the preparation-window cases). Found: LV2-8.
+- [x] **PERF-13 — Load-timing records as JSON.** 5 November 2026, from
+  jrp's review of `db54160`: each timing test writes every run's records
+  (each callback's due, wake, entry, return, CPU time and success; each
+  phase's hold and summary; verdicts and reasons) with the Convolver
+  version, build, compiler, FFT backend, operating system and processor
+  count, to `FORMAT-load-timing.json` in its work folder. The VST3 and Audio
+  Unit Release jobs keep them as an artifact, and a failed job keeps them
+  with its test evidence. Timing the loading stages inside the plug-in
+  remains open; [load timing](docs/develop/testing.md#load-timing-perf-9).
 - [x] **GAIN-2 — No noise simulation for `--gain-db no-clip`.** 5 November
   2026, PR #111, from the external review of `91fcf1f` (0.8.13): no-clip
   ran the whole noise estimate to use only the bound it also returns. It
@@ -1403,6 +1540,18 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   `portable/host.cpp`, with the same values, and the plug-in contract says a
   replacement plays for one Latency block before the crossfade, as it has
   since PLUG-10; [contract](docs/develop/plugin-contract.md).
+- [x] **REL-6 — Responsiveness qualification before a release.** 5
+  November 2026, from jrp's review of `db54160`: CI's timing tests run on
+  shared runners and report "not qualified" when they cannot judge, which
+  is not qualification. The
+  [procedure](docs/develop/releasing.md#responsiveness-qualification): on a
+  named machine (jrp's Mac first, through the command line), build the
+  candidate's tag with the SDKs its source manifest records, optimised and
+  without sanitizers; run the timing tests cold and `--warm`; the release
+  qualifies only if every entry passed (or no limit applied), with the
+  existing limits; every run's records are kept and the release notes state
+  the result either way. Not yet carried out: the first preview's run is
+  part of its publication.
 - [x] **REL-5 — Early limited walkthrough on macOS.** 1 November 2026,
   PR #101. An assisted check for jrp, not by an independent tester, of the
   stereo journey's package and command-line steps on the pull request's

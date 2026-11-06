@@ -63,9 +63,15 @@ enum class WorkerPoint : int {
     prepared = 1, // The new filter is prepared; the final generation check is next.
     checked = 2,  // The final check passed; publication is next.
     read = 3,     // The file was read (or failed to read); nothing is recorded yet.
+    // Not a pause (PLUG-21): deactivate() found the control lock held (work()
+    // in progress) and is about to wait for it. Called without the lock; the
+    // hook must return at once.
+    deactivate_waits = 4,
 };
 struct TestWorkerAccess {
     // Sets or (with null) clears the pause hook, under the control lock.
+    // deactivate() reads it without the lock (deactivate_waits), so set it
+    // before the instance is used and leave it.
     void (*set_pause)(void* instance, void* context, void (*pause)(void*, WorkerPoint));
 };
 } // namespace convolver::lv2

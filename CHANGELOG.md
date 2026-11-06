@@ -142,6 +142,50 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Tests (PERF-12, from jrp's review of `db54160`): the load-timing tests
+  record each audio callback (when it was due, when the thread woke, when
+  the plug-in was entered and returned, and the thread's CPU time where the
+  platform gives it) and print the latest wake and the longest call into the
+  plug-in. A callback late only because its thread woke late is not judged
+  and leaves the run not qualified rather than failed; a slow call with
+  little CPU time is judged, since a call blocked on a lock looks the same
+  as a descheduled one. `native.load_timing_harness` tests the verdicts on made-up records
+  instead of sleeping, in about 9 seconds rather than 40 to 60. Tests only:
+  no change to the plug-ins or the sound.
+- Tests (AU-14, from jrp's review of `db54160`): `au.adapter` waits for the
+  Audio Unit's Latency work to finish, through a completion witness, instead
+  of sleeping 100 ms and 20 ms before checking its notification and log
+  line. Each unit counts its Latency requests with a lock-free increment
+  for this, so one unit's finished work never satisfies another's check;
+  no change to the sound.
+- Tests (PERF-13, from jrp's review of `db54160`): each load-timing test
+  writes every callback's record, each phase's summary and each run's
+  verdict, with the Convolver version, build, compiler, FFT backend and
+  machine, to `FORMAT-load-timing.json` in its work folder; the VST3 and
+  Audio Unit Release jobs keep them as an artifact. Tests only: no change to
+  the plug-ins or the sound.
+- Releasing (REL-6, from jrp's review of `db54160`): a responsiveness
+  qualification before each release, on a named machine with the
+  candidate's source and an optimised build, cold and `--warm`; the release
+  notes state whether it qualified
+  ([releasing](docs/develop/releasing.md#responsiveness-qualification)).
+- Tests (PERF-14, from jrp's review of `db54160`): the load-timing tests
+  take `--warm`, which fills the filter's input history faster than real
+  time before the replacement and the reset, so they start from a long
+  filter's full cost, and shows half a second of each filter at that cost
+  (reported only). Not in CI (filling takes minutes). Tests only; no change
+  to the sound.
+- Tests (PLUG-21, from jrp's review of `db54160`): teardown is tested at
+  chosen stages instead of by repetition. `lv2.adapter` holds the worker's
+  `work()` after reading the file, after preparation and after its last
+  check, deactivates or closes the instance from another thread, and
+  releases it once deactivation signals from inside that it is waiting for
+  the held work; `au.adapter` holds a run of the Latency work while the
+  unit closes, releasing it once closing has cancelled the work. With LV2's
+  `deactivate()` lock removed, the staged case fails while the earlier
+  repeated loop passes. Both plug-ins gain test-only hooks, null in the
+  components; no change to the sound.
+
 - The version is now 0.10.0 (jrp, 5 November 2026), the minor step for the
   library changes in DIAG-3 and DIAG-4 below, after 0.9.0. CMake consumers
   request `find_package(Convolver 0.10)`, and the first preview is cut from

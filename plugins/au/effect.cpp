@@ -92,6 +92,8 @@ struct Effect::LatencyQueue {
     LatencyQueue& operator=(const LatencyQueue&) = delete;
     ~LatencyQueue() {
         dispatch_source_cancel(source);
+        if (const auto hook = latency_closing_for_tests)
+            hook(effect.GetComponentInstance());
         dispatch_semaphore_wait(ended, DISPATCH_TIME_FOREVER);
         dispatch_release(source);
         dispatch_release(queue);
@@ -308,11 +310,19 @@ void Effect::release_processor(std::unique_ptr<HostProcessor> previous) noexcept
 }
 
 void Effect::request_latency() noexcept {
+    // Numbered before the wake-up, which the run follows.
+    const auto number = latency_requests_.fetch_add(1) + 1;
+    if (const auto hook = latency_progress_for_tests)
+        hook(GetComponentInstance(), number, 0);
     if (latency_queue_) // Absent only before the constructor's end and in the destructor.
         latency_queue_->request();
 }
 
 void Effect::apply_latency() noexcept {
+    if (const auto hook = latency_started_for_tests)
+        hook(GetComponentInstance());
+    // Before the settings are read: the requests this run is sure to see.
+    const auto seen = latency_requests_.load();
     std::string message, faults;
     bool changed = false, problem = false;
     std::unique_ptr<HostProcessor> previous;
@@ -386,6 +396,9 @@ void Effect::apply_latency() noexcept {
     }
     if (!message.empty() || problem)
         notify_status();
+    // Finished: the tests' witness (AU-14).
+    if (const auto hook = latency_progress_for_tests)
+        hook(GetComponentInstance(), 0, seen);
 }
 
 void Effect::timing_changed() {

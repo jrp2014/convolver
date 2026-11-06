@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // The loading-responsiveness timings; see load_timing.hpp.
 #include "load_timing.hpp"
+#include "convolver/engine.hpp"
 #include "convolver/host.hpp"
 #include <algorithm>
 #include <atomic>
@@ -8,22 +9,26 @@
 #include <condition_variable>
 #include <cstdint>
 #include <cstdio>
+#include <ctime>
 #include <fstream>
 #include <iostream>
 #include <mutex>
 #include <stdexcept>
 #include <thread>
 #include <utility>
+#if !defined(_WIN32)
+#include <sys/utsname.h>
+#include <time.h> // clock_gettime, gmtime_r
+#endif
+#if __has_include("convolver_version.hpp")
+#include "convolver_version.hpp"
+#endif
 
 namespace convolver::plugin_test::load_timing {
 namespace {
 namespace fs = std::filesystem;
 using Clock = std::chrono::steady_clock;
 using Seconds = std::chrono::duration<double>;
-
-double ms(Seconds s) {
-    return s.count() * 1000;
-}
 
 #if defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_THREAD__)
 constexpr const char* build = "sanitizers";
@@ -128,29 +133,46 @@ fs::path write_file(const fs::path& folder, const std::string& name, const Confi
     return cfg;
 }
 
-// What the audio thread saw during one phase.
-struct Callbacks {
-    std::size_t count = 0, late = 0, failed = 0;
-    Seconds longest{0}, worst_late{0};
-    std::string error; // The first exception a callback threw.
-};
+// The audio thread's CPU time in seconds, or -1 where it is not measured.
+// Windows updates thread times only at the scheduler's tick (about 15 ms),
+// too coarse for a callback.
+double thread_cpu() {
+#if defined(_WIN32)
+    return -1;
+#else
+    timespec t{};
+    if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t) != 0)
+        return -1;
+    return static_cast<double>(t.tv_sec) + static_cast<double>(t.tv_nsec) * 1e-9;
+#endif
+}
 
 // Calls the driver's process() every `block` frames of real time, as a
-// host's audio device does. A callback is late when it finishes after the
-// next one was due; the schedule then restarts from its end, as a device
-// that dropped a buffer carries on.
+// host's audio device does, and records each callback (CallbackRecord). A
+// callback is late when it finishes after the next one was due; the
+// schedule then restarts from its end, as a device that dropped a buffer
+// carries on. The records are allocated beforehand: the audio thread does not
+// allocate or format, except to keep the first exception's text.
 class Renderer final : public Audio {
   public:
+    struct Seen {
+        std::vector<CallbackRecord> callbacks;
+        std::size_t dropped = 0;
+        std::string error;
+    };
+
     Renderer(lifecycle::Driver& driver, const Workload& w)
         : driver_(driver), period_(static_cast<double>(w.block) / w.host.sample_rate),
           in_(w.host.inputs, std::vector<float>(w.block)),
-          out_(w.host.outputs, std::vector<float>(w.block)), block_(w.block) {
+          out_(w.host.outputs, std::vector<float>(w.block)), block_(w.block),
+          records_(max_records) {
         for (std::size_t c = 0; c < in_.size(); ++c)
             in_[c] = quiet_noise(c, block_); // As a host plays.
         for (auto& v : in_)
             ins_.push_back(v.data());
         for (auto& v : out_)
             outs_.push_back(v.data());
+        start_ = Clock::now();
         thread_ = std::thread([this] { loop(); });
     }
     ~Renderer() override {
@@ -160,13 +182,15 @@ class Renderer final : public Audio {
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
 
-    Seconds period() const {
-        return period_;
-    }
-    // Starts a new phase; returns what the previous one saw.
-    Callbacks take() {
+    // Starts a new phase; returns what the previous one recorded.
+    Seen take() {
         std::lock_guard lock(mutex_);
-        return std::exchange(seen_, {});
+        Seen seen{{records_.begin(), records_.begin() + static_cast<std::ptrdiff_t>(used_)},
+                  dropped_,
+                  std::move(error_)};
+        used_ = dropped_ = 0;
+        error_.clear();
+        return seen;
     }
     // Held by a caller whose entry point the host does not run alongside audio.
     std::mutex& gate() {
@@ -185,11 +209,68 @@ class Renderer final : public Audio {
     void wait_for(Seconds s) {
         wait_callbacks(static_cast<std::size_t>(std::ceil(s / period_)));
     }
+    // PERF-14: plays `n` callbacks back to back, unpaced and not timed, to
+    // fill the filter's input history faster than real time, then goes back
+    // to the host's pace. A callback that fails is recorded in the next phase.
+    void fill(std::size_t n) {
+        std::unique_lock lock(mutex_);
+        fill_ = n;
+        changed_.wait(lock, [&] { return fill_ == 0; });
+    }
 
   private:
+    // About 11 minutes of 512-frame callbacks at 48 kHz: far more than a phase.
+    static constexpr std::size_t max_records = 1 << 16;
+
+    double at(Clock::time_point t) const {
+        return Seconds(t - start_).count();
+    }
+
+    // One unpaced callback of fill(); false once there are none to play.
+    bool fill_one() {
+        {
+            std::lock_guard lock(mutex_);
+            if (fill_ == 0)
+                return false;
+        }
+        bool ok = true;
+        std::string error;
+        {
+            std::lock_guard gate(gate_);
+            try {
+                ok = driver_.process(ins_, outs_, block_);
+            } catch (const std::exception& e) {
+                ok = false;
+                error = e.what();
+            } catch (...) {
+                ok = false;
+                error = "an exception that is not a std::exception";
+            }
+        }
+        {
+            std::lock_guard lock(mutex_);
+            if (!ok) { // Untimed: recorded as on time, so it counts only as a failure.
+                const auto t = at(Clock::now());
+                if (used_ < records_.size())
+                    records_[used_++] = {t, t, t, t, -1, false};
+                else
+                    ++dropped_;
+                if (error_.empty())
+                    error_ = std::move(error);
+            }
+            --fill_;
+        }
+        changed_.notify_all();
+        return true;
+    }
+
     void loop() {
         auto due = Clock::now();
         while (!stop_) {
+            if (fill_one()) {
+                due = Clock::now(); // The host's pace starts again after the fill.
+                continue;
+            }
             // Sleeps until just before the callback is due and waits out the
             // rest: some timers (Windows) wake a millisecond or more late,
             // which would show as late callbacks the plug-in did not cause.
@@ -205,11 +286,13 @@ class Renderer final : public Audio {
             }
             bool ok = true;
             std::string error;
-            // From before the gate: a callback the host holds back is long.
-            const auto begun = Clock::now();
-            Clock::time_point end;
+            const auto woke = Clock::now();
+            Clock::time_point entered, returned;
+            double cpu = -1;
             {
-                std::lock_guard gate(gate_);
+                std::lock_guard gate(gate_); // Held while the host holds audio back.
+                entered = Clock::now();
+                const double cpu_before = thread_cpu();
                 try { // A failure is counted, and the run goes on.
                     if (task)
                         (*task)();
@@ -221,24 +304,24 @@ class Renderer final : public Audio {
                     ok = false;
                     error = "an exception that is not a std::exception";
                 }
-                end = Clock::now();
+                returned = Clock::now();
+                const double cpu_after = thread_cpu();
+                if (cpu_before >= 0 && cpu_after >= 0)
+                    cpu = cpu_after - cpu_before;
             }
             const auto next = due + std::chrono::duration_cast<Clock::duration>(period_);
             {
                 std::lock_guard lock(mutex_);
-                ++seen_.count;
-                seen_.failed += ok ? 0 : 1;
-                if (seen_.error.empty())
-                    seen_.error = std::move(error);
-                seen_.longest = std::max<Seconds>(seen_.longest, end - begun);
-                if (end > next) {
-                    ++seen_.late;
-                    seen_.worst_late = std::max<Seconds>(seen_.worst_late, end - next);
-                }
+                if (used_ < records_.size())
+                    records_[used_++] = {at(due), at(woke), at(entered), at(returned), cpu, ok};
+                else
+                    ++dropped_;
+                if (!ok && error_.empty())
+                    error_ = std::move(error);
                 ++done_;
             }
             changed_.notify_all();
-            due = end > next ? end : next;
+            due = returned > next ? returned : next;
         }
     }
 
@@ -248,30 +331,54 @@ class Renderer final : public Audio {
     std::vector<const float*> ins_;
     std::vector<float*> outs_;
     std::size_t block_;
+    std::vector<CallbackRecord> records_;
+    std::size_t used_ = 0, dropped_ = 0;
+    std::string error_;
+    Clock::time_point start_;
     std::mutex mutex_, gate_;
     std::condition_variable changed_;
     const std::function<void()>* task_ = nullptr;
-    std::size_t done_ = 0, task_callback_ = 0;
-    Callbacks seen_;
+    std::size_t done_ = 0, task_callback_ = 0, fill_ = 0;
     std::atomic<bool> stop_{false};
     std::thread thread_;
 };
 
-void report(const std::string& format, const Workload& w, const std::string& entry,
-            const char* phase, std::optional<Seconds> held, const Callbacks& c, bool ok,
-            const std::string& over = {}) {
+void report(const std::string& format, const Workload& w, const std::string& entry, const Phase& p,
+            const Callbacks& c, const std::string& note) {
     char time[32] = "-", line[256];
-    if (held)
-        std::snprintf(time, sizeof time, "%.1f", ms(*held));
-    std::snprintf(line, sizeof line, "%-5s %-5s %-14s %-12s %10s %9zu %6zu %10.2f %10.2f%s\n",
-                  format.c_str(), w.name.c_str(), entry.c_str(), phase, time, c.count, c.late,
-                  ms(c.worst_late), ms(c.longest), ok ? "" : "  REFUSED OR FAILED");
+    if (p.held)
+        std::snprintf(time, sizeof time, "%.1f", *p.held * 1000);
+    const bool ok = p.accepted && c.failed == 0 && p.dropped == 0;
+    std::snprintf(line, sizeof line,
+                  "%-5s %-5s %-14s %-12s %8s %9zu %5zu %6zu %8.2f %8.2f %8.2f%s\n", format.c_str(),
+                  w.name.c_str(), entry.c_str(), p.name.c_str(), time, c.count, c.late,
+                  c.late_scheduling, c.worst_late * 1000, c.worst_wake * 1000,
+                  c.longest_call * 1000, ok ? "" : "  REFUSED OR FAILED");
     std::cout << line;
-    if (!c.error.empty())
-        std::cout << "      a callback threw: " << c.error << '\n';
-    if (!over.empty())
-        std::cout << "      " << over << '\n';
+    if (!p.error.empty())
+        std::cout << "      a callback threw: " << p.error << '\n';
+    if (p.dropped)
+        std::cout << "      " << p.dropped << " callbacks beyond what the renderer records\n";
+    if (!note.empty())
+        std::cout << "      " << note << '\n';
     std::cout << std::flush;
+}
+
+std::string join(const std::vector<std::string>& v) {
+    std::string text;
+    for (const auto& s : v)
+        text += (text.empty() ? "" : "; ") + s;
+    return text;
+}
+
+// "2 late callbacks, a callback took over half its period", or empty.
+std::string callbacks_text(std::size_t late, std::size_t slow) {
+    std::string text;
+    if (late)
+        text = std::to_string(late) + (late == 1 ? " late callback" : " late callbacks");
+    if (slow)
+        text += (text.empty() ? "" : ", ") + std::string("a callback took over half its period");
+    return text;
 }
 } // namespace
 
@@ -302,6 +409,14 @@ std::vector<Workload> workloads(const Options& o) {
     return list;
 }
 
+void read_flags(Options& o, int argc, char** argv, int first) {
+    for (int i = first; i < argc; ++i) {
+        const std::string flag = argv[i];
+        o.long_filters = o.long_filters || flag == "--long";
+        o.warm = o.warm || flag == "--warm";
+    }
+}
+
 bool optimised_build() {
     return build == nullptr;
 }
@@ -320,6 +435,286 @@ const char* describe(Verdict v) {
     return "?";
 }
 
+Callbacks summarise(const std::vector<CallbackRecord>& records, double period) {
+    Callbacks c;
+    const double half = period / 2;
+    for (const auto& r : records) {
+        ++c.count;
+        c.failed += r.ok ? 0 : 1;
+        const double call = r.returned - r.entered, own = r.returned - r.woke;
+        c.longest = std::max(c.longest, own);
+        c.longest_call = std::max(c.longest_call, call);
+        c.worst_wake = std::max(c.worst_wake, r.woke - r.due);
+        if (r.returned > r.due + period) {
+            ++c.late;
+            const double by = r.returned - (r.due + period);
+            c.worst_late = std::max(c.worst_late, by);
+            c.missed += static_cast<std::size_t>(std::ceil(by / period));
+            // Started on time, it would have finished on time.
+            if (own <= period)
+                ++c.late_scheduling;
+        }
+        if (call > half) {
+            ++c.slow;
+            // Little CPU time in a slow call: blocked (on a lock, say) or
+            // descheduled; the records cannot tell which (jrp's review of
+            // 5f47ecb), so it is reported and still counts as the plug-in's.
+            if (r.cpu >= 0 && r.cpu <= half)
+                ++c.slow_off_cpu;
+        }
+    }
+    return c;
+}
+
+Judged judge(const RunRecord& rec, const Limits& l) {
+    Judged j;
+    auto& r = j.run;
+    r.workload = rec.workload;
+    r.entry = rec.entry;
+    r.attempt = rec.attempt;
+    std::vector<Callbacks> seen;
+    std::size_t errors = rec.saved ? 0 : 1;
+    // Late callbacks in a baseline: the trailing one plays a loaded filter,
+    // so that shows uncertainty rather than proving the machine alone was
+    // busy (jrp, 5 November 2026); the run's timing cannot be qualified.
+    bool busy = false;
+    for (const auto& p : rec.phases) {
+        seen.push_back(summarise(p.callbacks, l.period));
+        errors += seen.back().failed + (p.accepted ? 0 : 1) + (p.dropped ? 1 : 0);
+        busy = busy || (p.baseline && seen.back().late);
+    }
+    bool hold_judged = false, callbacks_judged = false, hold_over = false, callbacks_over = false;
+    std::vector<std::string> failed, unqualified;
+    for (std::size_t i = 0; i < rec.phases.size(); ++i) {
+        const auto& p = rec.phases[i];
+        const auto& c = seen[i];
+        if (p.baseline) {
+            j.notes.push_back(
+                c.late ? "note: late callbacks here, so this run's timing could not be qualified"
+                       : "");
+            continue;
+        }
+        if (p.reported) {
+            const auto shown = callbacks_text(c.late, c.slow);
+            j.notes.push_back(shown.empty() ? ""
+                                            : "reported only (no limit for playing at full "
+                                              "history): " +
+                                                  shown);
+            continue;
+        }
+        std::vector<std::string> over, noisy;
+        // The hold is the plug-in's own time on the caller's thread, judged
+        // whatever the audio thread saw.
+        const bool hold_limited = p.held && l.host_thread && l.held;
+        hold_judged = hold_judged || hold_limited;
+        if (hold_limited && *p.held > *l.held) {
+            char text[96];
+            std::snprintf(text, sizeof text, "held the host's thread %.1f ms, over %.0f ms",
+                          *p.held * 1000, *l.held * 1000);
+            over.emplace_back(text);
+            hold_over = true;
+        }
+        if (!p.audio_held) {
+            callbacks_judged = true;
+            auto own = callbacks_text(c.late - c.late_scheduling, c.slow);
+            if (c.slow_off_cpu)
+                own += " (" + std::to_string(c.slow_off_cpu) +
+                       (c.slow_off_cpu == 1 ? " slow call" : " slow calls") +
+                       " mostly off the CPU: blocked or descheduled, which the records cannot "
+                       "tell apart)";
+            if (!own.empty() && busy)
+                noisy.push_back(own + " (a baseline was late too)");
+            else if (!own.empty()) {
+                over.push_back(own);
+                callbacks_over = true;
+            }
+            const auto scheduling = callbacks_text(c.late_scheduling, 0);
+            if (!scheduling.empty())
+                noisy.push_back(scheduling + " (the thread woke late; started on time, each "
+                                             "would have finished on time)");
+        }
+        std::string note;
+        for (const auto& v : over) {
+            failed.push_back(p.name + ": " + v);
+            note += (note.empty() ? "" : "; ") + v;
+        }
+        if (!note.empty())
+            note = (l.enforce ? "OVER THE LIMIT: " : "over the limit (not enforced): ") + note;
+        for (const auto& v : noisy) {
+            unqualified.push_back(p.name + ": " + v);
+            note += (note.empty() ? "" : "; ") + std::string("not judged: ") + v;
+        }
+        j.notes.push_back(note);
+    }
+    // Each limit separately: the hold of the host's thread, then the callbacks.
+    r.hold = !hold_judged ? Verdict::reported_only : hold_over ? Verdict::failed : Verdict::passed;
+    r.callbacks = !callbacks_judged      ? Verdict::reported_only
+                  : callbacks_over       ? Verdict::failed
+                  : !unqualified.empty() ? Verdict::not_qualified
+                                         : Verdict::passed;
+    r.errors = errors;
+    r.error = errors != 0;
+    if (r.error) {
+        // A defect, not timing: judged in every build, never rerun.
+        r.verdict = Verdict::failed;
+        r.why = std::to_string(errors) +
+                " errors (a refused load, a failed callback or the wrong filter saved)";
+    } else if (!l.enforce) {
+        r.verdict = r.hold = r.callbacks = Verdict::not_qualified;
+        r.why = "limits not enforced in this build";
+        if (!failed.empty())
+            r.why += "; would fail: " + join(failed);
+    } else {
+        r.verdict = combine(r.hold, r.callbacks);
+        r.why = join(failed);
+        if (!unqualified.empty())
+            r.why += (r.why.empty() ? "" : "; ") + std::string("not judged: ") + join(unqualified);
+    }
+    return j;
+}
+
+namespace {
+// A JSON string: quotes, backslashes and control characters escaped.
+std::string quoted(const std::string& s) {
+    std::string out = "\"";
+    for (const unsigned char c : s) {
+        if (c == '"' || c == '\\') {
+            out += '\\';
+            out += static_cast<char>(c);
+        } else if (c < 0x20) {
+            char escaped[8];
+            std::snprintf(escaped, sizeof escaped, "\\u%04x", c);
+            out += escaped;
+        } else
+            out += static_cast<char>(c);
+    }
+    return out + "\"";
+}
+
+// Seconds to the microsecond, enough for callbacks of a few milliseconds.
+std::string number(double seconds) {
+    char text[32];
+    std::snprintf(text, sizeof text, "%.6f", seconds);
+    return text;
+}
+
+std::string compiler() {
+#if defined(__clang__)
+    return std::string("clang ") + __clang_version__;
+#elif defined(__GNUC__)
+    return std::string("gcc ") + __VERSION__;
+#elif defined(_MSC_VER)
+    return "MSVC " + std::to_string(_MSC_FULL_VER);
+#else
+    return "unknown";
+#endif
+}
+
+std::string operating_system() {
+#if defined(_WIN32)
+    return "Windows";
+#else
+    utsname u{};
+    if (uname(&u) != 0)
+        return "unknown";
+    return std::string(u.sysname) + " " + u.release + " " + u.machine;
+#endif
+}
+
+std::string now_utc() {
+    const auto t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::tm utc{};
+#if defined(_WIN32)
+    gmtime_s(&utc, &t);
+#else
+    gmtime_r(&t, &utc);
+#endif
+    char text[32];
+    std::strftime(text, sizeof text, "%Y-%m-%dT%H:%M:%SZ", &utc);
+    return text;
+}
+
+const char* overall(const Result& r) {
+    return r.errors || r.failed ? "FAILED"
+           : r.not_qualified    ? "NOT QUALIFIED"
+           : r.passed == 0      ? "REPORTED ONLY"
+                                : "PASSED";
+}
+} // namespace
+
+void write_records(std::ostream& out, const std::string& format, const Result& result,
+                   const std::vector<Workload>& list, const Options& o) {
+    out << "{\n  \"format\": " << quoted(format) << ",\n  \"convolver\": "
+        << quoted(
+#if defined(CONVOLVER_VERSION_STRING)
+               CONVOLVER_VERSION_STRING
+#else
+               "unknown"
+#endif
+               )
+        << ",\n  \"build\": " << quoted(build ? build : "optimised")
+        << ",\n  \"limits_enforced\": " << (o.enforce ? "true" : "false")
+        << ",\n  \"compiler\": " << quoted(compiler())
+        << ",\n  \"fft\": " << quoted(std::string(fft_backend_name()) + " " + fft_backend_version())
+        << ",\n  \"system\": " << quoted(operating_system())
+        << ",\n  \"processors\": " << std::thread::hardware_concurrency()
+        << ",\n  \"written\": " << quoted(now_utc())
+        << ",\n  \"result\": " << quoted(overall(result)) << ",\n  \"runs\": [";
+    for (std::size_t i = 0; i < result.runs.size(); ++i) {
+        const auto& r = result.runs[i];
+        const auto& rec = result.records.at(i);
+        const auto w = std::find_if(list.begin(), list.end(), [&](const Workload& candidate) {
+            return candidate.name == r.workload;
+        });
+        const double period =
+            w == list.end() ? 0 : static_cast<double>(w->block) / w->host.sample_rate;
+        out << (i ? "," : "") << "\n    {\"workload\": " << quoted(r.workload)
+            << ", \"entry\": " << quoted(r.entry) << ", \"attempt\": " << r.attempt;
+        if (w != list.end()) {
+            out << ", \"filter_seconds\": " << w->seconds
+                << ", \"sample_rate\": " << w->host.sample_rate << ", \"channels\": ["
+                << w->host.inputs << ", " << w->host.outputs << "], \"block\": " << w->block
+                << ", \"period\": " << number(period) << ", \"held_limit\": "
+                << (w->held_limit ? number(w->held_limit->count()) : std::string("null"));
+        }
+        out << ", \"verdict\": " << quoted(describe(r.verdict))
+            << ", \"hold\": " << quoted(describe(r.hold))
+            << ", \"callbacks\": " << quoted(describe(r.callbacks)) << ", \"errors\": " << r.errors
+            << ", \"why\": " << quoted(r.why) << ", \"saved\": " << (rec.saved ? "true" : "false")
+            << ",\n     \"phases\": [";
+        for (std::size_t k = 0; k < rec.phases.size(); ++k) {
+            const auto& p = rec.phases[k];
+            const auto c = summarise(p.callbacks, period);
+            out << (k ? "," : "") << "\n      {\"name\": " << quoted(p.name)
+                << ", \"baseline\": " << (p.baseline ? "true" : "false")
+                << ", \"held\": " << (p.held ? number(*p.held) : std::string("null"))
+                << ", \"accepted\": " << (p.accepted ? "true" : "false")
+                << ", \"audio_held\": " << (p.audio_held ? "true" : "false")
+                << ", \"reported\": " << (p.reported ? "true" : "false")
+                << ", \"dropped\": " << p.dropped << ", \"error\": " << quoted(p.error)
+                << ",\n       \"summary\": {\"count\": " << c.count << ", \"failed\": " << c.failed
+                << ", \"late\": " << c.late << ", \"late_scheduling\": " << c.late_scheduling
+                << ", \"slow\": " << c.slow << ", \"slow_off_cpu\": " << c.slow_off_cpu
+                << ", \"missed\": " << c.missed << ", \"worst_late\": " << number(c.worst_late)
+                << ", \"worst_wake\": " << number(c.worst_wake)
+                << ", \"longest\": " << number(c.longest)
+                << ", \"longest_call\": " << number(c.longest_call) << "},"
+                << "\n       \"callback_fields\": [\"due\", \"woke\", \"entered\", \"returned\", "
+                   "\"cpu\", \"ok\"],\n       \"callbacks\": [";
+            for (std::size_t n = 0; n < p.callbacks.size(); ++n) {
+                const auto& cb = p.callbacks[n];
+                out << (n ? ", " : "") << '[' << number(cb.due) << ", " << number(cb.woke) << ", "
+                    << number(cb.entered) << ", " << number(cb.returned) << ", "
+                    << (cb.cpu >= 0 ? number(cb.cpu) : std::string("null")) << ", "
+                    << (cb.ok ? "true" : "false") << ']';
+            }
+            out << "]}";
+        }
+        out << "]}";
+    }
+    out << "\n  ]\n}\n";
+}
+
 Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
            const std::vector<Workload>& list, const Options& o) {
     const auto format = driver.format().name;
@@ -330,11 +725,13 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
                                   " build: timings not representative, limits reported only")
               << ")\n"
               << "held: ms the calling thread was held; late: callbacks that finished after the "
-                 "next was due, worst by how many ms; longest: ms of the longest callback\n";
+                 "next was due; sched.: of those, late only because the thread woke late; worst: "
+                 "ms past the next deadline at worst; wake: the latest start, "
+                 "ms after due; call: ms of the longest call into the plug-in\n";
     char header[256];
-    std::snprintf(header, sizeof header, "%-5s %-5s %-14s %-12s %10s %9s %6s %10s %10s\n", "",
-                  "filt.", "entry", "phase", "held ms", "callbacks", "late", "worst ms",
-                  "longest ms");
+    std::snprintf(header, sizeof header, "%-5s %-5s %-14s %-12s %8s %9s %5s %6s %8s %8s %8s\n", "",
+                  "filt.", "entry", "phase", "held ms", "callbacks", "late", "sched.", "worst",
+                  "wake", "call");
     std::cout << header;
     fs::create_directories(o.work_directory);
     for (const auto& w : list) {
@@ -349,62 +746,23 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
             f->state = encode_host_state(s);
             f->file = write_file(o.work_directory, format + "-" + f->name, f->configuration);
         }
+        const Limits limits{period(w).count(),
+                            w.held_limit ? std::optional<double>(w.held_limit->count())
+                                         : std::nullopt,
+                            true, o.enforce};
         for (const auto& e : entries)
             // A shared machine can stall any one run, so an entry that did not
             // pass runs again, up to o.attempts times. Every run is kept.
             for (int attempt = 1;; ++attempt) {
-                Run r{w.name, e.name, attempt, Verdict::passed, {}};
-                const auto errors_before = result.errors;
-                // Held back by a busy machine before anything loaded: late
-                // callbacks while loading then say nothing about the plug-in.
-                bool busy = false;
-                // Each limit applied to some phase; each was exceeded.
-                bool hold_judged = false, callbacks_judged = false;
-                bool hold_over = false, callbacks_over = false;
-                std::vector<std::string> failed, unqualified;
-                // Judges one phase by jrp's limits; returns the note for its line.
-                const auto judge = [&](const char* phase, std::optional<Seconds> held,
-                                       const Callbacks& c, bool audio_held) {
-                    std::vector<std::string> over, noisy;
-                    // The hold is the plug-in's own time on the caller's
-                    // thread, judged whatever the audio thread saw.
-                    const bool hold_limited = held && e.host_thread && w.held_limit;
-                    hold_judged = hold_judged || hold_limited;
-                    callbacks_judged = callbacks_judged || !audio_held;
-                    if (hold_limited && *held > *w.held_limit) {
-                        hold_over = true;
-                        char text[96];
-                        std::snprintf(text, sizeof text,
-                                      "held the host's thread %.1f ms, over %.0f ms", ms(*held),
-                                      ms(*w.held_limit));
-                        over.emplace_back(text);
-                    }
-                    std::string callbacks;
-                    if (!audio_held && c.late)
-                        callbacks = std::to_string(c.late) +
-                                    (c.late == 1 ? " late callback" : " late callbacks");
-                    if (!audio_held && c.longest > period(w) / 2)
-                        callbacks += (callbacks.empty() ? "" : ", ") +
-                                     std::string("a callback took over half its period");
-                    if (!callbacks.empty())
-                        (busy ? noisy : over).push_back(callbacks);
-                    callbacks_over = callbacks_over || (!callbacks.empty() && !busy);
-                    std::string note;
-                    for (const auto& v : over) {
-                        failed.push_back(std::string(phase) + ": " + v);
-                        note += (note.empty() ? "" : "; ") + v;
-                    }
-                    if (!note.empty())
-                        note =
-                            (o.enforce ? "OVER THE LIMIT: " : "over the limit (not enforced): ") +
-                            note;
-                    for (const auto& v : noisy) {
-                        unqualified.push_back(std::string(phase) + ": " + v +
-                                              " (a baseline was late too)");
-                        note += (note.empty() ? "" : "; ") + std::string("not judged, ") + v +
-                                " with a baseline late too";
-                    }
-                    return note;
+                RunRecord rec{w.name, e.name, attempt, {}, true};
+                const auto phase = [](std::string name, bool baseline, Renderer::Seen seen) {
+                    Phase p;
+                    p.name = std::move(name);
+                    p.baseline = baseline;
+                    p.callbacks = std::move(seen.callbacks);
+                    p.dropped = seen.dropped;
+                    p.error = std::move(seen.error);
+                    return p;
                 };
                 driver.create(w.host, true);
                 if (!driver.start())
@@ -412,25 +770,32 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
                 {
                     Renderer audio(driver, w);
                     const auto settle = Seconds(0.3); // Beyond any crossfade.
+                    // Half a second with nothing loading before the phases and
+                    // another after them: one short baseline on Windows CI was
+                    // once on time by chance, between two that were not.
+                    const auto baseline = Seconds(0.5);
                     audio.wait_for(settle);
                     audio.take();
-                    // A baseline with nothing loading before the phases and
-                    // another after them: late callbacks in either mean the
-                    // machine was busy, so late callbacks in the phases show
-                    // nothing either way (one short baseline on Windows CI was
-                    // once on time by chance, between two that were not).
-                    const auto baseline = Seconds(0.5);
                     audio.wait_for(baseline);
-                    const auto idle = audio.take();
-                    result.errors += idle.failed;
-                    struct Phase {
-                        const char* name;
-                        std::optional<Seconds> held;
-                        Callbacks seen;
-                        bool ok, audio_held;
+                    rec.phases.push_back(phase("baseline", true, audio.take()));
+                    // PERF-14: the filter's whole length of input, played
+                    // unpaced, so that the engine processes all of it (it
+                    // skips the parts that have not heard input yet).
+                    const auto history = static_cast<std::size_t>(std::ceil(
+                                             w.seconds * w.host.sample_rate / double(w.block))) +
+                                         2;
+                    // Each filter played at full history, before it is
+                    // replaced or reset: shown, not judged.
+                    const auto warm = [&](const char* name) {
+                        audio.fill(history);
+                        audio.wait_for(baseline);
+                        auto p = phase(name, false, audio.take());
+                        p.reported = true;
+                        rec.phases.push_back(std::move(p));
                     };
-                    std::vector<Phase> phases;
                     for (const auto* f : {&x, &y}) {
+                        if (f == &y && o.warm)
+                            warm("warm first");
                         Outcome outcome;
                         Seconds held{0};
                         const auto timed = [&] {
@@ -444,79 +809,41 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
                         } else
                             timed();
                         audio.wait_for(settle);
-                        const auto seen = audio.take();
-                        const bool ok = outcome.accepted && seen.failed == 0;
-                        phases.push_back({f == &x ? "first load" : "replacement", held, seen, ok,
-                                          e.audio_waits});
-                        result.errors += ok ? 0 : 1;
+                        auto p = phase(f == &x ? "first load" : "replacement", false, audio.take());
+                        p.held = held.count();
+                        p.accepted = outcome.accepted;
+                        p.audio_held = e.audio_waits;
+                        rec.phases.push_back(std::move(p));
                     }
+                    if (o.warm)
+                        warm("warm second");
                     audio.before_next([&] { driver.reset(); });
                     audio.wait_for(settle);
-                    const auto reset = audio.take();
-                    phases.push_back(
-                        {"reset", std::nullopt, reset, reset.failed == 0, o.reset_holds_audio});
-                    result.errors += reset.failed;
+                    auto reset = phase("reset", false, audio.take());
+                    reset.audio_held = o.reset_holds_audio;
+                    rec.phases.push_back(std::move(reset));
                     audio.wait_for(baseline);
-                    const auto idle_after = audio.take();
-                    result.errors += idle_after.failed;
-                    busy = idle.late != 0 || idle_after.late != 0;
-                    const char* busy_note =
-                        busy ? "note: the machine was busy, so late callbacks in this run are "
-                               "not judged"
-                             : "";
-                    report(format, w, e.name, "baseline", std::nullopt, idle, idle.failed == 0,
-                           idle.late ? busy_note : "");
-                    for (const auto& ph : phases)
-                        report(format, w, e.name, ph.name, ph.held, ph.seen, ph.ok,
-                               judge(ph.name, ph.held, ph.seen, ph.audio_held));
-                    report(format, w, e.name, "idle after", std::nullopt, idle_after,
-                           idle_after.failed == 0, idle_after.late && !idle.late ? busy_note : "");
+                    rec.phases.push_back(phase("idle after", true, audio.take()));
                     // The filter that plays is the replacement, as saved.
                     const auto saved = driver.saved();
-                    if (!saved.configuration || saved.configuration->paths.at(0).impulse !=
-                                                    y.configuration.paths[0].impulse) {
+                    rec.saved = saved.configuration && saved.configuration->paths.at(0).impulse ==
+                                                           y.configuration.paths[0].impulse;
+                    if (!rec.saved)
                         std::cout << format << ": after " << e.name
                                   << " the instance does not save " << w.name << " filter y\n";
-                        ++result.errors;
-                    }
                 }
                 driver.stop();
                 driver.destroy();
-                const auto join = [](const std::vector<std::string>& v) {
-                    std::string text;
-                    for (const auto& s : v)
-                        text += (text.empty() ? "" : "; ") + s;
-                    return text;
-                };
-                // Each limit separately: the hold of the host's thread, then
-                // the callbacks.
-                r.hold = !hold_judged ? Verdict::reported_only
-                         : hold_over  ? Verdict::failed
-                                      : Verdict::passed;
-                r.callbacks = !callbacks_judged      ? Verdict::reported_only
-                              : callbacks_over       ? Verdict::failed
-                              : !unqualified.empty() ? Verdict::not_qualified
-                                                     : Verdict::passed;
-                r.error = result.errors != errors_before;
-                if (r.error) {
-                    // A defect, not timing: judged in every build, never rerun.
-                    r.verdict = Verdict::failed;
-                    r.why = std::to_string(result.errors - errors_before) +
-                            " errors (a refused load, a failed callback or the wrong filter "
-                            "saved)";
-                } else if (!o.enforce) {
-                    r.verdict = r.hold = r.callbacks = Verdict::not_qualified;
-                    r.why = "limits not enforced in this build";
-                    if (!failed.empty())
-                        r.why += "; would fail: " + join(failed);
-                } else {
-                    r.verdict = combine(r.hold, r.callbacks);
-                    r.why = join(failed);
-                    if (!unqualified.empty())
-                        r.why += (r.why.empty() ? "" : "; ") + std::string("not judged: ") +
-                                 join(unqualified);
-                }
+                auto entry_limits = limits;
+                entry_limits.host_thread = e.host_thread;
+                auto judged = judge(rec, entry_limits);
+                for (std::size_t i = 0; i < rec.phases.size(); ++i)
+                    report(format, w, e.name, rec.phases[i],
+                           summarise(rec.phases[i].callbacks, limits.period), judged.notes[i]);
+                const auto& r = judged.run;
+                result.errors += r.errors;
                 result.runs.push_back(r);
+                result.records.push_back(std::move(rec));
                 // The entry so far: run again while it has not passed.
                 const auto so_far = verdict(result.runs.end() - attempt, result.runs.end());
                 if (o.enforce && !r.error &&
@@ -580,11 +907,18 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
         }
         i = j;
     }
-    const char* overall = result.errors || result.failed ? "FAILED"
-                          : result.not_qualified         ? "NOT QUALIFIED"
-                          : result.passed == 0           ? "REPORTED ONLY"
-                                                         : "PASSED";
-    std::cout << format << " load timing: " << overall << " (" << result.passed << " passed";
+    // PERF-13: every record, with the build and machine it came from.
+    const auto records = o.work_directory / (format + "-load-timing.json");
+    {
+        std::ofstream file(records);
+        write_records(file, format, result, list, o);
+        if (file)
+            std::cout << "records: " << records.string() << '\n';
+        else
+            std::cout << "could not write the records to " << records.string() << '\n';
+    }
+    std::cout << format << " load timing: " << overall(result) << " (" << result.passed
+              << " passed";
     if (result.passed_after_failure)
         std::cout << ", " << result.passed_after_failure << " of them after a run that did not";
     std::cout << "; " << result.failed << " failed, " << result.not_qualified << " not qualified, "

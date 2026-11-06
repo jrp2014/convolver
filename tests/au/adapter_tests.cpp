@@ -10,12 +10,15 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <csignal>
 #include <cstdlib>
 #include <filesystem>
+#include <future>
 #include <iostream>
 #include <limits>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <new>
 #include <optional>
@@ -222,6 +225,73 @@ template <class Done> bool eventually(Done done) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     return done();
+}
+
+// AU-14: each unit's Latency requests and finished runs, as the unit reports
+// them (au::latency_progress_for_tests, set in main()). Fixed slots and a
+// mutex, so that a report from a render callback never allocates; a slot is
+// started afresh by a unit's first request, as a new unit may reuse a closed
+// one's address. A new unit takes a settled slot; if every slot has work
+// outstanding, one is reused and progress_lost makes every wait fail, so a
+// lost record can never read as settled.
+struct LatencyProgress {
+    AudioComponentInstance unit = nullptr;
+    std::uint64_t requested = 0, done = 0;
+};
+std::mutex progress_mutex;
+std::array<LatencyProgress, 64> progress{};
+std::size_t next_slot = 0;
+bool progress_lost = false;
+LatencyProgress* progress_of(AudioComponentInstance unit) { // Under progress_mutex.
+    for (auto& p : progress)
+        if (p.unit == unit)
+            return &p;
+    return nullptr;
+}
+LatencyProgress& free_slot() { // Under progress_mutex.
+    for (std::size_t i = 0; i < progress.size(); ++i) {
+        auto& p = progress[(next_slot + i) % progress.size()];
+        if (p.done >= p.requested) {
+            next_slot = (next_slot + i + 1) % progress.size();
+            return p;
+        }
+    }
+    progress_lost = true;
+    auto& p = progress[next_slot];
+    next_slot = (next_slot + 1) % progress.size();
+    return p;
+}
+void record_progress(AudioComponentInstance unit, std::uint64_t requested,
+                     std::uint64_t done) noexcept {
+    std::lock_guard lock(progress_mutex);
+    auto* p = progress_of(unit);
+    if (!p || requested == 1) {
+        if (!p)
+            p = &free_slot();
+        *p = {unit, 0, 0};
+    }
+    p->requested = std::max(p->requested, requested);
+    p->done = std::max(p->done, done);
+}
+// Waits until a run of `unit`'s Latency work that saw every request made to
+// it so far has finished, logged and told the host: a completion witness
+// rather than a sleep. The default deadline only catches a deadlock.
+bool latency_settled(const Unit& unit,
+                     std::chrono::milliseconds deadline = std::chrono::seconds(10)) {
+    const auto done = [&] {
+        std::lock_guard lock(progress_mutex);
+        require(!progress_lost, "more units had Latency work outstanding than there are "
+                                "progress slots; enlarge them");
+        const auto* p = progress_of(unit.get());
+        return !p || p->done >= p->requested;
+    };
+    const auto until = std::chrono::steady_clock::now() + deadline;
+    while (!done()) {
+        if (std::chrono::steady_clock::now() > until)
+            return false;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    return true;
 }
 
 void timing_in_seconds() {
@@ -849,7 +919,8 @@ void latency_parameter() {
             "no notification for a new Latency");
     require(reports(unit, 512), "uninitialized latency is not the chosen 512 frames");
     set_parameter(unit, au::latency_parameter, 3);
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // The work for that choice has finished, so a notification would have come.
+    require(latency_settled(unit), "the Latency work for an unchanged choice did not finish");
     require(seen.of(kAudioUnitProperty_Latency) == 1, "a notification without a change");
     check(unit.initialize(), "initialization at 512 frames");
     require(impulse_delay(unit) == 512, "the audio is not delayed by 512 frames");
@@ -997,7 +1068,10 @@ void latency_parameter() {
         });
         completed = fail_countdown.exchange(0) > 0; // No allocation failed.
         CFRelease(unit.class_info_now());
-        std::this_thread::sleep_for(std::chrono::milliseconds(20)); // For its log line.
+        // The work logs after releasing the lock that saving waits for, so
+        // wait for the run itself to finish before reading the log.
+        require(latency_settled(unit),
+                "allocation failure " + std::to_string(k) + ": the Latency work did not finish");
         const auto reported = std::lround(unit.seconds(kAudioUnitProperty_Latency) * 48000);
         require(reported == before || reported == frames, "allocation failure " +
                                                               std::to_string(k) + ": reported " +
@@ -1301,8 +1375,129 @@ void latency_queue_lifetime() {
     }
 }
 
+// PLUG-21 (jrp's reviews of db54160 and 5f47ecb): the Latency work held at
+// the start of a run (au::latency_started_for_tests) for one chosen unit,
+// rather than left to chance as above. A watchdog stops the test, naming the
+// step, if one never finishes.
+struct LatencyHold {
+    std::mutex mutex;
+    std::condition_variable changed;
+    AudioComponentInstance unit = nullptr; // The unit whose runs are held.
+    bool released = false, closing = false;
+    int runs = 0; // Of that unit.
+};
+LatencyHold* latency_hold = nullptr;
+void hold_latency(AudioComponentInstance unit) noexcept {
+    auto& h = *latency_hold;
+    std::unique_lock lock(h.mutex);
+    if (unit != h.unit)
+        return;
+    ++h.runs;
+    h.changed.notify_all();
+    h.changed.wait(lock, [&] { return h.released; });
+}
+void closing_latency(AudioComponentInstance unit) noexcept {
+    auto& h = *latency_hold;
+    std::lock_guard lock(h.mutex);
+    if (unit == h.unit)
+        h.closing = true;
+    h.changed.notify_all();
+}
+void finish_within(std::future<void>&& step, const std::string& what) {
+    if (step.wait_for(std::chrono::seconds(60)) != std::future_status::ready) {
+        std::cerr << what << " did not finish within 60 s (deadlock)" << std::endl;
+        std::_Exit(1);
+    }
+    step.get();
+}
+// Returns once `condition` holds for `hold`, within the watchdog.
+template <class Condition>
+void wait_for_hold(LatencyHold& hold, Condition condition, const std::string& what) {
+    finish_within(std::async(std::launch::async,
+                             [&] {
+                                 std::unique_lock lock(hold.mutex);
+                                 hold.changed.wait(lock, condition);
+                             }),
+                  what);
+}
+void release(LatencyHold& hold) {
+    {
+        std::lock_guard lock(hold.mutex);
+        hold.released = true;
+    }
+    hold.changed.notify_all();
+}
+std::unique_ptr<Unit> latency_unit() {
+    auto unit = std::make_unique<Unit>();
+    check(unit->configure(48000, 2, 2, 512), "formats");
+    check(unit->load(state_of(stereo(48000))), "filter");
+    check(unit->initialize(), "initialization");
+    // The restore wakes the Latency work too; only later changes are held.
+    require(latency_settled(*unit), "the restore's Latency run did not finish");
+    return unit;
+}
+
+// AU-14 (jrp's review of 5f47ecb, his reproduction): one unit's finished
+// Latency work does not satisfy another's completion check. A's run is held
+// before it reads the settings; B's change finishes; A is still not settled
+// until its run is released.
+void latency_witness_per_unit() {
+    auto a = latency_unit(), b = latency_unit();
+    LatencyHold hold;
+    hold.unit = a->get();
+    latency_hold = &hold;
+    au::latency_started_for_tests = hold_latency;
+    set_parameter(*a, au::latency_parameter, 3.f);
+    wait_for_hold(hold, [&] { return hold.runs > 0; }, "A's Latency run starting");
+    set_parameter(*b, au::latency_parameter, 3.f);
+    require(latency_settled(*b), "B's Latency work did not finish while A's was held");
+    // A's run is held, so it cannot have finished: a short wait is enough.
+    require(!latency_settled(*a, std::chrono::milliseconds(20)),
+            "A's held Latency work counted as finished (by B's)");
+    release(hold);
+    require(latency_settled(*a), "A's Latency work did not finish once released");
+    au::latency_started_for_tests = nullptr;
+    latency_hold = nullptr;
+}
+
+// Closing a unit at each stage of its Latency work: a run in progress, and a
+// run in progress with another change queued behind it. The held run is
+// released only once closing has signalled, from inside, that it has
+// cancelled the work and is about to wait for the run (jrp's review of
+// 5f47ecb: otherwise the run could finish before closing began). So closing
+// must wait for the run, and the queued run never starts.
+void latency_staged_closing() {
+    for (const bool queued : {false, true}) {
+        const std::string label = std::string("closing with a Latency run held") +
+                                  (queued ? " and one queued" : "") + ": ";
+        auto unit = latency_unit();
+        LatencyHold hold;
+        hold.unit = unit->get();
+        latency_hold = &hold;
+        au::latency_started_for_tests = hold_latency;
+        au::latency_closing_for_tests = closing_latency;
+        set_parameter(*unit, au::latency_parameter, 3.f);
+        wait_for_hold(hold, [&] { return hold.runs > 0; }, label + "the Latency run starting");
+        if (queued)
+            set_parameter(*unit, au::latency_parameter, 5.f);
+        auto closed = std::async(std::launch::async, [&] { unit.reset(); });
+        wait_for_hold(hold, [&] { return hold.closing; }, label + "closing reaching the held run");
+        require(closed.wait_for(std::chrono::seconds(0)) != std::future_status::ready,
+                label + "closing finished while a Latency run was held");
+        release(hold);
+        finish_within(std::move(closed), label + "closing");
+        au::latency_started_for_tests = nullptr;
+        au::latency_closing_for_tests = nullptr;
+        latency_hold = nullptr;
+        require(hold.runs == 1, label + std::to_string(hold.runs) +
+                                    " runs of the Latency work (a queued run started after "
+                                    "the work was cancelled)");
+    }
+}
+
 int main(int argc, char** argv) {
     process_log = au_test::use_test_log("convolver-adapter-tests.log");
+    au::latency_progress_for_tests = record_progress;
     if (argc == 3 && std::string(argv[1]) == "--end-abruptly")
         return log_then_end(argv[2]);
     try {
@@ -1320,6 +1515,8 @@ int main(int argc, char** argv) {
         settings_parameters();
         latency_parameter();
         latency_queue_lifetime();
+        latency_witness_per_unit();
+        latency_staged_closing();
         settings_in_diagnostics();
         std::cout << "Audio Unit adapter checks passed\n";
         return 0;

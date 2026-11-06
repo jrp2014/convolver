@@ -29,8 +29,9 @@ class Collect(unittest.TestCase):
             'two/convolver-adapter-tests.log',
             'two/convolver-adapter-tests.log.old',
             'two/convolver-editor-tests.log',
+            'vst3-load-timing/VST3-load-timing.json',
         ]
-        left = ['two/test_binary', 'first-use/output.wav', 'two/other.log']
+        left = ['two/test_binary', 'first-use/output.wav', 'two/other.log', 'vst3-load-timing/x.cfg']
         with tempfile.TemporaryDirectory() as folder:
             build = Path(folder) / 'build'
             for name in kept + left:

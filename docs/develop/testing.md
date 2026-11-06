@@ -551,7 +551,7 @@ stereo filter of 1, 10 and 30 seconds into an empty instance, replaces it with
 another as long, and then resets processing from the audio thread. A callback
 is late when it finishes after the next one was due. Half a second with
 nothing loading before the phases and another after them (the baselines)
-show the machine's own scheduling noise; one would not do, since on Windows
+show scheduling noise; one would not do, since on Windows
 CI on 5 November 2026 a quarter-second baseline was once on time by chance
 on a runner where every other phase had two or three late callbacks.
 
@@ -561,11 +561,26 @@ on a runner where every other phase had two or three late callbacks.
 | `au.load_timing` | `RestoreState` (ClassInfo) and the window's load property, macOS only |
 | `lv2.load_timing` | `restore()`, with `run()` held back meanwhile because the plug-in does not declare `state:threadSafeRestore`, and a file chosen on the filter parameter, timed as the worker's `work()` |
 
-Each line gives the time the caller was held and, for the callbacks in that
-phase, how many there were, how many were late and by how much at worst, and
-the longest, counting time a callback was held back (LV2's `restore()`). A phase lasts a third of a second after its load, so callbacks
+The renderer records each callback (PERF-12, from jrp's review of
+`db54160`): when it was due, when the thread woke for it, when it entered and
+left the plug-in, and the thread's CPU time in the call (not on Windows,
+whose thread times move only at the scheduler's tick). Each line gives the
+time the caller was held and, for the callbacks in that phase, how many there
+were, how many were late, how many of those were late only because of the
+thread waking late (`sched.`), by how much the worst was late, the latest
+wake after its due time, and the longest call into the plug-in. A slow call
+with little CPU time is still the plug-in's: the thread may have been
+descheduled or blocked on a lock in the plug-in, which the records cannot
+tell apart (jrp's review of `5f47ecb`), so the note says so and the
+callback is judged. A phase
+lasts a third of a second after its load, so callbacks
 do not reach a long filter's steady cost, which grows as input history fills
-(PERF-5); that cost is PERF-3's to measure.
+(PERF-5). With `--warm` (PERF-14) the renderer first plays the filter's
+length of audio as fast as it can, before the replacement and again before
+the reset, so both start from a full history, and half a second of each
+filter playing at that cost is shown ("warm first", "warm second") but not
+judged, since no limit for steady playing has been decided. Filling takes
+minutes with the 30 s filter, so CI does not use it.
 
 The limits (jrp, 5 November 2026): while a load, a replacement or a reset
 runs on another thread, no callback may be late or take more than half its
@@ -580,8 +595,8 @@ Each run of an entry (one entry point with one filter) gets a verdict
 
 | Verdict | When |
 | --- | --- |
-| Failed | A load was refused, a callback failed or threw, or the instance did not then save the second filter (in every build, and not run again); or the host's thread was held over its limit, whatever the audio thread saw; or callbacks broke their limits while both baselines were on time |
-| Not qualified | Callbacks broke their limits, but a baseline was late too, so the machine was busy and the run shows nothing either way; and every run in a build that does not enforce the limits (anything but an optimised build without sanitizers, which only prints what would exceed them) |
+| Failed | A load was refused, a callback failed or threw, or the instance did not then save the second filter (in every build, and not run again); or the host's thread was held over its limit, whatever the audio thread saw; or callbacks broke their limits by the plug-in's own time while both baselines were on time |
+| Not qualified | Callbacks broke their limits, but a baseline was late too, so the run's timing could not be qualified (the trailing baseline plays a loaded filter, so a late callback there shows uncertainty, not that the machine alone was busy); or they broke them only because the audio thread woke late (late although, started on time, the callback would have finished on time), which these measurements cannot pin on the plug-in; and every run in a build that does not enforce the limits (anything but an optimised build without sanitizers, which only prints what would exceed them) |
 | Reported only | No limit applies to any of its phases: LV2's `restore()`, for which the host stops audio, and its reset (the 120 s filter's hold is reported only, but its callbacks are judged, so its entries are not) |
 | Passed | None of these |
 
@@ -608,22 +623,38 @@ was not qualified or none was judged, which CTest reports as skipped
 (`SKIP_RETURN_CODE`), never as passed. So sanitizer and debug jobs show the
 three tests as skipped.
 
-`native.load_timing_harness` tests the harness itself with a mock adapter
-whose loads and callbacks take as long as each case says, after checking the
-verdict rules on made-up runs (a stalled hold then unjudged callbacks is not
-qualified; a stalled hold then late callbacks fails; an error after a pass
-fails; nothing judged is skipped): a loader that holds
-the thread for 400 ms fails on all three runs, also when every callback,
-the baseline's included, is late (the review's reproduction, which the first
-version passed); one slow only on its first run meets the hold limit on the
-next, with the failed run kept; late callbacks with a late baseline are not
-qualified; late callbacks only while loading never pass; a build that does
-not enforce the limits never passes; a load no limit applies to is reported
-only, however slow, and the test is then skipped; a refused load fails at
-once. A quick adapter's
-callbacks are not checked there, since they depend on the machine. It also checks the input
-the audio thread plays: noise from -0.1 to 0.1 of both signs (PERF-11; the
-first version wrapped its negative half to about 1.8e15).
+`native.load_timing_harness` tests the harness without timing it (PERF-12):
+`judge()` gives a run's verdict from its records alone, so the rules are
+checked on made-up records, as jrp's review of `db54160` listed them: a
+deadline missed by a fast callback that woke late (not qualified), a slow
+callback (failed) and one as slow with little CPU time (failed, its note
+saying the records cannot tell blocked from descheduled), a callback blocked
+past the next deadline (failed), a
+loader over its limit (failed, also with every callback and both baselines
+late: the reproduction from the review of `59ac8e0`), a late baseline before
+or after (not qualified), functional errors (failed in every build), no limit
+applying (reported only), the 120 s filter's unlimited hold, and a build that
+does not enforce the limits. The timing summaries (late, missed deadlines,
+whose time) and the rules across runs (`verdict()`, exit codes) are checked
+the same way. A few runs with real threads and a mock adapter then check
+that the renderer's records reach the verdict: a quick adapter records
+every phase, each callback's times in order (due, wake, entry, return) and
+its CPU time within the call; a 60 ms load over a 20 ms limit fails on both
+of two runs; a refused load fails at once; and with `--warm` the two warm
+phases appear, filled faster than real time and reported only. It takes about nine seconds, where the first
+version, which slept and spun, took 40 to 60. It also checks the input the
+audio thread plays: noise from -0.1 to 0.1 of both signs (PERF-11; the first
+version wrapped its negative half to about 1.8e15).
+
+Each test also writes every run's records as JSON (PERF-13), as
+`FORMAT-load-timing.json` in its work folder (`vst3-load-timing/` and the
+like in the build folder): the Convolver version and commit, the build, the
+compiler, the FFT backend, the operating system and processor count, the
+time, and for each run its workload, limits, verdict and reasons, and for
+each phase its hold, a summary and every callback (due, wake, entry, return,
+CPU time and success, in seconds). The Release jobs of the VST3 and Audio
+Unit workflows keep these files as a `load-timing-*` artifact, and a failed
+job keeps them with its test evidence.
 
 CTest runs the three alone (`RUN_SERIAL`); the first line says which build
 ran, and the last gives the overall result. The plug-in candidates leave
@@ -635,7 +666,8 @@ workflows print the tables in a "Load timings" step; LV2's run only in its
 sanitizer job. The
 `timing` label selects the three tests. Run a lifecycle executable with
 `--load-timing DIRECTORY --long` (LV2: `BUNDLE DIRECTORY --load-timing --long`)
-to add the 120-second filter jrp loaded in GarageBand.
+to add the 120-second filter jrp loaded in GarageBand, and `--warm` (after
+or instead of `--long`) for the full-history runs above.
 
 ## Plug-in format tests
 
@@ -770,7 +802,23 @@ Five CTest tests run when the adapter is built (label `au`):
   allocation the worker makes for a change (the reported latency always
   matches the audio, and a change that plays is never logged as failed),
   and saving and restoring it, also after the unit has started
-  (GarageBand's order).
+  (GarageBand's order). Where a check needs the Latency work to have
+  finished (no second notification for an unchanged choice; the log line
+  after an allocation failure), it waits for a completion witness rather
+  than a fixed time (AU-14, from jrp's reviews of `db54160` and `5f47ecb`):
+  each unit numbers its requests, and each run of its work, once it has
+  logged and told the host, reports the number it had seen when it began,
+  with the unit (`latency_progress_for_tests` in `plugins/au/effect.hpp`;
+  a lock-free increment per request in the component). The test waits for
+  the unit it changed; a second unit's finished work does not count, which
+  a two-unit case checks with the first unit's run held. The wait's 10 s
+  deadline only catches a deadlock. Closing the unit is also tested at
+  chosen stages (PLUG-21): a run of the Latency work is held at its start
+  through `latency_started_for_tests`, alone and with another change queued
+  behind it, while another thread closes the unit; the run is released only
+  once closing has cancelled the work and is about to wait for it
+  (`latency_closing_for_tests`), so closing must wait and the queued run
+  never starts. A 60 s watchdog names a step that does not finish.
 - `au.log_evidence`: the adapter test's Convolver log, the file CTest
   names in the build folder (`convolver-adapter-tests.log`), reaches the
   [CI evidence](#evidence-from-failed-ci-runs) after the test aborts, as a
@@ -866,7 +914,15 @@ AU-4.
   with `work()` paused (through a second test-only extension) after
   preparation and after its last check while a newer request arrives, and a
   failed read overtaken the same way; restore with an answer outstanding;
-  teardown with work queued; state with a path (mapped, PipeWire's bare value,
+  teardown with work queued; deactivation and teardown at each pause point
+  (PLUG-21: `work()` held after reading, after preparation and after its
+  last check while another thread deactivates, and released only once
+  `deactivate()` has signalled, through the same test-only extension, that
+  it found `work()` holding the lock and is waiting; reactivated,
+  the new filter plays and is reported and saved; closed, with a newer
+  request queued, nothing is used after it is freed; a 60 s watchdog names
+  a stage that never finishes); a request a host drops at deactivation;
+  state with a path (mapped, PipeWire's bare value,
   an unusable embedded copy, lilv's own state files); and lifecycle
   sequences, one scripted and several seeded (loads, file loads, failed
   loads, audio, bypass, reset, reopening a saved session, an empty state
