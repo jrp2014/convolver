@@ -149,6 +149,16 @@ is superseded.
   preset for another rate or channel count: the status and message shown,
   silence or the previous filter as the contract says, then a fitting
   filter loads, and saving and reopening keep it).
+  Progress (6 November 2026, PR #129): jrp ran the REAPER smoke test (REAPER
+  7.85, macOS 27.2 arm64, candidate 0.10.9 from `83aa64d`;
+  [record](docs/archive/reviews/2026-11-06-host1-reaper.md)). The smoke steps, the stereo journey (render, save and
+  reopen, presets that do not fit; every `--compare` a Match) and the
+  window's settings passed. Two results are open
+  ([unresolved host findings](docs/develop/host-testing.md#unresolved-host-findings)):
+  a new VST3 Latency was not used until the project was reopened, and
+  REAPER gave the plug-in 6 inputs and 6 outputs, so the 2→6 crossover was
+  refused and its render, reopen and refusal steps were not run. Audacity,
+  and REAPER's display of the Status parameter, remain.
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
   now requested (progress below). Write adapters against the
