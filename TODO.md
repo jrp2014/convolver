@@ -346,14 +346,6 @@ LV2 (Linux first; also PipeWire system audio):
   older sessions restored with defaults in Ardour, Carla and PipeWire
   `filter-chain`.
 
-- [ ] **LV2-8 — Status after a request the host drops.** Found by PLUG-21:
-  a host whose worker drops queued requests at deactivation (the tests'
-  deferred worker can) leaves the status port at Loading until another
-  load is answered; the original filter keeps playing and stays saved.
-  Whether any real host drops requests has not been checked, so this may be
-  marginal: check the hosts first (Ardour, Carla, Jalv, PipeWire), and fix
-  only if one does.
-
 AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 
 - [ ] **AU-3 — Validation.** `auval` and pluginval in macOS CI. `auval -strict`
@@ -1349,6 +1341,20 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [LV2 tests](docs/develop/testing.md#lv2-tests).
 - [x] **LV2-2 — Loading filters.** 23 October 2026, PR #48;
   [loading a filter](docs/use/plugins.md#loading-a-filter), [LV2 tests](docs/develop/testing.md#lv2-tests).
+- [x] **LV2-8 — Status after a request the host drops.** 6 November 2026:
+  closed without a change, because none of the four hosts named drops a
+  queued request in a way that would leave the status at Loading. Read in
+  each host's current source on 6 November 2026 (Jalv `main`, Ardour
+  `master`, Carla `main`, PipeWire `master`): Ardour's LV2 worker thread
+  lives as long as the plug-in and keeps its queue across `deactivate()`
+  and `activate()`; Carla runs queued requests from its idle callback
+  whether or not the plug-in is active, and only creates the queue when it
+  loads the plug-in; PipeWire's filter chain runs each request on its main
+  loop and waits for queued work before freeing the instance; Jalv does
+  drop queued requests, but only when it deactivates to quit, after which
+  the instance is freed and its status is never read. The tests' deferred
+  worker stays as a stress case. Reopen if a host is found that drops
+  requests and reactivates.
 - [x] **PERF-4 — Compiler flags and CPU-specific kernels.** 24 October 2026,
   PR #61: run-time AVX2+FMA kernels, with FMA by jrp's decision and a divergence test; [compiler flags and AVX2 kernels](docs/develop/fft-backends.md#compiler-flags-and-avx2-kernels).
 - [x] **PERF-5 — Track valid input history.** 24 October 2026, PR #70: paths
