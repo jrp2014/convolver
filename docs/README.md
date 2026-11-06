@@ -162,7 +162,7 @@ including the 18 October plug-in distribution plan, whose open work is now in
   Convolver log; settings, framework, threads, testing, accessibility and
   phases, with decisions for jrp.
 - [Edges over the leading convolution plug-ins](project/plans/2026-11-06-edges-over-other-convolvers.md)
-  (EDGE-1 to EDGE-8, PERF-2): how Convolver compares with Altiverb,
+  (EDGE-1 to EDGE-9, PERF-2, PERF-3): how Convolver compares with Altiverb,
   Reverberate, Space Designer, Hang Loose Convolver, CamillaDSP and X-MCFX,
   the edges it already has, the ranked edges to build after the first
   walkthrough, and the rules each keeps.

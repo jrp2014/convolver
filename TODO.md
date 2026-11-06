@@ -68,7 +68,7 @@ boundary and C++20 in the core.
 | 6. Later previews | Windows and Linux (**VST3-12**, **VST3-13**), the remaining gain modes and meters (**PLUG-9**, **PLUG-10**, **AU-7**), PERF-3's supported workloads; **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need. Not a first-preview gate: the loading-responsiveness gate uses the finite preview workloads instead. |
 | Supporting, cheap | **PERF-1**, **HOST-4** | HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
-| After the milestone: edges over other convolvers | **EDGE-1** to **EDGE-8** and **PERF-2**, in the ranked order of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) | jrp's goal (6 November 2026): be better than the most popular reverb plug-ins. Waits for REL-3 unless jrp lifts the freeze; each item starts with the owner's decision its plan row names, and keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#non-negotiables). PERF-2 still waits for PERF-3's budgets. |
+| After the milestone: edges over other convolvers | **PERF-3**'s long-reverb workloads, then **PERF-2**, and **EDGE-1** to **EDGE-9**, in the ranked order of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) | jrp's goal (6 November 2026): be better than the most popular reverb plug-ins. Waits for REL-3 unless jrp lifts the freeze; each item starts with the owner's decision its plan row names, and keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#non-negotiables). PERF-2 still waits for PERF-3's budgets. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. |
 | Optional editor work | **PLUG-11** (FFT planning in FFTW-built plug-ins), **LV2-6** (an LV2 window, only if Linux users ask) | Not needed for any preview. |
 | On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
@@ -735,9 +735,15 @@ so the preset file path is not needed).
   stated: a zero or low-latency mode is rank 2 of the
   [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build)
   (Reverberate 2 offers zero latency, Space Designer 128 samples; Convolver
-  goes down to 64 frames). True zero latency also needs a direct
-  (time-domain) head before the first partition. PERF-3's budgets still set
-  the partition sizes.
+  goes down to 64 frames). It is rank 1 because long reverbs matter more
+  than expected (jrp, 6 November 2026): every block of a long filter is
+  processed on every callback, and the multiply-accumulate dominates.
+  Besides non-uniform partitions, consider spreading the long blocks' work
+  over callbacks or onto a worker thread without locks, so no callback
+  spikes, and a replacement that crossfades only the start of the filter.
+  Latency could then take any value the partitions allow, not only a power
+  of two; true zero latency also needs a direct (time-domain) head before
+  the first partition. PERF-3's long-reverb measurements come first.
 - [ ] **PERF-3 — Resource budgets and supported workloads.** Measure, on
   named machines, the distribution of callback durations (median, 99th
   percentile, 99.9th percentile and maximum, not only the average), memory in
@@ -750,7 +756,11 @@ so the preset file path is not needed).
   workloads (for example "8 channels of 65536 taps at 96 kHz uses under N% of
   one core and M MB") in the user guides. Only these results decide whether
   partitioning (PERF-2), memory layout or another FFT (FFT-2) deserves work,
-  and whether slow preparation needs VST3-5. PERF-1 keeps the throughput
+  and whether slow preparation needs VST3-5. Include long reverbs, which
+  the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build)
+  ranks first: 10, 30 and 60 s filters, stereo and true stereo (four
+  paths), at 48 and 96 kHz, with callback maxima while playing, replacing
+  and resetting. PERF-1 keeps the throughput
   benchmarks reproducible; ROBUST-1 adds stress under repeated changes.
   Progress: `convolver_callback_benchmark` (PR #70) times callbacks at a host
   callback size chosen apart from B, for warmed processing, startup, reset,
@@ -959,7 +969,8 @@ jrp's goal, set on 6 November 2026: be better than the most popular reverb
 plug-ins. The [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md)
 compares them, lists the edges Convolver already has, ranks these items and
 states the rules each keeps. They wait for REL-3 unless jrp lifts the freeze
-on optional features; the low-latency edge is PERF-2.
+on optional features. The first edge, long reverbs at low CPU with lower and
+finer latency, is PERF-3's long-reverb measurements and then PERF-2.
 
 - [ ] **EDGE-1 — A filter for every sample rate in one plug-in state.** When a
   list is loaded, keep every entry that fits the host's channels in the saved
@@ -988,13 +999,14 @@ on optional features; the low-latency edge is PERF-2.
   loudness, so a room correction can be judged by ear. Needs jrp's decision on
   the saved state (two filters double its size against the 64 MiB limit) and
   the loudness measure. Effort M.
-- [ ] **EDGE-5 — Publish the accuracy and performance evidence.** A
-  `docs/use/` page that states the measured accuracy and latency in plain
-  words, with a null test users can run with `--compare` against a shipped
-  reference render computed in double precision; and, with PERF-1's
-  benchmarks, CPU use beside the open convolvers (CamillaDSP, BruteFIR,
-  mcfx) on the same named machines. jrp approves the claims the guides make.
-  Effort S for the page, M for the comparison.
+- [ ] **EDGE-5 — Publish the workloads and the evidence.** PERF-3's
+  supported workloads, long reverbs included, with CPU use beside the open
+  convolvers (CamillaDSP, BruteFIR, mcfx) on the same named machines (with
+  PERF-1's benchmarks); and a `docs/use/` page saying the output is correct,
+  with a null test users can run with `--compare` against a shipped
+  reference render. Precision beyond audibility is not a claim to make.
+  jrp approves the claims the guides make. Effort S for the page, M for the
+  comparison.
 - [ ] **EDGE-6 — A reverb's pre-delay, start, length and fades.** Settings
   applied when the filter loads (never on the audio thread), checked against
   the shaped response computed independently; at their defaults the output
@@ -1009,6 +1021,14 @@ on optional features; the low-latency edge is PERF-2.
   the recorded [channel layouts](docs/develop/plugin-identities.md#channel-layouts)
   (VST3 buses up to 8 channels, LV2's eight fixed layouts) only if jrp
   decides so; new layouts and identities in every format. Effort M to L.
+- [ ] **EDGE-9 — Delays finer than a sample.** An opt-in fractional part for
+  each delay, built into the filter when it loads as a band-limited
+  fractional delay, so playing costs nothing more; checked against the
+  delayed response computed independently. One sample at 48 kHz is about
+  7 mm of speaker distance, which matters when aligning a crossover's
+  drivers. `.cfg` delays stay truncated to whole samples; jrp decides how
+  the finer delay is given (a setting or an option, never a `.cfg` syntax
+  change). Effort S to M.
 
 ## Developer tooling
 
