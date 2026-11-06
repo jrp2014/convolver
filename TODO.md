@@ -1319,6 +1319,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
 - [x] **IO-6 — FLAC in the preview packages.** 24 October 2026, PR #60:
   decided not to ship the codec libraries; limitation and workarounds in
   [FLAC and Ogg](docs/use/command-line.md#flac-and-ogg).
+- [x] **HOST-5 — A headless Ardour session in CI.** 6 November 2026, on
+  john's request for unattended host checks: the LV2 workflow records,
+  saves, restores and exports the three first-use fixtures through the
+  plug-in in Ardour 8 and checks the exports against the oracle
+  ([Ardour, headless](docs/develop/testing.md#ardour-headless)).
 - [x] **LV2-1 — Adapter and headless test.** 22 October 2026, PR #43;
   [LV2 tests](docs/develop/testing.md#lv2-tests).
 - [x] **LV2-2 — Loading filters.** 23 October 2026, PR #48;

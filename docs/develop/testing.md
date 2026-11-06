@@ -1020,6 +1020,41 @@ lilv's `lv2apply` cannot host Convolver: it offers plug-ins no features, and
 Convolver needs `urid:map` for its state (lv2apply 0.24.22 then crashes rather
 than reporting the refusal).
 
+### Ardour, headless
+
+A further job of the LV2 workflow plays the plug-in in Ardour, a full DAW
+whose LV2 host is its own code rather than lilv's or JUCE's (HOST-5).
+[`tests/lv2/ardour_tests.py`](../../tests/lv2/ardour_tests.py) uses Ardour's
+headless tools from Ubuntu's `ardour` package (8.4 on Ubuntu 24.04) on
+each [first-use fixture](#plug-in-comparisons-plug-2): mono (1 in, 1 out),
+the stereo cross-feed (2 in, 2 out) and the crossover (2 in, 6 out).
+
+1. `convolver-preset` makes an LV2 preset from the fixture's filter, and
+   `ardour8-new_session` makes a session whose master bus has one channel
+   per plug-in output.
+2. [`ardour_session.lua`](../../tests/lv2/ardour_session.lua), run by
+   `ardour8-lua` on Ardour's Dummy backend, adds a track with the plug-in,
+   loads the preset from Ardour's preset list, records the backend's white
+   noise onto the track, turns off the region's fades and bypasses the
+   panners. It then starts the take 9600 frames into the session, after
+   the ramp Ardour's gain stages make at the start of an export (0.3 % low
+   after 1000 frames), and saves the session.
+3. `ardour8-export`, a second process, restores the session, plug-in state
+   included, and exports it offline with Ardour's latency compensation.
+4. The export must match the direct double-precision oracle applied to the
+   recorded take within 1e-5, with no offset (Ardour compensates the
+   reported 256 frames) and with the whole tail.
+
+The worst error was 4.7e-8 when the test was written (Linux, Ardour 8.4).
+Ardour's configuration goes to a temporary folder;
+`CONVOLVER_ARDOUR_KEEP=DIR` keeps the sessions and exports in `DIR` to
+inspect. To run it:
+
+```sh
+sudo apt-get install --no-install-recommends ardour
+python3 tests/lv2/ardour_tests.py build/lv2/convolver.lv2 build/convolver-preset
+```
+
 ## Equalizer APO export tests
 
 `export.equalizer_apo` runs the exported commands through a model of Equalizer

@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Cloud sessions: install what the CMake build and tests need (CMake, FFTW,
 # libsndfile, Clang sanitizer runtimes, latest stable Clang tools and ruff,
-# and the LV2 headers, lilv and serdi; CI pins the LV2 dependencies), and install
-# the pre-commit Git hook so every commit runs the lint checks, formatting
-# included. Local machines are left alone (CONTRIBUTING.md, "Lint checks").
+# and the LV2 headers, lilv and serdi; CI pins the LV2 dependencies), start
+# installing the plug-in host tests' tools, and install the pre-commit Git
+# hook so every commit runs the lint checks, formatting included. Local
+# machines are left alone (CONTRIBUTING.md, "Lint checks").
 set -euo pipefail
 [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] || exit 0
 [ "$(uname -s)" = "Linux" ] || exit 0
@@ -29,6 +30,19 @@ install_build_tools() {
   # Separate, so a missing LV2 package cannot stop the core tools installing.
   $SUDO apt-get install -y "${lv2_pkgs[@]}" >/dev/null 2>&1 ||
     echo "Could not install: ${lv2_pkgs[*]}; LV2 work needs them." >&2
+}
+
+# The plug-in host tests' tools: xvfb for pluginval (JUCE needs an X server)
+# and Ardour's headless tools (the LV2 workflow's Ardour test). They are large and
+# few changes need them, so they install in the background.
+install_host_test_tools() {
+  command -v apt-get >/dev/null || return 0
+  if command -v xvfb-run >/dev/null && command -v ardour8-lua >/dev/null; then
+    return 0
+  fi
+  SUDO=""; [ "$(id -u)" = 0 ] || SUDO="sudo"
+  nohup $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -o DPkg::Lock::Timeout=300 \
+    xvfb libasound2t64 ardour >/dev/null 2>&1 </dev/null &
 }
 
 # The Git hook runs `pre-commit run` on the staged files before each commit,
@@ -66,6 +80,7 @@ install_lint_hook() {
   nohup "${venv}/bin/pre-commit" install-hooks >/dev/null 2>&1 </dev/null &
 }
 
-# Neither step may stop the other or fail the session.
+# No step may stop another or fail the session.
 install_build_tools || true
+install_host_test_tools || true
 install_lint_hook || true

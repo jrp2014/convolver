@@ -56,6 +56,13 @@ Until 1.0 the C++ API may change between minor versions.
   manual rendering, the filter loaded as an `.aupreset` through
   `ClassInfo`, block sizes 61, 300 and 1000) and checks the 256-frame
   latency and the output against the oracle within 1e-5.
+- Tests (HOST-5): the LV2 workflow plays the three first-use fixtures in
+  headless Ardour 8 sessions on the Dummy backend: the preset loaded from
+  Ardour's preset list, white noise recorded, the session saved, then
+  restored and exported by `ardour8-export` in a second process. Each
+  export must match the oracle applied to the recorded take within 1e-5,
+  with Ardour's latency compensation leaving no offset; the worst error was
+  4.7e-8.
 - Tests (FFMPEG-1): `native.ffmpeg_pipe` runs the
   [FFmpeg pipe](docs/use/command-line.md#with-ffmpeg) as the guide writes
   it, on a short film with two audio tracks: the second track is chosen,
