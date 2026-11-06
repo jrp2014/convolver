@@ -279,9 +279,10 @@ behaviour ([other programs](../use/other-programs.md)).
 5. Be better than the most popular reverb plug-ins where it can be measured
    and checked: correct and checkable output, failing safely, explaining
    itself and free source on every platform, and then the ranked edges of the
-   [edges plan](plans/2026-11-06-edges-over-other-convolvers.md) (long
-   reverbs at low CPU and latency first, then sample rates, finer delays,
-   showing a filter's response and reverb layouts), with its open questions
+   [edges plan](plans/2026-11-06-edges-over-other-convolvers.md) (easy
+   wins over the room-correction convolvers first: sample rates, finer
+   delays, showing a filter's response; then long reverbs at low CPU and
+   latency; then reverb features), with its open questions
    for jrp. Precision beyond what can be heard is not a goal.
 
 The plug-in direction is the [plug-in formats plan](plans/2026-10-21-plugin-formats.md):
