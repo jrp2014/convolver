@@ -22,7 +22,8 @@ cross-feed 2 in 2 out, the 2 in 6 out crossover) this test:
 
 Needs Ardour's headless tools (Ubuntu's `ardour` package: ardour8-lua,
 ardour8-new_session, ardour8-export). Ardour's configuration goes to a
-temporary folder, not the user's.
+temporary folder, not the user's, and the tools run without the MIDNAM files
+Ardour ships (see `without_midi_names`).
 """
 
 import json
@@ -60,6 +61,51 @@ def tool(name):
     sys.exit(f"Ardour's headless tool ardour*-{name} is not installed (Ubuntu: apt-get install ardour)")
 
 
+def without_midi_names(wrapper, directory):
+    """The program behind one of Ardour's tools, and its environment, minus MIDNAM files.
+
+    Every Ardour tool starts a thread that loads the MIDNAM (MIDI instrument
+    name) files Ardour ships. Ardour 8.4's export can corrupt its heap and
+    abort ("double free or corruption", in ExportGraphBuilder::reset or
+    ~PortExportChannel) when the export ends while that thread is still
+    loading: about 1 export in 10 with the plug-in on 2026-11-06, none in 40
+    with the plug-in and no MIDNAM files, none in 40 without the plug-in, and
+    valgrind found no error in Convolver. The sessions have no MIDI, so the
+    tools run with a copy of Ardour's data folder without the files.
+
+    Ubuntu's wrappers (/usr/bin/ardour8-export...) set the data folder
+    themselves and then exec the program (/usr/lib/ardour8/utils/ardour8-export,
+    /usr/lib/ardour8/luasession), so the test sets their environment itself and
+    runs that program. A tool that is not such a wrapper runs unchanged, with a
+    note.
+    """
+    try:
+        text = pathlib.Path(wrapper).read_text(encoding='utf-8')
+    except (OSError, UnicodeDecodeError):
+        text = ''
+    program = re.search(r'^exec "?([^"\s]+?)"? "\$@"$', text, re.MULTILINE)
+    exports = re.findall(r'^export (\w+)=([^\s"$]+)', text, re.MULTILINE)
+    data = dict(exports).get('ARDOUR_DATA_PATH')
+    target = program and program[1].replace('$SELF', pathlib.Path(wrapper).name)
+    if not (text.startswith('#!') and target and data and os.access(target, os.X_OK)):
+        print(f'note: {wrapper} is not an Ardour wrapper script; it runs with the MIDNAM files', flush=True)
+        return wrapper, {}
+    environment = {}
+    for name, value in exports:
+        # A wrapper keeps what was set before: VALUE${NAME:+:$NAME}.
+        kept = f'${{{name}:+:${name}}}' in text and os.environ.get(name)
+        environment[name] = f'{value}:{os.environ[name]}' if kept else value
+    copy = directory / 'ardour-data'
+    if not copy.exists():
+        copy.mkdir()
+        for folder in data.split(':'):
+            for entry in sorted(pathlib.Path(folder).iterdir()):
+                if entry.name != 'patchfiles' and not (copy / entry.name).exists():
+                    (copy / entry.name).symlink_to(entry)
+    environment['ARDOUR_DATA_PATH'] = str(copy)
+    return target, environment
+
+
 def plugin_uri(inputs, outputs):
     """The LV2 URI of the discrete layout with these channel counts."""
     for layout in REGISTRY['fixed_layouts']:
@@ -74,6 +120,10 @@ def plugin_uri(inputs, outputs):
 
 
 def run(command, environment, timeout=300):
+    """Run a command; an Ardour tool is a (program, environment) pair."""
+    if isinstance(command[0], tuple):
+        (program, extra), *arguments = command
+        command, environment = [program, *arguments], {**environment, **extra}
     print('+', ' '.join(str(part) for part in command), flush=True)
     result = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=timeout, check=False)
     sys.stdout.write(result.stdout)
@@ -164,7 +214,6 @@ def main():
         sys.exit(__doc__)
     bundle = pathlib.Path(sys.argv[1]).resolve()
     plugin_tool = pathlib.Path(sys.argv[2]).resolve()
-    tools = {name: tool(name) for name in ('lua', 'new_session', 'export')}
     worst = 0.0
     # CONVOLVER_ARDOUR_KEEP=DIR keeps the sessions and exports there, to inspect.
     keep = os.environ.get('CONVOLVER_ARDOUR_KEEP')
@@ -176,6 +225,7 @@ def main():
         (directory / 'lv2').mkdir()
         (directory / 'sessions').mkdir()
         shutil.copytree(bundle, directory / 'lv2' / bundle.name)
+        tools = {name: without_midi_names(tool(name), directory) for name in ('lua', 'new_session', 'export')}
         environment = {
             **os.environ,
             'LV2_PATH': str(directory / 'lv2'),

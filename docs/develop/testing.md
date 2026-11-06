@@ -1046,6 +1046,17 @@ the stereo cross-feed (2 in, 2 out) and the crossover (2 in, 6 out).
    reported 256 frames) and with the whole tail.
 
 The worst error was 4.7e-8 when the test was written (Linux, Ardour 8.4).
+
+The tools run without the MIDNAM (MIDI instrument name) files Ardour ships.
+Every Ardour tool loads them on a separate thread, and Ardour 8.4's export
+can corrupt its heap and abort ("double free or corruption") when the export
+ends while that thread is still loading. On 2026-11-06 this happened in 4 of
+40 exports with the plug-in. It did not happen in 40 exports with the plug-in
+and no MIDNAM files, or in 40 exports without the plug-in, and valgrind found
+no error in Convolver. The sessions have no MIDI. The test therefore runs
+the programs behind Ubuntu's wrapper scripts itself, with a copy of Ardour's
+data folder that leaves the MIDNAM files out.
+
 Ardour's configuration goes to a temporary folder;
 `CONVOLVER_ARDOUR_KEEP=DIR` keeps the sessions and exports in `DIR` to
 inspect. To run it:
