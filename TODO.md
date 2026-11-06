@@ -759,27 +759,6 @@ so the preset file path is not needed).
   load-timing tests start the replacement and the reset from a full history
   (`--warm`); still to do here: 6- and 8-channel routing, 96 kHz, peak
   memory and enough observations for tail percentiles.
-- [ ] **PERF-15 — Denormal numbers while processing.** Found by PERF-14 (5
-  November 2026): the load-timing tests' 30 s filter decays below the
-  smallest normal float, and on the Linux cloud VM (clang Release, Ooura,
-  stereo 48 kHz, 512-frame callbacks, 10.7 ms apart) each callback at full
-  history took 25 to 43 ms; with flush-to-zero and denormals-are-zero set on
-  the audio thread, 6 to 7 ms. Neither the engine nor the plug-ins set
-  them; most hosts do on their audio threads, but not all, and a reverb tail
-  fading to silence reaches the same numbers. jrp decided
-  ([decision](docs/project/decisions.md#configuration-and-sound)) that
-  Convolver flushes them itself, in its own pull request: one small
-  RAII helper sets flush-to-zero (and denormals-are-zero on x86-64; FPCR on
-  Apple Silicon) for each processing call and restores the caller's mode,
-  covering `Engine::process` (the CLI) and the whole `HostProcessor` call
-  (conversion, gain and mixing too). Tests: restoration on normal return,
-  early return, exceptions, nested scopes and a caller that already
-  flushes; the oracle tests with the worst error reported; subnormal input
-  and a decaying tail; the `--warm` runs with the incoming mode on and off.
-  Document that subnormal results are flushed (no promise of IEEE gradual
-  underflow). With flushing, the 30 s filter's 6 to 7 ms still exceeds half
-  the 10.7 ms period on that VM: the fix does not qualify that workload
-  there, and the limit stays.
 - [ ] **PERF-16 — Loading stages timed inside the plug-in.** From jrp's
   review of `db54160`: the load-timing records give a load's whole hold;
   split it into reading and decoding, validation, FFT preparation,
@@ -927,7 +906,7 @@ jrp's review of `db54160` (5 November 2026) separates correctness tests,
 performance measurement and release qualification: PERF-12 and PERF-13 (records
 and verdicts), AU-14 and PLUG-21 (completion witnesses and staged
 teardown), PERF-14 (warm workloads), REL-6 (the qualification procedure),
-and the open PERF-15 to PERF-18. The 100 ms and 250 ms limits and the
+PERF-15 (subnormal flushing, done) and the open PERF-16 to PERF-18. The 100 ms and 250 ms limits and the
 callback limits stay. With `--warm` (PERF-14, same cloud VM and build), the
 10 s filter at full history took about 3 ms a callback and the 30 s filter
 25 to 43 ms, every callback late, so its replacement and reset failed on
@@ -957,8 +936,8 @@ request with a DSP change.
   cost.** From jrp's simplification review of 5 November 2026: keep
   representative oracle and allocation checks as everyday gates, and run
   the largest and most extreme cases (`native.kernel_divergence`'s 128k to
-  512k filters and its noise near 1e-35, where much of the arithmetic is
-  subnormal) in scheduled or DSP-focused runs, keeping their evidence. Not
+  512k filters and its noise near 1e-35, where much of the arithmetic was
+  subnormal before PERF-15) in scheduled or DSP-focused runs, keeping their evidence. Not
   done yet, because today they cost little. On 5 November 2026 (Linux
   x86-64, Clang 18, a cloud build container), the test took 17.6 s under
   Debug with sanitizers, which already skips the long filters; the
@@ -998,6 +977,7 @@ with compatibility tests; linked IDs point to open work above.
 | Dither/shaping/valid bits apply to integer file output only | Float/RAW output rejects those options; the plug-ins exchange floats, so the host does any final conversion. | [Integer output](docs/use/command-line.md#integer-formats-dither-and-noise-shaping) |
 | C++ packages are static development libraries, not self-contained installers or a stable binary ABI | Rebuild with compatible toolchains; shared dependencies must be deployed. REL-1 covers end-user bundles. | [Package guide](docs/develop/library.md) |
 | Source tags and configured CI do not prove a release is qualified | Tie results to exact commits; named hosts, clean machines and signatures remain release evidence. | [Versioning](docs/develop/versioning.md), [testing](docs/develop/testing.md) |
+| Subnormal numbers (below about 1.2e-38, -758 dBFS) are flushed to zero while processing, on x86-64 and AArch64 | Deliberate (PERF-15): results are not bit-identical to IEEE gradual underflow, and a signal wholly below that level is silence; the caller's floating-point mode is restored after each call. Other processors keep gradual underflow. | [Subnormal numbers](docs/develop/architecture.md#subnormal-numbers) |
 | Finite oracle, fuzz and heap-guard tests do not prove all-input correctness or hard realtime | Keep explicit numerical tolerances and test boundaries; ROBUST-1. | [Testing](docs/develop/testing.md#validation-limits-and-release-work) |
 | Equalizer APO 1.4.2 (x86/x64) convolution drops up to three bins just below half the sample rate when a block is not a multiple of four frames | Upstream behaviour, inaudible (about 22 kHz at 44.1 kHz); the export does not work around it. The runtime test uses 480-frame blocks. | [Equalizer APO guide](docs/develop/testing.md#equalizer-apo-export-tests) |
 | Historical Windows applications are not built or host-tested by portable CI | Old PCM32, shaping, CMD tail and host-negotiation gaps remain historical; fix only proven defects, without implying modern host support. | [Historical coverage](docs/develop/testing.md#historical-coverage) |
@@ -1469,6 +1449,28 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   Unit Release jobs keep them as an artifact, and a failed job keeps them
   with its test evidence. Timing the loading stages inside the plug-in
   remains open; [load timing](docs/develop/testing.md#load-timing-perf-9).
+- [x] **PERF-15 — Subnormal numbers flushed while processing.** 5 November
+  2026, PR #117, on jrp's decision that day (option A, "protect the complete
+  processing call, including mixing and gain"; preparation too, 6
+  November): found by PERF-14, where the 30 s filter, decaying below the
+  smallest normal float, took 25 to 43 ms a callback on the Linux cloud VM (clang Release, Ooura,
+  stereo 48 kHz, 512-frame callbacks 10.7 ms apart) and 6 to 7 ms with
+  flush-to-zero on the audio thread. `ScopedFlushDenormals`
+  (`portable/denormals.hpp`, as JUCE's `ScopedNoDenormals`) sets MXCSR's
+  FTZ and DAZ on x86-64 and FPCR.FZ on AArch64 for the whole of
+  `Engine::process`, `HostProcessor::process` (conversion, gain, mixing and
+  crossfades too), the CLI's render and engine preparation, and restores
+  the caller's mode on every exit. Measured with the LV2 plug-in at full
+  history (`--warm`, same VM and build) and a renderer thread that does not
+  flush: the longest callbacks 37 to 43 ms before, 8 to 12 ms after (6 to
+  12 ms with a flushing renderer); a 30 s load held the worker for 170 to
+  200 ms before, 63 to 93 ms after. Subnormal arithmetic is flushed, not bit-identical to IEEE
+  gradual underflow; `native.denormals` checks restoration, subnormal input
+  and a decaying tail, and `native.kernel_divergence`'s 1e-35 case has an
+  absolute limit (1000 times `FLT_MIN`) where flushing applies. The callback limits are unchanged:
+  the 30 s filter's replacement still fails them on that VM (longest
+  callbacks 7 to 10 ms against the 5.3 ms half-period budget);
+  [subnormal numbers](docs/develop/architecture.md#subnormal-numbers).
 - [x] **GAIN-2 — No noise simulation for `--gain-db no-clip`.** 5 November
   2026, PR #111, from the external review of `91fcf1f` (0.8.13): no-clip
   ran the whole noise estimate to use only the bound it also returns. It

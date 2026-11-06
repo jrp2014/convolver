@@ -95,7 +95,31 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   tolerance, or if the FMA set's oracle error exceeds 1.5 times the
   baseline's ([measurements](fft-backends.md#avx2-kernels-chosen-at-run-time)).
   Do not widen these limits to make it pass: a failure is a divergence to
-  investigate.
+  investigate. Where the engine flushes subnormals (PERF-15: x86-64 and
+  AArch64) the case near `FLT_MIN` is held instead to 1000 `FLT_MIN`
+  (1.2e-35) between the sets and from the oracle, with no subnormal output
+  from either set and each keeping at least a quarter of the oracle's peak
+  ([subnormal numbers](architecture.md#subnormal-numbers)).
+- `native.denormals`: the PERF-15 flushing. `ScopedFlushDenormals` on its
+  own, from a thread that does not flush and from one that does: flushing
+  inside (checked by arithmetic, both results and operands), and the
+  caller's mode back after a normal return, an early return, an exception
+  and nested scopes, with the rounding direction untouched. Engine
+  construction restores the mode, also when it refuses a configuration;
+  `Engine::process` after a call and after its exception for nonfinite
+  input; `HostProcessor::process` (float and double) after a call and after
+  refusing too many frames, and `prepare` and a replacement too. A signal wholly below `FLT_MIN` gives exact
+  silence from the engine and from `HostProcessor` with gain and a dry mix,
+  and so does double input below `FLT_MIN` through `HostProcessor`'s double
+  path (its conversion to float flushes).
+  A 4096-tap filter decaying to about 1e-60, after a burst of noise, matches
+  the double oracle (printing the worst error relative to the peak), with
+  no subnormal output from the engine or `HostProcessor` (float or double,
+  with gain and mix). That check fails for `HostProcessor`'s float path
+  without its flushing; the engine's tail stays normal or zero here even
+  unflushed, so the engine's own flushing is shown by the subnormal input
+  and by `native.kernel_divergence`. On a processor with no flush control the restoration
+  checks still run and the others expect gradual underflow.
 - `native.io`: real libsndfile float/PCM8/16/24/32 round trips, valid-bit headers, clipping, seeded dither
   and noise-shaping behavior,
   legacy parser/config lists, Windows/POSIX/mixed relative paths, signed zero, malformed input,

@@ -4,6 +4,7 @@
 #include "convolver/engine.hpp"
 #include "convolver/io.hpp"
 #include "convolver_version.hpp"
+#include "denormals.hpp"
 #include "dither_advice.hpp"
 #include "file.hpp"
 #include "inspection_cli.hpp"
@@ -613,6 +614,9 @@ int run(int argc, char** argv) {
         // DIAG-1: from here on a failure leaves a partial output, so say so
         // (output safety in the command-line guide).
         try {
+            // PERF-15: the whole render (Engine::process, --gain-db and
+            // quantization) flushes subnormals to zero, as the plug-ins do.
+            const convolver::detail::ScopedFlushDenormals flush;
             constexpr std::size_t chunk = 4096;
             const auto channels = engine.output_channels();
             std::vector<float> in(chunk * engine.input_channels()), out(chunk * channels);

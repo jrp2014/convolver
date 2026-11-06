@@ -232,7 +232,29 @@ Until 1.0 the C++ API may change between minor versions.
   `deactivate()` lock removed, the staged case fails while the earlier
   repeated loop passes. Both plug-ins gain test-only hooks, null in the
   components; no change to the sound.
-
+- Processing (PERF-15, jrp's decision of 5 November 2026): numbers below the
+  smallest normal float (about 1.2e-38, -758 dBFS) are flushed to zero
+  while Convolver processes, in the plug-ins (the whole
+  `HostProcessor::process` call, including conversion, gain and mixing),
+  `Engine::process`, the CLI's render and while an engine is prepared. A
+  long filter or a tail fading to silence produces such numbers, and
+  arithmetic on them is much slower. On the Linux cloud VM (Release, Ooura,
+  the LV2 plug-in, 512-frame callbacks), with a 30 s filter at full history
+  and a host thread that does not flush, the longest callbacks took 37 to
+  43 ms before and 8 to 12 ms after, as with a host that flushes, and a
+  load held the plug-in's worker for 170 to 200 ms before and 63 to 93 ms
+  after. The
+  caller's floating-point mode is restored after every call, and a host
+  that already flushes keeps flushing. x86-64 (MXCSR FTZ and DAZ) and
+  AArch64, including Apple Silicon (FPCR.FZ); other processors are
+  unchanged. Results differ from IEEE gradual underflow only within a few
+  hundred `FLT_MIN` of zero, and a signal wholly below `FLT_MIN` becomes
+  silence; the double-precision oracle tests pass unchanged. Tests:
+  `native.denormals` (restoration on return, early return, exception and
+  nested scopes; subnormal input; a decaying tail), and
+  `native.kernel_divergence`'s 1e-35 case is held to an absolute limit
+  (1000 times `FLT_MIN`, 1.2e-35) where flushing applies. `convolver_callback_benchmark` gains
+  `--filter decaying` and `--thread-denormals gradual|flush`.
 - The version is now 0.10.0 (jrp, 5 November 2026), the minor step for the
   library changes in DIAG-3 and DIAG-4 below, after 0.9.0. CMake consumers
   request `find_package(Convolver 0.10)`, and the first preview is cut from

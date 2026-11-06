@@ -321,6 +321,9 @@ if(CONVOLVER_BUILD_NATIVE)
             SOURCES tests/native/engine_tests.cpp LIBRARIES convolver_core)
         convolver_native_test(native.kernel_divergence convolver_kernel_divergence_tests
             SOURCES tests/native/kernel_divergence_tests.cpp LIBRARIES convolver_core)
+        # PERF-15: subnormals flushed while processing, the caller's mode restored.
+        convolver_native_test(native.denormals convolver_denormal_tests
+            SOURCES tests/native/denormal_tests.cpp LIBRARIES Convolver::host)
         convolver_native_test(native.host convolver_host_tests
             SOURCES tests/native/host_tests.cpp LIBRARIES Convolver::host Threads::Threads)
         # PLUG-10: gain and mix.

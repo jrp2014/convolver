@@ -204,10 +204,11 @@ them on the intended machine, REL-6). The figures and their sources are in
   same filters after their whole length of audio, which is a long filter's
   sustained cost. On the cloud VM (512-frame callbacks, 10.7 ms apart) the
   10 s filter took about 3 ms a callback and the 30 s filter 25 to 43 ms,
-  every callback late, because its tail decays into subnormal numbers;
-  flushing them (PERF-15, in draft
-  [PR #117](https://github.com/jrp2014/convolver/pull/117)) brings it to 6 to
-  7 ms, still over half the period there (jrp's callback limit while a load
+  every callback late, because its tail decays into subnormal numbers.
+  Convolver now flushes them itself, whatever the host thread's setting
+  (PERF-15, 6 November 2026,
+  [PR #117](https://github.com/jrp2014/convolver/pull/117)): the longest
+  callbacks fell to 7 to 15 ms, still over half the period there (jrp's callback limit while a load
   runs; no limit for steady playing is decided). So the 30 s workload is not
   qualified on that machine, which neither condemns the engine nor shows
   that loading needs to move to the background.
