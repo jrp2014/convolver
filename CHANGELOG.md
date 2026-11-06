@@ -519,6 +519,13 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Tests (CI-33): `native.cli`'s no-clip case compared two float renders byte
+  for byte, so it failed when libsndfile's `PEAK` chunk, which records the
+  second the file was written, differed. It now checks the format, rate,
+  channel count and frame count one by one and every decoded sample
+  exactly, with the same dither seed for both renders, and reports the
+  first differing sample and the largest difference. The review checklist
+  says assertions test contracts and invariants, not incidental metadata.
 - Inspection (ROBUST-2): `--inspect` and `--validate` with
   `--all-configurations` decode and prepare every entry of a list, so a
   small list naming one long filter thousands of times kept them busy for

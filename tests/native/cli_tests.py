@@ -40,6 +40,56 @@ def floats(path):
     return channels, rate, list(struct.unpack(f'<{len(payload) // 4}f', payload))
 
 
+def wav_audio(path):
+    """The fmt fields and decoded samples of a WAV file, ignoring other chunks.
+
+    Other chunks (libsndfile's PEAK chunk records the second the file was
+    written) are incidental metadata, not part of the audio.
+    """
+    data = Path(path).read_bytes()
+    assert data[:4] in (b'RIFF', b'RF64') and data[8:12] == b'WAVE', path
+    pos, fmt, payload = 12, None, None
+    while pos + 8 <= len(data):
+        tag, size = struct.unpack_from('<4sI', data, pos)
+        if tag == b'fmt ':
+            tag_code, channels, rate, _, align, bits = struct.unpack_from('<HHIIHH', data, pos + 8)
+            valid = bits
+            if tag_code == 65534:
+                valid = struct.unpack_from('<H', data, pos + 26)[0]
+                tag_code = struct.unpack_from('<H', data, pos + 32)[0]
+            fmt = {'format': tag_code, 'channels': channels, 'rate': rate, 'bits': bits, 'valid bits': valid}
+        if tag == b'data':
+            payload = data[pos + 8 : pos + 8 + size]
+        pos += 8 + size + (size & 1)
+    assert fmt is not None and payload is not None, path
+    width = fmt['bits'] // 8
+    fmt['frames'] = len(payload) // align
+    if fmt['format'] == 3:
+        samples = struct.unpack(f'<{len(payload) // 4}f', payload)
+    elif width == 1:
+        samples = tuple(b - 128 for b in payload)
+    else:
+        samples = tuple(
+            int.from_bytes(payload[i : i + width], 'little', signed=True) for i in range(0, len(payload), width)
+        )
+    return fmt, samples
+
+
+def same_audio(a, b, label):
+    """Two WAV files hold the same audio: format, rate, channels and frame count
+    checked one by one, then every decoded sample exactly."""
+    fa, sa = wav_audio(a)
+    fb, sb = wav_audio(b)
+    for key in fa:
+        assert fa[key] == fb[key], (label, f'{key} differs', fa[key], fb[key])
+    if sa != sb:
+        first = next(i for i, (x, y) in enumerate(zip(sa, sb)) if x != y)
+        worst = max(abs(x - y) for x, y in zip(sa, sb))
+        where = f'frame {first // fa["channels"]} channel {first % fa["channels"]}'
+        detail = f'first difference at {where}: {sa[first]} != {sb[first]}; largest difference {worst}'
+        raise AssertionError((label, detail))
+
+
 def near(actual, expected):
     assert len(actual) == len(expected), (len(actual), len(expected))
     for i, (a, b) in enumerate(zip(actual, expected)):
@@ -334,7 +384,7 @@ def no_clip_headroom_tests(d):
     + 1/2 steps, where native.io shows the quantizer cannot clip; float output
     keeps the bound alone. The same render as float, at the reported gain,
     stays within that range too, and the reported figure, given back to
-    --gain-db, reproduces the file byte for byte.
+    --gain-db with the same dither seed, reproduces every sample exactly.
     """
     taps = [12000, -9000, 5000, -2000, 700]
     ir = d / 'nc-ir.wav'
@@ -358,7 +408,8 @@ def no_clip_headroom_tests(d):
     ]
     for i, (fmt, extra, bits, dither, shaper) in enumerate(cases):
         a, b = d / f'nc-{i}a.wav', d / f'nc-{i}b.wav'
-        args = ['--filter', ir, '--input', src, '--output-format', fmt, *extra]
+        seed = ['--dither-seed', '7'] if dither else []
+        args = ['--filter', ir, '--input', src, '--output-format', fmt, *extra, *seed]
         err = call([*args, '--output', a, '--gain-db', 'no-clip']).stderr.decode()
         text = re.search(r'no-clip attenuation (-?[0-9.]+) dB', err).group(1)
         db = float(text)
@@ -383,7 +434,7 @@ def no_clip_headroom_tests(d):
             peak = max(abs(v) for v in floats(f)[2])
             assert bound * gain * (1 - 2**-20) < peak <= limit, (fmt, extra, peak, limit)
         call([*args, '--output', b, '--gain-db', text])
-        assert a.read_bytes() == b.read_bytes(), (fmt, extra, text)
+        same_audio(a, b, (fmt, extra, text))
     # A numeric gain is applied as given, with no headroom.
     err = call(
         ['--filter', ir, '--input', src, '--output', d / 'nc-n.wav', '--output-format', 'wav-pcm16', '--gain-db', '-1']

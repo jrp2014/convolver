@@ -1403,6 +1403,11 @@ October to 1 November, with their re-run attempts):
   what the log gained while it ran. The log is the file CTest names in the
   build folder, its own since CI-27 (it was a private file copied at exit,
   which an abort lost; `au.editor`'s was a private file deleted at exit).
+- `native.cli` (PR #123, `ec631a8`, Ooura build): the no-clip case for
+  float output compared two renders byte for byte, and libsndfile writes
+  the second a float WAV file was made into its `PEAK` chunk, so renders
+  either side of a second differed. The test now compares the decoded
+  samples and the format fields (CI-33).
 - The Audio Unit's former Latency worker (`native.request_worker`, CI-24,
   and its watchdog check, CI-25) was removed by AU-12; its tests and the
   evidence from its failures are [archived](../archive/reviews/2026-11-05-request-worker.md).
