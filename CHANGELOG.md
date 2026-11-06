@@ -43,6 +43,14 @@ Until 1.0 the C++ API may change between minor versions.
   and `same_rate()` in `convolver/host.hpp`. Added, so existing code
   compiles unchanged.
 
+- Tests (LV2-3, AU-3): pluginval, at the VST3 job's strictness (10, the
+  highest), validates each of the eight LV2 plug-ins in the Release bundle
+  and the installed Audio Unit, its editor tests opening the window, in the
+  LV2 and Audio Unit workflows. The newest full release decides; a newer
+  pre-release runs afterwards as a warning only. Both formats share the
+  command line with the VST3 tests in `tests/plugins/pluginval.py`. Given
+  a bundle, pluginval tests only its first LV2 plug-in, so each is copied
+  into a bundle of its own first.
 - Tests (FFMPEG-1): `native.ffmpeg_pipe` runs the
   [FFmpeg pipe](docs/use/command-line.md#with-ffmpeg) as the guide writes
   it, on a short film with two audio tracks: the second track is chosen,

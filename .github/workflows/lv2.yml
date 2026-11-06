@@ -7,8 +7,9 @@
 # Convolver's Release bundle and lv2lints every plug-in. The other two build
 # against the same packages and run the LV2 tests (lilv-hosted PLUG-2
 # harness and adapter tests) under ASan and UBSan, and the adapter tests again
-# under ThreadSanitizer (LV2-2's worker). LV2-3 adds pluginval. Each job
-# records the versions it used in its summary.
+# under ThreadSanitizer (LV2-2's worker). pluginval, a JUCE host independent
+# of lilv, validates every plug-in in the Release bundle too (LV2-3). Each
+# job records the versions it used in its summary.
 # (lv2apply cannot host Convolver: it offers no features, and Convolver needs
 # urid:map for its state.)
 name: LV2
@@ -73,7 +74,7 @@ jobs:
           read -ra packages <<< "$LV2_PACKAGES"
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends "${packages[@]}" \
-            meson ninja-build pkg-config libelf-dev libsndfile1-dev
+            meson ninja-build pkg-config libelf-dev libsndfile1-dev xvfb libasound2t64
           lv2info --version
           python scripts/release/resolve.py packages "${packages[@]}"
       - name: Newest lv2 source
@@ -161,6 +162,46 @@ jobs:
           for uri in $uris; do
             env -u LV2_PATH lv2lint -I "$bundle" "$uri"
           done
+      # LV2-3: the formal check uses the newest full pluginval release (CI-6).
+      - name: Newest pluginval release
+        id: pluginval
+        uses: ./.github/actions/pluginval
+      - name: pluginval checks every Convolver plug-in
+        env:
+          PLUGINVAL: ${{ steps.pluginval.outputs.path }}
+        run: python tests/lv2/pluginval_tests.py "$PLUGINVAL" build-lv2/lv2/convolver.lv2
+      # A newer beta or release candidate only signposts what is coming:
+      # what it reports is a warning, never a failure.
+      - name: Newest pluginval pre-release
+        id: pluginval-prerelease
+        continue-on-error: true
+        uses: ./.github/actions/pluginval
+        with:
+          prerelease: 'true'
+      - name: pluginval pre-release on every plug-in (advisory)
+        if: always() && steps.pluginval.outcome == 'success'
+        env:
+          FETCHED: ${{ steps.pluginval-prerelease.outcome }}
+          AVAILABLE: ${{ steps.pluginval-prerelease.outputs.available }}
+          PLUGINVAL: ${{ steps.pluginval-prerelease.outputs.path }}
+          VERSION: ${{ steps.pluginval-prerelease.outputs.version }}
+          RELEASE: ${{ steps.pluginval.outputs.version }}
+        run: |
+          advise() {
+            echo "::warning title=pluginval pre-release::$1"
+            echo "**Warning:** $1" >> "$GITHUB_STEP_SUMMARY"
+          }
+          if [ "$FETCHED" != success ]; then
+            advise 'Cannot fetch the newest pluginval pre-release; see the log of the step before.'
+          elif [ "$AVAILABLE" = true ]; then
+            if python tests/lv2/pluginval_tests.py "$PLUGINVAL" build-lv2/lv2/convolver.lv2; then
+              echo "pluginval $VERSION (pre-release) passes every LV2 plug-in, as $RELEASE does." \
+                >> "$GITHUB_STEP_SUMMARY"
+            else
+              message="pluginval $VERSION (pre-release) reports LV2 problems that $RELEASE does not;"
+              advise "$message see the log of this step."
+            fi
+          fi
       - name: Explain a failure that may come from a new upstream release
         if: failure()
         run: python scripts/release/resolve.py explain-failure

@@ -3,7 +3,7 @@
 # The Audio Unit adapter (AU-1, AU-2): built against the newest AudioUnitSDK
 # release (CI-6; its version, commit and checksum are in the job summary),
 # tested through the Audio Unit API and the shared PLUG-2 harness, then
-# installed for the user and checked by auval.
+# installed for the user and checked by auval and pluginval (AU-3).
 name: Audio Unit
 
 'on':
@@ -152,6 +152,57 @@ jobs:
         run: |
           auval -strict -v aufx Conv CONV | tee auval.txt
           grep -q "Cocoa Views Available: 1" auval.txt
+      # AU-3: pluginval, a JUCE host, on the installed component, with its
+      # editor tests opening the window. The formal check uses the newest
+      # full release (CI-6).
+      - name: Newest pluginval release
+        id: pluginval
+        uses: ./.github/actions/pluginval
+      - name: pluginval
+        env:
+          PLUGINVAL: ${{ steps.pluginval.outputs.path }}
+          VERSION: ${{ steps.pluginval.outputs.version }}
+        run: |
+          options=()
+          # rtcheck (pluginval 2, macOS) flags real-time-unsafe calls while processing.
+          if [ "${VERSION%%.*}" -ge 2 ]; then options+=(--rtcheck relaxed); fi
+          python tests/plugins/pluginval.py validate "$PLUGINVAL" \
+            "$HOME/Library/Audio/Plug-Ins/Components/Convolver.component" "${options[@]}"
+      # A newer beta or release candidate only signposts what is coming:
+      # what it reports is a warning, never a failure.
+      - name: Newest pluginval pre-release
+        id: pluginval-prerelease
+        continue-on-error: true
+        uses: ./.github/actions/pluginval
+        with:
+          prerelease: 'true'
+      - name: pluginval pre-release (advisory)
+        if: always() && steps.pluginval.outcome == 'success'
+        env:
+          FETCHED: ${{ steps.pluginval-prerelease.outcome }}
+          AVAILABLE: ${{ steps.pluginval-prerelease.outputs.available }}
+          PLUGINVAL: ${{ steps.pluginval-prerelease.outputs.path }}
+          VERSION: ${{ steps.pluginval-prerelease.outputs.version }}
+          RELEASE: ${{ steps.pluginval.outputs.version }}
+        run: |
+          advise() {
+            echo "::warning title=pluginval pre-release::$1"
+            echo "**Warning:** $1" >> "$GITHUB_STEP_SUMMARY"
+          }
+          options=()
+          if [ "${VERSION%%.*}" -ge 2 ]; then options+=(--rtcheck relaxed); fi
+          component="$HOME/Library/Audio/Plug-Ins/Components/Convolver.component"
+          if [ "$FETCHED" != success ]; then
+            advise 'Cannot fetch the newest pluginval pre-release; see the log of the step before.'
+          elif [ "$AVAILABLE" = true ]; then
+            if python tests/plugins/pluginval.py validate "$PLUGINVAL" "$component" "${options[@]}"; then
+              echo "pluginval $VERSION (pre-release) passes the Audio Unit, as $RELEASE does." \
+                >> "$GITHUB_STEP_SUMMARY"
+            else
+              message="pluginval $VERSION (pre-release) reports Audio Unit problems that $RELEASE does not;"
+              advise "$message see the log of this step."
+            fi
+          fi
       # A new AudioUnitSDK release can need adapter changes (1.4.0 needed C++23).
       - name: Explain a failure that may come from a new upstream release
         if: failure()

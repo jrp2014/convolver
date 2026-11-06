@@ -300,6 +300,9 @@ LV2 (Linux first; also PipeWire system audio):
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
   CI came with LV2-1; pluginval and named layouts remain.
+  Progress (6 November 2026): pluginval validates each of the eight plug-ins
+  at strictness 10 in the LV2 workflow
+  ([pluginval](docs/develop/testing.md#pluginval)); named layouts remain.
 - [ ] **LV2-4 — User guide and host matrix.** LV2 in `docs/use/plugins.md` and
   `docs/use/install.md` (written in DOC-4), plus a PipeWire configuration; Ardour, REAPER, Carla, Qtractor and PipeWire results.
 - [ ] **LV2-5 — Release bundles.** Linux tarball, then distro packages; macOS and
@@ -340,6 +343,10 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   runs since PR #44; still to add: pluginval on the component, and a
   ThreadSanitizer build of `au.adapter` (bypass switched while rendering).
   Needed for the first preview.
+  Progress (6 November 2026): pluginval validates the installed component
+  at strictness 10, editor tests included, in the Audio Unit workflow
+  ([pluginval](docs/develop/testing.md#pluginval)); the ThreadSanitizer build
+  remains.
 - [ ] **AU-4 — User guide and host matrix.** The Audio Unit in
   `docs/use/plugins.md` and `docs/use/install.md` (written in DOC-4); Logic, GarageBand,
   SoundSource, Live, REAPER and FL Studio results, including loading an

@@ -795,6 +795,30 @@ release can run it yet
 on Linux, Windows and macOS. None of this proves hard real-time deadlines or
 compatibility with every DAW; see [host testing](host-testing.md).
 
+The Audio Unit and LV2 plug-ins get the same validation at the same
+strictness, 10, the highest, as steps of their workflows rather than CTest
+tests, because pluginval must load a Release build: the Audio Unit as
+installed for the runner's user (AU-3), and every LV2 plug-in in the
+Release bundle (LV2-3). Both go through
+[`tests/plugins/pluginval.py`](../../tests/plugins/pluginval.py), which
+holds the shared command line; the VST3 script uses it too. Given a bundle,
+pluginval tests only the first LV2 plug-in it lists, so
+[`tests/lv2/pluginval_tests.py`](../../tests/lv2/pluginval_tests.py) copies
+each plug-in into a bundle of its own and validates each. To run them
+locally:
+
+```sh
+python3 tests/lv2/pluginval_tests.py /path/to/pluginval build/lv2/convolver.lv2
+python3 tests/plugins/pluginval.py validate /path/to/pluginval \
+  ~/Library/Audio/Plug-Ins/Components/Convolver.component
+```
+
+Both workflows use the newest full release for the formal result and run
+the newest pre-release afterwards as a warning only; on macOS the
+pre-release adds `--rtcheck relaxed`. These runs load the plug-ins without a
+filter; audio with a filter loaded is checked by the PLUG-2 harnesses and the
+VST3 acceptance test.
+
 ### Audio Unit tests
 
 Five CTest tests run when the adapter is built (label `au`):
@@ -911,8 +935,8 @@ Five CTest tests run when the adapter is built (label `au`):
 The tests register the unit inside the test process with
 `AudioComponentRegister`, so they need no installation. The
 [Audio Unit workflow](../../.github/workflows/au.yml) runs them on macOS, then
-installs the component for the runner's user and runs `auval -strict`; its
-`au-sanitizers` job runs them again with ASan and UBSan, built with the
+installs the component for the runner's user and runs `auval -strict` and
+[pluginval](#pluginval); its `au-sanitizers` job runs them again with ASan and UBSan, built with the
 fallbacks (`CONVOLVER_AU_FILE_READER=LIBSNDFILE`, `CONVOLVER_FFT_BACKEND=FFTW`)
 so that they keep working. Named
 host results (Logic, GarageBand, SoundSource, Live, REAPER, FL Studio) are
@@ -963,8 +987,8 @@ AU-4.
 
 The [LV2 workflow](../../.github/workflows/lv2.yml) runs these under ASan and
 UBSan, runs `lv2.adapter` again under ThreadSanitizer for the worker's threads,
-and runs `lv2lint` on every plug-in in the bundle, with the
-newest [packages](build.md#supporting-libraries). The three run as
+and runs `lv2lint` and [pluginval](#pluginval) on every plug-in in the
+Release bundle, with the newest [packages](build.md#supporting-libraries). The three run as
 separate jobs side by side; the sanitizer jobs build only what their tests run
 (the `convolver_lv2_tests` target, or the adapter test and the preset tool).
 lilv's `lv2apply` cannot host Convolver: it offers plug-ins no features, and
