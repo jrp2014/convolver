@@ -306,8 +306,10 @@ void run(const fs::path& dir) {
                         contains(d.message, what) && contains(d.message, "smaller lists") &&
                         d.include_chain.size() == 1 && d.include_chain[0].line == 5,
                     std::string("one located limit diagnostic: ") + what);
-            require(contains(report.selection_reason, "until a limit"),
-                    "the selection reason says the check stopped");
+            require(
+                contains(report.selection_reason, "incomplete: entries validated until a limit") &&
+                    contains(d.message, "The check is incomplete"),
+                "the selection reason and the limit error say the check is incomplete");
         }
         text_file(dir / "four.txt", "match.cfg\nmatch.cfg\nmatch.cfg\nmatch.cfg\n");
         for (const auto& limits :

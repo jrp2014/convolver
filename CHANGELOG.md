@@ -160,6 +160,16 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Inspection (ROBUST-2, jrp's answers on PR #118): when `--all-configurations`
+  stops at a limit, the `limit` error now ends "The check is incomplete: this
+  entry and every entry after it were not checked.", and the selection reason
+  starts "incomplete:". The guides add that the sample limit is cumulative
+  decoding work, not peak memory, and that the entry crossing it is checked
+  in full. The decisions log records jrp's answers on the limits, CAF and
+  AIFF speaker labels, the new GAIN-3 item (`no-clip` to reserve integer
+  headroom, in its own pull request) and the crossover journey in HOST-1's
+  REAPER session.
+
 - Repository checks (DOC-2): `scripts/check_repository.py` now fails when a
   guide, workflow or script names a CMake `-DCONVOLVER_…` option the build
   does not define (or a value it does not allow, such as an unknown FFT

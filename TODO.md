@@ -68,8 +68,8 @@ boundary and C++20 in the core.
 | Optional editor work | **PLUG-11** (FFT planning in FFTW-built plug-ins), **LV2-6** (an LV2 window, only if Linux users ask) | Not needed for any preview. |
 | On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **PERF-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
 
-The CFG-1, IO-1, IO-2 and ROBUST-1 items
-remain open supporting work; take them up when a reproducible defect or the milestone
+The CFG-1, GAIN-3, IO-1, IO-2 and ROBUST-1 items
+remain open supporting work (GAIN-3 decided by jrp on 6 November 2026); take them up when a reproducible defect or the milestone
 needs them. This table owns the current ordering; the dated
 [21 October review order](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#recommended-order)
 is superseded.
@@ -123,7 +123,13 @@ is superseded.
   ([smoke tests](docs/develop/host-testing.md#smoke-test-in-each-first-host)).
   The REAPER smoke test also takes over the host steps that REL-5 left out:
   install, render, save and reopen, and presets that do not fit, in
-  [check a stereo filter in a host](docs/use/check-a-stereo-filter.md).
+  [check a stereo filter in a host](docs/use/check-a-stereo-filter.md),
+  and, as jrp decided on 6 November 2026, the 2→6 crossover journey
+  ([check a crossover in a host](docs/use/check-a-crossover-in-a-host.md)),
+  from the same candidate package: the record names the package, platform,
+  host version, routing, the rendered comparison and the save-and-reopen
+  result (step 12 of the REAPER smoke test). REL-3 reuses that evidence
+  where it applies; any gaps it leaves are recorded separately.
   In each host, also check that the VST3 Status text follows a change
   without side effects: the controller asks the host to reread every
   parameter (`restartComponent(kParamValuesChanged)`, which the SDK meant
@@ -588,6 +594,20 @@ means a patched FFmpeg build with `--enable-gpl`.
   [publication steps](docs/develop/releasing.md#publishing-an-unsigned-preview)
   when this is implemented. The four guarantees it protects are listed in
   [status](docs/project/status.md#compatibility-guarantees).
+- [ ] **GAIN-3 — `no-clip` reserves the integer headroom.** jrp's answer on
+  PR #118 (6 November 2026): `--gain-db no-clip` lowers its gain by the
+  headroom the chosen integer format, dither and noise shaping need (the
+  bound H in [gain](docs/use/command-line.md#gain-and-attenuation), GAIN-1),
+  allowing for float rounding too, so integer output never clips on input
+  within full scale; and it prints the applied gain with enough digits to
+  reproduce it with `--gain-db`. Numeric gains, `auto` and float output stay
+  as they are. Acceptance: `native.cli` renders the worst-case input (as
+  `native.engine`'s `no_clip_endpoint` builds it) for each integer type,
+  dither and shaper and finds no clipped sample, float output unchanged,
+  and passing the printed figure back reproduces the file exactly. It
+  changes the output level, so it has a pull request of its own and a
+  CHANGELOG line saying so; until then the guide's workaround (lower the
+  reported gain by the table's value and 0.01 dB) stands.
 - [ ] **IO-1 — Large files.** Specify and test boundary sizes and pipe behavior
   for output beyond 4 GiB. Input decoder support is not a promise of strict
   validation for every container.
@@ -974,7 +994,7 @@ with compatibility tests; linked IDs point to open work above.
 | Path portability checks are partial | No drive/share remapping; a clean profile is not certification for Windows or another reader. Extend checks only with fixtures. | [Profiles](docs/use/other-programs.md#check-that-a-configuration-will-travel) |
 | Output is WAV, RF64, W64, AIFF, CAF, FLAC or headerless raw; speaker labels are WAV and RF64 only, reduced valid bits WAV only | Input codecs and FLAC output depend on the libsndfile build; the preview packages have no FLAC or Ogg, by decision ([workarounds](docs/use/command-line.md#flac-and-ogg)). Boundary-size tests remain IO-1; libsndfile cannot write labels in the other containers (IO-5). RAW has no embedded rate/channel metadata. | [Output formats](docs/use/command-line.md#output-formats) |
 | Output writes are not transactional | An I/O or numerical failure leaves a partial file, which the CLI says is incomplete; deleting it or publishing through a temporary file was not chosen ([decisions](docs/project/decisions.md#diagnostics)). Never promise rollback for pipes. | [Output safety](docs/use/command-line.md#output-safety) |
-| Gain estimation is not a limiter; float samples can exceed full scale | Integer samples clip; `no-clip` reserves no quantizer headroom, for which the guide gives a safe bound (GAIN-1). | [Gain](docs/use/command-line.md#gain-and-attenuation) |
+| Gain estimation is not a limiter; float samples can exceed full scale | Integer samples clip; `no-clip` reserves no quantizer headroom, for which the guide gives a safe bound and a workaround (GAIN-1) until GAIN-3. | [Gain](docs/use/command-line.md#gain-and-attenuation) |
 | Dither/shaping/valid bits apply to integer file output only | Float/RAW output rejects those options; the plug-ins exchange floats, so the host does any final conversion. | [Integer output](docs/use/command-line.md#integer-formats-dither-and-noise-shaping) |
 | C++ packages are static development libraries, not self-contained installers or a stable binary ABI | Rebuild with compatible toolchains; shared dependencies must be deployed. REL-1 covers end-user bundles. | [Package guide](docs/develop/library.md) |
 | Source tags and configured CI do not prove a release is qualified | Tie results to exact commits; named hosts, clean machines and signatures remain release evidence. | [Versioning](docs/develop/versioning.md), [testing](docs/develop/testing.md) |

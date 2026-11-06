@@ -136,10 +136,12 @@ and individual delays are bounded to 67108864 frames. The importer additionally
 limits each text file to 1 MiB and all text read per operation to 16 MiB, list nesting to 16, visited entries to 4096, total decoded IR
 samples to 64 Mi (a file named by several paths counts once per path, although
 it is decoded once), and each delay to 16 Mi frames. Inspection with
-`all_configurations` gives every entry that decoding budget, and stops before
-the next entry once one check has decoded 1 Gi samples (so at most 1 Gi + 64 Mi
-are decoded), or before an entry that would take it past 16,384 reported
-filter paths or 131,072 reported routes; a no-match message names at most ten entries and ten
+`all_configurations` gives every entry that decoding budget, and stops, with a
+`limit` error and a selection reason starting "incomplete", before the next
+entry once one check has decoded 1 Gi samples in all (cumulative decoding
+work, not peak memory; the entry that crosses it is checked in full, so at
+most 1 Gi + 64 Mi are decoded), or before an entry that would take it past
+16,384 reported filter paths or 131,072 reported routes; a no-match message names at most ten entries and ten
 sample rates. Invalid dimensions, arithmetic
 overflow and nonfinite inputs/IRs/gains are rejected. DSP overflow is detected by
 the CLI's output check; library callers choose their own output policy.

@@ -286,12 +286,12 @@ class Inspector {
         report_.diagnostics.push_back(
             {"limit",
              DiagnosticSeverity::error,
-             detail::advice_text({"stopped before this entry: " + problem,
-                                  cause,
+             detail::advice_text({"stopped before this entry: " + problem, cause,
                                   "Check the rest of the list in smaller lists, or inspect the "
                                   "entry a render would use with --sample-rate and the channel "
                                   "counts instead of --all-configurations.",
-                                  {}}),
+                                  "The check is incomplete: this entry and every entry after "
+                                  "it were not checked."}),
              {l.path, 0, 0},
              chain(l.chain)});
         return true;
@@ -319,10 +319,9 @@ class Inspector {
             return;
         }
         if (options_.all_configurations) {
-            report_.selection_reason = limited_
-                                           ? "entries validated until a limit stopped the check "
-                                             "(--all-configurations)"
-                                           : "every entry validated (--all-configurations)";
+            report_.selection_reason = limited_ ? "incomplete: entries validated until a limit "
+                                                  "stopped the check (--all-configurations)"
+                                                : "every entry validated (--all-configurations)";
             return;
         }
         const auto wanted = selectors(options_);
