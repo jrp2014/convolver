@@ -185,7 +185,7 @@ Until 1.0 the C++ API may change between minor versions.
   the page that describes the result. Their earlier full entries, with the
   evidence they recorded, are kept unchanged apart from link paths in
   [`docs/archive/todo/`](docs/archive/todo/2026-11-06-done-entries.md).
-  `TODO.md` is about 630 lines shorter.
+  `TODO.md` is about 500 lines shorter.
 - Development (DOC-7): `scripts/check_format.sh`, a wrapper kept only for old
   habits, is removed; run `python3 scripts/check_format.py` (or pre-commit).
 - LV2 (LV2-8): closed without a change. Jalv, Ardour, Carla and PipeWire,

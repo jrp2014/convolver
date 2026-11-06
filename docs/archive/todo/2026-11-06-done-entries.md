@@ -1,11 +1,12 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Finished TODO items: full entries to 6 November 2026
 
-**Record.** These are the entries of the [done](../../../TODO.md#done) list in
-`TODO.md` as they stood on 6 November 2026 at `82cdc90` (0.10.10), before each
-was cut to one line as the [workflow guide](../../develop/workflow.md#recording-progress-in-todo)
-asks. Only relative links were changed, so they resolve from this folder. Use
-the [current documentation](../../README.md) for how Convolver behaves now.
+> **Archived 6 November 2026** (DOC-7). These are the entries of the
+> [done](../../../TODO.md#done) list in `TODO.md` as they stood at `82cdc90`
+> (0.10.10), before each was cut to one line as the
+> [workflow guide](../../develop/workflow.md#recording-progress-in-todo) asks.
+> Only relative links were changed, so they resolve from this folder. Use the
+> [current documentation](../../README.md) for how Convolver behaves now.
 
 - [x] **AU-1 — Adapter and test.** 23 October 2026, PR #44, with the bypass
   follow-up in PR #49; [plug-in guide](../../use/plugins.md),

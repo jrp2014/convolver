@@ -1004,8 +1004,8 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md). The longer
 entries written before 7 November 2026, with their evidence, are
 [archived](docs/archive/todo/2026-11-06-done-entries.md).
 
-- [x] **AU-1 — Adapter and test.** 23 October 2026, PR #44; [Audio Unit
-  licence](docs/use/plugins.md#audio-unit-licence).
+- [x] **AU-1 — Adapter and test.** 23 October 2026, PR #44, with the bypass
+  follow-up in PR #49; [plug-in guide](docs/use/plugins.md).
 - [x] **AU-2 — Loading filters.** 23 October 2026, PR #44;
   [presets](docs/use/presets.md).
 - [x] **AU-8 — Split the adapter's source by responsibility.** 31 October 2026,
@@ -1028,11 +1028,13 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **CI-2 — Shorten CI without losing coverage.** 24 October 2026, PR #65;
   [which configurations run which
   tests](docs/develop/testing.md#which-configurations-run-which-tests).
-- [x] **CI-3 — Latest stable Clang tools.** 24 October 2026, PR #69.
+- [x] **CI-3 — Latest stable Clang tools.** 24 October 2026, PR #69;
+  [formatting and analysis](CONTRIBUTING.md#formatting-and-analysis).
 - [x] **CI-4 — Report the oracle error relative to the signal.** 24 October
   2026, PR #74; [native
   tests](docs/develop/testing.md#native-production-tests).
-- [x] **CI-5 — No actions on a deprecated Node.js.** 24 October 2026, PR #76.
+- [x] **CI-5 — No actions on a deprecated Node.js.** 24 October 2026, PR #76;
+  [lint checks](CONTRIBUTING.md#lint-checks).
 - [x] **CI-6 — Keep supporting libraries on their newest releases.** 24 October
   2026, PR #77; [supporting
   libraries](docs/develop/build.md#supporting-libraries).
@@ -1047,7 +1049,8 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **CI-10 — One Linux source build for candidates.** 27 October 2026, PR
   #86; [candidate checks](docs/develop/testing.md#plug-in-candidate-checks).
 - [x] **CI-11 — FFT backend configurations as parallel jobs.** 27 October 2026,
-  PR #86; [CI triggers](docs/develop/testing.md#ci-triggers).
+  closed without the split, PR #86; [CI
+  triggers](docs/develop/testing.md#ci-triggers).
 - [x] **CI-12 — Fuzz campaigns side by side.** 27 October 2026, PR #86; [fuzz
   smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
 - [x] **CI-13 — Run only the affected format's workflows.** 27 October 2026, PR
@@ -1060,9 +1063,11 @@ entries written before 7 November 2026, with their evidence, are
   tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
 - [x] **CI-16 — A `--jobs` limit for release builds.** 28 October 2026, PR #87;
   [preview recipe](docs/develop/build.md#preview-recipe).
-- [x] **CI-17 — Remove unused Python imports.** 29 October 2026, PR #88.
+- [x] **CI-17 — Remove unused Python imports.** 29 October 2026, PR #88;
+  [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).
 - [x] **CI-18 — Format and lint the Python with ruff.** 29 October 2026, PR
-  #88.
+  #88; [Python formatting and
+  lint](CONTRIBUTING.md#python-formatting-and-lint).
 - [x] **CI-22 — Make intermittent CI failures fixable.** 1 November 2026;
   [intermittent failures](docs/develop/testing.md#intermittent-failures).
 - [x] **CI-30 — Complete the tests' replaced allocation functions.** 5 November
@@ -1070,11 +1075,13 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **CI-31 — Keep `native.host_settings` within its time limit under
   sanitizers.** 5 November 2026, PR #111.
 - [x] **CI-29 — Use LLVM's parallel clang-tidy runner.** 5 November 2026, PR
-  #108.
+  #108; [formatting and analysis](CONTRIBUTING.md#formatting-and-analysis).
 - [x] **CI-24 — Find why `native.request_worker` timed out on Windows.** 5
-  November 2026.
+  November 2026, closed without a cause, PR #109;
+  [evidence](docs/archive/reviews/2026-11-05-request-worker.md).
 - [x] **CI-25 — Find why the watchdog check hung on the macOS arm64
-  candidate.** 5 November 2026.
+  candidate.** 5 November 2026, closed without a cause, PR #109;
+  [evidence](docs/archive/reviews/2026-11-05-request-worker.md).
 - [x] **CI-28 — Keep `vst3.adapter`'s Status and log case's log as evidence.**
   5 November 2026; [evidence from failed CI
   runs](docs/develop/testing.md#evidence-from-failed-ci-runs).
@@ -1091,9 +1098,10 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **CI-20 — Keep unpacked ZIP files inside their destination.** 1 November
   2026, PR #102; [candidates](docs/develop/releasing.md#candidates).
 - [x] **CI-21 — Pin third-party actions to a commit SHA.** 1 November 2026, PR
-  #102.
-- [x] **DIAG-1 — Review how diagnostics reach the user.** 23 October 2026, PR
-  #57; [status and log](docs/develop/plugin-contract.md#status-and-log).
+  #102; [lint checks](CONTRIBUTING.md#lint-checks).
+- [x] **DIAG-1 — Review how diagnostics reach the user.** 23 to 31 October
+  2026, PRs #57, #68, #72, #73, #96; [status and
+  log](docs/develop/plugin-contract.md#status-and-log).
 - [x] **DIAG-2 — Actionable diagnostics.** 5 November 2026, PR #110;
   [troubleshooting](docs/use/troubleshooting.md).
 - [x] **DIAG-3 — Report faults around a filter change together.** 5 November
@@ -1101,7 +1109,8 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **DIAG-4 — Keep messages in their parts inside the library.** 5 November
   2026; [failure reasons](docs/develop/plugin-contract.md#failure-reasons).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026.
-- [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28.
+- [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;
+  [first-use examples](examples/first-use/README.md).
 - [x] **DOC-3 — Resolve adapter-plan review findings.** 21 October 2026.
 - [x] **DOC-4 — Organise the documentation by reader.** 23 October 2026, PRs
   #47, #51, #52, #53; [documentation guide](docs/develop/documentation.md).
@@ -1109,11 +1118,14 @@ entries written before 7 November 2026, with their evidence, are
   [status](docs/project/status.md).
 - [x] **DOC-6 — One home for progress.** 1 November 2026, PR #105; [recording
   progress](docs/develop/workflow.md#recording-progress-in-todo).
-- [x] **DOC-7 — Archive finished entries and remove cruft.** 6 November
-  2026, on jrp's request; [recording progress](docs/develop/workflow.md#recording-progress-in-todo).
+- [x] **DOC-7 — Archive finished entries and remove cruft.** 6 November 2026,
+  PR #123, on jrp's request; [recording
+  progress](docs/develop/workflow.md#recording-progress-in-todo).
 - [x] **FFMPEG-1 — Test the pipe workflow.** 5 November 2026;
   [tests](docs/develop/testing.md#native-production-tests).
-- [x] **FFT-1 — Check that we have the latest Ooura version.** 21 October 2026.
+- [x] **FFT-1 — Check that we have the latest Ooura version.** 21 October 2026;
+  [upstream
+  comparison](portable/third_party/ooura/README.md#upstream-comparison-21-october-2026).
 - [x] **FFT-3 — Accelerate by default on macOS.** 30 October 2026, PR #89;
   [which libraries each build
   uses](docs/develop/build.md#which-libraries-each-build-uses).
@@ -1137,8 +1149,8 @@ entries written before 7 November 2026, with their evidence, are
   tests](docs/develop/testing.md#lv2-tests).
 - [x] **LV2-2 — Loading filters.** 23 October 2026, PR #48; [LV2
   tests](docs/develop/testing.md#lv2-tests).
-- [x] **LV2-8 — Status after a request the host drops.** 6 November 2026, PR
-  #122; [worker
+- [x] **LV2-8 — Status after a request the host drops.** 6 November 2026,
+  closed without a change, PR #122; [worker
   lifecycle](docs/project/plans/2026-10-21-plugin-formats.md#lv2-adapter-design).
 - [x] **PERF-4 — Compiler flags and CPU-specific kernels.** 24 October 2026, PR
   #61; [compiler flags and AVX2
@@ -1200,8 +1212,9 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **PLUG-16 — Name the transition lengths.** 5 November 2026, PR #108;
   [contract](docs/develop/plugin-contract.md).
 - [x] **REL-2 — Define the first release by user journeys.** 6 November 2026,
-  PR #118; [check file rendering with the command
-  line](docs/use/check-files-with-the-command-line.md).
+  PR #118; [check a stereo filter](docs/use/check-a-stereo-filter.md), [a
+  crossover](docs/use/check-a-crossover-in-a-host.md), [file
+  rendering](docs/use/check-files-with-the-command-line.md).
 - [x] **REL-6 — Responsiveness qualification before a release.** 5 November
   2026; [procedure](docs/develop/releasing.md#responsiveness-qualification).
 - [x] **REL-5 — Early limited walkthrough on macOS.** 1 November 2026, PR #101;
