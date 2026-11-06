@@ -1134,11 +1134,6 @@ std::string status_text(Unit& unit) {
     return text;
 }
 
-// jrp's review of 0.5.5, reproduced through the Audio Unit API: with no
-// filter at Gain -20 dB an input of 0.5 played as 0.05 while Status said
-// "audio passes unchanged", and after a refused first load at Mix 50% it
-// played as 0.25 while Status said "Silent". Status and the start line now
-// say what is heard.
 // PLUG-23: a host may give more inputs than the filter has (REAPER gives
 // VST3 plug-ins equal counts on a six-channel track). The 2-in, 6-out filter
 // on 6 inputs reads inputs 1-2: its output matches a 2-in unit's exactly,
@@ -1226,6 +1221,11 @@ void wider_inputs() {
     }
 }
 
+// jrp's review of 0.5.5, reproduced through the Audio Unit API: with no
+// filter at Gain -20 dB an input of 0.5 played as 0.05 while Status said
+// "audio passes unchanged", and after a refused first load at Mix 50% it
+// played as 0.25 while Status said "Silent". Status and the start line now
+// say what is heard.
 void settings_in_diagnostics() {
     const auto contains = [](const std::string& text, const char* part) {
         return text.find(part) != std::string::npos;

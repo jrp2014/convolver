@@ -21,6 +21,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -899,6 +900,45 @@ void wider_inputs() {
     settle(1, "the crossover to a 6x6 filter");
     bypassed.publish(bypassed.prepare(x));
     settle(0, "a 6x6 filter to the crossover");
+    // The same replacements playing (not bypassed) at Mix 0% and 50%: each
+    // filter applies Mix by its own rule (the crossover is fully wet, the 6x6
+    // filter mixes in the dry signal), and the output crossfades between the
+    // two without a gap or dip. Constant input 1: the 6x6 filter plays
+    // 0.5 wet, so m * 0.5 + (1 - m); the crossover 1.5 on output 1 and 0.25
+    // on output 6.
+    for (const float m : {0.f, .5f}) {
+        const auto label = "Mix " + std::to_string(static_cast<int>(m * 100)) + "%, ";
+        HostProcessor playing(equal, 32, HostSettings{0, m, 64}, 6);
+        for (int k = 0; k < 8; ++k)
+            play(playing, a, 6);
+        const float mixed = m * .5f + (1 - m);
+        for (std::size_t o = 0; o < 6; ++o) {
+            require(std::abs(a[o][31] - mixed) < 1e-6f,
+                    label + "the 6x6 filter plays " + std::to_string(a[o][31]));
+            last[o] = a[o][31];
+        }
+        const std::vector<float> crossover{1.5f, 0, 0, 0, 0, .25f}, filtered(6, mixed);
+        for (const auto& [next, want, what] :
+             {std::tuple{&x, &crossover, "the 6x6 filter to the crossover"},
+              std::tuple{&equal, &filtered, "the crossover to the 6x6 filter"}}) {
+            playing.publish(playing.prepare(*next));
+            float step = 0;
+            for (int k = 0; k < 16; ++k) {
+                play(playing, a, 6);
+                for (std::size_t o = 0; o < 6; ++o)
+                    for (std::size_t i = 0; i < 32; ++i) {
+                        step = std::max(step, std::abs(a[o][i] - last[o]));
+                        last[o] = a[o][i];
+                    }
+            }
+            require(step <= 1.f / 200, label + what + ": the output jumped by " +
+                                           std::to_string(step) + " in one frame");
+            for (std::size_t o = 0; o < 6; ++o)
+                require(std::abs(a[o][31] - (*want)[o]) < 1e-6f,
+                        label + what + ": output " + std::to_string(o + 1) + " ends at " +
+                            std::to_string(a[o][31]));
+        }
+    }
     // Bypass off and on again under the crossover: still silent.
     bypassed.set_bypass(false);
     play(bypassed, a, 6);

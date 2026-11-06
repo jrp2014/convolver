@@ -184,12 +184,12 @@ Until 1.0 the C++ API may change between minor versions.
   it has, reading the first inputs and ignoring the rest; its outputs must
   still match exactly. REAPER gives the VST3 plug-in six inputs on a
   six-channel track, so the 2→6 crossover was refused there (HOST-1). Status
-  ends "plug-in inputs 3-6 ignored.", and the log and the window's Channels
-  line say which inputs the filter reads. Whether there is a dry signal now
+  ends "plug-in inputs 3-6 ignored.", and the log and the window's report
+  say which inputs the filter reads. Whether there is a dry signal now
   follows the filter's own counts, so a crossover still bypasses to silence
-  and stays fully filtered at any Mix, whatever the host's counts. When a
-  replacement changes whether there is a dry signal, the dry signal fades
-  with the filter that has it rather than stopping or starting at once.
+  and stays fully filtered at any Mix, whatever the host's counts. Each filter
+  applies Mix by its own rule, so a replacement that changes whether there
+  is a dry signal crossfades without a gap or a jump, playing or bypassed.
   The same in VST3, the Audio Unit and LV2 (an LV2 layout with more inputs
   than the filter now plays it too). The audio of a filter on exactly its
   own counts is unchanged.

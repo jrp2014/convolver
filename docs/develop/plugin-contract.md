@@ -407,10 +407,12 @@ on during bypass, so switching back does not lose history.
 Which counts decide is what plays: the filter's own, when a filter plays,
 otherwise the host's (`dry_signal()` in `host.hpp`). A 2→6 crossover on a
 6-in, 6-out bus has no dry signal; a 2→2 filter on a 6-in, 2-out bus has
-one. When a replacement changes whether there is a dry signal, the dry
-signal fades with the filter that has it (the replacement's warm-up and
-crossfade), so bypass and Mix never jump; a filter that gains a dry signal
-starts from an empty delay line.
+one. Each filter applies Mix by its own rule (a filter with no dry signal is
+fully wet), so when a replacement changes whether there is a dry signal,
+each filter's output, dry share included, crossfades with that filter (the
+replacement's warm-up, then the crossfade), and neither bypass nor Mix
+jumps. A filter that gains a dry signal is heard only after its warm-up of
+one block, by which time the delay line holds only fresh input.
 
 Bypass here is the plug-in's own bypass parameter. A host that removes the
 effect from its signal path (off, offline, or its own pass-through) routes
@@ -468,7 +470,7 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
 - **Mix** is the filtered share, 0 to 1, of the output before bypass; the
   rest is the latency-aligned dry signal that bypass uses. When the filter's
   input and output counts differ there is no dry signal ([bypass](#bypass)),
-  so the mix is always 1, and the window report's `mix_note` says why. Like bypass, a mix below 1 still passes its dry share while a
+  so the mix is always 1, and the window report's `mix_note` field says why (the window does not show it yet). Like bypass, a mix below 1 still passes its dry share while a
   failed first load plays silence (equal counts only).
 - **Latency** is the block size `HostProcessor` is built with, the engine's
   uniform partition (the CLI's `--block-size`): one of `host_latencies`, 64 to

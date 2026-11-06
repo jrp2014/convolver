@@ -875,8 +875,10 @@ struct HostProcessor::Impl {
         mix_setting = static_cast<float>(clamp_mix(settings.mix));
         mix = mix_target = target_mix();
     }
+    // Mix ramps as set; each filter applies it only if it has a dry signal
+    // (process()), so a replacement that changes that never jumps.
     float target_mix() const noexcept {
-        return current->dry ? mix_setting : 1.f;
+        return mix_setting;
     }
     // Audio thread, at the start of a call: a new gain or mix starts a ramp.
     void retarget() noexcept {
@@ -996,15 +998,12 @@ struct HostProcessor::Impl {
                     // directly, so output follows the filter from the first frame.
                     retire(current);
                 }
-                // PLUG-23: a filter whose counts differ from the previous
-                // one's may change whether there is a dry signal. One that
-                // ends fades out with the previous filter (below); one that
-                // starts after none begins from an empty delay line, never
-                // from input delayed long ago, and fades in with the new one.
-                if (!current->dry && next->dry)
-                    std::fill(dry.begin(), dry.end(), 0.f);
-                if (!started && !next->dry) // Nothing heard: no fade.
-                    std::fill(dry.begin(), dry.end(), 0.f);
+                // PLUG-23: the new filter may have a dry signal when the old
+                // one had none, or the reverse; each one's dry share fades
+                // with it (below). The delay line needs no clearing: a new
+                // filter is heard only after its warm-up, which is one
+                // block, the line's whole length, and the line is written
+                // throughout it.
                 current = next;
                 // A filter published before mute() is as silenced as the
                 // one it replaces (jrp's contract: silent until the next
@@ -1069,14 +1068,19 @@ struct HostProcessor::Impl {
                 --level_frames;
             if (previous_muted && previous_level_frames)
                 --previous_level_frames;
-            // PLUG-23: the dry signal's share. While a filter with a dry
-            // signal replaces one without, or the reverse, the dry signal
-            // fades with the filter that has it, so neither bypass nor Mix
-            // jumps; once no filter with one plays, it is silent.
+            // PLUG-23: each filter mixes with its own dry rule: Mix applies
+            // only to a filter with a dry signal (otherwise it is fully
+            // wet), and bypass passes the dry signal only as far as such a
+            // filter plays. While a filter with a dry signal replaces one
+            // without, or the reverse, both fade with the crossfade, so
+            // neither bypass nor Mix jumps.
             const bool dry_now = current->dry, dry_before = previous && previous->dry;
-            const float dry_share = dry_now == dry_before || !previous ? (dry_now ? 1.f : 0.f)
-                                    : dry_now                          ? blend
-                                                                       : 1.f - blend;
+            const float mix_now = dry_now ? mix : 1.f;
+            const float mix_before = dry_before ? mix : 1.f;
+            const bool same_rule = !previous || dry_now == dry_before;
+            const float dry_share = same_rule ? (dry_now ? 1.f : 0.f)
+                                    : dry_now ? blend
+                                              : 1.f - blend;
             const float dry_mix = share(dry_frames), level = share(level_frames),
                         previous_level = share(previous_level_frames);
             for (std::size_t c = 0; c < outputs; ++c) {
@@ -1089,17 +1093,23 @@ struct HostProcessor::Impl {
                 // signal); with a dry signal, outputs <= inputs.
                 auto index = t * outputs + c;
                 auto& delayed = dry[dry_position * outputs + c];
-                float dry_value = dry_share * delayed;
+                const float dry_value = delayed;
                 delayed = dry_now || dry_before ? input[t * inputs + c] : 0.f;
                 double value = level * static_cast<double>(wet[index]);
-                if (previous)
-                    value = (1.0 - blend) * previous_level * old_wet[index] + blend * value;
-                // Gain 1 and mix 1 (the defaults) leave every value exactly
-                // as it was before the settings existed.
-                value *= gain;
-                if (mix != 1)
-                    value = mix * value + (1.0 - mix) * dry_value;
-                value = (1.0 - dry_mix) * value + dry_mix * dry_value;
+                if (same_rule) {
+                    if (previous)
+                        value = (1.0 - blend) * previous_level * old_wet[index] + blend * value;
+                    // Gain 1 and mix 1 (the defaults) leave every value
+                    // exactly as it was before the settings existed.
+                    value *= gain;
+                    if (mix_now != 1)
+                        value = mix_now * value + (1.0 - mix_now) * dry_value;
+                } else {
+                    const double before = gain * previous_level * old_wet[index];
+                    value = blend * (mix_now * gain * value + (1.0 - mix_now) * dry_value) +
+                            (1.0 - blend) * (mix_before * before + (1.0 - mix_before) * dry_value);
+                }
+                value = (1.0 - dry_mix) * value + dry_mix * dry_share * dry_value;
                 if (!std::isfinite(value) || std::abs(value) > std::numeric_limits<float>::max()) {
                     value = 0;
                     invalid_output = true;

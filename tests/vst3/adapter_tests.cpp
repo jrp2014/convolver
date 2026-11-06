@@ -340,6 +340,27 @@ void multichannel() {
             "2x6 state reopened on 6x6 buses");
     p.setProcessing(true);
     wide_routing("2x6 state reopened on 6x6 buses");
+    // The filter's counts differ, so there is no dry signal although the
+    // buses' counts are equal: Mix 0% still plays the filtered sound, and
+    // bypass is silent.
+    int32 at = 0;
+    ParameterChanges dry_mix, bypassed, restored;
+    dry_mix.addParameterData(mix_id, at)->addPoint(0, 0, at);
+    d.inputParameterChanges = &dry_mix;
+    wide_routing("Mix 0% with a 2x6 preset on 6x6 buses");
+    bypassed.addParameterData(bypass_id, at = 0)->addPoint(0, 1, at);
+    d.inputParameterChanges = &bypassed;
+    for (int c = 0; c < 6; ++c)
+        outs[c].fill(1);
+    require(p.process(d) == kResultOk, "bypassed 6x6 process");
+    for (int c = 0; c < 6; ++c)
+        for (int i = 64; i < 300; ++i)
+            require(outs[c][i] == 0, "bypass with a 2x6 preset on 6x6 buses is not silent");
+    restored.addParameterData(mix_id, at = 0)->addPoint(0, 1, at);
+    restored.addParameterData(bypass_id, at = 0)->addPoint(0, 0, at);
+    d.inputParameterChanges = &restored;
+    require(p.process(d) == kResultOk, "Mix 100% and bypass off again");
+    d.inputParameterChanges = nullptr;
     p.setProcessing(false);
     p.setActive(false);
     require(p.setBusArrangements(&octo, 1, &octo, 1) == kResultOk, "8x8 after 6x6");
