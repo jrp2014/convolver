@@ -276,13 +276,12 @@ behaviour ([other programs](../use/other-programs.md)).
    substantial refactor (jrp's
    [guidance](../review-2026-10/release-readiness-guidance-2026-10-22.md),
    22 October 2026).
-
 5. Be better than the most popular reverb plug-ins where it can be measured
-   and checked: exact audio, failing safely, explaining itself, running
-   everywhere, and then the ranked edges of the
+   and checked: tested and published accuracy, failing safely, explaining
+   itself and free source on every platform, and then the ranked edges of the
    [edges plan](plans/2026-11-06-edges-over-other-convolvers.md) (sample
-   rates, latency, showing a filter's response, reverb layouts), after the
-   first independent walkthrough.
+   rates, latency, showing a filter's response, reverb layouts), with its
+   open questions for jrp.
 
 The plug-in direction is the [plug-in formats plan](plans/2026-10-21-plugin-formats.md):
 VST3, LV2 and AU in parallel, CLAP on request. The dependency choices behind

@@ -71,7 +71,7 @@ boundary and C++20 in the core.
 | After the milestone: edges over other convolvers | **EDGE-1** to **EDGE-8** and **PERF-2**, in the ranked order of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) | jrp's goal (6 November 2026): be better than the most popular reverb plug-ins. Waits for REL-3 unless jrp lifts the freeze; each item starts with the owner's decision its plan row names, and keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#non-negotiables). PERF-2 still waits for PERF-3's budgets. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. |
 | Optional editor work | **PLUG-11** (FFT planning in FFTW-built plug-ins), **LV2-6** (an LV2 window, only if Linux users ask) | Not needed for any preview. |
-| On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **PERF-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
+| On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
 
 The CFG-1, IO-1, IO-2 and ROBUST-1 items
 remain open supporting work; take them up when a reproducible defect or the milestone
@@ -734,8 +734,10 @@ so the preset file path is not needed).
   Shared forward transforms are already implemented. A user need is now
   stated: a zero or low-latency mode is rank 2 of the
   [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build)
-  (Reverberate offers zero latency, Space Designer 128 samples; Convolver
-  goes down to 64 frames). PERF-3's budgets still set the partition sizes.
+  (Reverberate 2 offers zero latency, Space Designer 128 samples; Convolver
+  goes down to 64 frames). True zero latency also needs a direct
+  (time-domain) head before the first partition. PERF-3's budgets still set
+  the partition sizes.
 - [ ] **PERF-3 — Resource budgets and supported workloads.** Measure, on
   named machines, the distribution of callback durations (median, 99th
   percentile, 99.9th percentile and maximum, not only the average), memory in
@@ -984,10 +986,12 @@ on optional features; the low-latency edge is PERF-2.
 - [ ] **EDGE-4 — Compare two filters, level-matched.** Hold two filters and
   switch between them with the existing replacement crossfade, at matched
   loudness, so a room correction can be judged by ear. Needs jrp's decision on
-  the saved state and the loudness measure. Effort M.
+  the saved state (two filters double its size against the 64 MiB limit) and
+  the loudness measure. Effort M.
 - [ ] **EDGE-5 — Publish the accuracy and performance evidence.** A
   `docs/use/` page that states the measured accuracy and latency in plain
-  words, with a null test users can run with `--compare`; and, with PERF-1's
+  words, with a null test users can run with `--compare` against a shipped
+  reference render computed in double precision; and, with PERF-1's
   benchmarks, CPU use beside the open convolvers (CamillaDSP, BruteFIR,
   mcfx) on the same named machines. jrp approves the claims the guides make.
   Effort S for the page, M for the comparison.
@@ -1001,9 +1005,10 @@ on optional features; the low-latency edge is PERF-2.
   EDGE-6 is in use and reverb users ask; jrp decides whether to do it.
   Effort L.
 - [ ] **EDGE-8 — Immersive layouts beyond 8 channels.** 7.1.4, 9.1.6 and up
-  to 16 × 16 in the plug-ins, as the command line already allows. Replaces
-  the 23 October 2026 decision to stop at 8 channels only if jrp decides so;
-  new layouts and identities in every format. Effort M to L.
+  to 16 × 16 in the plug-ins, as the command line already allows. Changes
+  the recorded [channel layouts](docs/develop/plugin-identities.md#channel-layouts)
+  (VST3 buses up to 8 channels, LV2's eight fixed layouts) only if jrp
+  decides so; new layouts and identities in every format. Effort M to L.
 
 ## Developer tooling
 
