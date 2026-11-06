@@ -47,7 +47,7 @@ def wav_audio(path):
     written) are incidental metadata, not part of the audio.
     """
     data = Path(path).read_bytes()
-    assert data[:4] in (b'RIFF', b'RF64') and data[8:12] == b'WAVE', path
+    assert data[:4] == b'RIFF' and data[8:12] == b'WAVE', path  # RF64 sizes are in ds64; not read here.
     pos, fmt, payload = 12, None, None
     while pos + 8 <= len(data):
         tag, size = struct.unpack_from('<4sI', data, pos)
@@ -62,6 +62,7 @@ def wav_audio(path):
             payload = data[pos + 8 : pos + 8 + size]
         pos += 8 + size + (size & 1)
     assert fmt is not None and payload is not None, path
+    assert (fmt['format'], fmt['bits']) in {(1, 8), (1, 16), (1, 24), (1, 32), (3, 32)}, (path, fmt)
     width = fmt['bits'] // 8
     fmt['frames'] = len(payload) // align
     if fmt['format'] == 3:
@@ -72,18 +73,22 @@ def wav_audio(path):
         samples = tuple(
             int.from_bytes(payload[i : i + width], 'little', signed=True) for i in range(0, len(payload), width)
         )
-    return fmt, samples
+    return fmt, samples, payload
 
 
 def same_audio(a, b, label):
     """Two WAV files hold the same audio: format, rate, channels and frame count
-    checked one by one, then every decoded sample exactly."""
-    fa, sa = wav_audio(a)
-    fb, sb = wav_audio(b)
+    checked one by one, then every sample exactly (as stored, so -0.0 is not
+    0.0); the decoded values only describe a difference."""
+    fa, sa, ra = wav_audio(a)
+    fb, sb, rb = wav_audio(b)
     for key in fa:
         assert fa[key] == fb[key], (label, f'{key} differs', fa[key], fb[key])
-    if sa != sb:
-        first = next(i for i, (x, y) in enumerate(zip(sa, sb)) if x != y)
+    if ra != rb:
+        width = fa['bits'] // 8
+        first = next(
+            i for i in range(len(ra) // width) if ra[i * width : (i + 1) * width] != rb[i * width : (i + 1) * width]
+        )
         worst = max(abs(x - y) for x, y in zip(sa, sb))
         where = f'frame {first // fa["channels"]} channel {first % fa["channels"]}'
         detail = f'first difference at {where}: {sa[first]} != {sb[first]}; largest difference {worst}'

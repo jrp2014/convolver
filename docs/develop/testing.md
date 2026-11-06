@@ -1372,8 +1372,8 @@ A test that fails on one run and passes on the next has a cause, usually a
 race or a time limit that a busy runner exceeds; find and fix it rather than
 re-running until green. CI does not repeat failed tests automatically, as
 that would hide real races like the Audio Unit's lost stop. Causes found so
-far (CI-22, 1 November 2026, from the 1,000 most recent workflow runs, 25
-October to 1 November, with their re-run attempts):
+far, starting with CI-22's survey (1 November 2026, the 1,000 most recent
+workflow runs, 25 October to 1 November, with their re-run attempts):
 
 - Windows builds, "The process cannot access the file because it is being
   used by another process", exit 32, in the app-local DLL step
@@ -1411,6 +1411,12 @@ October to 1 November, with their re-run attempts):
 - The Audio Unit's former Latency worker (`native.request_worker`, CI-24,
   and its watchdog check, CI-25) was removed by AU-12; its tests and the
   evidence from its failures are [archived](../archive/reviews/2026-11-05-request-worker.md).
+
+To check that two renders hold the same audio, compare the decoded samples
+exactly and check the format, sample rate, channel count and frame count one
+by one (`same_audio` in `tests/native/cli_tests.py`), and on failure report
+the first differing sample and the largest difference. Compare file bytes,
+or any other metadata, only where a requirement says what it must contain.
 
 The package consumer tests each build with `--parallel 2`, so CTest counts
 two CPUs for each (`PROCESSORS 2`) and runs fewer other tests beside them.
