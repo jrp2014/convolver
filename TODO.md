@@ -67,7 +67,7 @@ boundary and C++20 in the core.
 | Optional editor work | **PLUG-11** (FFT planning in FFTW-built plug-ins), **LV2-6** (an LV2 window, only if Linux users ask) | Not needed for any preview. |
 | On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **PERF-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
 
-DOC-2 automation and the CFG-1, IO-1, IO-2, IO-5 and ROBUST-1 items
+The CFG-1, IO-1, IO-2, IO-5 and ROBUST-1 items
 remain open supporting work; take them up when a reproducible defect or the milestone
 needs them. This table owns the current ordering; the dated
 [21 October review order](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#recommended-order)
@@ -75,11 +75,6 @@ is superseded.
 
 ## User experience and distribution
 
-- [ ] **DOC-2 — Maintain documentation automatically.** Extend checks to build
-  options and executable CLI examples in CI. Local Markdown links/anchors and
-  checker regression tests now run through pre-commit; the separate
-  `documentation` CTest protects the historical website. See the
-  [check scope](docs/develop/documentation.md#automated-checks).
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The candidate workflow
   builds unsigned packages with pinned dependencies, corresponding source,
   staging, installers, artifact verification and promotion gates
@@ -1408,6 +1403,15 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   `native.load_timing_harness` checks the range (-0.1 to 0.1) and that both
   signs occur; it failed with the old generator. The loading timings were
   measured again with it ([loading responsiveness](#loading-responsiveness)).
+- [x] **DOC-2 — Maintain documentation automatically.** 6 November 2026, PR #118:
+  `check_repository.py` (pre-commit and lint CI) checks every CMake `-D`
+  option in the guides, workflows and scripts against the build, with its
+  allowed values, and that the build guide describes every option; and
+  every option shown with a Convolver tool against the options its source
+  parses, and that each tool's guide names them all. The packaged guide's
+  marked examples already ran in the candidates workflow (PR #101). Links
+  and anchors were already checked;
+  [automated checks](docs/develop/documentation.md#automated-checks).
 - [x] **GAIN-1 — Define no-clip headroom precisely.** 6 November 2026, PR #118: with
   the no-clip gain, the input reaching the bound stays within full scale up
   to float rounding (largest sample 0.99999994, `native.engine`); integer

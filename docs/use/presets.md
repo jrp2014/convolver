@@ -53,6 +53,8 @@ convolver-preset --name "Living room" impulse.wav living.aupreset
 - **Name:** `--name` sets the name hosts show for AU and LV2 presets. Without it,
   the file name of the first AU or LV2 output is used (`room.preset.lv2` gives `room`). A
   `.vstpreset` stores no name; hosts show its file name.
+- **Help:** `convolver-preset --help` lists these options and the preset
+  formats.
 - **New files only:** every output must be a new path. If any output cannot be
   written (it exists, its format is unknown, or the filter does not fit that
   format), the tool writes nothing and explains why. Remove or rename the old

@@ -52,7 +52,8 @@ convolver-equalizer-apo room.cfg room
 ```
 
 The second argument must be a new folder; the tool never writes into an
-existing one. If anything fails, it removes the folder again and says so. It
+existing one. `convolver-equalizer-apo --help` shows how to use it, and
+`--version` prints its version. If anything fails, it removes the folder again and says so. It
 checks the input the way [`convolver --validate`](command-line.md#inspecting-and-validating-configurations) does and
 lists every problem with its file and line.
 

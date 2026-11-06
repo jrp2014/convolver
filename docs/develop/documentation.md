@@ -212,7 +212,15 @@ fences and inline code are ignored. It is a deliberately small, offline check,
 not a complete Markdown renderer: it does not validate external URLs, detect
 undefined reference labels, or verify commands and source claims. Review those
 separately; extend the checker with a regression test if maintained guides need
-additional Markdown syntax. DOC-2 in [TODO](../../TODO.md) tracks remaining automation.
+additional Markdown syntax.
+
+Commands are checked in two ways (DOC-2). The
+[repository checks](workflow.md#automated-checks) compare every CMake `-D`
+option and every Convolver tool option the pages show with the build and the
+tools' sources, so a renamed or removed option fails in pre-commit. The
+examples marked `<!-- executable-example -->` (above) run from the staged
+package in the candidates workflow, on every pull request. Other examples
+name files a reader has, so they are not run.
 
 The [repository checks](workflow.md#automated-checks) add the structural rules:
 every maintained page is listed in the [index](../README.md) and sits in a

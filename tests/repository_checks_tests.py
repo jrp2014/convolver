@@ -163,6 +163,99 @@ class RepositoryChecks(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_build_options(self):
+        # DOC-2: -D options in guides and CI must exist, with allowed values,
+        # and the build guide must describe every option.
+        spdx_cmake = '# SPDX-License-Identifier: GPL-2.0-or-later\n'
+        tree = {
+            'CMakeLists.txt': spdx_cmake
+            + 'option(CONVOLVER_BUILD_X "X" OFF)\n'
+            + 'set(CONVOLVER_FFT_BACKEND "AUTO" CACHE STRING "FFT")\n'
+            + 'set_property(CACHE CONVOLVER_FFT_BACKEND PROPERTY STRINGS AUTO FFTW)\n',
+            'tests/consumer/CMakeLists.txt': spdx_cmake + 'set(CONVOLVER_FORCED ON CACHE BOOL "" FORCE)\n',
+            'docs/develop/build.md': SPDX_MD + '# Build\n`CONVOLVER_BUILD_X` and `CONVOLVER_FFT_BACKEND`.\n',
+            'docs/README.md': BASE['docs/README.md'] + '[Build](develop/build.md)\n',
+            'docs/use/guide.md': SPDX_MD
+            + '# Guide\n`cmake -DCONVOLVER_FFT_BACKEND=FFTW -DCONVOLVER_BUILD_X=ON`\n'
+            + '`-DCONVOLVER_FFT_BACKEND=fftw` works too: CMake upper-cases it.\n',
+        }
+        result = self.run_check(tree)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertBroken(
+            self.run_check(
+                {**tree, '.github/workflows/ci.yml': '# SPDX-License-Identifier: x\n-DCONVOLVER_BUILD_Y=ON\n'}
+            ),
+            '.github/workflows/ci.yml:2: -DCONVOLVER_BUILD_Y is not a CMake option',
+        )
+        self.assertBroken(
+            self.run_check({**tree, 'docs/use/guide.md': SPDX_MD + '`-DCONVOLVER_FFT_BACKEND=FFTW3`\n'}),
+            'docs/use/guide.md:2: CONVOLVER_FFT_BACKEND=FFTW3 is not one of AUTO, FFTW',
+        )
+        self.assertBroken(
+            self.run_check({**tree, 'docs/use/guide.md': SPDX_MD + '`-DCONVOLVER_FFT_BACKEND=FFTW-x`\n'}),
+            'CONVOLVER_FFT_BACKEND=FFTW-x is not one of',
+        )
+        # Options a test project forces are not the build's options.
+        self.assertBroken(
+            self.run_check({**tree, 'docs/use/guide.md': SPDX_MD + '`-DCONVOLVER_FORCED=ON`\n'}),
+            '-DCONVOLVER_FORCED is not a CMake option',
+        )
+        self.assertBroken(
+            self.run_check({**tree, 'docs/develop/build.md': SPDX_MD + '# Build\n`CONVOLVER_BUILD_X`\n'}),
+            'docs/develop/build.md: does not describe the CMake option CONVOLVER_FFT_BACKEND',
+        )
+        # Dated records and open plans may name options that do not exist (yet).
+        result = self.run_check(
+            {
+                **tree,
+                'CHANGELOG.md': SPDX_MD + 'Removed `-DCONVOLVER_OLD`.\n',
+                'docs/project/plans/2026-10-21-formats.md': SPDX_MD + 'Serves PLUG-2 with `-DCONVOLVER_NEW`.\n',
+            }
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_cli_options(self):
+        # DOC-2: options shown with a Convolver tool must be ones it parses
+        # (comments do not count), and its guide must describe each of them.
+        tree = {
+            'portable/main.cpp': SPDX_CPP + 'if (o == "--gain-db" || o == "--help") {}\n// "--old"\n',
+            'docs/use/command-line.md': SPDX_MD
+            + '# CLI\n```sh\nconvolver --gain-db -3 --help\nflac --best a.wav\n```\n'
+            + 'Use `--gain-db`, or `./bin/convolver --help`.\n',
+            'docs/README.md': BASE['docs/README.md'] + '[CLI](use/command-line.md)\n',
+        }
+        result = self.run_check(tree)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertBroken(
+            self.run_check({**tree, 'docs/use/guide.md': SPDX_MD + '```sh\nconvolver --old x\n```\n'}),
+            'docs/use/guide.md:3: `convolver --old x`: --old is not an option of convolver',
+        )
+        self.assertBroken(
+            self.run_check({**tree, 'docs/use/guide.md': SPDX_MD + 'Add `--gain-dB 3`.\n'}),
+            '--gain-dB is not an option of any Convolver tool',
+        )
+        # Any path to the tool, each command of a pipeline, and continued lines.
+        for command, line in (
+            ('./build/convolver --old x', 3),
+            ('.\\bin\\convolver.exe --old x', 3),
+            ('ffmpeg -i a.flac - | convolver --old x', 3),
+            ('convolver --help && convolver --old x', 3),
+            ('convolver --gain-db -3 \\\n  --old x', 3),
+        ):
+            self.assertBroken(
+                self.run_check({**tree, 'docs/use/guide.md': SPDX_MD + f'```sh\n{command}\n```\n'}),
+                f'docs/use/guide.md:{line}: ',
+            )
+        # Another program's options after a pipe are not Convolver's.
+        result = self.run_check(
+            {**tree, 'docs/use/guide.md': SPDX_MD + '```sh\nconvolver --help | flac --best -\n```\n'}
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertBroken(
+            self.run_check({**tree, 'docs/use/command-line.md': SPDX_MD + '# CLI\n`--help`\n'}),
+            'docs/use/command-line.md: does not describe convolver --gain-db',
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

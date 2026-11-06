@@ -268,7 +268,22 @@ is used but never defined.
   line;
 - only known folders and files sit at the top level of the repository, and
   every adapter under `plugins/` has tests under `tests/` and is named in
-  [how the plug-ins behave](../use/plugins.md).
+  [how the plug-ins behave](../use/plugins.md);
+- every `-DCONVOLVER_…` option in the maintained documentation (not the
+  changelog or open plans), the workflows and `scripts/` is a CMake option
+  of this build, with one of its allowed values where it lists them (in any
+  case, as CMake upper-cases them), and
+  [building](build.md) describes every option (DOC-2);
+- every option shown with `convolver`, `convolver-preset` or
+  `convolver-equalizer-apo` in a code block or span of the maintained
+  documentation (not the changelog or open plans), run by any path
+  (`./bin/convolver`, `./build/convolver`) and as any command of a pipeline
+  or `&&` list, with lines ending in `\` joined, and every option on its
+  own in a span in `docs/use/`, is
+  one that tool parses (a `"--name"` literal in its source), and each tool's
+  guide names every option it parses: the
+  [command line](../use/command-line.md), [presets](../use/presets.md) and
+  [Equalizer APO](../use/equalizer-apo.md) (DOC-2).
 
 `scripts/trademarks.py` also runs in pre-commit and lint CI (PLUG-5): the
 README and every user guide that mentions VST must write its first mention

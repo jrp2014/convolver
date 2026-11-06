@@ -65,6 +65,27 @@ TOP_LEVEL = {
 SPDX_SUFFIXES = {'.c', '.cpp', '.h', '.hpp', '.mm', '.py', '.sh', '.ps1', '.cmake', '.yml', '.yaml'}
 SPDX_EXEMPT = ('portable/third_party/', 'tests/fuzz/seeds/', 'tests/fuzz/regressions/', 'docs/benchmarks/')
 
+# DOC-2: where each Convolver tool's options are parsed, and the page that
+# documents them. Options are the "--name" string literals outside comments.
+TOOL_SOURCES = {
+    'convolver': ('portable/main.cpp', 'portable/inspection_cli.cpp', 'portable/compare_cli.cpp'),
+    'convolver-preset': ('portable/preset_main.cpp',),
+    'convolver-equalizer-apo': ('portable/equalizer_apo_main.cpp',),
+}
+TOOL_GUIDES = {
+    'convolver': 'docs/use/command-line.md',
+    'convolver-preset': 'docs/use/presets.md',
+    'convolver-equalizer-apo': 'docs/use/equalizer-apo.md',
+}
+# The page that documents every CMake cache option.
+BUILD_GUIDE = 'docs/develop/build.md'
+CMAKE_OPTION = re.compile(r'\b(?:cmake_dependent_option|option)\(\s*(CONVOLVER_[A-Z0-9_]+)')
+CMAKE_CACHE = re.compile(r'\bset\(\s*(CONVOLVER_[A-Z0-9_]+)\s[^)]*\bCACHE\b([^)]*)\)')
+CMAKE_STRINGS = re.compile(r'set_property\(\s*CACHE\s+(CONVOLVER_[A-Z0-9_]+)\s+PROPERTY\s+STRINGS\s+([^)]*)\)')
+CMAKE_USE = re.compile(r'-D(CONVOLVER_[A-Z0-9_]+)(?::[A-Z]+)?(?:=([A-Za-z0-9_.-]+))?')
+COMMAND_SEPARATOR = re.compile(r'\|\|?|&&|;')
+CLI_OPTION = re.compile(r'(?<![\w-])(--[A-Za-z][A-Za-z0-9-]*)')
+
 TODO_DEFINITION = re.compile(r'^- \[([ xX])\] \*\*([A-Z][A-Z0-9]*-\d+) — ', re.MULTILINE)
 PLAN_NAME = re.compile(r'^\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*\.md$')
 CODE_SPAN = re.compile(r'`([^`\n]+)`')
@@ -269,6 +290,129 @@ def check_layout(root, files, errors):
             )
 
 
+def cmake_options(root, files):
+    """CMake cache options defined by the build: name -> allowed values or None."""
+    options = {}
+    for name in files:
+        if is_record(name) or not name.endswith(('CMakeLists.txt', '.cmake')):
+            continue
+        if name.startswith('tests/'):
+            continue  # Test projects force the build's options; they define none.
+        text = read(root, name)
+        for match in CMAKE_OPTION.finditer(text):
+            options.setdefault(match.group(1), None)
+        for match in CMAKE_CACHE.finditer(text):
+            if 'FORCE' not in match.group(2).split():
+                options.setdefault(match.group(1), None)
+        for match in CMAKE_STRINGS.finditer(text):
+            options[match.group(1)] = set(match.group(2).split())
+    return options
+
+
+def check_build_options(root, files, errors):
+    """DOC-2: -D options named in guides and CI exist, with allowed values, and the
+    build guide names every option."""
+    options = cmake_options(root, files)
+    if not options:
+        return
+    sources = [
+        name
+        for name in maintained_markdown(files)
+        if name != 'CHANGELOG.md' and not name.startswith('docs/project/plans/')
+    ]
+    sources += [name for name in files if name.startswith('.github/workflows/') and name.endswith('.yml')]
+    sources += [name for name in files if name.startswith('scripts/') and name.endswith(('.py', '.sh'))]
+    for source in sources:
+        for number, line in enumerate(read(root, source).splitlines(), 1):
+            for match in CMAKE_USE.finditer(line):
+                option, value = match.groups()
+                if option not in options:
+                    errors.append(
+                        f'{source}:{number}: -D{option} is not a CMake option of this build; '
+                        f'correct the name, or define and document it in {BUILD_GUIDE}'
+                    )
+                elif (
+                    value
+                    and options[option] is not None
+                    and value.upper() not in {allowed.upper() for allowed in options[option]}
+                ):  # CMake upper-cases these values (string(TOUPPER)).
+                    allowed = ', '.join(sorted(options[option]))
+                    errors.append(f'{source}:{number}: {option}={value} is not one of {allowed}')
+    if BUILD_GUIDE in files:
+        guide = read(root, BUILD_GUIDE)
+        for option in sorted(options):
+            if not re.search(rf'\b{option}\b', guide):
+                errors.append(f'{BUILD_GUIDE}: does not describe the CMake option {option}')
+
+
+def tool_options(root, files, tool):
+    found = set()
+    for name in TOOL_SOURCES[tool]:
+        if name in files:
+            code = re.sub(r'//[^\n]*', '', read(root, name))
+            found.update(re.findall(r'"(--[a-z][a-z0-9-]*)"', code))
+    return found
+
+
+def command_lines(text):
+    """(line number, text) for each command of a fenced block, with lines ending
+    in a backslash joined to the next, and each inline code span."""
+    fenced = False
+    pending = None
+    for number, line in enumerate(text.splitlines(), 1):
+        if line.lstrip().startswith('```'):
+            fenced = not fenced
+            if pending:
+                yield pending
+            pending = None
+        elif fenced:
+            pending = (pending[0], pending[1] + ' ' + line.strip()) if pending else (number, line)
+            if not pending[1].endswith('\\'):
+                yield pending
+                pending = None
+            else:
+                pending = (pending[0], pending[1][:-1])
+        else:
+            for span in CODE_SPAN.findall(line):
+                yield number, span
+
+
+def check_cli_options(root, files, errors):
+    """DOC-2: options shown with a Convolver tool exist, and each tool's guide
+    names every option it accepts."""
+    known = {tool: tool_options(root, files, tool) for tool in TOOL_SOURCES}
+    if not any(known.values()):
+        return
+    every = set().union(*known.values())
+    for page in maintained_markdown(files):
+        if page == 'CHANGELOG.md' or page.startswith('docs/project/plans/'):
+            continue  # Past and proposed options.
+        for number, line in command_lines(read(root, page)):
+            # Each command of a pipeline or list, run by any path (./bin/,
+            # ./build/, .\bin\ on Windows).
+            for command in COMMAND_SEPARATOR.split(line):
+                words = command.split()
+                if not words:
+                    continue
+                first = re.split(r'[/\\]', words[0])[-1].removesuffix('.exe')
+                if first in known:
+                    allowed, what = known[first], first
+                elif first.startswith('--') and page.startswith('docs/use/'):
+                    allowed, what = every, 'any Convolver tool'
+                else:
+                    continue  # Another program's command, or prose.
+                for option in CLI_OPTION.findall(command):
+                    if option not in allowed:
+                        errors.append(f'{page}:{number}: `{line.strip()}`: {option} is not an option of {what}')
+    for tool, guide in TOOL_GUIDES.items():
+        if guide not in files or not known[tool]:
+            continue
+        text = read(root, guide)
+        for option in sorted(known[tool]):
+            if not re.search(rf'(?<![\w-]){re.escape(option)}(?![\w-])', text):
+                errors.append(f'{guide}: does not describe {tool} {option}')
+
+
 def check(root):
     files = repository_files(root)
     errors = []
@@ -279,6 +423,8 @@ def check(root):
     check_agent_paths(root, files, errors)
     check_spdx(root, files, errors)
     check_layout(root, files, errors)
+    check_build_options(root, files, errors)
+    check_cli_options(root, files, errors)
     return len(files), errors
 
 

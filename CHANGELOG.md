@@ -142,6 +142,14 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Repository checks (DOC-2): `scripts/check_repository.py` now fails when a
+  guide, workflow or script names a CMake `-DCONVOLVER_…` option the build
+  does not define (or a value it does not allow, such as an unknown FFT
+  backend), when the build guide leaves an option out, when a command shown
+  with `convolver`, `convolver-preset` or `convolver-equalizer-apo` uses an
+  option the tool does not parse, or when a tool's guide leaves out one it
+  does. The presets and Equalizer APO guides now mention `--help` and
+  `--version`.
 - Documentation (GAIN-1): the command-line guide states a safe bound for the
   headroom integer output needs after `--gain-db no-clip`: none for float
   output, beyond float rounding; for B-bit integers, H = (1 + S)(½ + D) + ½
