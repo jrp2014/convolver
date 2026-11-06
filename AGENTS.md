@@ -33,6 +33,11 @@ documentation is organised and written, for agents too, is in
 
 Follow `docs/develop/workflow.md`. In short:
 
+- Tell a review, local host testing and a change apart
+  ([kinds of task](docs/develop/workflow.md#kinds-of-task)). A review is
+  read-only: no branch, commit or GitHub post unless the person asks, except
+  the independent review of an open pull request. Host testing records what
+  was observed. Only a change gets a branch and the rules below.
 - One TODO item (or a tightly coupled group) per branch. Open a **draft pull
   request titled with the ID** as soon as you start; that is the claim. Check
   open pull requests for the ID first.

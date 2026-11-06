@@ -17,7 +17,8 @@ This page applies to people and coding agents alike. Several streams of work
 often in sessions that end without warning. These rules let one contributor
 continue where another stopped.
 
-Contents: [before you start](#before-you-start) ·
+Contents: [kinds of task](#kinds-of-task) ·
+[before you start](#before-you-start) ·
 [while working](#while-working) · [handoff note](#handoff-note) ·
 [picking up someone else's work](#picking-up-someone-elses-work) ·
 [verification](#verification-for-each-kind-of-change) ·
@@ -25,6 +26,29 @@ Contents: [before you start](#before-you-start) ·
 [independent review](#independent-review) ·
 [merging](#merging-and-afterwards) ·
 [recording progress in TODO](#recording-progress-in-todo)
+
+## Kinds of task
+
+Decide first which kind of task you have been given. Only the third changes
+the repository.
+
+- **A review** of a pull request, a branch, a page or the repository is
+  read-only. Read the files, and build and run tests in a scratch build
+  folder if that helps, but change no tracked file, create no branch or
+  commit, and post nothing on GitHub. Give the findings to whoever asked, in
+  the conversation. Only the [independent review](#independent-review) of an
+  open pull request is posted on that pull request ([report](#report)).
+  Fixing the findings is a change, started only when the person asks for it.
+- **Local host testing** is steps jrp runs in a host on his own computer.
+  Write the steps, then record what jrp reports as dated evidence where the
+  task says (a pull request, the TODO item's `Progress` line, or a host
+  record). Record a result as it was observed, including a step that did
+  not work; do not turn it into a new sequence of host operations nobody
+  has tried ([while working](#while-working)). A fix the testing calls for
+  is a separate change.
+- **A change** to the repository: one TODO item, or a tightly coupled group,
+  on its own branch with a draft pull request. The rest of this page is about
+  changes.
 
 ## Before you start
 
@@ -90,7 +114,10 @@ Contents: [before you start](#before-you-start) ·
 
 Whenever you stop, even part-way:
 
-1. Run `pre-commit run --all-files`, then commit and push everything.
+1. Run `pre-commit run --all-files`, then commit and push all of this item's
+   work on its branch. Leave out anything unrelated to the item (a scratch
+   file, a local experiment, another item's fix): keep it uncommitted, or
+   give it its own branch.
 2. Replace the handoff note in the pull request description (below).
 3. If a partial merge is useful, add a `Progress` line to the TODO item
    ([recording progress](#recording-progress-in-todo)).
@@ -235,9 +262,12 @@ and say what you ran.
 
 ### Report
 
-Post the review on the pull request: each finding with file and
+Post the review on the pull request it reviews: each finding with file and
 line, why it matters and a suggested fix; then a short list of what you checked
-and found sound. Say plainly if you found nothing. The author answers each
+and found sound. Change no files and push nothing: the author fixes the
+findings. A review that is not this step, such as a review of `main` or of
+another contributor's draft, goes to whoever asked for it, and onto GitHub
+only if they ask. Say plainly if you found nothing. The author answers each
 finding: fixed (with the commit), or not fixed and why. Reviewers do not
 approve or merge; jrp does that.
 

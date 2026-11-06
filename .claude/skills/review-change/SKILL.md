@@ -12,4 +12,5 @@ procedure, and "Definition of done" on the same page is what a ready pull
 request must meet. Read `AGENTS.md` first for the rules that apply everywhere.
 If the procedure seems to be missing a check, add it to that page, not here.
 
-Do not approve or merge; jrp does that.
+The review is read-only: change no files, commit nothing and post only what
+"Report" says. Do not approve or merge; jrp does that.
