@@ -170,15 +170,52 @@ void cases() {
          {"The filter is for 48000 Hz, and the host runs at 44100 Hz. The previous filter keeps "
           "playing."},
          {}},
-        {"playing",
+        // PLUG-22: the window's heading names the filter and the Audio
+        // section describes it, so nothing is said under the status.
+        {"active",
          [&] {
              HostFilter f(8);
              f.load(HostState{filter(44100, 2)}, stereo, [](const Configuration&) {});
              return host_report(f, facts(stereo));
          },
-         HostStatus::playing,
-         {"A filter for 44100 Hz, 2 in, 2 out."},
-         {"preset menu", "Fix:"}},
+         HostStatus::active,
+         {},
+         {"A filter for", "preset menu", "Fix:"}},
+        {"bypassed",
+         [&] {
+             HostFilter f(8);
+             f.load(HostState{filter(44100, 2)}, stereo, [](const Configuration&) {});
+             auto bypassed = facts(stereo);
+             bypassed.bypassed = true;
+             return host_report(f, bypassed);
+         },
+         HostStatus::bypassed,
+         {"The input plays unfiltered.", "Fix: Turn bypass off to hear the filter."},
+         {"silent"}},
+        {"bypassed, unequal counts",
+         [&] {
+             const HostLayout two_to_four{44100, 2, 4, 0, 0};
+             Configuration c{44100, 2, 4, 0, {}, {}, {}};
+             for (std::size_t i = 0; i < 4; ++i)
+                 c.paths.push_back({{1.f}, {{i % 2, 1}}, {{i, 1}}});
+             HostFilter f(8);
+             f.load(HostState{c}, two_to_four, [](const Configuration&) {});
+             auto bypassed = facts(two_to_four);
+             bypassed.bypassed = true;
+             return host_report(f, bypassed);
+         },
+         HostStatus::bypassed,
+         {"The outputs are silent: with 2 in, 4 out there is no unfiltered signal"},
+         {"plays unfiltered"}},
+        {"bypassed without a filter",
+         [&] {
+             auto bypassed = facts(stereo);
+             bypassed.bypassed = true;
+             return host_report(HostFilter(8), bypassed);
+         },
+         HostStatus::no_filter,
+         {"No filter"},
+         {"bypass"}},
         {"not checked yet",
          [] {
              HostFilter f(8);
@@ -285,11 +322,12 @@ void cases() {
                 contains(report_text(r), "Sample rate: 44100 Hz (the filter's rate too)\n") &&
                 contains(report_text(r), "Filter file: a saved project or preset, request 1\n"),
             "report text:\n" + report_text(r));
-    // Playing: the status word says it; nothing is wrong, so there is no
-    // problem, fix or action.
-    require(r.plays == "A filter for 44100 Hz, 2 in, 2 out." && r.problem.empty() &&
-                r.fix.empty() && r.action.empty(),
-            "playing message: " + r.explanation);
+    // Active: the status word says it; nothing is wrong, so there is no
+    // problem, fix or action, and the heading and Audio section say what
+    // plays (PLUG-22).
+    require(r.plays.empty() && r.problem.empty() && r.fix.empty() && r.action.empty() &&
+                r.explanation.empty(),
+            "active message: " + r.explanation);
 
     // Before the host starts: what is known.
     const auto unstarted = host_report(HostFilter(8), facts(std::nullopt));
@@ -337,6 +375,20 @@ void cases() {
     const auto rc = host_report(chosen, facts(stereo));
     require(rc.filter_path == "/filters/room.cfg" && rc.filter_files == from_file.files,
             "accepted file's path and files: " + rc.filter_path);
+    // PLUG-22: a file's name keeps its extension; saved state shows the
+    // name saved beside it, and the generic words only without one.
+    require(rc.filter_name == "room.cfg", "file name: " + rc.filter_name);
+    HostFilter named(8);
+    HostRequest saved_name;
+    saved_name.name = "Living room 48k.cfg";
+    named.load(HostState{filter(44100, 2)}, stereo, [](const Configuration&) {}, saved_name);
+    require(host_report(named, facts(stereo)).filter_name == "Living room 48k.cfg" &&
+                host_report(named, facts(stereo)).filter_path.empty(),
+            "saved name: " + host_report(named, facts(stereo)).filter_name);
+    HostFilter unnamed(8);
+    unnamed.load(HostState{filter(44100, 2)}, stereo, [](const Configuration&) {});
+    require(host_report(unnamed, facts(stereo)).filter_name == "From the saved project or preset",
+            "no saved name: " + host_report(unnamed, facts(stereo)).filter_name);
     std::string files;
     for (const auto& [key, value] : report_fields(rc))
         if (key == "filter files")

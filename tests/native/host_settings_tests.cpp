@@ -533,7 +533,7 @@ void diagnostics_follow_settings() {
          .5f,
          "Filter loaded: 48000 Hz, 1 in, 1 out. Mix 0%: only the dry signal plays.",
          "Playing ",
-         HostStatus::playing},
+         HostStatus::active},
         {"filter, mix 50%",
          mono,
          false,
@@ -542,7 +542,7 @@ void diagnostics_follow_settings() {
          .5f * (.5f * .25f + .5f),
          "Filter loaded: 48000 Hz, 1 in, 1 out.",
          "Playing ",
-         HostStatus::playing},
+         HostStatus::active},
     };
     for (const auto& c : cases) {
         HostFilter filter;

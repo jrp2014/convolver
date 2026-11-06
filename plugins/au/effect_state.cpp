@@ -322,9 +322,11 @@ OSStatus Effect::load_file(const std::string& path) {
     // and the chosen filter was lost on reopening). An accepted file also
     // becomes the present preset, a user preset (number -1) named after the
     // file, as choosing a preset would; GarageBand then asks to save (jrp's
-    // run of bf7adb6).
+    // run of bf7adb6). PLUG-22: the name keeps its extension, which says
+    // what kind of filter it is, and the project saves it, so the window
+    // names the filter after reopening (RestoreState).
     if (accepted) {
-        const auto name = std::filesystem::path(path).stem().string();
+        const auto name = std::filesystem::path(path).filename().string();
         if (const auto preset_name = cf_string(name.empty() ? path : name)) {
             static_cast<void>(NewCustomPresetSet(AUPreset{-1, preset_name.get()}));
             PropertyChanged(kAudioUnitProperty_PresentPreset, kAudioUnitScope_Global, 0);
@@ -344,8 +346,20 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
         fail_unrecorded();
         return kAudioUnitErr_InvalidPropertyValue;
     }
+    // PLUG-22: the window names the filter by the preset name saved with it,
+    // which a file chosen in the window sets to the file's name (load_file).
+    // AUBase's default name ("Untitled") names nothing.
+    HostRequest request;
+    try {
+        request.name = utf8_text(
+            CFDictionaryGetValue(static_cast<CFDictionaryRef>(plist), CFSTR(kAUPresetNameKey)));
+        if (request.name == "Untitled" || request.name.size() > max_filter_name_bytes)
+            request.name.clear();
+    } catch (...) { // Out of memory: the window says the filter came from saved state.
+        request.name.clear();
+    }
     const bool accepted =
-        install(std::move(next), {}, saved ? &*saved : nullptr, settings_unreadable);
+        install(std::move(next), request, saved ? &*saved : nullptr, settings_unreadable);
     if (!accepted)
         return kAudioUnitErr_InvalidPropertyValue;
     // A restored Latency plays at once. GarageBand starts the unit before it

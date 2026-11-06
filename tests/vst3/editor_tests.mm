@@ -281,7 +281,7 @@ void window() {
     const auto file = folder / "room.wav";
     write_wav(file);
     require([shown loadFile:@(file.c_str())] && handler.dirty == 1, "file not loaded");
-    require([shown.statusField.stringValue isEqualToString:@"Playing"] &&
+    require([shown.statusField.stringValue isEqualToString:@"Active"] &&
                 [shown.filterNameField.stringValue isEqualToString:@"room.wav"],
             "after loading: " + text(shown.statusField.stringValue) + ", " +
                 text(shown.filterNameField.stringValue));

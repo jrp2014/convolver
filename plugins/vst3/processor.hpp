@@ -38,9 +38,7 @@ inline constexpr Steinberg::Vst::ParamID status_id = identity::vst3_status_param
 inline constexpr const char* status_message = "ConvolverStatus";
 // The Status parameter's values, in HostStatus order, and a status as the
 // parameter's normalized value.
-inline constexpr std::array<const char*, 5> status_names{"Playing", "No filter", "Load failed",
-                                                         "Not checked yet", "Fault"};
-static_assert(static_cast<std::size_t>(HostStatus::fault) == status_names.size() - 1);
+inline constexpr auto& status_names = host_status_names;
 constexpr Steinberg::Vst::ParamValue normalized_status(HostStatus status) {
     return static_cast<Steinberg::Vst::ParamValue>(status) /
            static_cast<Steinberg::Vst::ParamValue>(status_names.size() - 1);

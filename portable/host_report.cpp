@@ -108,11 +108,22 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         }
         if (filter.faults().processing_failure)
             m.action = "copy diagnostics";
+    } else if (facts.bypassed && filter.filter()) {
+        // PLUG-22: as HostProcessor bypasses, the input for equal counts,
+        // otherwise silence.
+        m.plays = !host ? std::string("No filter is applied while bypassed.")
+                  : host->inputs == host->outputs
+                      ? std::string("The input plays unfiltered.")
+                      : "The outputs are silent: with " + ports(host->inputs, host->outputs) +
+                            " there is no unfiltered signal to play.";
+        m.fix = "Turn bypass off to hear the filter.";
     } else if (const auto& c = filter.filter()) {
-        m.plays = host ? "A filter for " + filter_words(*c) + "."
-                       : "A filter for " + filter_words(*c) +
-                             " is loaded. It is checked against the host's sample rate and "
-                             "channels when the host starts the plug-in.";
+        // PLUG-22: while it plays, the window's heading names the filter and
+        // the Audio section describes it, so nothing is said here.
+        if (!host)
+            m.plays = "A filter for " + filter_words(*c) +
+                      " is loaded. It is checked against the host's sample rate and channels "
+                      "when the host starts the plug-in.";
         if (host && !filter.notice().empty())
             take(filter.notice());
     } else if (filter.failed()) {
@@ -353,7 +364,7 @@ std::string request_reference(const HostRequest& r) {
 
 HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
     HostReport r;
-    r.status = host_status(filter, facts.host, facts.log_written, facts.settings);
+    r.status = host_status(filter, facts.host, facts.log_written, facts.settings, facts.bypassed);
     r.status_name = host_status_names.at(static_cast<std::size_t>(r.status.status));
     const auto program = host_program_name();
     // Out of process (GarageBand, Logic) the program is Apple's hosting
@@ -378,7 +389,8 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
     if (c)
         r.filter_name = accepted.source == HostFilterSource::file && !accepted.path.empty()
                             ? file_name(accepted.path)
-                            : "From the saved project or preset";
+                        : !accepted.name.empty() ? accepted.name
+                                                 : "From the saved project or preset";
     else
         r.filter_name = "None";
     if (c && accepted.source == HostFilterSource::file) {

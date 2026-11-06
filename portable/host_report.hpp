@@ -17,9 +17,9 @@
 // not a stable interface.
 namespace convolver {
 // The Status parameter's value names, in HostStatus order.
-inline constexpr std::array<const char*, 5> host_status_names{"Playing", "No filter", "Load failed",
-                                                              "Not checked yet", "Fault"};
-static_assert(static_cast<std::size_t>(HostStatus::fault) == host_status_names.size() - 1);
+inline constexpr std::array<const char*, 6> host_status_names{
+    "Active", "No filter", "Load failed", "Not checked yet", "Fault", "Bypassed"};
+static_assert(static_cast<std::size_t>(HostStatus::bypassed) == host_status_names.size() - 1);
 
 // What the adapter knows besides its HostFilter, under its control lock.
 struct HostReportFacts {
@@ -31,6 +31,8 @@ struct HostReportFacts {
     // not yet in use when they differ), and the tail.
     std::size_t latency_frames = 0, tail_frames = 0;
     bool log_written = true; // host_log_written()
+    // PLUG-22: the instance is bypassed (the host's switch or the window's).
+    bool bypassed = false;
     // The format's window can load a filter file (the Audio Unit's Choose
     // Filter), so an empty instance is told about it as well as presets.
     bool chooses_files = false;
@@ -65,9 +67,10 @@ struct HostReport {
     // All of it as text: the problem and what plays, then "Cause: ", "Fix: "
     // and "Note: " lines (advice.hpp), for the text report.
     std::string explanation;
-    // The window's Filter row: the accepted filter's file name ("From the
-    // saved project or preset" when it came from saved state, "None"), and
-    // a note about the newest request when it was refused.
+    // The window's heading: the accepted filter's file name, with its
+    // extension (for saved state, the name saved beside it, PLUG-22; "From
+    // the saved project or preset" when none was; "None"), and a note about
+    // the newest request when it was refused.
     std::string filter_name, filter_note;
     // VST3-11: the accepted filter's file as chosen (UTF-8; empty when it came
     // from saved state), which the window's Reload reads again, and every

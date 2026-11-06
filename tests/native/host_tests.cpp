@@ -1176,7 +1176,7 @@ void processing_faults() {
 
     HostFilter f(8);
     f.load(HostState{loud}, layout);
-    require(host_status(f, layout).status == HostStatus::playing, "playing before observing");
+    require(host_status(f, layout).status == HostStatus::active, "playing before observing");
     const auto fresh = f.observe(host.faults());
     require(fresh.faults.output_overflow == 1 && !fresh.changed && !fresh.held &&
                 f.faults().output_overflow == 1,
@@ -1205,7 +1205,7 @@ void processing_faults() {
     }
     require(host_status(f, layout).status == HostStatus::load_failed, "load failure first");
     f.load(HostState{mono()}, layout);
-    require(!f.faults().any() && host_status(f, layout).status == HostStatus::playing,
+    require(!f.faults().any() && host_status(f, layout).status == HostStatus::active,
             "an accepted load clears the fault");
     // Without a processor passed to load(), faults() counts on from the last
     // observe(), so the cleared fault does not come back (DIAG-3 review).
@@ -1273,7 +1273,7 @@ void processing_faults() {
     play(0.f);
     const auto window = h.observe(p.faults());
     require(window.faults.rejected_input == 1 && window.changed && !h.faults().any() &&
-                host_status(h, layout).status == HostStatus::playing,
+                host_status(h, layout).status == HostStatus::active,
             "a fault counted while the replacement was prepared is shown against it");
     require(!window.held, "no load failure holds the report");
     // Its log text must not claim the status shows it.
@@ -1418,8 +1418,16 @@ void status_lines() {
     check(host_status(f, stereo), Status::load_failed, "Silent: the filter is for 44100 Hz",
           "mismatch at activation");
     f.load(HostState{a}, stereo);
-    check(host_status(f, stereo), Status::playing, "Filter loaded: 48000 Hz, 2 in, 2 out.",
-          "playing");
+    check(host_status(f, stereo), Status::active, "Filter loaded: 48000 Hz, 2 in, 2 out.",
+          "active");
+    // PLUG-22: bypassed, as HostProcessor bypasses: the input for equal
+    // counts, silence otherwise; nothing is bypassed before the host starts.
+    check(host_status(f, stereo, true, {}, true), Status::bypassed,
+          "Bypassed: the input plays unfiltered.", "bypassed");
+    check(host_status(f, HostLayout{48000, 2, 6, 0, 0}, true, {}, true), Status::bypassed,
+          "Bypassed: silent, as inputs and outputs differ.", "bypassed, unequal counts");
+    check(host_status(f, std::nullopt, true, {}, true), Status::bypassed,
+          "Bypassed: no filter is applied.", "bypassed before the host starts");
     // A refused replacement: the previous filter plays, and the line says so.
     refused([&] { f.load(HostState{crossover}, stereo); });
     check(host_status(f, stereo), Status::load_failed,
@@ -1463,7 +1471,7 @@ void status_lines() {
     HostFilter labelled(8);
     Configuration surround{48000, 2, 6, 0x3F, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
     labelled.load(HostState{surround}, HostLayout{48000, 2, 6, 0x3, 0x633});
-    check(host_status(labelled, HostLayout{48000, 2, 6, 0x3, 0x633}), Status::playing,
+    check(host_status(labelled, HostLayout{48000, 2, 6, 0x3, 0x633}), Status::active,
           "Speaker labels differ", "speaker notice");
 
     // The log lines adapters write.

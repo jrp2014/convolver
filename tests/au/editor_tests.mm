@@ -372,8 +372,7 @@ void window() {
             "\n" +
             text([[view.audioValues valueForKey:@"stringValue"] componentsJoinedByString:@"\n"]));
     require([view.filterNameField.stringValue isEqualToString:r[@"filter name"]] &&
-                [view.filterNameField.stringValue
-                    isEqualToString:@"From the saved project or preset"] &&
+                [view.filterNameField.stringValue isEqualToString:@"test"] &&
                 contains(view.filterNoteField.stringValue, "drop"),
             "Filter row: " + text(view.filterNameField.stringValue) + " / " +
                 text(view.filterNoteField.stringValue));
@@ -639,7 +638,7 @@ void window() {
     check(unit.load(state_of(identity(44100, 1))), "mono preset");
     check(unit.initialize(), "mono initialization with a mono filter");
     [view refresh];
-    require([view.statusField.stringValue isEqualToString:@"Playing"],
+    require([view.statusField.stringValue isEqualToString:@"Active"],
             "window status after the fix " + text(view.statusField.stringValue));
 
     // A host may close the window and keep the view in it: the twice-a-second
@@ -683,13 +682,14 @@ void files() {
     require([view loadFile:@(stereo.c_str())], "the stereo file was refused");
     // The project must be marked changed: GarageBand 10.4.14 ignored the
     // ClassInfo notification alone (jrp's run of d1dc0a2), so an accepted
-    // file is also the present preset, a user preset named after it.
+    // file is also the present preset, a user preset named after it, with
+    // its extension (PLUG-22).
     require(class_info_changes > 0 && preset_changes > 0,
             "a chosen file sent no ClassInfo or PresentPreset notification");
-    require(present_preset(unit) == "stereo", "present preset: " + present_preset(unit));
+    require(present_preset(unit) == "stereo.wav", "present preset: " + present_preset(unit));
     auto r = report(unit);
-    require([r[@"status name"] isEqualToString:@"Playing"] &&
-                [view.statusField.stringValue isEqualToString:@"Playing"],
+    require([r[@"status name"] isEqualToString:@"Active"] &&
+                [view.statusField.stringValue isEqualToString:@"Active"],
             "after the stereo file: " + text(r[@"status name"]) + ": " + text(r[@"explanation"]));
     require(contains(r[@"reference"], stereo.c_str()) &&
                 [view.filterNameField.stringValue isEqualToString:@"stereo.wav"],
@@ -721,24 +721,29 @@ void files() {
                 contains(r[@"explanation"], "load it in Convolver instead"),
             "mono file advice: " + text(r[@"explanation"]));
     require(loaded_path(unit) == stereo.string(), "the refused file replaced the stereo one");
-    require(present_preset(unit) == "stereo", "a refused file renamed the present preset");
+    require(present_preset(unit) == "stereo.wav", "a refused file renamed the present preset");
     {
         // The saved state carries the preset name, and restoring it in
-        // another unit (a reopened project) brings the name back.
+        // another unit (a reopened project) brings the name back, and the
+        // window names the filter by it (PLUG-22).
         const auto plist = unit.class_info_now();
         const auto saved_name = static_cast<CFStringRef>(
             CFDictionaryGetValue(static_cast<CFDictionaryRef>(plist), CFSTR(kAUPresetNameKey)));
         const bool named = saved_name && CFGetTypeID(saved_name) == CFStringGetTypeID() &&
-                           text((__bridge NSString*)saved_name) == "stereo";
+                           text((__bridge NSString*)saved_name) == "stereo.wav";
         Unit reopened;
         check(reopened.configure(44100, 2, 2, 512), "reopened formats");
         check(reopened.initialize(), "reopened initialization");
         const auto restored = reopened.restore(plist);
         CFRelease(plist);
-        require(named, "the saved state does not name the preset \"stereo\"");
+        require(named, "the saved state does not name the preset \"stereo.wav\"");
         check(restored, "restoring the saved state");
-        require(present_preset(reopened) == "stereo",
+        require(present_preset(reopened) == "stereo.wav",
                 "restored present preset: " + present_preset(reopened));
+        const auto reopened_report = report(reopened);
+        require([reopened_report[@"filter name"] isEqualToString:@"stereo.wav"] &&
+                    [reopened_report[@"filter path"] length] == 0,
+                "reopened filter name: " + text(reopened_report[@"filter name"]));
         reopened.uninitialize();
     }
     const auto kept = unit.failure();
@@ -841,11 +846,11 @@ void responsive() {
     std::string after;
     for (int i = 0; i < 1000; ++i) {
         after = text(report(unit)[@"status name"]);
-        if (after == "Playing")
+        if (after == "Active")
             break;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-    require(after == "Playing", "after the load: " + after);
+    require(after == "Active", "after the load: " + after);
     std::cout << "report read during a held load: '" << during << "', then '" << after << "'\n";
     unit.uninitialize();
 }

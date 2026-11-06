@@ -909,7 +909,7 @@ void status_and_log() {
     require(c.getParameterCount() == 5 && c.getParameterInfo(4, info) == kResultOk &&
                 info.id == status_id && (info.flags & ParameterInfo::kIsReadOnly) &&
                 (info.flags & ParameterInfo::kIsList) &&
-                !(info.flags & ParameterInfo::kCanAutomate) && info.stepCount == 4,
+                !(info.flags & ParameterInfo::kCanAutomate) && info.stepCount == 5,
             "Status parameter not read-only list");
     // The text the host shows for the parameter's current value.
     const auto shown = [&] {
@@ -995,7 +995,7 @@ void status_and_log() {
             "failed first load not logged");
     require(p.setState(stream(good).get()) == kResultOk &&
                 shown() == "Filter loaded: 48000 Hz, 2 in, 2 out." &&
-                status() == convolver::HostStatus::playing &&
+                status() == convolver::HostStatus::active &&
                 contains(log_text(), ": Loaded a filter for 48000 Hz, 2 in, 2 out.\n"),
             "good load not shown or logged");
     // Wrong preset while a filter plays: the filter keeps playing, and both say so.
@@ -1020,7 +1020,7 @@ void status_and_log() {
     auto loud = good;
     loud.configuration->paths[0].impulse[0] = std::numeric_limits<float>::max() / 4;
     require(p.setState(stream(loud).get()) == kResultOk &&
-                status() == convolver::HostStatus::playing,
+                status() == convolver::HostStatus::active,
             "loud filter not loaded");
     {
         std::array<float, 64> left{}, right{};
@@ -1156,7 +1156,7 @@ void status_and_log() {
     }
     // Restarted at another rate: silence until the rate is put back.
     require(p.setState(stream(good).get()) == kResultOk &&
-                status() == convolver::HostStatus::playing,
+                status() == convolver::HostStatus::active,
             "status good again");
     require(p.setActive(false) == kResultOk, "status deactivate");
     setup.sampleRate = 44100;
@@ -1722,7 +1722,7 @@ void report_and_files() {
     // the project changed, and the saved state holds the filter.
     require(c.load_file(good.string()) && handler.dirty == 1, "file not loaded");
     report = c.report();
-    require(field(report, "status name") == "Playing" && field(report, "filter name") == "room.wav",
+    require(field(report, "status name") == "Active" && field(report, "filter name") == "room.wav",
             "report after loading a file");
     auto f = p.failure();
     require(!f, "a loaded file left a failure");

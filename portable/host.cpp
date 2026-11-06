@@ -669,7 +669,7 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
 } // namespace
 
 HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLayout>& host,
-                           bool log_written, const HostSettings& settings) {
+                           bool log_written, const HostSettings& settings, bool bypassed) {
     const char* details =
         log_written ? " Details in the Convolver log." : " The log could not be written.";
     HostStatusLine line;
@@ -698,8 +698,17 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
     } else if (filter.faults().any() && !filter.failed()) {
         line.status = HostStatus::fault;
         line.text = "Fault: " + short_fault(filter.faults()) + details;
+    } else if (bypassed && filter.filter()) {
+        // As HostProcessor bypasses: the delayed input on each output for
+        // equal counts, otherwise silence (no output has an unfiltered
+        // counterpart).
+        line.status = HostStatus::bypassed;
+        line.text = !host ? "Bypassed: no filter is applied."
+                    : host->inputs == host->outputs
+                        ? "Bypassed: the input plays unfiltered."
+                        : "Bypassed: silent, as inputs and outputs differ.";
     } else if (const auto& c = filter.filter()) {
-        line.status = host ? HostStatus::playing : HostStatus::unchecked;
+        line.status = host ? HostStatus::active : HostStatus::unchecked;
         line.text = "Filter loaded: " + std::to_string(c->sample_rate) + " Hz, " +
                     ports(c->input_channels, c->output_channels) +
                     (host ? "." : "; checked when the host starts it.");

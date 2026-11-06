@@ -166,7 +166,14 @@ struct HostRequest {
     // passed over), as read_filter_file() gives them, so a window can reload
     // the filter when one changes. Empty for state and for a refused file.
     std::vector<std::string> files{};
+    // PLUG-22: for state, the name saved beside it for the window to show
+    // (UTF-8, at most max_filter_name_bytes): the file's name with its
+    // extension, never its folder, as the Audio Unit's preset name or VST3's
+    // controller state keeps it. Empty when unknown; a file's request leaves
+    // it empty, as the window takes the name from `path`.
+    std::string name{};
 };
+inline constexpr std::size_t max_filter_name_bytes = 1024;
 struct HostFailure {
     HostFailureKind kind = HostFailureKind::state_unreadable;
     HostRequest request;
@@ -383,11 +390,17 @@ class HostFilter {
 // failure(): a refused replacement shows "load failed" although the previous
 // filter keeps playing, as LV2's status port does.
 enum class HostStatus {
-    playing = 0,     // A filter is accepted and suits the host.
+    // A filter is accepted and suits the host (PLUG-22: "Active", not
+    // "Playing": the plug-in cannot tell whether the host's transport runs).
+    active = 0,
     no_filter = 1,   // An empty instance: identity, or silence for unequal counts.
     load_failed = 2, // The newest request failed, or the instance plays silence.
     unchecked = 3,   // A filter is accepted, but the host's configuration is not known yet.
     fault = 4,       // HostFilter::faults(): the audio met a problem while playing.
+    // PLUG-22: the host or the window bypasses an instance with a filter, and
+    // nothing is wrong: the input plays unfiltered, or silence for unequal
+    // counts. Without a filter the status stays No filter.
+    bypassed = 5,
 };
 struct HostStatusLine {
     HostStatus status = HostStatus::no_filter;
@@ -403,9 +416,11 @@ inline constexpr std::size_t max_status_text = 127; // VST3's String128, less it
 // be written, instead of pointing to it. `settings` are the instance's Gain
 // and Mix (PLUG-10): without a filter, or after a failed load, the text says
 // what they let through (the input at a changed level, or the dry signal),
-// not only what the filter does.
+// not only what the filter does. `bypassed`: the instance is bypassed; a load
+// failure or a fault still comes first, as both need attention.
 HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& host,
-                           bool log_written = true, const HostSettings& settings = {});
+                           bool log_written = true, const HostSettings& settings = {},
+                           bool bypassed = false);
 
 // Prepared planar host boundary. Float DSP with float/double host buffers.
 // Input and output channel counts follow the configuration and may differ.
