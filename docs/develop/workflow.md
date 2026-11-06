@@ -278,7 +278,14 @@ approve or merge; jrp does that.
 - CI must be green on the final commit. A failure that is also red on `main`
   is reported in the pull request, not ignored.
 - After a merge, the version workflow bumps `VERSION` and tags `main`
-  ([source versioning](versioning.md)). Delete the merged branch.
+  ([source versioning](versioning.md)).
+- GitHub deletes a pull request's branch when it is merged (the repository's
+  *Automatically delete head branches* setting, under *Settings › General ›
+  Pull Requests*). Cloud agent sessions cannot delete branches; a branch the
+  setting missed, whose commits are all in `main` and which has no open pull
+  request, goes on a list for jrp to delete. Further work after a merge starts
+  again from current `main`, even on a branch of the same name; a merged
+  pull request is never reused.
 
 ## Recording progress in TODO
 
