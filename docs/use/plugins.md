@@ -470,8 +470,9 @@ defaults play exactly as Convolver did before the settings existed.
   wet, with a latency of 256 frames. The LV2 plug-in has no settings yet.
   The same project can therefore sound different in another format.
 - **VST3 hosts** mark Mix as the plug-in's dry/wet control where they have
-  one. A new Latency asks the host to restart the plug-in, which hosts do
-  at once or when playback stops; until then the old Latency plays. A
+  one. A new Latency asks the host to restart the plug-in; until it does,
+  the old Latency plays. REAPER 7.85 did so only when the project was
+  reopened ([unresolved](../develop/host-testing.md#unresolved-host-findings)). A
   project saved at the default settings is saved exactly as before the
   settings existed, so older Convolver builds still open it; one saved with
   other settings needs a Convolver with these settings, and an older build refuses
