@@ -180,6 +180,12 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Documentation (DOC-7): finished items in [TODO](TODO.md#done) are one line
+  each again, as the workflow guide asks: ID, title, date, pull request and
+  the page that describes the result. Their earlier full entries, with the
+  evidence they recorded, are kept unchanged apart from link paths in
+  [`docs/archive/todo/`](docs/archive/todo/2026-11-06-done-entries.md).
+  `TODO.md` is about 630 lines shorter.
 - LV2 (LV2-8): closed without a change. Jalv, Ardour, Carla and PipeWire,
   read in their current source and in their normal configuration, do not
   drop a queued worker request and then reactivate the plug-in, so the
