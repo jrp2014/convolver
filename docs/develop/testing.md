@@ -948,7 +948,8 @@ After installing the component, the Audio Unit workflow plays the
 [first-use fixtures](#plug-in-comparisons-plug-2) through it with Apple's own
 hosting stack (AU-15): AVAudioEngine in offline manual rendering mode, with
 the unit as an `AVAudioUnitEffect`. This shares no code with Convolver's
-tests or with pluginval.
+tests or with pluginval. It is a workflow step, not a CTest test, because it
+needs the component installed for the runner's user, as pluginval does.
 [`tests/au/avaudioengine_render.swift`](../../tests/au/avaudioengine_render.swift)
 applies an `.aupreset` from `convolver-preset` through `ClassInfo` before the
 engine starts, as a host restores a project, then feeds the input through
@@ -1023,7 +1024,9 @@ than reporting the refusal).
 ### Ardour, headless
 
 A further job of the LV2 workflow plays the plug-in in Ardour, a full DAW
-whose LV2 host is its own code rather than lilv's or JUCE's (HOST-5).
+whose LV2 host is its own code rather than lilv's or JUCE's (HOST-5). It is
+a job of its own, not a CTest test, because it needs Ardour, a large package
+that the other LV2 jobs do not install.
 [`tests/lv2/ardour_tests.py`](../../tests/lv2/ardour_tests.py) uses Ardour's
 headless tools from Ubuntu's `ardour` package (8.4 on Ubuntu 24.04) on
 each [first-use fixture](#plug-in-comparisons-plug-2): mono (1 in, 1 out),
@@ -1047,19 +1050,19 @@ the stereo cross-feed (2 in, 2 out) and the crossover (2 in, 6 out).
 
 The worst error was 4.7e-8 when the test was written (Linux, Ardour 8.4).
 
-The tools run without the MIDNAM (MIDI instrument name) files Ardour ships.
-Every Ardour tool loads them on a separate thread, and Ardour 8.4's export
-can corrupt its heap and abort ("double free or corruption") when the export
-ends while that thread is still loading. On 2026-11-06 this happened in 4 of
-40 exports with the plug-in. It did not happen in 40 exports with the plug-in
-and no MIDNAM files, or in 40 exports without the plug-in, and valgrind found
-no error in Convolver. The sessions have no MIDI. The test therefore runs
-the programs behind Ubuntu's wrapper scripts itself, with a copy of Ardour's
-data folder that leaves the MIDNAM files out.
+Ardour 8.4's export sometimes corrupts its heap and aborts at the end
+("double free or corruption") when a track has a plug-in, whichever plug-in
+it is. On 2026-11-06, with the mono session, this happened in 4 of 40
+exports with Convolver, 3 of 30 with Ardour's own a-delay plug-in instead
+and 3 of 30 with Convolver and no filter loaded, and in none of 40 with no
+plug-in; valgrind found no error in Convolver. So an export that Ardour
+kills by a signal is tried again, up to three attempts in all, and each
+retry is a warning in the log and, in CI, an annotation on the run. Any
+other failure, and any difference from the oracle, fails at once.
 
 Ardour's configuration goes to a temporary folder;
-`CONVOLVER_ARDOUR_KEEP=DIR` keeps the sessions and exports in `DIR` to
-inspect. To run it:
+`CONVOLVER_ARDOUR_KEEP=DIR` keeps the sessions and exports in `DIR`, a new
+or empty folder, to inspect. To run it:
 
 ```sh
 sudo apt-get install --no-install-recommends ardour

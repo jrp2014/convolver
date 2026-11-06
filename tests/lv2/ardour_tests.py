@@ -22,8 +22,8 @@ cross-feed 2 in 2 out, the 2 in 6 out crossover) this test:
 
 Needs Ardour's headless tools (Ubuntu's `ardour` package: ardour8-lua,
 ardour8-new_session, ardour8-export). Ardour's configuration goes to a
-temporary folder, not the user's, and the tools run without the MIDNAM files
-Ardour ships (see `without_midi_names`).
+temporary folder, not the user's. An export that Ardour 8.4 kills by a
+signal is tried again, with a warning (see `export`).
 """
 
 import json
@@ -31,6 +31,7 @@ import os
 import pathlib
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -61,51 +62,6 @@ def tool(name):
     sys.exit(f"Ardour's headless tool ardour*-{name} is not installed (Ubuntu: apt-get install ardour)")
 
 
-def without_midi_names(wrapper, directory):
-    """The program behind one of Ardour's tools, and its environment, minus MIDNAM files.
-
-    Every Ardour tool starts a thread that loads the MIDNAM (MIDI instrument
-    name) files Ardour ships. Ardour 8.4's export can corrupt its heap and
-    abort ("double free or corruption", in ExportGraphBuilder::reset or
-    ~PortExportChannel) when the export ends while that thread is still
-    loading: about 1 export in 10 with the plug-in on 2026-11-06, none in 40
-    with the plug-in and no MIDNAM files, none in 40 without the plug-in, and
-    valgrind found no error in Convolver. The sessions have no MIDI, so the
-    tools run with a copy of Ardour's data folder without the files.
-
-    Ubuntu's wrappers (/usr/bin/ardour8-export...) set the data folder
-    themselves and then exec the program (/usr/lib/ardour8/utils/ardour8-export,
-    /usr/lib/ardour8/luasession), so the test sets their environment itself and
-    runs that program. A tool that is not such a wrapper runs unchanged, with a
-    note.
-    """
-    try:
-        text = pathlib.Path(wrapper).read_text(encoding='utf-8')
-    except (OSError, UnicodeDecodeError):
-        text = ''
-    program = re.search(r'^exec "?([^"\s]+?)"? "\$@"$', text, re.MULTILINE)
-    exports = re.findall(r'^export (\w+)=([^\s"$]+)', text, re.MULTILINE)
-    data = dict(exports).get('ARDOUR_DATA_PATH')
-    target = program and program[1].replace('$SELF', pathlib.Path(wrapper).name)
-    if not (text.startswith('#!') and target and data and os.access(target, os.X_OK)):
-        print(f'note: {wrapper} is not an Ardour wrapper script; it runs with the MIDNAM files', flush=True)
-        return wrapper, {}
-    environment = {}
-    for name, value in exports:
-        # A wrapper keeps what was set before: VALUE${NAME:+:$NAME}.
-        kept = f'${{{name}:+:${name}}}' in text and os.environ.get(name)
-        environment[name] = f'{value}:{os.environ[name]}' if kept else value
-    copy = directory / 'ardour-data'
-    if not copy.exists():
-        copy.mkdir()
-        for folder in data.split(':'):
-            for entry in sorted(pathlib.Path(folder).iterdir()):
-                if entry.name != 'patchfiles' and not (copy / entry.name).exists():
-                    (copy / entry.name).symlink_to(entry)
-    environment['ARDOUR_DATA_PATH'] = str(copy)
-    return target, environment
-
-
 def plugin_uri(inputs, outputs):
     """The LV2 URI of the discrete layout with these channel counts."""
     for layout in REGISTRY['fixed_layouts']:
@@ -119,18 +75,46 @@ def plugin_uri(inputs, outputs):
     sys.exit(f'no discrete {inputs} in, {outputs} out layout in plugins/identities.json')
 
 
-def run(command, environment, timeout=300):
-    """Run a command; an Ardour tool is a (program, environment) pair."""
-    if isinstance(command[0], tuple):
-        (program, extra), *arguments = command
-        command, environment = [program, *arguments], {**environment, **extra}
+def run(command, environment, timeout=300, *, check=True):
     print('+', ' '.join(str(part) for part in command), flush=True)
     result = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=timeout, check=False)
     sys.stdout.write(result.stdout)
     sys.stdout.write(result.stderr)
-    if result.returncode != 0:
+    if check and result.returncode != 0:
         sys.exit(f'{pathlib.Path(command[0]).name} failed with exit code {result.returncode}')
-    return result.stdout
+    return result
+
+
+# Ardour 8.4's export sometimes corrupts its heap and aborts at the end
+# ("double free or corruption", in ExportGraphBuilder::reset or
+# ~PortExportChannel) when a track has a plug-in. On 2026-11-06, with the
+# mono session: 4 of 40 exports with Convolver, 3 of 30 with Ardour's own
+# a-delay plug-in instead, 3 of 30 with Convolver and no filter loaded, none
+# of 40 with no plug-in. valgrind found no error in Convolver.
+EXPORT_ATTEMPTS = 3
+
+
+def warn(message):
+    print(f'warning: {message}', flush=True)
+    if os.environ.get('GITHUB_ACTIONS') == 'true':
+        print(f'::warning title=Ardour export::{message}', flush=True)
+
+
+def export(tool_path, environment, exported, session, name):
+    """Export the session; an export killed by a signal is tried again, with a warning."""
+    for attempt in range(1, EXPORT_ATTEMPTS + 1):
+        exported.unlink(missing_ok=True)  # Nothing from an attempt that died.
+        result = run([tool_path, '-b', 'float', '-o', exported, session, name], environment, check=False)
+        if result.returncode >= 0:
+            break
+        signal_name = signal.Signals(-result.returncode).name
+        if attempt < EXPORT_ATTEMPTS:
+            warn(
+                f'{name}: {pathlib.Path(tool_path).name} died by {signal_name} (attempt {attempt} of '
+                f"{EXPORT_ATTEMPTS}), as Ardour 8.4's export can with any plug-in; trying again"
+            )
+    if result.returncode != 0:
+        sys.exit(f'{name}: {pathlib.Path(tool_path).name} failed with exit code {result.returncode}')
 
 
 def recorded_take(session, name):
@@ -170,14 +154,14 @@ def check(tools, environment, directory, plugin_tool, fixture_name, fixture):
         'CONVOLVER_TAIL': str(filter_tail + MARGIN),
         'CONVOLVER_LEAD': str(LEAD),
     }
-    log = run([tools['lua'], SCRIPT], {**environment, **settings})
+    log = run([tools['lua'], SCRIPT], {**environment, **settings}).stdout
     # The region can be a few frames shorter than the take's files.
     recorded = re.search(r'^Recorded (\d+) frames', log, re.MULTILINE)
     assert recorded, f'{name}: the script did not report the recording'
     length = int(recorded[1])
 
     exported = directory / f'{name}.wav'
-    run([tools['export'], '-b', 'float', '-o', exported, session, name], environment)
+    export(tools['export'], environment, exported, session, name)
 
     take = recorded_take(session, name)
     assert len(take) == inputs, f'{name}: recorded {len(take)} channels, expected {inputs}'
@@ -214,18 +198,19 @@ def main():
         sys.exit(__doc__)
     bundle = pathlib.Path(sys.argv[1]).resolve()
     plugin_tool = pathlib.Path(sys.argv[2]).resolve()
+    tools = {name: tool(name) for name in ('lua', 'new_session', 'export')}
     worst = 0.0
-    # CONVOLVER_ARDOUR_KEEP=DIR keeps the sessions and exports there, to inspect.
+    # CONVOLVER_ARDOUR_KEEP=DIR keeps the sessions and exports in DIR, a new or
+    # empty folder, to inspect.
     keep = os.environ.get('CONVOLVER_ARDOUR_KEEP')
+    if keep and pathlib.Path(keep).exists() and any(pathlib.Path(keep).iterdir()):
+        sys.exit(f'CONVOLVER_ARDOUR_KEEP={keep} is not empty; name a new or empty folder')
     with tempfile.TemporaryDirectory() as temporary:
         directory = pathlib.Path(keep or temporary)
-        if keep:
-            shutil.rmtree(directory, ignore_errors=True)
-            directory.mkdir(parents=True)
+        directory.mkdir(parents=True, exist_ok=True)
         (directory / 'lv2').mkdir()
         (directory / 'sessions').mkdir()
         shutil.copytree(bundle, directory / 'lv2' / bundle.name)
-        tools = {name: without_midi_names(tool(name), directory) for name in ('lua', 'new_session', 'export')}
         environment = {
             **os.environ,
             'LV2_PATH': str(directory / 'lv2'),

@@ -1323,7 +1323,10 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   john's request for unattended host checks: the LV2 workflow records,
   saves, restores and exports the three first-use fixtures through the
   plug-in in Ardour 8 and checks the exports against the oracle
-  ([Ardour, headless](docs/develop/testing.md#ardour-headless)).
+  ([Ardour, headless](docs/develop/testing.md#ardour-headless)). Ardour
+  8.4's export aborts in about 1 export in 10 with any plug-in, Ardour's
+  own included, so an export killed by a signal is tried again with a
+  warning; a newer Ardour on the runners can drop the retry.
 - [x] **LV2-1 — Adapter and headless test.** 22 October 2026, PR #43;
   [LV2 tests](docs/develop/testing.md#lv2-tests).
 - [x] **LV2-2 — Loading filters.** 23 October 2026, PR #48;

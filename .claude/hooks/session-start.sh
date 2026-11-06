@@ -41,8 +41,16 @@ install_host_test_tools() {
     return 0
   fi
   SUDO=""; [ "$(id -u)" = 0 ] || SUDO="sudo"
-  nohup $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -o DPkg::Lock::Timeout=300 \
-    xvfb libasound2t64 ardour >/dev/null 2>&1 </dev/null &
+  # As install_build_tools does, refresh stale package lists once if the
+  # install fails. The outcome goes to /tmp/convolver-host-test-tools.log.
+  nohup $SUDO bash -c '
+    install() {
+      DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        -o DPkg::Lock::Timeout=300 xvfb libasound2t64 ardour
+    }
+    install || { apt-get update -qq -o DPkg::Lock::Timeout=300 && install; } ||
+      echo "Could not install xvfb and Ardour; the pluginval and Ardour tests need them." >&2' \
+    >/tmp/convolver-host-test-tools.log 2>&1 </dev/null &
 }
 
 # The Git hook runs `pre-commit run` on the staged files before each commit,
