@@ -90,8 +90,11 @@ def run(command, environment, timeout=300, *, check=True):
 # ~PortExportChannel) when a track has a plug-in. On 2026-11-06, with the
 # mono session: 4 of 40 exports with Convolver, 3 of 30 with Ardour's own
 # a-delay plug-in instead, 3 of 30 with Convolver and no filter loaded, none
-# of 40 with no plug-in. valgrind found no error in Convolver.
+# of 40 with no plug-in. valgrind found no error in Convolver. The corrupted
+# heap can also leave the export hung (1 in about 100), so a hung export is
+# stopped and tried again too. An export takes a few seconds.
 EXPORT_ATTEMPTS = 3
+EXPORT_TIMEOUT = 120
 
 
 def warn(message):
@@ -101,20 +104,28 @@ def warn(message):
 
 
 def export(tool_path, environment, exported, session, name):
-    """Export the session; an export killed by a signal is tried again, with a warning."""
+    """Export the session; an export killed by a signal, or hung, is tried again with a warning."""
+    tool_name = pathlib.Path(tool_path).name
     for attempt in range(1, EXPORT_ATTEMPTS + 1):
         exported.unlink(missing_ok=True)  # Nothing from an attempt that died.
-        result = run([tool_path, '-b', 'float', '-o', exported, session, name], environment, check=False)
-        if result.returncode >= 0:
-            break
-        signal_name = signal.Signals(-result.returncode).name
+        command = [tool_path, '-b', 'float', '-o', exported, session, name]
+        try:
+            returncode = run(command, environment, timeout=EXPORT_TIMEOUT, check=False).returncode
+        except subprocess.TimeoutExpired:
+            returncode, failure = None, f'did not finish in {EXPORT_TIMEOUT} s'
+        else:
+            if returncode >= 0:
+                break
+            failure = f'died by {signal.Signals(-returncode).name}'
         if attempt < EXPORT_ATTEMPTS:
             warn(
-                f'{name}: {pathlib.Path(tool_path).name} died by {signal_name} (attempt {attempt} of '
-                f"{EXPORT_ATTEMPTS}), as Ardour 8.4's export can with any plug-in; trying again"
+                f'{name}: {tool_name} {failure} (attempt {attempt} of {EXPORT_ATTEMPTS}), '
+                f"as Ardour 8.4's export can with any plug-in; trying again"
             )
-    if result.returncode != 0:
-        sys.exit(f'{name}: {pathlib.Path(tool_path).name} failed with exit code {result.returncode}')
+    if returncode is None:
+        sys.exit(f'{name}: {tool_name} {failure}, {EXPORT_ATTEMPTS} times')
+    if returncode != 0:
+        sys.exit(f'{name}: {tool_name} failed with exit code {returncode}')
 
 
 def recorded_take(session, name):
@@ -131,6 +142,22 @@ def recorded_take(session, name):
         file = session / 'interchange' / name / 'audiofiles' / sources[region.get(f'source-{len(channels)}')]
         channels.append(read_float_wav(file)[0])
     return channels
+
+
+def region_position(session, name):
+    """The one region's position as the session file writes it, for diagnostics."""
+    root = ET.parse(session / f'{name}.ardour').getroot()  # noqa: S314
+    return next(region.get('position') for playlist in root.iter('Playlist') for region in playlist.iter('Region'))
+
+
+def best_lag(got, want, search=512, span=4096):
+    """For a failure: the shift, in frames, at which `got` best matches `want` after the lead."""
+
+    def error(lag):
+        frames = range(LEAD, min(LEAD + span, len(want), len(got) - lag))
+        return max(abs(got[n + lag] - want[n]) for n in frames)
+
+    return min(((lag, error(lag)) for lag in range(-search, search + 1)), key=lambda pair: pair[1])
 
 
 def check(tools, environment, directory, plugin_tool, fixture_name, fixture):
@@ -183,6 +210,9 @@ def check(tools, environment, directory, plugin_tool, fixture_name, fixture):
             first = next((n for n, e in enumerate(errors) if e >= TOLERANCE), None)
             if first is not None:
                 print(f'{name}: output {c} first differs at frame {first}: {got[first]} instead of {want[first]}')
+                lag, error = best_lag(got, want)
+                print(f'{name}: output {c} matches best {lag:+d} frames from where expected (error {error:.3g})')
+        print(f'{name}: the region is at {region_position(session, name)} in the session file')
     peak = max(abs(v) for channel in expected for v in channel)
     print(
         f'{name}: {inputs} in, {outputs} out, {len(take[0])} recorded frames, export of {frames}: '
@@ -203,8 +233,9 @@ def main():
     # CONVOLVER_ARDOUR_KEEP=DIR keeps the sessions and exports in DIR, a new or
     # empty folder, to inspect.
     keep = os.environ.get('CONVOLVER_ARDOUR_KEEP')
-    if keep and pathlib.Path(keep).exists() and any(pathlib.Path(keep).iterdir()):
-        sys.exit(f'CONVOLVER_ARDOUR_KEEP={keep} is not empty; name a new or empty folder')
+    folder = pathlib.Path(keep) if keep else None
+    if folder and folder.exists() and (not folder.is_dir() or any(folder.iterdir())):
+        sys.exit(f'CONVOLVER_ARDOUR_KEEP={keep} is not an empty folder; name a new or empty folder')
     with tempfile.TemporaryDirectory() as temporary:
         directory = pathlib.Path(keep or temporary)
         directory.mkdir(parents=True, exist_ok=True)

@@ -172,6 +172,17 @@ is superseded.
   Windows device in the [guide](docs/develop/testing.md#equalizer-apo-export-tests)
   (device rate and channel count reach the configuration; exclusive mode
   bypasses it), done by anyone with a Windows computer, with the result recorded there.
+- [ ] **HOST-6 — Explain an Ardour export 16 frames early.** On 6 November
+  2026, 1 of about 300 local mono exports in the
+  [Ardour test](docs/develop/testing.md#ardour-headless) (HOST-5) came out
+  16 frames earlier than the recorded take plus the reported 256 frames of
+  latency; it was not reproduced in 180 more runs, some under full CPU load.
+  It is not yet known whether Ardour 8.4 or Convolver moved it. The test
+  fails on such an export, never retries it, and prints the shift that
+  matches best and the region's position. Next time: keep the session
+  (`CONVOLVER_ARDOUR_KEEP`), check the region position and whether the
+  plug-in's filter loaded during the export, and repeat with a plug-in
+  that reports latency and has no worker.
 
 ## Plug-ins: VST3, LV2 and AU
 
@@ -1325,8 +1336,9 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   plug-in in Ardour 8 and checks the exports against the oracle
   ([Ardour, headless](docs/develop/testing.md#ardour-headless)). Ardour
   8.4's export aborts in about 1 export in 10 with any plug-in, Ardour's
-  own included, so an export killed by a signal is tried again with a
-  warning; a newer Ardour on the runners can drop the retry.
+  own included, and now and then hangs, so an export killed by a signal or
+  hung for 2 minutes is tried again with a warning; a newer Ardour on the
+  runners can drop the retry. One unexplained early export is HOST-6.
 - [x] **LV2-1 — Adapter and headless test.** 22 October 2026, PR #43;
   [LV2 tests](docs/develop/testing.md#lv2-tests).
 - [x] **LV2-2 — Loading filters.** 23 October 2026, PR #48;

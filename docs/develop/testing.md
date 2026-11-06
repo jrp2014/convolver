@@ -1055,10 +1055,14 @@ Ardour 8.4's export sometimes corrupts its heap and aborts at the end
 it is. On 2026-11-06, with the mono session, this happened in 4 of 40
 exports with Convolver, 3 of 30 with Ardour's own a-delay plug-in instead
 and 3 of 30 with Convolver and no filter loaded, and in none of 40 with no
-plug-in; valgrind found no error in Convolver. So an export that Ardour
-kills by a signal is tried again, up to three attempts in all, and each
-retry is a warning in the log and, in CI, an annotation on the run. Any
-other failure, and any difference from the oracle, fails at once.
+plug-in; valgrind found no error in Convolver. The corrupted heap can also
+leave the export hung (once in about 100 exports). So an export that Ardour
+kills by a signal, or that has not finished after 2 minutes, is tried again,
+up to three attempts in all, and each retry is a warning in the log and, in
+CI, an annotation on the run. Any other failure, and any difference from the
+oracle, fails at once. A failing comparison prints the shift at which the
+export matches best and the region's position in the session file; one
+local export came out 16 frames early, unexplained so far (HOST-6).
 
 Ardour's configuration goes to a temporary folder;
 `CONVOLVER_ARDOUR_KEEP=DIR` keeps the sessions and exports in `DIR`, a new
