@@ -205,9 +205,11 @@ jrp, and has not been done yet:
    other workflows. Wait for the whole run to pass.
 2. Download that run's `complete-preview-candidate` artifact (made by its
    `collect` job) and check every file against the `SHA256SUMS` file it
-   contains. These are the files you will attach, unchanged. For the first
-   preview, the independent walkthrough (REL-3 in [TODO](../../TODO.md)) uses
-   these same files before they are uploaded.
+   contains. These are the files you will attach, unchanged. The first
+   preview is macOS-only ([decisions](../project/decisions.md#plug-in-behaviour)),
+   so attach only the two macOS packages, with the [corresponding source](#licences-and-corresponding-source). For
+   the first preview, the independent walkthrough (REL-3 in
+   [TODO](../../TODO.md)) uses these same files before they are uploaded.
 3. Run the [smoke test](host-testing.md#smoke-test-for-an-unsigned-preview) in
    at least one host, and the
    [responsiveness qualification](#responsiveness-qualification) on a named

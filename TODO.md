@@ -42,10 +42,13 @@ request before starting so independent tasks do not duplicate changes.
 22 October 2026): an independent user installs and uses an exact preview
 package, following only the documentation. This is the end-to-end test. "Ready" means the
 REL-2 journeys work, not that a set of items is ticked. The first preview is
-cut from the 0.10 series and holds the VST3 plug-in, the Audio Unit (macOS),
-the `convolver` CLI and the preset tool, with the editor's settings and window
-in both plug-in formats; LV2 joins a later preview once
-its own journeys are demonstrated. What still blocks it, with the evidence, is in
+cut from the 0.10 series and is macOS-only
+([decided](docs/project/decisions.md#plug-in-behaviour)): the VST3 plug-in and the
+Audio Unit with the existing shared window and their Gain, Mix and Latency
+settings, the `convolver` CLI and the preset tool. The Windows and Linux
+windows, the other gain modes and the meters, and PERF-3's wider workloads
+come in later previews; LV2 joins a later preview once its own journeys are
+demonstrated. What still blocks it, with the evidence, is in
 [status](docs/project/status.md#what-still-blocks-the-first-preview).
 Finishing a dependable product matters more than another substantial
 refactor: move code into shared layers only when two formats need the same
@@ -59,10 +62,10 @@ boundary and C++20 in the core.
 | 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, the Audio Unit from the same candidate, which holds it since PR #115) at the same sitting | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 and AU-4 both gate the first preview, which holds the Audio Unit too. Needs no CLI in the package, so it can start now that step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
 | 3. Alongside step 2 | **PLUG-5** first-preview contents: in the candidates since PR #115 (the Audio Unit on macOS, the VST trademark notice; the `convolver` CLI and the first-use presets since PR #101); what remains is qualifying one exact candidate (HOST-1, AU-4, REL-3) and jrp's publication. **REL-2** (done): the stereo, 2→6 crossover and CLI journeys are written in `docs/use/` | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
 | Early walkthrough (macOS) (done) | **REL-5**: an explicitly limited walkthrough of an exact candidate on macOS, the stereo journey only | Done on 1 November 2026 as a package and command-line check only, by jrp's choice ([done](#done)); its host steps moved to HOST-1's REAPER smoke test and REL-3. It did not change the first preview's contents and does not replace REL-3. |
-| 4. Settings, windows and the Audio Unit | The **HOST-2** editor, which jrp wants in the first preview with the Audio Unit: **PLUG-9** and **PLUG-10**, then **VST3-3**, **VST3-4**, **AU-7** and the first half of **AU-6**, then the windows **VST3-11** (macOS, shared with the Audio Unit in **AU-6**), **VST3-12** (Windows) and **VST3-13** (Linux, VSTGUI stop-gap); and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview, in the macOS candidates since PR #115) | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the supported workloads (PERF-3), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
+| 4. Settings, windows and the Audio Unit | The **HOST-2** editor as the macOS-only first preview has it: **PLUG-9** and **PLUG-10** (Gain, Mix and Latency), **VST3-3**, **VST3-4**, **AU-7**, and the window **VST3-11** shared with the Audio Unit in **AU-6**; and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview, in the macOS candidates since PR #115). For later previews: **VST3-12** (Windows), **VST3-13** (Linux), and PLUG-9, PLUG-10 and AU-7's remaining gain modes and meters | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items) the first preview needs, each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the [preview workloads](#loading-responsiveness), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
 | 5. The milestone | A candidate from a 0.10.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
-| 6. Later previews | **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
-| Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need; the loading-responsiveness gate uses its workloads. |
+| 6. Later previews | Windows and Linux (**VST3-12**, **VST3-13**), the remaining gain modes and meters (**PLUG-9**, **PLUG-10**, **AU-7**), PERF-3's supported workloads; **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
+| Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need. Not a first-preview gate: the loading-responsiveness gate uses the finite preview workloads instead. |
 | Supporting, cheap | **PERF-1**, **HOST-4** | HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. |
 | Optional editor work | **PLUG-11** (FFT planning in FFTW-built plug-ins), **LV2-6** (an LV2 window, only if Linux users ask) | Not needed for any preview. |
@@ -158,7 +161,9 @@ is superseded.
   for the settings and the windows (VST3 on macOS, Windows, and Linux in
   VSTGUI as a stop-gap; the Audio Unit, which joins the first preview, with
   the shared macOS window); settings saved in each format's own way, with the
-  divergence documented.
+  divergence documented. Since narrowed: the first preview is macOS-only,
+  and the Windows and Linux windows come in later previews
+  ([decided](docs/project/decisions.md#plug-in-behaviour)).
 - [ ] **HOST-3 — Windows Media Foundation transform (parked).** Needs more
   thought before any work starts. Wrap the engine as a
   synchronous dual-mode audio effect (MFT plus DMO) for Windows Media Player
@@ -248,7 +253,7 @@ Shared work, done once for all three formats:
   file-to-state step as a shared function, so a load from the window gives
   state byte-identical to `convolver-preset`'s. Table-driven tests per
   failure kind in `native.host`; the contract change in its own pull request.
-  Needed for the first preview.
+  What the first preview needs is done; the rest is for a later preview.
   Progress (25 October 2026, PR #84): the report, `report_fields()`,
   `report_text()` and Copy diagnostics' `diagnostics_text()` in
   `portable/host_report.hpp`, checked per state in `native.host_report`, for
@@ -271,7 +276,8 @@ Shared work, done once for all three formats:
   only; states moved between formats keep the filter, not the settings) is
   documented in `docs/use/plugins.md` and listed here as a limitation
   ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings)). Defaults leave the sound unchanged.
-  Needed for the first preview. Oracle tests with the worst
+  Gain, Mix and Latency are in the first preview; the other gain modes and
+  the meters are for a later preview. Oracle tests with the worst
   error relative to the peak; the contract change in its own pull request.
   Progress (25 October 2026, PR #80): Gain and Mix in `HostProcessor`, the
   contract's [settings](docs/develop/plugin-contract.md#settings) and the
@@ -533,7 +539,8 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   mode, mix and latency as global parameters (IDs beside Status 1001 in
   `plugins/identities.json`), latency indexed and not automatable, with
   latency and tail change notifications ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#per-format)).
-  Needed for the first preview.
+  Gain, Mix and Latency are in the first preview; Gain mode is for a later
+  preview.
   Progress (25 October 2026, PR #80): Gain (0) and Mix (1003), saved in
   `ClassInfo` ([settings](docs/use/plugins.md#settings)). Progress
   (31 October 2026, PR #95): Latency (1004), with the latency change
@@ -662,19 +669,21 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   on macOS CI ([format notes](docs/develop/plugin-contract.md#format-notes)).
   `editorhost` is not used: it is an interactive program that runs until its
   window is closed, so pluginval's editor tests stand in for it. Remaining:
-  the steps in REAPER and Audacity ([host testing](docs/develop/host-testing.md#reaper-vst3)),
-  VoiceOver, and the meters (with PLUG-10).
+  the steps in REAPER and Audacity ([host testing](docs/develop/host-testing.md#reaper-vst3))
+  and VoiceOver for the first preview; the meters (with PLUG-10) for a later
+  preview.
 - [ ] **VST3-12 — Editor window on Windows.** The same window as a Win32 view
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.
-  Needed for the first preview.
+  For a later preview: the first preview is macOS-only ([decided](docs/project/decisions.md#plug-in-behaviour)).
 - [ ] **VST3-13 — Editor window on Linux.** The window in VSTGUI, for the
   Linux VST3 build only, as a stop-gap, driven by the
   host's `IRunLoop`; VSTGUI (BSD-3-Clause) and the libraries it links added
   to the package checks and licence notices; opened by `editorhost` under
   `xvfb-run`. Not reachable by screen readers, which the guide says. A native
   X11 view can replace it later if Linux users need one
-  ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#framework-choice)). Needed for the first preview.
+  ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#framework-choice)).
+  For a later preview: the first preview is macOS-only ([decided](docs/project/decisions.md#plug-in-behaviour)).
 Not relevant to a convolver unless the product changes: MIDI and note
 interfaces (`IMidiMapping2`, `IMidiLearn2`, note expression, MIDI 2.0
 articulations), `ITransportControl`, `IPrefetchableSupport`,
@@ -821,7 +830,7 @@ prepares a filter on the thread that asks for it: VST3's `setState`, the
 Audio Unit's `RestoreState` and, since PR #84 (merged 31 October 2026), the
 Audio Unit window's Choose Filter property call. Cached reports keep other readers from waiting,
 but not the calling thread, which may be the host's interface thread.
-Measure, on the PERF-3 supported workloads, how long that thread is held
+Measure, on the preview workloads (below), how long that thread is held
 and whether audio drops out while a long filter loads, replaces another and
 is reset; if loads cause noticeable pauses, move preparation to the
 background before the preview (VST3-5 is the VST3 part). Measure with
@@ -847,7 +856,7 @@ become an executable gate before the preview. Acceptance: an automated test
 times each adapter's own load and restore entry point (VST3 `setState` and
 the window's load, the Audio Unit's `RestoreState` and load property, LV2's
 `restore` and worker) while a test host renders audio on another thread, on
-the PERF-3 workloads, and records how long the caller is blocked and how
+the preview workloads, and records how long the caller is blocked and how
 late each callback is. jrp sets the threshold for both; the gate passes when
 every adapter meets it. If one does not, preparation moves to a worker, with
 the adapter (as LV2 does) owning request order, overtaken requests,
@@ -857,11 +866,19 @@ PERF-9 (done, PR #111) built that test on interim workloads, with jrp's
 limits (5 November 2026): in optimised builds, no late callback and none
 over half its period while a load runs on another thread, and the host's
 thread held at most 100 ms with filters up to 10 s and 250 ms with 30 s
-([load timing](docs/develop/testing.md#load-timing-perf-9)). What remains:
-the PERF-3 workloads in place of the interim ones, and, if the 30 s case
-ever exceeds 250 ms on a supported platform, jrp's choice between
-background preparation in VST3 and the Audio Unit (VST3-5) and a higher
-limit with the pause documented.
+([load timing](docs/develop/testing.md#load-timing-perf-9)).
+
+**Preview workloads.** The gate is finite: its workloads are the ones that
+test already runs, a stereo 48 kHz filter of 1, 10 and 30 s with 512-frame
+callbacks, loaded into an empty instance, replaced by another as long and
+reset, through each adapter's load and restore entry points. PERF-3's wider
+measurements (6- and 8-channel routing, 96 kHz, other block sizes, memory)
+become stated supported workloads after the first preview; they are not a
+preview gate. What remains for the gate: the release qualification run on
+the intended machine ([REL-6](docs/develop/releasing.md#responsiveness-qualification)) and, if the 30 s case
+exceeds 250 ms on a supported platform, jrp's choice between background
+preparation in VST3 and the Audio Unit (VST3-5) and a higher limit with the
+pause documented.
 First optimised-build figures (Linux cloud VM, 4 cores, clang Release with
 Ooura, 5 November 2026; stereo 48 kHz, 512-frame callbacks): VST3 `setState`
 held the host's thread for 4 ms with a 1 s filter, 43 to 61 ms with 10 s,

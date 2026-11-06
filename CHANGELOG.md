@@ -195,6 +195,14 @@ Until 1.0 the C++ API may change between minor versions.
   full (for example `-3.5314949508258078 dB`), so the figure can be given to
   `--gain-db` to make the same file, and `no-clip` says how much of it is
   headroom. The library adds `quantization_headroom()`.
+- Planning (jrp's review of 0.10.8): the first preview is macOS-only, with
+  the VST3 plug-in and the Audio Unit in the existing shared window and
+  their Gain, Mix and Latency settings; the Windows and Linux windows, the
+  other gain modes and the meters move to later previews. Its
+  loading-responsiveness gate names a finite set of workloads, the stereo 1,
+  10 and 30 s filters its test already runs; PERF-3's wider supported
+  workloads come after the preview. TODO, the status page (whose summary
+  now describes 0.10.8), the release steps and the decisions log say so.
 - Inspection (ROBUST-2, jrp's answers on PR #118): when `--all-configurations`
   stops at a limit, the `limit` error now ends "The check is incomplete: this
   entry and every entry after it were not checked.", and the selection reason

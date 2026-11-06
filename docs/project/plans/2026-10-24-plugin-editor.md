@@ -716,7 +716,7 @@ and VST3-4 are in, as they share the report code and differ only in views.
   prepared on the host's thread, as a state restore is today, so the window
   cannot repaint meanwhile. Since jrp's review of `6920a45` (31 October 2026)
   this is an acceptance gate for every window, not only a risk: measured on
-  the PERF-3 supported workloads by automated tests rather than by hand in a
+  the [preview workloads](../../../TODO.md#loading-responsiveness) by automated tests rather than by hand in a
   host, a load must not pause the host noticeably,
   or preparation moves to the background first (VST3-5 for VST3, the same in
   the Audio Unit), with the window showing "Loading". LV2's request numbers
@@ -795,4 +795,7 @@ them: the Gain range (PLUG-10), new parameter IDs and LV2 port symbols.
    recorded rather than blocking.
 9. **Previews (decided):** the first preview waits for the settings and the
    three VST3 windows, and holds the Audio Unit with its settings and the
-   shared macOS window.
+   shared macOS window. Narrowed since: the first preview is macOS-only, with
+   the existing shared window and Gain, Mix and Latency; the Windows and
+   Linux windows, the other gain modes and the meters come in later previews
+   ([decisions](../decisions.md#plug-in-behaviour)).
