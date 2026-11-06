@@ -515,7 +515,8 @@ class HostProcessor {
     // In-place input/output is supported. Nonfinite input/output is silenced.
     // False means invalid dimensions, with no state advance or output guarantee,
     // or an engine failure, with the output silenced. Each problem is counted
-    // in faults().
+    // in faults(). The whole call flushes subnormal floats to zero (x86-64 and
+    // AArch64) and restores the host thread's floating-point mode on return.
     bool process(std::span<const float* const>, std::span<float* const>, std::size_t) noexcept;
     bool process(std::span<const double* const>, std::span<double* const>, std::size_t) noexcept;
 

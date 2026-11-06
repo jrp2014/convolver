@@ -628,10 +628,22 @@ convolution at 256 frames per output where the whole filter is engaged. The
 filters are synthetic room corrections (a central peak in decaying noise) or,
 for the crossover, Blackman-windowed bands at 10–250–2500–24k Hz. The input is
 scaled so that the full-level signal's output peaks at -0.1 dBFS; the quiet
-inputs are that level less 120 dB, or 1e-35 of it (output peaking near 1e-35,
-with about a quarter of the output samples subnormal, below `FLT_MIN`; the test
-requires subnormal output and some differing samples there, so the case cannot
-pass vacuously).
+inputs are that level less 120 dB, or 1e-35 of it (output peaking near 1e-35).
+Before PERF-15 about a quarter of that case's output samples were subnormal,
+below `FLT_MIN`, and the test required subnormal output and some differing
+samples there, so the case could not pass vacuously. Since PERF-15 the engine
+flushes subnormals to zero on x86-64 and AArch64
+([numerical policy](architecture.md#subnormal-numbers)), so there the case has
+no subnormal output and loses the products below `FLT_MIN`: the sets differ by
+about 0.3 of its peak and each is about 0.66 of the peak from the oracle
+(1.9e-36 and 4.7e-36 on x86-64 with FFTW, 5 November 2026). That loss is a
+few hundred `FLT_MIN` at any level, so at 1e-35 the case cannot check the
+kernels' rounding (the -120 dB case does). It checks the flushing instead: no
+subnormal output from either set, each set's output keeping at least a quarter
+of the oracle's peak (so neither vanished), and both sets within 1000
+`FLT_MIN` (1.2e-35, about -699 dBFS) of each other and of the oracle, which an
+inverted output would break. Where nothing flushes, the earlier checks still apply.
+The table below predates PERF-15.
 Measured 24 October 2026 with the Ooura FFT, Release builds, GCC 13.3 and
 Clang 18.1.3 giving identical figures; "relative" is to the output's peak, dBFS
 to full scale (1.0):
@@ -659,8 +671,8 @@ audible. For scale, changing the block size from 256 to 512 with the baseline
 set changes a 64k sine render by as much (up to 1.5e-6 at some frequencies,
 -116.5 dBFS). The test fails if the sets differ by more than 1e-6 of the peak
 or -120 dBFS, if either leaves the oracle tolerance, or if the FMA set's
-oracle error exceeds 1.5 times the baseline's; those limits are not to be
-widened without investigating the cause. In Debug builds it runs the 64k
+oracle error exceeds 1.5 times the baseline's (except the flushed 1e-35 case
+above); those limits are not to be widened without investigating the cause. In Debug builds it runs the 64k
 workloads only. `native.engine` also checks every kernel against the standard
 floating-point error bound of a double-precision sum, on random values of
 every magnitude.

@@ -2,6 +2,7 @@
 #include "convolver/host.hpp"
 #include "advice.hpp"
 #include "convolver_identities.hpp"
+#include "denormals.hpp"
 #include "host_log.hpp"
 #include <algorithm>
 #include <array>
@@ -1172,10 +1173,16 @@ void HostProcessor::fault_signalled() noexcept {
 }
 bool HostProcessor::process(std::span<const float* const> in, std::span<float* const> out,
                             std::size_t n) noexcept {
+    // PERF-15: the whole call (conversion, gain, mixing and the engines) runs
+    // with subnormals flushed to zero; the host's mode is restored on return.
+    const detail::ScopedFlushDenormals flush;
     return impl_->process(in, out, n);
 }
 bool HostProcessor::process(std::span<const double* const> in, std::span<double* const> out,
                             std::size_t n) noexcept {
+    // PERF-15: the whole call (conversion, gain, mixing and the engines) runs
+    // with subnormals flushed to zero; the host's mode is restored on return.
+    const detail::ScopedFlushDenormals flush;
     return impl_->process(in, out, n);
 }
 } // namespace convolver

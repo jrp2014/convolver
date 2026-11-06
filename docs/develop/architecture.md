@@ -16,6 +16,7 @@ For the audio vocabulary, start with [concepts](../use/concepts.md).
 | Validation, latency, tail and storage estimates | `validate_configuration`, `analyze_configuration`, `configuration_tail_frames` in the same files | Shared by engine construction and inspection; no FFT planning in analysis |
 | Offline attenuation estimates | `estimate_attenuation` and `worst_case_peak` in [`attenuation.cpp`](../../portable/attenuation.cpp) | Core; `estimate_attenuation` prepares and runs an engine, and both allocate, so never call them from an audio callback |
 | Partition multiply-accumulate kernels | [`kernels.hpp`](../../portable/kernels.hpp): `Kernels`, `kernels()`; bodies in [`kernels.inc`](../../portable/kernels.inc), compiled for the baseline in [`kernels.cpp`](../../portable/kernels.cpp) and for AVX2 with FMA in [`kernels_avx2.cpp`](../../portable/kernels_avx2.cpp) | Private to core; chosen once from the CPU's features when an engine is built; the sets differ by float rounding only (`native.kernel_divergence`) |
+| Subnormal flushing while processing (PERF-15) | [`denormals.hpp`](../../portable/denormals.hpp): `ScopedFlushDenormals`, entered by `Engine::process`, `HostProcessor::process`, the `Engine` constructor and the CLI's render | Private to core; header only; x86-64 and AArch64 controls, nothing elsewhere ([numerical policy](#subnormal-numbers)) |
 | FFT contract and implementations | [`fft.hpp`](../../portable/fft.hpp): `RealFft`, `fft_size`, `fft_storage`; [`fft_fftw.cpp`](../../portable/fft_fftw.cpp), [`fft_accelerate.cpp`](../../portable/fft_accelerate.cpp), [`fft_ooura.cpp`](../../portable/fft_ooura.cpp) | One backend per build; plan/storage details stay private |
 | Host buffering, bypass and filter replacement | [`host.hpp`](../../include/convolver/host.hpp): `HostProcessor`; [`host.cpp`](../../portable/host.cpp) | `Convolver::host` depends on core; planar/in-place host buffers |
 | Shared adapter contract, control side | `HostFilter`, `HostLayout`, `unfiltered_configuration`, `speaker_notice`, `HostFailure` in [`host.hpp`](../../include/convolver/host.hpp); messages in their parts, `Advice` in [`advice.hpp`](../../include/convolver/advice.hpp), formatted for each surface by [`portable/advice.hpp`](../../portable/advice.hpp) (DIAG-4) | Which filter a load replaces, what is saved and what plays, and why a request failed (PLUG-8); every plug-in adapter uses it under its control lock |
@@ -86,6 +87,48 @@ workflow.
    partitions (PERF-5), so neither reset nor the blocks after it pay for
    history known to be silence. It does not rebuild plans or read files.
 
+### Subnormal numbers
+
+Numbers below the smallest normal float (`FLT_MIN`, about 1.2e-38, or -758
+dBFS) are flushed to zero while Convolver processes (PERF-15; see the
+[decisions log](../project/decisions.md#configuration-and-sound)). A long filter, or a tail fading to silence, produces them,
+and arithmetic on them is many times slower on most processors: on the Linux
+cloud VM the LV2 plug-in's longest callbacks with a 30-second filter at full
+history took 37 to 43 ms with them and 8 to 12 ms without. Most hosts flush on their audio threads, but not all, and the
+CLI's thread never does, so Convolver does not rely on the caller.
+
+- `Engine::process` and `HostProcessor::process` each hold a
+  `ScopedFlushDenormals` for the whole call: in `HostProcessor` that covers
+  the sample conversion, gain, mixing and crossfades as well as the engines.
+  The CLI holds one for its whole render, so `--gain-db` and quantization
+  are covered too. The `Engine` constructor holds one while it prepares
+  (so `HostProcessor`'s construction and `prepare` do): transforming a long
+  filter's subnormal tail was slow too, and with it the LV2 plug-in held a
+  load of the 30-second filter for 170 to 200 ms, against 63 to 93 ms
+  flushed (Linux cloud VM, Release, Ooura).
+  It sets the thread's flush mode and restores the caller's on return,
+  early return or exception; only the flush bits change, and a caller that
+  already flushes keeps doing so. Nested scopes write nothing.
+- x86-64 sets MXCSR's flush-to-zero and denormals-are-zero bits; AArch64
+  (Apple Silicon, Arm Linux) sets FPCR.FZ. Other processors keep IEEE gradual
+  underflow; none is a supported release target.
+- The result is not bit-identical to IEEE gradual underflow. Subnormal inputs
+  read as zero (a signal wholly below `FLT_MIN` gives silence), and a float
+  product or sum below `FLT_MIN` becomes zero, so float output never holds a
+  subnormal value. (`HostProcessor`'s double path does its gain and mix in
+  double, so a double output can still hold a normal double below
+  `FLT_MIN`; only double subnormals are flushed there.) The absolute error
+  this adds is of the order of a few hundred `FLT_MIN` (4.7e-36, about 400
+  times `FLT_MIN`, in `native.kernel_divergence`'s 1e-35 case, whose limit
+  is 1000 times `FLT_MIN`, about -699 dBFS), so results are unchanged except
+  within that distance of zero, and the oracle tests still pass:
+  `native.denormals` checks the restoration rules, a subnormal input and a
+  tail decaying through the subnormal range, and
+  `native.kernel_divergence` checks its 1e-35 case with that absolute limit.
+- Work outside these calls, such as `estimate_attenuation`'s engine runs,
+  gets the same flushing because it builds and runs engines; code that calls
+  the FFT or kernels directly (their tests) does not.
+
 The FFT interface uses interleaved real/imaginary bins. The engine stores its
 partition spectra in separate real and imaginary arrays for multiply-accumulate
 loops. Do not confuse these two layouts when changing a backend. All backends
@@ -99,6 +142,7 @@ See [FFT contracts](fft-backends.md#selection-and-contract).
 | Audio callback | No allocation, locking, file I/O or FFT planning in `Engine::process` or its callees | `native.engine`; inspect callees as well as the heap guard |
 | Timing | B-frame core latency; tail excludes latency; arbitrary caller chunks and reset preserve defined behavior | `native.engine`, `native.host`, `native.cli` |
 | Numeric changes | Independent direct DFT and double-precision convolution references; backend agreement alone is insufficient | `fft_tests.cpp`, `engine_tests.cpp`, backend comparison script |
+| Subnormals | Flushed to zero for the whole of `Engine::process`, `HostProcessor::process` and engine preparation; the caller's floating-point mode restored on every exit | `native.denormals`, `native.kernel_divergence` |
 | Routes | Preserve order, repeated-route addition, fractional gains and signed zero | Parser, engine, I/O and compatibility corpus tests |
 | Selection | First matching list entry; relative paths beside their owner; no implicit resampling or guessed drive mapping | `config.cpp`, `native.inspection`, `compatibility.corpus` |
 | Errors | Expected input errors become located diagnostics; resource exhaustion propagates; all-entry validation can continue | `native.inspection_cli`, `native.limits` |
