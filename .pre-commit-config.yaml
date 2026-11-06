@@ -47,7 +47,7 @@ repos:
           - clang-format
         pass_filenames: false
         files: >-
-          (\.(h|hpp|cpp|mm)|^\.clang-format(-ignore)?|^scripts/check_format\.(py|sh)|^\.pre-commit-config\.yaml)$
+          (\.(h|hpp|cpp|mm)|^\.clang-format(-ignore)?|^scripts/check_format\.py|^\.pre-commit-config\.yaml)$
       - id: format-tool-tests
         name: Stable formatter discovery tests
         entry: python tests/format_tools_tests.py

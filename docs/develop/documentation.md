@@ -35,7 +35,7 @@ Contents: [readers](#readers-and-folders) · [kinds of page](#kinds-of-page) ·
 | `docs/use/` | Someone applying filters with the command-line tool, in a plug-in host, or system-wide on Windows. Shipped in preview packages. | Install, load a filter, hear it, fix a problem | Build recipes, SDK versions, internals, TODO IDs, test evidence |
 | `docs/develop/` | Someone building from source, embedding the library, packaging a fork or changing Convolver, including coding agents | Build, find the code, know the rules and contracts, prove a change | User hand-holding, history |
 | `docs/project/` | jrp, and anyone asking where Convolver is going and why | Status, direction, open plans, decisions, history | Instructions |
-| `docs/archive/` | Anyone checking what was true or decided at a date | Dated reviews, completed or superseded plans, release records | Anything current; records are never edited, but the index pages in it (such as `archive/plans/README.md`) are maintained |
+| `docs/archive/` | Anyone checking what was true or decided at a date | Dated reviews, completed or superseded plans, release records, full entries of finished TODO items | Anything current; records are never edited, but the index pages in it (such as `archive/plans/README.md`) are maintained |
 
 The root keeps the files people and GitHub expect: `README.md`,
 `CONTRIBUTING.md`, `AGENTS.md`, `CLAUDE.md`, `TODO.md` and `CHANGELOG.md`.
