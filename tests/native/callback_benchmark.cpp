@@ -4,9 +4,14 @@
 // size, and startup, reset and live replacement are timed through
 // HostProcessor, as the plug-ins drive the engine. The load scenario times
 // load_configuration on a crossover that names one multichannel file per path.
+// PERF-15: --filter decaying uses the load-timing tests' filter shape (noise
+// fading at 35 dB a second, so a long one reaches the subnormal range), and
+// --thread-denormals sets the calling thread's flush mode as a host might
+// leave it; processing should cost the same either way.
 #include "convolver/engine.hpp"
 #include "convolver/host.hpp"
 #include "convolver/io.hpp"
+#include "denormals.hpp"
 #include "kernels.hpp"
 #include <algorithm>
 #include <chrono>
@@ -26,19 +31,24 @@ double microseconds(Clock::duration d) {
     return std::chrono::duration<double, std::micro>(d).count();
 }
 struct Options {
-    std::string scenario = "warm", layout = "matrix";
+    std::string scenario = "warm", layout = "matrix", filter = "noise",
+                thread_denormals = "gradual";
     std::size_t taps = 65536, inputs = 6, outputs = 6, block = 256, callback = 64;
     double seconds = 2;
 };
 const char* usage =
     "usage: convolver_callback_benchmark [--scenario warm|startup|reset|replace|load]\n"
     "  [--taps N] [--inputs N] [--outputs N] [--layout diagonal|matrix|crossover]\n"
-    "  [--block B] [--callback FRAMES] [--seconds S]\n"
+    "  [--block B] [--callback FRAMES] [--seconds S] [--filter noise|decaying]\n"
+    "  [--thread-denormals gradual|flush]\n"
     "warm: callbacks after the history is full. startup: the first callbacks of a new\n"
     "processor. reset: reset() and the callbacks after it. replace: prepare, publish and\n"
     "the callbacks after it. Each costly-moment scenario times the callbacks that cover\n"
     "the filter length plus two blocks, repeated for the given seconds. load: decode a\n"
-    "crossover whose paths each name a channel of one outputs-channel WAV file.";
+    "crossover whose paths each name a channel of one outputs-channel WAV file.\n"
+    "decaying: noise fading at 35 dB a second. --thread-denormals: the calling thread's\n"
+    "subnormal mode while it runs (gradual: IEEE gradual underflow, the default; flush: flush "
+    "to zero).";
 Options parse(int argc, char** argv) {
     Options o;
     for (int i = 1; i < argc; i += 2) {
@@ -61,11 +71,17 @@ Options parse(int argc, char** argv) {
             o.callback = std::stoul(value);
         else if (key == "--seconds")
             o.seconds = std::stod(value);
+        else if (key == "--filter")
+            o.filter = value;
+        else if (key == "--thread-denormals")
+            o.thread_denormals = value;
         else
             throw std::invalid_argument(usage);
     }
     if (!o.taps || !o.inputs || !o.outputs || !o.block || !o.callback ||
-        !std::isfinite(o.seconds) || o.seconds <= 0 || o.seconds > 600)
+        !std::isfinite(o.seconds) || o.seconds <= 0 || o.seconds > 600 ||
+        (o.filter != "noise" && o.filter != "decaying") ||
+        (o.thread_denormals != "gradual" && o.thread_denormals != "flush"))
         throw std::invalid_argument(usage);
     return o;
 }
@@ -93,8 +109,11 @@ convolver::Configuration configuration(const Options& o, float scale) {
             path.inputs = {{in, 1}};
             path.outputs = {{out, 1}};
             path.impulse.resize(o.taps);
-            for (auto& x : path.impulse)
-                x = random_value() * scale;
+            // -35 dB a second at 48 kHz, as in tests/plugins/load_timing.cpp.
+            const double decay = o.filter == "decaying" ? -1 / (0.25 * 48000) : 0;
+            for (std::size_t t = 0; t < o.taps; ++t)
+                path.impulse[t] =
+                    static_cast<float>(random_value() * scale * std::exp(decay * double(t)));
             config.paths.push_back(std::move(path));
         }
     return config;
@@ -147,14 +166,17 @@ void report(const Options& o, std::size_t paths, Callbacks& c, double event_us, 
     const auto percentile = [&](double q) {
         return c.us.empty() ? 0.0 : c.us[static_cast<std::size_t>(q * double(c.us.size() - 1))];
     };
+    // New columns go at the end, so rows from older builds still line up.
     std::cout << "backend,kernels,scenario,block,callback,taps,channels,paths,repetitions,"
-                 "ns_per_frame,p50_us,p99_us,p999_us,max_us,event_us,prepare_ms\n"
+                 "ns_per_frame,p50_us,p99_us,p999_us,max_us,event_us,prepare_ms,filter,"
+                 "thread_denormals\n"
               << std::setprecision(6) << convolver::fft_backend_name() << ','
               << convolver::detail::kernels().name << ',' << o.scenario << ',' << o.block << ','
               << o.callback << ',' << o.taps << ',' << o.inputs << "->" << o.outputs << ',' << paths
               << ',' << repetitions << ',' << c.total_us * 1e3 / c.frames << ',' << percentile(.5)
               << ',' << percentile(.99) << ',' << percentile(.999) << ','
-              << (c.us.empty() ? 0.0 : c.us.back()) << ',' << event_us << ',' << prepare_ms << '\n';
+              << (c.us.empty() ? 0.0 : c.us.back()) << ',' << event_us << ',' << prepare_ms << ','
+              << o.filter << ',' << o.thread_denormals << '\n';
 }
 void write_crossover(const Options& o, const std::filesystem::path& dir) {
     std::filesystem::create_directories(dir);
@@ -183,6 +205,7 @@ void write_crossover(const Options& o, const std::filesystem::path& dir) {
 int main(int argc, char** argv) {
     try {
         const auto o = parse(argc, argv);
+        convolver::detail::set_denormals_flushed(o.thread_denormals == "flush");
         if (o.scenario == "load") {
             const auto dir = std::filesystem::temp_directory_path() /
                              ("convolver-load-benchmark-" + std::to_string(o.taps) + "-" +

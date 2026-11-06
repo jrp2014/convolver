@@ -114,7 +114,9 @@ void tune_fft(std::size_t block_frames, FftOptions);
 
 // Prepared single-precision uniformly partitioned convolution.
 // Construction/destruction must be outside processing and are serialized for
-// FFTW planning. Each instance has independent processing state.
+// FFTW planning. Each instance has independent processing state. Construction
+// and process() flush subnormal floats to zero while they run (x86-64 and
+// AArch64) and restore the calling thread's floating-point mode on return.
 class Engine {
   public:
     explicit Engine(const Configuration&, std::size_t block_frames = 256, FftOptions = {});

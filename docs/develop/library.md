@@ -113,7 +113,10 @@ frames. Empty input means silence for drain. Input/output spans must not overlap
 there is no in-place mode. `latency_frames()` and `tail_frames()` are separate;
 feed their sum as silence after the final nonempty input to drain fully.
 `reset()` clears history and delays. Instances have separate state; an individual
-instance must not be processed/reset concurrently.
+instance must not be processed/reset concurrently. Construction and `process`
+(and `HostProcessor::process`) flush subnormal floats to zero on x86-64 and
+AArch64 and restore the calling thread's floating-point mode before they
+return ([subnormal numbers](architecture.md#subnormal-numbers)).
 
 This implementation uses uniform partitioned overlap-add with input-spectrum
 history, as described in [the implementation map](architecture.md#processing-data-flow). All three backends expose the same spectrum layout and

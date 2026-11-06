@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/engine.hpp"
+#include "denormals.hpp"
 #include "fft.hpp"
 #include "kernels.hpp"
 #include <algorithm>
@@ -273,8 +274,14 @@ void tune_fft(std::size_t b, FftOptions options) {
             "FFT tuning requires measure, patient or exhaustive planning, without wisdom-only");
     detail::RealFft fft(detail::fft_size(b), options);
 }
+// PERF-15: preparation flushes subnormals too. A long filter's decaying tail
+// has subnormal samples and spectra, and transforming them without flushing
+// made a 30 s filter's preparation about three times slower.
 Engine::Engine(const Configuration& c, std::size_t b, FftOptions options)
-    : impl_(std::make_unique<Impl>(c, b, validate(c, b), options)) {}
+    : impl_([&] {
+          const detail::ScopedFlushDenormals flush;
+          return std::make_unique<Impl>(c, b, validate(c, b), options);
+      }()) {}
 Engine::~Engine() = default;
 Engine::Engine(Engine&&) noexcept = default;
 Engine& Engine::operator=(Engine&&) noexcept = default;
@@ -295,6 +302,9 @@ void Engine::reset() noexcept {
         impl_->reset();
 }
 void Engine::process(std::span<const float> input, std::span<float> output, std::size_t frames) {
+    // PERF-15: subnormals flushed to zero while processing, the caller's mode
+    // restored on return or exception.
+    const detail::ScopedFlushDenormals flush;
     if (!impl_)
         throw std::invalid_argument("cannot process moved-from engine");
     auto& s = *impl_;

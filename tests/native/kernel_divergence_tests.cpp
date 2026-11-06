@@ -14,25 +14,40 @@
 //     so that the full-level signal's output peaks at -0.1 dBFS (these synthetic
 //     filters have up to about +11 dB of gain, which would clip, and the absolute
 //     differences scale with the level). The quiet inputs are that level less
-//     120 dB, or 1e-35 of it: output peaking near 1e-35, where about a quarter
-//     of the output samples and many products are subnormal (below FLT_MIN,
-//     1.2e-38), so FMA's single rounding and the baseline's two meet reduced
-//     precision. The test requires that case to have subnormal output and
-//     differing samples, so it cannot pass vacuously (at 1e-37 of the level,
-//     for example, the sets agree exactly because subnormal steps swamp the
-//     rounding difference).
+//     120 dB, or 1e-35 of it: output peaking near 1e-35, where many products
+//     fall below FLT_MIN (1.2e-38).
+//   - The 1e-35 case depends on how the processor treats those products.
+//     Engine::process flushes subnormals to zero (PERF-15, jrp's decision of 5
+//     November 2026) on x86-64 and AArch64, so there the output has no
+//     subnormal sample and products below FLT_MIN are lost: that error is a
+//     few hundred FLT_MIN whatever the level (measured 2e-36 to 1e-35 for
+//     inputs from 1e-35 to 1e-29 of the level), which at 1e-35 is most of the
+//     signal (on x86-64 with FFTW, 5 November 2026: 1.9e-36 between the sets
+//     and 4.7e-36 from the oracle, 0.3 and 0.66 of the peak). So the relative
+//     limits above cannot apply, and the case cannot check the kernels'
+//     rounding (the -120 dBFS case does that). It checks the flushing
+//     instead: no subnormal output from either set, each set's output peak
+//     at least a quarter of the oracle's (so neither vanished), and both
+//     sets within 1000 FLT_MIN (1.2e-35, about -699 dBFS) of each other and
+//     of the oracle, which an inverted output (2e-35 away) would break.
+//     Where nothing flushes, the case keeps its gradual-underflow checks: it
+//     must have subnormal output and differing samples, so it cannot pass
+//     vacuously (at 1e-37 of the level, for example, the sets agree exactly
+//     because subnormal steps swamp the rounding difference).
 //   - Each set against the oracle: within the engine tests' oracle tolerance,
 //     2e-5 * (1 + |expected|), and the FMA set's worst error at most 1.5 times
 //     the baseline set's (FMA must not make the result noticeably worse).
 // Release builds (NDEBUG) also run the 128k-512k filters; other builds run the
 // 64k workloads only, to keep sanitizer runs short.
 #include "convolver/engine.hpp"
+#include "denormals.hpp"
 #include "kernels.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <numbers>
 #include <random>
 #include <span>
@@ -198,14 +213,16 @@ int main() {
             const double level = 0.9886 / loud_peak; // -0.1 dBFS
             const auto in = input_signal(w.signal, frames, level);
             const auto a = render(c, block, in, false), b = render(c, block, in, true);
-            double diff = 0, peak = 0;
-            std::size_t differing = 0, subnormal = 0;
+            double diff = 0, peak = 0, peak_fast = 0;
+            std::size_t differing = 0, subnormal = 0, subnormal_fast = 0;
             for (std::size_t i = 0; i < a.size(); ++i) {
                 require(std::isfinite(a[i]) && std::isfinite(b[i]), "non-finite output");
                 diff = std::max(diff, double(std::abs(a[i] - b[i])));
                 peak = std::max(peak, double(std::abs(b[i])));
+                peak_fast = std::max(peak_fast, double(std::abs(a[i])));
                 differing += a[i] != b[i] ? 1 : 0;
                 subnormal += std::fpclassify(b[i]) == FP_SUBNORMAL ? 1 : 0;
+                subnormal_fast += std::fpclassify(a[i]) == FP_SUBNORMAL ? 1 : 0;
             }
             double oracle_fast = 0, oracle_base = 0, oracle_peak = 0;
             const auto first = block + w.taps - 1;
@@ -232,6 +249,21 @@ int main() {
                 100.0 * double(subnormal) / double(a.size()), oracle_base, oracle_fast,
                 oracle_peak > 0 ? oracle_fast / oracle_peak : 0);
             std::cout << line << std::flush;
+            if (w.signal == Signal::near_denormal && detail::flush_denormals_supported) {
+                // Flushed (PERF-15): absolute limits in units of FLT_MIN.
+                const double allowance = 1000.0 * std::numeric_limits<float>::min();
+                require(subnormal == 0 && subnormal_fast == 0,
+                        std::string(w.name) + ": subnormal output while flushing");
+                // The allowance is about the size of the signal, so it cannot
+                // catch an output that vanished: each set's output must keep
+                // at least a quarter of the oracle's peak (jrp's review of
+                // 1550475: silencing the FMA output passed before).
+                require(peak >= 0.25 * oracle_peak && peak_fast >= 0.25 * oracle_peak,
+                        std::string(w.name) + ": an output is (nearly) silent");
+                require(diff <= allowance && oracle_fast <= allowance && oracle_base <= allowance,
+                        std::string(w.name) + ": flushed output more than 1000 FLT_MIN apart");
+                continue;
+            }
             require(relative <= 1e-6, std::string(w.name) + ": FMA and baseline differ by more "
                                                             "than 1e-6 of the peak");
             if (amplitude(w.signal) >= 1e-6)
