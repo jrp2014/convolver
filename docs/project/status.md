@@ -8,15 +8,17 @@ For jrp and anyone asking what is ready, what is not, and where the project is
 going. [TODO](../../TODO.md) is the backlog and owns the order of work; the
 linked guides own the behaviour.
 
-**In short:** status checked on 1 November 2026 against `main` at `276c7dc`
-(0.8.6), whose last source change is `e3336e9`
-([PR #103](https://github.com/jrp2014/convolver/pull/103)). Every workflow
-that runs on `main` passed on `e3336e9`, including
-[Native and historical tests](https://github.com/jrp2014/convolver/actions/runs/41360889002),
-[VST3 compatibility](https://github.com/jrp2014/convolver/actions/runs/41360888968),
-[Audio Unit](https://github.com/jrp2014/convolver/actions/runs/41360888965)
+**In short:** status checked on 6 November 2026 against `main` at
+`77e3061` (0.10.4), whose last source change is `a6995f7`
+([PR #116](https://github.com/jrp2014/convolver/pull/116), which separates
+correctness tests, performance measurement and release qualification).
+Every workflow that runs on `main` passed on the previous source change,
+`5d500a0` ([PR #115](https://github.com/jrp2014/convolver/pull/115)),
+including
+[Native and historical tests](https://github.com/jrp2014/convolver/actions/runs/42126811218)
 and the
-[Plug-in distribution candidates](https://github.com/jrp2014/convolver/actions/runs/41360888979).
+[Plug-in distribution candidates](https://github.com/jrp2014/convolver/actions/runs/42126810576);
+the runs on `a6995f7` were still going when this was written.
 Nothing has been published yet: there are no GitHub releases, and
 preview packages exist only as temporary CI artifacts. The command-line
 renderer, the preset tool, the Equalizer APO export and the VST3, Audio Unit
@@ -47,6 +49,7 @@ Contents: [evidence levels](#evidence-levels) ·
 [user journeys](#user-journeys-for-the-first-preview) ·
 [next milestone](#next-milestone-an-independent-user-runs-a-preview) ·
 [what still blocks it](#what-still-blocks-the-first-preview) ·
+[performance](#performance-what-is-measured) ·
 [compatibility guarantees](#compatibility-guarantees) ·
 [what the tests do not establish](#what-the-tests-do-not-establish) ·
 [direction](#direction)
@@ -158,7 +161,7 @@ notarization (the production gate, REL-1 and PLUG-5), resource budgets
 ## What still blocks the first preview
 
 In the order of [TODO's priorities](../../TODO.md#execution-priorities), on
-1 November 2026. Each line names only what remains; the items hold the
+6 November 2026. Each line names only what remains; the items hold the
 detail.
 
 1. **Open fixes:** none. The defects from jrp's reviews are fixed (table
@@ -173,9 +176,9 @@ detail.
    Linux (VST3-12, VST3-13); the gain modes, computed gains and meters
    (PLUG-9, PLUG-10, AU-7); the Audio Unit's pluginval run (AU-3); the
    remaining checks under AU-6 and VST3-11; and
-   the [loading responsiveness](../../TODO.md#loading-responsiveness) gate,
-   whose timing test now runs with jrp's limits (PERF-9); on CI a 30 s
-   filter holds the host's thread 28 to 154 ms, within its 250 ms limit.
+   the [loading responsiveness](../../TODO.md#loading-responsiveness) gate
+   and the long-filter workloads ([performance](#performance-what-is-measured)
+   below).
 5. **jrp's decisions:** who the REL-3 tester is. The LV2 version mapping
    (LV2-5) is needed only before LV2 joins a preview.
 
@@ -183,6 +186,31 @@ jrp's review of `276c7dc` (1 November 2026): qualify this fixed feature set
 against explicit acceptance criteria before adding further conveniences or
 DSP optimisation. A smaller, macOS-first preview would need jrp to revise
 the agreed scope.
+
+## Performance: what is measured
+
+Two kinds of measurement, of different things; neither qualifies a
+workload on its own ([release qualification](../develop/releasing.md) runs
+them on the intended machine, REL-6). The figures and their sources are in
+[loading responsiveness](../../TODO.md#loading-responsiveness).
+
+- **Loading, from a cold start** (PERF-9 to PERF-11, 5 November 2026): how
+  long a load holds the host's thread, with a newly loaded filter that has
+  heard little input. With the 30 s filter, CI held it 28 to 154 ms and the
+  Linux cloud VM 227 to 254 ms, against jrp's 250 ms limit. A run whose
+  callbacks cannot be judged (late baselines, as on the macOS and Windows
+  runners) counts as not qualified, never as passed.
+- **Playing at full history** (PERF-14, 5 November 2026, PR #116): the
+  same filters after their whole length of audio, which is a long filter's
+  sustained cost. On the cloud VM (512-frame callbacks, 10.7 ms apart) the
+  10 s filter took about 3 ms a callback and the 30 s filter 25 to 43 ms,
+  every callback late, because its tail decays into subnormal numbers;
+  flushing them (PERF-15, in draft
+  [PR #117](https://github.com/jrp2014/convolver/pull/117)) brings it to 6 to
+  7 ms, still over half the period there (jrp's callback limit while a load
+  runs; no limit for steady playing is decided). So the 30 s workload is not
+  qualified on that machine, which neither condemns the engine nor shows
+  that loading needs to move to the background.
 
 ## Compatibility guarantees
 
