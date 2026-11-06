@@ -7,7 +7,7 @@ most popular reverb plug-ins. Identify those edges and move towards them."
 Nothing here is implemented. Optional features wait until the first
 independent walkthrough (REL-3, [decided](../decisions.md#plug-in-behaviour)),
 so this plan names the edges, ranks them and turns them into TODO items
-(EDGE-1 to EDGE-9, with PERF-2 and PERF-3) to take up afterwards in the
+(EDGE-1 to EDGE-10, with PERF-2 and PERF-3) to take up afterwards in the
 order given here, unless jrp [decides otherwise](#decisions-for-jrp). Revised
 the same day after jrp's reply: accuracy beyond what can be heard is not a
 priority, long reverbs matter more than expected, and faster convolution and
@@ -48,7 +48,8 @@ then takes up one of the EDGE items.
   showing a filter's response (EDGE-2), level-matched comparison of two
   filters (EDGE-4) and published workloads and evidence (EDGE-5). Then long
   reverbs at low CPU, with lower and finer latency (measured in PERF-3, then
-  PERF-2's non-uniform partitions). Then the reverb features: file layouts
+  PERF-2's non-uniform partitions, with the sound-aware and platform-aware
+  optimisations of EDGE-10). Then the reverb features: file layouts
   such as true stereo without writing a `.cfg` (EDGE-3), a reverb's
   pre-delay, start, length and fades (EDGE-6), decay and damping (EDGE-7)
   and immersive layouts beyond 8 channels (EDGE-8).
@@ -60,6 +61,7 @@ then takes up one of the EDGE items.
 Contents: [the products compared](#the-products-compared) ·
 [edges Convolver already has](#edges-convolver-already-has) ·
 [ranked edges to build](#ranked-edges-to-build) ·
+[sound-aware optimisation](#sound-aware-and-platform-aware-optimisation) ·
 [not pursued](#not-pursued) · [non-negotiables](#non-negotiables) ·
 [decisions for jrp](#decisions-for-jrp) · [sources](#sources)
 
@@ -127,7 +129,7 @@ Nothing starts before REL-3 unless jrp lifts the freeze.
 | 3 | **Show what a filter does.** Magnitude, phase, group delay and the decay (energy-time) of each path, as data from `--inspect` and as a plot in the window. | The report gives rate, lengths, delay and peak, not the response. Room-correction users check filters in REW; reverb users expect to see the decay. | M (data S, window M) | EDGE-2 | The window's layout (an addition to the editor plan) |
 | 4 | **Compare two filters, level-matched.** Hold two filters and switch between them with the existing crossfade, at matched loudness. | Hang Loose Convolver switches filter sets in real time, with level matching. Convolver replaces one filter with another. | M | EDGE-4 | The saved state (two filters double its size against the 64 MiB limit), and the loudness measure used for matching |
 | 5 | **Publish the evidence.** The supported workloads, long reverbs included, with CPU measured beside open convolvers (CamillaDSP, BruteFIR, mcfx) on the same machines; and a user page saying the output is correct, with a null test anyone can run with `--compare` against a shipped reference render. | The evidence exists only in test logs; none of the products above publishes CPU figures for stated workloads. | S (page), M (benchmarks) | EDGE-5 | Which claims the user guides make |
-| 6 | **Long reverbs at low CPU, with lower and finer latency.** First measure long reverbs (10, 30 and 60 s; stereo and true stereo; 48 and 96 kHz) in PERF-3. Then, in PERF-2: non-uniform partitions (short blocks at the start for latency, ever longer blocks for the tail); spreading the long blocks' work evenly over callbacks, or onto a worker thread without locks, so no callback spikes; and a replacement that crossfades the start of the filter rather than running two whole engines. Latency can then be any value the partitions allow, not only a power of two, down to zero with a direct (time-domain) head. | Every block of a filter is processed on every callback: at 256 frames, a 30 s filter at 48 kHz is about 5,600 blocks, about 1.4 million complex multiply-adds and 12 MB of filter spectra per path per callback, and the multiply-accumulate dominates (the FFTs are a few per cent of the work). With a 30 s filter the longest 512-frame callbacks took 8–12 ms of a 10.7 ms period on a cloud machine (PERF-15), and a replacement misses its budget. Latency is a power of two from 64 to 4096 frames in VST3 and the Audio Unit (LV2 stays at 256); Reverberate 2 offers zero, Space Designer 128 samples. Published comparisons put non-uniform partitions about an order of magnitude ahead of uniform ones for filters this long; PERF-3 checks that on our machines first. | L | PERF-3, then PERF-2 | Whether "zero" means zero samples or one small block; whether a worker thread is acceptable |
+| 6 | **Long reverbs at low CPU, with lower and finer latency.** First measure long reverbs (10, 30 and 60 s; stereo and true stereo; 48 and 96 kHz) in PERF-3. Then, in PERF-2: non-uniform partitions (short blocks at the start for latency, ever longer blocks for the tail); spreading the long blocks' work evenly over callbacks, or onto a worker thread without locks, so no callback spikes; and a replacement that crossfades the start of the filter rather than running two whole engines. Latency can then be any value the partitions allow, not only a power of two, down to zero with a direct (time-domain) head. | Every block of a filter is processed on every callback: at 256 frames, a 30 s filter at 48 kHz is about 5,600 blocks, about 1.4 million complex multiply-adds and 12 MB of filter spectra per path per callback, and the multiply-accumulate dominates (the FFTs are a few per cent of the work). With a 30 s filter the longest 512-frame callbacks took 8–12 ms of a 10.7 ms period on a cloud machine (PERF-15), and a replacement misses its budget. Latency is a power of two from 64 to 4096 frames in VST3 and the Audio Unit (LV2 stays at 256); Reverberate 2 offers zero, Space Designer 128 samples. Published comparisons put non-uniform partitions about an order of magnitude ahead of uniform ones for filters this long; PERF-3 checks that on our machines first. | L | PERF-3, then PERF-2 and EDGE-10 | Whether "zero" means zero samples or one small block; whether a worker thread is acceptable |
 | 7 | **Reverb file layouts without a `.cfg`.** Mono on stereo, true stereo as one four-channel file or two stereo files. | A sound file filters channel by channel only; true stereo needs a hand-written `.cfg`. Reverb responses are commonly distributed in these layouts. | S–M | EDGE-3 | The channel order assumed for four-channel files, and how the layout is chosen |
 | 8 | **A reverb's pre-delay, start, length and fades**, computed when the filter loads, not on the audio thread. | Every reverb above has them; Convolver has delays in `.cfg` only. | M | EDGE-6 | Parameter IDs and how they are saved |
 | 9 | **Decay and damping.** Shorten or lengthen the decay, per band, by reshaping the response when it loads. | Altiverb (decay, three-band damping) and Reverberate (re-decay, contour) have it. | L | EDGE-7 | Whether to do it at all, after EDGE-6 is used |
@@ -143,6 +145,29 @@ partition boundary, with the worst error reported, and keep everything
 `.cfg` defines (routing, delays, tail, reset). Ranks 1, 3 and 4 are mostly
 control-side work and keep the engine as it is; rank 2 changes only the
 filter that is prepared.
+
+## Sound-aware and platform-aware optimisation
+
+jrp's direction: take each platform's floating-point characteristics fully
+into account, as the subnormal flushing did, and use what is known about
+sound to make processing cheaper; that is the value a DSP project adds over a
+general convolution library. EDGE-10 surveys and measures these before any
+is built; PERF-3's long-reverb workloads are the yardstick. Candidates:
+
+| Candidate | Kind | What it gains | What it costs or risks |
+| --- | --- | --- | --- |
+| Skip the blocks of input history that are exactly silent | Exact | Gaps, fades and silence between tracks cost almost nothing; the engine already skips history from before a reset (PERF-5) | Bookkeeping per block; must stay allocation-free |
+| Stop at a filter's audible end: blocks whose whole contribution is below a stated level (for example below the output's least significant bit) are not processed | Bounded approximation | Long reverb tails often hold seconds of decay far below audibility; cost falls with them | Changes the output below the bound; the bound and the report of what was cut are jrp's decision |
+| Store a long filter's late blocks in 16-bit floating point (F16C on x86-64, FP16 on AArch64) | Bounded approximation | Halves the memory traffic that dominates long filters (about 12 MB of spectra per path at 30 s); the late tail is already tens of dB down, so the relative error of 16-bit floats lands far below audibility | Needs measurement against the oracle, scaled to the tail's level; a conversion per multiply on processors without native support |
+| Platform kernels for Apple silicon and other AArch64 processors: NEON multiply-accumulate, or Accelerate's vDSP complex multiply-accumulate | Rounding only | AArch64 builds run the baseline kernels today; x86-64 has AVX2 and FMA kernels (PERF-4) | A second kernel set to keep within `native.kernel_divergence`'s bound |
+| FFT sizes each backend handles well: Accelerate and Ooura round 2B up to a power of two | Exact | Choosing B (and non-uniform block sizes) so that 2B is a power of two avoids nearly doubling the transform | Constrains PERF-2's block sizes |
+| Floating-point environment checks on every platform: flush mode (done, PERF-15), contraction and fused multiply-add per compiler, MSVC's floating-point model, and denormal behaviour inside FFT libraries | Exact or rounding only | No hidden slow paths or output differences between platforms | Tests per compiler and processor in CI |
+
+An exact candidate keeps the output the same; a rounding-only one stays
+within the kernels' existing divergence bound; a bounded approximation
+changes the output by a stated amount below audibility, and needs jrp's
+decision on the bound, judged as the dither defaults were, against the
+threshold of hearing at a stated playback level.
 
 ## Not pursued
 
@@ -169,6 +194,9 @@ Every EDGE item, and PERF-2, keeps these; a change that cannot is not done.
 
 - **Exact audio.** The direct double-precision oracle tests pass, with the
   worst error reported ([workflow](../../develop/workflow.md#definition-of-done)).
+  The only exception is a bounded approximation jrp has approved
+  ([sound-aware optimisation](#sound-aware-and-platform-aware-optimisation)),
+  tested against its stated bound.
   Shaping a reverb's response (EDGE-6, EDGE-7) is checked against the shaped
   response computed independently, and with every control at its neutral
   value the output is the same as without the feature.

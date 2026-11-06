@@ -68,7 +68,7 @@ boundary and C++20 in the core.
 | 6. Later previews | Windows and Linux (**VST3-12**, **VST3-13**), the remaining gain modes and meters (**PLUG-9**, **PLUG-10**, **AU-7**), PERF-3's supported workloads; **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need. Not a first-preview gate: the loading-responsiveness gate uses the finite preview workloads instead. |
 | Supporting, cheap | **PERF-1**, **HOST-4** | HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
-| After the milestone: edges over other convolvers | The easy wins over room-correction convolvers (**EDGE-1**, **EDGE-9**, **EDGE-2**, **EDGE-4**, **EDGE-5**), then long reverbs (**PERF-3**'s long-reverb workloads, then **PERF-2**), then **EDGE-3** and **EDGE-6** to **EDGE-8**, in the ranked order of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) | jrp's goal (6 November 2026): be better than the most popular reverb plug-ins. Waits for REL-3 unless jrp lifts the freeze; each item starts with the owner's decision its plan row names, and keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#non-negotiables). PERF-2 still waits for PERF-3's budgets. |
+| After the milestone: edges over other convolvers | The easy wins over room-correction convolvers (**EDGE-1**, **EDGE-9**, **EDGE-2**, **EDGE-4**, **EDGE-5**), then long reverbs (**PERF-3**'s long-reverb workloads, then **PERF-2** and **EDGE-10**), then **EDGE-3** and **EDGE-6** to **EDGE-8**, in the ranked order of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) | jrp's goal (6 November 2026): be better than the most popular reverb plug-ins. Waits for REL-3 unless jrp lifts the freeze; each item starts with the owner's decision its plan row names, and keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#non-negotiables). PERF-2 still waits for PERF-3's budgets. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. |
 | Optional editor work | **PLUG-11** (FFT planning in FFTW-built plug-ins), **LV2-6** (an LV2 window, only if Linux users ask) | Not needed for any preview. |
 | On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
@@ -974,7 +974,7 @@ states the rules each keeps. They wait for REL-3 unless jrp lifts the freeze
 on optional features. The easy wins over the room-correction convolvers
 come first (EDGE-1, EDGE-9, EDGE-2, EDGE-4, EDGE-5); then long reverbs at low
 CPU with lower and finer latency (PERF-3's long-reverb measurements, then
-PERF-2); then the reverb features.
+PERF-2 and EDGE-10); then the reverb features.
 
 - [ ] **EDGE-1 — A filter for every sample rate in one plug-in state.** When a
   list is loaded, keep every entry that fits the host's channels in the saved
@@ -1033,6 +1033,20 @@ PERF-2); then the reverb features.
   drivers. `.cfg` delays stay truncated to whole samples; jrp decides how
   the finer delay is given (a setting or an option, never a `.cfg` syntax
   change). Effort S to M.
+- [ ] **EDGE-10 — Sound-aware and platform-aware optimisation.** jrp's
+  direction: take each platform's floating-point characteristics fully into
+  account, as PERF-15's subnormal flushing did, and use what is known about
+  sound to make processing cheaper. Survey and measure, on PERF-3's
+  long-reverb workloads, the
+  [candidates](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#sound-aware-and-platform-aware-optimisation):
+  skipping exactly silent input blocks; stopping at a filter's audible end;
+  16-bit floating-point storage for late filter blocks; NEON or vDSP
+  multiply-accumulate kernels for AArch64; FFT sizes each backend handles
+  well; and the floating-point environment per compiler and processor.
+  Exact and rounding-only changes keep the oracle and divergence bounds;
+  a bounded approximation needs jrp's decision on its bound, judged against
+  the threshold of hearing as the dither defaults were. Goes with PERF-2.
+  Effort M for the survey; each change its own item.
 
 ## Developer tooling
 
