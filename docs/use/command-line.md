@@ -81,25 +81,38 @@ positive values amplify. Two offline estimates are also available:
 - `--gain-db no-clip` calculates a mathematical filter bound: for each output,
   combine the paths from each input, sum the absolute values of their taps,
   then take the largest output sum. The gain is `-20 log10(bound)`, or 0 dB for
-  silent routing. It assumes every input sample has magnitude at most 1.
+  silent routing. It assumes every input sample has magnitude at most 1. For
+  integer output it is lowered a little further, so that rounding, dither and
+  noise shaping cannot clip either (below).
 
-Both report the chosen gain on stderr. `auto` may take time before rendering,
-as it filters the noise; `no-clip` only adds up the taps. Both stop with an
+Both report the chosen gain on stderr, with every digit needed to give the
+same figure back to `--gain-db` and get the same file. `auto` may take time
+before rendering, as it filters the noise; `no-clip` only adds up the taps. Both stop with an
 error, before rendering, when the filter's coefficients are too large for
 single precision (filtering the noise overflows, or the bound exceeds the
 largest float); check how the filter files are scaled. The noise estimate is
 the old Windows Convolver's "optimum attenuation" method.
 
 Neither option is a limiter: the bound holds for input within full scale, so
-louder input can still clip. With `no-clip`, the input that reaches the bound
-comes out within full scale, up to the float rounding of the convolution (a
-largest sample of 0.99999994 in the test). Integer output needs slightly more
-room, because rounding, dither and noise shaping add to each sample. It never
-clips while every sample stays within ±(1 − H / 2^(B−1)), where B is the
-number of significant bits and H = (1 + S)(½ + D) + ½ steps. D is the largest
-dither value: 0 with `--dither none` and 1 with either triangular dither. S is
-the sum of the shaper's coefficient magnitudes: 0 without shaping, 1 for
-`simple`, 2.13 for `third-order` and 22.6 for `ninth-order`.
+louder input can still clip. With `no-clip` and float output, the input that
+reaches the bound comes out within full scale, up to the float rounding of the
+convolution (a largest sample of 0.99999994 in the test). Integer output needs
+slightly more room, because rounding, dither and noise shaping add to each
+sample. It never clips while every sample stays within ±(1 − H / 2^(B−1)),
+where B is the number of significant bits (`--valid-bits`, or the sample
+type's) and H = (1 + S)(½ + D) + ½ steps. D is the largest dither value: 0
+with `--dither none` and 1 with either triangular dither. S is the sum of the
+shaper's coefficient magnitudes: 0 without shaping, 1 for `simple`, 2.13 for
+`third-order` and 22.6 for `ninth-order`.
+
+For integer output `no-clip` keeps every sample within that range: it lowers
+the gain by the headroom in the table, and by another 2^−16 of the level
+(0.00013 dB) for the convolution's float rounding, which is about 100 times the
+largest overshoot measured at the bound. The report gives the headroom, for
+example `no-clip attenuation -3.5314949508258078 dB (largest possible peak
+1.5000, including 0.0097 dB of headroom for 16-bit output with dither and
+noise shaping)` for a filter whose taps add up to 1.5 in `wav-pcm16` with
+`--noise-shaping ninth-order`. A numeric `--gain-db` is applied exactly as given.
 
 | Dither and shaping | H (steps) | At 16 bits | At 8 bits |
 | --- | --- | --- | --- |
@@ -113,11 +126,7 @@ exact limit: its last half step is margin, so that a sample exactly at the
 bound does not clip either. Without dither or shaping the exact limit is that
 half step: a sample from 1 − 2^−B up rounds to 2^(B−1) and clips by one step,
 since the largest positive integer is one step short of full scale, while −1
-does not clip. To keep integer output strictly unclipped, give `--gain-db` the
-figure that `--gain-db no-clip` reports, lowered by the table's value and by
-another 0.01 dB, since the report is rounded to 0.01 dB: for example
-`--gain-db -3.54` where it reported -3.52 dB, at 16 bits with ninth-order
-shaping.
+does not clip.
 
 ### Output formats
 

@@ -68,7 +68,7 @@ boundary and C++20 in the core.
 | Optional editor work | **PLUG-11** (FFT planning in FFTW-built plug-ins), **LV2-6** (an LV2 window, only if Linux users ask) | Not needed for any preview. |
 | On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **PERF-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
 
-The CFG-1, GAIN-3, IO-1, IO-2 and ROBUST-1 items
+The CFG-1, IO-1, IO-2 and ROBUST-1 items
 remain open supporting work; take them up when a reproducible defect or the milestone
 needs them. This table owns the current ordering; the dated
 [21 October review order](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#recommended-order)
@@ -594,20 +594,6 @@ means a patched FFmpeg build with `--enable-gpl`.
   [publication steps](docs/develop/releasing.md#publishing-an-unsigned-preview)
   when this is implemented. The four guarantees it protects are listed in
   [status](docs/project/status.md#compatibility-guarantees).
-- [ ] **GAIN-3 — `no-clip` reserves the integer headroom.** As
-  [decided](docs/project/decisions.md#configuration-and-sound), `--gain-db no-clip` lowers its gain by the
-  headroom the chosen integer format, dither and noise shaping need (the
-  bound H in [gain](docs/use/command-line.md#gain-and-attenuation), GAIN-1),
-  allowing for float rounding too, so integer output never clips on input
-  within full scale; and it prints the applied gain with enough digits to
-  reproduce it with `--gain-db`. Numeric gains, `auto` and float output stay
-  as they are. Acceptance: `native.cli` renders the worst-case input (as
-  `native.engine`'s `no_clip_endpoint` builds it) for each integer type,
-  dither and shaper and finds no clipped sample, float output unchanged,
-  and passing the printed figure back reproduces the file exactly. It
-  changes the output level, so it has a pull request of its own and a
-  CHANGELOG line saying so; until then the guide's workaround (lower the
-  reported gain by the table's value and 0.01 dB) stands.
 - [ ] **IO-1 — Large files.** Specify and test boundary sizes and pipe behavior
   for output beyond 4 GiB. Input decoder support is not a promise of strict
   validation for every container.
@@ -973,7 +959,7 @@ with compatibility tests; linked IDs point to open work above.
 | Path portability checks are partial | No drive/share remapping; a clean profile is not certification for Windows or another reader. Extend checks only with fixtures. | [Profiles](docs/use/other-programs.md#check-that-a-configuration-will-travel) |
 | Output is WAV, RF64, W64, AIFF, CAF, FLAC or headerless raw; speaker labels are WAV and RF64 only, reduced valid bits WAV only | Input codecs and FLAC output depend on the libsndfile build; the preview packages have no FLAC or Ogg, by decision ([workarounds](docs/use/command-line.md#flac-and-ogg)). Boundary-size tests remain IO-1; libsndfile cannot write labels in the other containers (IO-5). RAW has no embedded rate/channel metadata. | [Output formats](docs/use/command-line.md#output-formats) |
 | Output writes are not transactional | An I/O or numerical failure leaves a partial file, which the CLI says is incomplete; deleting it or publishing through a temporary file was not chosen ([decisions](docs/project/decisions.md#diagnostics)). Never promise rollback for pipes. | [Output safety](docs/use/command-line.md#output-safety) |
-| Gain estimation is not a limiter; float samples can exceed full scale | Integer samples clip; `no-clip` reserves no quantizer headroom, for which the guide gives a safe bound and a workaround (GAIN-1) until GAIN-3. | [Gain](docs/use/command-line.md#gain-and-attenuation) |
+| Gain estimation is not a limiter; float samples can exceed full scale | Input beyond full scale can clip integer output; `no-clip` keeps full-scale input from clipping it, quantizer headroom included (GAIN-3). | [Gain](docs/use/command-line.md#gain-and-attenuation) |
 | Dither/shaping/valid bits apply to integer file output only | Float/RAW output rejects those options; the plug-ins exchange floats, so the host does any final conversion. | [Integer output](docs/use/command-line.md#integer-formats-dither-and-noise-shaping) |
 | C++ packages are static development libraries, not self-contained installers or a stable binary ABI | Rebuild with compatible toolchains; shared dependencies must be deployed. REL-1 covers end-user bundles. | [Package guide](docs/develop/library.md) |
 | Source tags and configured CI do not prove a release is qualified | Tie results to exact commits; named hosts, clean machines and signatures remain release evidence. | [Versioning](docs/develop/versioning.md), [testing](docs/develop/testing.md) |
@@ -1393,6 +1379,21 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   comparing with a quantizer one bit wider), with the exact undithered
   endpoints. No change to the sound: `no-clip` still reserves no quantizer
   headroom; [gain](docs/use/command-line.md#gain-and-attenuation).
+- [x] **GAIN-3 — `no-clip` reserves the integer headroom.** 6 November 2026,
+  as [decided](docs/project/decisions.md#configuration-and-sound): for integer output `--gain-db no-clip` lowers its
+  gain by the headroom H that rounding, dither and noise shaping need at the
+  output's significant bits (`quantization_headroom` in `io.hpp`), and by
+  2^−16 for the convolution's float rounding (about 100 times the largest
+  overshoot measured at the bound, 1.2e-7 at 65,536 and 262,144 taps). The
+  CLI prints the gain `no-clip` and `auto` apply with every digit needed to
+  give it back to `--gain-db` and get the same file. Numeric gains and float
+  output are unchanged. `native.cli` renders the input that reaches the bound
+  for 8, 16, 18 (valid bits), 24 and 32 bits, with each dither and with each
+  shaper the command line offers, and checks that the level, also rendered
+  as float, stays within ±(1 − H / 2^(B−1)), where `native.io` shows the
+  quantizer cannot clip (`native.io` also checks `quantization_headroom` for
+  every dither and shaper), and that the printed figure reproduces each file
+  byte for byte; [gain](docs/use/command-line.md#gain-and-attenuation).
 - [x] **PERF-12 — Load-timing verdicts from records, tested without
   timing.** 5 November 2026, from jrp's review of `db54160`: the renderer
   records each callback (due, wake, entry into and return from the plug-in,

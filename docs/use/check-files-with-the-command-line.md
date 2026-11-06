@@ -185,9 +185,8 @@ output:
 
 There is no expected file to compare with, so listen to the result at a low
 volume first. A filter with gain can push 24-bit output past full scale,
-where it clips; `--gain-db no-clip` lowers the level so that it does not,
-within the small margin that [gain](command-line.md#gain-and-attenuation)
-gives. Every option is in the
+where it clips; `--gain-db no-clip` lowers the level so that full-scale
+input cannot clip ([gain](command-line.md#gain-and-attenuation)). Every option is in the
 [command-line reference](command-line.md).
 
 ## If something went wrong

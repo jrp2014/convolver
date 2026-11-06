@@ -52,8 +52,10 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
   --gain-db DB         Output gain in decibels (default 0), or 'auto' for the
                       historical optimum attenuation (peak response to white
                       noise) or 'no-clip' for the filter's worst-case peak
-                      bound (input within full scale, no dither or shaping
-                      headroom); the chosen value is reported on stderr
+                      bound, lowered for integer output by the room rounding,
+                      dither and shaping need, so input within full scale
+                      never clips; the chosen gain is reported on stderr
+                      exactly, to give again as a number
   --keep-latency       Keep the leading block of algorithmic latency
   --output-format F   CONTAINER-TYPE, default wav-float. Containers: wav, rf64,
                       w64, aiff, caf (rf64, w64 and caf have no 4 GiB limit),
@@ -118,6 +120,26 @@ std::optional<double> number(const std::string& text) {
         return std::nullopt;
     return value;
 }
+// The fewest decimals that number() reads back as the same double, so a
+// reported gain can be given to --gain-db exactly.
+std::string exact_decimal(double value) {
+    for (int decimals = 2; decimals <= 20; ++decimals) {
+        std::ostringstream text;
+        text.imbue(std::locale::classic());
+        text << std::fixed << std::setprecision(decimals) << value;
+        if (number(text.str()) == value)
+            return text.str();
+    }
+    std::ostringstream text;
+    text.imbue(std::locale::classic());
+    text << std::setprecision(17) << value;
+    return text.str();
+}
+// GAIN-3: the no-clip gain's allowance for the convolution's float rounding,
+// relative to the bound: 2^-16 (0.00013 dB), about 100 times the largest
+// overshoot measured at the bound (1.2e-7 of full scale, with 65,536 and
+// 262,144 random taps at blocks of 64 to 16,384 frames).
+constexpr double no_clip_rounding = 1.0 / 65536;
 // CONTAINER-TYPE, for example wav-pcm24 or flac-pcm16.
 std::optional<convolver::OutputEncoding> parse_output_format(std::string_view name) {
     using convolver::Container;
@@ -543,6 +565,13 @@ int run(int argc, char** argv) {
                            "The configuration reads that file, so writing over it would destroy "
                            "the filter.",
                            "Choose another output name.");
+        // TPDF dither by default below 20 significant bits, and advice on
+        // pointless or clearly beaten choices (dither_advice.hpp).
+        const auto plan = convolver::cli::plan_quantization(bits, valid_bits, info.sample_rate,
+                                                            dither, shaping, dither_seed);
+        for (const auto& note : plan.notes)
+            std::cerr << "convolver: " << note << '\n';
+        const auto& quantization = plan.options;
         if (automatic_gain) {
             const bool safe = *automatic_gain == "no-clip";
             // GAIN-2: no-clip needs only the bound, which takes no convolution
@@ -564,7 +593,19 @@ int run(int argc, char** argv) {
             } else {
                 peak = convolver::estimate_attenuation(config).noise_peak;
             }
-            const auto db = peak > 0 ? -20 * std::log10(peak) : 0.;
+            auto db = peak > 0 ? -20 * std::log10(peak) : 0.;
+            // GAIN-3: for integer output, no-clip also leaves room for
+            // rounding, dither and noise shaping (H steps, io.hpp) and for the
+            // convolution's float rounding, so input within full scale never
+            // clips. Float output keeps the bound alone.
+            double headroom_db = 0;
+            const unsigned significant = quantization.valid_bits ? quantization.valid_bits : bits;
+            if (safe && bits && peak > 0) {
+                const double limit = 1 - convolver::quantization_headroom(quantization) /
+                                             std::ldexp(1.0, static_cast<int>(significant) - 1);
+                headroom_db = -20 * std::log10(limit / (1 + no_clip_rounding));
+                db -= headroom_db;
+            }
             gain = static_cast<float>(std::pow(10., db / 20.));
             if (!std::isfinite(gain))
                 throw std::invalid_argument(convolver::detail::advice_text(
@@ -573,19 +614,25 @@ int run(int argc, char** argv) {
                      "not fit in a 32-bit float.",
                      "Check the IRs (one may be silent or damaged), or give --gain-db as a number.",
                      {}}));
+            // Printed exactly, so that --gain-db with this figure gives the
+            // same gain and the same file.
             std::cerr << "convolver: " << (safe ? "no-clip" : "optimum") << " attenuation "
-                      << std::fixed << std::setprecision(2) << db << " dB ("
-                      << (safe ? "largest possible peak " : "white-noise peak ")
-                      << std::setprecision(4) << peak << ")\n";
+                      << exact_decimal(db) << " dB ("
+                      << (safe ? "largest possible peak " : "white-noise peak ") << std::fixed
+                      << std::setprecision(4) << peak;
+            if (headroom_db > 0) {
+                const bool dithered = quantization.dither != convolver::Dither::none;
+                const bool shaped = quantization.noise_shaping != convolver::NoiseShaping::none;
+                std::cerr << ", including " << std::setprecision(4) << headroom_db
+                          << " dB of headroom for " << significant << "-bit output"
+                          << (dithered && shaped ? " with dither and noise shaping"
+                              : dithered         ? " with dither"
+                              : shaped           ? " with noise shaping"
+                                                 : "");
+            }
+            std::cerr << ")\n";
         }
         convolver::Engine engine(config, block, fft_options);
-        // TPDF dither by default below 20 significant bits, and advice on
-        // pointless or clearly beaten choices (dither_advice.hpp).
-        const auto plan = convolver::cli::plan_quantization(bits, valid_bits, info.sample_rate,
-                                                            dither, shaping, dither_seed);
-        for (const auto& note : plan.notes)
-            std::cerr << "convolver: " << note << '\n';
-        const auto& quantization = plan.options;
         convolver::OutputMetadata metadata;
         if (speaker_map) {
             metadata.channel_mask = config.channel_mask;

@@ -99,6 +99,13 @@ struct QuantizationOptions {
     // wValidBitsPerSample (for example 20 valid bits in a 24-bit container).
     unsigned valid_bits = 0;
 };
+// The most, in steps of the B-bit output, that rounding, dither and noise
+// shaping can move a sample that does not clip: H = (1 + S)(1/2 + D) + 1/2, with
+// D the dither's largest value (0, 1/2 for rectangular, 1 for either
+// triangular) and S the sum of the shaper's coefficient magnitudes. Output never
+// clips while every sample stays within +-(1 - H / 2^(B-1)); the last half step
+// is margin. valid_bits does not affect H. Throws on an unknown dither or shaper.
+double quantization_headroom(const QuantizationOptions&);
 class Quantizer {
   public:
     // bits: significant bits, 8 to 32. Throws on invalid channels, bits or options.

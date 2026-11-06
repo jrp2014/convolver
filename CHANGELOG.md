@@ -160,6 +160,17 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- CLI (GAIN-3): `--gain-db no-clip` now also reserves the headroom that
+  integer output needs, so input within full scale cannot clip even after
+  rounding, dither and noise shaping. **Integer output with `no-clip` is
+  slightly quieter**: by at most 0.0002 dB at 24 and 32 bits, 0.0007 dB at 16 bits
+  with the default dither (0.0097 dB with ninth-order shaping), and 0.14 dB
+  at 8 bits with dither (2.86 dB with ninth-order shaping); this includes
+  0.00013 dB for the convolution's float rounding. Float output and numeric
+  gains are unchanged. `no-clip` and `auto` now print the applied gain in
+  full (for example `-3.5314949508258078 dB`), so the figure can be given to
+  `--gain-db` to make the same file, and `no-clip` says how much of it is
+  headroom. The library adds `quantization_headroom()`.
 - Inspection (ROBUST-2, jrp's answers on PR #118): when `--all-configurations`
   stops at a limit, the `limit` error now ends "The check is incomplete: this
   entry and every entry after it were not checked.", and the selection reason
