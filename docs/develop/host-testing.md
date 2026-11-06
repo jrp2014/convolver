@@ -321,6 +321,17 @@ except the Audio Unit build, which runs in a source checkout.
     disclosure triangle: REAPER's FX window grows to fit.
     Click **Copy Diagnostics** and paste into the report. Save, quit and
     reopen: Gain, Mix and Latency come back.
+12. The 2→6 crossover. Follow sections 3 to 5 of
+    [check a crossover in a host](../use/check-a-crossover-in-a-host.md#3-render-the-example-in-the-host)
+    in a new project, from the same candidate package as the steps above:
+    a six-channel track, the crossover preset, a six-channel render
+    compared with `convolver --compare`, save and reopen, and the presets
+    that do not fit. Record how REAPER gave Convolver 2 inputs and 6 outputs
+    (the track's channels, the plug-in's routing, and what Status and the
+    log said), the render settings, each `--compare` result and the
+    save-and-reopen result, and every place the guide differs from REAPER.
+    This is the guide's first run in a host; REL-3 reuses the record where
+    it applies.
 
 ### Audacity (VST3)
 

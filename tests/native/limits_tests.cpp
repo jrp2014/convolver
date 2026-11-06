@@ -306,8 +306,11 @@ void run(const fs::path& dir) {
                         contains(d.message, what) && contains(d.message, "smaller lists") &&
                         d.include_chain.size() == 1 && d.include_chain[0].line == 5,
                     std::string("one located limit diagnostic: ") + what);
-            require(contains(report.selection_reason, "until a limit"),
-                    "the selection reason says the check stopped");
+            require(
+                contains(report.selection_reason, "incomplete: entries validated until a limit") &&
+                    contains(d.message, "The check is incomplete: this entry and every entry "
+                                        "after it were not checked."),
+                "the selection reason and the limit error say the check is incomplete");
         }
         text_file(dir / "four.txt", "match.cfg\nmatch.cfg\nmatch.cfg\nmatch.cfg\n");
         for (const auto& limits :
@@ -341,6 +344,8 @@ void run(const fs::path& dir) {
         require(!wide.valid && wide.configurations.size() == 4 && wide.diagnostics.size() == 1 &&
                     wide.diagnostics.back().code == "limit" &&
                     contains(wide.diagnostics.back().message, "routes reported past 20") &&
+                    contains(wide.diagnostics.back().message, "The check is incomplete") &&
+                    contains(wide.selection_reason, "incomplete:") &&
                     wide.diagnostics.back().include_chain[0].line == 5,
                 "an all-entry check stops before the entry past the route limit");
         text_file(dir / "wides4.txt", "wide.cfg\nwide.cfg\nwide.cfg\nwide.cfg\n");
