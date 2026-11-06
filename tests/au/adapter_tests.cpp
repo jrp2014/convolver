@@ -1215,7 +1215,7 @@ void status_parameter() {
                                au::status_parameter, &info, &size),
           "Status parameter info");
     require(info.unit == kAudioUnitParameterUnit_Indexed && info.minValue == 0 &&
-                info.maxValue == 4 && (info.flags & kAudioUnitParameterFlag_IsReadable) &&
+                info.maxValue == 5 && (info.flags & kAudioUnitParameterFlag_IsReadable) &&
                 !(info.flags & kAudioUnitParameterFlag_IsWritable) &&
                 (info.flags & kAudioUnitParameterFlag_ValuesHaveStrings),
             "Status parameter not a read-only indexed parameter");

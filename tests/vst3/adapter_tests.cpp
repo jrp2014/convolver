@@ -932,8 +932,8 @@ void status_and_log() {
             "status before activation");
     // Other values read as their names (a host asking how a value would read).
     String128 name{};
-    require(c.getParamStringByValue(status_id, 0, name) == kResultOk && name[0] == 'P' &&
-                name[1] == 'l',
+    require(c.getParamStringByValue(status_id, 0, name) == kResultOk && name[0] == 'A' &&
+                name[1] == 'c',
             "status value names");
     SpeakerArrangement stereo = SpeakerArr::kStereo;
     // DIAG-1: refused host settings are logged with the reason; a refused
