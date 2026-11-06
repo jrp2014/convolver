@@ -161,6 +161,11 @@ including the 18 October plug-in distribution plan, whose open work is now in
   the status, the full explanation of a failure, what is loaded and the
   Convolver log; settings, framework, threads, testing, accessibility and
   phases, with decisions for jrp.
+- [Edges over the leading convolution plug-ins](project/plans/2026-11-06-edges-over-other-convolvers.md)
+  (EDGE-1 to EDGE-8, PERF-2): how Convolver compares with Altiverb,
+  Reverberate, Space Designer, Hang Loose Convolver, CamillaDSP and X-MCFX,
+  the edges it already has, the ranked edges to build after the first
+  walkthrough, and the rules each keeps.
 - [Media Foundation transform](project/plans/2026-10-21-media-foundation-transform.md)
   (HOST-3, parked): a Windows audio effect for Media Player Legacy, DirectShow players and
   Media Foundation or WinRT applications, with APO and Equalizer APO alternatives
