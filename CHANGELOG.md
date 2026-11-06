@@ -186,6 +186,8 @@ Until 1.0 the C++ API may change between minor versions.
   evidence they recorded, are kept unchanged apart from link paths in
   [`docs/archive/todo/`](docs/archive/todo/2026-11-06-done-entries.md).
   `TODO.md` is about 630 lines shorter.
+- Development (DOC-7): `scripts/check_format.sh`, a wrapper kept only for old
+  habits, is removed; run `python3 scripts/check_format.py` (or pre-commit).
 - LV2 (LV2-8): closed without a change. Jalv, Ardour, Carla and PipeWire,
   read in their current source and in their normal configuration, do not
   drop a queued worker request and then reactivate the plug-in, so the
