@@ -19,7 +19,9 @@ preset from an IR or `.cfg` with `convolver-preset` and load it in your host.
 - The filter itself is copied into the preset, so the preset keeps working when
   the original WAV and `.cfg` files move or are deleted. All three formats carry
   the same bytes, so the filter sounds the same in every format.
-- A preset must match the host's sample rate and channel counts. A plug-in that
+- A preset must match the host's sample rate and output channels, and have no
+  more inputs than the host gives (extra inputs are ignored,
+  [channels](plugins.md#channels)). A plug-in that
   cannot use a preset as its first filter plays **silence** rather than passing
   unfiltered audio to your speakers; [how the plug-ins behave](plugins.md#when-a-filter-does-not-fit)
   says how each format reports it.
@@ -127,7 +129,9 @@ plug-in plays silence, see [when a preset does not fit](#when-a-preset-does-not-
 ## When a preset does not fit
 
 A preset holds one filter at one sample rate, with fixed input and output
-channel counts, and it must match the host's. If the **first** filter of a
+channel counts. Its rate and outputs must match the host's, and the host must
+give at least its inputs: a filter reads the first ones and ignores the rest
+([channels](plugins.md#channels)). If the **first** filter of a
 plug-in does not fit, the plug-in plays **silence** rather than unfiltered
 audio. If a **new** filter does not fit while another is playing, the working
 filter keeps playing. [How the plug-ins behave](plugins.md#when-a-filter-does-not-fit)

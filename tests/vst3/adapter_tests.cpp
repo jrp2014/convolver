@@ -299,6 +299,50 @@ void multichannel() {
     kept.seek(0, IBStream::kIBSeekSet, nullptr);
     require(read_state(&kept).configuration->output_channels == 6, "2x6 preset not kept");
     p.setActive(false);
+    // PLUG-23: REAPER gives the effect on a six-channel track 6 inputs and 6
+    // outputs. The 2x6 preset plays, reading inputs 1-2 and ignoring 3-6.
+    require(p.setBusArrangements(&surround, 1, &surround, 1) == kResultOk &&
+                p.setActive(true) == kResultOk,
+            "2x6 preset on 6x6 buses");
+    p.setProcessing(true);
+    std::array<std::array<float, 300>, 6> six{};
+    std::array<float*, 6> six_ptr{};
+    for (int c = 0; c < 6; ++c) {
+        six[c][0] = c == 0 ? 1.f : c == 1 ? 2.f : 7.f;
+        six_ptr[c] = six[c].data();
+        outs[c].fill(0);
+    }
+    input.numChannels = 6;
+    input.channelBuffers32 = six_ptr.data();
+    output.numChannels = 6;
+    const auto wide_routing = [&](const std::string& what) {
+        for (int c = 0; c < 6; ++c)
+            outs[c].fill(0);
+        require(p.process(d) == kResultOk, (what + ": 6x6 process").c_str());
+        for (int c = 0; c < 6; ++c)
+            for (int i = 0; i < 300; ++i) {
+                float want = i == 256 ? expected[c][0] : i == 257 ? expected[c][1] : 0.f;
+                require(std::abs(outs[c][i] - want) < 1e-5, (what + ": routing").c_str());
+            }
+    };
+    wide_routing("2x6 preset on 6x6 buses");
+    // Saved and reopened on the same buses, the filter keeps its own counts.
+    MemoryStream surround_state;
+    require(p.getState(&surround_state) == kResultOk, "state on 6x6 buses");
+    surround_state.seek(0, IBStream::kIBSeekSet, nullptr);
+    const auto wide_saved = read_state(&surround_state).configuration;
+    require(wide_saved && wide_saved->input_channels == 2 && wide_saved->output_channels == 6,
+            "a 2x6 preset on 6x6 buses saved with other channel counts");
+    p.setProcessing(false);
+    p.setActive(false);
+    surround_state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&surround_state) == kResultOk && p.setActive(true) == kResultOk,
+            "2x6 state reopened on 6x6 buses");
+    p.setProcessing(true);
+    wide_routing("2x6 state reopened on 6x6 buses");
+    p.setProcessing(false);
+    p.setActive(false);
+    require(p.setBusArrangements(&octo, 1, &octo, 1) == kResultOk, "8x8 after 6x6");
     convolver::HostState identity;
     MemoryStream empty;
     require(write_state(&empty, identity), "encode identity state");

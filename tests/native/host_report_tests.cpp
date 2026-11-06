@@ -228,8 +228,8 @@ void cases() {
              {"status",      "status name",   "summary",     "title",       "explanation",
               "problem",     "plays",         "cause",       "fix",         "note",
               "action",      "filter name",   "filter note", "filter path", "filter files",
-              "sample rate", "latency waits", "audio",       "reference",   "log path",
-              "log written"}) {
+              "sample rate", "latency waits", "mix note",    "audio",       "reference",
+              "log path",    "log written"}) {
             bool found = false;
             for (const auto& [k, v] : fields)
                 found = found || k == key;
@@ -513,12 +513,51 @@ void log_agrees() {
 }
 } // namespace
 
+// PLUG-23: a 2-in, 6-out crossover on REAPER's 6 inputs and 6 outputs: the
+// Channels line says which inputs the filter reads, and Mix has its own note
+// (no dry signal), for the window to show by the Mix row.
+void wider_inputs() {
+    const HostLayout six{48000, 6, 6};
+    Configuration x{48000, 2, 6, 0, {}, {}, {}};
+    x.paths.push_back({{1.f}, {{0, 1}}, {{0, 1}}});
+    x.paths.push_back({{1.f}, {{1, 1}}, {{5, 1}}});
+    HostFilter f(8);
+    f.load(HostState{x}, six);
+    static_cast<void>(f.activate(six));
+    const auto r = host_report(f, facts(six));
+    require(r.status.status == HostStatus::playing && r.problem.empty(),
+            "a crossover on a wider bus is reported as a problem: " + r.explanation);
+    const auto& channels = fact(r, "Channels");
+    require(channels.value == "6 in, 6 out" &&
+                channels.note == "(the filter reads inputs 1–2, inputs 3–6 are ignored)" &&
+                !channels.problem,
+            "Channels: " + channels.value + " " + channels.note);
+    require(r.mix_note == "The filter's inputs and outputs differ, so there is no dry signal: Mix "
+                          "has no effect, and bypass plays silence.",
+            "mix note: " + r.mix_note);
+    // An empty instance on the same track has a dry signal; a stereo filter
+    // on a stereo track has no Mix note.
+    HostFilter empty(8);
+    require(host_report(empty, facts(six)).mix_note.empty(), "an empty instance has a mix note");
+    HostFilter stereo(8);
+    stereo.load(HostState{filter(48000, 2)}, HostLayout{48000, 2, 2});
+    const auto rs = host_report(stereo, facts(HostLayout{48000, 2, 2}));
+    require(rs.mix_note.empty() && fact(rs, "Channels").note.find("ignored") == std::string::npos,
+            "a stereo filter has a mix note or ignored inputs");
+    // Without a filter and with unequal counts, the host's counts decide.
+    HostFilter none(8);
+    require(contains(host_report(none, facts(HostLayout{48000, 2, 6})).mix_note,
+                     "Inputs and outputs differ"),
+            "no mix note for an empty instance with unequal counts");
+}
+
 int main() {
     try {
         cases();
         actions();
         log_agrees();
         diagnostics();
+        wider_inputs();
     } catch (const std::exception& e) {
         std::cerr << "FAIL: " << e.what() << "\n";
         return 1;

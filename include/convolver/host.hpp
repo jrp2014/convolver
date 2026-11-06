@@ -27,8 +27,9 @@ struct HostSettings {
     // max_gain_db (clamped there by HostProcessor).
     double gain_db = 0;
     // The share of the filtered signal, 0 to 1; the rest is the input delayed
-    // by the latency. Ignored (always 1) when input and output counts differ,
-    // as there is no dry signal (the bypass rule). Clamped to 0..1.
+    // by the latency. Ignored (always 1) when the filter's input and output
+    // counts differ (with no filter playing, the host's), as there is no dry
+    // signal (the bypass rule, dry_signal()). Clamped to 0..1.
     double mix = 1;
     // The latency in frames, one of host_latencies. Unlike gain and mix it
     // cannot change while a processor runs: it is the block size the
@@ -126,6 +127,12 @@ Advice speaker_notice(const Configuration&, const HostLayout&);
 // counts; exact silence for unequal counts or when `failed` (a failed initial
 // load or a filter that does not suit the host).
 Configuration unfiltered_configuration(const HostLayout&, bool failed);
+// PLUG-23: a filter may have fewer inputs than the host gives the plug-in
+// (REAPER gives a VST3 plug-in as many inputs as outputs, so a 2-in, 6-out
+// crossover gets 6 of each); it reads the first ones and the rest are
+// ignored. The ignored ones in words, "inputs 3–6" or "input 2" with `dash`
+// between two numbers; empty when the filter reads every input the host gives.
+std::string ignored_inputs(const Configuration&, const HostLayout&, const char* dash = "–");
 
 class HostProcessor;
 
@@ -406,9 +413,21 @@ inline constexpr std::size_t max_status_text = 127; // VST3's String128, less it
 // not only what the filter does.
 HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& host,
                            bool log_written = true, const HostSettings& settings = {});
+// Whether a dry signal exists under `host`: Mix's dry share and bypass pass
+// input c to output c only when what plays has as many inputs as outputs.
+// That is the filter when one plays (PLUG-23: its own counts, not the
+// host's), otherwise the host's counts (unfiltered_configuration()).
+bool dry_signal(const HostFilter&, const HostLayout& host);
 
 // Prepared planar host boundary. Float DSP with float/double host buffers.
 // Input and output channel counts follow the configuration and may differ.
+// PLUG-23: the processor may take more inputs than the configuration has
+// (`inputs`, the host's input count); the filter reads the first ones and the
+// others are ignored. Each filter keeps its own rule for the dry signal
+// (Mix's dry share and bypass): input c to output c only when the filter
+// itself has as many inputs as outputs, never because the host's counts are
+// equal, so a 2-in, 6-out crossover on 6 inputs never sends unfiltered audio
+// to an output.
 // Control: construction, replace, prepare, publish, silence, collect,
 // destruction; serialize these calls. Audio: process, set_bypass, reset, mute,
 // publications; one audio thread per instance. Control and audio may overlap
@@ -421,6 +440,11 @@ class HostProcessor {
     // and the latency as the block size. Throws std::invalid_argument if the
     // latency is not one of host_latencies.
     HostProcessor(const Configuration&, std::size_t max_frames, const HostSettings&);
+    // PLUG-23: the same, taking `inputs` input channels (at least the
+    // configuration's; 0 means the configuration's). Replacements may have
+    // any input count from 1 to `inputs`, and the same rate and outputs.
+    HostProcessor(const Configuration&, std::size_t max_frames, const HostSettings&,
+                  std::size_t inputs);
     ~HostProcessor();
     HostProcessor(const HostProcessor&) = delete;
     HostProcessor& operator=(const HostProcessor&) = delete;

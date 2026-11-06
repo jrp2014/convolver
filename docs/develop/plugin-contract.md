@@ -22,8 +22,11 @@ and are maintained here.
   sample rate and channels as soon as the host has settled them.
 - Every failure keeps a structured reason on the control side, for the host's
   log, LV2's status port and, later, a status display in the other formats.
+- A filter plays on exactly its outputs and at least its inputs: on a wider
+  input bus it reads the first inputs and ignores the rest, and says so.
 - Bypass ramps over 1.33 ms (64 samples at 48 kHz) to the input delayed by
-  the latency, or to silence when the counts differ.
+  the latency, or to silence when the filter's counts differ (with no filter
+  playing, the host's).
 - Gain and mix are host parameters whose defaults keep the sound unchanged
   ([settings](#settings)); the Audio Unit has them first.
 - Nothing on the audio thread allocates, locks or does I/O; filters are
@@ -401,6 +404,18 @@ Bypass ramps over 1.33 ms to the dry signal and back, with the dry path
 delayed by the reported latency so wet and dry line up. Wet processing carries
 on during bypass, so switching back does not lose history.
 
+Which counts decide is what plays: the filter's own, when a filter plays,
+otherwise the host's (`dry_signal()` in `host.hpp`). A 2→6 crossover on a
+6-in, 6-out bus has no dry signal; a 2→2 filter on a 6-in, 2-out bus has
+one. When a replacement changes whether there is a dry signal, the dry
+signal fades with the filter that has it (the replacement's warm-up and
+crossfade), so bypass and Mix never jump; a filter that gains a dry signal
+starts from an empty delay line.
+
+Bypass here is the plug-in's own bypass parameter. A host that removes the
+effect from its signal path (off, offline, or its own pass-through) routes
+around the plug-in, and no adapter can stop that.
+
 - **Equal input and output counts:** the dry signal is input *c* on output *c*.
 - **Unequal counts:** every output ramps to silence. No output has an unfiltered counterpart: bypassing a 2→6
   crossover must not send full-range audio to a tweeter, and a 1→2 filter that
@@ -451,9 +466,9 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   mix; the dry path stays the untouched input. Range −100 to +24 dB, linear
   in decibels (jrp). During a replacement both filters play at the same gain.
 - **Mix** is the filtered share, 0 to 1, of the output before bypass; the
-  rest is the latency-aligned dry signal that bypass uses. With unequal input
-  and output counts there is no dry signal ([bypass](#bypass)), so the mix is
-  always 1. Like bypass, a mix below 1 still passes its dry share while a
+  rest is the latency-aligned dry signal that bypass uses. When the filter's
+  input and output counts differ there is no dry signal ([bypass](#bypass)),
+  so the mix is always 1, and the window report's `mix_note` says why. Like bypass, a mix below 1 still passes its dry share while a
   failed first load plays silence (equal counts only).
 - **Latency** is the block size `HostProcessor` is built with, the engine's
   uniform partition (the CLI's `--block-size`): one of `host_latencies`, 64 to
@@ -546,6 +561,20 @@ recorded layout are treated, and the per-format details are in
 [plug-in identities and channel layouts](plugin-identities.md#channel-layouts).
 In short: version-1 presets load on any arrangement with matching channel
 counts, and a recorded output speaker mask only ever gives a notice.
+
+**A wider input bus (PLUG-23).** A filter is accepted when the host gives it
+exactly its outputs and at least its inputs (`HostFilter::mismatch()`); fewer
+inputs, or other outputs, are refused as before. Some hosts give a plug-in as
+many inputs as outputs (REAPER does for VST3, found in HOST-1), so a 2→6
+crossover would otherwise never load there. The filter reads the first
+inputs and the rest are ignored: `HostProcessor` takes the host's input count
+and widens each prepared engine to it, the extra inputs routed nowhere, so
+every filter in one processor shares the input stride while keeping its own
+dry rule ([bypass](#bypass) for the fade when that changes). The user is told: Status ends "plug-in inputs 3-6 ignored.",
+the loaded, playing and started log lines add "Inputs 3–6 are ignored: the
+filter reads inputs 1–2.", and the window report's Channels fact says the
+same (`ignored_inputs()`). Outputs stay exact: a filter is never spread over,
+or cut to, other outputs.
 
 ## Replacement and threads
 

@@ -63,6 +63,16 @@ The plug-in has one input and one output. Each has 1 to 8 channels, and the
 counts may differ. More channels, or more inputs and outputs, are refused; use
 the [command-line tool](command-line.md) for wider filters.
 
+**More inputs than the filter needs.** A filter plays on its own number of
+outputs, exactly, and on at least its number of inputs: it reads the first
+ones and ignores the rest. Some hosts give a plug-in as many inputs as
+outputs: REAPER gives the VST3 plug-in six inputs on a six-channel track, so a
+2→6 crossover reads inputs 1 and 2 and ignores 3 to 6. Status then ends with
+"plug-in inputs 3-6 ignored.", and the [Convolver log](#status-and-the-convolver-log)
+and the window's Channels line say the same. Make sure the source plays on
+the inputs the filter reads. A filter with more inputs than the host gives,
+or with a different number of outputs, is refused.
+
 Channels are numbered in the host's order, and the `.cfg` routes refer to them
 in that order. For VST3 the order follows the speaker arrangement: 5.1 is left,
 right, centre, LFE, left surround, right surround, the same order as the WAV
@@ -112,6 +122,7 @@ channel counts. Each plug-in checks it against the host:
 | --- | --- |
 | No filter loaded yet, equal input and output counts | The input, unchanged (after the latency) |
 | No filter loaded yet, different counts | Silence |
+| The host gives more inputs than the filter needs, and the outputs match | The filter, reading the first inputs; the rest are ignored ([channels](#channels)) |
 | The first filter does not fit, or its preset is damaged | Silence |
 | A new filter does not fit while another is playing | The working filter, unchanged; the project keeps saving it |
 | The filter is too large to save with the project | As for a filter that does not fit: silence for a first filter, otherwise the working filter |
@@ -452,7 +463,7 @@ defaults play exactly as Convolver did before the settings existed.
 | Setting | Values | Default | What it does |
 | --- | --- | --- | --- |
 | **Gain** | −100 to +24 dB | 0 dB | Scales the filtered signal, as the command line's `--gain-db` does. Negative values make room for a filter that boosts some frequencies; positive values make up level. |
-| **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. With different input and output counts there is no dry signal, so the mix stays at 100%. Like bypass, the input share still plays when a filter fails to load and the filtered sound is silent. |
+| **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. When the filter's input and output counts differ (with no filter, the track's) there is no dry signal, so the mix stays at 100%. Like bypass, the input share still plays when a filter fails to load and the filtered sound is silent. |
 | **Latency** | 64, 128, 256, 512, 1024, 2048 or 4096 frames | 256 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. Smaller values mean less delay and more processor load; larger values the opposite. It is the old Convolver's partitions setting in modern form, and the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
 
 - Gain and Mix changes fade over 1.3 ms (64 samples at 48 kHz, 128 at
@@ -510,9 +521,20 @@ The host's bypass switch fades over 1.3 ms to the input, delayed by the
 latency so nothing jumps in time, and back. The filter keeps running
 underneath, so switching back loses nothing.
 
-With different input and output counts, bypass fades every output to silence
-instead: no output has an unfiltered counterpart, and bypassing a crossover
-must not send full-range audio to a tweeter.
+When the filter's input and output counts differ, bypass fades every output
+to silence instead: no output has an unfiltered counterpart, and bypassing a
+crossover must not send full-range audio to a tweeter. What counts is the
+filter, not the track: a 2→6 crossover on a six-channel REAPER track is
+bypassed to silence, and a 2-in, 2-out filter given six inputs and two
+outputs bypasses to inputs 1 and 2. With no filter playing, the track's
+counts decide. Mix has no effect when the filter's counts differ: the sound
+stays fully filtered at any Mix.
+
+This is Convolver's own **Bypass** (the host's bypass button where it uses
+it). A host that takes the effect out of the signal path altogether, such as
+switching it off or offline, may route the track's audio around Convolver,
+unfiltered, to its outputs; Convolver cannot prevent that. With a crossover,
+check in the host which kind of bypass its button uses before relying on it.
 
 VST3 saves bypass with the filter. Audio Unit and LV2 hosts save and restore
 the bypass switch themselves (in LV2 it is the `enabled` control), so loading
@@ -545,7 +567,9 @@ is installed at once.
 
 An LV2 plug-in's inputs and outputs are fixed, so each layout is its own
 plug-in: 1→1, 2→2, 1→2, 2→4, 2→6, 2→8, 6→6 and 8→8. Choose the one whose
-counts match your filter; [`convolver-preset`](presets.md) says which. Their
+counts match your filter; [`convolver-preset`](presets.md) says which. One with
+the filter's outputs and more inputs also plays it, reading the first inputs
+([channels](#channels)). Their
 URIs are `https://github.com/jrp2014/convolver/lv2#discrete-N-M`.
 
 ## LV2 ports

@@ -1513,6 +1513,92 @@ void refused_first_loads(host::World& world, const fs::path& work) {
     }
 }
 
+// PLUG-23: the discrete-6-6 plug-in takes a 2-in, 6-out filter, as REAPER
+// gives VST3 plug-ins on a six-channel track. It reads inputs 1-2: its output
+// matches discrete-2-6's exactly whatever plays on inputs 3-6; bypass plays
+// silence (the filter's counts differ); the saved filter keeps its own two
+// inputs and plays the same once restored on six again. Then, bypassed,
+// replacements between filters with and without a dry signal fade, never jump.
+void wider_inputs(host::World& world, const Fixture& f) {
+    const std::string label = "a 2-in, 6-out filter on discrete-6-6: ";
+    const auto rate = f.filter.sample_rate;
+    host::Plugin wide(world, world.plugin(6, 6), rate);
+    auto narrow = instance(world, f.filter);
+    check(wide.instantiated(), label + "instantiates");
+    check(wide.restore(state_of(f.filter), chunk(world)) == LV2_STATE_SUCCESS &&
+              narrow->restore(state_of(f.filter), chunk(world)) == LV2_STATE_SUCCESS,
+          label + "restored");
+    wide.activate();
+    narrow->activate();
+    const std::size_t frames = 4096;
+    std::vector<float> two(frames * 2), six(frames * 6);
+    std::uint32_t seed = 23;
+    for (std::size_t t = 0; t < frames; ++t)
+        for (std::size_t c = 0; c < 6; ++c) {
+            seed = seed * 1664525U + 1013904223U;
+            const float noise = static_cast<float>(seed >> 8) / 16777216.f - .5f;
+            const float v = c < 2 && t * 2 + c < f.input.size() ? f.input[t * 2 + c] : noise;
+            six[t * 6 + c] = v;
+            if (c < 2)
+                two[t * 2 + c] = v;
+        }
+    const auto a = render(wide, six, frames, 256), b = render(*narrow, two, frames, 256);
+    check(a == b, label + "inputs 3-6 changed the output");
+    check(std::any_of(a.begin(), a.end(), [](float v) { return v != 0; }), label + "plays nothing");
+    wide.enabled = 0;
+    const auto bypassed = render(wide, six, frames, 256);
+    check(std::all_of(bypassed.begin() + 6 * 256, bypassed.end(), [](float v) { return v == 0; }),
+          label + "bypass is not silent");
+    wide.enabled = 1;
+    const auto saved = wide.save();
+    const auto kept = decode_host_state(saved.bytes).configuration;
+    check(kept && kept->input_channels == 2 && same(kept, f.filter),
+          label + "saved with other channel counts than the filter's");
+    host::Plugin reopened(world, world.plugin(6, 6), rate);
+    check(reopened.restore(saved.bytes, chunk(world)) == LV2_STATE_SUCCESS,
+          label + "reopened on six inputs");
+    reopened.activate();
+    auto fresh = instance(world, f.filter);
+    check(fresh->restore(state_of(f.filter), chunk(world)) == LV2_STATE_SUCCESS, label + "fresh");
+    fresh->activate();
+    check(render(reopened, six, frames, 256) == render(*fresh, two, frames, 256),
+          label + "the reopened filter sounds different");
+
+    // Bypassed, constant input 1: identity (the empty instance), the
+    // crossover, a 6x6 filter, the crossover. The 5.33 ms crossfade moves at
+    // most 1/crossfade a frame; each ends silent (crossover) or at the input.
+    host::Plugin p(world, world.plugin(6, 6), rate);
+    p.activate();
+    p.enabled = 0;
+    const std::vector<float> ones(4096 * 6, 1.f);
+    auto out = render(p, ones, 4096, 256);
+    float previous = out[(4096 - 1) * 6];
+    check(previous == 1, label + "bypass on an empty instance does not pass the input");
+    auto equal = unfiltered_configuration({rate, 6, 6}, false);
+    for (auto& path : equal.paths)
+        for (auto& v : path.impulse)
+            v *= .5f;
+    for (const auto& [next, want, what] :
+         {std::tuple{f.filter, 0.f, "identity to the crossover"},
+          std::tuple{equal, 1.f, "the crossover to a 6x6 filter"},
+          std::tuple{f.filter, 0.f, "a 6x6 filter to the crossover"}}) {
+        check(p.restore(state_of(next), chunk(world)) == LV2_STATE_SUCCESS,
+              label + what + ": restored");
+        out = render(p, ones, 4096, 256);
+        float step = 0;
+        for (std::size_t t = 0; t < 4096; ++t)
+            for (std::size_t c = 0; c < 6; ++c) {
+                const float v = out[t * 6 + c];
+                step = std::max(step, std::abs(v - (t ? out[(t - 1) * 6 + c] : previous)));
+            }
+        previous = out[(4096 - 1) * 6];
+        check(step <= 1.f / 200, label + what + ": the bypassed output jumped by " +
+                                     std::to_string(step) + " in one frame");
+        check(std::all_of(out.end() - 6, out.end(), [&](float v) { return v == want; }),
+              label + what + ": does not end at " + std::to_string(want));
+    }
+}
+
 // LV2 state, restore(): "The plugin MUST gracefully fall back to a default
 // value when a value can not be retrieved. This allows the host to reset the
 // plugin state with an empty map." The default is an empty instance: identity
@@ -1777,6 +1863,9 @@ int main(int argc, char** argv) {
         path_state(world, work);
         refused_first_loads(world, work);
         empty_state_resets(world, work);
+        for (const auto& f : fixtures)
+            if (f.name == "crossover")
+                wider_inputs(world, f);
         for (const auto& f : fixtures) {
             status_and_log(world, f);
             presets(world, f, tool, work);

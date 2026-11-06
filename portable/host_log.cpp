@@ -138,6 +138,21 @@ std::string request_words(const HostRequest& r) {
 }
 } // namespace
 
+namespace {
+// PLUG-23: the inputs a filter ignores, as a sentence after "Playing ...".
+std::string ignored_sentence(const Configuration& c, const HostLayout& host) {
+    auto ignored = ignored_inputs(c, host);
+    if (ignored.empty())
+        return {};
+    ignored[0] = 'I';
+    const bool several = host.inputs > c.input_channels + 1;
+    return " " + ignored + (several ? " are" : " is") + " ignored: the filter reads " +
+           (c.input_channels == 1 ? std::string("input 1")
+                                  : "inputs 1–" + std::to_string(c.input_channels)) +
+           ".";
+}
+} // namespace
+
 std::string loaded_line(const HostFilter& filter, bool host_known) {
     const auto request = request_words(filter.accepted());
     if (const auto& f = filter.failure(); f && f->kind == HostFailureKind::saved_failure)
@@ -151,6 +166,14 @@ std::string loaded_line(const HostFilter& filter, bool host_known) {
                 : filter.notice().empty() ? "."
                                           : "; " + detail::advice_line(filter.notice()));
     return request + "Loaded state with no filter.";
+}
+
+std::string loaded_line(const HostFilter& filter, const std::optional<HostLayout>& host) {
+    auto line = loaded_line(filter, host.has_value());
+    const auto& f = filter.failure();
+    if (const auto& c = filter.filter(); host && c && !(f && f->silent))
+        line += ignored_sentence(*c, *host);
+    return line;
 }
 
 std::string rejected_line(const HostFilter& filter, bool started) {
@@ -236,7 +259,7 @@ std::string playing_words(const HostFilter& filter, const HostLayout& host,
         return failure_consequence(*f, &host, used) + " " +
                detail::as_sentence(detail::advice_line(failure_message(*f)));
     if (const auto& c = filter.filter()) {
-        auto line = "Playing " + filter_words(*c) + ".";
+        auto line = "Playing " + filter_words(*c) + "." + ignored_sentence(*c, host);
         if (!filter.notice().empty())
             line += " " + detail::as_sentence(detail::advice_line(filter.notice()));
         return line;
@@ -260,7 +283,7 @@ std::string started_line(const HostFilter& filter, const HostLayout& host, std::
                 ", blocks of up to " + std::to_string(max_frames) + " frames. " +
                 playing_words(filter, host, settings ? *settings : HostSettings{});
     if (settings)
-        line += " Settings: " + settings_words(*settings, host.inputs == host.outputs) + ".";
+        line += " Settings: " + settings_words(*settings, dry_signal(filter, host)) + ".";
     return line;
 }
 

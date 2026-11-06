@@ -1139,6 +1139,93 @@ std::string status_text(Unit& unit) {
 // "audio passes unchanged", and after a refused first load at Mix 50% it
 // played as 0.25 while Status said "Silent". Status and the start line now
 // say what is heard.
+// PLUG-23: a host may give more inputs than the filter has (REAPER gives
+// VST3 plug-ins equal counts on a six-channel track). The 2-in, 6-out filter
+// on 6 inputs reads inputs 1-2: its output matches a 2-in unit's exactly,
+// whatever plays on 3-6, also at Mix 0% (no dry signal, so fully wet);
+// bypass plays silence; the saved filter keeps its own two inputs. Then,
+// bypassed, replacements between filters with and without a dry signal
+// fade, never jump.
+void wider_inputs() {
+    const auto filter = crossover(48000);
+    Unit wide, narrow;
+    check(wide.configure(48000, 6, 6, 512), "6 to 6 formats");
+    check(narrow.configure(48000, 2, 6, 512), "2 to 6 formats");
+    check(wide.load(state_of(filter)), "a 2 to 6 filter on 6 inputs");
+    check(narrow.load(state_of(filter)), "a 2 to 6 filter on 2 inputs");
+    check(wide.initialize(), "6 to 6 initialization");
+    check(narrow.initialize(), "2 to 6 initialization");
+    Buffers x(6, 6, 512), y(2, 6, 512);
+    std::uint32_t seed = 23;
+    const auto compare = [&](const std::string& what) {
+        bool heard = false;
+        for (int block = 0; block < 8; ++block) {
+            x.noise(seed);
+            for (std::size_t c = 0; c < 2; ++c)
+                std::copy(x.in[c].begin(), x.in[c].end(), y.in[c].begin());
+            bool s = false;
+            check(render(wide, x, 512, false, s), "6 to 6 render");
+            check(render(narrow, y, 512, false, s), "2 to 6 render");
+            require(x.out == y.out, what + ": inputs 3-6 changed the output");
+            heard = heard || !x.output_silent();
+        }
+        require(heard, what + ": the filter played nothing");
+    };
+    compare("a 2 to 6 filter on 6 inputs");
+    set_parameter(wide, au::mix_parameter, 0);
+    set_parameter(narrow, au::mix_parameter, 0);
+    compare("Mix 0% on a 2 to 6 filter");
+    wide.set_bypass(true);
+    for (int block = 0; block < 2; ++block) {
+        x.noise(seed);
+        bool s = false;
+        check(render(wide, x, 512, false, s), "bypassed render");
+    }
+    require(x.output_silent(), "bypass on 6 inputs passes input to a 2 to 6 filter's outputs");
+    const auto saved = wide.saved();
+    require(saved.configuration && saved.configuration->input_channels == 2 &&
+                saved.configuration->output_channels == 6,
+            "a 2 to 6 filter on 6 inputs saved with other channel counts");
+
+    Unit p;
+    check(p.configure(48000, 6, 6, 512), "6 to 6 formats");
+    check(p.initialize(), "6 to 6 initialization");
+    p.set_bypass(true);
+    Buffers b(6, 6, 512);
+    for (auto& channel : b.in)
+        channel.assign(channel.size(), 1.f);
+    bool s = false;
+    for (int block = 0; block < 2; ++block)
+        check(render(p, b, 512, false, s), "bypassed render");
+    float previous = b.out[0].back();
+    require(previous == 1, "bypass on an empty instance does not pass the input");
+    auto equal = unfiltered_configuration(HostLayout{48000, 6, 6}, false);
+    for (auto& path : equal.paths)
+        for (auto& v : path.impulse)
+            v *= .5f;
+    const std::array<std::pair<const Configuration*, float>, 3> steps{
+        {{&filter, 0.f}, {&equal, 1.f}, {&filter, 0.f}}};
+    for (const auto& [next, want] : steps) {
+        check(p.load(state_of(*next)), "bypassed replacement");
+        float step = 0;
+        std::vector<float> last(6, previous);
+        for (int block = 0; block < 4; ++block) { // Warm-up and crossfade: 512 frames.
+            check(render(p, b, 512, false, s), "bypassed render");
+            for (std::size_t c = 0; c < 6; ++c)
+                for (auto v : b.out[c]) {
+                    step = std::max(step, std::abs(v - last[c]));
+                    last[c] = v;
+                }
+        }
+        require(step <= 1.f / 200,
+                "a bypassed replacement jumped by " + std::to_string(step) + " in one frame");
+        for (std::size_t c = 0; c < 6; ++c)
+            require(b.out[c].back() == want,
+                    "a bypassed replacement ends at " + std::to_string(b.out[c].back()));
+        previous = want;
+    }
+}
+
 void settings_in_diagnostics() {
     const auto contains = [](const std::string& text, const char* part) {
         return text.find(part) != std::string::npos;
@@ -1518,6 +1605,7 @@ int main(int argc, char** argv) {
         latency_witness_per_unit();
         latency_staged_closing();
         settings_in_diagnostics();
+        wider_inputs();
         std::cout << "Audio Unit adapter checks passed\n";
         return 0;
     } catch (const std::exception& e) {

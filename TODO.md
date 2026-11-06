@@ -685,6 +685,21 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   X11 view can replace it later if Linux users need one
   ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#framework-choice)).
   For a later preview: the first preview is macOS-only ([decided](docs/project/decisions.md#plug-in-behaviour)).
+- [ ] **VST3-16 — A new Latency in REAPER.** In jrp's HOST-1 REAPER run (6
+  November 2026, REAPER 7.85 on macOS) a new Latency stayed pending until
+  the project was reopened: the plug-in asks for a restart
+  (`restartComponent(kLatencyChanged)`), which the SDK says the host answers
+  by deactivating and activating the component, and REAPER did not do so
+  then. Why is not yet known. First trace, in REAPER, whether the request
+  arrives, what it returns, when `getLatencySamples()` is read and which
+  activation calls follow; only then choose a fix (a documented host step,
+  or applying the new processor at once as the Audio Unit does). Done when
+  an impulse lines up with a reference track after a change in both
+  directions (256 to 1024 and back), with REAPER's delay compensation
+  measured rather than its display or the reported value, and any change is
+  tested for rapid successive choices, a filter replacement at the same
+  time, deactivation and a failed preparation, with deterministic
+  synchronisation. Its own pull request, after PLUG-23.
 Not relevant to a convolver unless the product changes: MIDI and note
 interfaces (`IMidiMapping2`, `IMidiLearn2`, note expression, MIDI 2.0
 articulations), `ITransportControl`, `IPrefetchableSupport`,
@@ -1178,6 +1193,8 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **PERF-12 — Load-timing verdicts from records, tested without timing.** 5
   November 2026; [load timing](docs/develop/testing.md#load-timing-perf-9).
 - [x] **PERF-14 — Load timing from a full history.** 5 November 2026.
+- [x] **PLUG-23 — A filter reads the first inputs of a wider input bus.** 6
+  November 2026; [channels](docs/use/plugins.md#channels).
 - [x] **PLUG-21 — Teardown tested at chosen stages.** 5 November 2026.
 - [x] **PERF-13 — Load-timing records as JSON.** 5 November 2026; [load
   timing](docs/develop/testing.md#load-timing-perf-9).

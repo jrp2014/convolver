@@ -278,8 +278,9 @@ tresult Processor::activate(TBool state) {
             // A filter that does not suit the host plays silence, and is kept so
             // that correcting the rate or layout brings it back.
             const auto chosen = settings();
-            auto next = std::make_unique<HostProcessor>(filter_.activate(layout()),
-                                                        processSetup.maxSamplesPerBlock, chosen);
+            const auto host = layout();
+            auto next = std::make_unique<HostProcessor>(
+                filter_.activate(host), processSetup.maxSamplesPerBlock, chosen, host.inputs);
             tail_.store(static_cast<uint32>(next->tail_frames()));
             next->set_bypass(bypass_.load());
             next->reset();
@@ -567,8 +568,7 @@ void Processor::install(HostState next, const HostRequest& request, bool restore
     logged_.clear(); // A later failure is logged even if it repeats an earlier one.
     try {            // Accepted: nothing here may turn that into a rejection.
         // A restored failed load says why it plays silence.
-        log(loaded_line(filter_, host.has_value()),
-            filter_.failure().has_value() || !filter_.notice().empty());
+        log(loaded_line(filter_, host), filter_.failure().has_value() || !filter_.notice().empty());
     } catch (...) { // Out of memory for the line: it is dropped.
     }
 }

@@ -180,6 +180,19 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Plug-ins (PLUG-23): a filter now plays when the host gives more inputs than
+  it has, reading the first inputs and ignoring the rest; its outputs must
+  still match exactly. REAPER gives the VST3 plug-in six inputs on a
+  six-channel track, so the 2→6 crossover was refused there (HOST-1). Status
+  ends "plug-in inputs 3-6 ignored.", and the log and the window's Channels
+  line say which inputs the filter reads. Whether there is a dry signal now
+  follows the filter's own counts, so a crossover still bypasses to silence
+  and stays fully filtered at any Mix, whatever the host's counts. When a
+  replacement changes whether there is a dry signal, the dry signal fades
+  with the filter that has it rather than stopping or starting at once.
+  The same in VST3, the Audio Unit and LV2 (an LV2 layout with more inputs
+  than the filter now plays it too). The audio of a filter on exactly its
+  own counts is unchanged.
 - Documentation (DOC-7): finished items in [TODO](TODO.md#done) are one line
   each again, as the workflow guide asks: ID, title, date, pull request and
   the page that describes the result. Their earlier full entries, with the

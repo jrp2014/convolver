@@ -87,6 +87,10 @@ struct HostReport {
     // and whether the chosen Latency is not in use yet (latency_waits()).
     int sample_rate = 0;
     bool latency_waits = false;
+    // PLUG-23: for the window's Mix row, empty when Mix applies: why there
+    // is no dry signal (the filter's inputs and outputs differ, or with no
+    // filter the host's), so Mix has no effect and bypass plays silence.
+    std::string mix_note;
     // Reference material for problem reports, smaller and folded away in
     // the window: the filter file and request, software, log.
     std::vector<std::pair<std::string, std::string>> reference;
@@ -101,8 +105,9 @@ HostReport host_report(const HostFilter&, const HostReportFacts&);
 // summary (the status line), title, explanation, problem, plays, cause, fix,
 // note, action, filter name,
 // filter note, filter path, filter files (one per line), sample rate (digits, or empty), latency
-// waits ("yes" or "no"), audio (one line per fact: label, value, note, "problem" or empty, and
-// help, separated by tabs), reference (one "Label: value" line each), log path and log written
+// waits ("yes" or "no"), mix note, audio (one line per fact: label, value, note, "problem" or
+// empty, and help, separated by tabs), reference (one "Label: value" line each), log path and log
+// written
 // ("yes" or "no").
 std::vector<std::pair<std::string, std::string>> report_fields(const HostReport&);
 

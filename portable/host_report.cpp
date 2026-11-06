@@ -257,11 +257,22 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
         channels.problem = true;
     } else if (c) {
         const auto speakers = speaker_names(c->channel_mask, c->output_channels);
+        // PLUG-23: a host that gives more inputs than the filter has.
+        const auto ignored = host ? ignored_inputs(*c, *host) : std::string();
+        const auto reads =
+            ignored.empty()
+                ? std::string()
+                : "the filter reads " +
+                      (c->input_channels == 1 ? std::string("input 1")
+                                              : "inputs 1–" + std::to_string(c->input_channels)) +
+                      ", " + ignored + (host->inputs > c->input_channels + 1 ? " are" : " is") +
+                      " ignored";
         if (!host)
             channels.note = "(the filter has " + ports(c->input_channels, c->output_channels) +
                             (speakers.empty() ? "" : ": " + speakers) + ")";
-        else if (!speakers.empty())
-            channels.note = "(" + speakers + ")";
+        else if (!speakers.empty() || !reads.empty())
+            channels.note =
+                "(" + speakers + (speakers.empty() || reads.empty() ? "" : "; ") + reads + ")";
     }
     audio.push_back(std::move(channels));
 
@@ -397,8 +408,14 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
     r.audio = audio_facts(filter, facts);
     const auto& host = facts.host;
     const bool equal =
-        host ? host->inputs == host->outputs : !c || c->input_channels == c->output_channels;
+        host ? dry_signal(filter, *host) : !c || c->input_channels == c->output_channels;
     r.settings = settings_words(facts.settings, equal);
+    if (!equal) // PLUG-23: the filter's counts while it plays, otherwise the host's.
+        r.mix_note = c && !(failure && failure->silent)
+                         ? "The filter's inputs and outputs differ, so there is no dry signal: "
+                           "Mix has no effect, and bypass plays silence."
+                         : "Inputs and outputs differ, so there is no dry signal: Mix has no "
+                           "effect, and bypass plays silence.";
     r.sample_rate = host ? host->sample_rate : 0;
     r.latency_waits = latency_waits(facts);
 
@@ -467,6 +484,7 @@ std::vector<std::pair<std::string, std::string>> report_fields(const HostReport&
             {"filter files", files},
             {"sample rate", r.sample_rate ? std::to_string(r.sample_rate) : std::string()},
             {"latency waits", r.latency_waits ? "yes" : "no"},
+            {"mix note", r.mix_note},
             {"audio", audio},
             {"reference", reference},
             {"log path", r.log_path},

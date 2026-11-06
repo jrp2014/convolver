@@ -378,7 +378,8 @@ void activate_locked(Instance& p) {
     try {
         // A fresh processor: the filter plays from the first frame, its tail
         // and history start afresh, and LV2's activate() is also its reset.
-        p.host = std::make_unique<HostProcessor>(p.filter.activate(p.layout), p.max_block);
+        p.host = std::make_unique<HostProcessor>(p.filter.activate(p.layout), p.max_block,
+                                                 HostSettings{}, p.layout.inputs);
     } catch (const std::exception& e) {
         record_activation_failure(p, e.what());
     } catch (...) {

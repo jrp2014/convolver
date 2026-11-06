@@ -53,6 +53,9 @@ void set_host_log_sdk(const char* description) noexcept;
 // against the host yet. Both are numbered with the request ("Request 3: "),
 // so a sequence of loads can be followed.
 std::string loaded_line(const HostFilter&, bool host_known);
+// The same with the host's configuration where known, which also names the
+// host's inputs the filter ignores (PLUG-23).
+std::string loaded_line(const HostFilter&, const std::optional<HostLayout>& host);
 // After a rejected load: what plays instead and HostFilter::rejection()'s
 // message, numbered as loaded_line() numbers accepted ones ("Request 3: ");
 // empty if there is none. `started` says whether the host has started the
