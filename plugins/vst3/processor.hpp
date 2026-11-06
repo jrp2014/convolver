@@ -10,6 +10,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
@@ -42,6 +43,11 @@ inline constexpr auto& status_names = host_status_names;
 constexpr Steinberg::Vst::ParamValue normalized_status(HostStatus status) {
     return static_cast<Steinberg::Vst::ParamValue>(status) /
            static_cast<Steinberg::Vst::ParamValue>(status_names.size() - 1);
+}
+// The status value nearest `value`: a host that keeps normalized values as
+// float hands back 0.8 (Fault, since PLUG-22 added Bypassed) as 0.80000001.
+inline long status_index(Steinberg::Vst::ParamValue value) {
+    return std::lround(value * static_cast<Steinberg::Vst::ParamValue>(status_names.size() - 1));
 }
 // VST3-3: the status_message also carries the PLUG-9 report for the window
 // ("report": report_fields() as UTF-8 name and value pairs, each ended by a

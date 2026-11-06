@@ -173,7 +173,8 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
         return result;
     }
     const auto result = EditController::setParamNormalized(id, value);
-    if (id != status_id || result != kResultOk || value != normalized_status(HostStatus::fault))
+    if (id != status_id || result != kResultOk ||
+        status_index(value) != static_cast<long>(HostStatus::fault))
         return result;
     {
         std::lock_guard lock(status_lock_);
@@ -193,8 +194,7 @@ tresult PLUGIN_API Controller::getParamStringByValue(ParamID id, ParamValue valu
         std::lock_guard lock(status_lock_);
         // The text belongs to the status the processor sent last; a Fault
         // value from the audio thread reads as its name until it explains.
-        if (!status_text_.empty() &&
-            value == normalized_status(static_cast<HostStatus>(status_value_))) {
+        if (!status_text_.empty() && status_index(value) == status_value_) {
             copy(status_text_, string);
             return kResultOk;
         }

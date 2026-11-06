@@ -1048,18 +1048,21 @@ void status_and_log() {
             for (int i = 0; i < 64; ++i)
                 require(std::isfinite(left[i]) && std::isfinite(right[i]), "overflow not silenced");
         }
-        // One Fault point, written once however many blocks overflow.
+        // One Fault point, written once however many blocks overflow: Fault
+        // is value 4 of 0 to 5 (Bypassed is last, PLUG-22), so 0.8.
         require(changes.getParameterCount() == 1, "Fault not written to the Status parameter");
         auto* queue = changes.getParameterData(0);
         int32 offset = -1;
         ParamValue value = 0;
         require(queue && queue->getParameterId() == status_id && queue->getPointCount() == 1 &&
-                    queue->getPoint(0, offset, value) == kResultOk && value == 1.0,
+                    queue->getPoint(0, offset, value) == kResultOk && value == 0.8,
                 "Fault point");
         require(contains(log_text(), "too large") == false, "fault logged on the audio thread");
         // The host hands the value to the controller, which reads it as the
-        // name until the processor has explained.
-        require(c.setParamNormalized(status_id, value) == kResultOk, "host passes Fault on");
+        // name until the processor has explained; here as a host that keeps
+        // normalized values as float does (0.80000001).
+        require(c.setParamNormalized(status_id, static_cast<float>(value)) == kResultOk,
+                "host passes Fault on");
     }
     require(status() == convolver::HostStatus::fault &&
                 shown() == "Fault: output too large, silenced and the filter restarted. Details "
