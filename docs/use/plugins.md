@@ -95,13 +95,16 @@ before any audio plays starts at once; one loaded during playback fades in
 
 In the Audio Unit, and in the VST3 plug-in on macOS, you can also choose the
 `.cfg` file, list or impulse response itself, in Convolver's window:
-**Choose…** beside Filter, or drop the file on the window
+**Choose…** under the filter's name, or drop the file on the window
 ([Convolver's window](#convolvers-window)). In LV2
 you choose it with the host's file chooser
 ([LV2 filter files](#lv2-filter-files)). Either way the plug-in reads the
 file as `convolver-preset` does, for the rate and channels the host has
 set, and the project then holds the filter itself, as with a preset: moving
-or deleting the file afterwards changes nothing.
+or deleting the file afterwards changes nothing. In the Audio Unit and VST3
+the project also keeps the file's name, with its extension, so the window
+names the filter after reopening; it does not keep the file's folder, so a
+project passed to someone else does not carry your folder names.
 
 ## When a filter does not fit
 
@@ -180,12 +183,20 @@ example (some hosts show only the status name in the first column):
 
 | Status | Example text |
 | --- | --- |
-| Playing | `Filter loaded: 48000 Hz, 2 in, 2 out.` |
+| Active | `Filter loaded: 48000 Hz, 2 in, 2 out.` |
 | No filter | `No filter: audio passes unchanged. Load a Convolver preset.` |
 | Load failed (silence) | `Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in the Convolver log.` |
 | Load failed (previous filter kept) | `Load failed, previous filter kept: the filter has 2 in, 6 out, the plug-in 2 in, 2 out. Details in the Convolver log.` |
 | Not checked yet | `Filter loaded: 44100 Hz, 2 in, 2 out; checked when the host starts it.` |
 | Fault | `Fault: output too large, silenced and the filter restarted. Details in the Convolver log.` |
+| Bypassed | `Bypassed: the input plays unfiltered.` (`Bypassed: silent, as inputs and outputs differ.` when the counts differ) |
+
+**Active** means a filter is loaded and the host has started the plug-in at
+a rate and channel layout the filter suits. It does not follow the host's
+transport: a paused or stopped project still reads Active, as the filter is
+ready to play the moment audio arrives. **Bypassed** shows while the host's
+bypass (or, in VST3, the window's Bypass checkbox) is on and a filter is
+loaded; a problem (Load failed, Fault) still shows first.
 
 The text also follows the [settings](#settings) when no filter
 is heard. With no filter loaded and Gain or Mix changed, it reads, for
@@ -287,9 +298,25 @@ From the top, the window has:
   plug-in process" when the host runs plug-ins in Apple's separate service,
   as GarageBand does (the Software line names that process). The VST3
   plug-in's Bypass checkbox sits at its right-hand end.
-- **The status** (Playing, No filter, Load failed, Not checked yet or Fault),
-  the same as the Status parameter, as a symbol and a coloured word, and
-  under them **the message**, as the log explains it, in parts:
+- **The filter's name** as the heading: the name of the file that plays,
+  with its extension (`Living room 48k.cfg`), so the kind of filter shows
+  too. A long name loses its middle, never its extension; hold the pointer
+  over it for all of it. The project and the host's presets keep the name
+  with the filter (the Audio Unit as its preset name, VST3 in its
+  controller state), so it is still there after reopening the project, but
+  not the file's folder: see [loading a filter](#loading-a-filter). A
+  project saved by an earlier Convolver, or a preset that holds no name,
+  shows "From the saved project or preset". With no filter it reads
+  "None". Under the name, in small text: a note when the newest file was
+  refused, and a reminder that a file can be dropped on the window.
+- **The status** beside the name (Active, Bypassed, No filter, Load failed,
+  Not checked yet or Fault), the same as the Status parameter, as a symbol
+  and a word, coloured for Active (green), Load failed (red) and Fault
+  (orange).
+- **The message**, under the heading, only when there is something to say.
+  A problem sits in a box tinted with the status colour; Bypassed's line
+  ("The input plays unfiltered. Turn bypass off to hear the filter.") and a
+  note are plain text. It explains as the log does, in parts:
 
   | Part | What it says |
   | --- | --- |
@@ -308,11 +335,10 @@ From the top, the window has:
   made for 1 input and 1 output.", the Choose Filter… button, and Note:
   "Hosts run an effect with one channel on a mono track (GarageBand does):
   put Convolver on a stereo track instead." While a filter simply plays,
-  the message is only the filter's rate and channels; with no filter, Fix
-  says what to load, with Choose Filter… under it.
-- **Filter:** the name of the file that plays (or "From the saved project or
-  preset" after reopening a project, which saves the filter itself, not the
-  file), a note when the newest file was refused, and **Choose…** beside it.
+  there is no message: the heading and the Audio section say what plays.
+  With no filter, Fix says what to load, with Choose Filter… under it.
+- **Choose…**, **Recent**, **Reload** and **Reload when the file changes**,
+  on one row under the message.
   Choose… opens the file dialog for a `.cfg` file, a
   configuration list or a sound file; dropping the file anywhere on the
   window does the same. The Audio Unit reads sound files with macOS's own reader, so
@@ -343,7 +369,7 @@ From the top, the window has:
   beside it. Where a sandbox refuses, the explanation says permission was
   denied. A preset always works.
 
-  Under the file name:
+  Beside Choose…:
 
   - **Recent** lists the filter files last loaded in a Convolver window, in
     any host or format (up to ten, newest first, each with its folder's
@@ -388,8 +414,9 @@ From the top, the window has:
   automation from it may record each step separately; not yet tried in
   GarageBand.
 - **Latency**: a menu of block sizes, with the delay it adds at the host's
-  rate beside it; a new choice plays at once, and "not in use yet" shows
-  only until it does ([settings](#settings)).
+  rate beside it ("adds 21.3 ms"); a new choice plays at once, and "not in
+  use yet" shows only until it does ([settings](#settings)). The host is
+  told the delay, so it can delay other tracks to keep them in time.
 - **Audio**: what plays, in plain words, with the technical term in
   brackets. Hold the pointer over a line for what it means.
 
@@ -399,7 +426,6 @@ From the top, the window has:
   | Channels | The host's inputs and outputs, the speakers the filter's outputs are labelled for, and the filter's counts when they do not suit |
   | Routing | Which input feeds which output (`In 1 → Out 1`), with route gains such as `×0.5`; the first four paths, then how many more |
   | Filter length | The longest filter, in time and in taps |
-  | Added delay | The latency, in time and frames, and a chosen one not in use yet |
   | Ring-out | How long the output goes on after the input stops (the tail) |
   | Loudest peak | The loudest output any full-scale input could make through the filter, and the Gain that rules out clipping (or that it cannot clip at the current Gain and Mix) |
   | Host blocks | The largest block the host sends at a time |

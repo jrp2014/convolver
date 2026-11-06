@@ -308,14 +308,14 @@ except the Audio Unit build, which runs in a source checkout.
     differ from REAPER's.
 11. The window and settings (macOS, VST3-11). Use a source checkout's
     `examples/first-use/stereo/filter.cfg` (48 kHz). In Convolver's window
-    click **Choose…**, pick that file: the status reads Playing, the Filter
-    row reads `filter.cfg`, and REAPER marks the project changed (an
+    click **Choose…**, pick that file: the status reads Active, the heading
+    reads `filter.cfg`, and REAPER marks the project changed (an
     asterisk in the title bar). Drag Gain to about −12 dB while playing:
     the level drops without a click, and *Edit › Undo* undoes the whole drag
     in one step. Set Mix to 0%: you hear the dry track. Option-click both
     sliders to reset them. Choose 1024 frames in the Latency menu: after a
     short gap the sound carries on, the window's Latency row reads
-    `21.3 ms`, the log has `Latency set to 1024 frames`, and the track stays
+    `adds 21.3 ms`, the log has `Latency set to 1024 frames`, and the track stays
     in time with the source. Record where REAPER shows the plug-in's latency
     (its delay compensation) and whether it reads 1024 samples. Open the
     disclosure triangle: REAPER's FX window grows to fit.

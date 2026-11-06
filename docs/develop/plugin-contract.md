@@ -163,8 +163,10 @@ named-host smoke tests): adapters without a host log interface show why they
 are silent or refused a load in two places, with the same words in every
 format.
 
-- **A read-only Status parameter** whose value is a `HostStatus` (Playing, No
-  filter, Load failed, Not checked yet, Fault) and whose text for the current value
+- **A read-only Status parameter** whose value is a `HostStatus` (Active, No
+  filter, Load failed, Not checked yet, Fault, Bypassed; PLUG-22 renamed
+  Playing to Active and added Bypassed as the last value, so saved automation
+  of other parameters is unaffected) and whose text for the current value
   is `host_status()`'s one line of at most 127 ASCII characters
   ([`host.hpp`](../../include/convolver/host.hpp)). The status follows
   `HostFilter::failure()`, so a refused replacement shows Load failed while
@@ -199,9 +201,12 @@ format.
   diagnostics"), taken from the failure's or notice's parts as they are
   (DIAG-4), and all of it as one explanation text with `Cause:`, `Fix:`
   and `Note:` lines ([`advice.hpp`](../../portable/advice.hpp)); then
-  the Filter row (the file's name and a note when the newest request was
-  refused), the Audio facts in plain words (`HostFact`: sample rate,
-  channels and speakers, routing, filter length, added delay, ring-out,
+  the filter's name for the heading (the file's name with its extension;
+  after a restore the name saved with the project, `HostRequest::name`, or
+  "From the saved project or preset" without one; PLUG-22) and a note when
+  the newest request was
+  refused, the Audio facts in plain words (`HostFact`: sample rate,
+  channels and speakers, routing, filter length, ring-out,
   loudest peak from `HostFilter::filter_peak()`, host blocks; each with a
   note, a problem flag for what does not match, and help text), the
   settings in words, and reference lines: the filter file and request,

@@ -129,9 +129,9 @@ prints `Match`: the project kept the filter and its six outputs.
 
 REAPER also loads Audio Units. Install `Components/Convolver.component` as
 [install](install.md) says, insert Convolver's Audio Unit in step 3 in place
-of the VST3 plug-in, and load the filter in its window: **Choose…** beside
-Filter, then `examples/first-use/crossover/filter.cfg`. The window reads
-Playing with 48000 Hz, 2 in, 6 out, and the render and comparison are as
+of the VST3 plug-in, and load the filter in its window: **Choose…** under
+the filter's name, then `examples/first-use/crossover/filter.cfg`. The window reads
+`filter.cfg`, Active, and its Audio section 48000 Hz, 2 in, 6 out, and the render and comparison are as
 above. Its preset menu takes `.aupreset` files rather than `.vstpreset`
 ([plug-in presets](presets.md)).
 
