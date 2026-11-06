@@ -399,6 +399,18 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Inspection (ROBUST-2): `--inspect` and `--validate` with
+  `--all-configurations` decode and prepare every entry of a list, so a
+  small list naming one long filter thousands of times kept them busy for
+  many minutes, and a list of configurations with thousands of paths made
+  a report of hundreds of megabytes. One check now stops, with a `limit`
+  error, before the next entry once it has decoded 1 Gi IR samples (16
+  renders of the largest filter), or before an entry that would take it past
+  16,384 reported filter paths. A
+  message saying no list entry has the wanted sample rate now names at
+  most ten of the list's rates, as it already did entries; it had named
+  every rate, which a plug-in's log and window then showed. The `limit`
+  error is kept even when the report's 256 diagnostics are already used.
 - Tests (PERF-10, from jrp's review of `59ac8e0`): the load-timing tests
   passed when they could not judge a run: a late baseline made every
   violation, an over-long load included, "inconclusive", which counted as

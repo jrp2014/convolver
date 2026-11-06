@@ -439,9 +439,16 @@ std::string explain_no_match(const std::filesystem::path& filter, bool list,
         for (const auto& c : candidates)
             if (std::find(rates.begin(), rates.end(), c.sample_rate) == rates.end())
                 rates.push_back(c.sample_rate);
+        // As with the entries, at most `shown` rates (ROBUST-2): a list can hold
+        // thousands, and the message reaches a plug-in's log and window.
+        const auto named = std::min(rates.size(), shown);
         std::string available;
-        for (std::size_t i = 0; i < rates.size(); ++i)
+        for (std::size_t i = 0; i < named; ++i)
             available += (i == 0 ? "" : i + 1 == rates.size() ? " or " : ", ") + hertz(rates[i]);
+        if (const auto others = rates.size() - named; others == 1)
+            available += " or the list's one other rate";
+        else if (others > 1)
+            available += " or one of the list's " + std::to_string(others) + " other rates";
         a.fix = "No entry is for " + hertz(w.sample_rate) + ". " +
                 resample_fix(w.sample_rate, available, true, who);
         a.note = resample_note(true);

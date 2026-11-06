@@ -16,6 +16,11 @@
 #include <utility>
 #include <vector>
 
+namespace convolver {
+struct InspectionOptions;
+struct InspectionReport;
+} // namespace convolver
+
 namespace convolver::detail {
 // Limits shared by loading, inspection and tests.
 inline constexpr std::size_t max_text_bytes = 1024 * 1024;
@@ -27,6 +32,10 @@ inline constexpr std::size_t max_filter_paths = 4096;
 inline constexpr std::size_t max_routes = 4096;
 // Configuration/list text read by one resolution; a shared sublist counts each read.
 inline constexpr std::size_t max_total_text_bytes = 16 * 1024 * 1024;
+// One --all-configurations inspection (ROBUST-2): IR samples decoded by all the
+// entries it verifies (16 renders' worth), and filter paths it reports.
+inline constexpr std::size_t max_inspected_samples = 16 * max_decoded_samples;
+inline constexpr std::size_t max_inspected_paths = 4 * max_filter_paths;
 
 // Physical 1-based line and byte column (a UTF-8 BOM is not counted). Zero means
 // the location is unknown or the whole file.
@@ -245,4 +254,13 @@ class Resolver {
     IncludeChain chain_;
     std::size_t visits_ = 0;
 };
+
+// inspect_configuration() with other --all-configurations limits, so tests can
+// reach them without decoding a gibibyte of samples.
+struct InspectionLimits {
+    std::size_t samples = max_inspected_samples;
+    std::size_t paths = max_inspected_paths;
+};
+InspectionReport inspect_configuration(const std::filesystem::path&, const InspectionOptions&,
+                                       InspectionLimits);
 } // namespace convolver::detail

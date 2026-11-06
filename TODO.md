@@ -639,9 +639,6 @@ means a patched FFmpeg build with `--enable-gpl`.
 - [ ] **ROBUST-1 — Longer fuzz and transition stress.** Keep discovered inputs as
   regressions. Measure worst callback times and exercise repeated filter changes;
   allocation guards and average throughput are not a deadline guarantee.
-- [ ] **ROBUST-2 — Bound report output.** Review traversal/report growth after the
-  configuration-visit limit and diagnostic truncation, including huge invalid
-  lists. Bound reporting work as well as file reads.
 
 ## VST3 SDK features not yet used
 
@@ -1010,7 +1007,7 @@ with compatibility tests; linked IDs point to open work above.
 | Core processing uses interleaved float buffers that must not overlap | Use `HostProcessor` for planar/in-place float/double host buffers; internal DSP remains float. | [Engine API](docs/develop/library.md#engine-api) |
 | Latency and filter replacement are not instantaneous | Core latency is B; the plug-ins' default is 256 frames. Replacement starts with fresh history and warms/crossfades; reset work scales with the block buffers and delay lines, not the filter length (PERF-5). | [Replacement](docs/develop/plugin-contract.md#replacement-and-threads) |
 | Callback safety has a defined thread contract | One audio thread per instance; serialized control calls; teardown requires stopped audio. Stress/deadline evidence remains ROBUST-1. | [Implementation invariants](docs/develop/architecture.md#invariants-to-preserve) |
-| Resource limits cap channels, paths, delays, text, IRs and state | Intentional bounds; assess any increase with memory/overflow tests. Report-size follow-up is ROBUST-2. | [Core limits](docs/develop/library.md#resource-limits), [tests](docs/develop/testing.md) |
+| Resource limits cap channels, paths, delays, text, IRs and state | Intentional bounds; assess any increase with memory/overflow tests. | [Core limits](docs/develop/library.md#resource-limits), [tests](docs/develop/testing.md) |
 | The configuration format is not identical across consumers | No external consumer has verified this corpus yet; CFG-1. Older bundled configs may need delay lines and portable paths. | [Compatibility matrix](docs/use/other-programs.md#what-convolver-accepts) |
 | Path portability checks are partial | No drive/share remapping; a clean profile is not certification for Windows or another reader. Extend checks only with fixtures. | [Profiles](docs/use/other-programs.md#check-that-a-configuration-will-travel) |
 | Output is WAV, RF64, W64, AIFF, CAF, FLAC or headerless raw; speaker labels and reduced valid bits are WAV-only | Input codecs and FLAC output depend on the libsndfile build; the preview packages have no FLAC or Ogg, by decision ([workarounds](docs/use/command-line.md#flac-and-ogg)). Boundary-size tests remain IO-1; labels in other containers are IO-5. RAW has no embedded rate/channel metadata. | [Output formats](docs/use/command-line.md#output-formats) |
@@ -1590,6 +1587,18 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   in its constructor, so out of memory reaches the caller, and
   `estimate_attenuation` refuses a non-finite noise response; tests in
   `native.io` and `native.engine`; [gain](docs/use/command-line.md#gain-and-attenuation).
+- [x] **ROBUST-2 — Bound report output.** 6 November 2026, PR #118: traversal and
+  diagnostics were already bounded (4096 visits, 256 diagnostics), but
+  `--inspect --all-configurations` gives each entry a render's decoding
+  budget, so a 20 KB list naming a 64 MB filter 4095 times kept it busy for
+  about 18 minutes, and a 16 MiB list of 4096-path configurations made a
+  533 MB JSON report using 2.9 GB. One check now stops, with one error,
+  before the next entry once it has decoded 1 Gi samples, or before an entry
+  that would take it past 16,384 reported paths (4.2 s and 4 MB on the same
+  lists); a no-match message
+  names at most ten sample rates, as it already did entries. Tests in
+  `native.limits`;
+  [resource limits](docs/develop/library.md#resource-limits).
 - [x] **ROBUST-6 — State the shared limits once.** 5 November 2026, PR #108,
   from the project review of that day: the sample-rate, channel, block and
   impulse limits are `constexpr` values in `convolver/engine.hpp`, used by

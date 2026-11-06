@@ -2,6 +2,7 @@
 // Inspection reuses the loader's parser, resolver, selection and decoder, and the
 // engine's own validation/accounting, so a report cannot disagree with a render.
 #include "convolver/inspection.hpp"
+#include "advice.hpp"
 #include "config_parse.hpp"
 #include <algorithm>
 #include <memory>
@@ -58,8 +59,9 @@ std::string selectors(const InspectionOptions& o) {
 
 class Inspector {
   public:
-    Inspector(const std::filesystem::path& path, const InspectionOptions& options)
-        : options_(options) {
+    Inspector(const std::filesystem::path& path, const InspectionOptions& options,
+              detail::InspectionLimits limits)
+        : options_(options), limits_(limits) {
         report_.path = path;
         report_.options = options;
     }
@@ -182,6 +184,11 @@ class Inspector {
         }
         SelectionStep step{l.path, chain(l.chain), "", rate, inputs, outputs};
         candidates_.push_back({l.path, l.audio != nullptr, rate, inputs, outputs});
+        if (options_.all_configurations && over_limit(l, result.paths.size())) {
+            step.outcome = "failed";
+            report_.traversal.push_back(std::move(step));
+            return true; // Stops the traversal; the entries left are not checked.
+        }
         if (!options_.all_configurations) {
             step.outcome = mismatch(rate, inputs, outputs, options_);
             if (!step.outcome.empty()) {
@@ -229,10 +236,53 @@ class Inspector {
                 e.included_from(*it);
             add(diagnostic(e));
         }
+        samples_ += budget_;
         result.valid = errors_ == errors;
         report_.configurations.push_back(std::move(result));
         // Selected rendering stops at the first match; all-entry mode continues.
         return !options_.all_configurations;
+    }
+    // ROBUST-2: --all-configurations verifies each entry with a render's whole
+    // decoding budget, so without a limit a long list of long filters could
+    // keep it decoding and preparing for many minutes, and a list of wide
+    // configurations build a report of millions of paths. It stops, with one
+    // error, before the next entry once the entries checked have decoded the
+    // sample limit (the entry that crosses it is checked in full), or before
+    // an entry that would take the paths reported past their limit.
+    bool over_limit(const detail::Resolver::Leaf& l, std::size_t paths) {
+        std::string problem, cause;
+        if (samples_ >= limits_.samples) {
+            problem = "the entries checked so far decoded " + std::to_string(samples_) +
+                      " IR samples, and one --all-configurations check stops after " +
+                      std::to_string(limits_.samples);
+            cause = "Each entry's filters are decoded and prepared as a render would, so a long "
+                    "list of long filters would take a long time.";
+        } else if (paths > limits_.paths - paths_) {
+            problem = "this entry would take the filter paths reported past " +
+                      std::to_string(limits_.paths) +
+                      ", the most one --all-configurations check reports";
+            cause = "Every path of every entry is reported, so a long list of configurations "
+                    "with many paths would make a very large report.";
+        } else {
+            paths_ += paths;
+            return false;
+        }
+        limited_ = true;
+        // Kept even past max_diagnostics: it is the one error that says why
+        // the check stopped.
+        ++errors_;
+        report_.diagnostics.push_back(
+            {"limit",
+             DiagnosticSeverity::error,
+             detail::advice_text({"stopped before this entry: " + problem,
+                                  cause,
+                                  "Check the rest of the list in smaller lists, or inspect the "
+                                  "entry a render would use with --sample-rate and the channel "
+                                  "counts instead of --all-configurations.",
+                                  {}}),
+             {l.path, 0, 0},
+             chain(l.chain)});
+        return true;
     }
     void resolve() {
         detail::Resolver::ErrorHandler on_error;
@@ -257,7 +307,10 @@ class Inspector {
             return;
         }
         if (options_.all_configurations) {
-            report_.selection_reason = "every entry validated (--all-configurations)";
+            report_.selection_reason = limited_
+                                           ? "entries validated until a limit stopped the check "
+                                             "(--all-configurations)"
+                                           : "every entry validated (--all-configurations)";
             return;
         }
         const auto wanted = selectors(options_);
@@ -468,13 +521,21 @@ class Inspector {
     InspectionOptions options_;
     InspectionReport report_;
     std::size_t errors_ = 0, dropped_ = 0;
+    detail::InspectionLimits limits_;
     std::size_t budget_ = 0;
+    std::size_t samples_ = 0, paths_ = 0; // --all-configurations totals (ROBUST-2).
+    bool limited_ = false;
     std::vector<detail::SelectionCandidate> candidates_; // Leaves visited, for no-match help.
 };
 } // namespace
 
 InspectionReport inspect_configuration(const std::filesystem::path& path,
                                        const InspectionOptions& options) {
+    return detail::inspect_configuration(path, options, {});
+}
+InspectionReport detail::inspect_configuration(const std::filesystem::path& path,
+                                               const InspectionOptions& options,
+                                               InspectionLimits limits) {
     if (options.expected_rate < 0 || options.expected_rate > max_sample_rate ||
         options.expected_inputs > max_channel_count || options.expected_outputs > max_channel_count)
         throw std::invalid_argument("expected audio properties out of range");
@@ -491,6 +552,6 @@ InspectionReport inspect_configuration(const std::filesystem::path& path,
         throw std::invalid_argument("syntax-only and all-configuration modes are exclusive");
     if (path.empty() || path == "-")
         throw std::invalid_argument("configuration must be a file");
-    return Inspector(path, options).run();
+    return Inspector(path, options, limits).run();
 }
 } // namespace convolver
