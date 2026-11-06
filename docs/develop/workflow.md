@@ -280,11 +280,12 @@ approve or merge; jrp does that.
   is reported in the pull request, not ignored.
 - After a merge, the version workflow bumps `VERSION` and tags `main`
   ([source versioning](versioning.md)).
-- A merged pull request's branch is deleted by GitHub's *Automatically
-  delete head branches* setting (*Settings › General › Pull Requests*) once
-  jrp turns it on; it was still off on 6 November 2026. Cloud agent sessions
-  cannot delete branches, so a merged branch that is left over (its work all
-  in `main`, no open pull request) goes on a list for jrp to delete. Further work after a merge starts
+- Merged branches are kept for a while, so their history can still be
+  read, and jrp deletes them periodically (his choice, 6 November 2026;
+  GitHub's automatic deletion stays off). Cloud agent sessions cannot delete
+  branches; a reminder every two weeks lists the branches whose work is all
+  in `main` (squash merges compared by content) and that have no open pull
+  request, with a script jrp runs from a clone. Further work after a merge starts
   again from current `main`, even on a branch of the same name; a merged
   pull request is never reused.
 
