@@ -7,10 +7,11 @@ or for listening checks in another host. It is a 20-second, 48 kHz stereo
 16-bit PCM WAV, peaking at -18.06 dBFS. Start with playback volume low.
 
 Import it onto a stereo track at time zero in a 48 kHz project. This is
-**input audio**, not an impulse response to load into Convolver. It suits
-part A of the REAPER session walkthrough and the settings checks in part C;
-keep using the supplied first-use inputs and expected outputs for parts B
-and D's numerical comparisons.
+**input audio**, not an impulse response to load into Convolver. Use it for
+the smoke test's listening and settings checks. For the
+[stereo](../../docs/use/check-a-stereo-filter.md) and
+[crossover](../../docs/use/check-a-crossover-in-a-host.md) numerical comparisons,
+keep using those guides' supplied first-use inputs and expected outputs.
 
 | Time | What you hear |
 | --- | --- |
