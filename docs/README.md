@@ -68,8 +68,10 @@ These pages are in `docs/use/` and are shipped in preview packages.
 | [Implementation map](develop/architecture.md) | Background | Source responsibilities, invariants, change-to-test map |
 | [Plug-in adapter contract](develop/plugin-contract.md) | Reference | What every plug-in adapter must do: failed loads, restoration, replacement, bypass, threads, host state, preset files |
 | [Plug-in identities and channel layouts](develop/plugin-identities.md) | Reference | Permanent IDs for every format, what forks must change, discrete and named layouts, old presets |
-| [FFT guide](develop/fft-backends.md) | Background | Backend choice, numerical contract, dated benchmarks |
+| [FFT guide](develop/fft-backends.md) | Background | Backend choice, numerical contract, what the benchmarks concluded |
+| [FFT and engine measurements](develop/fft-measurements.md) | Background | Dated benchmarks: FFT libraries, FFTW builds, spectrum layout, compiler flags, AVX2 kernels, startup and reset, how to reproduce them |
 | [Testing](develop/testing.md) | Reference | What each test establishes and its limits, including each plug-in format and the Equalizer APO export |
+| [Load timing](develop/load-timing.md) | Reference | How the load-timing tests measure loading, their limits, verdicts and records (PERF-9) |
 | [Host testing](develop/host-testing.md) | How-to | Testing in real hosts: the preview smoke test, production qualification, Equalizer APO on a device |
 | [Taking on and reviewing work](develop/workflow.md) | How-to | Claiming a TODO item, handoff notes, definition of done, independent review, merge, repository checks |
 | [Documentation guide](develop/documentation.md) | Reference | Readers and kinds of page, writing rules, pages agents follow, which page owns each topic, link checks |

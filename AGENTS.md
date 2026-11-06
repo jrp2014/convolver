@@ -65,6 +65,29 @@ Claude Code sessions reach the same sections through two repository skills,
 | Finish | [Verification](docs/develop/workflow.md#verification-for-each-kind-of-change), [definition of done](docs/develop/workflow.md#definition-of-done) |
 | Review a change | [Independent review](docs/develop/workflow.md#independent-review) |
 
+## Read only what the task needs
+
+`TODO.md`, `docs/develop/testing.md` and the plug-in contract are long
+reference pages: go to the section your task needs instead of reading them
+whole.
+
+| Task | Read |
+| --- | --- |
+| Choose or claim work | [Execution priorities](TODO.md#execution-priorities), then search `TODO.md` for the item's ID |
+| Find the code and its tests | [Change and test map](docs/develop/architecture.md#change-and-test-map) |
+| Decide what to run before pushing | [Verification](docs/develop/workflow.md#verification-for-each-kind-of-change) |
+| Build | [Sanitizer build](docs/develop/build.md#sanitizer-build-for-changes); plug-in SDKs under [plug-ins](docs/develop/build.md#plug-ins) |
+| Understand a native test | [Native production tests](docs/develop/testing.md#native-production-tests) |
+| Change or debug a plug-in | The [adapter contract](docs/develop/plugin-contract.md) section for the behaviour, [plug-in comparisons](docs/develop/testing.md#plug-in-comparisons-plug-2) and the format's own [tests](docs/develop/testing.md#plug-in-format-tests) |
+| A load-timing test failed or skipped | [Load timing](docs/develop/load-timing.md) |
+| A CI run failed | [Evidence from failed CI runs](docs/develop/testing.md#evidence-from-failed-ci-runs), [intermittent failures](docs/develop/testing.md#intermittent-failures) |
+| Why CI ran or skipped a job | [CI triggers](docs/develop/testing.md#ci-triggers) |
+| FFT backend or a speed claim | [Selection and contract](docs/develop/fft-backends.md#selection-and-contract); the evidence on [measurements](docs/develop/fft-measurements.md) |
+| Write host-test steps or record results | [Every report](docs/develop/host-testing.md#every-report) and the host's section of [host testing](docs/develop/host-testing.md) |
+| Candidates and preview packages | [Releasing](docs/develop/releasing.md#candidates) |
+| Change documentation | [One home for each topic](docs/develop/documentation.md#one-home-for-each-topic), [writing rules](docs/develop/documentation.md#writing-rules) |
+| What jrp has decided | [Decisions](docs/project/decisions.md) |
+
 ## Build and test
 
 Verify in proportion to the change: the

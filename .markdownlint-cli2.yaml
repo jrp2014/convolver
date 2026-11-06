@@ -6,9 +6,10 @@ config:
   # Repeated subheadings are useful under different implementation tasks.
   MD024:
     siblings_only: true
-  # The VST Compatible logo at a set width (scripts/trademarks.py writes it).
+  # The VST Compatible logo at a set width (scripts/trademarks.py writes it), and
+  # <a id> anchors that keep the links to sections moved to another page.
   MD033:
-    allowed_elements: [img]
+    allowed_elements: [img, a]
 ignores:
   - 'archives/**'
   - 'historical/**'

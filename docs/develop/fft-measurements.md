@@ -1,0 +1,756 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+# FFT and engine measurements
+
+[Documentation index](../README.md) · [FFT guide](fft-backends.md)
+
+Dated measurements behind the choices in the [FFT guide](fft-backends.md):
+FFT libraries, FFTW builds and planning, spectrum layout, shared transforms,
+overlap-add against overlap-save, compiler flags and the AVX2 kernels, and the
+cost of starting, resetting and replacing a filter. Each section names its
+machine, build and workload, and links its raw data in
+[`docs/benchmarks/`](../benchmarks/). They are records, not a ranking that
+holds on every machine: later engine changes and other machines need new
+measurements ([reproduce](#reproduce)). The conclusions that guide current
+choices are in the FFT guide; read this page when you need the evidence or
+are about to measure again.
+
+Contents: [processing benchmark](#processing-benchmark) ·
+[x86-64 FFTW tuning and split spectra](#fftw-tuning-on-x86-64-and-split-spectra) ·
+[overlap-add and overlap-save](#overlap-add-and-overlap-save) ·
+[compiler flags and AVX2 kernels](#compiler-flags-and-avx2-kernels) ·
+[startup, reset and filter loading](#startup-reset-and-filter-loading) ·
+[reproduce](#reproduce)
+
+## Processing benchmark
+
+The following is the 18 October Apple FFTW/Accelerate measurement record.
+Later engine changes and other machines require new measurements.
+
+This measures the full in-memory Engine processing loop, including routing,
+partition accumulation and FFT layout conversion. It excludes file I/O, CLI
+startup and filter preparation. It is not an isolated FFT microbenchmark.
+
+Those two Convolver builds used AppleClang 21.0.0, `-O3 -DNDEBUG`, no fast-math or
+sanitizers. FFTW is official 3.3.11, built with `--enable-float --enable-neon
+--enable-shared --disable-fortran`; configure chose `-O3 -fomit-frame-pointer
+-mtune=native -fstrict-aliasing`. It reports `fftw-3.3.11-neon`. Plans use
+`FFTW_ESTIMATE`, without persisted wisdom. Accelerate is the macOS system
+framework (reported framework version 4.0.0). Both CLI tests use libsndfile 1.2.2.
+
+Each workload warms the complete partition history before timing. Seven separate
+process repetitions per backend/case run for at least 0.35 seconds each, in
+64-block batches. Backend order alternates by repetition and case. No builds,
+tests or other benchmarks ran concurrently. The figures below are medians; lower
+ns/frame is better. A frame includes all configured channels. The final column
+is FFTW time divided by Accelerate time; above 1 favours Accelerate.
+
+| Case | FFTW ns/frame | Accelerate ns/frame | FFTW/Accelerate |
+| --- | ---: | ---: | ---: |
+| mono_short | 5.6 | 6.0 | 0.94× |
+| mono_room | 9.4 | 8.8 | 1.07× |
+| stereo_low_latency | 78.2 | 76.2 | 1.03× |
+| stereo_long | 145.4 | 167.2 | 0.87× |
+| matrix_short | 51.5 | 48.1 | 1.07× |
+| matrix_long | 293.5 | 360.4 | 0.81× |
+| stereo_large_block | 44.1 | 44.1 | 1.00× |
+| stereo_odd_size | 31.9 | 56.3 | 0.57× |
+
+For example, matrix_long takes about 1.41% of one core's time at 48 kHz with FFTW
+and 1.73% with Accelerate in this benchmark. This is average throughput, not a
+real-time deadline guarantee. Threads are not pinned and this was an interactive
+Mac, so OS scheduling and background work can affect results.
+
+Accelerate's long-filter measurements varied: stereo_long ranged 144.3–182.6
+ns/frame (FFTW 145.4–150.4); matrix_long ranged 291.8–365.9 (FFTW 290.9–294.4).
+Do not read these medians as a universal library ranking. The awkward B=192 case
+uses N=384 for FFTW versus N=512 for Accelerate, increasing both FFT and partition
+accumulation work. Power-of-two blocks avoid that padding penalty.
+
+The conclusion drawn on 18 October was to keep FFTW as the default and offer
+Accelerate as an option: it removes the separate FFT dependency, prepares
+filters faster in these cases, and is competitive in several processing
+workloads. Since FFT-3 (30 October 2026) Accelerate is the macOS default and
+FFTW the option ([Accelerate by default](fft-backends.md#accelerate-by-default-on-macos)).
+Benchmark the intended routing, IR lengths and latency on the target machine
+before choosing either for speed.
+
+Setup medians include plan construction and all filter spectra, separately timed:
+
+| Case | B | IR frames | Paths | FFTW setup ms | Accelerate setup ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| mono_short | 64 | 256 | 1 | 0.260 | 0.026 |
+| mono_room | 256 | 4096 | 1 | 0.486 | 0.054 |
+| stereo_low_latency | 128 | 16384 | 2 | 0.495 | 0.093 |
+| stereo_long | 256 | 65536 | 2 | 0.788 | 0.477 |
+| matrix_short | 128 | 4096 | 4 | 0.471 | 0.069 |
+| matrix_long | 256 | 65536 | 4 | 1.056 | 0.917 |
+| stereo_large_block | 1024 | 65536 | 2 | 1.088 | 0.396 |
+| stereo_odd_size | 192 | 8192 | 2 | 0.879 | 0.116 |
+
+[Raw measurements](../benchmarks/2026-10-18-m5-max.csv) preserve every repetition,
+setup time, processed-frame count, checksum and separately sampled p99 block time.
+The p99 measurements are descriptive samples of 512 calls, not deadline guarantees.
+
+### FFTW implementation and planning comparisons
+
+On the same M5 Max, seven alternating rounds of at least 0.2 seconds per case
+compared scalar and NEON builds of FFTW 3.3.11 with the same configure-selected
+compiler flags. NEON improved full-engine throughput by approximately 2–24%
+across these eight workloads. [Scalar/NEON measurements](../benchmarks/2026-10-18-fftw-scalar-neon.csv).
+This supports keeping the native NEON build as the Mac baseline; it does not
+establish an optimal FFT implementation for every machine or workload.
+
+A separate five-round, 0.2-second comparison changed only FFTW planning from
+ESTIMATE to MEASURE in a temporary backend source copy, using the same optimized
+engine and benchmark. Several workloads gained about 2–6%, while the others
+changed little; measured setup medians ranged approximately 4–26 ms.
+[ESTIMATE/MEASURE measurements](../benchmarks/2026-10-18-fftw-estimate-measure.csv).
+These numbers precede the new public planning API; the temporary measured build
+also passed the native engine oracle. They are a planning experiment, not a
+benchmark of wisdom loading or patient planning. Saved wisdom support is now
+tested independently through fresh CLI processes, and FFT/engine oracles run
+estimate, measure and patient plans. See [the tuning workflow](../use/command-line.md#fftw-plan-tuning).
+
+## FFTW tuning on x86-64 and split spectra
+
+Measured 18 October 2026 on a 4-vCPU Intel Xeon cloud VM at 2.1 GHz (AVX-512),
+Ubuntu 24.04, Clang 18, `-O3 -DNDEBUG`. It is a shared virtual machine, so
+differences under about 5% are noise. FFTW 3.3.11 was built from the
+[FFTW/fftw3](https://github.com/FFTW/fftw3) `fftw-3.3.11` tag in three variants:
+scalar, `--enable-sse2 --enable-avx --enable-avx2`, and the same plus
+`--enable-avx512`. Ubuntu's packaged library (`fftw-3.3.10-sse2-avx`) was also
+measured. The M5 Max figures above predate the split-spectrum change below.
+
+### Where the time goes
+
+[`fft_breakdown.cpp`](../../tests/native/benchmarks/fft_breakdown.cpp) times one path's
+forward FFT, partition multiply-accumulate and inverse FFT separately
+([raw data](../benchmarks/2026-10-18-x86-fftw-builds.csv)). With the AVX2 build and
+MEASURE plans, the two FFTs are about 50% of per-block work for a 256-frame IR
+at B=64, 20% for 4096 frames at B=256, and under 4% for 16384 frames or more at
+B=128–256. Long
+filters spend almost all their time in the multiply-accumulate, so FFTW tuning
+alone cannot speed them up much.
+
+### FFTW build and planner findings
+
+| FFT pair time (forward + inverse), N=512 | ESTIMATE | MEASURE |
+| --- | ---: | ---: |
+| FFTW 3.3.11 scalar | 2.39 µs | 2.22 µs |
+| Ubuntu 3.3.10 SSE2/AVX | 1.26 µs | 0.94 µs |
+| FFTW 3.3.11 SSE2/AVX/AVX2 | 1.03 µs | 0.59 µs |
+| FFTW 3.3.11 + AVX-512 | 0.86 µs | 0.52 µs |
+
+- **SIMD codelets matter most**: AVX2 is 2–4× faster than scalar FFTW. FFTW
+  detects CPU features at run time, so enabling SSE2/AVX/AVX2 is safe on older
+  x86-64 CPUs.
+- **MEASURE plans** are another 1.2–1.8× on the FFT, at 0.1–0.5 s planning per
+  block size. Use `--tune-fft` once per machine and load the wisdom.
+- **PATIENT** matched MEASURE within noise while taking 2–5× longer to plan.
+- **AVX-512** added about 10% over AVX2 on the FFT. Not worth a custom build.
+- **`FFTW_DESTROY_INPUT`** on the out-of-place forward plan made no difference.
+- **FFTW's split-format guru plans** (`fftwf_plan_guru_split_dft_r2c`) were
+  about 2× slower than interleaved plans, so the engine keeps interleaved FFTs
+  and converts layout itself.
+
+Packaging, from the FFTW 3.3.11 sources, the
+[Homebrew formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/f/fftw.rb)
+and the [vcpkg port](https://github.com/microsoft/vcpkg/tree/master/ports/fftw3):
+
+- Homebrew on Apple Silicon does **not** pass `--enable-neon`, so `brew install
+  fftw` there is scalar (`--version` reports plain `fftw-3.3.11`). Homebrew on
+  Intel enables SSE2/AVX/AVX2. Build FFTW yourself with `--enable-neon` on an ARM
+  Mac, as in the reproduction steps below.
+- vcpkg's `fftw3` has no SIMD unless features are requested. Windows CI now
+  installs `fftw3[core,sse2,avx,avx2]`. vcpkg's `neon` feature is limited to
+  Linux/Android ARM, so an arm64 macOS vcpkg build is scalar.
+- FFTW's own CMake build (used by vcpkg) only knows SSE/SSE2/AVX/AVX2 and NEON
+  (by vcpkg patch). AVX-512, SVE and generic SIMD need the autotools build.
+- FFTW 3.3.11 has cycle counters for Apple ARM and Linux AArch64 by default, so
+  MEASURE planning works there without extra configure flags.
+
+### Split spectrum storage
+
+The engine previously stored filter and history spectra as interleaved complex
+pairs. Each partition's multiply-accumulate then needed shuffles on x86. Spectra
+are now stored per partition as all real parts followed by all imaginary parts;
+the forward spectrum is split once per block and the sum is re-interleaved once
+before the inverse FFT. Arithmetic per bin is unchanged.
+[`spectrum_layout.cpp`](../../tests/native/benchmarks/spectrum_layout.cpp) measured the
+multiply-accumulate alone at 1.4–1.8× faster with identical results
+([raw data](../benchmarks/2026-10-18-x86-mac-layout.csv)).
+
+Full engine benchmark, seven alternating rounds of 0.3 s, median ns/frame, FFTW
+ESTIMATE plans ([raw data](../benchmarks/2026-10-18-x86-split-spectra.csv)):
+
+| Case | Scalar FFTW, before | Scalar FFTW, after | AVX2 FFTW, before | AVX2 FFTW, after | Layout gain (AVX2) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| mono_short | 18.7 | 18.2 | 12.8 | 12.4 | 1.04× |
+| mono_room | 26.9 | 24.4 | 20.6 | 21.2 | 0.97× |
+| stereo_low_latency | 195.1 | 147.9 | 183.6 | 138.6 | 1.32× |
+| stereo_long | 456.3 | 381.0 | 411.2 | 335.2 | 1.23× |
+| matrix_short | 137.3 | 118.0 | 124.0 | 96.9 | 1.28× |
+| matrix_long | 901.6 | 838.6 | 952.9 | 814.1 | 1.17× |
+| stereo_large_block | 121.3 | 105.8 | 106.4 | 92.2 | 1.15× |
+| stereo_odd_size | 93.2 | 80.0 | 71.4 | 57.4 | 1.24× |
+
+On ARM, NEON's `ld2` de-interleaving loads make the old layout cheaper than on
+x86, so the gain there may be smaller; rerun `benchmark_backends.py` on the Mac
+to confirm. Larger gains for long filters need fewer multiply-accumulates rather
+than faster FFTs. Sharing forward FFTs between paths with the same input mix is
+now implemented ([below](#shared-forward-transforms)); inverse-transform sharing
+and non-uniform partitioning remain open as **PERF-2** in
+[TODO](../../TODO.md#fft-libraries-and-performance).
+
+The [24 October M5 Max vDSP experiment](../archive/reviews/2026-10-24-apple-vdsp.md)
+compared these kernels with Accelerate complex multiply-add without changing
+layout. It found no substantial whole-engine gain and exceeded existing
+numerical-divergence limits, so the current kernels stayed. After 0.8.10 the
+vDSP kernels and their scripts were removed (FFT-4); the timing program stays
+as `convolver_kernel_benchmark`
+([`kernels.cpp`](../../tests/native/benchmarks/kernels.cpp)).
+
+### Shared forward transforms
+
+Paths whose ordered input routes are identical (same channels, same order,
+bit-identical gains) mix the same block, so the engine now runs one forward FFT
+per distinct mix and keeps one spectrum history ring for it, sized for the
+longest member path. Paths still multiply, inverse-transform and accumulate in
+their configured order, so output is bit-identical to the previous engine; this
+was checked on 20 randomized 3×3 configurations with delays and mixed inputs,
+comparing the old and new libraries byte for byte. Memory falls by one history
+ring per shared path.
+
+Release builds, FFTW 3.3.10 (Ubuntu, AVX2), GCC 13.3, Intel Xeon @ 2.10 GHz on a
+shared cloud VM, so differences under about 7% are noise (`stereo_long` shares
+nothing yet reads 0.93×). Five alternating rounds of 0.4 s per case, medians;
+p99 is over 4096 single-block calls after the throughput run; RSS is the whole
+process peak. `matrix6_short` and `matrix6_long` are new 6×6 matrix cases (36
+paths, 6 distinct mixes):
+
+| Case | Paths | Before ns/frame | After ns/frame | Speed-up | Before p99 µs | After p99 µs | Before RSS KiB | After RSS KiB |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| mono_short | 1 | 15.5 | 15.1 | 1.03× | 1.8 | 1.4 | 12448 | 12448 |
+| mono_room | 1 | 21.1 | 21.3 | 0.99× | 9.3 | 10.1 | 12448 | 12448 |
+| stereo_low_latency | 2 | 159.2 | 154.1 | 1.03× | 42.8 | 33.6 | 12448 | 12448 |
+| stereo_long | 2 | 362.1 | 388.2 | 0.93× | 159.7 | 169.5 | 12448 | 12448 |
+| matrix_short | 4 | 100.7 | 100.7 | 1.00× | 26.5 | 25.2 | 12448 | 12448 |
+| matrix_long | 4 | 940.2 | 789.3 | 1.19× | 329.6 | 315.5 | 12448 | 12448 |
+| stereo_large_block | 2 | 115.8 | 106.6 | 1.09× | 181.7 | 173.6 | 12448 | 12448 |
+| stereo_odd_size | 2 | 70.5 | 68.9 | 1.02× | 26.8 | 24.5 | 12448 | 12448 |
+| matrix6_short | 36 | 451.6 | 329.2 | 1.37× | 98.9 | 72.9 | 12448 | 12448 |
+| matrix6_long | 36 | 2345.6 | 1767.3 | 1.33× | 866.6 | 673.9 | 18196 | 14232 |
+
+Gains appear only where several paths read one mix: dense matrices (1.2–1.4×,
+with p99 callback time falling by about the same factor). Diagonal stereo and
+mono have one path per mix and are unchanged.
+
+Inverse-transform sharing was evaluated but not implemented. Paths with identical
+ordered output routes could sum their spectra and run one inverse FFT and one
+overlap buffer, which would save the inverse FFT for every extra path into the
+same outputs (30 of 36 inverses in the 6×6 cases). Unlike forward sharing it
+changes summation order (frequency domain instead of time domain after the
+inverse), so output would no longer be bit-identical, only within the oracle
+tolerance. It also needs care with output delays and the per-path output gains.
+It is a reasonable next step for dense matrices, as a separate, separately
+measured change.
+
+## Overlap-add and overlap-save
+
+The historical engine uses uniformly partitioned overlap-save: each block's input
+spectrum is multiplied by every filter partition and accumulated into a ring of
+future output spectra (`historical/convolution/convolution.cpp`,
+`doPartitionedConvolution`). The portable engine uses overlap-add with a ring of
+past input spectra (`portable/engine.cpp`). The portable engine was written this
+way from its first commit (`fa8ca77`); no reason for the change is recorded. It
+was not made for speed.
+
+Per block and path both schemes do one forward FFT of size 2B, P
+multiply-accumulates and one inverse FFT. The only differences are memory traffic
+and bookkeeping. Overlap-save reads and writes back P output spectra. Overlap-add
+reads P history spectra into a single accumulator, and pads its input with zeros
+and adds the overlap afterwards.
+
+[`overlap_schemes.cpp`](../../tests/native/benchmarks/overlap_schemes.cpp) times both on one
+path with the same FFTW MEASURE plans and the same split-spectrum MAC loop, so
+only the scheme differs. Both agree with a direct double-precision convolution
+to within 1e-5. Measured 19 October 2026 on a 4-vCPU Intel Xeon cloud VM at
+2.8 GHz, Ubuntu 24.04, GCC 13.3 `-O3`, Ubuntu's FFTW 3.3.10. Each case ran seven
+alternating rounds of 0.2 s, and the whole benchmark ran three times. The table
+shows medians across the three runs and each run's ratio
+([raw data](../benchmarks/2026-10-19-x86-overlap-schemes.csv)). A ratio below 1
+means overlap-save was faster.
+
+| IR frames | B | Partitions | Overlap-add µs/block | Overlap-save µs/block | Save/add (each run) |
+| ---: | ---: | ---: | ---: | ---: | --- |
+| 4096 | 64 | 64 | 3.2 | 3.0 | 0.92, 0.93, 1.00 |
+| 4096 | 256 | 16 | 3.9 | 3.8 | 1.00, 0.96, 0.95 |
+| 4096 | 1024 | 4 | 9.4 | 10.6 | 1.28, 1.20, 1.01 |
+| 4096 | 4096 | 1 | 35.2 | 35.5 | 1.02, 0.97, 1.01 |
+| 65536 | 64 | 1024 | 46.9 | 42.7 | 0.94, 0.89, 0.90 |
+| 65536 | 256 | 256 | 45.2 | 46.7 | 1.03, 1.05, 0.92 |
+| 65536 | 1024 | 64 | 48.5 | 52.2 | 1.04, 1.16, 1.08 |
+| 65536 | 4096 | 16 | 89.5 | 94.8 | 1.10, 1.01, 1.06 |
+| 262144 | 64 | 4096 | 215.0 | 184.7 | 0.85, 0.86, 0.88 |
+| 262144 | 256 | 1024 | 246.2 | 234.1 | 0.95, 0.91, 0.88 |
+| 262144 | 1024 | 256 | 217.1 | 206.3 | 1.03, 0.93, 1.05 |
+| 262144 | 4096 | 64 | 234.8 | 242.3 | 1.02, 1.03, 1.05 |
+| 1048576 | 64 | 16384 | 1213.1 | 833.2 | 0.86, 0.69, 0.86 |
+| 1048576 | 256 | 4096 | 1872.8 | 1045.2 | 0.66, 0.56, 0.70 |
+| 1048576 | 1024 | 1024 | 1407.9 | 1337.8 | 0.95, 1.07, 0.89 |
+| 1048576 | 4096 | 256 | 1250.3 | 1169.3 | 0.85, 1.00, 0.91 |
+
+Overlap-save was consistently faster at B = 64, by 7–15% up to 256k taps. With
+1M taps at B = 64–256 it was 1.2–1.8× faster, where the spectra no longer fit in
+cache. At B = 1024–4096 the two were within shared-VM noise up to 256k taps, with
+overlap-add sometimes ahead. The cause has not been profiled; ARM is unmeasured.
+
+The layout also decides which transform sharing is natural. Input-spectrum
+history lets paths with the same input mix share one forward FFT and history
+ring (implemented above). Output-spectrum accumulation would instead let paths
+with the same output routes share one inverse FFT. Any switch to overlap-save
+must keep the engine's latency, tail, oracle and allocation tests.
+
+## Compiler flags and AVX2 kernels
+
+Measured 23–24 October 2026 (PERF-4) on a 4-vCPU Intel Xeon cloud VM at
+2.80 GHz (AVX2 and AVX-512), Ubuntu 24.04, Clang 18.1.3 and GCC 13.3.0, Ubuntu
+FFTW 3.3.10 (SSE2/AVX, estimate plans) and the built-in Ooura FFT. It is a
+shared virtual machine: treat differences under about 5% as noise. Each variant
+was a separate Release build of the core with `CMAKE_CXX_FLAGS_RELEASE`
+replaced; the benchmark was pinned to one core, variants ran in a shuffled order
+within each case, and the tables give medians of 5 rounds of 0.3 s each. All
+workloads use B = 256 at 48 kHz, the plug-in and CLI default. Raw data:
+[flags](../benchmarks/2026-10-24-x86-compiler-flags.csv),
+[kernels without FMA](../benchmarks/2026-10-24-x86-avx2-kernels.csv),
+[kernels with FMA](../benchmarks/2026-10-24-x86-avx2-fma-kernels.csv) (a later,
+different VM; see [AVX2 kernels](fft-backends.md#avx2-kernels-chosen-at-run-time)).
+
+Both kernel tables were made with
+[`compiler_flags.py`](../../tests/native/benchmarks/compiler_flags.py) and
+`convolver_benchmark` as committed, and their CSVs are the script's output (the
+commands are under [Reproduce](#compiler-flags-1)). The flag table, the FFT shares
+and the PGO and per-file builds came first, from a one-off harness that ran the
+same nine workload sizes and layouts and also timed the FFTs on their own; it was
+not kept. Its CSV has the columns `variant` (compiler, backend and flags),
+`round` (from 0), `case`, `taps`, `paths`, `ns_per_frame`, the block-time
+percentiles, `fft_pair_ns` (one forward plus one inverse transform) and
+`fft_share` (the FFTs' share of the block time). `compiler_flags.py` can rerun
+the flag rows other than PGO and the per-file builds with `--variant`, but does
+not time the FFTs.
+
+The primary workloads are room-correction filters. REW exports filters of
+[131,072 samples](https://www.roomeqwizard.com/help/help/html/file.html), a
+[Roon community guide](https://community.roonlabs.com/t/a-guide-to-advanced-room-correction-with-rew-and-rephase-using-convolution-filters/90990)
+recommends 65,536 taps at 44.1 and 48 kHz, and Audiolense users report 32k–65k
+filters, 130k for long ones. So: stereo at 32k, 64k and 128k taps, true stereo
+(a 2×2 matrix) at 64k, and a stereo 3-way crossover (2 inputs, 6 outputs, one
+path each) at 32k and 64k. A 16k crossover, 4k stereo and a 512k-tap stereo
+reverb are secondary checks. They are cases 10 to 18 of `convolver_benchmark`.
+
+### Where the time goes
+
+At these lengths almost all of the time is the per-partition multiply-accumulate.
+The FFTs (one forward per input, one inverse per path, timed separately at
+N = 512) are this share of the -O3 block time:
+
+| | 32k stereo | 64k stereo | 128k stereo | 64k true stereo | 64k crossover | 4k stereo |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| FFTW | 5–7% | 2–3% | 1% | 2% | 2% | 25–27% |
+| Ooura | 14–15% | 6% | 3% | 4–5% | 4% | 41–48% |
+
+That is why the flags used to build the FFT library matter little here: building
+Ooura's code alone for AVX2 changed nothing measurable (0.96–1.03×), while
+building only `engine.cpp` for AVX2 gave the whole AVX2 gain. For FFTW, a SIMD
+build is still worth having for short filters ([above](#fftw-build-and-planner-findings)).
+The preview recipe builds FFTW without SIMD, but no preview package uses
+FFTW; enable FFTW's SSE2/AVX/AVX2 (chosen at run time by FFTW) if one ever does.
+
+### Compiler flags
+
+Speedup over `-O3 -DNDEBUG` (CMake's Release default), geometric mean of the six
+primary workloads; above 1 is faster. "v2", "v3" and "v4" are
+`-march=x86-64-v2` (SSE4.2), `-march=x86-64-v3` (AVX2, FMA) and
+`-march=x86-64-v4` (AVX-512).
+
+| Flags | Clang, FFTW | Clang, Ooura | GCC, FFTW | GCC, Ooura |
+| --- | ---: | ---: | ---: | ---: |
+| `-O2` | 0.97 | 0.99 | **0.54** | **0.55** |
+| `-O3` (current) | 1.00 | 1.00 | 1.00 | 1.00 |
+| LTO (`CMAKE_INTERPROCEDURAL_OPTIMIZATION`) | 1.00 | 1.03 | 0.99 | 0.97 |
+| PGO, trained on the benchmark | 0.99 | 0.98 | 1.03 | 1.02 |
+| `-funroll-loops` | 0.98 | 1.02 | 0.95 | 0.96 |
+| `-fno-math-errno` | 0.97 | 1.01 | 0.98 | 1.00 |
+| `-ffast-math` | 0.97 | 1.01 | 0.97 | 0.96 |
+| v2 | 0.98 | 1.03 | 0.96 | 0.99 |
+| v3 | **1.39** | **1.34** | **1.39** | **1.34** |
+| v3, `-ffp-contract=off` (no FMA) | 1.35 | 1.29 | 1.37 | 1.27 |
+| v3, `-ffp-contract=fast` | 1.39 | 1.33 | 1.44 | 1.33 |
+| v3 + LTO | 1.40 | 1.36 | 1.32 | 1.34 |
+| v3 + `-ffast-math` | 1.44 | 1.38 | 1.35 | 1.32 |
+| v4 | 1.36 | 1.35 | 1.05 | 0.97 |
+| v3 for `engine.cpp` only | 1.40 | 1.32 | 1.41 | 1.32 |
+| v3 for Ooura's files only | | 0.98 | | 0.99 |
+
+- **Keep `-O3`.** With GCC, `-O2` (the `RelWithDebInfo` default) is 1.8 times
+  slower: GCC 13 at `-O2` emitted no packed multiplies in `engine.cpp`, so the
+  loops run one value at a time. Clang vectorizes them at both levels. Release builds and packages must stay `Release`.
+- **Only the vector width matters.** AVX2 makes the multiply-accumulate about
+  1.3–1.4 times faster for every primary workload. AVX-512 adds nothing with
+  Clang and loses the gain with GCC. FMA adds about 2–7% and changes the output
+  in the last bits (up to 1.5e-5 absolute on a 51-peak render, 3e-7 relative).
+- **The rest is noise.** LTO, PGO, unrolling, `-fno-math-errno`,
+  `-ffast-math` and v2 stay within ±5%. The hot loops call no library
+  functions and cross no file boundaries that LTO could remove.
+- **`-ffast-math` is unsafe here.** Its `-ffinite-math-only` lets the compiler
+  remove `std::isfinite`, so the Clang build failed six test suites (engine,
+  host, state, I/O, CLI and inspection): non-finite input, filters and state
+  were accepted. With `-fno-finite-math-only` added (GCC) the tests pass, but it
+  gives no speedup.
+- **Clang was up to 20% faster than GCC** on these workloads (median 1.1× at
+  `-O3` and with the AVX2 kernels below, for both FFT libraries).
+- `-march=native` and plain v3 cannot be used for distributed binaries: they
+  would fail on older or budget x86-64 CPUs and, for the x86-64 macOS package,
+  under Rosetta 2 before macOS 15, which has
+  [no AVX2](https://www.macg.co/macos/2024/06/rosetta-2-va-etre-plus-efficace-avec-macos-sequoia-et-cest-important-pour-les-jeux-144245).
+  The release check rejects `-march=native` and `/arch:AVX`.
+
+### AVX2 kernel measurements
+
+How the kernels are built and chosen is in the
+[FFT guide](fft-backends.md#avx2-kernels-chosen-at-run-time).
+
+#### Divergence
+
+`native.kernel_divergence` renders each workload with both sets at B = 256 and
+compares them sample by sample, and both with a direct double-precision
+convolution at 256 frames per output where the whole filter is engaged. The
+filters are synthetic room corrections (a central peak in decaying noise) or,
+for the crossover, Blackman-windowed bands at 10–250–2500–24k Hz. The input is
+scaled so that the full-level signal's output peaks at -0.1 dBFS; the quiet
+inputs are that level less 120 dB, or 1e-35 of it (output peaking near 1e-35).
+Before PERF-15 about a quarter of that case's output samples were subnormal,
+below `FLT_MIN`, and the test required subnormal output and some differing
+samples there, so the case could not pass vacuously. Since PERF-15 the engine
+flushes subnormals to zero on x86-64 and AArch64
+([numerical policy](architecture.md#subnormal-numbers)), so there the case has
+no subnormal output and loses the products below `FLT_MIN`: the sets differ by
+about 0.3 of its peak and each is about 0.66 of the peak from the oracle
+(1.9e-36 and 4.7e-36 on x86-64 with FFTW, 5 November 2026). That loss is a
+few hundred `FLT_MIN` at any level, so at 1e-35 the case cannot check the
+kernels' rounding (the -120 dB case does). It checks the flushing instead: no
+subnormal output from either set, each set's output keeping at least a quarter
+of the oracle's peak (so neither vanished), and both sets within 1000
+`FLT_MIN` (1.2e-35, about -699 dBFS) of each other and of the oracle, which an
+inverted output would break. Where nothing flushes, the earlier checks still apply.
+The table below predates PERF-15.
+Measured 24 October 2026 with the Ooura FFT, Release builds, GCC 13.3 and
+Clang 18.1.3 giving identical figures; "relative" is to the output's peak, dBFS
+to full scale (1.0):
+
+| Workload | FMA vs baseline, max abs | relative | dBFS | baseline vs oracle | FMA vs oracle |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 64k stereo, white noise | 1.8e-7 | 1.8e-7 | -135.0 | 2.8e-7 | 2.6e-7 |
+| 64k stereo, full-scale 997 Hz sine | 4.8e-7 | 4.8e-7 | -126.4 | 8.1e-7 | 8.7e-7 |
+| 64k stereo, noise at -120 dB | 1.5e-13 | 1.5e-7 | -256.5 | 2.2e-13 | 2.2e-13 |
+| 64k stereo, noise at subnormal level | 1.4e-42 | 1.5e-7 | | 2.7e-42 | 2.7e-42 |
+| 64k 2→6 crossover, white noise | 2.4e-7 | 2.4e-7 | -132.5 | 3.6e-7 | 3.6e-7 |
+| 128k stereo, white noise | 1.8e-7 | 1.8e-7 | -135.0 | 3.0e-7 | 3.5e-7 |
+| 256k stereo, white noise | 1.8e-7 | 1.8e-7 | -135.0 | 3.6e-7 | 3.9e-7 |
+| 512k stereo, white noise | 2.1e-7 | 2.1e-7 | -133.6 | 4.4e-7 | 4.6e-7 |
+| 512k stereo, full-scale sine | 7.5e-7 | 7.5e-7 | -122.6 | 2.4e-6 | 2.4e-6 |
+
+The two sets differ by 1.8e-7 to 7.5e-7 of the output's peak (3 to 12 float
+rounding steps of the largest samples), the same size as each set's own error
+against the oracle, and at most -122.6 dBFS. That is 1.5 to 6 steps of 24-bit output
+(a 24-bit step is 2^-23 ≈ 1.2e-7 of full scale, -138.5 dBFS), so 24-bit
+renders can differ in their lowest bits between CPUs with and without
+AVX2+FMA; 16-bit output (step 3.1e-5) differs only where a sample lies that
+close to a rounding boundary. It is below the noise of any converter, so not
+audible. For scale, changing the block size from 256 to 512 with the baseline
+set changes a 64k sine render by as much (up to 1.5e-6 at some frequencies,
+-116.5 dBFS). The test fails if the sets differ by more than 1e-6 of the peak
+or -120 dBFS, if either leaves the oracle tolerance, or if the FMA set's
+oracle error exceeds 1.5 times the baseline's (except the flushed 1e-35 case
+above); those limits are not to be widened without investigating the cause. In Debug builds it runs the 64k
+workloads only. `native.engine` also checks every kernel against the standard
+floating-point error bound of a double-precision sum, on random values of
+every magnitude.
+
+#### Speed
+
+Speedup of the AVX2 kernels **without FMA** (the set before 24 October) over
+the same `-O3` build without them (`-DCONVOLVER_AVX2_KERNELS=OFF`), median of
+5 rounds, on the 4-vCPU VM described above
+([CSV](../benchmarks/2026-10-24-x86-avx2-kernels.csv)); above 1 is faster:
+
+| | 32k stereo | 64k stereo | 128k stereo | 64k true stereo | 64k crossover | 32k crossover | 16k crossover | 4k stereo | 512k reverb |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Clang, FFTW | 1.35 | 1.25 | 1.33 | 1.44 | 1.55 | 1.37 | 1.30 | 1.11 | 1.37 |
+| Clang, Ooura | 1.31 | 1.11 | 1.20 | 1.15 | 1.18 | 1.26 | 1.16 | 1.08 | 1.33 |
+| GCC, FFTW | 1.43 | 1.38 | 1.43 | 1.41 | 1.44 | 1.47 | 1.36 | 1.14 | 1.39 |
+| GCC, Ooura | 1.20 | 1.25 | 1.32 | 1.30 | 1.23 | 1.18 | 1.19 | 0.98 | 1.32 |
+
+Over the six primary workloads (the first six columns) that is 1.38 (Clang,
+FFTW), 1.20 (Clang, Ooura), 1.43 (GCC, FFTW) and 1.25 (GCC, Ooura) as a
+geometric mean. Without the kernels a 64k stereo filter took 410–475 ns per
+frame (about 2.0–2.3% of one core at 48 kHz) and a 64k 2→6 crossover
+1090–1380 ns (about 5–7%). The 99th percentile block time fell by similar
+amounts (Clang, Ooura: 184 to 150 µs for 64k stereo, 419 to 360 µs for the 64k
+crossover). The same runs built the whole engine for v3 with FMA and without
+the kernels: 1.42, 1.32, 1.42 and 1.34 times the baseline (same order), no
+faster than these kernels without FMA with FFTW and 7–10% faster with Ooura.
+
+Speedup **with FMA** (the kernels as now), measured on 24 October 2026 on a
+different, smaller VM: 2 vCPUs of an Intel Xeon at 2.70 GHz (AVX2, FMA and
+AVX-512), 7 GiB, Ubuntu 24.04, the same compilers, the Ooura FFT only (FFTW was
+not installed there), another session sharing the machine. Three builds ran in
+a shuffled order per case, pinned to one core, 15 rounds of 0.5 s
+([CSV](../benchmarks/2026-10-24-x86-avx2-fma-kernels.csv), Ooura rows only): without the
+kernels, with the earlier AVX2 kernels without FMA (commit 356a707) and with
+the AVX2+FMA kernels. Speedup over the build without the kernels, median of
+the 15 rounds:
+
+| | 32k stereo | 64k stereo | 128k stereo | 64k true stereo | 64k crossover | 32k crossover | 16k crossover | 4k stereo | 512k reverb |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Clang, Ooura, AVX2 | 1.08 | 1.36 | 1.33 | 1.35 | 1.28 | 1.31 | 1.08 | 1.02 | 1.19 |
+| Clang, Ooura, AVX2+FMA | 1.10 | 1.47 | 1.27 | 1.44 | 1.34 | 1.32 | 1.09 | 1.03 | 1.39 |
+| GCC, Ooura, AVX2 | 1.10 | 1.33 | 1.47 | 1.44 | 1.44 | 1.26 | 1.08 | 1.01 | 1.36 |
+| GCC, Ooura, AVX2+FMA | 1.16 | 1.43 | 1.62 | 1.52 | 1.51 | 1.33 | 1.13 | 1.04 | 1.43 |
+
+Over the six primary workloads that is 1.32 (Clang) and 1.42 (GCC) for
+AVX2+FMA, against 1.28 and 1.33 without FMA on the same machine: FMA itself is
+worth 1.03 (Clang) and 1.06 (GCC), consistent with the 2–7% the whole-engine v3
+builds showed on the first VM. The 99th percentile block time with Clang went
+from 139 µs (no kernels) through 107 (AVX2) to 103 µs (AVX2+FMA) for 64k
+stereo, and from 396 through 317 to 302 µs for the 64k crossover. FMA with FFTW
+was not re-measured; on the first VM the whole-engine v3 build with FMA was no
+faster than the kernels without it there. The two VMs' absolute times and
+per-case speedups differ (the second machine's baseline was faster for 32k,
+slower for 64k), so compare ratios within one table only.
+
+Not measured here: Apple Silicon (AppleClang, Accelerate), where Clang's
+default target is already the M1 and NEON is always used, and MSVC on Windows.
+Rerun cases 10 to 18 there before choosing other flags for those builds (PERF-1).
+
+## Startup, reset and filter loading
+
+Measured 24 October 2026 (PERF-5, PERF-6) on a 4-vCPU Intel Xeon cloud VM at
+2.10 GHz, Ubuntu 24.04, Clang 18.1.3, Ubuntu FFTW 3.3.10 (estimate plans) and
+the AVX2+FMA kernels: Release builds of `main` at `0269064` (before) and of
+PR #70 (after), alternated in each of three rounds of 2 s per run; the tables
+give medians. It is a shared virtual machine: treat differences under about
+10% as noise. [Raw data](../benchmarks/2026-10-24-x86-startup-reset-load.csv),
+made with [`callback_scenarios.sh`](../../tests/native/benchmarks/callback_scenarios.sh)
+and `convolver_callback_benchmark`.
+
+The workload is the one in jrp's performance review of `0269064`: 65,536-tap
+paths in a 6×6 matrix (36 paths, 6 shared input mixes), driven through
+`HostProcessor` as the plug-ins drive it, with the host callback size chosen
+apart from the partition size B. Four scenarios:
+
+- **warm:** callbacks once the history is full (steady processing);
+- **startup:** the first callbacks of a new processor;
+- **reset:** `reset()`, then the callbacks after it;
+- **replace:** `prepare()` and `publish()` of a new filter, then the callbacks
+  after it: one block of warm-up and a 256-frame crossfade with both engines
+  running, then the new engine alone.
+
+The last three time the callbacks that cover the filter length plus two blocks,
+long enough for the history to fill again; ns/frame is their average.
+
+| Scenario | B | Callback | Before ns/frame | After ns/frame | Speed-up | Before p99.9 µs | After p99.9 µs |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| warm | 256 | 64 | 5976 | 6206 | 0.96× | 2513 | 3024 |
+| startup | 256 | 64 | 6032 | 3276 | 1.84× | 2636 | 2174 |
+| reset | 256 | 64 | 6444 | 3181 | 2.03× | 3156 | 1978 |
+| replace | 256 | 64 | 6009 | 3339 | 1.80× | 5531 | 2614 |
+| warm | 257 | 64 | 7190 | 6986 | 1.03× | 2757 | 3138 |
+| startup | 257 | 64 | 6828 | 4319 | 1.58× | 3656 | 2489 |
+| reset | 257 | 64 | 7065 | 3870 | 1.83× | 2956 | 2148 |
+| replace | 257 | 64 | 7146 | 4141 | 1.73× | 3754 | 3465 |
+| warm | 1024 | 64 | 1488 | 1480 | 1.01× | 1989 | 1916 |
+| startup | 1024 | 64 | 1527 | 920 | 1.66× | 1993 | 1845 |
+| reset | 1024 | 64 | 1440 | 891 | 1.62× | 2101 | 1757 |
+| replace | 1024 | 64 | 1568 | 974 | 1.61× | 3728 | 2021 |
+| warm | 256 | 512 | 5986 | 6079 | 0.98× | 5588 | 6316 |
+| startup | 256 | 512 | 6098 | 3162 | 1.93× | 5983 | 4275 |
+| reset | 256 | 512 | 5863 | 2987 | 1.96× | 5985 | 4235 |
+| replace | 256 | 512 | 6001 | 3014 | 1.99× | 12470 | 4983 |
+
+- **Steady processing is unchanged**, as expected: PERF-5 skips only
+  partitions that would meet the silence before the first block, so once the
+  history is full the only new work is one `min`. Its 99.9th percentiles
+  varied between rounds of the same build by up to 1.6 times (2.1–2.9 ms
+  before and 2.3–3.7 ms after at B = 256 with 64-frame callbacks), so their
+  differences in the table are this VM's variance.
+- **The average over the refill about halves**, because the first blocks
+  after a start, reset or replacement visit few partitions and the last visit
+  all of them. The slowest callbacks fall less, since the end of the refill
+  costs as much as steady processing.
+- **Replacement gains most at the tail of the distribution**: while the old
+  and new engines run together, the new one no longer pays for its whole
+  filter, so the 99.9th-percentile callback at B = 256 falls from 5.5 to
+  2.6 ms with 64-frame callbacks and from 12.5 to 5.0 ms with 512-frame ones.
+- **`reset()` itself** took 143–165 µs at B = 256 and 257 and 152 µs at
+  B = 1024 before; it now takes about 4 µs and 13 µs. What remains is
+  clearing each path's overlap buffer (36 × B floats) and the host's buffers.
+- **B = 257** costs about 1.17 times B = 256 when warm here, because the FFTW
+  backend transforms 2B = 514 points. The Accelerate and Ooura backends round
+  the transform up to a power of two (1024), which is why jrp measured about
+  1.82 times on Accelerate. The plug-ins use B = 256; the planned Latency setting
+  (PLUG-10) offers powers of two only.
+
+Loading a 2→6 crossover whose six paths each name a channel of one six-channel
+65,536-frame float WAV (as `examples/first-use/crossover` does at a smaller
+size) took a median of 2.42 ms before and 0.86 ms after (2.8×), because the
+file is opened and decoded once instead of six times (PERF-6). The remaining
+time is parsing, path resolution and copying each path's channel.
+
+## Reproduce
+
+The benchmark programs and scripts are in
+[`tests/native/benchmarks/`](../../tests/native/benchmarks/), where the
+formatting checks cover them, and the dated results stay in
+[`docs/benchmarks/`](../benchmarks/).
+
+### Overlap-add and overlap-save
+
+Needs a C++20 compiler and single-precision FFTW (`brew install fftw` on macOS,
+`apt-get install libfftw3-dev` on Ubuntu); no CMake build is required:
+
+```sh
+sh tests/native/benchmarks/run_overlap_schemes.sh > overlap.csv   # about 1 minute
+sh tests/native/benchmarks/run_overlap_schemes.sh --quick         # about 10 s, no 1M-tap cases
+```
+
+The script finds FFTW with `pkg-config` or Homebrew, compiles with `-O3 -DNDEBUG`
+(override with `CXX` and `CXXFLAGS`), prints the accuracy check and compiler to
+stderr and CSV to stdout.
+
+### Building FFTW for this Apple Silicon Mac
+
+NEON is not new in FFTW 3.3.11: earlier releases already support it. Version
+3.3.11 adds Apple ARM cycle counters and SVE support, among other changes; NEON
+is the SIMD backend enabled in this Mac's verified build. See the
+[official release notes](https://fftw.org/release-notes.html). Rendering defaults to
+`FFTW_ESTIMATE`; [offline measured planning and persisted wisdom](../use/command-line.md#fftw-plan-tuning)
+are now available explicitly.
+
+The benchmark dependency was built from the official source archive with the
+following options. To reproduce in an ignored local dependency directory, start
+at the Convolver repository root (Xcode command-line tools must be available):
+
+```sh
+convolver_root="$PWD"
+mkdir -p build-deps
+curl -fL https://fftw.org/fftw-3.3.11.tar.gz -o build-deps/fftw-3.3.11.tar.gz
+shasum -a 256 build-deps/fftw-3.3.11.tar.gz
+# Expected: 5630c24cdeb33b131612f7eb4b1a9934234754f9f388ff8617458d0be6f239a1
+tar -xzf build-deps/fftw-3.3.11.tar.gz -C build-deps
+mkdir -p build-deps/fftw-neon-build
+cd build-deps/fftw-neon-build
+../fftw-3.3.11/configure --prefix="$convolver_root/build-deps/fftw-neon" \
+  --enable-float --enable-neon --enable-shared --disable-fortran
+make -j8
+make check
+make install
+cd "$convolver_root"
+cmake -S . -B build-local-neon -DCMAKE_BUILD_TYPE=Release \
+  -DCONVOLVER_FFT_BACKEND=FFTW -DCMAKE_DISABLE_FIND_PACKAGE_FFTW3f=ON \
+  -DCMAKE_PREFIX_PATH="$convolver_root/build-deps/fftw-neon"
+cmake --build build-local-neon --parallel
+ctest --test-dir build-local-neon --output-on-failure
+./build-local-neon/convolver --version
+```
+
+The FFTW package-config lookup is disabled here so an unrelated system CMake
+package cannot override the intended configure/make installation. Use a fresh
+Convolver build directory; existing cached library paths can select an older
+installation. libsndfile must also be installed, or its prefix supplied in the
+semicolon-separated `CMAKE_PREFIX_PATH` list.
+
+The tested configure defaults selected `-O3 -mtune=native` (plus the flags listed
+above). No `-ffast-math`, SVE or x86 SIMD flags were added. `--enable-float` is
+essential: Convolver uses `fftwf_*`, not the double-precision API. This installs
+under the repository's ignored `build-deps/` directory without changing system
+libraries. The benchmark's existing installation is temporary, under
+`/private/tmp/convolver-native-deps-fftw-neon`; use the instructions above for a
+durable installation. Convolver's tests passed against that temporary build;
+`make check` above additionally runs FFTW's own tests when reproducing.
+
+### Compiler flags
+
+[`compiler_flags.py`](../../tests/native/benchmarks/compiler_flags.py) builds the core
+and benchmark once per flag set and alternates them over the room-correction
+cases. The first kernel table came from this, once per compiler and FFT
+library (`|baseline` builds without the AVX2 kernels):
+
+```sh
+python3 tests/native/benchmarks/compiler_flags.py --compiler clang++ --backend OOURA --cpu 2 \
+    --variant 'O3=-O3 -DNDEBUG' --variant 'O3-baseline=-O3 -DNDEBUG|baseline' \
+    --variant 'O3-v3-fma=-O3 -march=x86-64-v3 -DNDEBUG|baseline' \
+    --work /tmp/convolver-flags --output kernels.csv
+```
+
+The FMA table came from this, once per compiler, with the commit before FMA
+exported to a folder (`|source=` builds another source tree):
+
+```sh
+git archive 356a707 | (mkdir -p /tmp/nofma && tar -x -C /tmp/nofma)
+python3 tests/native/benchmarks/compiler_flags.py --compiler clang++ --backend OOURA --cpu 1 \
+    --rounds 15 --seconds 0.5 \
+    --variant 'O3-baseline=-O3 -DNDEBUG|baseline' \
+    --variant 'O3-avx2-nofma=-O3 -DNDEBUG|source=/tmp/nofma' --variant 'O3=-O3 -DNDEBUG' \
+    --work /tmp/convolver-fma --output fma-kernels.csv
+```
+
+The divergence table is the output of `native.kernel_divergence` in a Release
+build (`ctest -R kernel_divergence -V`, or run `convolver_kernel_divergence_tests`).
+
+Without `--variant` it builds `-O2`, `-O3`, LTO, v3 and v3 without FMA.
+
+### Startup, reset and loading
+
+Build `main` and the change to compare as Release builds with
+`-DCONVOLVER_BUILD_BENCHMARKS=ON` (the script needs
+`convolver_callback_benchmark` in both, so copy
+`tests/native/callback_benchmark.cpp` and its CMake lines into an older
+tree), then:
+
+```sh
+sh tests/native/benchmarks/callback_scenarios.sh before/convolver_callback_benchmark \
+    after/convolver_callback_benchmark 3 > startup-reset-load.csv   # about 15 minutes
+```
+
+Each line is `round,build,` followed by the benchmark's CSV row. One
+scenario on its own, for example jrp's baseline at B = 1024:
+
+```sh
+build/convolver_callback_benchmark --scenario warm --taps 65536 --inputs 6 --outputs 6 \
+    --layout matrix --block 1024 --callback 64 --seconds 5
+```
+
+### Comparing backends
+
+Install CMake, a C++20 compiler, optimized single-precision FFTW and libsndfile.
+Use `CMAKE_PREFIX_PATH` for libraries installed outside standard locations.
+
+```sh
+cmake -S . -B build-fftw -DCMAKE_BUILD_TYPE=Release -DCONVOLVER_FFT_BACKEND=FFTW -DCONVOLVER_BUILD_BENCHMARKS=ON
+cmake -S . -B build-accelerate -DCMAKE_BUILD_TYPE=Release -DCONVOLVER_FFT_BACKEND=ACCELERATE -DCONVOLVER_BUILD_BENCHMARKS=ON
+cmake --build build-fftw --parallel
+cmake --build build-accelerate --parallel
+ctest --test-dir build-fftw --output-on-failure
+ctest --test-dir build-accelerate --output-on-failure
+python3 tests/native/backend_equivalence.py build-fftw/convolver build-accelerate/convolver
+python3 tests/native/benchmark_backends.py build-fftw/convolver_benchmark build-accelerate/convolver_benchmark --rounds 7 --seconds 0.35 --output benchmark.csv
+```
+
+Repeat correctness tests in separate Debug build directories with
+`-DCONVOLVER_SANITIZERS=ON`. Never benchmark sanitizer builds. Native baseline
+sources and dependency archive hashes are recorded in [the portable guide](../use/command-line.md).
+
+For Ooura, configure another directory with `-DCONVOLVER_FFT_BACKEND=OOURA`
+and pass that CLI/benchmark as one side of the same pairwise comparison.
+Compare each backend with an independent oracle as well as with its peers.

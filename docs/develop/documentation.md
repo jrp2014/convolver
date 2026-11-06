@@ -136,8 +136,8 @@ can act on it without a separate copy of the rules:
 | Status, evidence levels and direction | [Status](../project/status.md) | TODO, open pull requests, GitHub releases, host records |
 | jrp's decisions | [Decisions](../project/decisions.md), with the details on the page each row links to; other pages state decisions as plain fact ([rule](workflow.md#while-working)) | TODO, the guides and pull requests that describe the work |
 | Dependency choices: which FFT and sound-file library each build uses, and how to change it | [Build from source](build.md#which-libraries-each-build-uses); the reasons in the [implementation map](architecture.md#dependency-choices) | `CMakeLists.txt`, the release policy |
-| FFT selection and performance evidence | [FFT guide](fft-backends.md) | Adapter contract; dated measurement artifacts |
-| Verification | [Testing](testing.md) | CMake registrations, workflow matrix, actual run results |
+| FFT selection and performance evidence | [FFT guide](fft-backends.md); the dated records on [FFT and engine measurements](fft-measurements.md) | Adapter contract; dated measurement artifacts |
+| Verification | [Testing](testing.md); the load-timing method on [load timing](load-timing.md) | CMake registrations, workflow matrix, actual run results |
 | Open work | [TODO](../../TODO.md) | Current source and linked issues/plans |
 | Claiming, handing over and reviewing work | [Workflow](workflow.md) | Pull request template, repository checks, `.claude/skills/` (pointers only) |
 | How documentation is organised and written | This page | The index, the link and repository checks |

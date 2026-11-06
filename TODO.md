@@ -23,7 +23,9 @@ large files and resampling (IO), no-clip headroom (GAIN), stress testing
 where measurements justify it (FFT, PERF). The
 [limitations table](#documented-limitations) lists current constraints.
 
-To take an item on, open a draft pull request titled with its ID; that is the
+You need not read this file whole: read the
+[execution priorities](#execution-priorities), then search for your item's
+ID. To take an item on, open a draft pull request titled with its ID; that is the
 claim, and its description holds the handoff note. Record progress here as the
 [workflow guide](docs/develop/workflow.md#recording-progress-in-todo) describes,
 and confirm the current source first: other work may already have done part of
