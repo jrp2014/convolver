@@ -94,8 +94,9 @@ filter.
    very start of the project. Make sure the clip has no fade in or out; some
    hosts add a short one to new clips (REAPER: select it, *Item properties*,
    set both fades to 0).
-3. Add Convolver to the track as an effect. It has no window of its own: the
-   host shows its generic controls, with a read-only **Status**.
+3. Add Convolver to the track as an effect. On macOS its window opens and
+   shows the status; on Windows and Linux the host shows its generic controls,
+   with a read-only **Status**.
 4. Load `examples/first-use/stereo/filter.vstpreset` from the host's preset
    menu (REAPER: the **+** button beside the preset menu, then the item that
    imports a VST preset file). Status reads

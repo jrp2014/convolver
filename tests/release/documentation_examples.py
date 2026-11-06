@@ -7,9 +7,15 @@ import shlex
 import shutil
 import subprocess
 import tempfile
+import textwrap
 from pathlib import Path
 
 TOOLS = ('convolver', 'convolver-preset', 'convolver-equalizer-apo')
+EXAMPLE = re.compile(
+    r'<!-- (executable|refused)-example -->\s*```sh\n(.*?)\n[ \t]*```'
+    r'(?:(?:(?!<!--|```).)*?```text\n(.*?)\n[ \t]*```)?',
+    re.DOTALL,
+)
 
 
 def check(package):
@@ -24,18 +30,20 @@ def check(package):
     examples = []
     for page in sorted((docs / 'use').glob('*.md')):
         text = page.read_text(encoding='utf-8')
+        # A refused example is a render the guide says is refused: the
+        # ```text block after it is the start of the message it prints.
         examples += [
-            (page.name, command)
-            for command in re.findall(r'<!-- executable-example -->\s*```sh\n(.*?)\n```', text, re.DOTALL)
+            (page.name, textwrap.dedent(match[2]), match[1] == 'refused', ' '.join((match[3] or '').split()))
+            for match in re.finditer(EXAMPLE, text)
         ]
-    used = {shlex.split(command)[0] for _, command in examples}
+    used = {shlex.split(command)[0] for _, command, _, _ in examples}
     for tool in TOOLS:
         if './bin/' + tool not in used:
             raise ValueError(f'no executable example for {tool} in the packaged guide')
     with tempfile.TemporaryDirectory(prefix='convolver-guide-') as temporary:
         root = Path(temporary) / 'guide ü'
         shutil.copytree(package, root)
-        for page, command in examples:
+        for page, command, refused, message in examples:
             tokens = shlex.split(command)
             name = tokens[0][len('./bin/') :] if tokens[0].startswith('./bin/') else tokens[0]
             tool = root / 'bin' / name
@@ -56,6 +64,15 @@ def check(package):
                 raise ValueError(f'{page}: examples must run a bundled tool as TOOL INPUT OUTPUT...: {command}')
             else:
                 outputs = tokens[2:]
+            if refused:
+                if name != 'convolver' or not outputs or not message:
+                    raise ValueError(f'{page}: a refused example renders and quotes its message: {command}')
+                result = subprocess.run([str(tool), *tokens[1:]], cwd=root, capture_output=True, text=True, check=False)
+                printed = ' '.join(result.stderr.split())
+                assert result.returncode == 1, f'{page}: {command} was not refused: {result.stderr}'
+                assert message in printed, f'{page}: {command} printed {result.stderr!r}, not {message!r}'
+                assert not (root / outputs[0]).exists(), f'{page}: {command} wrote {outputs[0]}'
+                continue
             subprocess.run([str(tool), *tokens[1:]], cwd=root, check=True)
             for output in outputs:
                 assert (root / output).exists(), f'{page}: {command} did not produce {output}'

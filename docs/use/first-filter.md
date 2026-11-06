@@ -109,5 +109,7 @@ with stereo input it prints a configuration you can save.
   ([gain](command-line.md#gain-and-attenuation)).
 - Anything else: [troubleshooting](troubleshooting.md).
 
-Next: every option is in the [command-line reference](command-line.md); to use
+Next: to check a preview package's tool from download to output, see
+[check file rendering with the command line](check-files-with-the-command-line.md);
+every option is in the [command-line reference](command-line.md); to use
 the same filter in a DAW, see [install](install.md).

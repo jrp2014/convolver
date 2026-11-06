@@ -12,6 +12,17 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- User guides (REL-2): [check a crossover in a host](docs/use/check-a-crossover-in-a-host.md),
+  the 2→6 crossover journey in REAPER with the VST3 plug-in or the Audio
+  Unit, and [check file rendering with the command line](docs/use/check-files-with-the-command-line.md),
+  the CLI journey from download to the three examples checked with
+  `--compare` and the messages for a filter at another rate or channel
+  count. With the stereo journey, the three first-preview journeys are
+  written; none has yet been followed in a host. The release tests run the
+  new guides' commands from the package and check that each refusal they
+  quote (`<!-- refused-example -->`) fails with that message and writes no
+  file; the package must hold the crossover's preset, input and expected
+  output.
 - CLI (IO-5): `--speaker-map config` also labels `rf64-` output, with any
   mask, in RF64's WAVE_FORMAT_EXTENSIBLE header (so `5.1(side)` and `7.1`
   files larger than 4 GiB can be labelled). W64, FLAC, CAF and AIFF still

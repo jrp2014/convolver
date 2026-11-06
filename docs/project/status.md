@@ -112,8 +112,8 @@ not fit its input instead of saving and presets.
 | Journey | Filter | Surfaces | Status |
 | --- | --- | --- | --- |
 | Stereo room correction | [`examples/first-use/stereo`](../../examples/first-use/README.md) | VST3 and the Audio Unit in named hosts; CLI | CLI commands run in CI (`examples.first_use`). The package holds the example and a preset made from it, and the journey is written ([check a stereo filter in a host](../use/check-a-stereo-filter.md)), checked with `convolver --compare`; the release tests render it with the packaged CLI. On 1 November its package and command-line steps passed on a macOS arm64 candidate (REL-5). Not demonstrated in a host: that is part of the REAPER smoke test (HOST-1). |
-| 2→6 crossover | [`examples/first-use/crossover`](../../examples/first-use/README.md) | VST3 and the Audio Unit in named hosts; CLI | CLI commands run in CI. The package holds the example and a 2→6 preset; the journey is not written. GarageBand offers only mono and stereo effects, so the Audio Unit's 2→6 journey needs a second host, still to be chosen in AU-4. Not demonstrated. |
-| Offline file rendering | All three first-use filters | CLI from the preview package | Run from the source tree in CI; the release tests also run the packaged `bin/convolver` on all three examples. The journey is not written. Not demonstrated. |
+| 2→6 crossover | [`examples/first-use/crossover`](../../examples/first-use/README.md) | VST3 and the Audio Unit in named hosts; CLI | CLI commands run in CI, and the release tests run the packaged CLI on it. The package holds the example and a 2→6 preset, and the journey is written for REAPER, with the VST3 plug-in and the Audio Unit ([check a crossover in a host](../use/check-a-crossover-in-a-host.md)), checked with `convolver --compare`. GarageBand and Audacity offer only mono and stereo effects. Not demonstrated: how REAPER gives an effect 2 inputs and 6 outputs is unchecked. |
+| Offline file rendering | All three first-use filters | CLI from the preview package | The journey is written ([check file rendering with the command line](../use/check-files-with-the-command-line.md)): it renders and compares all three examples and shows the messages for a filter at another rate or channel count. The release tests run every command in it from the packaged `bin/convolver`, including the two refusals and their messages. Not demonstrated by a user. |
 
 Recovering from a wrong preset is the step to watch. VST3 keeps the working
 filter but can report the rejection to the host only as `kResultFalse`, which
@@ -145,7 +145,7 @@ The first preview is cut from a 0.10.x tag.
 | The Audio Unit validated, smoke-tested in a named host and in the package | jrp | AU-3, AU-4, AU-5 | `auval -strict` and `au.editor` run in CI, and the component is in both macOS candidates, where `auval -strict` runs on it after the `.pkg` installs it (AU-5, PR #115; first passed on both Macs in candidates [run 42108659224](https://github.com/jrp2014/convolver/actions/runs/42108659224)). Remaining: pluginval for the component (AU-3) and GarageBand's [smoke test](../develop/host-testing.md#garageband-audio-unit) from that candidate (AU-4) |
 | An exact preview package: VST3 (and the Audio Unit on macOS), the CLI, the preset tool, examples and guides | jrp's milestone | PLUG-5 | The candidates hold everything the preview is to ship: the VST3 plug-in, the Audio Unit on macOS, the CLI, the preset tool, the Equalizer APO export, the first-use examples with their presets, the guides, and the VST trademark notice with the logo jrp approved (PR #115); the automated package checks are in [releasing](../develop/releasing.md#what-a-package-holds) and first passed on all four platforms in candidates [run 42108659224](https://github.com/jrp2014/convolver/actions/runs/42108659224). Remaining: the named-host smoke tests (HOST-1, AU-4) and the independent walkthrough (REL-3) of one exact candidate, then jrp's publication |
 | Settings (gain, mix, latency) and a window in each VST3 build and the Audio Unit | jrp | PLUG-9, PLUG-10, VST3-3, VST3-4, VST3-11 to VST3-13, AU-6, AU-7 | In progress: both formats have Gain, Mix and Latency and share the macOS window (the Audio Unit's checked by jrp in GarageBand, VST3's not yet in a host). Remaining: the Windows and Linux VST3 windows (VST3-12, VST3-13); the gain modes, computed gains and meters (PLUG-9, PLUG-10, AU-7); the host checks listed under AU-6 and VST3-11 |
-| Journeys written as steps, with the presets they need in the package | jrp's milestone | REL-2 | In progress: the stereo journey is written ([check a stereo filter in a host](../use/check-a-stereo-filter.md)). Remaining: the 2→6 crossover and CLI journeys |
+| Journeys written as steps, with the presets they need in the package | jrp's milestone | REL-2 | Done, 6 November 2026: the stereo, 2→6 crossover and CLI journeys are written (table above); the host steps are demonstrated by HOST-1 and REL-3 |
 | An independent user completes the journeys from those exact files | jrp's milestone | REL-3 | Not started; uses the candidate's files before upload |
 
 At publication, and before the next preview: COMPAT-1 keeps presets, a host
@@ -166,8 +166,9 @@ detail.
 2. **jrp's host smoke tests** on his Mac, from the latest candidate:
    HOST-1 (VST3 in REAPER, with the window, and Audacity) and AU-4 (the
    Audio Unit in GarageBand, with Latency). They can start now.
-3. **The journeys:** the 2→6 crossover and CLI journeys (REL-2). The
-   package holds everything the preview ships (PLUG-5, PR #115).
+3. **The journeys:** written (REL-2), and the package holds everything the
+   preview ships (PLUG-5, PR #115). They still have to be followed in a host
+   (HOST-1, REL-3).
 4. **Settings, windows and the Audio Unit:** the VST3 windows on Windows and
    Linux (VST3-12, VST3-13); the gain modes, computed gains and meters
    (PLUG-9, PLUG-10, AU-7); the Audio Unit's pluginval run (AU-3); the

@@ -243,6 +243,9 @@ def main():
             'examples/first-use/stereo/filter.vstpreset',
             'examples/first-use/stereo/input.wav',
             'examples/first-use/stereo/expected.wav',
+            'examples/first-use/crossover/filter.vstpreset',
+            'examples/first-use/crossover/input.wav',
+            'examples/first-use/crossover/expected.wav',
             'VST3/Convolver.vst3/Contents/Resources/moduleinfo.json',
             # PLUG-5: the plug-in's credits and the guides' VST Compatible logo.
             'VST3/Convolver.vst3/Contents/Resources/NOTICE.txt',

@@ -150,7 +150,10 @@ write those pages as usual. Commands marked `<!-- executable-example -->` in
 `docs/use/` must run a bundled tool from the package folder, as
 `./bin/TOOL INPUT OUTPUT...`, or as
 `./bin/convolver --filter F --input I --output O` or
-`./bin/convolver --compare OUTPUT EXPECTED` (which must find a match); the
+`./bin/convolver --compare OUTPUT EXPECTED` (which must find a match). A
+render marked `<!-- refused-example -->` must instead fail with exit status 1,
+write no output and print the message in the next `text` block (compared with
+line breaks ignored). The
 release tests run them in page order (`tests/release/documentation_examples.py`). `VERSION` is the numeric source of
 truth. Version numbers in commands are examples or compatibility requirements,
 not another release metadata source.
@@ -218,8 +221,10 @@ Commands are checked in two ways (DOC-2). The
 [repository checks](workflow.md#automated-checks) compare every CMake `-D`
 option and every Convolver tool option the pages show with the build and the
 tools' sources, so a renamed or removed option fails in pre-commit. The
-examples marked `<!-- executable-example -->` (above) run from the staged
-package in the candidates workflow, on every pull request. Other examples
+examples marked `<!-- executable-example -->` or `<!-- refused-example -->`
+(above) run from the staged package in the candidates workflow, on every
+pull request that changes code or the packaged pages
+([CI scope](testing.md#documentation-only-pull-requests)). Other examples
 name files a reader has, so they are not run.
 
 The [repository checks](workflow.md#automated-checks) add the structural rules:

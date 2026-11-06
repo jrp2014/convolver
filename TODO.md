@@ -10,8 +10,9 @@ delivered is described in the guides and the [CHANGELOG](CHANGELOG.md).
 running an exact preview package from the 0.10 series. The
 [order of work](#execution-priorities) gets there in four steps: finish the
 open fixes (done), run jrp's host smoke tests (HOST-1), finish the package
-and the user journeys (PLUG-5, REL-2; the CLI, the journey presets, the Audio
-Unit and the VST trademark notice are in the package), then the independent
+and the user journeys (PLUG-5, REL-2; the journeys are written, and the CLI,
+the journey presets, the Audio Unit and the VST trademark notice are in the
+package), then the independent
 walkthrough (REL-3).
 [Status](docs/project/status.md) shows what users can run now and what still
 blocks the preview, and [decisions](docs/project/decisions.md) what jrp has
@@ -56,7 +57,7 @@ boundary and C++20 in the core.
 | --- | --- | --- |
 | 1. Finish the open fixes (done) | **DIAG-1** fault state after reloads and Load failed before Fault ([PR #73](https://github.com/jrp2014/convolver/pull/73)); from jrp's review of `6920a45` (31 October 2026), **PLUG-12** (a filter that loads but cannot be saved) and **ROBUST-3** (silence after a failed first load that cannot run out of memory); from his review of `276c7dc` (1 November 2026), **PLUG-13** (room for the settings in saved state, [PR #105](https://github.com/jrp2014/convolver/pull/105)) | DIAG-1 done: merged on 25 October 2026 (`7ed7e38`), and the "Plug-in distribution candidates" run on that commit passed ([run](https://github.com/jrp2014/convolver/actions/runs/40145929436)). PLUG-12 and ROBUST-3 done: merged on 31 October 2026 ([PR #91](https://github.com/jrp2014/convolver/pull/91), `7542576`), each with a test of the sequence that failed. |
 | 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, the Audio Unit from the same candidate, which holds it since PR #115) at the same sitting | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 and AU-4 both gate the first preview, which holds the Audio Unit too. Needs no CLI in the package, so it can start now that step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
-| 3. Alongside step 2 | **PLUG-5** first-preview contents: in the candidates since PR #115 (the Audio Unit on macOS, the VST trademark notice; the `convolver` CLI and the first-use presets since PR #101); what remains is qualifying one exact candidate (HOST-1, AU-4, REL-3) and jrp's publication. **REL-2:** the 2→6 crossover and CLI journeys written in `docs/use/` (the stereo journey is written) | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
+| 3. Alongside step 2 | **PLUG-5** first-preview contents: in the candidates since PR #115 (the Audio Unit on macOS, the VST trademark notice; the `convolver` CLI and the first-use presets since PR #101); what remains is qualifying one exact candidate (HOST-1, AU-4, REL-3) and jrp's publication. **REL-2** (done): the stereo, 2→6 crossover and CLI journeys are written in `docs/use/` | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
 | Early walkthrough (macOS) (done) | **REL-5**: an explicitly limited walkthrough of an exact candidate on macOS, the stereo journey only | Done on 1 November 2026 as a package and command-line check only, by jrp's choice ([done](#done)); its host steps moved to HOST-1's REAPER smoke test and REL-3. It did not change the first preview's contents and does not replace REL-3. |
 | 4. Settings, windows and the Audio Unit | The **HOST-2** editor, which jrp wants in the first preview with the Audio Unit: **PLUG-9** and **PLUG-10**, then **VST3-3**, **VST3-4**, **AU-7** and the first half of **AU-6**, then the windows **VST3-11** (macOS, shared with the Audio Unit in **AU-6**), **VST3-12** (Windows) and **VST3-13** (Linux, VSTGUI stop-gap); and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview, in the macOS candidates since PR #115) | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the supported workloads (PERF-3), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
 | 5. The milestone | A candidate from a 0.10.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
@@ -86,31 +87,6 @@ is superseded.
   release assets ([production gates](docs/develop/releasing.md#production-gates)).
   The 18 October [distribution plan](docs/archive/plans/2026-10-18-plugin-distribution.md)
   is archived as superseded.
-- [ ] **REL-2 — Define the first release by user journeys.** Write three
-  journeys as numbered steps for a reader who has never seen the repository:
-  stereo room correction and a 2→6 crossover in a plug-in host, and offline
-  file rendering with the CLI, using the DOC-1 filters. Each journey covers
-  download and checksum, installation, loading the filter, checking the
-  expected output, saving and reopening, and recovering from a wrong preset
-  (wrong rate or channel count), and states the expected result of every step.
-  Saving and reopening and recovering from a wrong preset apply to the
-  plug-in journeys; the CLI journey instead covers a filter that does not fit
-  the input (wrong rate or channel count) and the message that explains it.
-  Each journey must say how a user checks the output, for example the host's
-  offline render of `input.wav` compared with `expected.wav` by a stated
-  command, with a listening check only where no comparison is possible.
-  Write them once in the user guides that ship in the package
-  (`docs/use/`, starting from its two first-use tutorials), with per-platform
-  differences marked, and make the
-  package contain what they need: presets made from the stereo and 2→6
-  filters, the preset tool and the `convolver` CLI, which the first preview
-  ships. See
-  [status](docs/project/status.md#user-journeys-for-the-first-preview).
-  Progress (1 November 2026, PR #101): the stereo journey in a host is
-  written ([check a stereo filter in a host](docs/use/check-a-stereo-filter.md)),
-  with `convolver --compare` as its check; the package holds the first-use
-  examples and their presets, and `bin/convolver`. The 2→6 crossover and
-  CLI journeys remain.
 - [ ] **REL-3 — Independent walkthrough of an exact preview.** Someone who
   did not write the code or the guides follows the REL-2 journeys from the
   exact preview files (identified by their SHA-256 sums), on their own
@@ -1542,6 +1518,21 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   `portable/host.cpp`, with the same values, and the plug-in contract says a
   replacement plays for one Latency block before the crossfade, as it has
   since PLUG-10; [contract](docs/develop/plugin-contract.md).
+- [x] **REL-2 — Define the first release by user journeys.** 6 November
+  2026, PR #118: the three journeys are written in `docs/use/` as numbered steps with
+  the expected result of each, from download and checksum:
+  [check a stereo filter in a host](docs/use/check-a-stereo-filter.md)
+  (PR #101), [check a crossover in a host](docs/use/check-a-crossover-in-a-host.md)
+  (2→6 in REAPER, VST3 and the Audio Unit) and
+  [check file rendering with the command line](docs/use/check-files-with-the-command-line.md)
+  (the three examples, each checked with `--compare`, and filters refused
+  for another rate or channel count, whose messages the guide quotes). The
+  package holds what they use, now also required by `verify_artifact.py` for
+  the crossover; the release tests run the guides' commands, and since this
+  change also check each quoted refusal (`<!-- refused-example -->`). No
+  journey has been followed in a host yet: the host steps, and REAPER's
+  routing of an effect with 2 inputs and 6 outputs in particular, are for
+  HOST-1 and REL-3 to demonstrate.
 - [x] **REL-6 — Responsiveness qualification before a release.** 5
   November 2026, from jrp's review of `db54160`: CI's timing tests run on
   shared runners and report "not qualified" when they cannot judge, which

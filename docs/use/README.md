@@ -25,8 +25,8 @@ and the plug-ins have not yet been tested in named DAWs. The
 
 | I want to… | Start with | Then |
 | --- | --- | --- |
-| Filter WAV files, or a stream through a pipe | [Your first filter](first-filter.md) | [Command-line reference](command-line.md) |
-| Filter audio in a DAW or other plug-in host | [Install](install.md), then [your first sound in a host](first-sound-in-a-host.md) | [Check a stereo filter in a host](check-a-stereo-filter.md), [plug-in presets](presets.md), [how the plug-ins behave](plugins.md) |
+| Filter WAV files, or a stream through a pipe | [Your first filter](first-filter.md) | [Check file rendering with the command line](check-files-with-the-command-line.md), [command-line reference](command-line.md) |
+| Filter audio in a DAW or other plug-in host | [Install](install.md), then [your first sound in a host](first-sound-in-a-host.md) | [Check a stereo filter in a host](check-a-stereo-filter.md), [check a crossover in a host](check-a-crossover-in-a-host.md), [plug-in presets](presets.md), [how the plug-ins behave](plugins.md) |
 | Filter everything Windows plays | [Equalizer APO export](equalizer-apo.md) | |
 | Use a filter made for Roon, JRiver, Audiolense or the old Windows Convolver | [Other programs](other-programs.md) | [Configuration files](configuration.md) |
 
@@ -38,6 +38,8 @@ and the plug-ins have not yet been tested in named DAWs. The
 | [Your first filter](first-filter.md) | Tutorial | The bundled example filters with the command-line tool |
 | [Your first sound in a host](first-sound-in-a-host.md) | Tutorial | The example presets in a plug-in host |
 | [Check a stereo filter in a host](check-a-stereo-filter.md) | Tutorial | From download to a host render checked against the expected output |
+| [Check a crossover in a host](check-a-crossover-in-a-host.md) | Tutorial | The same for a filter with 2 inputs and 6 outputs |
+| [Check file rendering with the command line](check-files-with-the-command-line.md) | Tutorial | From download to rendered files checked against the expected output, and a filter that does not fit |
 | [Install](install.md) | How-to | A preview package or your own build, for every plug-in format and system |
 | [Plug-in presets](presets.md) | How-to | Turning a filter into a preset for a plug-in |
 | [Equalizer APO export](equalizer-apo.md) | How-to | System-wide filtering on Windows |
