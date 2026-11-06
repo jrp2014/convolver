@@ -12,6 +12,13 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- CLI (IO-5): `--speaker-map config` also labels `rf64-` output, with any
+  mask, in RF64's WAVE_FORMAT_EXTENSIBLE header (so `5.1(side)` and `7.1`
+  files larger than 4 GiB can be labelled). W64, FLAC, CAF and AIFF still
+  refuse a map before the output is created, now saying why: libsndfile
+  cannot write labels in W64 or FLAC, and CAF and AIFF layouts would change
+  the labels' meaning. The library's `AudioWriter` accepts a mask for
+  `Container::rf64` the same way.
 - VST3 (VST3-9): host rates that are not a whole number of hertz, such as a
   pull-down 48000 ÷ 1.001 ≈ 47952.04795 Hz, are accepted rather than refused
   by `setupProcessing` (which made hosts report the plug-in unusable). They

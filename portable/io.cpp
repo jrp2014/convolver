@@ -68,10 +68,16 @@ void validate_speakers(std::uint32_t mask, std::size_t channels, Container conta
     if (!mask)
         return;
     if (container == Container::raw)
-        throw std::invalid_argument("a speaker map needs WAV output; RAW has no header");
-    if (container != Container::wav)
-        throw std::invalid_argument("a speaker map needs WAV output; other containers do not "
-                                    "carry speaker labels yet");
+        throw std::invalid_argument("a speaker map needs WAV or RF64 output; RAW has no header");
+    // IO-5: libsndfile writes no labels in W64 or FLAC, and in CAF and AIFF only
+    // Apple layouts whose surround speakers are neither WAVE's back nor side
+    // ones (FFmpeg reads 0x3F written there as 5.1 with side speakers), so
+    // those refuse a map rather than change its meaning.
+    if (container != Container::wav && container != Container::rf64)
+        throw std::invalid_argument(
+            "a speaker map needs WAV or RF64 output; libsndfile cannot write speaker labels in "
+            "W64 or FLAC, and CAF and AIFF layouts cannot keep WAVE's back and side speakers "
+            "apart");
     if (mask & ~known_speaker_bits)
         throw std::invalid_argument("speaker mask has unknown speaker bits (only 0x3ffff are "
                                     "defined): 0x" +
@@ -85,7 +91,8 @@ void validate_speakers(std::uint32_t mask, std::size_t channels, Container conta
                                     " speakers for " + std::to_string(channels) +
                                     " output channels");
 }
-// The WAVE_FORMAT_EXTENSIBLE fields a RIFF/WAVE file declares, if it has them.
+// The WAVE_FORMAT_EXTENSIBLE fields a RIFF/WAVE or RF64 file declares, if it
+// has them (RF64's ds64 chunk comes before 'fmt ' like any other chunk).
 struct Extensible {
     std::uint16_t valid_bits = 0;
     std::uint32_t channel_mask = 0;
@@ -95,7 +102,8 @@ std::optional<Extensible> declared_extensible(const std::filesystem::path& path)
     std::ifstream file(path, std::ios::binary);
     std::array<unsigned char, 12> head{};
     file.read(reinterpret_cast<char*>(head.data()), head.size());
-    if (!file || std::string_view(reinterpret_cast<char*>(head.data()), 4) != "RIFF")
+    const std::string_view magic(reinterpret_cast<char*>(head.data()), 4);
+    if (!file || (magic != "RIFF" && magic != "RF64"))
         return std::nullopt;
     for (int chunk = 0; chunk < 64; ++chunk) {
         std::array<unsigned char, 8> header{};
@@ -782,8 +790,9 @@ AudioWriter::AudioWriter(const std::filesystem::path& path, AudioInfo info, Outp
     impl_->frame_bytes = info.channels * (bits                                     ? bits / 8
                                           : encoding.sample == SampleType::float64 ? 8
                                                                                    : 4);
-    // Speaker labels and reduced valid bits both need WAVE_FORMAT_EXTENSIBLE.
-    if (impl_->speakers || impl_->valid_bits != bits)
+    // Speaker labels and reduced valid bits both need WAVE_FORMAT_EXTENSIBLE,
+    // which RF64 writes by itself once given a speaker map.
+    if (encoding.container == Container::wav && (impl_->speakers || impl_->valid_bits != bits))
         sf.format = (sf.format & ~SF_FORMAT_TYPEMASK) | SF_FORMAT_WAVEX;
     if (!sf_format_check(&sf))
         throw std::invalid_argument("unsupported audio output format");

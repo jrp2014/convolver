@@ -138,8 +138,8 @@ struct OutputMetadata {
     // WAVE speaker positions (bit 0 front left ... bit 17 top back right), one
     // set bit per channel in channel order. Zero leaves the speakers unspecified
     // and writes the same file as before. A nonzero mask writes
-    // WAVE_FORMAT_EXTENSIBLE; it needs WAV output, known bits only and as many
-    // bits as channels, and is checked before the output is opened.
+    // WAVE_FORMAT_EXTENSIBLE; it needs WAV or RF64 output, known bits only and
+    // as many bits as channels, and is checked before the output is opened.
     std::uint32_t channel_mask = 0;
 };
 // Speaker bits libsndfile can label in WAVE_FORMAT_EXTENSIBLE (bits 0 to 17).

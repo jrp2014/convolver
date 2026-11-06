@@ -61,8 +61,9 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
                       (headerless little-endian; no pcm8). Types: pcm8,
                       pcm16, pcm24, pcm32, float, double. Example: flac-pcm24
   --speaker-map config
-                      Label WAV output channels with the configuration's channel
-                      mask (WAVE_FORMAT_EXTENSIBLE). wav- formats only.
+                      Label WAV or RF64 output channels with the configuration's
+                      channel mask (WAVE_FORMAT_EXTENSIBLE). wav- and rf64-
+                      formats only.
   --dither D           Integer PCM only: triangular, triangular-highpass or
                       none. Default triangular below 20 significant bits
                       (pcm8, pcm16), none from 20 bits, where it is inaudible
@@ -410,11 +411,20 @@ int run(int argc, char** argv) {
                 bad_option("unknown option: " + option, {},
                            "Check its spelling; convolver --help lists every option.");
         }
-        if (speaker_map && format.container != convolver::Container::wav)
-            bad_option("--speaker-map needs a wav- output format",
-                       "Other containers carry no speaker labels yet.",
-                       "Use a wav output format, such as --output-format wav-float, or leave out "
-                       "--speaker-map.");
+        if (speaker_map && format.container != convolver::Container::wav &&
+            format.container != convolver::Container::rf64)
+            bad_option("--speaker-map needs a wav- or rf64- output format",
+                       format.container == convolver::Container::raw
+                           ? "Headerless raw output has nowhere to keep speaker labels."
+                       : format.container == convolver::Container::caf ||
+                               format.container == convolver::Container::aiff
+                           ? "CAF and AIFF files label speakers with Apple's layouts, which "
+                             "cannot keep WAVE's back and side speakers apart, so the labels "
+                             "would change meaning."
+                           : "libsndfile, which writes the file, cannot store speaker labels in "
+                             "this format.",
+                       "Use a wav or rf64 output format, such as --output-format wav-float or "
+                       "rf64-float, or leave out --speaker-map.");
         if (raw_format && !raw)
             bad_option("--raw-format needs --raw-input RATE CHANNELS",
                        "--raw-format says how headerless input samples are stored, which only "
@@ -579,8 +589,12 @@ int run(int argc, char** argv) {
         if (speaker_map) {
             metadata.channel_mask = config.channel_mask;
             if (!metadata.channel_mask)
-                std::cerr << "convolver: the configuration declares no speaker mask; the output "
-                             "channels stay unlabelled\n";
+                std::cerr << (format.container == convolver::Container::rf64
+                                  ? "convolver: the configuration declares no speaker mask; the "
+                                    "output gets libsndfile's default RF64 header, which may "
+                                    "label the channels\n"
+                                  : "convolver: the configuration declares no speaker mask; the "
+                                    "output channels stay unlabelled\n");
         }
         const auto open_output = [&] {
             try {

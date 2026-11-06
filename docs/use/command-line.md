@@ -136,9 +136,9 @@ example `flac-pcm24` or `rf64-float`. The default is `wav-float`.
 `float` is 32-bit and `double` 64-bit IEEE floating point. 8-bit PCM is
 unsigned in `wav`, `rf64` and `w64`, as those formats define it, and signed in
 `aiff`, `caf` and `flac`. An unsupported pair, such as `flac-float`, is
-rejected before any file is created. Speaker labels (`--speaker-map`) and
-`--valid-bits` below the container size need a `wav-` format, because only
-WAVE_FORMAT_EXTENSIBLE carries them here. Standard output (`--output -`)
+rejected before any file is created. Speaker labels (`--speaker-map`) need a
+`wav-` or `rf64-` format, and `--valid-bits` below the container size a
+`wav-` format, because only WAVE_FORMAT_EXTENSIBLE carries them here. Standard output (`--output -`)
 needs a `raw-` format, since no file header can be completed on a pipe.
 
 FLAC output needs a libsndfile built with FLAC; see [FLAC and Ogg](#flac-and-ogg).
@@ -278,7 +278,7 @@ engine offered. Dither and shaping then act at that resolution.
 
 ### Speaker labels
 
-WAV output has no speaker labels unless requested. A valid-bit override may
+WAV and RF64 output have no speaker labels unless requested. A valid-bit override may
 also require an extensible header, independently of labels.
 `--speaker-map config` labels the output channels with the configuration's hex
 channel mask (the fourth header value) by writing a WAVE_FORMAT_EXTENSIBLE header:
@@ -297,10 +297,18 @@ convolver --filter surround.cfg --input music.wav --output out.wav --speaker-map
   only bits 0 to 17 are accepted. Otherwise the render stops before the output is
   created.
 - A mask of 0 (and any sound-file filter, which has no mask) means unspecified:
-  the CLI says so on stderr and writes the plain header.
-- Only `wav-` formats carry the labels; any other container stops the render
-  before the output is created (labels in other containers are not yet
-  supported).
+  the CLI says so on stderr and writes the plain header, which for `rf64-`
+  output is libsndfile's default (below).
+- Only `wav-` and `rf64-` formats carry the labels, both in a
+  WAVE_FORMAT_EXTENSIBLE header; any other container stops the render before
+  the output is created. libsndfile, which writes the files, cannot store
+  labels in W64 or FLAC. In CAF and AIFF it can store only Apple's channel
+  layouts, whose "surround" speakers are neither WAVE's back nor side
+  speakers (FFmpeg reads `3F` written there as 5.1 with side speakers), so
+  the labels would change meaning.
+- Unlabelled `rf64-` output with more than two channels still gets
+  libsndfile's default header, which may declare a mask of its own; use
+  `--speaker-map config` when the labels matter.
 - After writing, the CLI reads the finished header back and fails if the labels
   are not exactly the requested mask, so a sound-file library that cannot write
   them is reported rather than silently ignored.

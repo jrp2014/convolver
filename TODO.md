@@ -67,7 +67,7 @@ boundary and C++20 in the core.
 | Optional editor work | **PLUG-11** (FFT planning in FFTW-built plug-ins), **LV2-6** (an LV2 window, only if Linux users ask) | Not needed for any preview. |
 | On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **PERF-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
 
-The CFG-1, IO-1, IO-2, IO-5 and ROBUST-1 items
+The CFG-1, IO-1, IO-2 and ROBUST-1 items
 remain open supporting work; take them up when a reproducible defect or the milestone
 needs them. This table owns the current ordering; the dated
 [21 October review order](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#recommended-order)
@@ -618,11 +618,6 @@ means a patched FFmpeg build with `--enable-gpl`.
   Progress (23 October 2026, PR #60): RF64, W64, CAF, FLAC and raw output have
   no 4 GiB limit; WAV and AIFF stop with an error at it. Tests at the boundary
   sizes remain.
-- [ ] **IO-5 — Speaker labels beyond WAV.** Carry `--speaker-map` labels into
-  the channel layouts of the other containers (WAVE_FORMAT_EXTENSIBLE in RF64
-  and W64, FLAC's `WAVEFORMATEXTENSIBLE_CHANNEL_MASK` tag, CAF and AIFF channel
-  layouts). Check what libsndfile can write and what readers honour first; a
-  rejected layout must fail as WAV does, not fall back to a default.
 - [ ] **IO-2 — Optional offline IR resampling.** Only add as an explicit operation
   with tests for gain, delay, length and reported metadata; retain mismatch errors
   by default. Compare [libsamplerate](https://libsndfile.github.io/libsamplerate/)
@@ -1001,7 +996,7 @@ with compatibility tests; linked IDs point to open work above.
 | Resource limits cap channels, paths, delays, text, IRs and state | Intentional bounds; assess any increase with memory/overflow tests. | [Core limits](docs/develop/library.md#resource-limits), [tests](docs/develop/testing.md) |
 | The configuration format is not identical across consumers | No external consumer has verified this corpus yet; CFG-1. Older bundled configs may need delay lines and portable paths. | [Compatibility matrix](docs/use/other-programs.md#what-convolver-accepts) |
 | Path portability checks are partial | No drive/share remapping; a clean profile is not certification for Windows or another reader. Extend checks only with fixtures. | [Profiles](docs/use/other-programs.md#check-that-a-configuration-will-travel) |
-| Output is WAV, RF64, W64, AIFF, CAF, FLAC or headerless raw; speaker labels and reduced valid bits are WAV-only | Input codecs and FLAC output depend on the libsndfile build; the preview packages have no FLAC or Ogg, by decision ([workarounds](docs/use/command-line.md#flac-and-ogg)). Boundary-size tests remain IO-1; labels in other containers are IO-5. RAW has no embedded rate/channel metadata. | [Output formats](docs/use/command-line.md#output-formats) |
+| Output is WAV, RF64, W64, AIFF, CAF, FLAC or headerless raw; speaker labels are WAV and RF64 only, reduced valid bits WAV only | Input codecs and FLAC output depend on the libsndfile build; the preview packages have no FLAC or Ogg, by decision ([workarounds](docs/use/command-line.md#flac-and-ogg)). Boundary-size tests remain IO-1; libsndfile cannot write labels in the other containers (IO-5). RAW has no embedded rate/channel metadata. | [Output formats](docs/use/command-line.md#output-formats) |
 | Output writes are not transactional | An I/O or numerical failure leaves a partial file, which the CLI says is incomplete; deleting it or publishing through a temporary file was not chosen ([decisions](docs/project/decisions.md#diagnostics)). Never promise rollback for pipes. | [Output safety](docs/use/command-line.md#output-safety) |
 | Gain estimation is not a limiter; float samples can exceed full scale | Integer samples clip; `no-clip` reserves no quantizer headroom, for which the guide gives a safe bound (GAIN-1). | [Gain](docs/use/command-line.md#gain-and-attenuation) |
 | Dither/shaping/valid bits apply to integer file output only | Float/RAW output rejects those options; the plug-ins exchange floats, so the host does any final conversion. | [Integer output](docs/use/command-line.md#integer-formats-dither-and-noise-shaping) |
@@ -1597,6 +1592,15 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   in its constructor, so out of memory reaches the caller, and
   `estimate_attenuation` refuses a non-finite noise response; tests in
   `native.io` and `native.engine`; [gain](docs/use/command-line.md#gain-and-attenuation).
+- [x] **IO-5 — Speaker labels beyond WAV.** 6 November 2026, PR #118: checked with
+  libsndfile 1.2.2 and FFmpeg's reader. RF64 now carries `--speaker-map`
+  labels in its WAVE_FORMAT_EXTENSIBLE header, any mask, read back exactly
+  by both. libsndfile writes no labels in W64 or FLAC; in CAF and AIFF it
+  writes only Apple layouts, refusing side-speaker 5.1 and 7.1 and turning
+  WAVE's back speakers into surround ones that FFmpeg reads as side, so
+  those containers, like W64 and FLAC, refuse a map before the output is
+  created. Tests in `native.io` and `native.cli`;
+  [speaker labels](docs/use/command-line.md#speaker-labels).
 - [x] **ROBUST-2 — Bound report output.** 6 November 2026, PR #118: traversal and
   diagnostics were already bounded (4096 visits, 256 diagnostics), but
   `--inspect --all-configurations` gives each entry a render's decoding

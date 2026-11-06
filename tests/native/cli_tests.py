@@ -382,19 +382,26 @@ def speaker_map_tests(d):
 
     def config(mask, outputs):
         # Input 0 feeds output o with weight 0.(o+1), so each channel is distinguishable.
-        cfg = d / 'sm.cfg'
+        # One file per mask, so a list of configurations made at once keeps each.
+        cfg = d / f'sm-{mask:x}-{outputs}.cfg'
         cfg.write_text(
             f'48000 2 {outputs} {mask:x}\n0 0\n{" ".join("0" * outputs)}\n'
             + ''.join(f'sm-ir.wav\n0\n0\n{o}.{o + 1}\n' for o in range(outputs))
         )
         return cfg
 
-    for mask, outputs, fmt in ((0x3, 2, 'wav-float'), (0x3F, 6, 'wav-pcm24'), (0x3F, 6, 'wav-float')):
+    for mask, outputs, fmt in (
+        (0x3, 2, 'wav-float'),
+        (0x3F, 6, 'wav-pcm24'),
+        (0x3F, 6, 'wav-float'),
+        (0x60F, 6, 'rf64-pcm24'),  # IO-5: RF64 keeps the exact mask too.
+    ):
         cfg = config(mask, outputs)
         base = ['--filter', cfg, '--input', src, '--output', out, '--output-format', fmt]
         call(base)
         plain = out.read_bytes()
-        assert channel_mask(out) is None
+        # libsndfile gives unlabelled RF64 its default mask for the channel count.
+        assert channel_mask(out) is None or fmt.startswith('rf64'), hex(channel_mask(out) or 0)
         call([*base, '--speaker-map', 'config'])
         assert channel_mask(out) == mask, hex(channel_mask(out) or 0)
         if fmt == 'wav-float':
@@ -406,7 +413,13 @@ def speaker_map_tests(d):
     cfg = config(0, 2)
     p = call(['--filter', cfg, '--input', src, '--output', out, '--speaker-map', 'config'])
     assert channel_mask(out) is None and b'no speaker mask' in p.stderr
-    for args in ([config(0x7, 2)], [config(0x3, 2), '--output-format', 'raw-float'], [config(0x40001, 2)]):
+    for args in (
+        [config(0x7, 2)],
+        [config(0x3, 2), '--output-format', 'raw-float'],
+        [config(0x40001, 2)],
+        [config(0x3, 2), '--output-format', 'caf-pcm24'],
+        [config(0x3, 2), '--output-format', 'w64-float'],
+    ):
         out.unlink(missing_ok=True)
         p = call(['--filter', args[0], '--input', src, '--output', out, '--speaker-map', 'config', *args[1:]], ok=False)
         assert not out.exists() and b'speaker' in p.stderr, p.stderr

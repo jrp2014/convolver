@@ -172,7 +172,9 @@ WaveFormat wave_format(const fs::path& p) {
             v = v << 8 | static_cast<unsigned char>(bytes.at(at + i));
         return v;
     };
-    require(bytes.compare(0, 4, "RIFF") == 0 && bytes.compare(8, 4, "WAVE") == 0, "RIFF header");
+    require((bytes.compare(0, 4, "RIFF") == 0 || bytes.compare(0, 4, "RF64") == 0) &&
+                bytes.compare(8, 4, "WAVE") == 0,
+            "RIFF or RF64 header");
     for (std::size_t at = 12; at + 8 <= bytes.size();) {
         const auto length = u(at + 4, 4);
         if (bytes.compare(at, 4, "fmt ") == 0) {
@@ -196,18 +198,25 @@ void speaker_tests(const fs::path& dir) {
     struct Case {
         std::size_t channels;
         std::uint32_t mask;
-        OutputFormat format;
+        OutputEncoding format;
         unsigned tag, bits;
     };
-    for (const auto& c : {Case{2, 0x3, OutputFormat::wav_float, 3, 32},
-                          Case{2, 0x3, OutputFormat::wav_pcm16, 1, 16},
-                          Case{6, 0x3f, OutputFormat::wav_float, 3, 32},
-                          Case{6, 0x3f, OutputFormat::wav_pcm24, 1, 24},
-                          Case{4, 0x603, OutputFormat::wav_pcm32, 1, 32},
-                          Case{1, 0x20000, OutputFormat::wav_float, 3, 32},
-                          Case{18, 0x3ffff, OutputFormat::wav_float, 3, 32}}) {
+    constexpr auto wav = Container::wav, rf64 = Container::rf64;
+    // IO-5: RF64 carries any mask too, in its own WAVE_FORMAT_EXTENSIBLE header.
+    for (const auto& c : {Case{2, 0x3, {wav, SampleType::float32}, 3, 32},
+                          Case{2, 0x3, {wav, SampleType::pcm16}, 1, 16},
+                          Case{6, 0x3f, {wav, SampleType::float32}, 3, 32},
+                          Case{6, 0x3f, {wav, SampleType::pcm24}, 1, 24},
+                          Case{4, 0x603, {wav, SampleType::pcm32}, 1, 32},
+                          Case{1, 0x20000, {wav, SampleType::float32}, 3, 32},
+                          Case{18, 0x3ffff, {wav, SampleType::float32}, 3, 32},
+                          Case{1, 0x4, {rf64, SampleType::pcm16}, 1, 16},
+                          Case{6, 0x60f, {rf64, SampleType::pcm24}, 1, 24},
+                          Case{8, 0x63f, {rf64, SampleType::float32}, 3, 32},
+                          Case{18, 0x3ffff, {rf64, SampleType::float64}, 3, 64}}) {
         const auto out = dir / ("speakers-" + std::to_string(c.channels) + "-" +
-                                std::to_string(static_cast<int>(c.format)) + ".wav");
+                                std::to_string(static_cast<int>(c.format.container)) + "-" +
+                                std::to_string(static_cast<int>(c.format.sample)) + ".wav");
         // Two frames per channel: an impulse identifying the channel, then its negation.
         std::vector<float> samples;
         for (int frame = 0; frame < 2; ++frame)
@@ -267,6 +276,22 @@ void speaker_tests(const fs::path& dir) {
             threw = true;
         }
         require(threw && !fs::exists(out), "invalid speaker mask rejected before opening");
+    }
+    // IO-5: libsndfile writes no labels in W64 or FLAC, and CAF and AIFF layouts
+    // would turn WAVE's back speakers into surround ones read as side.
+    for (const auto container :
+         {Container::w64, Container::flac, Container::caf, Container::aiff}) {
+        if (!available(container))
+            continue; // A libsndfile without FLAC refuses FLAC output first.
+        const auto out = dir / "speakers-container";
+        std::string message;
+        try {
+            AudioWriter(out, {48000, 6}, {container, SampleType::pcm16}, {}, {0x3f});
+        } catch (const std::invalid_argument& e) {
+            message = e.what();
+        }
+        require(message.find("WAV or RF64") != std::string::npos && !fs::exists(out),
+                "a speaker map in another container is refused before opening");
     }
 }
 std::vector<std::int16_t> pcm16_samples(const fs::path& p) {
