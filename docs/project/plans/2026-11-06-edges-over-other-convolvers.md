@@ -42,14 +42,16 @@ then takes up one of the EDGE items.
   say why it is silent; free GPL source for macOS, Windows and Linux in
   VST3, Audio Unit and LV2, plus a command-line tool and a library (nothing
   is published yet, and the first preview is macOS-only).
-- **The ranked edges to build** (each a TODO item, after REL-3): long
+- **The ranked edges to build** (each a TODO item, after REL-3). First the
+  easy wins over the room-correction convolvers: filters for every sample
+  rate in one plug-in state (EDGE-1), delays finer than a sample (EDGE-9),
+  showing a filter's response (EDGE-2), level-matched comparison of two
+  filters (EDGE-4) and published workloads and evidence (EDGE-5). Then long
   reverbs at low CPU, with lower and finer latency (measured in PERF-3, then
-  PERF-2's non-uniform partitions), filters for every sample rate in one
-  plug-in state (EDGE-1), delays finer than a sample (EDGE-9), showing a
-  filter's response (EDGE-2), reverb file layouts such as
-  true stereo without writing a `.cfg` (EDGE-3), level-matched comparison of
-  two filters (EDGE-4), published workloads and evidence (EDGE-5), a reverb's pre-delay, start, length and fades (EDGE-6), decay and
-  damping (EDGE-7) and immersive layouts beyond 8 channels (EDGE-8).
+  PERF-2's non-uniform partitions). Then the reverb features: file layouts
+  such as true stereo without writing a `.cfg` (EDGE-3), a reverb's
+  pre-delay, start, length and fades (EDGE-6), decay and damping (EDGE-7)
+  and immersive layouts beyond 8 channels (EDGE-8).
 - **What every edge keeps.** The rules in [non-negotiables](#non-negotiables)
   apply to each item: the oracle tests, no allocation or locks on the audio
   thread, failing safe, clear diagnostics, each platform's guidelines, `.cfg`
@@ -110,21 +112,23 @@ host is told the exact latency, with Mix delaying the dry signal to match
 
 ## Ranked edges to build
 
-Ranked by value to Convolver's users (room correction and crossovers, and
-long reverbs, which matter more than first expected), how clearly the gap
-shows in the comparison, and effort.
+Ranked by jrp's priorities: first the easy wins over the room-correction
+convolvers, where Convolver started (ranks 1 to 5, each S or M); then long
+reverbs, which matter more than first expected (rank 6, L); then the reverb
+features (ranks 7 to 10). Within each group, by value to users, how clearly
+the gap shows in the comparison, and effort.
 Effort: **S** about a pull request, **M** a few, **L** a design and several.
 Nothing starts before REL-3 unless jrp lifts the freeze.
 
 | Rank | Edge | The gap today | Effort | TODO | jrp decides first |
 | --- | --- | --- | --- | --- | --- |
-| 1 | **Long reverbs at low CPU, with lower and finer latency.** First measure long reverbs (10, 30 and 60 s; stereo and true stereo; 48 and 96 kHz) in PERF-3. Then, in PERF-2: non-uniform partitions (short blocks at the start for latency, ever longer blocks for the tail); spreading the long blocks' work evenly over callbacks, or onto a worker thread without locks, so no callback spikes; and a replacement that crossfades the start of the filter rather than running two whole engines. Latency can then be any value the partitions allow, not only a power of two, down to zero with a direct (time-domain) head. | Every block of a filter is processed on every callback: at 256 frames, a 30 s filter at 48 kHz is about 5,600 blocks, about 1.4 million complex multiply-adds and 12 MB of filter spectra per path per callback, and the multiply-accumulate dominates (the FFTs are a few per cent of the work). With a 30 s filter the longest 512-frame callbacks took 8–12 ms of a 10.7 ms period on a cloud machine (PERF-15), and a replacement misses its budget. Latency is a power of two from 64 to 4096 frames in VST3 and the Audio Unit (LV2 stays at 256); Reverberate 2 offers zero, Space Designer 128 samples. Published comparisons put non-uniform partitions about an order of magnitude ahead of uniform ones for filters this long; PERF-3 checks that on our machines first. | L | PERF-3, then PERF-2 | Whether "zero" means zero samples or one small block; whether a worker thread is acceptable |
-| 2 | **A filter for every sample rate in one plug-in state.** Keep each entry of a configuration list in the state and play the one matching the host's rate; switch when the rate changes. | A list already picks the entry for the host's rate, but the plug-in keeps only that entry, so a project opened at another rate plays silence. Hang Loose Convolver loads the matching-rate filter when the rate changes, and CamillaDSP picks a file per rate; room-correction tools write one filter per rate. | M | EDGE-1 | The saved-state format (a new host state version) |
-| 3 | **Delays finer than a sample.** An opt-in fractional part for each delay, built into the filter when it loads (a band-limited fractional delay), so playing costs nothing more. | `.cfg` delays are truncated to whole samples, a compatibility rule that stays. One sample at 48 kHz is about 7 mm of speaker distance, which matters when aligning a crossover's drivers. | S–M | EDGE-9 | How the finer delay is given (a setting or an option, never a change to `.cfg` syntax) |
-| 4 | **Show what a filter does.** Magnitude, phase, group delay and the decay (energy-time) of each path, as data from `--inspect` and as a plot in the window. | The report gives rate, lengths, delay and peak, not the response. Room-correction users check filters in REW; reverb users expect to see the decay. | M (data S, window M) | EDGE-2 | The window's layout (an addition to the editor plan) |
-| 5 | **Reverb file layouts without a `.cfg`.** Mono on stereo, true stereo as one four-channel file or two stereo files. | A sound file filters channel by channel only; true stereo needs a hand-written `.cfg`. Reverb responses are commonly distributed in these layouts. | S–M | EDGE-3 | The channel order assumed for four-channel files, and how the layout is chosen |
-| 6 | **Compare two filters, level-matched.** Hold two filters and switch between them with the existing crossfade, at matched loudness. | Hang Loose Convolver switches filter sets in real time, with level matching. Convolver replaces one filter with another. | M | EDGE-4 | The saved state (two filters double its size against the 64 MiB limit), and the loudness measure used for matching |
-| 7 | **Publish the evidence.** The supported workloads, long reverbs included, with CPU measured beside open convolvers (CamillaDSP, BruteFIR, mcfx) on the same machines; and a user page saying the output is correct, with a null test anyone can run with `--compare` against a shipped reference render. | The evidence exists only in test logs; none of the products above publishes CPU figures for stated workloads. | S (page), M (benchmarks) | EDGE-5 | Which claims the user guides make |
+| 1 | **A filter for every sample rate in one plug-in state.** Keep each entry of a configuration list in the state and play the one matching the host's rate; switch when the rate changes. | A list already picks the entry for the host's rate, but the plug-in keeps only that entry, so a project opened at another rate plays silence. Hang Loose Convolver loads the matching-rate filter when the rate changes, and CamillaDSP picks a file per rate; room-correction tools write one filter per rate. | M | EDGE-1 | The saved-state format (a new host state version) |
+| 2 | **Delays finer than a sample.** An opt-in fractional part for each delay, built into the filter when it loads (a band-limited fractional delay), so playing costs nothing more. | `.cfg` delays are truncated to whole samples, a compatibility rule that stays. One sample at 48 kHz is about 7 mm of speaker distance, which matters when aligning a crossover's drivers. | S–M | EDGE-9 | How the finer delay is given (a setting or an option, never a change to `.cfg` syntax) |
+| 3 | **Show what a filter does.** Magnitude, phase, group delay and the decay (energy-time) of each path, as data from `--inspect` and as a plot in the window. | The report gives rate, lengths, delay and peak, not the response. Room-correction users check filters in REW; reverb users expect to see the decay. | M (data S, window M) | EDGE-2 | The window's layout (an addition to the editor plan) |
+| 4 | **Compare two filters, level-matched.** Hold two filters and switch between them with the existing crossfade, at matched loudness. | Hang Loose Convolver switches filter sets in real time, with level matching. Convolver replaces one filter with another. | M | EDGE-4 | The saved state (two filters double its size against the 64 MiB limit), and the loudness measure used for matching |
+| 5 | **Publish the evidence.** The supported workloads, long reverbs included, with CPU measured beside open convolvers (CamillaDSP, BruteFIR, mcfx) on the same machines; and a user page saying the output is correct, with a null test anyone can run with `--compare` against a shipped reference render. | The evidence exists only in test logs; none of the products above publishes CPU figures for stated workloads. | S (page), M (benchmarks) | EDGE-5 | Which claims the user guides make |
+| 6 | **Long reverbs at low CPU, with lower and finer latency.** First measure long reverbs (10, 30 and 60 s; stereo and true stereo; 48 and 96 kHz) in PERF-3. Then, in PERF-2: non-uniform partitions (short blocks at the start for latency, ever longer blocks for the tail); spreading the long blocks' work evenly over callbacks, or onto a worker thread without locks, so no callback spikes; and a replacement that crossfades the start of the filter rather than running two whole engines. Latency can then be any value the partitions allow, not only a power of two, down to zero with a direct (time-domain) head. | Every block of a filter is processed on every callback: at 256 frames, a 30 s filter at 48 kHz is about 5,600 blocks, about 1.4 million complex multiply-adds and 12 MB of filter spectra per path per callback, and the multiply-accumulate dominates (the FFTs are a few per cent of the work). With a 30 s filter the longest 512-frame callbacks took 8–12 ms of a 10.7 ms period on a cloud machine (PERF-15), and a replacement misses its budget. Latency is a power of two from 64 to 4096 frames in VST3 and the Audio Unit (LV2 stays at 256); Reverberate 2 offers zero, Space Designer 128 samples. Published comparisons put non-uniform partitions about an order of magnitude ahead of uniform ones for filters this long; PERF-3 checks that on our machines first. | L | PERF-3, then PERF-2 | Whether "zero" means zero samples or one small block; whether a worker thread is acceptable |
+| 7 | **Reverb file layouts without a `.cfg`.** Mono on stereo, true stereo as one four-channel file or two stereo files. | A sound file filters channel by channel only; true stereo needs a hand-written `.cfg`. Reverb responses are commonly distributed in these layouts. | S–M | EDGE-3 | The channel order assumed for four-channel files, and how the layout is chosen |
 | 8 | **A reverb's pre-delay, start, length and fades**, computed when the filter loads, not on the audio thread. | Every reverb above has them; Convolver has delays in `.cfg` only. | M | EDGE-6 | Parameter IDs and how they are saved |
 | 9 | **Decay and damping.** Shorten or lengthen the decay, per band, by reshaping the response when it loads. | Altiverb (decay, three-band damping) and Reverberate (re-decay, contour) have it. | L | EDGE-7 | Whether to do it at all, after EDGE-6 is used |
 | 10 | **Immersive layouts beyond 8 channels** (7.1.4, 9.1.6, 16 × 16). | Plug-ins stop at 8 × 8 ([channel layouts](../../develop/plugin-identities.md#channel-layouts): VST3 buses up to 8 channels, revisit on request, and LV2's eight fixed layouts); Altiverb XL reaches 9.1.6 and X-MCFX 128 × 128. | M–L | EDGE-8 | New layouts and identities in every format |
@@ -133,11 +137,11 @@ Two edges already have open items and need no new one: a window that a
 screen reader can use (VoiceOver, in VST3-11 and AU-6), which most
 custom-drawn plug-in windows lack; and CLAP (HOST-2), on request.
 
-Measured performance comes first for rank 1: PERF-3's measurements decide
+Measured performance comes first for rank 6: PERF-3's measurements decide
 the partition sizes, and the result must pass the same oracle tests at every
 partition boundary, with the worst error reported, and keep everything
-`.cfg` defines (routing, delays, tail, reset). Ranks 2, 5 and 6 are mostly
-control-side work and keep the engine as it is; rank 3 changes only the
+`.cfg` defines (routing, delays, tail, reset). Ranks 1, 3 and 4 are mostly
+control-side work and keep the engine as it is; rank 2 changes only the
 filter that is prepared.
 
 ## Not pursued
@@ -187,9 +191,9 @@ Every EDGE item, and PERF-2, keeps these; a change that cannot is not done.
 1. **Which plug-ins does the goal mean?** Answered: the reverbs that play
    impulse responses and the room-correction convolvers, leaving algorithmic
    reverb out ([decisions](../decisions.md#direction)).
-2. **Adopt this order?** The ranking puts long reverbs and latency (rank 1)
-   and the room-correction gains (ranks 2 to 4) before reverb shaping (ranks
-   8, 9). It also weighs the standing direction to favour stability and
+2. **Adopt this order?** The ranking puts the easy room-correction wins
+   (ranks 1 to 5) first, as jrp asked, then long reverbs and latency (rank
+   6), then the reverb features (ranks 7 to 10). It also weighs the standing direction to favour stability and
    longevity over features ([decisions](../decisions.md#direction)): each
    item keeps the [non-negotiables](#non-negotiables), and the reverb-shaping
    items wait for users to ask.
