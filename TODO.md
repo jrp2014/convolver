@@ -69,7 +69,7 @@ boundary and C++20 in the core.
 | On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **PERF-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
 
 The CFG-1, GAIN-3, IO-1, IO-2 and ROBUST-1 items
-remain open supporting work (GAIN-3 decided by jrp on 6 November 2026); take them up when a reproducible defect or the milestone
+remain open supporting work; take them up when a reproducible defect or the milestone
 needs them. This table owns the current ordering; the dated
 [21 October review order](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#recommended-order)
 is superseded.
@@ -124,7 +124,7 @@ is superseded.
   The REAPER smoke test also takes over the host steps that REL-5 left out:
   install, render, save and reopen, and presets that do not fit, in
   [check a stereo filter in a host](docs/use/check-a-stereo-filter.md),
-  and, as jrp decided on 6 November 2026, the 2→6 crossover journey
+  and the 2→6 crossover journey
   ([check a crossover in a host](docs/use/check-a-crossover-in-a-host.md)),
   from the same candidate package: the record names the package, platform,
   host version, routing, the rendered comparison and the save-and-reopen
@@ -594,8 +594,8 @@ means a patched FFmpeg build with `--enable-gpl`.
   [publication steps](docs/develop/releasing.md#publishing-an-unsigned-preview)
   when this is implemented. The four guarantees it protects are listed in
   [status](docs/project/status.md#compatibility-guarantees).
-- [ ] **GAIN-3 — `no-clip` reserves the integer headroom.** jrp's answer on
-  PR #118 (6 November 2026): `--gain-db no-clip` lowers its gain by the
+- [ ] **GAIN-3 — `no-clip` reserves the integer headroom.** As
+  [decided](docs/project/decisions.md#configuration-and-sound), `--gain-db no-clip` lowers its gain by the
   headroom the chosen integer format, dither and noise shaping need (the
   bound H in [gain](docs/use/command-line.md#gain-and-attenuation), GAIN-1),
   allowing for float rounding too, so integer output never clips on input
