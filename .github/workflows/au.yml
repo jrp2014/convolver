@@ -195,12 +195,12 @@ jobs:
             echo "::warning title=pluginval pre-release::$1"
             echo "**Warning:** $1" >> "$GITHUB_STEP_SUMMARY"
           }
-          options=()
-          if [ "${VERSION%%.*}" -ge 2 ]; then options+=(--rtcheck relaxed); fi
           component="$HOME/Library/Audio/Plug-Ins/Components/Convolver.component"
           if [ "$FETCHED" != success ]; then
             advise 'Cannot fetch the newest pluginval pre-release; see the log of the step before.'
           elif [ "$AVAILABLE" = true ]; then
+            options=()
+            if [ "${VERSION%%.*}" -ge 2 ]; then options+=(--rtcheck relaxed); fi
             if python tests/plugins/pluginval.py validate "$PLUGINVAL" "$component" "${options[@]}"; then
               echo "pluginval $VERSION (pre-release) passes the Audio Unit, as $RELEASE does." \
                 >> "$GITHUB_STEP_SUMMARY"
