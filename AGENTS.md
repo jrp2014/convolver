@@ -51,8 +51,12 @@ point to sections of `docs/develop/workflow.md`, which holds the procedures.
 
 ## Build and test
 
-Use the sanitizer build for every change (all builds, presets and plug-in SDKs
-are in `docs/develop/build.md`):
+Verify in proportion to the change: the
+[verification table](docs/develop/workflow.md#verification-for-each-kind-of-change)
+says what prose, executable examples, tooling, code, DSP and plug-in changes
+each need. A prose-only change needs `pre-commit run --all-files`, not a native
+build. Any change to C++, CMake or a test CTest runs uses the sanitizer build
+(all builds, presets and plug-in SDKs are in `docs/develop/build.md`):
 
 ```sh
 cmake -S . -B build -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug -DCONVOLVER_SANITIZERS=ON
@@ -81,8 +85,8 @@ plus Ooura configurations described in [testing](docs/develop/testing.md).
   `python3 scripts/check_format.py --fix`), formats and lints the Python
   with ruff (`ruff.toml`) and runs the other lint checks;
   lint CI fails on any difference. Cloud sessions install it as a Git hook.
-  Portable sources must also pass the `.clang-tidy` checks (commands in
-  `CONTRIBUTING.md`).
+  Changed portable C++ sources must also pass the `.clang-tidy` checks
+  (commands in `CONTRIBUTING.md`).
 - `python3 scripts/check_repository.py` must pass (pre-commit runs it; the
   list of checks is in the [workflow guide](docs/develop/workflow.md#automated-checks)).
 - Do not claim something builds or passes unless you ran it.
