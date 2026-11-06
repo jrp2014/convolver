@@ -1126,6 +1126,8 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **DOC-7 — Archive finished entries and remove cruft.** 6 November 2026,
   PR #123, on jrp's request; [recording
   progress](docs/develop/workflow.md#recording-progress-in-todo).
+- [x] **DOC-8 — Tune the agent guidance and workflow.** 6 November 2026,
+  PR #129, from jrp's review; [workflow](docs/develop/workflow.md#kinds-of-task).
 - [x] **FFMPEG-1 — Test the pipe workflow.** 5 November 2026;
   [tests](docs/develop/testing.md#native-production-tests).
 - [x] **FFT-1 — Check that we have the latest Ooura version.** 21 October 2026;
