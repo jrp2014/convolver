@@ -50,9 +50,20 @@ Follow `docs/develop/workflow.md`. In short:
   **independent review** by someone who did not write the change.
 - jrp merges. Never merge, approve, push to `main` or move tags.
 
-Claude Code sessions have two repository skills, `todo-item` (start, resume or
-hand over an item) and `review-change` (the independent review). Both only
-point to sections of `docs/develop/workflow.md`, which holds the procedures.
+The procedures, for any agent, are these sections of the workflow guide.
+Claude Code sessions reach the same sections through two repository skills,
+`todo-item` (start, resume, hand over or finish an item) and `review-change`
+(the independent review), which only link to them; the link check covers
+`.claude/skills/`, so a renamed section fails in pre-commit.
+
+| Task | Section |
+| --- | --- |
+| Decide whether this is a review, host testing or a change | [Kinds of task](docs/develop/workflow.md#kinds-of-task) |
+| Start an item | [Before you start](docs/develop/workflow.md#before-you-start), then [while working](docs/develop/workflow.md#while-working) |
+| Continue someone else's branch | [Picking up someone else's work](docs/develop/workflow.md#picking-up-someone-elses-work) |
+| Stop or hand over | [Handoff note](docs/develop/workflow.md#handoff-note) |
+| Finish | [Verification](docs/develop/workflow.md#verification-for-each-kind-of-change), [definition of done](docs/develop/workflow.md#definition-of-done) |
+| Review a change | [Independent review](docs/develop/workflow.md#independent-review) |
 
 ## Build and test
 

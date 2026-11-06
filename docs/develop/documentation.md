@@ -107,8 +107,9 @@ can act on it without a separate copy of the rules:
 - Keep anchors stable; skills and `AGENTS.md` link to sections by anchor.
 - Put every rule on exactly one page. `AGENTS.md` lists the rules that apply
   everywhere and links to the rest; a repository skill in `.claude/skills/`
-  only says when it applies and which section to follow. If a skill needs
-  more than that, the missing text belongs on the page.
+  only says when it applies and links to the section to follow, by anchor,
+  so the [link check](#automated-checks) catches a renamed section. If a
+  skill needs more than that, the missing text belongs on the page.
 
 ## One home for each topic
 
@@ -203,7 +204,8 @@ our vendored copy is current.
 The pre-commit configuration used by lint CI (which also checks C++ formatting) runs
 [`check_doc_links.py`](../../scripts/check_doc_links.py) and its
 [regression tests](../../tests/documentation_links_tests.py). The checker scans
-top-level `.md` files and Markdown under `docs/`, excluding `archive/`,
+top-level `.md` files, the repository skills under `.claude/skills/` and
+Markdown under `docs/`, excluding `archive/`,
 `historical/` and `review-2026-10/` as source pages. Open plans in `project/plans/` are
 checked like maintained guides. Links to the excluded
 records are still checked. This keeps preserved evidence separate from maintained
