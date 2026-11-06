@@ -24,8 +24,8 @@ then takes up one of the EDGE items.
   reads jrp's goal as the reverbs that play impulse responses (Altiverb,
   LiquidSonics Reverberate and Seventh Heaven, Logic's Space Designer, Waves
   IR) and the convolvers Convolver's room-correction users choose between
-  (Hang Loose Convolver, CamillaDSP, X-MCFX). jrp is [asked](#decisions-for-jrp)
-  whether that reading is right.
+  (Hang Loose Convolver, CamillaDSP, X-MCFX), leaving algorithmic reverb
+  out, as jrp [chose](../decisions.md#direction).
 - **Where Convolver can lead.** Not in libraries of sampled spaces or in
   algorithmic sound design, nor in precision beyond what can be heard, but
   in long reverbs at low CPU and low latency, output that is correct and
@@ -184,10 +184,9 @@ Every EDGE item, and PERF-2, keeps these; a change that cannot is not done.
 
 ## Decisions for jrp
 
-1. **Which plug-ins does the goal mean?** This plan reads "the most popular
-   reverb plug-ins" as the reverbs that play impulse responses and the
-   room-correction convolvers, and leaves algorithmic reverb out (see
-   [not pursued](#not-pursued)). Is that right?
+1. **Which plug-ins does the goal mean?** Answered: the reverbs that play
+   impulse responses and the room-correction convolvers, leaving algorithmic
+   reverb out ([decisions](../decisions.md#direction)).
 2. **Adopt this order?** The ranking puts long reverbs and latency (rank 1)
    and the room-correction gains (ranks 2 to 4) before reverb shaping (ranks
    8, 9). It also weighs the standing direction to favour stability and
