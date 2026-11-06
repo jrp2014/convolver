@@ -388,8 +388,8 @@ From the top, the window has:
   automation from it may record each step separately; not yet tried in
   GarageBand.
 - **Latency**: a menu of block sizes, with the delay it adds at the host's
-  rate beside it; a new choice plays at once, and "not in use yet" shows
-  only until it does ([settings](#settings)).
+  rate beside it. A new choice plays once the plug-in restarts with it,
+  and until then the row says it is "not in use yet" ([settings](#settings)).
 - **Audio**: what plays, in plain words, with the technical term in
   brackets. Hold the pointer over a line for what it means.
 
@@ -471,8 +471,8 @@ defaults play exactly as Convolver did before the settings existed.
   The same project can therefore sound different in another format.
 - **VST3 hosts** mark Mix as the plug-in's dry/wet control where they have
   one. A new Latency asks the host to restart the plug-in; until it does,
-  the old Latency plays. REAPER 7.85 did so only when the project was
-  reopened ([unresolved](../develop/host-testing.md#unresolved-host-findings)). A
+  the old Latency plays. REAPER 7.85 restarts it only when the project is
+  reopened ([REAPER findings](../develop/host-testing.md#unresolved-host-findings)). A
   project saved at the default settings is saved exactly as before the
   settings existed, so older Convolver builds still open it; one saved with
   other settings needs a Convolver with these settings, and an older build refuses

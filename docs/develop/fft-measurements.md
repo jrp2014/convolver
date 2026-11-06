@@ -3,6 +3,17 @@
 
 [Documentation index](../README.md) · [FFT guide](fft-backends.md)
 
+**In short:**
+
+- These are dated records, each with its machine, build, workload and raw
+  data; they explain the choices in the [FFT guide](fft-backends.md), which
+  states the conclusions.
+- For long filters nearly all the time is the per-partition
+  multiply-accumulate, so FFT libraries and their tuning matter little there;
+  SIMD (NEON, AVX2) and `-O3` matter most.
+- Measure again on the target machine before a speed claim
+  ([reproduce](#reproduce)).
+
 Dated measurements behind the choices in the [FFT guide](fft-backends.md):
 FFT libraries, FFTW builds and planning, spectrum layout, shared transforms,
 overlap-add against overlap-save, compiler flags and the AVX2 kernels, and the
@@ -23,8 +34,9 @@ Contents: [processing benchmark](#processing-benchmark) ·
 
 ## Processing benchmark
 
-The following is the 18 October Apple FFTW/Accelerate measurement record.
-Later engine changes and other machines require new measurements.
+The following is the 18 October Apple FFTW/Accelerate measurement record,
+measured on an M5 Max, 128 GiB RAM, macOS 27.0.1 (26A434). Later engine
+changes and other machines require new measurements.
 
 This measures the full in-memory Engine processing loop, including routing,
 partition accumulation and FFT layout conversion. It excludes file I/O, CLI

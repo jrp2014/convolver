@@ -869,7 +869,7 @@ PERF-9 (done, PR #111) built that test on interim workloads, with jrp's
 limits (5 November 2026): in optimised builds, no late callback and none
 over half its period while a load runs on another thread, and the host's
 thread held at most 100 ms with filters up to 10 s and 250 ms with 30 s
-([load timing](docs/develop/testing.md#load-timing-perf-9)).
+([load timing](docs/develop/load-timing.md)).
 
 **Preview workloads.** The gate is finite: its workloads are the ones that
 test already runs, a stereo 48 kHz filter of 1, 10 and 30 s with 512-frame

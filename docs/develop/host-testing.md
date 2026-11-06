@@ -18,6 +18,7 @@ Contents: [first hosts](#first-hosts) · [hosts in CI](#hosts-in-ci) ·
 [Steinberg's SDK hosts](#steinbergs-sdk-hosts) · [every report](#every-report) ·
 [smoke test](#smoke-test-for-an-unsigned-preview) ·
 [smoke test in each first host](#smoke-test-in-each-first-host) ·
+[unresolved host findings](#unresolved-host-findings) ·
 [production qualification](#production-qualification) ·
 [Equalizer APO on a real device](#equalizer-apo-on-a-real-device)
 

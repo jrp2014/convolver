@@ -194,9 +194,9 @@ Until 1.0 the C++ API may change between minor versions.
   two open findings (a new VST3 Latency not used until the project is
   reopened; no REAPER route for the 2→6 crossover) are listed in
   [host testing](docs/develop/host-testing.md#unresolved-host-findings)
-  instead of the guides promising those results. Merged branches are deleted
-  by GitHub's *Automatically delete head branches* setting, which the workflow
-  guide now names.
+  instead of the guides promising those results. The workflow guide names
+  GitHub's *Automatically delete head branches* setting for removing merged
+  branches, and says leftovers go on a list for jrp.
 - Documentation (DOC-7): finished items in [TODO](TODO.md#done) are one line
   each again, as the workflow guide asks: ID, title, date, pull request and
   the page that describes the result. Their earlier full entries, with the

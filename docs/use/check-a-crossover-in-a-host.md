@@ -20,7 +20,7 @@ preset for another rate or channel count must leave it playing.
 been followed in a host from start to finish. How a host gives an effect more
 outputs than inputs differs most between hosts, so the routing steps below
 are the most likely to differ from what you see. In the one REAPER session so
-far (REAPER 7.85 on macOS, 6 November 2026) they did not work: REAPER gave the
+far (REAPER 7.85 on macOS) they did not work: REAPER gave the
 VST3 plug-in 6 inputs and 6 outputs, so the crossover preset was refused
 ([details](../develop/host-testing.md#unresolved-host-findings)). The
 [status page](../project/status.md) says what is ready.

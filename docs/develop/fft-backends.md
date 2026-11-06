@@ -210,7 +210,8 @@ On an M5 Max on 18 October 2026, FFTW built with NEON and Accelerate were
 close for most workloads: FFTW took 13–19% less time for 65,536-tap filters
 at B = 256 and was 1.8 times faster at B = 192, where Accelerate pads to a
 power of two, while Accelerate was up to 7% faster in some 4096-tap cases and
-prepared filters several times faster
+prepared filters faster (9–10 times for the shortest filters, 1.2–2.7 times
+for 65,536-tap ones)
 ([measurements](fft-measurements.md#processing-benchmark)).
 
 #### FFTW implementation and planning comparisons
@@ -230,8 +231,9 @@ ESTIMATE in several workloads
 
 On x86-64 (18 October 2026), FFTW's SIMD codelets matter most: an AVX2 build
 is 2–4 times faster than scalar FFTW, and FFTW picks the instruction set at
-run time. MEASURE plans add 1.2–1.8 times on the FFT; PATIENT, AVX-512,
-`FFTW_DESTROY_INPUT` and FFTW's split-format plans add nothing. vcpkg's
+run time. MEASURE plans add 1.2–1.8 times on the FFT. PATIENT and
+`FFTW_DESTROY_INPUT` add nothing, AVX-512 about 10% (not worth a custom
+build), and FFTW's split-format plans were about 2 times slower. vcpkg's
 `fftw3` has no SIMD unless features are requested, so Windows CI asks for
 `fftw3[core,sse2,avx,avx2]`. The engine stores each partition's spectra
 split (all real parts, then all imaginary parts), which made the
@@ -277,7 +279,7 @@ Measured on x86-64 in October 2026 (PERF-4,
 - Keep `-O3`: GCC at `-O2` (the `RelWithDebInfo` default) is 1.8 times
   slower. Release builds and packages must stay `Release`.
 - Only the vector width matters: AVX2 makes the multiply-accumulate 1.3–1.4
-  times faster. AVX-512 adds nothing. LTO, PGO, unrolling and
+  times faster. AVX-512 adds nothing with Clang and loses the gain with GCC. LTO, PGO, unrolling and
   `-fno-math-errno` are within noise.
 - `-ffast-math` is unsafe: it lets the compiler remove `std::isfinite`, so
   non-finite input, filters and state are accepted.
@@ -333,7 +335,7 @@ workloads ([speed](fft-measurements.md#speed)).
 
 Since PERF-5 a new, reset or replaced filter skips the partitions that would
 meet the silence before its first block, so the average callback cost while
-the history refills about halves, and `reset()` takes microseconds. Steady
+the history refills about halves, and `reset()` takes about 4–13 µs instead of about 150 µs. Steady
 processing is unchanged. Since PERF-6 a filter whose paths name channels of
 one file opens and decodes it once
 ([measurements](fft-measurements.md#startup-reset-and-filter-loading)).

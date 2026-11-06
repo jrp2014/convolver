@@ -3,6 +3,16 @@
 
 [Documentation index](../README.md) · [Testing](testing.md#load-timing-perf-9)
 
+**In short:**
+
+- A thread plays audio in real time while the test loads, replaces and
+  resets 1, 10 and 30 second filters through each format's own entry points.
+- Limits (jrp, 5 November 2026): no callback late or over half its period
+  while a load runs elsewhere; a load holds the host's thread at most 100 ms
+  (filters up to 10 s) or 250 ms (30 s).
+- Only optimised builds without sanitizers are judged. A run whose timing
+  cannot be qualified is skipped in CTest, never passed.
+
 How the `vst3.load_timing`, `au.load_timing` and `lv2.load_timing` tests
 measure loading, the limits jrp set, how each run gets its verdict and what
 the records hold. Read it when one of these tests fails, is skipped or needs

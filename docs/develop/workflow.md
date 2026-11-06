@@ -29,15 +29,16 @@ Contents: [kinds of task](#kinds-of-task) ·
 
 ## Kinds of task
 
-Decide first which kind of task you have been given. Only the third changes
-the repository.
+Decide first which kind of task you have been given. Only a change alters the
+repository; recording a review's or a host test's results in it is a change.
 
 - **A review** of a pull request, a branch, a page or the repository is
   read-only. Read the files, and build and run tests in a scratch build
   folder if that helps, but change no tracked file, create no branch or
-  commit, and post nothing on GitHub. Give the findings to whoever asked, in
-  the conversation. Only the [independent review](#independent-review) of an
-  open pull request is posted on that pull request ([report](#report)).
+  commit, and post nothing on GitHub unless the person asks. Give the
+  findings to whoever asked, in the conversation. The
+  [independent review](#independent-review) of an open pull request is the
+  exception: it is posted on that pull request ([report](#report)).
   Fixing the findings is a change, started only when the person asks for it.
 - **Local host testing** is steps jrp runs in a host on his own computer.
   Write the steps, then record what jrp reports as dated evidence where the
@@ -152,11 +153,11 @@ the pull request which rows you followed and what you ran.
 
 | What changed | Run before pushing | Not needed |
 | --- | --- | --- |
-| **Prose:** Markdown no test reads (most of `docs/develop/`, `docs/project/`, `TODO.md`, `CHANGELOG.md`, `AGENTS.md`, `.claude/skills/`) | `pre-commit run --all-files`: Markdown lint, links and anchors, the repository rules | A native build, CTest or clang-tidy; CI runs only Lint ([documentation-only pull requests](testing.md#documentation-only-pull-requests)) |
+| **Prose:** Markdown whose commands no test runs (most of `docs/develop/`, `docs/project/`, `TODO.md`, `CHANGELOG.md`, `AGENTS.md`, `.claude/skills/`, and pages in `docs/use/` whose marked commands did not change) | `pre-commit run --all-files`: Markdown lint, links and anchors, the repository rules | A native build, CTest or clang-tidy. CI runs only Lint, and for `docs/use/`, which the packages ship, the candidate workflow too ([documentation-only pull requests](testing.md#documentation-only-pull-requests)) |
 | **Executable examples:** `README.md`, `examples/first-use/README.md` and `docs/use/first-filter.md` (`examples.first_use` runs their commands), or a command marked `<!-- executable-example -->` or `<!-- refused-example -->` in `docs/use/` | An [everyday build](build.md#everyday-build) and `ctest --test-dir build -R '^examples\.first_use$' --output-on-failure`; run each changed marked command with that build's `convolver` and check its output against the page (the [candidate workflow](testing.md#plug-in-candidate-checks) runs them from a package) | The sanitizer build and clang-tidy, unless code changed too |
 | **Tooling:** Python under `scripts/` or `tests/` that CTest does not run, `.pre-commit-config.yaml`, `.github/`, `.claude/hooks/` | pre-commit (ruff, actionlint, and the checkers' own tests); the script's own tests, such as `python3 tests/repository_checks_tests.py`; for a workflow, the CI run on the draft pull request | A native build, unless the script is run by CTest or builds something |
 | **Code:** C++, CMake, or a test CTest runs, outside the DSP path (CLI, I/O, configuration, presets, host lifecycle) | The [sanitizer build](build.md#sanitizer-build-for-changes) with the full CTest configuration; clang-tidy on the changed portable sources ([CONTRIBUTING](../../CONTRIBUTING.md#formatting-and-analysis)); the focused tests in the [change and test map](architecture.md#change-and-test-map) | |
-| **DSP:** convolution, routes, delays, FFT backends, kernels, dither | As for code, and report the worst error of the direct double-precision oracle tests in `tests/native/engine_tests.cpp`; measure any speed claim in a separate Release build ([FFT guide](fft-backends.md)) | |
+| **DSP:** convolution, routes, delays, FFT backends, kernels, dither | As for code, and report the worst error of the direct double-precision oracle tests in `tests/native/engine_tests.cpp`; measure any speed claim in a separate Release build ([how to measure](fft-measurements.md#reproduce)) | |
 | **Plug-in adapter or window:** `plugins/`, or shared host code they call | As for code, configured with the format's SDK; the format's validator, its [PLUG-2 comparisons](testing.md#plug-in-comparisons-plug-2) and [pluginval](testing.md#pluginval) where they apply. What only macOS builds (the window, the Audio Unit) runs in CI if you have no Mac; say so | Host steps, unless the change is about behaviour only a host shows ([host testing](host-testing.md)) |
 | **Versioning:** `VERSION`, `SOURCE_PATHS`, the version workflow | `python3 tests/versioning_tests.py` ([source versioning](versioning.md)) | Running the version helper, which commits and tags |
 
@@ -279,11 +280,11 @@ approve or merge; jrp does that.
   is reported in the pull request, not ignored.
 - After a merge, the version workflow bumps `VERSION` and tags `main`
   ([source versioning](versioning.md)).
-- GitHub deletes a pull request's branch when it is merged (the repository's
-  *Automatically delete head branches* setting, under *Settings › General ›
-  Pull Requests*). Cloud agent sessions cannot delete branches; a branch the
-  setting missed, whose commits are all in `main` and which has no open pull
-  request, goes on a list for jrp to delete. Further work after a merge starts
+- A merged pull request's branch is deleted by GitHub's *Automatically
+  delete head branches* setting (*Settings › General › Pull Requests*) once
+  jrp turns it on; it was still off on 6 November 2026. Cloud agent sessions
+  cannot delete branches, so a merged branch that is left over (its work all
+  in `main`, no open pull request) goes on a list for jrp to delete. Further work after a merge starts
   again from current `main`, even on a branch of the same name; a merged
   pull request is never reused.
 
