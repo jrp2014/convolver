@@ -196,7 +196,10 @@ a rate and channel layout the filter suits. It does not follow the host's
 transport: a paused or stopped project still reads Active, as the filter is
 ready to play the moment audio arrives. **Bypassed** shows while the host's
 bypass (or, in VST3, the window's Bypass checkbox) is on and a filter is
-loaded; a problem (Load failed, Fault) still shows first.
+loaded; a problem (Load failed, Fault) still shows first. A host that
+switches the effect off altogether, rather than bypassing it, may route the
+audio around Convolver and stop calling it, so the status can stay as it
+was; what you hear then is the host's doing.
 
 The text also follows the [settings](#settings) when no filter
 is heard. With no filter loaded and Gain or Mix changed, it reads, for
