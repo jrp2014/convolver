@@ -787,9 +787,13 @@ so the preset file path is not needed).
   extra cost at zero latency, worst 64-frame callback near 0.2 ms, oracle
   worst −131 dB; a worker thread did not help
   ([measurements](docs/develop/fft-measurements.md#long-reverbs-and-zero-latency)).
-  Next, after jrp's decisions in the plan's rank 3: move the spread
-  non-uniform scheme into `Engine`, keeping routing, delays, tail, reset and
-  shared forward transforms.
+  Decided (jrp, 7 November 2026): a working release comes first; after it,
+  move the spread non-uniform scheme into `Engine`, keeping routing,
+  delays, tail, reset and shared forward transforms, with block sizes tuned
+  on each platform. Zero latency then becomes the plug-ins' default, the
+  Latency setting stays and shows the CPU a larger value saves, and a new
+  filter still plays as soon as possible (the plan's
+  [rank 3](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#3-long-reverbs-at-low-cpu-and-latency)).
 - [ ] **PERF-3 — Resource budgets and supported workloads.** Measure, on
   named machines, the distribution of callback durations (median, 99th
   percentile, 99.9th percentile and maximum, not only the average), memory in
@@ -1143,15 +1147,16 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   what a replacement with a different delay does, since the latency is
   fixed for a processor's life. Effort S to M.
 - [ ] **EDGE-14 — Match the loudness of a reverb response, as an option.**
-  Done when a Level setting offers "As designed" and "Match loudness" (the
-  wet signal's K-weighted loudness for pink noise matched to the dry
-  signal, computed when the filter loads and applied as one fixed gain); a
-  `.cfg` configuration always plays as designed; the gain is the same at
-  every sample rate for the same response; and the Status warns when a
-  filter plays more than 12 dB louder than its input at 100% Mix. Evidence
-  and the methods compared: the plan's [automatic gain](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#automatic-gain).
-  Needs jrp's decision on offering it, its default, its parameter ID and
-  how it is saved. Effort S to M.
+  Done when a "Match loudness" checkbox, off by default (jrp, 7 November
+  2026), matches the wet signal's K-weighted loudness for pink noise to the
+  dry signal, computed when the filter loads and applied as one fixed gain;
+  off plays every filter as designed, as today; a `.cfg` configuration
+  always plays as designed; and the gain is the same at every sample rate
+  for the same response. Evidence and the methods compared: the plan's
+  [automatic gain](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#automatic-gain).
+  Still needs jrp's decision on its parameter ID, how it is saved, and the
+  proposed Status warning when a filter plays more than 12 dB louder than
+  its input at 100% Mix. Effort S to M.
 
 ## Developer tooling
 

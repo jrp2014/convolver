@@ -326,20 +326,28 @@ LSP and zita-convolver each do, and no algorithm beyond partitioned
 convolution beats it with exact output; block sizes still need tuning on
 each platform ([review](#other-convolvers-and-algorithms)).
 
-**Recommendation for usability.** Make zero latency the plug-ins' default
-once this engine is in, as reverb users expect (KlangFalter and REEV-R are
-zero-latency, and Reverberate offers zero): no delay to compensate, nothing for Mix to
-align, and live monitoring works. Keep larger Latency values only as a
-compatibility choice; they no longer save meaningful CPU. When a filter is
-replaced, warm the new engine with the recent input on the preparation
-thread before the crossfade (as REEV-R does, though on its audio thread),
-so a long reverb's tail does not drop out.
+**Decided (jrp, 7 November 2026).** "I want to get to a working release
+before revising the core algorithm": the experiment and these findings stay
+in a draft pull request, and the engine is to adopt the new design after
+the release, not before. Once it does:
 
-**jrp decides first.** Zero latency as the default, and what the Latency
-setting keeps; adopting non-uniform partitions in the engine (a DSP change
-under the non-negotiables, with the oracle at every partition boundary);
-what happens to the old tail on replacement (warm the new engine, or let
-the old one ring out).
+- **Zero latency is the plug-ins' default**, as reverb users expect
+  (KlangFalter, REEV-R, WDL and LSP are zero-latency, and Reverberate
+  offers zero): no delay to compensate, nothing for Mix to align, and live
+  monitoring works. The Latency setting stays ("Users will want control"),
+  and shows what a larger value saves (jrp: "with an indication to the user
+  of any gain from moving away from it"), as a figure measured for the
+  loaded filter or a measured range, never an unmeasured claim.
+- **A new filter plays as soon as possible**, as it does today (a short
+  crossfade from the old filter, whose tail is faded, not left to ring
+  out): jrp expects a load to take effect at once. Letting the old tail
+  ring out ("spillover" on guitar and live-sound processors, for preset
+  changes between songs) and warming the new filter with recent input
+  (REEV-R) are not pursued: jrp expects few users to switch filters often,
+  and room correction, Convolver's first use, wants the new filter at once.
+- The change is a DSP change under the
+  [non-negotiables](#non-negotiables), with the oracle at every partition
+  boundary and the block sizes tuned on each platform.
 
 ### 4. Reverb file layouts without a `.cfg`
 
@@ -543,15 +551,15 @@ filters ([output](../../benchmarks/2026-11-07-auto-gain.txt)):
   can push the response above 0 dB, so it would clip.
 - **Peak normalisation does not help**: it leaves the spread unchanged.
 
-**Proposal (EDGE-14).** A Level setting with two values: "As designed"
-(today's behaviour, and always for a `.cfg` configuration) and "Match
-loudness" (K-weighted loudness of the wet signal matched to the dry signal,
-computed when the filter loads, then a fixed gain). The default needs
-jrp's decision: "As designed" keeps every existing project and room
-correction unchanged; "Match loudness" is what reverb users expect. Either
-way, a Status warning when a loaded filter plays more than 12 dB louder
-than its input at 100% Mix, offering "Match loudness" or Gain, removes the
-loud surprise without changing anyone's sound.
+**Decided (EDGE-14, jrp, 7 November 2026).** A "Match loudness" checkbox,
+off by default ("You can add a match loudness checkbox, but leave it off";
+"Users will want control"). Off is today's behaviour, and a `.cfg`
+configuration always plays as designed. On, the wet signal's K-weighted
+loudness is matched to the dry signal, computed when the filter loads and
+applied as one fixed gain. Proposed with it, for jrp to confirm when
+EDGE-14 starts: a Status warning when a loaded filter plays more than
+12 dB louder than its input at 100% Mix, pointing to the checkbox or Gain,
+which removes the loud surprise without changing anyone's sound.
 
 ## Other convolvers and algorithms
 
@@ -750,12 +758,14 @@ Every EDGE item, and PERF-2, keeps these; a change that cannot is not done.
    [experiments table](#sound-aware-and-platform-aware-optimisation) are
    proposals, to be confirmed or changed before the measurements.
 5. Each item's own question, listed in its section above, when it starts.
-6. **Long reverbs and zero latency** (7 November 2026 experiment, [rank
-   3](#3-long-reverbs-at-low-cpu-and-latency)): adopt non-uniform
-   partitions with the spread schedule; zero latency as the default; warm a
-   replacement with recent input.
-7. **Automatic gain** ([EDGE-14](#automatic-gain)): whether to offer
-   "Match loudness", its default, and the loud-filter warning.
+6. **Long reverbs and zero latency.** Decided on 7 November 2026 ([rank
+   3](#3-long-reverbs-at-low-cpu-and-latency)): a working release first;
+   then the engine adopts non-uniform partitions with the spread schedule,
+   zero latency becomes the default with the saving of a larger Latency
+   shown, and a new filter keeps playing as soon as possible.
+7. **Automatic gain.** Decided on 7 November 2026 ([EDGE-14](#automatic-gain)):
+   a "Match loudness" checkbox, off by default. Open: the loud-filter
+   warning, when EDGE-14 starts.
 
 ## Sources
 
