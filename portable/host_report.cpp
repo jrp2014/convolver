@@ -90,7 +90,8 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         auto a = failure_message(*failure);
         a.problem = short_problem(std::move(a.problem), *failure);
         take(a);
-        m.plays = failure_consequence(*failure, layout, facts.settings);
+        m.plays = failure_consequence(*failure, layout, facts.settings,
+                                      layout && dry_signal(filter, *layout));
         if (chosen_away(failure->kind))
             m.action = choose;
         // Faults the load failure hides from the status.
@@ -268,6 +269,10 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
                                          : std::string("the refused file has ")) +
                         ports(failure->inputs, failure->outputs);
         channels.problem = true;
+    } else if (c && host) {
+        // PLUG-23: a host that gives more inputs than the filter reads.
+        if (const auto ignored = ignored_inputs(*c, *host); !ignored.empty())
+            channels.note = "(" + ignored + " ignored)";
     }
     audio.push_back(std::move(channels));
 
@@ -438,9 +443,16 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
 
     r.audio = audio_facts(filter, facts);
     const auto& host = facts.host;
-    const bool equal =
-        host ? host->inputs == host->outputs : !c || c->input_channels == c->output_channels;
-    r.settings = settings_words(facts.settings, equal);
+    // Before the host starts the instance only the filter's counts are known.
+    const auto dry = host ? dry_signal_rule(filter, *host)
+                     : !c || c->input_channels == c->output_channels ? HostDrySignal::present
+                                                                     : HostDrySignal::filter_counts;
+    r.settings = settings_words(facts.settings, dry);
+    if (dry != HostDrySignal::present) { // PLUG-23 (dry_signal_rule()).
+        r.mix_note = std::string(no_dry_reason(dry)) +
+                     ", so there is no dry signal: Mix has no effect, and bypass plays silence.";
+        r.mix_note[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(r.mix_note[0])));
+    }
     r.sample_rate = host ? host->sample_rate : 0;
     r.latency_waits = latency_waits(facts);
 
@@ -515,6 +527,7 @@ std::vector<std::pair<std::string, std::string>> report_fields(const HostReport&
             {"filter files", files},
             {"sample rate", r.sample_rate ? std::to_string(r.sample_rate) : std::string()},
             {"latency waits", r.latency_waits ? "yes" : "no"},
+            {"mix note", r.mix_note},
             {"audio", audio},
             {"reference", reference},
             {"log path", r.log_path},

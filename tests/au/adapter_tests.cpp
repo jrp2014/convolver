@@ -912,11 +912,18 @@ void latency_parameter() {
         return eventually([&] { return u.seconds(kAudioUnitProperty_Latency) == frames / 48000; });
     };
     // The unit's Latency queue applies a choice: uninitialized, the reported latency
-    // follows it, and the host is told once.
+    // follows it, and the host is told once. The choices above woke the queue
+    // too, and its runs for them may notify after the listener is added: wait
+    // for them first, so that the count is this choice's alone (on 7 November
+    // 2026 a slow macOS Intel runner never saw exactly one). A run notifies
+    // before it reports itself finished, so once settled the count is final.
+    require(latency_settled(unit), "the Latency work for the earlier choices did not finish");
     seen.clear();
     set_parameter(unit, au::latency_parameter, 3);
-    require(eventually([&] { return seen.of(kAudioUnitProperty_Latency) == 1; }),
-            "no notification for a new Latency");
+    require(latency_settled(unit), "the Latency work for a new choice did not finish");
+    require(seen.of(kAudioUnitProperty_Latency) == 1,
+            "a new Latency notified " + std::to_string(seen.of(kAudioUnitProperty_Latency)) +
+                " times, not once");
     require(reports(unit, 512), "uninitialized latency is not the chosen 512 frames");
     set_parameter(unit, au::latency_parameter, 3);
     // The work for that choice has finished, so a notification would have come.
@@ -1134,6 +1141,93 @@ std::string status_text(Unit& unit) {
     return text;
 }
 
+// PLUG-23: a host may give more inputs than the filter has (REAPER gives
+// VST3 plug-ins equal counts on a six-channel track). The 2-in, 6-out filter
+// on 6 inputs reads inputs 1-2: its output matches a 2-in unit's exactly,
+// whatever plays on 3-6, also at Mix 0% (no dry signal, so fully wet);
+// bypass plays silence; the saved filter keeps its own two inputs. Then,
+// bypassed, replacements between filters with and without a dry signal
+// fade, never jump.
+void wider_inputs() {
+    const auto filter = crossover(48000);
+    Unit wide, narrow;
+    check(wide.configure(48000, 6, 6, 512), "6 to 6 formats");
+    check(narrow.configure(48000, 2, 6, 512), "2 to 6 formats");
+    check(wide.load(state_of(filter)), "a 2 to 6 filter on 6 inputs");
+    check(narrow.load(state_of(filter)), "a 2 to 6 filter on 2 inputs");
+    check(wide.initialize(), "6 to 6 initialization");
+    check(narrow.initialize(), "2 to 6 initialization");
+    Buffers x(6, 6, 512), y(2, 6, 512);
+    std::uint32_t seed = 23;
+    const auto compare = [&](const std::string& what) {
+        bool heard = false;
+        for (int block = 0; block < 8; ++block) {
+            x.noise(seed);
+            for (std::size_t c = 0; c < 2; ++c)
+                std::copy(x.in[c].begin(), x.in[c].end(), y.in[c].begin());
+            bool s = false;
+            check(render(wide, x, 512, false, s), "6 to 6 render");
+            check(render(narrow, y, 512, false, s), "2 to 6 render");
+            require(x.out == y.out, what + ": inputs 3-6 changed the output");
+            heard = heard || !x.output_silent();
+        }
+        require(heard, what + ": the filter played nothing");
+    };
+    compare("a 2 to 6 filter on 6 inputs");
+    set_parameter(wide, au::mix_parameter, 0);
+    set_parameter(narrow, au::mix_parameter, 0);
+    compare("Mix 0% on a 2 to 6 filter");
+    wide.set_bypass(true);
+    for (int block = 0; block < 2; ++block) {
+        x.noise(seed);
+        bool s = false;
+        check(render(wide, x, 512, false, s), "bypassed render");
+    }
+    require(x.output_silent(), "bypass on 6 inputs passes input to a 2 to 6 filter's outputs");
+    const auto saved = wide.saved();
+    require(saved.configuration && saved.configuration->input_channels == 2 &&
+                saved.configuration->output_channels == 6,
+            "a 2 to 6 filter on 6 inputs saved with other channel counts");
+
+    Unit p;
+    check(p.configure(48000, 6, 6, 512), "6 to 6 formats");
+    check(p.initialize(), "6 to 6 initialization");
+    p.set_bypass(true);
+    Buffers b(6, 6, 512);
+    for (auto& channel : b.in)
+        channel.assign(channel.size(), 1.f);
+    bool s = false;
+    for (int block = 0; block < 2; ++block)
+        check(render(p, b, 512, false, s), "bypassed render");
+    float previous = b.out[0].back();
+    require(previous == 1, "bypass on an empty instance does not pass the input");
+    auto equal = unfiltered_configuration(HostLayout{48000, 6, 6}, false);
+    for (auto& path : equal.paths)
+        for (auto& v : path.impulse)
+            v *= .5f;
+    const std::array<std::pair<const Configuration*, float>, 3> steps{
+        {{&filter, 0.f}, {&equal, 1.f}, {&filter, 0.f}}};
+    for (const auto& [next, want] : steps) {
+        check(p.load(state_of(*next)), "bypassed replacement");
+        float step = 0;
+        std::vector<float> last(6, previous);
+        for (int block = 0; block < 4; ++block) { // Warm-up and crossfade: 512 frames.
+            check(render(p, b, 512, false, s), "bypassed render");
+            for (std::size_t c = 0; c < 6; ++c)
+                for (auto v : b.out[c]) {
+                    step = std::max(step, std::abs(v - last[c]));
+                    last[c] = v;
+                }
+        }
+        require(step <= 1.f / 200,
+                "a bypassed replacement jumped by " + std::to_string(step) + " in one frame");
+        for (std::size_t c = 0; c < 6; ++c)
+            require(b.out[c].back() == want,
+                    "a bypassed replacement ends at " + std::to_string(b.out[c].back()));
+        previous = want;
+    }
+}
+
 // jrp's review of 0.5.5, reproduced through the Audio Unit API: with no
 // filter at Gain -20 dB an input of 0.5 played as 0.05 while Status said
 // "audio passes unchanged", and after a refused first load at Mix 50% it
@@ -1170,18 +1264,21 @@ void settings_in_diagnostics() {
     set_parameter(unit, au::mix_parameter, 50);
     check(unit.initialize(), "mix status initialization");
     require(unit.load(state_of(stereo(44100))) != noErr, "wrong-rate preset accepted");
-    require(std::abs(steady_output(unit, 3) - .25f) < 1e-5, "Mix 50% after a refused first load");
+    // PLUG-23 (jrp, 7 November 2026): a failed load with no filter kept has
+    // no dry signal, so Mix 50% plays silence too, and Status says so.
+    require(std::abs(steady_output(unit, 3)) < 1e-6, "Mix 50% after a refused first load");
     const auto shown = status_text(unit);
-    require(shown == "Load failed, only the dry signal plays: the filter is for 44100 Hz, the "
-                     "host runs at 48000 Hz. Details in the Convolver log.",
+    require(shown == "Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in "
+                     "the Convolver log.",
             "refused first load at Mix 50%: " + shown);
-    // Started again, the start line says the dry half plays.
+    // Started again, the start line says why Mix plays nothing.
     unit.uninitialize();
     check(unit.initialize(), "mix status restart");
-    require(contains(log.text(),
-                     "With Mix at 50% wet, only the dry signal plays: the input at -6.0 dB."),
+    require(contains(log.text(), "mix 100% wet (a load failed and no filter is kept, so there "
+                                 "is no dry signal)"),
             "start line after a refused first load at Mix 50%: " + log.text());
-    // At Mix 100% it is silent again, and Status says so.
+    require(std::abs(steady_output(unit, 3)) < 1e-6, "Mix 50% after a restart");
+    // At Mix 100% it is silent as well, and Status says so.
     set_parameter(unit, au::mix_parameter, 100);
     require(std::abs(steady_output(unit, 3)) < 1e-6, "Mix 100% after a refused first load");
     require(contains(status_text(unit), "Silent: the filter is for 44100 Hz"),
@@ -1526,6 +1623,7 @@ int main(int argc, char** argv) {
         latency_witness_per_unit();
         latency_staged_closing();
         settings_in_diagnostics();
+        wider_inputs();
         std::cout << "Audio Unit adapter checks passed\n";
         return 0;
     } catch (const std::exception& e) {

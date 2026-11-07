@@ -98,7 +98,9 @@ class Reference final : public lc::Driver {
         return restore(bytes);
     }
     bool start() override {
-        processor_ = std::make_unique<HostProcessor>(filter_->activate(layout()), max_block());
+        // PLUG-23: activate() may read fewer inputs than the host gives.
+        processor_ = std::make_unique<HostProcessor>(filter_->activate(layout()), max_block(),
+                                                     HostSettings{}, layout().inputs);
         processor_->set_bypass(bypass_);
         processor_->reset();
         bound_ = host_;

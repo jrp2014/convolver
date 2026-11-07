@@ -185,6 +185,30 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Plug-ins (PLUG-23): a filter now plays when the host gives more inputs than
+  it has, reading the first inputs and ignoring the rest; its outputs must
+  still match exactly. REAPER gives the VST3 plug-in six inputs on a
+  six-channel track, so the 2→6 crossover was refused there (HOST-1). Status
+  ends "plug-in inputs 3-6 ignored.", and the log and the window's report
+  say which inputs the filter reads. Whether there is a dry signal now
+  follows the filter's own counts, so a crossover still bypasses to silence
+  and stays fully filtered at any Mix, whatever the host's counts. Each filter
+  applies Mix by its own rule, so a replacement that changes whether there
+  is a dry signal crossfades without a gap or a jump, playing or bypassed.
+  The same in VST3, the Audio Unit and LV2 (an LV2 layout with more inputs
+  than the filter now plays it too). The audio of a filter on exactly its
+  own counts is unchanged.
+- Plug-ins (PLUG-23): bypass and Mix pass nothing when no filter plays and
+  passing the input could send full-range audio to a driver. A kept filter
+  that does not suit the host (another rate, say) has a dry signal only if
+  its own input and output counts are equal, so a 2→6 crossover kept at the
+  wrong rate stays silent bypassed. After a failed load with no filter kept
+  (a missing or unreadable file or preset, a first filter that does not fit,
+  or a project saved after such a failure) bypass and Mix pass nothing at
+  all, where they used to pass the input on a track with as many inputs as
+  outputs; a mono instance still passes it. A failed first load fades its dry
+  signal out with it. Status, the log's settings and the window's report give
+  the reason.
 - Development (DOC-8, from jrp's review of the agent guidance at `f6895f3`):
   the [workflow guide](docs/develop/workflow.md#verification-for-each-kind-of-change)
   says what each kind of change must run before a push (a prose-only change

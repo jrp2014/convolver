@@ -383,15 +383,17 @@ void latency_choices() {
 }
 
 void settings_text() {
-    require(settings_words(HostSettings{}, true) == "gain 0 dB, mix 100% wet, latency 256 frames",
-            "settings words: " + settings_words(HostSettings{}, true));
+    require(settings_words(HostSettings{}, HostDrySignal::present) ==
+                "gain 0 dB, mix 100% wet, latency 256 frames",
+            "settings words: " + settings_words(HostSettings{}, HostDrySignal::present));
     HostSettings s{-6, .5, 1024};
-    require(settings_words(s, true) == "gain -6 dB, mix 50% wet, latency 1024 frames",
-            "settings words: " + settings_words(s, true));
-    require(settings_words(s, false) ==
+    require(settings_words(s, HostDrySignal::present) ==
+                "gain -6 dB, mix 50% wet, latency 1024 frames",
+            "settings words: " + settings_words(s, HostDrySignal::present));
+    require(settings_words(s, HostDrySignal::host_counts) ==
                 "gain -6 dB, mix 100% wet (inputs and outputs differ, so there is no dry "
                 "signal), latency 1024 frames",
-            "settings words for unequal counts: " + settings_words(s, false));
+            "settings words for unequal counts: " + settings_words(s, HostDrySignal::host_counts));
     // GarageBand's sliders give values like these (jrp's run of AU-6).
     for (const auto& [settings, words] :
          {std::pair{HostSettings{-75.967, .561413}, "gain -76 dB, mix 56.1% wet"},
@@ -399,8 +401,9 @@ void settings_text() {
           std::pair{HostSettings{-.01, .9996}, "gain -0.01 dB, mix 99.96% wet"},
           std::pair{HostSettings{-99.99, .99999}, "gain -99.99 dB, mix 99.999% wet"},
           std::pair{HostSettings{-.04, .0004}, "gain -0.04 dB, mix 0.04% wet"}})
-        require(settings_words(settings, true) == std::string(words) + ", latency 256 frames",
-                "settings words: " + settings_words(settings, true));
+        require(settings_words(settings, HostDrySignal::present) ==
+                    std::string(words) + ", latency 256 frames",
+                "settings words: " + settings_words(settings, HostDrySignal::present));
     // The window's slider text: never an exponent, never a range end it is not.
     for (const auto& [value, text] :
          {std::pair{23.97, "23.97"}, std::pair{24.0, "24"}, std::pair{-1e-9, "0"},

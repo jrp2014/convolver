@@ -299,6 +299,92 @@ void multichannel() {
     kept.seek(0, IBStream::kIBSeekSet, nullptr);
     require(read_state(&kept).configuration->output_channels == 6, "2x6 preset not kept");
     p.setActive(false);
+    // PLUG-23: REAPER gives the effect on a six-channel track 6 inputs and 6
+    // outputs. The 2x6 preset plays, reading inputs 1-2 and ignoring 3-6.
+    require(p.setBusArrangements(&surround, 1, &surround, 1) == kResultOk &&
+                p.setActive(true) == kResultOk,
+            "2x6 preset on 6x6 buses");
+    p.setProcessing(true);
+    std::array<std::array<float, 300>, 6> six{};
+    std::array<float*, 6> six_ptr{};
+    for (int c = 0; c < 6; ++c) {
+        six[c][0] = c == 0 ? 1.f : c == 1 ? 2.f : 7.f;
+        six_ptr[c] = six[c].data();
+        outs[c].fill(0);
+    }
+    input.numChannels = 6;
+    input.channelBuffers32 = six_ptr.data();
+    output.numChannels = 6;
+    const auto wide_routing = [&](const std::string& what) {
+        for (int c = 0; c < 6; ++c)
+            outs[c].fill(0);
+        require(p.process(d) == kResultOk, (what + ": 6x6 process").c_str());
+        for (int c = 0; c < 6; ++c)
+            for (int i = 0; i < 300; ++i) {
+                float want = i == 256 ? expected[c][0] : i == 257 ? expected[c][1] : 0.f;
+                require(std::abs(outs[c][i] - want) < 1e-5, (what + ": routing").c_str());
+            }
+    };
+    wide_routing("2x6 preset on 6x6 buses");
+    // Saved and reopened on the same buses, the filter keeps its own counts.
+    MemoryStream surround_state;
+    require(p.getState(&surround_state) == kResultOk, "state on 6x6 buses");
+    surround_state.seek(0, IBStream::kIBSeekSet, nullptr);
+    const auto wide_saved = read_state(&surround_state).configuration;
+    require(wide_saved && wide_saved->input_channels == 2 && wide_saved->output_channels == 6,
+            "a 2x6 preset on 6x6 buses saved with other channel counts");
+    p.setProcessing(false);
+    p.setActive(false);
+    surround_state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&surround_state) == kResultOk && p.setActive(true) == kResultOk,
+            "2x6 state reopened on 6x6 buses");
+    p.setProcessing(true);
+    wide_routing("2x6 state reopened on 6x6 buses");
+    // The filter's counts differ, so there is no dry signal although the
+    // buses' counts are equal: Mix 0% still plays the filtered sound, and
+    // bypass is silent.
+    int32 at = 0;
+    ParameterChanges dry_mix, bypassed, restored;
+    dry_mix.addParameterData(mix_id, at)->addPoint(0, 0, at);
+    d.inputParameterChanges = &dry_mix;
+    wide_routing("Mix 0% with a 2x6 preset on 6x6 buses");
+    bypassed.addParameterData(bypass_id, at = 0)->addPoint(0, 1, at);
+    d.inputParameterChanges = &bypassed;
+    for (int c = 0; c < 6; ++c)
+        outs[c].fill(1);
+    require(p.process(d) == kResultOk, "bypassed 6x6 process");
+    for (int c = 0; c < 6; ++c)
+        for (int i = 64; i < 300; ++i)
+            require(outs[c][i] == 0, "bypass with a 2x6 preset on 6x6 buses is not silent");
+    restored.addParameterData(mix_id, at = 0)->addPoint(0, 1, at);
+    restored.addParameterData(bypass_id, at = 0)->addPoint(0, 0, at);
+    d.inputParameterChanges = &restored;
+    require(p.process(d) == kResultOk, "Mix 100% and bypass off again");
+    // jrp, 7 November 2026: kept at the wrong rate, the crossover plays
+    // nothing, and with no dry signal bypass stays silent too.
+    p.setProcessing(false);
+    p.setActive(false);
+    auto slower = setup;
+    slower.sampleRate = 44100;
+    require(p.setupProcessing(slower) == kResultOk && p.setActive(true) == kResultOk,
+            "2x6 preset at 44.1 kHz on 6x6 buses must activate, silent");
+    p.setProcessing(true);
+    for (ParameterChanges* changes : {&bypassed, &dry_mix}) {
+        d.inputParameterChanges = changes;
+        for (int c = 0; c < 6; ++c)
+            outs[c].fill(1);
+        require(p.process(d) == kResultOk, "kept 2x6 preset process");
+        for (int c = 0; c < 6; ++c)
+            for (int i = 0; i < 300; ++i)
+                require(outs[c][i] == 0,
+                        "a kept 2x6 preset that does not suit the host passes the input");
+    }
+    d.inputParameterChanges = &restored;
+    require(p.process(d) == kResultOk, "Mix 100% and bypass off once more");
+    d.inputParameterChanges = nullptr;
+    p.setProcessing(false);
+    p.setActive(false);
+    require(p.setBusArrangements(&octo, 1, &octo, 1) == kResultOk, "8x8 after 6x6");
     convolver::HostState identity;
     MemoryStream empty;
     require(write_state(&empty, identity), "encode identity state");

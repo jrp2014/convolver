@@ -256,7 +256,7 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                 message = rejected_line(filter_, host_ != nullptr);
             } else {
                 problem = filter_.failure().has_value() || !filter_.notice().empty();
-                message = loaded_line(filter_, host.has_value());
+                message = loaded_line(filter_, host);
                 // Hosts such as GarageBand restore a project after starting the
                 // unit, so its "Started at" line shows the settings before this.
                 if (saved && std::ranges::any_of(*saved, [](const auto& p) {
@@ -265,7 +265,7 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                     })) {
                     const auto counts = host ? *host : layout();
                     message += " Restored settings: " +
-                               settings_words(settings(), counts.inputs == counts.outputs) + ".";
+                               settings_words(settings(), dry_signal_rule(filter_, counts)) + ".";
                 }
             }
         } catch (...) { // Out of memory for the message: it is dropped.
