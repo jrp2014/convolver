@@ -442,6 +442,10 @@ void window() {
     require(gain.minValue == -100 && gain.maxValue == 24 && gain.doubleValue == 0 &&
                 mix.minValue == 0 && mix.maxValue == 100 && mix.doubleValue == 100,
             "slider ranges or values");
+    // PLUG-23: equal counts have a dry signal, so Mix applies and no note.
+    require(mix.enabled && view.settingValues[1].enabled && view.mixNoteField.superview.hidden &&
+                view.mixNoteField.stringValue.length == 0,
+            "a mix note with a dry signal");
     require([view.settingValues[0].stringValue isEqualToString:@"0"] &&
                 [view.settingValues[1].stringValue isEqualToString:@"100"] &&
                 view.settingValues[0].editable && view.settingValues[1].editable &&

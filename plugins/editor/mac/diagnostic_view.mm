@@ -224,6 +224,9 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSStackView* factsRow_;     // The facts under the name, hidden while they are not known.
     NSStackView* noteRow_;      // "Note:" and the note, hidden without one.
     NSStackView* actionRow_;    // The fix's button, hidden without one.
+    NSStackView* mixRow_;       // Mix's row, whose label dims when Mix has no effect.
+    NSStackView* mixNoteRow_;   // The mix note's row, hidden while Mix applies.
+    NSUInteger mix_;            // Mix's index among the settings (NSNotFound: none).
     NSTimer* timer_;
     NSString* shown_; // The text last shown, so a refresh keeps a selection.
     NSString* logPath_;
@@ -497,8 +500,22 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
                                                           chosen:^{
                                                             [weakSelf refresh];
                                                           }];
-    for (NSUInteger i = 0; i < settings_.rows.count; ++i)
-        [self add:[self formRow:settings[i][@"name"] content:settings_.rows[i]] after:12];
+    mix_ = NSNotFound;
+    _mixNoteField = wrapping(small_font(), [NSColor secondaryLabelColor], inner - form_label - 10);
+    for (NSUInteger i = 0; i < settings_.rows.count; ++i) {
+        NSStackView* row = [self formRow:settings[i][@"name"] content:settings_.rows[i]];
+        [self add:row after:12];
+        if ([settings[i][@"name"] isEqualToString:@"Mix"]) {
+            // PLUG-23: with no dry signal, a note under Mix says why it has
+            // no effect.
+            mix_ = i;
+            mixRow_ = row;
+            mixNoteRow_ = [self formRow:@"" content:_mixNoteField];
+            mixNoteRow_.hidden = YES;
+            [stack_ setCustomSpacing:4 afterView:row];
+            [self add:mixNoteRow_ after:12];
+        }
+    }
     _settingSliders = settings_.sliders;
     _settingMenus = settings_.menus;
     _settingValues = settings_.values;
@@ -760,10 +777,11 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     // Choose Filter… only where the window can choose a file.
     if ([action isEqualToString:@"choose filter"] && !loader_)
         action = @"";
+    NSString* mixNote = field(report, @"mix note");
     NSString* text = [@[
         @(status).stringValue, problem, plays, cause, fix, advice, action, name, note, audio,
         reference, field(report, @"filter rate"), field(report, @"filter channels"),
-        field(report, @"filter length"), field(report, @"filter speakers")
+        field(report, @"filter length"), field(report, @"filter speakers"), mixNote
     ] componentsJoinedByString:@"\v"];
     if ([text isEqualToString:shown_])
         return;
@@ -778,8 +796,25 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _filterNoteField.stringValue = note;
     [self showAudio:audio];
     [self showGlance:report];
+    [self showMixNote:mixNote];
     _referenceField.attributedStringValue = reference_text(reference);
     [self fit];
+}
+
+// PLUG-23: Mix has no effect without a dry signal: its label and controls
+// dim and the note under it says why (the mockup's Wider input state).
+- (void)showMixNote:(NSString*)mixNote {
+    if (mix_ == NSNotFound)
+        return;
+    const BOOL applies = mixNote.length == 0;
+    _mixNoteField.stringValue = mixNote;
+    mixNoteRow_.hidden = applies;
+    for (NSSlider* slider in settings_.sliders)
+        if ([slider isDescendantOf:settings_.rows[mix_]])
+            slider.enabled = applies;
+    settings_.values[mix_].enabled = applies;
+    NSTextField* title = (NSTextField*)mixRow_.arrangedSubviews.firstObject;
+    title.textColor = applies ? [NSColor labelColor] : [NSColor secondaryLabelColor];
 }
 
 // The facts under the name: the filter's own rate, channels, length and

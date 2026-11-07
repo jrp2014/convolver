@@ -129,6 +129,9 @@ typedef BOOL (^ConvolverFileLoader)(NSString* path);
 @property(readonly, nonatomic) NSArray<NSSlider*>* settingSliders;
 @property(readonly, nonatomic) NSArray<NSPopUpButton*>* settingMenus;
 @property(readonly, nonatomic) NSArray<NSTextField*>* settingValues;
+// PLUG-23: under Mix, why it has no effect (the report's mix note); hidden
+// while Mix applies. The Mix slider and its value are disabled meanwhile.
+@property(readonly, nonatomic) NSTextField* mixNoteField;
 // The Audio section: one label and one value (value and note) per fact.
 @property(readonly, nonatomic) NSArray<NSTextField*>* audioLabels;
 @property(readonly, nonatomic) NSArray<NSTextField*>* audioValues;
