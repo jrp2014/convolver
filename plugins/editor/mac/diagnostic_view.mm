@@ -221,6 +221,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSStackView* audio_;        // The Audio facts' rows, rebuilt when they change.
     NSBox* message_;            // The message, in a box when it is a problem; hidden when empty.
     NSStackView* messageStack_; // Its text, button and note.
+    NSStackView* factsRow_;     // The facts under the name, hidden while they are not known.
     NSStackView* noteRow_;      // "Note:" and the note, hidden without one.
     NSStackView* actionRow_;    // The fix's button, hidden without one.
     NSTimer* timer_;
@@ -313,11 +314,51 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
                                            forOrientation:NSLayoutConstraintOrientationHorizontal];
     NSStackView* badge =
         stack(@[ _statusSymbol, _statusField ], NSUserInterfaceLayoutOrientationHorizontal, 4);
-    NSStackView* name_row = stack(@[ document, _filterNameField, badge ],
-                                  NSUserInterfaceLayoutOrientationHorizontal, 6);
-    [name_row setCustomSpacing:14 afterView:_filterNameField];
-    [name_row.widthAnchor constraintLessThanOrEqualToConstant:inner].active = YES;
-    [self add:name_row after:2];
+    NSStackView* name_row = stack(@[], NSUserInterfaceLayoutOrientationHorizontal, 6);
+    [name_row addView:document inGravity:NSStackViewGravityLeading];
+    [name_row addView:_filterNameField inGravity:NSStackViewGravityLeading];
+    [name_row addView:badge inGravity:NSStackViewGravityTrailing];
+    fixed_width(name_row, inner);
+    [self add:name_row after:4];
+
+    // jrp, 7 November 2026: the facts under the name as labelled columns
+    // (Sample rate, Channels, Length, Speakers) that start at the name's
+    // text, rather than a run of values with gaps. The speaker list, the one
+    // long value, comes last and loses its end when it does not fit; its
+    // tooltip and the Audio section have all of it.
+    NSMutableArray<NSView*>* columns = [NSMutableArray array];
+    NSMutableArray<NSTextField*>* values = [NSMutableArray array];
+    NSView* facts_indent = [[NSView alloc] init];
+    fixed_width(facts_indent, icon);
+    [facts_indent.heightAnchor constraintEqualToConstant:1].active = YES;
+    [columns addObject:facts_indent];
+    for (NSString* title in @[ @"Sample rate", @"Channels", @"Length", @"Speakers" ]) {
+        NSTextField* heading = label([NSFont systemFontOfSize:[NSFont smallSystemFontSize] - 1],
+                                     [NSColor secondaryLabelColor]);
+        heading.stringValue = title;
+        heading.selectable = NO;
+        heading.accessibilityElement = NO; // The value carries it.
+        NSTextField* value =
+            label([NSFont monospacedDigitSystemFontOfSize:[NSFont smallSystemFontSize]
+                                                   weight:NSFontWeightRegular],
+                  [NSColor labelColor]);
+        value.accessibilityLabel = title;
+        NSStackView* column =
+            stack(@[ heading, value ], NSUserInterfaceLayoutOrientationVertical, 1);
+        if ([title isEqualToString:@"Speakers"]) {
+            stretches(value);
+            stretches(column);
+        }
+        [columns addObject:column];
+        [values addObject:value];
+    }
+    factsRow_ = stack(columns, NSUserInterfaceLayoutOrientationHorizontal, 22);
+    factsRow_.alignment = NSLayoutAttributeTop;
+    [factsRow_ setCustomSpacing:6 afterView:facts_indent];
+    factsRow_.distribution = NSStackViewDistributionFill;
+    fixed_width(factsRow_, inner);
+    _glanceValues = values;
+    [self add:factsRow_ after:6];
     // Under the name, a refused file and the drop hint, in the small font.
     _filterNoteField = wrapping(small_font(), [NSColor secondaryLabelColor], inner - icon - 6);
     NSView* note_indent = [[NSView alloc] init];
@@ -734,8 +775,43 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _filterNameField.toolTip = name.length ? name : nil;
     _filterNoteField.stringValue = note;
     [self showAudio:audio];
+    [self showGlance:audio sampleRate:report ? field(report, @"sample rate") : @""];
     _referenceField.attributedStringValue = reference_text(reference);
     [self fit];
+}
+
+// The facts under the name, from the report's Audio lines: the host's
+// rate, the channels, the filter's length and the speakers its outputs are
+// labelled for. Shown only while a filter is loaded and the host has
+// started (the rate is known); the speakers column only when the filter
+// names them.
+- (void)showGlance:(NSString*)audio sampleRate:(NSString*)sampleRate {
+    NSString *rate = @"", *channels = @"", *length = @"", *speakers = @"";
+    // Each line: label, value, note, "problem" or empty, help (showAudio:).
+    for (NSString* line in [audio componentsSeparatedByString:@"\n"]) {
+        NSArray<NSString*>* parts = [line componentsSeparatedByString:@"\t"];
+        if (parts.count < 5)
+            continue;
+        if ([parts[0] isEqualToString:@"Sample rate"])
+            rate = parts[1];
+        else if ([parts[0] isEqualToString:@"Channels"]) {
+            channels = [parts[1] stringByReplacingOccurrencesOfString:@" in, "
+                                                           withString:@" in → "];
+            NSString* note = parts[2];
+            // "(Front Left, Front Right)"; a problem note says something else.
+            if (![parts[3] isEqualToString:@"problem"] && [note hasPrefix:@"("] &&
+                [note hasSuffix:@")"] && ![note hasPrefix:@"(the filter"])
+                speakers = [note substringWithRange:NSMakeRange(1, note.length - 2)];
+        } else if ([parts[0] isEqualToString:@"Filter length"])
+            length = parts[1];
+    }
+    factsRow_.hidden = sampleRate.length == 0 || length.length == 0;
+    _glanceValues[0].stringValue = rate;
+    _glanceValues[1].stringValue = channels;
+    _glanceValues[2].stringValue = length;
+    _glanceValues[3].stringValue = speakers;
+    _glanceValues[3].toolTip = speakers.length ? speakers : nil;
+    _glanceValues[3].superview.hidden = speakers.length == 0;
 }
 
 // The message under the heading: hidden when there is nothing to say, in a

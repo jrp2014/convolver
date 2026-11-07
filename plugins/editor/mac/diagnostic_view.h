@@ -98,11 +98,16 @@ typedef BOOL (^ConvolverFileLoader)(NSString* path);
 // What a user reads and presses, for the tests.
 @property(readonly, nonatomic) NSTextField* titleField;
 // The heading: the filter's file name (the report's "filter name"), then
-// the status's symbol and word; under it the report's "filter note".
+// the status's symbol and word at the end of the line; under it the facts
+// (glanceValues) and the report's "filter note".
 @property(readonly, nonatomic) NSTextField* filterNameField;
 @property(readonly, nonatomic) NSImageView* statusSymbol;
 @property(readonly, nonatomic) NSTextField* statusField;
 @property(readonly, nonatomic) NSTextField* filterNoteField;
+// Under the name, the facts as labelled columns: the values for Sample rate,
+// Channels, Length and Speakers, in that order. Hidden until a filter is
+// loaded and the host has started; Speakers only when the filter names them.
+@property(readonly, nonatomic) NSArray<NSTextField*>* glanceValues;
 // The report's problem (semibold) and what plays, then its cause and fix as
 // labelled rows; empty and hidden while nothing needs saying.
 @property(readonly, nonatomic) NSTextView* explanationView;

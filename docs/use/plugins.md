@@ -310,8 +310,13 @@ From the top, the window has:
   not the file's folder: see [loading a filter](#loading-a-filter). A
   project saved by an earlier Convolver, or a preset that holds no name,
   shows "From the saved project or preset". With no filter it reads
-  "None". Under the name, in small text: a note when the newest file was
-  refused, and a reminder that a file can be dropped on the window.
+  "None". Under the name, once a filter is loaded and the host has started
+  it, the main facts as labelled columns: **Sample rate**, **Channels**
+  (`2 in → 2 out`), **Length** and, when the filter names them,
+  **Speakers** (cut short with "…" if they do not fit; hold the pointer
+  over them, or see the Audio section, for all of them). Under those, in
+  small text: a note when the newest file was refused, and a reminder that
+  a file can be dropped on the window.
 - **The status** beside the name (Active, Bypassed, No filter, Load failed,
   Not checked yet or Fault), the same as the Status parameter, as a symbol
   and a word, coloured for Active (green), Load failed (red) and Fault

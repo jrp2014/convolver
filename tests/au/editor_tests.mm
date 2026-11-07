@@ -694,6 +694,13 @@ void files() {
                 [view.filterNameField.stringValue isEqualToString:@"stereo.wav"],
             "the window does not name the file:\n" + text(r[@"reference"]) + "\n" +
                 text(view.filterNameField.stringValue));
+    // jrp, 7 November 2026: the facts under the name, as labelled columns.
+    require(view.glanceValues.count == 4 && !view.glanceValues[0].superview.superview.hidden &&
+                [view.glanceValues[0].stringValue isEqualToString:@"44100 Hz"] &&
+                [view.glanceValues[1].stringValue isEqualToString:@"2 in → 2 out"] &&
+                view.glanceValues[2].stringValue.length > 0,
+            "facts under the name: " + text([[view.glanceValues valueForKey:@"stringValue"]
+                                           componentsJoinedByString:@" | "]));
     require(loaded_path(unit) == stereo.string(), "filter file property " + loaded_path(unit));
     require(encode_host_state(unit.saved()) ==
                 encode_host_state(filter_file_state(stereo, {44100, 2, 2}, unit_reader())),
