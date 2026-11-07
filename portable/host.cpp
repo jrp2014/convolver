@@ -235,8 +235,15 @@ bool same_configuration(const HostLayout& a, const HostLayout& b) noexcept {
     return same_rate(a, b) && a.inputs == b.inputs && a.outputs == b.outputs;
 }
 
+namespace {
+// A playing filter's own answer: a dry signal only with equal counts (PLUG-23).
+bool own_dry(const Configuration& c) noexcept {
+    return c.input_channels == c.output_channels;
+}
+} // namespace
+
 HostPlayback filter_playback(Configuration c) {
-    const bool dry = c.input_channels == c.output_channels;
+    const bool dry = own_dry(c);
     return {std::move(c), dry};
 }
 
@@ -490,7 +497,16 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
                 : next ? HostPlayback{}
                        : unfiltered_playback(*host, state.failed, !state.failed);
             try {
-                install(next && !kept_failure ? filter_playback(*next) : unfiltered);
+                if (next && !kept_failure) {
+                    // Moved in and back, not copied: a filter can be large.
+                    // On a throw `next` is never used again.
+                    const bool dry = own_dry(*next);
+                    HostPlayback playing{std::move(*next), dry};
+                    install(playing);
+                    *next = std::move(playing.filter);
+                } else {
+                    install(unfiltered);
+                }
             } catch (const SupersededRequest&) {
                 throw; // Abandoned: nothing recorded or changed.
             } catch (const std::exception& e) {
@@ -797,6 +813,16 @@ HostDrySignal dry_signal_rule(const HostFilter& filter, const HostLayout& host) 
     return unplayed_dry(c ? &*c : nullptr, filter.failed() || (f && f->silent), host);
 }
 
+HostDrySignal dry_signal_before_host(const HostFilter& filter) noexcept {
+    const auto& f = filter.failure();
+    const auto& c = filter.filter();
+    if (!c)
+        return filter.failed() || (f && f->silent) ? HostDrySignal::failed_load
+                                                   : HostDrySignal::present;
+    return c->input_channels == c->output_channels ? HostDrySignal::present
+                                                   : HostDrySignal::filter_counts;
+}
+
 const char* no_dry_reason(HostDrySignal rule) noexcept {
     switch (rule) {
     case HostDrySignal::present:
@@ -822,7 +848,7 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
     // kept never has one, whatever the host (jrp, 7 November 2026).
     const bool dry_known = host && dry_signal(filter, *host);
     const auto& failure = filter.failure();
-    const bool never_dry = !filter.filter() && (filter.failed() || (failure && failure->silent));
+    const bool never_dry = dry_signal_before_host(filter) == HostDrySignal::failed_load;
     const bool dry_unknown = !host && !never_dry && clamp_mix(settings.mix) < 1;
     // What plays with no filter heard, before the reason: "Silent: " only
     // when Mix lets no dry signal through.
@@ -928,8 +954,8 @@ struct HostProcessor::Impl {
         bool dry;
         Prepared* next_retired = nullptr;
         std::uint64_t number = 0; // Publications are numbered from 1, in order.
-        Prepared(const HostPlayback& p, std::size_t block, std::size_t inputs)
-            : engine(fitted_engine(p.filter, block, inputs)), dry(p.dry) {}
+        Prepared(const Configuration& c, bool dry_, std::size_t block, std::size_t inputs)
+            : engine(fitted_engine(c, block, inputs)), dry(dry_) {}
     };
     static_assert(std::atomic<Prepared*>::is_always_lock_free);
     static_assert(std::atomic<std::size_t>::is_always_lock_free);
@@ -990,19 +1016,18 @@ struct HostProcessor::Impl {
     std::atomic<std::uint64_t> silence_through{0};
     bool bypass = false;
     bool started = false; // Audio processed since construction or reset.
-    Impl(const HostPlayback& p, std::size_t maximum_, std::size_t block_,
+    // The filter and its dry answer apart, so the Configuration overloads
+    // need no copy of the filter in a HostPlayback.
+    Impl(const Configuration& c, bool has_dry, std::size_t maximum_, std::size_t block_,
          const HostSettings& settings = {}, std::size_t inputs_ = 0)
-        : Impl(p, p.filter, maximum_, block_, settings, inputs_) {}
-    Impl(const HostPlayback& p, const Configuration& c, std::size_t maximum_, std::size_t block_,
-         const HostSettings& settings, std::size_t inputs_)
         : rate(c.sample_rate), inputs(std::max(inputs_, c.input_channels)),
           outputs(c.output_channels), maximum(maximum_), block(block_) {
         if (!c.input_channels || !outputs || inputs > max_channel_count ||
             outputs > max_channel_count || !maximum || maximum > max_block_frames ||
             std::max(inputs, outputs) * maximum > (1U << 24) ||
-            (inputs_ && inputs_ < c.input_channels) || (p.dry && outputs > inputs))
+            (inputs_ && inputs_ < c.input_channels) || (has_dry && outputs > inputs))
             throw std::invalid_argument("invalid host channel count or callback capacity");
-        auto prepared = std::make_unique<Prepared>(p, block, inputs);
+        auto prepared = std::make_unique<Prepared>(c, has_dry, block, inputs);
         input.resize(inputs * maximum);
         wet.resize(outputs * maximum);
         old_wet.resize(wet.size());
@@ -1046,12 +1071,11 @@ struct HostProcessor::Impl {
             item = next;
         }
     }
-    std::unique_ptr<Prepared> prepare(const HostPlayback& p) const {
-        const auto& c = p.filter;
+    std::unique_ptr<Prepared> prepare(const Configuration& c, bool has_dry) const {
         if (c.sample_rate != rate || !c.input_channels || c.input_channels > inputs ||
-            c.output_channels != outputs || (p.dry && outputs > inputs))
+            c.output_channels != outputs || (has_dry && outputs > inputs))
             throw std::invalid_argument("replacement must preserve sample rate and channels");
-        return std::make_unique<Prepared>(p, block, inputs);
+        return std::make_unique<Prepared>(c, has_dry, block, inputs);
     }
     void publish(std::unique_ptr<Prepared> prepared) noexcept {
         collect();
@@ -1063,8 +1087,8 @@ struct HostProcessor::Impl {
         published.store(prepared->number, std::memory_order_release);
         delete pending.exchange(prepared.release(), std::memory_order_acq_rel);
     }
-    void replace(const HostPlayback& p) {
-        publish(prepare(p));
+    void replace(const Configuration& c, bool has_dry) {
+        publish(prepare(c, has_dry));
     }
     // The audio producer only links; the control consumer owns deletion.
     // Collection must never hold up adoption of another pending filter.
@@ -1287,7 +1311,7 @@ struct HostProcessor::Impl {
     }
 };
 HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum, std::size_t block)
-    : impl_(std::make_unique<Impl>(filter_playback(c), maximum, block)) {}
+    : impl_(std::make_unique<Impl>(c, own_dry(c), maximum, block)) {}
 namespace {
 std::size_t offered_latency(std::size_t frames) {
     if (std::find(host_latencies.begin(), host_latencies.end(), frames) == host_latencies.end())
@@ -1299,21 +1323,22 @@ std::size_t offered_latency(std::size_t frames) {
 } // namespace
 HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum,
                              const HostSettings& settings)
-    : impl_(std::make_unique<Impl>(filter_playback(c), maximum, offered_latency(settings.latency),
+    : impl_(std::make_unique<Impl>(c, own_dry(c), maximum, offered_latency(settings.latency),
                                    settings)) {}
 HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum,
                              const HostSettings& settings, std::size_t inputs)
-    : HostProcessor(filter_playback(c), maximum, settings, inputs) {}
+    : impl_(std::make_unique<Impl>(c, own_dry(c), maximum, offered_latency(settings.latency),
+                                   settings, inputs)) {}
 HostProcessor::HostProcessor(const HostPlayback& p, std::size_t maximum,
                              const HostSettings& settings, std::size_t inputs)
-    : impl_(std::make_unique<Impl>(p, maximum, offered_latency(settings.latency), settings,
-                                   inputs)) {}
+    : impl_(std::make_unique<Impl>(p.filter, p.dry, maximum, offered_latency(settings.latency),
+                                   settings, inputs)) {}
 HostProcessor::~HostProcessor() = default;
 void HostProcessor::replace(const Configuration& c) {
-    impl_->replace(filter_playback(c));
+    impl_->replace(c, own_dry(c));
 }
 void HostProcessor::replace(const HostPlayback& p) {
-    impl_->replace(p);
+    impl_->replace(p.filter, p.dry);
 }
 struct HostProcessor::Replacement::Data {
     const Impl* owner = nullptr;
@@ -1325,10 +1350,15 @@ HostProcessor::Replacement::Replacement(Replacement&&) noexcept = default;
 HostProcessor::Replacement& HostProcessor::Replacement::operator=(Replacement&&) noexcept = default;
 HostProcessor::Replacement::~Replacement() = default;
 HostProcessor::Replacement HostProcessor::prepare(const Configuration& c) const {
-    return prepare(filter_playback(c));
+    auto prepared = impl_->prepare(c, own_dry(c));
+    // Member by member: Apple Clang lacks parenthesized aggregate initialization.
+    auto data = std::make_unique<Replacement::Data>();
+    data->owner = impl_.get();
+    data->prepared = std::move(prepared);
+    return Replacement(std::move(data));
 }
 HostProcessor::Replacement HostProcessor::prepare(const HostPlayback& p) const {
-    auto prepared = impl_->prepare(p);
+    auto prepared = impl_->prepare(p.filter, p.dry);
     // Member by member: Apple Clang lacks parenthesized aggregate initialization.
     auto data = std::make_unique<Replacement::Data>();
     data->owner = impl_.get();

@@ -710,6 +710,14 @@ void wider_inputs() {
                 "a failed load with no filter kept, host " +
                     std::string(host ? "mono" : "unknown") + ": " +
                     host_report(failed, facts(host, {0, .5})).mix_note);
+    // An empty instance the adapter could not start, its host no longer
+    // known: the report agrees with Status that nothing plays.
+    HostFilter unstarted(8);
+    unstarted.fail_activation("no memory");
+    const auto ru = host_report(unstarted, facts(std::nullopt, {0, .5}));
+    require(!ru.mix_note.empty() && contains(ru.settings, "mix 100% wet") &&
+                contains(host_status(unstarted, std::nullopt, true, {0, .5}).text, "Silent: "),
+            "an unstarted empty instance: " + ru.mix_note + " | " + ru.settings);
 }
 
 int main() {

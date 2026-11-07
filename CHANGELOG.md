@@ -226,18 +226,21 @@ Until 1.0 the C++ API may change between minor versions.
   (a missing or unreadable file or preset, a first filter that does not fit,
   or a project saved after such a failure) bypass and Mix pass nothing at
   all, where they used to pass the input on a track with as many inputs as
-  outputs, a mono instance included (jrp). An instance with no filter that
-  has never had a load fail still passes the input. A failed first load
+  outputs, a mono instance included (jrp). An instance with no filter passes
+  the input until a load fails, and again once a filter loads or an empty
+  state is restored. A failed first load
   fades its dry signal out with it. Status, the log's settings and the
   window's report give the reason; Status no longer says "Load failed, no
   filter plays" before the host has started the plug-in, as nothing plays.
-- Library (PLUG-23, jrp's review): a prepared filter carries whether it has
-  a dry signal. `HostFilter::activate()` returns a `HostPlayback`, and the
-  `HostFilter::load()` install callback, `HostProcessor`'s constructor,
-  `prepare()` and `replace()` take one (`filter_playback()` and
-  `unfiltered_playback()` build them); the `Configuration` overloads remain.
-  `HostFilter::load()` takes a `HostLoadCheck` that says whether a filter
-  that does not suit the host is refused or kept until it does, and
+- Library (PLUG-23, jrp's review), incompatible: a prepared filter carries
+  whether it has a dry signal. `HostFilter::activate()` returns a
+  `HostPlayback` instead of a `Configuration`; the `HostFilter::load()`
+  install callback takes `const HostPlayback&`; its last parameter is a
+  `HostLoadCheck` (whether a filter that does not suit the host is refused
+  or kept until it does) instead of a `bool`; and the three-argument
+  `unfiltered_configuration()` is gone (use `unfiltered_playback()`).
+  `HostProcessor`'s constructor, `prepare()` and `replace()` gain
+  `HostPlayback` overloads beside the `Configuration` ones, and
   `same_configuration()` compares two layouts' rates and channels.
 - Development (DOC-8, from jrp's review of the agent guidance at `f6895f3`):
   the [workflow guide](docs/develop/workflow.md#verification-for-each-kind-of-change)

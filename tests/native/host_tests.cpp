@@ -1696,7 +1696,7 @@ void processing_faults() {
     } catch (const std::invalid_argument&) {
     }
     require(empty.failed(), "failed first load");
-    q.replace(unfiltered_configuration(layout, true)); // As the VST3 and AU adapters do.
+    q.replace(unfiltered_playback(layout, true, false)); // As HostFilter::activate() gives it.
     play_q(nan);
     const auto after = empty.observe(q.faults());
     explained += after.faults.rejected_input;
