@@ -72,6 +72,13 @@ struct HostReport {
     // the saved project or preset" when none was; "None"), and a note about
     // the newest request when it was refused.
     std::string filter_name, filter_note;
+    // Under the name, the accepted filter's own values (jrp, 7 November
+    // 2026), which the Audio section's host values need not match: its rate
+    // ("48000 Hz"), channels ("2 in → 2 out"), length ("1.37 s") and the
+    // speakers its outputs are labelled for ("Front left, front right";
+    // empty when it names none).
+    // All empty without a filter.
+    std::string filter_rate, filter_channels, filter_length, filter_speakers;
     // VST3-11: the accepted filter's file as chosen (UTF-8; empty when it came
     // from saved state), which the window's Reload reads again, and every
     // file it was read from (HostRequest::files), which the window watches

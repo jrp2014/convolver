@@ -694,7 +694,8 @@ void files() {
                 [view.filterNameField.stringValue isEqualToString:@"stereo.wav"],
             "the window does not name the file:\n" + text(r[@"reference"]) + "\n" +
                 text(view.filterNameField.stringValue));
-    // jrp, 7 November 2026: the facts under the name, as labelled columns.
+    // jrp, 7 November 2026: the filter's own facts under its name, as
+    // labelled columns (here the same as the host's).
     require(view.glanceValues.count == 4 && !view.glanceValues[0].superview.superview.hidden &&
                 [view.glanceValues[0].stringValue isEqualToString:@"44100 Hz"] &&
                 [view.glanceValues[1].stringValue isEqualToString:@"2 in → 2 out"] &&

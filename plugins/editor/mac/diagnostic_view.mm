@@ -321,11 +321,12 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     fixed_width(name_row, inner);
     [self add:name_row after:4];
 
-    // jrp, 7 November 2026: the facts under the name as labelled columns
-    // (Sample rate, Channels, Length, Speakers) that start at the name's
-    // text, rather than a run of values with gaps. The speaker list, the one
-    // long value, comes last and loses its end when it does not fit; its
-    // tooltip and the Audio section have all of it.
+    // jrp, 7 November 2026: the filter's own facts under its name, as
+    // labelled columns (Sample rate, Channels, Length, Speakers) that start
+    // at the name's text, rather than a run of values with gaps; the Audio
+    // section gives the host's, which need not match. The speaker list, the
+    // one long value, comes last and loses its end when it does not fit;
+    // its tooltip has all of it.
     NSMutableArray<NSView*>* columns = [NSMutableArray array];
     NSMutableArray<NSTextField*>* values = [NSMutableArray array];
     NSView* facts_indent = [[NSView alloc] init];
@@ -761,7 +762,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
         action = @"";
     NSString* text = [@[
         @(status).stringValue, problem, plays, cause, fix, advice, action, name, note, audio,
-        reference
+        reference, field(report, @"filter rate"), field(report, @"filter channels"),
+        field(report, @"filter length"), field(report, @"filter speakers")
     ] componentsJoinedByString:@"\v"];
     if ([text isEqualToString:shown_])
         return;
@@ -775,40 +777,21 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _filterNameField.toolTip = name.length ? name : nil;
     _filterNoteField.stringValue = note;
     [self showAudio:audio];
-    [self showGlance:audio sampleRate:report ? field(report, @"sample rate") : @""];
+    [self showGlance:report];
     _referenceField.attributedStringValue = reference_text(reference);
     [self fit];
 }
 
-// The facts under the name, from the report's Audio lines: the host's
-// rate, the channels, the filter's length and the speakers its outputs are
-// labelled for. Shown only while a filter is loaded and the host has
-// started (the rate is known); the speakers column only when the filter
-// names them.
-- (void)showGlance:(NSString*)audio sampleRate:(NSString*)sampleRate {
-    NSString *rate = @"", *channels = @"", *length = @"", *speakers = @"";
-    // Each line: label, value, note, "problem" or empty, help (showAudio:).
-    for (NSString* line in [audio componentsSeparatedByString:@"\n"]) {
-        NSArray<NSString*>* parts = [line componentsSeparatedByString:@"\t"];
-        if (parts.count < 5)
-            continue;
-        if ([parts[0] isEqualToString:@"Sample rate"])
-            rate = parts[1];
-        else if ([parts[0] isEqualToString:@"Channels"]) {
-            channels = [parts[1] stringByReplacingOccurrencesOfString:@" in, "
-                                                           withString:@" in → "];
-            NSString* note = parts[2];
-            // "(Front Left, Front Right)"; a problem note says something else.
-            if (![parts[3] isEqualToString:@"problem"] && [note hasPrefix:@"("] &&
-                [note hasSuffix:@")"] && ![note hasPrefix:@"(the filter"])
-                speakers = [note substringWithRange:NSMakeRange(1, note.length - 2)];
-        } else if ([parts[0] isEqualToString:@"Filter length"])
-            length = parts[1];
-    }
-    factsRow_.hidden = sampleRate.length == 0 || length.length == 0;
-    _glanceValues[0].stringValue = rate;
-    _glanceValues[1].stringValue = channels;
-    _glanceValues[2].stringValue = length;
+// The facts under the name: the filter's own rate, channels, length and
+// the speakers its outputs are labelled for (jrp, 7 November 2026), which
+// the Audio section's host values need not match. Shown while a filter is
+// loaded; the speakers column only when the filter names them.
+- (void)showGlance:(NSDictionary<NSString*, NSString*>*)report {
+    NSString* speakers = field(report, @"filter speakers");
+    factsRow_.hidden = field(report, @"filter rate").length == 0;
+    _glanceValues[0].stringValue = field(report, @"filter rate");
+    _glanceValues[1].stringValue = field(report, @"filter channels");
+    _glanceValues[2].stringValue = field(report, @"filter length");
     _glanceValues[3].stringValue = speakers;
     _glanceValues[3].toolTip = speakers.length ? speakers : nil;
     _glanceValues[3].superview.hidden = speakers.length == 0;

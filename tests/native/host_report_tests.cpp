@@ -297,6 +297,38 @@ void cases() {
     check(fact(r, "Loudest peak"), "+4.9 dB",
           "at most, for full-scale input; it cannot clip at this Gain and Mix");
     check(fact(r, "Host blocks"), "up to 512 frames", "(11.6 ms) per call");
+    // jrp, 7 November 2026: the filter's own facts, under its name in the
+    // window; the Audio section gives the host's.
+    const auto fields = report_fields(r);
+    const auto field = [&](const std::string& name) {
+        for (const auto& [key, value] : fields)
+            if (key == name)
+                return value;
+        throw std::runtime_error("no report field " + name);
+    };
+    require(r.filter_rate == "44100 Hz" && r.filter_channels == "2 in → 2 out" &&
+                r.filter_length == "0.1 ms" && r.filter_speakers.empty() &&
+                field("filter rate") == "44100 Hz" && field("filter channels") == "2 in → 2 out" &&
+                field("filter length") == "0.1 ms" && field("filter speakers").empty(),
+            "filter facts: " + r.filter_rate + " | " + r.filter_channels + " | " + r.filter_length +
+                " | " + r.filter_speakers);
+    {
+        // Known before the host starts, and with the speakers it names.
+        auto labelled = filter(48000, 2);
+        labelled.channel_mask = 0x3;
+        HostFilter waiting(8);
+        waiting.load(HostState{labelled}, std::nullopt);
+        const auto w = host_report(waiting, facts(std::nullopt));
+        require(w.filter_rate == "48000 Hz" && w.filter_channels == "2 in → 2 out" &&
+                    w.filter_speakers == "Front left, front right" &&
+                    contains(fact(w, "Sample rate").value, "not known until the host starts"),
+                "filter facts before the host starts: " + w.filter_rate + " | " +
+                    w.filter_speakers);
+        const auto none = host_report(HostFilter(8), facts(std::nullopt));
+        require(none.filter_rate.empty() && none.filter_channels.empty() &&
+                    none.filter_length.empty() && none.filter_speakers.empty(),
+                "filter facts without a filter");
+    }
     require(r.audio.front().label == "Sample rate" && r.audio.back().label == "Host blocks",
             "Audio order");
     const auto loud = host_report(f, facts(stereo));

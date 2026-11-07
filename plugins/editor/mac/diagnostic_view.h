@@ -104,9 +104,10 @@ typedef BOOL (^ConvolverFileLoader)(NSString* path);
 @property(readonly, nonatomic) NSImageView* statusSymbol;
 @property(readonly, nonatomic) NSTextField* statusField;
 @property(readonly, nonatomic) NSTextField* filterNoteField;
-// Under the name, the facts as labelled columns: the values for Sample rate,
-// Channels, Length and Speakers, in that order. Hidden until a filter is
-// loaded and the host has started; Speakers only when the filter names them.
+// Under the name, the filter's own facts as labelled columns: the values for
+// Sample rate, Channels, Length and Speakers, in that order (the report's
+// "filter rate" and the rest). Hidden without a filter; Speakers only when
+// the filter names them.
 @property(readonly, nonatomic) NSArray<NSTextField*>* glanceValues;
 // The report's problem (semibold) and what plays, then its cause and fix as
 // labelled rows; empty and hidden while nothing needs saying.

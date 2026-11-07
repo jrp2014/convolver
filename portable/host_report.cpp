@@ -4,6 +4,7 @@
 #include "convolver_version.hpp"
 #include "host_log.hpp"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -382,6 +383,19 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
                                                  : "From the saved project or preset";
     else
         r.filter_name = "None";
+    if (c) {
+        r.filter_rate = std::to_string(c->sample_rate) + " Hz";
+        r.filter_channels = std::to_string(c->input_channels) + " in → " +
+                            std::to_string(c->output_channels) + " out";
+        const auto taps = longest_taps(*c);
+        const auto length = duration(taps, c->sample_rate);
+        r.filter_length = length.empty() ? std::to_string(taps) + " taps" : length;
+        // A list on its own, so it starts with a capital: "Front left, front right".
+        r.filter_speakers = speaker_names(c->channel_mask, c->output_channels);
+        if (!r.filter_speakers.empty())
+            r.filter_speakers[0] =
+                static_cast<char>(std::toupper(static_cast<unsigned char>(r.filter_speakers[0])));
+    }
     if (c && accepted.source == HostFilterSource::file) {
         r.filter_path = accepted.path;
         r.filter_files = accepted.files;
@@ -463,6 +477,10 @@ std::vector<std::pair<std::string, std::string>> report_fields(const HostReport&
             {"note", r.note},
             {"action", r.action},
             {"filter name", r.filter_name},
+            {"filter rate", r.filter_rate},
+            {"filter channels", r.filter_channels},
+            {"filter length", r.filter_length},
+            {"filter speakers", r.filter_speakers},
             {"filter note", r.filter_note},
             {"filter path", r.filter_path},
             {"filter files", files},
