@@ -33,6 +33,11 @@ documentation is organised and written, for agents too, is in
 
 Follow `docs/develop/workflow.md`. In short:
 
+- Tell a review, local host testing and a change apart
+  ([kinds of task](docs/develop/workflow.md#kinds-of-task)). A review is
+  read-only: no branch, commit or GitHub post unless the person asks, except
+  the independent review of an open pull request. Host testing records what
+  was observed. Only a change gets a branch and the rules below.
 - One TODO item (or a tightly coupled group) per branch. Open a **draft pull
   request titled with the ID** as soon as you start; that is the claim. Check
   open pull requests for the ID first.
@@ -45,14 +50,52 @@ Follow `docs/develop/workflow.md`. In short:
   **independent review** by someone who did not write the change.
 - jrp merges. Never merge, approve, push to `main` or move tags.
 
-Claude Code sessions have two repository skills, `todo-item` (start, resume or
-hand over an item) and `review-change` (the independent review). Both only
-point to sections of `docs/develop/workflow.md`, which holds the procedures.
+The procedures, for any agent, are these sections of the workflow guide.
+Claude Code sessions reach the same sections through two repository skills,
+`todo-item` (start, resume, hand over or finish an item) and `review-change`
+(the independent review), which only link to them; the link check covers
+`.claude/skills/`, so a renamed section fails in pre-commit.
+
+| Task | Section |
+| --- | --- |
+| Decide whether this is a review, host testing or a change | [Kinds of task](docs/develop/workflow.md#kinds-of-task) |
+| Start an item | [Before you start](docs/develop/workflow.md#before-you-start), then [while working](docs/develop/workflow.md#while-working) |
+| Continue someone else's branch | [Picking up someone else's work](docs/develop/workflow.md#picking-up-someone-elses-work) |
+| Stop or hand over | [Handoff note](docs/develop/workflow.md#handoff-note) |
+| Finish | [Verification](docs/develop/workflow.md#verification-for-each-kind-of-change), [definition of done](docs/develop/workflow.md#definition-of-done) |
+| Review a change | [Independent review](docs/develop/workflow.md#independent-review) |
+
+## Read only what the task needs
+
+`TODO.md`, `docs/develop/testing.md` and the plug-in contract are long
+reference pages: go to the section your task needs instead of reading them
+whole.
+
+| Task | Read |
+| --- | --- |
+| Choose or claim work | [Execution priorities](TODO.md#execution-priorities), then search `TODO.md` for the item's ID |
+| Find the code and its tests | [Change and test map](docs/develop/architecture.md#change-and-test-map) |
+| Decide what to run before pushing | [Verification](docs/develop/workflow.md#verification-for-each-kind-of-change) |
+| Build | [Sanitizer build](docs/develop/build.md#sanitizer-build-for-changes); plug-in SDKs under [plug-ins](docs/develop/build.md#plug-ins) |
+| Understand a native test | [Native production tests](docs/develop/testing.md#native-production-tests) |
+| Change or debug a plug-in | The [adapter contract](docs/develop/plugin-contract.md) section for the behaviour, [plug-in comparisons](docs/develop/testing.md#plug-in-comparisons-plug-2) and the format's own [tests](docs/develop/testing.md#plug-in-format-tests) |
+| A load-timing test failed or skipped | [Load timing](docs/develop/load-timing.md) |
+| A CI run failed | [Evidence from failed CI runs](docs/develop/testing.md#evidence-from-failed-ci-runs), [intermittent failures](docs/develop/testing.md#intermittent-failures) |
+| Why CI ran or skipped a job | [CI triggers](docs/develop/testing.md#ci-triggers) |
+| FFT backend or a speed claim | [Selection and contract](docs/develop/fft-backends.md#selection-and-contract); the evidence on [measurements](docs/develop/fft-measurements.md) |
+| Write host-test steps or record results | [Every report](docs/develop/host-testing.md#every-report) and the host's section of [host testing](docs/develop/host-testing.md) |
+| Candidates and preview packages | [Releasing](docs/develop/releasing.md#candidates) |
+| Change documentation | [One home for each topic](docs/develop/documentation.md#one-home-for-each-topic), [writing rules](docs/develop/documentation.md#writing-rules) |
+| What jrp has decided | [Decisions](docs/project/decisions.md) |
 
 ## Build and test
 
-Use the sanitizer build for every change (all builds, presets and plug-in SDKs
-are in `docs/develop/build.md`):
+Verify in proportion to the change: the
+[verification table](docs/develop/workflow.md#verification-for-each-kind-of-change)
+says what prose, executable examples, tooling, code, DSP and plug-in changes
+each need. A prose-only change needs `pre-commit run --all-files`, not a native
+build. Any change to C++, CMake or a test CTest runs uses the sanitizer build
+(all builds, presets and plug-in SDKs are in `docs/develop/build.md`):
 
 ```sh
 cmake -S . -B build -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug -DCONVOLVER_SANITIZERS=ON
@@ -81,8 +124,8 @@ plus Ooura configurations described in [testing](docs/develop/testing.md).
   `python3 scripts/check_format.py --fix`), formats and lints the Python
   with ruff (`ruff.toml`) and runs the other lint checks;
   lint CI fails on any difference. Cloud sessions install it as a Git hook.
-  Portable sources must also pass the `.clang-tidy` checks (commands in
-  `CONTRIBUTING.md`).
+  Changed portable C++ sources must also pass the `.clang-tidy` checks
+  (commands in `CONTRIBUTING.md`).
 - `python3 scripts/check_repository.py` must pass (pre-commit runs it; the
   list of checks is in the [workflow guide](docs/develop/workflow.md#automated-checks)).
 - Do not claim something builds or passes unless you ran it.

@@ -13,7 +13,10 @@ Keep host APIs and file access outside the DSP core. Preserve the historical
 source/documents and their provenance; do not mechanically modernize them when
 editing the portable implementation.
 
-For a normal change, build and run the complete CTest configuration. Use a
+For a change to code, build and run the complete CTest configuration; a
+prose or tooling change needs less, as the
+[verification table](docs/develop/workflow.md#verification-for-each-kind-of-change)
+says. Use a
 separate sanitizer build for correctness and Release for measurements. The
 core-only preset checks dependency isolation; the package-consumer test checks
 installed and source-tree use. Keep independent time-domain/DFT oracles and

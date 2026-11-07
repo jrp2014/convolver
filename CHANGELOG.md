@@ -185,6 +185,22 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Development (DOC-8, from jrp's review of the agent guidance at `f6895f3`):
+  the [workflow guide](docs/develop/workflow.md#verification-for-each-kind-of-change)
+  says what each kind of change must run before a push (a prose-only change
+  needs pre-commit, not a native build), and that a review is read-only
+  unless asked otherwise, host testing records what was observed, and only a
+  change gets a branch. The `todo-item` and `review-change` skills link to
+  their sections and the link check now reads `.claude/skills/`; `AGENTS.md`
+  lists the same entry points and a task-to-section index. The dated
+  benchmarks move to [FFT and engine measurements](docs/develop/fft-measurements.md)
+  and the load-timing method to [load timing](docs/develop/load-timing.md),
+  with the old links kept. jrp's HOST-1 REAPER session is archived, and its
+  two open findings (a new VST3 Latency not used until the project is
+  reopened; no REAPER route for the 2→6 crossover) are listed in
+  [host testing](docs/develop/host-testing.md#unresolved-host-findings)
+  instead of the guides promising those results. Merged branches are kept
+  for a while and deleted periodically by jrp from a list agents prepare.
 - Documentation (DOC-7): finished items in [TODO](TODO.md#done) are one line
   each again, as the workflow guide asks: ID, title, date, pull request and
   the page that describes the result. Their earlier full entries, with the

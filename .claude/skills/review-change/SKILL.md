@@ -6,10 +6,17 @@ description: Independently review a Convolver pull request or branch against thi
 
 # Review a change
 
-You are the independent reviewer. Follow "Independent review" in
-`docs/develop/workflow.md`: its Gather, Check and Report steps are the whole
-procedure, and "Definition of done" on the same page is what a ready pull
-request must meet. Read `AGENTS.md` first for the rules that apply everywhere.
-If the procedure seems to be missing a check, add it to that page, not here.
+You are the independent reviewer. Follow the
+[independent review](../../../docs/develop/workflow.md#independent-review) in
+the workflow guide: its [gather](../../../docs/develop/workflow.md#gather),
+[check](../../../docs/develop/workflow.md#check) and
+[report](../../../docs/develop/workflow.md#report) steps are the whole
+procedure, and the [definition of done](../../../docs/develop/workflow.md#definition-of-done)
+is what a ready pull request must meet. Read [AGENTS.md](../../../AGENTS.md)
+first for the rules that apply everywhere. If the procedure seems to be
+missing a check, add it to that page, not here. The link checker checks these
+links.
 
-Do not approve or merge; jrp does that.
+The review is read-only ([kinds of task](../../../docs/develop/workflow.md#kinds-of-task)):
+change no files, commit nothing and post only what the report step says. Do
+not approve or merge; jrp does that.

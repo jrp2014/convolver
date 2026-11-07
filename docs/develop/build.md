@@ -153,7 +153,10 @@ add `-DCONVOLVER_LEGACY_TESTS=OFF`.
 
 ## Sanitizer build for changes
 
-Build and test every change this way before pushing. It instruments the native
+Build and test every change to C++, CMake or the tests CTest runs this way
+before pushing; prose and tooling changes need less
+([verification for each kind of change](workflow.md#verification-for-each-kind-of-change)).
+It instruments the native
 targets with AddressSanitizer and UndefinedBehaviorSanitizer and runs the
 historical regression tests too:
 

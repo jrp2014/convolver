@@ -24,7 +24,9 @@ where measurements justify it (FFT, PERF), and the edges over the leading
 convolution plug-ins to build after the first walkthrough (EDGE). The
 [limitations table](#documented-limitations) lists current constraints.
 
-To take an item on, open a draft pull request titled with its ID; that is the
+You need not read this file whole: read the
+[execution priorities](#execution-priorities), then search for your item's
+ID. To take an item on, open a draft pull request titled with its ID; that is the
 claim, and its description holds the handoff note. Record progress here as the
 [workflow guide](docs/develop/workflow.md#recording-progress-in-todo) describes,
 and confirm the current source first: other work may already have done part of
@@ -152,6 +154,16 @@ is superseded.
   preset for another rate or channel count: the status and message shown,
   silence or the previous filter as the contract says, then a fitting
   filter loads, and saving and reopening keep it).
+  Progress (6 November 2026, PR #129): jrp ran the REAPER smoke test (REAPER
+  7.85, macOS 27.2 arm64, candidate 0.10.9 from `83aa64d`;
+  [record](docs/archive/reviews/2026-11-06-host1-reaper.md)). The smoke steps, the stereo journey (render, save and
+  reopen, presets that do not fit; every `--compare` a Match) and the
+  window's settings passed. Two results are open
+  ([unresolved host findings](docs/develop/host-testing.md#unresolved-host-findings)):
+  a new VST3 Latency was not used until the project was reopened, and
+  REAPER gave the plug-in 6 inputs and 6 outputs, so the 2→6 crossover was
+  refused and its render, reopen and refusal steps were not run. Audacity,
+  and REAPER's display of the Status parameter, remain.
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
   now requested (progress below). Write adapters against the
@@ -888,7 +900,7 @@ PERF-9 (done, PR #111) built that test on interim workloads, with jrp's
 limits (5 November 2026): in optimised builds, no late callback and none
 over half its period while a load runs on another thread, and the host's
 thread held at most 100 ms with filters up to 10 s and 250 ms with 30 s
-([load timing](docs/develop/testing.md#load-timing-perf-9)).
+([load timing](docs/develop/load-timing.md)).
 
 **Preview workloads.** The gate is finite: its workloads are the ones that
 test already runs, a stereo 48 kHz filter of 1, 10 and 30 s with 512-frame
@@ -1245,6 +1257,8 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **DOC-7 — Archive finished entries and remove cruft.** 6 November 2026,
   PR #123, on jrp's request; [recording
   progress](docs/develop/workflow.md#recording-progress-in-todo).
+- [x] **DOC-8 — Tune the agent guidance and workflow.** 6 November 2026,
+  PR #129, from jrp's review; [workflow](docs/develop/workflow.md#kinds-of-task).
 - [x] **FFMPEG-1 — Test the pipe workflow.** 5 November 2026;
   [tests](docs/develop/testing.md#native-production-tests).
 - [x] **FFT-1 — Check that we have the latest Ooura version.** 21 October 2026;

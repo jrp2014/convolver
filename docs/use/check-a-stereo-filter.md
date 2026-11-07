@@ -14,8 +14,9 @@ render `input.wav` through it, and run
 It should print `Match`. The filter must survive saving and reopening, and a
 preset for another rate or channel count must leave it playing.
 
-**Status:** Convolver is a developer preview, and these steps have not yet
-been followed in a host from start to finish. Menu names and what a host
+**Status:** Convolver is a developer preview. These steps have been followed
+from start to finish once, in REAPER on macOS, and gave the expected result;
+other hosts are not yet checked. Menu names and what a host
 shows may differ from what is written here; the
 [status page](../project/status.md) says what is ready.
 
