@@ -49,6 +49,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
 | 6 November 2026 | The goal's "most popular reverb plug-ins" means the reverbs that play impulse responses (Altiverb, Reverberate, Space Designer and the like) and the room-correction convolvers (Hang Loose Convolver, CamillaDSP, X-MCFX); algorithmic reverbs such as Valhalla's are left out (decision card: "IR reverbs and convolvers") | [Edges plan](plans/2026-11-06-edges-over-other-convolvers.md) |
 | 6 November 2026 | Qualifying that choice: easy wins over the room-correction convolvers, where Convolver started, come first ("if there are easy wins over room correction reverbs (which is where we started) prioritise those") | [Edges plan](plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) |
 | 6 November 2026 | Optimisations take each platform's floating-point characteristics fully into account, as the subnormal flushing did, and use what is known about sound: "Optimizations that reflect that we are dealing with DSP and so sound characteristics are the added value that we can bring" (EDGE-10) | [Edges plan](plans/2026-11-06-edges-over-other-convolvers.md#sound-aware-and-platform-aware-optimisation) |
+| 7 November 2026 | Benchmark the EDGE-10 candidates, and use OpenMP where it would not lead to cross-platform incompatibilities ("Try to use OpenMP where it would not lead to cross-platform incompatibilities"): the offline paths, optional, with a serial fallback | [TODO](../../TODO.md) EDGE-10 |
 
 ## Releases
 

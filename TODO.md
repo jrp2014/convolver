@@ -1047,6 +1047,13 @@ PERF-2 and EDGE-10); then the reverb features.
   (preparation and offline renders; on the audio thread only through the
   platform's real-time mechanism, such as macOS audio workgroups, never
   OpenMP); and the floating-point environment per compiler and processor.
+  jrp wants OpenMP used where it causes no cross-platform incompatibility:
+  as an optional build feature for the offline paths, using only what
+  MSVC's OpenMP 2.0 supports, with a serial build that compiles and gives
+  byte-identical output where OpenMP is missing (Apple's compiler has none;
+  shipping `libomp` in a package is a dependency for jrp to approve).
+  Parallel results must not depend on thread scheduling: each path computed
+  as now, outputs summed in a fixed order.
   Exact and rounding-only changes keep the oracle and divergence bounds;
   a bounded approximation needs jrp's decision on its bound, judged against
   the threshold of hearing as the dither defaults were. Goes with PERF-2.
