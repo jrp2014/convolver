@@ -28,6 +28,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 using namespace Steinberg;
 using namespace Steinberg::Vst;
@@ -1771,6 +1772,50 @@ void output_silence_flags_64() {
 // VST3-4: Gain, Mix and Latency as parameters, applied by the processor,
 // saved in the component state (version 3 only when not at the defaults), and
 // a new Latency reported to the host with kLatencyChanged.
+// VST3-16: the latency trace records nothing until opened, counts a
+// repeated call instead of recording it again, names the thread, and says
+// how many calls it could not keep.
+void latency_trace() {
+    using Call = LatencyTrace::Call;
+    LatencyTrace trace;
+    trace.record(Call::get_latency, 256);
+    require(trace.take().empty(), "the latency trace recorded before it was opened");
+    trace.open();
+    for (int i = 0; i < 5; ++i)
+        trace.record(Call::get_latency, 256);
+    trace.record(Call::get_latency, 1024);
+    trace.record(Call::set_active, 1, 1024, 0);
+    trace.record(Call::get_latency, 1024);
+    trace.record(Call::get_latency, 1024);
+    auto lines = trace.take();
+    const auto has = [&](std::size_t i, const char* part) {
+        return i < lines.size() && lines[i].find(part) != std::string::npos;
+    };
+    require(lines.size() == 6 && has(0, "main thread: getLatencySamples() returned 256.") &&
+                has(1, "Latency trace: the call above was repeated 4 more times.") &&
+                has(2, "getLatencySamples() returned 1024.") &&
+                has(3, "setActive(true) returned kResultOk; the processor runs at 1024.") &&
+                has(4, "getLatencySamples() returned 1024.") &&
+                has(5, "the call above was repeated 1 more times."),
+            "the latency trace's repeated calls");
+    // Another thread, then the same thread once it has played a block.
+    std::thread([&] {
+        trace.record(Call::set_processing, 1);
+        trace.audio_block(64); // Not the first block since a restart: not recorded.
+        trace.restarted();
+        trace.audio_block(32);
+    }).join();
+    lines = trace.take();
+    require(lines.size() == 2 && has(0, "audio thread: setProcessing(true).") &&
+                has(1, "audio thread: process() started again, 32 frames."),
+            "the latency trace's threads");
+    for (int i = 0; i < 300; ++i)
+        trace.record(Call::get_tail, i);
+    lines = trace.take();
+    require(lines.size() == 257 && has(255, "getTailSamples() returned 255.") &&
+                has(256, "Latency trace: 44 host calls were not recorded (the record was full)."),
+            "the latency trace's full record");
+}
 void settings_parameters() {
     HostApplication context;
     Handler handler; // Outlives the controller, which holds it.
@@ -1926,6 +1971,9 @@ void settings_parameters() {
     // Latency: the controller tells the processor and asks the host to
     // restart; the next activation plays at the new delay.
     handler.restarts.clear();
+    // VST3-16: the host's calls are traced from the choice on, not before.
+    const convolver::test_log::LogSince trace_log(process_log);
+    require(p.getLatencySamples() == 256, "latency before the choice");
     // Until the host restarts it, the processor reports the latency it runs at.
     require(c.setParamNormalized(latency_id, normalized_latency(1024)) == kResultOk &&
                 p.settings().latency == 1024 && p.getLatencySamples() == 256 &&
@@ -1950,6 +1998,46 @@ void settings_parameters() {
                 at = b * 512 + i;
     }
     require(at == 1024, "output not delayed by the new Latency");
+    {
+        p.setProcessing(false); // Writes nothing, but is traced.
+        require(p.setActive(false) == kResultOk && p.setActive(true) == kResultOk &&
+                    p.setProcessing(true) == kResultOk,
+                "restart to write the trace");
+        const auto text = trace_log.text();
+        const auto first = text.find("Latency trace");
+        require(first != std::string::npos &&
+                    text.substr(first, text.find('\n', first) - first)
+                            .find(": Latency 1024 frames chosen (the processor runs at 256).") !=
+                        std::string::npos,
+                "the trace did not start with the Latency choice");
+        // The host's calls, in order (this test is the host).
+        std::size_t at_line = first;
+        for (const char* call : {
+                 "the controller calls restartComponent(kLatencyChanged).",
+                 "restartComponent(kLatencyChanged) returned kResultOk.",
+                 "getLatencySamples() returned 256.",
+                 "setProcessing(false).",
+                 "setActive(false) returned kResultOk; the processor runs at 0.",
+                 "setActive(true) returned kResultOk; the processor runs at 1024.",
+                 "setProcessing(true).",
+                 "getLatencySamples() returned 1024.",
+                 "getTailSamples() returned 1024.",
+                 "process() started again, 512 frames.",
+                 "setProcessing(false).",
+                 "setActive(false) returned kResultOk; the processor runs at 0.",
+             }) {
+            at_line = text.find(call, at_line);
+            if (at_line == std::string::npos)
+                std::cerr << "Not found after the previous call: " << call << '\n';
+            require(at_line != std::string::npos, "the latency trace is missing, or out of order");
+        }
+        // Only the first block after starting is recorded.
+        std::size_t started = 0;
+        for (auto at_text = text.find("process() started again"); at_text != std::string::npos;
+             at_text = text.find("process() started again", at_text + 1))
+            ++started;
+        require(started == 1, "every block traced");
+    }
     // A state with another Latency changes the processor's and asks the
     // controller's host to restart.
     MemoryStream with_latency;
@@ -2501,6 +2589,7 @@ int run(const std::filesystem::path& preset_path) {
         edge_cases();
         fractional_rates();
         controller_conversions();
+        latency_trace();
         settings_parameters();
         report_and_files();
         saved_filter_name();

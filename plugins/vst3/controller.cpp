@@ -263,9 +263,25 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     // after this message's Status: with a direct connection this runs inside
     // Processor::notify, and a host that restarts at once sends newer
     // status messages from setActive.
-    if (restart && componentHandler)
-        componentHandler->restartComponent(kLatencyChanged);
+    if (restart)
+        restart_for_latency();
     return kResultOk;
+}
+void Controller::restart_for_latency() {
+    if (!componentHandler)
+        return;
+    const auto trace = [this](int64 call, int64 result) {
+        if (auto message = owned(allocateMessage())) {
+            message->setMessageID(trace_message);
+            if (auto* attributes = message->getAttributes()) {
+                attributes->setInt("call", call);
+                attributes->setInt("result", result);
+                sendMessage(message);
+            }
+        }
+    };
+    trace(0, 0);
+    trace(1, componentHandler->restartComponent(kLatencyChanged));
 }
 void Controller::latency_chosen(std::size_t frames) {
     int64 request = 0;
@@ -382,8 +398,8 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
     // host is asked to read it again when it changed.
     const auto before = latency_frames(getParamNormalized(latency_id));
     EditController::setParamNormalized(latency_id, normalized_latency(saved.latency));
-    if (latency_frames(getParamNormalized(latency_id)) != before && componentHandler)
-        componentHandler->restartComponent(kLatencyChanged);
+    if (latency_frames(getParamNormalized(latency_id)) != before)
+        restart_for_latency();
     return EditController::setParamNormalized(bypass_id, state.bypass ? 1 : 0);
 }
 IPlugView* PLUGIN_API Controller::createView(FIDString name) {

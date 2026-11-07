@@ -195,8 +195,11 @@ tresult Processor::arrange(SpeakerArrangement* in, int32 ni, SpeakerArrangement*
 }
 uint32 PLUGIN_API Processor::getTailSamples() {
     const auto tail = tail_.load();
-    const auto latency = getLatencySamples();
-    return tail >= kInfiniteTail - latency ? kInfiniteTail - 1 : tail + latency;
+    const auto running = active_latency_.load();
+    const auto latency = static_cast<uint32>(running ? running : latency_.load());
+    const auto samples = tail >= kInfiniteTail - latency ? kInfiniteTail - 1 : tail + latency;
+    trace_.record(LatencyTrace::Call::get_tail, samples);
+    return samples;
 }
 HostSettings Processor::settings() const noexcept {
     return {gain_db_.load(), mix_.load(), latency_.load()};
@@ -241,10 +244,12 @@ tresult PLUGIN_API Processor::setupProcessing(ProcessSetup& setup) {
         } else
             result = AudioEffect::setupProcessing(setup);
     }
+    const bool whole = std::isfinite(setup.sampleRate) && std::abs(setup.sampleRate) < 1e15;
+    trace_.record(LatencyTrace::Call::setup_processing, setup.maxSamplesPerBlock,
+                  whole ? static_cast<std::int64_t>(setup.sampleRate) : -1, result);
+    write_log();
     if (result == kResultOk)
         send_status(); // Whether the filter has been checked may have changed.
-    else
-        write_log();
     return result;
 }
 HostLayout Processor::layout() const {
@@ -268,6 +273,10 @@ std::optional<HostLayout> Processor::known_layout() const {
 }
 tresult PLUGIN_API Processor::setActive(TBool state) {
     const auto result = activate(state);
+    trace_.record(LatencyTrace::Call::set_active, state ? 1 : 0,
+                  static_cast<std::int64_t>(active_latency_.load()), result);
+    if (state)
+        trace_.restarted();
     write_log();
     send_status();
     return result;
@@ -356,6 +365,11 @@ void Processor::write_log() noexcept {
     std::vector<std::pair<std::string, bool>> lines;
     {
         std::lock_guard lock(control_);
+        try { // VST3-16: the host's calls since the last write, in order.
+            for (auto& line : trace_.take())
+                unlogged_.emplace_back(std::move(line), false);
+        } catch (...) { // Out of memory: those lines are dropped.
+        }
         lines.swap(unlogged_);
     }
     for (const auto& [line, problem] : lines)
@@ -445,6 +459,9 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
         attributes->getInt("request", request);
         {
             std::lock_guard lock(control_);
+            trace_.open();
+            trace_.record(LatencyTrace::Call::latency_chosen, frames,
+                          static_cast<std::int64_t>(active_latency_.load()));
             choose_latency(static_cast<std::size_t>(frames));
         }
         write_log();
@@ -465,18 +482,28 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
         return accepted ? kResultOk : kResultFalse;
     }
     if (id == report_message) {
-        bool faulted = false;
         {
             std::lock_guard lock(control_);
             const auto now = std::chrono::steady_clock::now();
             if (now - report_faults_at_ >= report_fault_interval) {
-                faulted = observe_faults();
+                observe_faults();
                 report_faults_at_ = now;
             }
         }
-        if (faulted)
-            write_log();
+        write_log(); // New fault lines, and the latency trace's (VST3-16).
         send_status();
+        return kResultOk;
+    }
+    if (id == trace_message) {
+        int64 call = 0, result = 0;
+        auto* attributes = message->getAttributes();
+        if (!attributes || attributes->getInt("call", call) != kResultOk)
+            return kInvalidArgument;
+        attributes->getInt("result", result);
+        trace_.record(call ? LatencyTrace::Call::restart_answered
+                           : LatencyTrace::Call::restart_asking,
+                      0, 0, result);
+        write_log();
         return kResultOk;
     }
     if (id == name_message) {
@@ -547,6 +574,9 @@ tresult PLUGIN_API Processor::setProcessing(TBool state) {
         host_->set_bypass(bypass_.load());
         host_->reset();
     }
+    trace_.record(LatencyTrace::Call::set_processing, state ? 1 : 0);
+    if (state)
+        trace_.restarted();
     return kResultOk;
 }
 tresult PLUGIN_API Processor::setState(IBStream* stream) {
@@ -818,8 +848,10 @@ tresult PLUGIN_API Processor::process(ProcessData& d) {
         return kInvalidArgument;
     if (d.numSamples && (!host_ || canProcessSampleSize(d.symbolicSampleSize) != kResultOk))
         return kInvalidArgument;
-    if (d.numSamples) // Restored state is now checked against the host (install()).
+    if (d.numSamples) { // Restored state is now checked against the host (install()).
         played_.store(true, std::memory_order_relaxed);
+        trace_.audio_block(d.numSamples);
+    }
     if (d.numOutputs && d.outputs)
         d.outputs[0].silenceFlags = 0; // Set again below once the output is known.
     auto render = [&](int32 first, int32 count) {

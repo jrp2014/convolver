@@ -3,6 +3,7 @@
 #include "convolver/host.hpp"
 #include "convolver_identities.hpp"
 #include "host_report.hpp"
+#include "latency_trace.hpp"
 #include "pluginterfaces/vst/ivstparameterfunctionname.h"
 #include "public.sdk/source/vst/vstaudioeffect.h"
 #include "public.sdk/source/vst/vsteditcontroller.h"
@@ -112,6 +113,10 @@ inline constexpr Steinberg::Vst::ParamID gain_id = identity::vst3_gain_parameter
 inline constexpr Steinberg::Vst::ParamID mix_id = identity::vst3_mix_parameter_id;
 inline constexpr Steinberg::Vst::ParamID latency_id = identity::vst3_latency_parameter_id;
 inline constexpr const char* latency_message = "ConvolverLatency";
+// VST3-16 (investigation): the controller's trace_message ("call": 0 before
+// it calls restartComponent(kLatencyChanged), 1 after; "result": what that
+// returned), for the processor's LatencyTrace.
+inline constexpr const char* trace_message = "ConvolverTrace";
 // PLUG-22: the controller's bypass_message ("bypass": 0 or 1) when the host
 // or the window changes Bypass, so the Status reads Bypassed at once rather
 // than when the audio thread next sees the change.
@@ -158,7 +163,9 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // (kLatencyChanged) and reads it after setActive(true), as the SDK says.
     Steinberg::uint32 PLUGIN_API getLatencySamples() override {
         const auto running = active_latency_.load();
-        return static_cast<Steinberg::uint32>(running ? running : latency_.load());
+        const auto latency = static_cast<Steinberg::uint32>(running ? running : latency_.load());
+        trace_.record(LatencyTrace::Call::get_latency, latency);
+        return latency;
     }
     // How long the output keeps sounding after the input stops, measured at the
     // plug-in's output as Steinberg's tail test does: the filter's tail plus
@@ -258,6 +265,7 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     std::atomic<std::size_t> latency_{default_host_latency};
     std::atomic<std::size_t> active_latency_{0}; // The running processor's; 0 while inactive.
     std::atomic<Steinberg::uint32> tail_{0};
+    LatencyTrace trace_; // VST3-16: the host's calls after a Latency change.
     int inputs_ = 2, outputs_ = 2;
     Steinberg::Vst::SpeakerArrangement input_arrangement_ = Steinberg::Vst::SpeakerArr::kStereo,
                                        output_arrangement_ = Steinberg::Vst::SpeakerArr::kStereo;
@@ -357,6 +365,9 @@ class Controller final : public Steinberg::Vst::EditController,
     // processor answers that it has them (notify), since the host reads the
     // latency during the restart.
     void latency_chosen(std::size_t frames);
+    // VST3-16: asks the host to restart for a new latency, telling the
+    // processor's LatencyTrace before and after (trace_message).
+    void restart_for_latency();
     // The host may restore state (and so send the status) on another thread
     // than the one reading parameter text.
     std::mutex status_lock_;
