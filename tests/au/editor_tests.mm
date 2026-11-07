@@ -247,7 +247,8 @@ void properties(const au_test::LogSince& log) {
         require(contains(r[@"explanation"], part), "mono track explanation lacks \"" +
                                                        std::string(part) +
                                                        "\": " + text(r[@"explanation"]));
-    require(contains(r[@"audio"], "Channels\t1 in, 1 out\tthe filter has 2 in, 2 out\tproblem\t") &&
+    require(contains(r[@"audio"],
+                     "Host channels\t1 in, 1 out\tthe filter has 2 in, 2 out\tproblem\t") &&
                 contains(r[@"audio"], "Host block size\tup to 512 frames\t"),
             "mono track Audio facts: " + text(r[@"audio"]));
     require(contains(r[@"reference"], "Software: Convolver "),
