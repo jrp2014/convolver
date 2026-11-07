@@ -126,6 +126,9 @@ is superseded.
   First step, before the first preview: jrp's smoke tests in REAPER and
   Audacity on his Mac, from the latest candidate
   ([smoke tests](docs/develop/host-testing.md#smoke-test-in-each-first-host)).
+  Progress (6 November 2026): a [48 kHz stereo listening clip](examples/host-audio/README.md)
+  and its generator are available for the manual checks. The clip does not
+  replace the first-use numerical comparisons or establish a host result.
   The REAPER smoke test also takes over the host steps that REL-5 left out:
   install, render, save and reopen, and presets that do not fit, in
   [check a stereo filter in a host](docs/use/check-a-stereo-filter.md),

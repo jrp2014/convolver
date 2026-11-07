@@ -12,6 +12,11 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Host checks (HOST-1): a reusable 20-second, 48 kHz stereo listening WAV
+  with quiet clicks and sustained tones, a standard-library Python generator,
+  and [usage notes](examples/host-audio/README.md). The REAPER smoke-test
+  guide links to it. This is source audio for manual checks, not a filter
+  or a numerical reference; preview package contents are unchanged.
 - User guides (REL-2): [check a crossover in a host](docs/use/check-a-crossover-in-a-host.md),
   the 2→6 crossover journey in REAPER with the VST3 plug-in or the Audio
   Unit, and [check file rendering with the command line](docs/use/check-files-with-the-command-line.md),

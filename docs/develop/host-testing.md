@@ -243,7 +243,9 @@ except the Audio Unit build, which runs in a source checkout.
    open. Remove the folder after testing
    (`sudo rm -r /Library/Audio/Presets/Convolver`).
 4. Have a stereo test file at 44.1 kHz and one at 48 kHz, with clear
-   transients (a click track or spoken word).
+   transients (a click track or spoken word). For the 48 kHz checks, the
+   repository includes a [quiet stereo listening clip](../../examples/host-audio/README.md)
+   with clicks and sustained tones.
 5. Start each host's test with an empty
    [Convolver log](../use/plugins.md#status-and-the-convolver-log), and copy it
    into the report afterwards:
