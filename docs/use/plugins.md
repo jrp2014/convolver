@@ -423,9 +423,10 @@ From the top, the window has:
   automation from it may record each step separately; not yet tried in
   GarageBand.
 - **Latency**: a menu of block sizes, with the delay it adds at the host's
-  rate beside it ("adds 21.3 ms"); a new choice plays at once, and "not in
-  use yet" shows only until it does ([settings](#settings)). The host is
-  told the delay, so it can delay other tracks to keep them in time.
+  rate beside it ("adds 21.3 ms"). A new choice plays once the plug-in
+  restarts with it, and until then the row says it is "not in use yet"
+  ([settings](#settings)). The host is told the delay, so it can delay
+  other tracks to keep them in time.
 - **Audio**: the host's values and what plays, each a short value. The
   filter's own rate, channels, length and speakers are under its name, so
   these lines say what the host gives, which need not be the same. Hold the
@@ -507,8 +508,9 @@ defaults play exactly as Convolver did before the settings existed.
   wet, with a latency of 256 frames. The LV2 plug-in has no settings yet.
   The same project can therefore sound different in another format.
 - **VST3 hosts** mark Mix as the plug-in's dry/wet control where they have
-  one. A new Latency asks the host to restart the plug-in, which hosts do
-  at once or when playback stops; until then the old Latency plays. A
+  one. A new Latency asks the host to restart the plug-in; until it does,
+  the old Latency plays. REAPER 7.85 restarts it only when the project is
+  reopened ([REAPER findings](../develop/host-testing.md#unresolved-host-findings)). A
   project saved at the default settings is saved exactly as before the
   settings existed, so older Convolver builds still open it; one saved with
   other settings needs a Convolver with these settings, and an older build refuses

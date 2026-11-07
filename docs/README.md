@@ -68,8 +68,10 @@ These pages are in `docs/use/` and are shipped in preview packages.
 | [Implementation map](develop/architecture.md) | Background | Source responsibilities, invariants, change-to-test map |
 | [Plug-in adapter contract](develop/plugin-contract.md) | Reference | What every plug-in adapter must do: failed loads, restoration, replacement, bypass, threads, host state, preset files |
 | [Plug-in identities and channel layouts](develop/plugin-identities.md) | Reference | Permanent IDs for every format, what forks must change, discrete and named layouts, old presets |
-| [FFT guide](develop/fft-backends.md) | Background | Backend choice, numerical contract, dated benchmarks |
+| [FFT guide](develop/fft-backends.md) | Background | Backend choice, numerical contract, what the benchmarks concluded |
+| [FFT and engine measurements](develop/fft-measurements.md) | Background | Dated benchmarks: FFT libraries, FFTW builds, spectrum layout, compiler flags, AVX2 kernels, startup and reset, how to reproduce them |
 | [Testing](develop/testing.md) | Reference | What each test establishes and its limits, including each plug-in format and the Equalizer APO export |
+| [Load timing](develop/load-timing.md) | Reference | How the load-timing tests measure loading, their limits, verdicts and records (PERF-9) |
 | [Host testing](develop/host-testing.md) | How-to | Testing in real hosts: the preview smoke test, production qualification, Equalizer APO on a device |
 | [Taking on and reviewing work](develop/workflow.md) | How-to | Claiming a TODO item, handoff notes, definition of done, independent review, merge, repository checks |
 | [Documentation guide](develop/documentation.md) | Reference | Readers and kinds of page, writing rules, pages agents follow, which page owns each topic, link checks |
@@ -161,6 +163,11 @@ including the 18 October plug-in distribution plan, whose open work is now in
   the status, the full explanation of a failure, what is loaded and the
   Convolver log; settings, framework, threads, testing, accessibility and
   phases, with decisions for jrp.
+- [Edges over the leading convolution plug-ins](project/plans/2026-11-06-edges-over-other-convolvers.md)
+  (EDGE-1 to EDGE-13, PERF-2, PERF-3, IO-2): how Convolver compares with Altiverb,
+  Reverberate, Space Designer, Hang Loose Convolver, CamillaDSP and X-MCFX,
+  the edges it already has, the ranked edges to build after the first
+  walkthrough, and the rules each keeps.
 - [Media Foundation transform](project/plans/2026-10-21-media-foundation-transform.md)
   (HOST-3, parked): a Windows audio effect for Media Player Legacy, DirectShow players and
   Media Foundation or WinRT applications, with APO and Equalizer APO alternatives
