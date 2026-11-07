@@ -23,8 +23,8 @@ class Reference final : public lc::Driver {
         using lc::Op;
         lc::Format f;
         f.name = "host layer";
-        // As VST3: the configuration binds at activation and stays known while
-        // it is unchanged.
+        // The configuration binds at activation and stays known while it is
+        // unchanged (VST3 also waits until audio has played).
         f.known = lc::Known::activation;
         f.operations = {Op::state_a,
                         Op::state_b,
@@ -76,7 +76,7 @@ class Reference final : public lc::Driver {
             // Contract, replacement and threads: while active, a prepared
             // replacement is published; stopped, activation installs it.
             const auto host = known();
-            filter_->load(std::move(state), host, [&](const Configuration& c) {
+            filter_->load(std::move(state), host, [&](const HostPlayback& c) {
                 if (processor_)
                     processor_->replace(c);
             });
@@ -98,7 +98,9 @@ class Reference final : public lc::Driver {
         return restore(bytes);
     }
     bool start() override {
-        processor_ = std::make_unique<HostProcessor>(filter_->activate(layout()), max_block());
+        // PLUG-23: activate() may read fewer inputs than the host gives.
+        processor_ = std::make_unique<HostProcessor>(filter_->activate(layout()), max_block(),
+                                                     HostSettings{}, layout().inputs);
         processor_->set_bypass(bypass_);
         processor_->reset();
         bound_ = host_;

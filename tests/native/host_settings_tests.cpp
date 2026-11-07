@@ -383,15 +383,17 @@ void latency_choices() {
 }
 
 void settings_text() {
-    require(settings_words(HostSettings{}, true) == "gain 0 dB, mix 100% wet, latency 256 frames",
-            "settings words: " + settings_words(HostSettings{}, true));
+    require(settings_words(HostSettings{}, HostDrySignal::present) ==
+                "gain 0 dB, mix 100% wet, latency 256 frames",
+            "settings words: " + settings_words(HostSettings{}, HostDrySignal::present));
     HostSettings s{-6, .5, 1024};
-    require(settings_words(s, true) == "gain -6 dB, mix 50% wet, latency 1024 frames",
-            "settings words: " + settings_words(s, true));
-    require(settings_words(s, false) ==
+    require(settings_words(s, HostDrySignal::present) ==
+                "gain -6 dB, mix 50% wet, latency 1024 frames",
+            "settings words: " + settings_words(s, HostDrySignal::present));
+    require(settings_words(s, HostDrySignal::host_counts) ==
                 "gain -6 dB, mix 100% wet (inputs and outputs differ, so there is no dry "
                 "signal), latency 1024 frames",
-            "settings words for unequal counts: " + settings_words(s, false));
+            "settings words for unequal counts: " + settings_words(s, HostDrySignal::host_counts));
     // GarageBand's sliders give values like these (jrp's run of AU-6).
     for (const auto& [settings, words] :
          {std::pair{HostSettings{-75.967, .561413}, "gain -76 dB, mix 56.1% wet"},
@@ -399,8 +401,9 @@ void settings_text() {
           std::pair{HostSettings{-.01, .9996}, "gain -0.01 dB, mix 99.96% wet"},
           std::pair{HostSettings{-99.99, .99999}, "gain -99.99 dB, mix 99.999% wet"},
           std::pair{HostSettings{-.04, .0004}, "gain -0.04 dB, mix 0.04% wet"}})
-        require(settings_words(settings, true) == std::string(words) + ", latency 256 frames",
-                "settings words: " + settings_words(settings, true));
+        require(settings_words(settings, HostDrySignal::present) ==
+                    std::string(words) + ", latency 256 frames",
+                "settings words: " + settings_words(settings, HostDrySignal::present));
     // The window's slider text: never an exponent, never a range end it is not.
     for (const auto& [value, text] :
          {std::pair{23.97, "23.97"}, std::pair{24.0, "24"}, std::pair{-1e-9, "0"},
@@ -497,24 +500,34 @@ void diagnostics_follow_settings() {
          "Silent: the filter is for 44100 Hz",
          "Convolver plays silence. The filter is for 44100 Hz",
          HostStatus::load_failed},
+        // No dry signal after a failed load with no filter kept, with one
+        // input and one output too (jrp, 7 November 2026).
         {"refused first load, mix 50%",
          mono,
          true,
          false,
          {0, .5},
-         .25f,
-         "Load failed, only the dry signal plays: the filter is for 44100 Hz",
-         "With Mix at 50% wet, only the dry signal plays: the input at -6.0 dB. The filter is for "
-         "44100 Hz",
+         0,
+         "Silent: the filter is for 44100 Hz",
+         "Convolver plays silence. The filter is for 44100 Hz",
          HostStatus::load_failed},
         {"refused first load, gain +24 dB, mix 0%",
          mono,
          true,
          false,
          {24, 0},
-         .5f,
-         "Load failed, only the dry signal plays:",
-         "With Mix at 0% wet, only the dry signal plays: the input unchanged.",
+         0,
+         "Silent: the filter is for 44100 Hz",
+         "Convolver plays silence.",
+         HostStatus::load_failed},
+        {"refused first load, 2 in 2 out, mix 0%",
+         {48000, 2, 2},
+         true,
+         false,
+         {0, 0},
+         0,
+         "Silent: the filter is for 44100 Hz",
+         "Convolver plays silence.",
          HostStatus::load_failed},
         {"refused first load, 1 in 2 out, mix 50%",
          split,
@@ -593,8 +606,8 @@ void diagnostics_follow_settings() {
     const auto failed_start = host_status(unstarted, mono, true, HostSettings{0, .5});
     require(contains(failed_start.text, "Silent: the plug-in could not start the filter."),
             "activation failure at Mix 50%: " + failed_start.text);
-    // Before the host is known, a refused first load cannot say whether
-    // Mix's dry share will play (it does only with equal counts).
+    // Before the host is known, a refused first load already knows that no
+    // dry signal will play (jrp, 7 November 2026).
     HostFilter unknown;
     try {
         unknown.load(HostState{Configuration{44100, 1, 1, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}}},
@@ -602,7 +615,7 @@ void diagnostics_follow_settings() {
     } catch (const std::invalid_argument&) {
     }
     const auto line = host_status(unknown, std::nullopt, true, HostSettings{0, .5});
-    require(contains(line.text, "Load failed, no filter plays: "),
+    require(contains(line.text, "Silent: the filter is for 44100 Hz."),
             "unknown host, mix 50%: " + line.text);
     require(contains(host_status(unknown, std::nullopt).text, "Silent: "),
             "unknown host, defaults: " + host_status(unknown, std::nullopt).text);

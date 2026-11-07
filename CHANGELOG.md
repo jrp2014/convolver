@@ -185,6 +185,43 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Plug-ins (PLUG-23): a filter now plays when the host gives more inputs than
+  it has, reading the first inputs and ignoring the rest; its outputs must
+  still match exactly. REAPER gives the VST3 plug-in six inputs on a
+  six-channel track, so the 2→6 crossover was refused there (HOST-1). Status
+  ends "plug-in inputs 3-6 ignored.", and the log and the window's report
+  say which inputs the filter reads. Whether there is a dry signal now
+  follows the filter's own counts, so a crossover still bypasses to silence
+  and stays fully filtered at any Mix, whatever the host's counts. Each filter
+  applies Mix by its own rule, so a replacement that changes whether there
+  is a dry signal crossfades without a gap or a jump, playing or bypassed.
+  The same in VST3, the Audio Unit and LV2 (an LV2 layout with more inputs
+  than the filter now plays it too). The audio of a filter on exactly its
+  own counts is unchanged.
+- Plug-ins (PLUG-23): bypass and Mix pass nothing when no filter plays and
+  passing the input could send full-range audio to a driver. A kept filter
+  that does not suit the host (another rate, say) has a dry signal only if
+  its own input and output counts are equal, so a 2→6 crossover kept at the
+  wrong rate stays silent bypassed. After a failed load with no filter kept
+  (a missing or unreadable file or preset, a first filter that does not fit,
+  or a project saved after such a failure) bypass and Mix pass nothing at
+  all, where they used to pass the input on a track with as many inputs as
+  outputs, a mono instance included (jrp). An instance with no filter passes
+  the input until a load fails, and again once a filter loads or an empty
+  state is restored. A failed first load
+  fades its dry signal out with it. Status, the log's settings and the
+  window's report give the reason; Status no longer says "Load failed, no
+  filter plays" before the host has started the plug-in, as nothing plays.
+- Library (PLUG-23, jrp's review), incompatible: a prepared filter carries
+  whether it has a dry signal. `HostFilter::activate()` returns a
+  `HostPlayback` instead of a `Configuration`; the `HostFilter::load()`
+  install callback takes `const HostPlayback&`; its last parameter is a
+  `HostLoadCheck` (whether a filter that does not suit the host is refused
+  or kept until it does) instead of a `bool`; and the three-argument
+  `unfiltered_configuration()` is gone (use `unfiltered_playback()`).
+  `HostProcessor`'s constructor, `prepare()` and `replace()` gain
+  `HostPlayback` overloads beside the `Configuration` ones, and
+  `same_configuration()` compares two layouts' rates and channels.
 - Development (DOC-8, from jrp's review of the agent guidance at `f6895f3`):
   the [workflow guide](docs/develop/workflow.md#verification-for-each-kind-of-change)
   says what each kind of change must run before a push (a prose-only change
@@ -329,11 +366,14 @@ Until 1.0 the C++ API may change between minor versions.
   `native.kernel_divergence`'s 1e-35 case is held to an absolute limit
   (1000 times `FLT_MIN`, 1.2e-35) where flushing applies. `convolver_callback_benchmark` gains
   `--filter decaying` and `--thread-denormals gradual|flush`.
-- The version is now 0.10.0 (jrp, 5 November 2026), the minor step for the
-  library changes in DIAG-3 and DIAG-4 below, after 0.9.0. CMake consumers
-  request `find_package(Convolver 0.10)`, and the first preview is cut from
-  the 0.10 series. The LV2 plug-in reports minor version 10, which LV2
-  accepts as a release.
+- The version is now 0.11.0 (jrp, 7 November 2026), the minor step for
+  PLUG-23's incompatible library changes below, after 0.10.13. CMake
+  consumers request `find_package(Convolver 0.11)`, and the first preview is
+  cut from the 0.11 series. The LV2 plug-in reports minor version 11, which
+  LV2 reads as a development version; LV2 is not in the first preview.
+- 0.10.0 (jrp, 5 November 2026) was the minor step for the library changes
+  in DIAG-3 and DIAG-4 below, after 0.9.0; its LV2 plug-in reported minor
+  version 10, which LV2 accepts as a release.
 - 0.9.0 was the milestone step before jrp's host smoke tests (HOST-1), from
   which the first preview was first to be cut (jrp, 5 November 2026). Its
   CMake consumers request `find_package(Convolver 0.9)`, and its LV2 plug-in
@@ -542,6 +582,34 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- VST3 (PLUG-23, from jrp's REAPER crossover retest at `5d188a7`): a project
+  saved with the 2→6 crossover on a six-channel track played silence after
+  reopening, and after FX Offline then Online. REAPER starts the plug-in on
+  stereo buses, restores the saved state, and only then gives it the track's
+  six inputs and outputs; the plug-in refused the crossover against the
+  stereo buses, so nothing was left to play on six. Restored state is now
+  refused for not suiting the host's rate or channels only once the host has
+  played audio with them, and never when the host says it is restoring a
+  project (VST 3.6 `IStreamAttributes`). Until then a filter that does not
+  suit is kept, plays silence with the reason in Status and the log, and
+  plays as soon as the host starts the plug-in on buses that suit it. A
+  preset that does not suit an instance that has played audio is still
+  refused, and the previous filter keeps playing, also after the host
+  restarts the plug-in on the same rate and buses. A preset loaded into a
+  new instance before the host has played any audio, or just after the host
+  changed its rate or buses, is now kept silent rather than refused, and
+  replaces the filter that was loaded; saving then saves it. The log says
+  whether the host had played audio and whether it said it was restoring a
+  project. jrp's retest in REAPER 7.85 at `c3dbf0d` passed: the crossover
+  came back after reopening and after FX Online, and survived a save, quit
+  and reopen with the new build (REAPER does not say it is restoring a
+  project).
+- Plug-ins (PLUG-23): after a refused load, if the host later changes to a
+  rate or channels the refused filter would suit, Status no longer shows
+  counts that look as if they conflict ("the filter has 2 in, 6 out, the
+  plug-in 6 in, 6 out"); it says "the filter has 2 in, 6 out; the channels
+  have changed since." (or "the rate has changed since."), and the log keeps
+  the counts the load was refused against.
 - Tests (CI-33): `native.cli`'s no-clip case compared each pair of renders
   byte for byte, so its float case failed when the two files' `PEAK` chunks,
   in which libsndfile records the second a float WAV file was written,

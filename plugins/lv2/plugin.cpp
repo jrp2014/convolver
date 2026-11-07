@@ -378,7 +378,8 @@ void activate_locked(Instance& p) {
     try {
         // A fresh processor: the filter plays from the first frame, its tail
         // and history start afresh, and LV2's activate() is also its reset.
-        p.host = std::make_unique<HostProcessor>(p.filter.activate(p.layout), p.max_block);
+        p.host = std::make_unique<HostProcessor>(p.filter.activate(p.layout), p.max_block,
+                                                 HostSettings{}, p.layout.inputs);
     } catch (const std::exception& e) {
         record_activation_failure(p, e.what());
     } catch (...) {
@@ -386,8 +387,10 @@ void activate_locked(Instance& p) {
     }
     if (!p.host) {
         try {
-            p.host = std::make_unique<HostProcessor>(unfiltered_configuration(p.layout, true),
-                                                     p.max_block);
+            // Nothing plays, not even a dry signal, as host_status() says of
+            // a filter that could not be started.
+            p.host = std::make_unique<HostProcessor>(unfiltered_playback(p.layout, true, false),
+                                                     p.max_block, HostSettings{}, p.layout.inputs);
         } catch (...) {
         }
         try { // error() builds the text, which needs memory (ROBUST-7).
@@ -481,7 +484,7 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
     try {
         p.filter.load(
             std::move(*next), p.layout,
-            [&](const Configuration& c) {
+            [&](const HostPlayback& c) {
                 if (!p.host) { // Inactive: the next activation installs it.
                     if (r.generation != newest())
                         throw SupersededRequest();
@@ -986,7 +989,7 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
     // configuration is always known and checked here. While active, a
     // prepared replacement is published (installed directly if no audio has
     // run yet); inactive, the next activation installs it.
-    const auto install = [&](const Configuration& c) {
+    const auto install = [&](const HostPlayback& c) {
         if (p.host)
             p.host->replace(c);
     };

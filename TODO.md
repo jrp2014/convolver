@@ -7,7 +7,7 @@ implemented. Finished items are listed briefly under [done](#done); what they
 delivered is described in the guides and the [CHANGELOG](CHANGELOG.md).
 
 **In short:** the next milestone is end-to-end testing: an independent user
-running an exact preview package from the 0.10 series. The
+running an exact preview package from the 0.11 series. The
 [order of work](#execution-priorities) gets there in four steps: finish the
 open fixes (done), run jrp's host smoke tests (HOST-1), finish the package
 and the user journeys (PLUG-5, REL-2; the journeys are written, and the CLI,
@@ -45,7 +45,7 @@ request before starting so independent tasks do not duplicate changes.
 22 October 2026): an independent user installs and uses an exact preview
 package, following only the documentation. This is the end-to-end test. "Ready" means the
 REL-2 journeys work, not that a set of items is ticked. The first preview is
-cut from the 0.10 series and is macOS-only
+cut from the 0.11 series and is macOS-only
 ([decided](docs/project/decisions.md#plug-in-behaviour)): the VST3 plug-in and the
 Audio Unit with the existing shared window and their Gain, Mix and Latency
 settings, the `convolver` CLI and the preset tool. The Windows and Linux
@@ -66,7 +66,7 @@ boundary and C++20 in the core.
 | 3. Alongside step 2 | **PLUG-5** first-preview contents: in the candidates since PR #115 (the Audio Unit on macOS, the VST trademark notice; the `convolver` CLI and the first-use presets since PR #101); what remains is qualifying one exact candidate (HOST-1, AU-4, REL-3) and jrp's publication. **REL-2** (done): the stereo, 2→6 crossover and CLI journeys are written in `docs/use/` | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
 | Early walkthrough (macOS) (done) | **REL-5**: an explicitly limited walkthrough of an exact candidate on macOS, the stereo journey only | Done on 1 November 2026 as a package and command-line check only, by jrp's choice ([done](#done)); its host steps moved to HOST-1's REAPER smoke test and REL-3. It did not change the first preview's contents and does not replace REL-3. |
 | 4. Settings, windows and the Audio Unit | The **HOST-2** editor as the macOS-only first preview has it: **PLUG-9** (the report and loading from a file) and **PLUG-10** (Gain, Mix and Latency), **VST3-3**, **VST3-4**, **AU-7**, and the window **VST3-11** shared with the Audio Unit in **AU-6**; and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview, in the macOS candidates since PR #115). For later previews: **VST3-12** (Windows), **VST3-13** (Linux), and PLUG-9, PLUG-10 and AU-7's remaining gain modes and meters | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items) the first preview needs, each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the [preview workloads](#loading-responsiveness), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). |
-| 5. The milestone | A candidate from a 0.10.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
+| 5. The milestone | A candidate from a 0.11.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
 | 6. Later previews | Windows and Linux (**VST3-12**, **VST3-13**), the remaining gain modes and meters (**PLUG-9**, **PLUG-10**, **AU-7**), PERF-3's supported workloads; **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need. Not a first-preview gate: the loading-responsiveness gate uses the finite preview workloads instead. |
 | Supporting, cheap | **PERF-1**, **HOST-4** | HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
@@ -164,6 +164,12 @@ is superseded.
   REAPER gave the plug-in 6 inputs and 6 outputs, so the 2→6 crossover was
   refused and its render, reopen and refusal steps were not run. Audacity,
   and REAPER's display of the Status parameter, remain.
+  Progress (7 November 2026, PR #131): with PLUG-23 the VST3 crossover
+  passed part D in REAPER 7.85: render, Mix 0%, bypass, a refused six-input
+  preset, the wrong rate, and (after a restore fix in the same PR) saving,
+  quitting and reopening, and FX Offline then Online
+  ([record](docs/archive/reviews/2026-11-07-reaper-crossover-retest.md)).
+  The Latency finding stays open (VST3-16).
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
   now requested (progress below). Write adapters against the
@@ -354,9 +360,9 @@ LV2 (Linux first; also PipeWire system audio):
   loads the highest (minor, micro) it finds, so 1.0.0 mapped this way would
   lose to an old 0.4.x left in `~/.lv2`. The mapping must keep increasing,
   with minor even and non-zero and micro even for releases. Mapped this way,
-  0.10.x builds are minor 10, which LV2 accepts, but every odd patch number
-  is a micro version LV2 reads as a development version (0.9.x was minor 9,
-  a development version; LV2 is not in the first preview).
+  0.11.x builds are minor 11, which LV2 reads as a development version, and
+  every odd patch number is a micro version LV2 reads the same way (0.10.x
+  was minor 10, which LV2 accepts; LV2 is not in the first preview).
 - [ ] **LV2-6 — Editor report and UI (optional).** Only if Linux users show a
   need: generic UIs already offer the `filter` file chooser and the status
   port. The report as `patch:Set` atoms on the notify port, prepared in
@@ -704,6 +710,21 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   X11 view can replace it later if Linux users need one
   ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#framework-choice)).
   For a later preview: the first preview is macOS-only ([decided](docs/project/decisions.md#plug-in-behaviour)).
+- [ ] **VST3-16 — A new Latency in REAPER.** In jrp's HOST-1 REAPER run (6
+  November 2026, REAPER 7.85 on macOS) a new Latency stayed pending until
+  the project was reopened: the plug-in asks for a restart
+  (`restartComponent(kLatencyChanged)`), which the SDK says the host answers
+  by deactivating and activating the component, and REAPER did not do so
+  then. Why is not yet known. First trace, in REAPER, whether the request
+  arrives, what it returns, when `getLatencySamples()` is read and which
+  activation calls follow; only then choose a fix (a documented host step,
+  or applying the new processor at once as the Audio Unit does). Done when
+  an impulse lines up with a reference track after a change in both
+  directions (256 to 1024 and back), with REAPER's delay compensation
+  measured rather than its display or the reported value, and any change is
+  tested for rapid successive choices, a filter replacement at the same
+  time, deactivation and a failed preparation, with deterministic
+  synchronisation. Its own pull request, after PLUG-23.
 Not relevant to a convolver unless the product changes: MIDI and note
 interfaces (`IMidiMapping2`, `IMidiLearn2`, note expression, MIDI 2.0
 articulations), `ITransportControl`, `IPrefetchableSupport`,
@@ -835,6 +856,16 @@ so the preset file path is not needed).
   day agrees, measurement first: remove such redundant work (as GAIN-2 did
   for `--gain-db no-clip`) before any new planar engine or more elaborate
   partitioning.
+- [ ] **PERF-19 — Copies of whole configurations on the control side.**
+  From jrp's review of PLUG-23 (7 November 2026): a filter's configuration,
+  every tap included, is copied where the control side hands it on:
+  `HostFilter::activate()` returns a copy in a `HostPlayback` at each
+  activation, the install callback's filter is copied into the prepared
+  engine, and saving copies it into `HostState`. For a 30-second stereo
+  reverb at 48 kHz each copy is at least 11 MB. Profiling targets only: measure the preview loading
+  workloads with a profiler first, and remove a copy only where it shows in
+  preparation time or peak memory, with saved state, diagnostics and audio
+  unchanged. Waits for the freeze.
 - [ ] **PERF-8 — Split spectra straight from the FFT.** From the project
   review of 5 November 2026, after PERF-3: the engine stores spectra split
   (real parts, then imaginary), but the backends hand them over interleaved
@@ -969,17 +1000,22 @@ explained; AU-12 removed that worker, which is not a diagnosis.
 
 ### Keeping `host.cpp` manageable
 
-Guidance, not an item (external review of `91fcf1f`, 0.8.13, 5 November
-2026): `portable/host.cpp` combines filter acceptance, failure policy,
-diagnostic wording, status text and the real-time `HostProcessor`. When one
-of these next changes, move the control-side filter policy apart from
-`HostProcessor`'s audio code, as VST3-14 and AU-11 moved code out of the
-adapters, with public APIs and ownership unchanged. Diagnostics already stay
-in their structured parts (problem, cause, fix) inside and are formatted
+From the external review of `91fcf1f` (0.8.13, 5 November 2026):
+`portable/host.cpp` combines filter acceptance, failure policy, diagnostic
+wording, status text and the real-time `HostProcessor`. Diagnostics already
+stay in their structured parts (problem, cause, fix) inside and are formatted
 only where they leave the library (DIAG-4).
-No new general framework. Such moves keep saved state, diagnostic text,
-allocation guards and numerical results unchanged, and never share a pull
-request with a DSP change.
+
+- [ ] **PLUG-24 — `HostProcessor` in its own source file.** From jrp's review
+  of PLUG-23 (7 November 2026), which grew `host.cpp` again: move
+  `HostProcessor`'s audio code into its own source file, apart from the
+  control-side filter policy, as VST3-14 and AU-11 moved code out of the
+  adapters, with public APIs and ownership unchanged. PLUG-23 already
+  gathered the rate and channel comparison (`same_configuration()`) and the
+  dry-signal answer (`HostPlayback`) in one place each. No new general
+  framework. The move keeps saved state, diagnostic text, allocation guards
+  and numerical results unchanged, and never shares a pull request with a
+  DSP change. Waits for the freeze.
 
 ## Edges over other convolvers
 
@@ -1330,6 +1366,8 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **PERF-12 — Load-timing verdicts from records, tested without timing.** 5
   November 2026; [load timing](docs/develop/testing.md#load-timing-perf-9).
 - [x] **PERF-14 — Load timing from a full history.** 5 November 2026.
+- [x] **PLUG-23 — A filter reads the first inputs of a wider input bus.** 6
+  November 2026; [channels](docs/use/plugins.md#channels).
 - [x] **PLUG-21 — Teardown tested at chosen stages.** 5 November 2026.
 - [x] **PERF-13 — Load-timing records as JSON.** 5 November 2026; [load
   timing](docs/develop/testing.md#load-timing-perf-9).

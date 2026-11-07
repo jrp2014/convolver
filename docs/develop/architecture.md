@@ -3,9 +3,10 @@
 
 [Documentation index](../README.md) · [Repository rules](../../AGENTS.md) · [Tests](testing.md)
 
-This is a source map for contributors and coding agents. It describes the active
-implementation at `9fa13f7` (0.4.44), reviewed 24 October 2026. Verify the current code
-before changing it; dated plans are design context, not evidence of completion.
+This is a source map for contributors and coding agents. It names where each
+responsibility lives in the active implementation and is updated with the code it
+describes. Verify the current code before changing it; dated plans are design
+context, not evidence of completion.
 For the audio vocabulary, start with [concepts](../use/concepts.md).
 
 ## Components and source of truth
@@ -19,7 +20,7 @@ For the audio vocabulary, start with [concepts](../use/concepts.md).
 | Subnormal flushing while processing (PERF-15) | [`denormals.hpp`](../../portable/denormals.hpp): `ScopedFlushDenormals`, entered by `Engine::process`, `HostProcessor::process`, the `Engine` constructor and the CLI's render | Private to core; header only; x86-64 and AArch64 controls, nothing elsewhere ([numerical policy](#subnormal-numbers)) |
 | FFT contract and implementations | [`fft.hpp`](../../portable/fft.hpp): `RealFft`, `fft_size`, `fft_storage`; [`fft_fftw.cpp`](../../portable/fft_fftw.cpp), [`fft_accelerate.cpp`](../../portable/fft_accelerate.cpp), [`fft_ooura.cpp`](../../portable/fft_ooura.cpp) | One backend per build; plan/storage details stay private |
 | Host buffering, bypass and filter replacement | [`host.hpp`](../../include/convolver/host.hpp): `HostProcessor`; [`host.cpp`](../../portable/host.cpp) | `Convolver::host` depends on core; planar/in-place host buffers |
-| Shared adapter contract, control side | `HostFilter`, `HostLayout`, `unfiltered_configuration`, `speaker_notice`, `HostFailure` in [`host.hpp`](../../include/convolver/host.hpp); messages in their parts, `Advice` in [`advice.hpp`](../../include/convolver/advice.hpp), formatted for each surface by [`portable/advice.hpp`](../../portable/advice.hpp) (DIAG-4) | Which filter a load replaces, what is saved and what plays, and why a request failed (PLUG-8); every plug-in adapter uses it under its control lock |
+| Shared adapter contract, control side | `HostFilter`, `HostLayout`, `HostPlayback` (a filter and whether it has a dry signal), `HostLoadCheck`, `unfiltered_configuration`, `speaker_notice`, `HostFailure` in [`host.hpp`](../../include/convolver/host.hpp); messages in their parts, `Advice` in [`advice.hpp`](../../include/convolver/advice.hpp), formatted for each surface by [`portable/advice.hpp`](../../portable/advice.hpp) (DIAG-4) | Which filter a load replaces, what is saved and what plays, and why a request failed (PLUG-8); every plug-in adapter uses it under its control lock |
 | Status and the Convolver log (DIAG-1) | `HostStatus`, `host_status`, processing faults (`HostFaults`, `HostProcessor::faults`, `HostFilter::observe`, `fault_message`) in [`host.hpp`](../../include/convolver/host.hpp); `host_log`, `host_log_written`, `execution_line`, `loaded_line`, `rejected_line`, `started_line`, `playing_words` (what plays, shared with the editor report), `unfiltered_sound` (what Gain and Mix let through with no filter heard), `host_log_recent` in [`host_log.hpp`](../../portable/host_log.hpp), [`host_log.cpp`](../../portable/host_log.cpp); the editor report (PLUG-9: `host_report`, `report_fields`, `report_text`, `diagnostics_text`) in [`host_report.hpp`](../../portable/host_report.hpp), [`host_report.cpp`](../../portable/host_report.cpp) | Part of `Convolver::host`; file I/O on the control thread only; the VST3 and AU adapters show the line as a read-only Status parameter ([contract](plugin-contract.md#status-and-log)) |
 | Embedded state | `HostState`, `encode_host_state`, `decode_host_state`; [`state.cpp`](../../portable/state.cpp) | Bounded wire format; control-side work |
 | Sound files, RAW streams and integer conversion | [`io.hpp`](../../include/convolver/io.hpp): `AudioReader`, `AudioWriter`, `Quantizer`, `sound_file_header`; [`io.cpp`](../../portable/io.cpp) | `Convolver::io` adds libsndfile, whose detection (plus a few container markers it does not report) decides what is a sound file; `Pcm16Quantizer` wraps the 16-bit case |

@@ -170,7 +170,8 @@ channel mask, and no input layout. Hence:
 
 - A version-1 preset, or any filter with no recorded layout, is **unspecified**
   and treated as discrete on both sides. It loads on every host arrangement with
-  matching counts, exactly as before, and channels are routed by bus index.
+  matching counts, exactly as before, and channels are routed by bus index
+  (since PLUG-23 also on an arrangement with more inputs, the first ones read).
   Stricter layout checks added later must never reject it.
 - Its output mask is advisory: an adapter may warn when it disagrees with the
   host's arrangement, but does not reject the preset. `speaker_notice` in
