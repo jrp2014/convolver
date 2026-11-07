@@ -6,26 +6,15 @@ jrp's request: "Make it a goal of this project to be superior to the existing
 most popular reverb plug-ins. Identify those edges and move towards them."
 Nothing here is implemented. Optional features wait until the first
 independent walkthrough (REL-3, [decided](../decisions.md#plug-in-behaviour)),
-so this plan names the edges, ranks them and turns them into TODO items
-(EDGE-1 to EDGE-13, with PERF-2, PERF-3 and IO-2) to take up afterwards in the
-order given here, unless jrp [decides otherwise](#decisions-for-jrp). Revised
-the same day after jrp's reply: accuracy beyond what can be heard is not a
-priority, long reverbs matter more than expected, and faster convolution and
-more precise lag are worth investigating once the framework is more stable.
-Corrected on 7 November 2026 after jrp's review of `5e2a641`: the
-saved-state limit, fractional-delay costs, the earlier vDSP experiment,
-estimates kept apart from results, Altiverb on Windows, and plug-in
-identities. Re-ranked later on 7 November 2026 by jrp's rule that
-limitations users cite come first, after matching public complaints against
-the edges and new performance candidates. The freeze until the first
-walkthrough still holds, and jrp confirmed that platform- and chip-level
-micro-optimisation waits for the walkthroughs. Restructured on 7 November
-2026 after jrp's review of `ecd087a`: a gate before any item starts, the
-optimisations as experiments with a stated gain and permission to stop, a
-scheduling rule for worker threads that covers VST3 prefetch, a correct
-definition of a filter's delay for EDGE-13, and short ranking rows linked
-to a section per item. Rationale and measurements live here; TODO holds
-each item's acceptance criteria.
+and platform- and chip-level micro-optimisation waits for the walkthroughs
+(jrp, 7 November 2026). This plan names the edges, ranks them and turns them
+into TODO items (EDGE-1 to EDGE-13, with PERF-2, PERF-3 and IO-2) to take
+up afterwards in the order given here, unless jrp
+[decides otherwise](#decisions-for-jrp). Last revised on 7 November 2026
+after jrp's review of `ecd087a`; his decisions along the way are in
+[decisions](../decisions.md#direction), and the earlier versions in git.
+Rationale and measurements live here; TODO holds each item's acceptance
+criteria.
 
 For jrp, deciding which edges to pursue and in what order, and for whoever
 then takes up one of the EDGE items.
@@ -250,18 +239,10 @@ resamples at all (today it never does; refusal stays the default).
 
 ### 2. Savings in today's engine
 
-**Approach.** Experiments, each measured on PERF-3's workloads first and
-kept only for the gain stated in [the experiments
-table](#sound-aware-and-platform-aware-optimisation). Sharing identical
-spectra and removing unnecessary work come first. Exact: go idle once
-silent input has outlasted the tail; skip filter blocks that are all
-zeros; hold identical responses once; read each input history once for all
-the paths that use it. Rounding only, within the kernels' divergence bound:
-when host callbacks are smaller than the Latency block, do the older filter
-blocks' multiply-adds in the callbacks between engine blocks, so only the
-newest block waits (this changes the summation order); and sum each
-output's spectra before one inverse transform where outputs are fewer than
-paths.
+**Approach.** The first six candidates in the [experiments
+table](#sound-aware-and-platform-aware-optimisation), four exact and two
+rounding-only, each measured on PERF-3's workloads and kept only for the
+gain stated there; sharing identical spectra first.
 
 **Gap.** With a 64-frame host callback and the default 256-frame block,
 every fourth callback does all the work, and that peak is what hosts and
@@ -271,9 +252,9 @@ or one correction on left and right, is stored twice. True stereo reads
 each input history twice and inverts four transforms for two outputs. All
 of these are arithmetic estimates until PERF-3 measures them.
 
-**jrp decides first.** Nothing for the exact changes, which keep the output
-bit-identical; the rounding-only ones stay within the kernels' divergence
-bound.
+**jrp decides first.** Only the gains needed ([decision
+4](#decisions-for-jrp)): the exact changes keep the output bit-identical,
+and the rounding-only ones stay within the kernels' divergence bound.
 
 ### 3. Long reverbs at low CPU and latency
 
@@ -299,7 +280,9 @@ modes](https://steinbergmedia.github.io/vst3_doc/vstinterfaces/namespaceSteinber
 the Audio Unit's offline render and LV2 hosts' free-wheeling. Prefetch and
 offline calls can come faster than real time, so a worker's results must be
 ready when their samples are needed, never assumed from elapsed wall-clock
-time, and checking an offline flag alone is not enough. Otherwise bounces
+time. Any call, flagged or not, may come faster than real time (REAPER's
+anticipative FX processing does so without a flag), so a mode flag may
+tune scheduling but never ensures correctness. Otherwise bounces
 drop out, as reported on the HISE forum. Today's engine is synchronous, so
 this is a requirement on a future design, not a defect.
 
@@ -347,12 +330,24 @@ largest coefficient is not its delay: `[1, 0, 1]` has one sample of group
 delay while its peaks are at samples 0 and 2, because a symmetric filter's
 group delay is its centre of symmetry ([Smith, linear-phase
 filters](https://www.dsprelated.com/freebooks/filters/Filters_Preserving_Phase.html)).
-The item also defines what happens with a fractional delay (an even-length
-symmetric filter's centre lies half-way between two samples) and with paths
-whose delays differ.
+Proposed handling, for jrp to confirm:
+
+- **Each path's delay is its whole delay:** its centre of symmetry plus the
+  input and output delays the configuration gives it, because a `.cfg`
+  delay moves the centre.
+- **Symmetry is checked within a stated tolerance**, for example every
+  coefficient pair equal to within 1e-6 of the path's peak; a path outside
+  it is not linear-phase, and only a user-given delay applies.
+- **Paths whose delays differ:** the option adds nothing and the Status says
+  why, offering a user-given delay instead.
+- **A fractional delay:** an even-length symmetric filter's centre lies
+  half-way between two samples, and the plug-in formats report latency in
+  whole samples, so the delay is rounded down and the half sample left over
+  is stated in the report. The plan's own example (65,536 taps) is such a
+  filter.
 
 The wet convolution is unchanged. Mix and bypass delay the dry signal by
-the larger latency, so a Mix between 0 and 100% sounds different with the
+the reported latency, so a Mix between 0 and 100% sounds different with the
 option on, and the dry path needs a buffer as long as the reported delay
 (for example about 0.7 s per channel for 65,536 symmetric taps at 48 kHz;
 an example, not a maximum) instead of one block. The latency is fixed for a
@@ -366,8 +361,8 @@ cannot compensate for the rest. Players that do not host plug-ins do not
 benefit, so this answers the lip-sync complaint only in part.
 
 **jrp decides first.** Whether to offer it; user-given only or also
-verified linear-phase; fractional and differing path delays; what a
-replacement with a different delay does.
+verified linear-phase; the proposed handling above; what a replacement with
+a different delay does.
 
 ### 6. Filters larger than the saved-state limit
 
@@ -489,18 +484,20 @@ apply to every candidate.
 
 Order: sharing identical spectra and removing unnecessary work first (rank
 2's exact savings), then the other rounding-only and exact changes; worker
-threads, reduced-precision storage and lower-rate tails only after those
-have been measured.
+threads, reduced-precision storage, lower-rate tails and the other bounded
+approximations only after those have been measured.
 
 The gains needed are proposals, set before measuring so that a result
 cannot move them; jrp may change them. "p99" is the 99th-percentile
-callback time on the PERF-3 workload the candidate targets.
+callback time on the PERF-3 workload the candidate targets, and "no
+regression" means no worse than the run-to-run spread of repeated
+measurements.
 
 | Candidate | Kind | What it gains | Gain needed to keep it | What it costs or risks |
 | --- | --- | --- | --- | --- |
 | Hold identical responses once | Exact | Halves the spectra of a mono reverb on two channels or one correction on left and right, and their memory traffic | 25% less filter memory on such a workload, with no p99 regression | A lookup at preparation |
 | Skip input history that is exactly silent, and go idle once silent input has outlasted the tail | Exact | Gaps, fades and silence between tracks cost almost nothing; the engine already skips history from before a reset (PERF-5) | 50% less CPU on silent input, with no p99 regression on music | Bookkeeping per block; must stay allocation-free |
-| Skip all-zero filter blocks | Exact | Leading silence and zero padding cost nothing | 10% less CPU on a filter with such blocks | The same caveat as PERF-5 for an infinite spectrum |
+| Skip all-zero filter blocks | Exact | Leading silence and zero padding cost nothing | 10% less CPU on a 30 s reverb with 0.5 s of leading silence | The same caveat as PERF-5 for an infinite spectrum |
 | Read each input history once for all the paths that use it | Exact | About a quarter less memory traffic for true stereo (an estimate) | 10% lower p99 for true stereo | A fused multiply-accumulate kernel per path count |
 | Do the older blocks' work in the callbacks between engine blocks when host callbacks are smaller than the Latency block | Rounding only | Lower callback peaks at small host buffers | 30% lower maximum callback time at 64-frame callbacks with the default block | A changed summation order within `native.kernel_divergence`'s bound; bookkeeping across callbacks |
 | One inverse transform per output where outputs are fewer than paths | Rounding only | Two inverse transforms instead of four for true stereo; most for short filters and many channels | 10% lower p99 on a short true-stereo or matrix workload | A changed accumulation order within the divergence bound |
