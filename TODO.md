@@ -1043,8 +1043,10 @@ PERF-2 and EDGE-10); then the reverb features.
   16-bit floating-point storage for late filter blocks; NEON or vDSP
   multiply-accumulate kernels for AArch64, with the compiler options PERF-4
   measured only on x86-64 (`-mcpu` tuning on Apple silicon, MSVC's options);
-  FFT sizes each backend handles well; and the floating-point environment
-  per compiler and processor.
+  FFT sizes each backend handles well; parallelism where it is safe
+  (preparation and offline renders; on the audio thread only through the
+  platform's real-time mechanism, such as macOS audio workgroups, never
+  OpenMP); and the floating-point environment per compiler and processor.
   Exact and rounding-only changes keep the oracle and divergence bounds;
   a bounded approximation needs jrp's decision on its bound, judged against
   the threshold of hearing as the dither defaults were. Goes with PERF-2.
