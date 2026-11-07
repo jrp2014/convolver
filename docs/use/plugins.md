@@ -27,11 +27,12 @@ does not fit. Installing is in [install](install.md); making presets is in
   the wet/dry mix and the latency; the LV2 plug-in does not have them yet
   (its latency stays 256 samples).
 - A filter that does not fit the host's sample rate or channel counts never
-  lets unfiltered audio through: a first filter that does not fit plays
-  silence, even bypassed, and one that replaces a working filter is refused,
-  leaving the working filter playing. Only a kept filter with as many inputs
-  as outputs still lets bypass and Mix pass the input (see
-  [bypass](#bypass)).
+  plays unfiltered audio in its place: a first filter that fails to load
+  plays silence, even bypassed, and one that replaces a working filter is
+  refused, leaving the working filter playing. A filter that is kept but
+  does not fit (a project opened at another rate, say) plays silence too;
+  bypass and Mix pass the input only if that filter and the track each have
+  as many inputs as outputs (see [bypass](#bypass)).
 
 Contents: [formats](#formats) · [channels](#channels) ·
 [loading a filter](#loading-a-filter) ·
@@ -548,10 +549,12 @@ tell that is safe:
 | The track's inputs and outputs differ | Silent |
 
 On a mono instance (one input, one output) the input always passes when no
-filter plays, as there is only one output. Status says which applies: after a
-failure, `Silent: ...` means bypass and Mix pass nothing. The Convolver log's
-`Settings:` and the window's copied diagnostics give the reason, such as `mix
-100% wet (a load failed and no filter is kept, so there is no dry signal)`.
+filter plays, as there is only one output. Status says which applies at Mix
+below 100%: after a failure, `Silent: ...` means Mix passes nothing either.
+At Mix 100%, and for bypass, the Convolver log's `Settings:` line and the
+window's copied diagnostics say whether there is a dry signal, and why not,
+such as `mix 100% wet (a load failed and no filter is kept, so there is no dry
+signal)`.
 
 This is Convolver's own **Bypass** (the host's bypass button where it uses
 it). A host that takes the effect out of the signal path altogether, such as

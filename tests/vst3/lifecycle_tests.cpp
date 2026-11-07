@@ -271,6 +271,11 @@ int main(int argc, char** argv) {
                  // is recorded, before audio and while it plays.
                  "start state-malformed-starved listen",
                  "start play state-malformed-starved listen",
+                 // Audio played at one rate or layout does not settle the
+                 // next: restored state after the host changes them, before
+                 // it plays again, is kept (jrp's REAPER retest; c3dbf0d).
+                 "start play stop rate start state-A listen stop rate start listen",
+                 "start play stop layout start state-A listen stop layout start listen",
              })
             options.fixed.push_back(lc::parse(s));
         std::size_t failures = 0;
