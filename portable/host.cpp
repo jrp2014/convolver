@@ -231,12 +231,16 @@ bool same_rate(const HostLayout& a, const HostLayout& b) noexcept {
     return a.sample_rate == b.sample_rate && a.fractional_rate == b.fractional_rate;
 }
 
-Configuration unfiltered_configuration(const HostLayout& host, bool failed) {
+Configuration unfiltered_configuration(const HostLayout& host, bool failed, bool dry) {
     Configuration c;
     c.sample_rate = host.sample_rate;
     c.input_channels = host.inputs;
     c.output_channels = host.outputs;
-    if (failed || host.inputs != host.outputs) {
+    if (failed || !dry || host.inputs != host.outputs) {
+        // PLUG-23: fewer inputs than outputs, so no dry signal (HostProcessor
+        // follows the configuration's counts).
+        if (!dry && host.inputs == host.outputs && host.outputs > 1)
+            c.input_channels = 1;
         // One all-zero response: exact silence on every output, and no tail.
         c.paths.push_back({{0.f}, {{0, 1}}, {{0, 1}}});
         return c;
@@ -472,7 +476,7 @@ Configuration HostFilter::activate(const HostLayout& host) {
         f.silent = true;
         f.message = std::move(m->why);
         activation_failure_ = std::move(f);
-        return unfiltered_configuration(host, true);
+        return unfiltered_configuration(host, true, dry_signal(*this, host));
     }
     notice_ = speaker_notice(*filter_, host);
     return *filter_;
@@ -680,11 +684,43 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
 }
 } // namespace
 
-bool dry_signal(const HostFilter& filter, const HostLayout& host) {
+HostDrySignal dry_signal_rule(const HostFilter& filter, const HostLayout& host) noexcept {
     const auto& f = filter.failure();
-    if (const auto& c = filter.filter(); c && !(f && f->silent))
-        return c->input_channels == c->output_channels;
-    return host.inputs == host.outputs;
+    const auto& c = filter.filter();
+    const auto counts = [](std::size_t inputs, std::size_t outputs) {
+        return inputs == outputs ? HostDrySignal::present : HostDrySignal::filter_counts;
+    };
+    if (c && !(f && f->silent)) // A filter plays: its own counts (PLUG-23).
+        return counts(c->input_channels, c->output_channels);
+    if (host.inputs != host.outputs)
+        return HostDrySignal::host_counts;
+    // No filter plays. A kept filter's counts decide too, and with none kept
+    // after a failed load there is no dry signal (jrp, 7 November 2026): a
+    // kept crossover must not send full-range audio to a driver, and nothing
+    // shows that a filter that failed to load was not one. With one output
+    // there is no driver to protect (and unfiltered_configuration() has no
+    // silence without a dry signal).
+    if (host.outputs == 1)
+        return HostDrySignal::present;
+    if (c)
+        return counts(c->input_channels, c->output_channels);
+    if (filter.failed() || (f && f->silent))
+        return HostDrySignal::failed_load;
+    return HostDrySignal::present; // An empty instance passes its input.
+}
+
+const char* no_dry_reason(HostDrySignal rule) noexcept {
+    switch (rule) {
+    case HostDrySignal::present:
+        return "";
+    case HostDrySignal::filter_counts:
+        return "the filter's inputs and outputs differ";
+    case HostDrySignal::failed_load:
+        return "a load failed and no filter is kept";
+    case HostDrySignal::host_counts:
+        return "inputs and outputs differ";
+    }
+    return "";
 }
 
 HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLayout>& host,
@@ -1078,11 +1114,23 @@ struct HostProcessor::Impl {
             const float mix_now = dry_now ? mix : 1.f;
             const float mix_before = dry_before ? mix : 1.f;
             const bool same_rule = !previous || dry_now == dry_before;
-            const float dry_share = same_rule ? (dry_now ? 1.f : 0.f)
-                                    : dry_now ? blend
-                                              : 1.f - blend;
             const float dry_mix = share(dry_frames), level = share(level_frames),
                         previous_level = share(previous_level_frames);
+            // A muted filter's dry signal ramps and stays silent with it
+            // (PLUG-23: a failed first load passes nothing), except with one
+            // output (dry_signal_rule()). An unmuted filter's level is exactly
+            // 1, which leaves every value as before.
+            const bool dry_mutes = outputs > 1;
+            const float dry_level = dry_mutes ? level : 1.f;
+            const float previous_dry_level = dry_mutes && previous ? previous_level : 1.f;
+            // Both filters' dry shares, crossfaded, where they apply alike.
+            const float shared_dry = dry_level == 1 && previous_dry_level == 1 ? 1.f
+                                     : previous
+                                         ? blend * dry_level + (1 - blend) * previous_dry_level
+                                         : dry_level;
+            const float dry_share = same_rule ? (dry_now ? shared_dry : 0.f)
+                                    : dry_now ? blend * dry_level
+                                              : (1.f - blend) * previous_dry_level;
             for (std::size_t c = 0; c < outputs; ++c) {
                 // Bypass passes input c to output c when the filter's counts are
                 // equal. With unequal counts it plays silence on every output
@@ -1103,11 +1151,13 @@ struct HostProcessor::Impl {
                     // exactly as it was before the settings existed.
                     value *= gain;
                     if (mix_now != 1)
-                        value = mix_now * value + (1.0 - mix_now) * dry_value;
+                        value = mix_now * value + (1.0 - mix_now) * shared_dry * dry_value;
                 } else {
                     const double before = gain * previous_level * old_wet[index];
-                    value = blend * (mix_now * gain * value + (1.0 - mix_now) * dry_value) +
-                            (1.0 - blend) * (mix_before * before + (1.0 - mix_before) * dry_value);
+                    value =
+                        blend * (mix_now * gain * value + (1.0 - mix_now) * dry_level * dry_value) +
+                        (1.0 - blend) * (mix_before * before +
+                                         (1.0 - mix_before) * previous_dry_level * dry_value);
                 }
                 value = (1.0 - dry_mix) * value + dry_mix * dry_share * dry_value;
                 if (!std::isfinite(value) || std::abs(value) > std::numeric_limits<float>::max()) {

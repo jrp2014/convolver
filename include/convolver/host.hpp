@@ -27,9 +27,10 @@ struct HostSettings {
     // max_gain_db (clamped there by HostProcessor).
     double gain_db = 0;
     // The share of the filtered signal, 0 to 1; the rest is the input delayed
-    // by the latency. Ignored (always 1) when the filter's input and output
-    // counts differ (with no filter playing, the host's), as there is no dry
-    // signal (the bypass rule, dry_signal()). Clamped to 0..1.
+    // by the latency. Ignored (always 1) when there is no dry signal
+    // (dry_signal(): the filter's input and output counts differ, or the
+    // host's, or a load failed and no filter is kept), as for bypass.
+    // Clamped to 0..1.
     double mix = 1;
     // The latency in frames, one of host_latencies. Unlike gain and mix it
     // cannot change while a processor runs: it is the block size the
@@ -125,8 +126,17 @@ Advice speaker_notice(const Configuration&, const HostLayout&);
 // What an instance plays without a usable filter, under the shared adapter
 // contract: identity (input c to output c) for an empty instance with equal
 // counts; exact silence for unequal counts or when `failed` (a failed initial
-// load or a filter that does not suit the host).
-Configuration unfiltered_configuration(const HostLayout&, bool failed);
+// load or a filter that does not suit the host). Silence has a dry signal
+// (Mix's dry share and bypass) only when `dry` and the host's counts are
+// equal (HostFilter::activate() passes it for a kept filter with equal
+// counts; dry_signal()). Without one it reads only the first input, so it has
+// fewer inputs than outputs (PLUG-23). A plug-in with one input and one
+// output has no such configuration and keeps its dry signal.
+Configuration unfiltered_configuration(const HostLayout&, bool failed, bool dry);
+// The same with a dry signal only when not `failed`: an empty instance's.
+inline Configuration unfiltered_configuration(const HostLayout& host, bool failed) {
+    return unfiltered_configuration(host, failed, !failed);
+}
 // PLUG-23: a filter may have fewer inputs than the host gives the plug-in
 // (REAPER gives a VST3 plug-in as many inputs as outputs, so a 2-in, 6-out
 // crossover gets 6 of each); it reads the first ones and the rest are
@@ -413,11 +423,31 @@ inline constexpr std::size_t max_status_text = 127; // VST3's String128, less it
 // not only what the filter does.
 HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& host,
                            bool log_written = true, const HostSettings& settings = {});
-// Whether a dry signal exists under `host`: Mix's dry share and bypass pass
-// input c to output c only when what plays has as many inputs as outputs.
-// That is the filter when one plays (PLUG-23: its own counts, not the
-// host's), otherwise the host's counts (unfiltered_configuration()).
-bool dry_signal(const HostFilter&, const HostLayout& host);
+// Whether a dry signal exists under `host` (Mix's dry share and bypass pass
+// input c to output c), and if not, why.
+enum class HostDrySignal {
+    present,
+    // The filter's inputs and outputs differ: the one playing (PLUG-23: its
+    // own counts, not the host's), or one kept that does not suit the host.
+    filter_counts,
+    // A load failed and no filter is kept (HostFilter::failed()): Convolver
+    // cannot tell that the failed filter was not a crossover (jrp, 7
+    // November 2026).
+    failed_load,
+    // No filter plays and the host's inputs and outputs differ.
+    host_counts,
+};
+// A dry signal exists only when what plays has as many inputs as outputs:
+// the filter when one plays; with none playing, the host, and a kept filter
+// too. None after a failed load with no filter kept. A plug-in with one input
+// and one output always has one when no filter plays. Allocates nothing.
+HostDrySignal dry_signal_rule(const HostFilter&, const HostLayout& host) noexcept;
+inline bool dry_signal(const HostFilter& filter, const HostLayout& host) noexcept {
+    return dry_signal_rule(filter, host) == HostDrySignal::present;
+}
+// Why there is no dry signal, in words completing "..., so there is no dry
+// signal" ("the filter's inputs and outputs differ"); empty when there is one.
+const char* no_dry_reason(HostDrySignal) noexcept;
 
 // Prepared planar host boundary. Float DSP with float/double host buffers.
 // Input and output channel counts follow the configuration and may differ.
@@ -488,10 +518,13 @@ class HostProcessor {
     // silent at once, before any audio since construction or reset) and
     // stays silent until a filter published after this call takes over,
     // which then fades in from silence as any replacement does; one published
-    // before it (still waiting for the audio thread) is silenced too. Bypass
-    // still passes the dry signal. For a failure the audio thread finds
-    // itself: LV2's run() refusing an empty instance's first load (no
-    // worker, or a full worker queue). The control side uses silence().
+    // before it (still waiting for the audio thread) is silenced too. The
+    // filter's dry signal (bypass and Mix's dry share) ramps and stays silent
+    // with it, except with one output: a failed first load passes nothing
+    // (PLUG-23, dry_signal()).
+    // For a failure the audio thread finds itself: LV2's run() refusing an
+    // empty instance's first load (no worker, or a full worker queue). The
+    // control side uses silence().
     void mute() noexcept;
     // The same for publications up to `through`, a count publications()
     // returned. An adapter that decides to mute from a flag its control side

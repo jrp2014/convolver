@@ -219,22 +219,22 @@ std::string setting_text(double value, double low, double high) {
     return out;
 }
 
-std::string settings_words(const HostSettings& s, bool equal_counts) {
+std::string settings_words(const HostSettings& s, HostDrySignal dry) {
     const auto gain = "gain " + setting_text(s.gain_db, min_gain_db, max_gain_db) + " dB";
     const auto latency = ", latency " + std::to_string(s.latency) + " frames";
-    if (!equal_counts)
-        return gain + ", mix 100% wet (inputs and outputs differ, so there is no dry signal)" +
+    if (dry != HostDrySignal::present)
+        return gain + ", mix 100% wet (" + no_dry_reason(dry) + ", so there is no dry signal)" +
                latency;
     return gain + ", mix " + setting_text(100 * s.mix, 0, 100) + "% wet" + latency;
 }
 
 std::string failure_consequence(const HostFailure& failure, const HostLayout* host,
-                                const HostSettings& used) {
+                                const HostSettings& used, bool dry) {
     if (!failure.silent)
         return host ? "The previous filter keeps playing." : "The previous filter is kept.";
     // A filter the adapter could not start has no processor, so nothing
     // plays, not even Mix's dry share (as host_status() says).
-    if (!host || host->inputs != host->outputs || failure.kind == HostFailureKind::activation)
+    if (!host || !dry || failure.kind == HostFailureKind::activation)
         return "Convolver plays silence.";
     const auto s = unfiltered_sound(used, false);
     if (s.silent)
@@ -246,9 +246,9 @@ std::string failure_consequence(const HostFailure& failure, const HostLayout* ho
 
 std::string playing_words(const HostFilter& filter, const HostLayout& host,
                           const HostSettings& used) {
-    // PLUG-10: with equal counts, Mix's dry share plays even when no filter
+    // PLUG-10: with a dry signal, Mix's dry share plays even when no filter
     // does, and Gain changes the input that passes with no filter loaded.
-    const bool equal = host.inputs == host.outputs;
+    const bool equal = dry_signal(filter, host);
     const auto sound = [&](bool identity) {
         return equal ? unfiltered_sound(used, identity) : UnfilteredSound{true, false, {}};
     };
@@ -256,7 +256,7 @@ std::string playing_words(const HostFilter& filter, const HostLayout& host,
         return s.unchanged ? std::string("unchanged") : "at " + s.level;
     };
     if (const auto& f = filter.failure(); f && f->silent)
-        return failure_consequence(*f, &host, used) + " " +
+        return failure_consequence(*f, &host, used, equal) + " " +
                detail::as_sentence(detail::advice_line(failure_message(*f)));
     if (const auto& c = filter.filter()) {
         auto line = "Playing " + filter_words(*c) + "." + ignored_sentence(*c, host);
@@ -283,7 +283,7 @@ std::string started_line(const HostFilter& filter, const HostLayout& host, std::
                 ", blocks of up to " + std::to_string(max_frames) + " frames. " +
                 playing_words(filter, host, settings ? *settings : HostSettings{});
     if (settings)
-        line += " Settings: " + settings_words(*settings, dry_signal(filter, host)) + ".";
+        line += " Settings: " + settings_words(*settings, dry_signal_rule(filter, host)) + ".";
     return line;
 }
 

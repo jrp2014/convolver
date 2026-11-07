@@ -430,9 +430,9 @@ void filter_contract() {
             "failed replacement lost the working filter");
     require(running.error().find("the filter could not be prepared") == 0 &&
                 !running.failure()->silent &&
-                failure_consequence(*running.failure(), &stereo, {}) ==
+                failure_consequence(*running.failure(), &stereo, {}, true) ==
                     "The previous filter keeps playing." &&
-                failure_consequence(*running.failure(), nullptr, {}) ==
+                failure_consequence(*running.failure(), nullptr, {}, true) ==
                     "The previous filter is kept.",
             "failed replacement not explained");
 
@@ -948,10 +948,91 @@ void wider_inputs() {
     for (const auto& channel : a)
         for (auto v : channel)
             require(v == 0, "bypass passes input under the crossover after a toggle");
+
+    // jrp, 7 November 2026: with no filter playing, a kept filter's counts
+    // decide too, and a failed load with no filter kept has no dry signal.
+    // The crossover kept at the wrong rate on the six-channel track: silent,
+    // bypassed or not, at any Mix.
+    const HostLayout slower{44100, 6, 6};
+    HostFilter kept(8);
+    kept.load(HostState{x}, std::nullopt);
+    const auto silent_crossover = kept.activate(slower);
+    require(kept.failure() && kept.failure()->silent &&
+                dry_signal_rule(kept, slower) == HostDrySignal::filter_counts &&
+                silent_crossover.input_channels == 1 && silent_crossover.output_channels == 6,
+            "a kept crossover that does not suit the host has a dry signal");
+    require(host_status(kept, slower, true, {0, .5}).text.rfind("Silent: ", 0) == 0,
+            "status: " + host_status(kept, slower, true, {0, .5}).text);
+    require(failure_consequence(*kept.failure(), &slower, {0, .5}, dry_signal(kept, slower)) ==
+                "Convolver plays silence.",
+            "a kept crossover is said to play the dry signal");
+    for (const float m : {0.f, 1.f}) {
+        HostProcessor q(silent_crossover, 32, HostSettings{0, m, 64}, 6);
+        q.set_bypass(m == 1);
+        for (int k = 0; k < 4; ++k) {
+            play(q, a, 6);
+            for (const auto& channel : a)
+                for (auto v : channel)
+                    require(v == 0, "a kept crossover that does not suit the host passes input");
+        }
+    }
+    // A kept 6x6 filter at the wrong rate keeps its dry signal.
+    HostFilter kept_equal(8);
+    kept_equal.load(HostState{equal}, std::nullopt);
+    const auto silent_equal = kept_equal.activate(slower);
+    require(dry_signal(kept_equal, slower) && silent_equal.input_channels == 6,
+            "a kept 6x6 filter that does not suit the host has no dry signal");
+    // A failed load with no filter kept (here, an unreadable state; a missing
+    // file is the same): no dry signal, whatever the counts.
+    HostFilter failed(8);
+    failed.reject(HostFailureKind::filter_file, {"The filter file could not be read."});
+    require(dry_signal_rule(failed, six) == HostDrySignal::failed_load &&
+                failed.activate(six).input_channels == 1 &&
+                unfiltered_configuration(six, true).input_channels == 1 &&
+                unfiltered_configuration(six, true, true).input_channels == 6 &&
+                unfiltered_configuration({48000, 1, 1}, true).input_channels == 1,
+            "a failed load with no filter kept has a dry signal");
+    require(host_status(failed, six, true, {0, .5}).text.rfind("Silent: ", 0) == 0,
+            "status: " + host_status(failed, six, true, {0, .5}).text);
+    // An empty instance that fails its first load while bypassed (the
+    // adapters' silence()): the dry signal ramps out with the filter, and a
+    // filter loaded afterwards brings it back by its own rule, never jumping.
+    for (const float m : {1.f, 0.f}) {
+        const auto label = std::string(m == 1 ? "bypassed" : "Mix 0%") + ", ";
+        HostProcessor empty(unfiltered_configuration(six, false), 32, HostSettings{0, m, 64}, 6);
+        empty.set_bypass(m == 1);
+        for (int k = 0; k < 4; ++k)
+            play(empty, a, 6);
+        for (std::size_t o = 0; o < 6; ++o) {
+            require(a[o][31] == 1, label + "an empty instance does not pass the input");
+            last[o] = 1;
+        }
+        const auto settle_on = [&](float want, const std::string& what) {
+            float step = 0;
+            for (int k = 0; k < 16; ++k) {
+                play(empty, a, 6);
+                for (std::size_t o = 0; o < 6; ++o)
+                    for (std::size_t i = 0; i < 32; ++i) {
+                        step = std::max(step, std::abs(a[o][i] - last[o]));
+                        last[o] = a[o][i];
+                    }
+            }
+            require(step <= 1.f / 32, label + what + ": the output jumped by " +
+                                          std::to_string(step) + " in one frame");
+            for (std::size_t o = 0; o < 6; ++o)
+                require(a[o][31] == want, label + what + ": output " + std::to_string(o + 1) +
+                                              " ends at " + std::to_string(a[o][31]));
+        };
+        empty.silence();
+        settle_on(0, "a failed first load");
+        empty.publish(empty.prepare(equal));
+        settle_on(m == 1 ? 1.f : .5f * m + (1 - m), "a 6x6 filter after the failure");
+    }
 }
 // mute(), the audio thread's own silence: the current filter ramps to 0 over
 // 64 frames and stays silent until a published filter takes over and fades in
-// from silence. Bypass still passes the dry signal; a reset keeps the silence.
+// from silence. Its dry signal goes with it unless there is one output
+// (PLUG-23); a reset keeps the silence.
 void muting() {
     std::array<float, 512> input{}, output{};
     input.fill(1);
@@ -980,6 +1061,8 @@ void muting() {
         require(std::abs(output[i] - 1.25f * (1 - static_cast<float>(i + 1) / 64)) < 1e-5,
                 "mute does not ramp over 64 frames");
     require(silent_from(63, 128), "muted output not exactly silent");
+    // With one output the dry signal stays (PLUG-23: wider_inputs() checks
+    // that it goes with more).
     host.set_bypass(true);
     run(host, 256);
     require(std::abs(output[255] - 1) < 1e-6, "bypass while muted does not pass the input");

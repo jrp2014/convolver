@@ -626,14 +626,16 @@ void lifecycle(host::World& world, const Fixture& f, unsigned seed,
     };
     // What a fresh start plays: the saved filter, or what an instance without
     // one plays (identity for equal counts, silence otherwise or after a
-    // failure), wet or bypassed.
+    // failure), wet or bypassed. Bypass passes the input only with equal
+    // counts, and not after a failed load with no filter kept unless there
+    // is only one output (PLUG-23).
     const auto fresh_output_ok = [&] {
         const auto c = m.saved ? *m.saved : unfiltered_configuration(layout, m.failed);
         const auto length = frames + test::tail(c) + 2 * latency;
         const auto out = render(*p, f.input, length, 300);
         if (m.bypass) {
             std::vector<double> dry(out.size());
-            if (ni == no)
+            if (ni == no && (no == 1 || m.saved || !m.failed))
                 for (std::size_t t = latency; t < length && t - latency < frames; ++t)
                     for (std::size_t ch = 0; ch < no; ++ch)
                         dry[t * no + ch] = f.input[(t - latency) * ni + ch];
@@ -1427,11 +1429,12 @@ void refused_first_loads(host::World& world, const fs::path& work) {
               label + "silent within 64 frames of the refusal, without a control call");
         check(p->status == as_float(Status::load_failed), label + "status load failed");
         check(all_zero_from(play_constant(*p, 4096), 0), label + "stays silent");
-        // Bypass still passes the dry signal, as with any failed first load.
+        // A failed load with no filter kept has no dry signal (PLUG-23, jrp,
+        // 7 November 2026), so bypass plays silence too.
         p->enabled = 0;
-        check(near(play_constant(*p, 2048).back(), 1.f), label + "bypass passes the input");
+        check(all_zero_from(play_constant(*p, 2048), 0), label + "bypass passes the input");
         p->enabled = 1;
-        check(all_zero_from(play_constant(*p, 2048), 64), label + "silent again after bypass");
+        check(all_zero_from(play_constant(*p, 2048), 0), label + "silent again after bypass");
         // The next control call records it; the instance stays silent, also
         // after a restart.
         check(decode_host_state(p->save().bytes).failed && p->failure() && p->failure()->silent,

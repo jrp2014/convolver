@@ -27,10 +27,11 @@ does not fit. Installing is in [install](install.md); making presets is in
   the wet/dry mix and the latency; the LV2 plug-in does not have them yet
   (its latency stays 256 samples).
 - A filter that does not fit the host's sample rate or channel counts never
-  lets unfiltered audio through (unless you bypass the plug-in or set its
-  Mix below 100%): a first filter that does not fit plays silence, and one
-  that replaces a working filter is refused, leaving the working filter
-  playing.
+  lets unfiltered audio through: a first filter that does not fit plays
+  silence, even bypassed, and one that replaces a working filter is refused,
+  leaving the working filter playing. Only a kept filter with as many inputs
+  as outputs still lets bypass and Mix pass the input (see
+  [bypass](#bypass)).
 
 Contents: [formats](#formats) · [channels](#channels) ·
 [loading a filter](#loading-a-filter) ·
@@ -200,9 +201,10 @@ example (some hosts show only the status name in the first column):
 
 The text also follows the [settings](#settings) when no filter
 is heard. With no filter loaded and Gain or Mix changed, it reads, for
-example, `No filter: audio passes at -20.0 dB (Gain and Mix).`; after a
-failed load with Mix below 100%, `Load failed, only the dry signal plays:
-...` instead of `Silent: ...`, as the dry share still plays. A filter at Mix
+example, `No filter: audio passes at -20.0 dB (Gain and Mix).`; when a
+kept filter does not fit and Mix is below 100%, `Load failed, only the dry
+signal plays: ...` instead of `Silent: ...`, as the dry share still plays
+(only where there is a dry signal: see [bypass](#bypass)). A filter at Mix
 0% adds `Mix 0%: only the dry signal plays.`
 
 **Fault** means something went wrong in the audio while it played, with or
@@ -463,7 +465,7 @@ defaults play exactly as Convolver did before the settings existed.
 | Setting | Values | Default | What it does |
 | --- | --- | --- | --- |
 | **Gain** | −100 to +24 dB | 0 dB | Scales the filtered signal, as the command line's `--gain-db` does. Negative values make room for a filter that boosts some frequencies; positive values make up level. |
-| **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. When the filter's input and output counts differ (with no filter, the track's) there is no dry signal, so the mix stays at 100%. Like bypass, the input share still plays when a filter fails to load and the filtered sound is silent. |
+| **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. Whenever bypass plays silence there is no dry signal, so the mix stays at 100%: when the filter's input and output counts differ, and in the cases [bypass](#bypass) lists when no filter plays. Where bypass passes the input, the input share of Mix still plays while a kept filter is silent. |
 | **Latency** | 64, 128, 256, 512, 1024, 2048 or 4096 frames | 256 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. Smaller values mean less delay and more processor load; larger values the opposite. It is the old Convolver's partitions setting in modern form, and the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
 
 - Gain and Mix changes fade over 1.3 ms (64 samples at 48 kHz, 128 at
@@ -526,9 +528,24 @@ to silence instead: no output has an unfiltered counterpart, and bypassing a
 crossover must not send full-range audio to a tweeter. What counts is the
 filter, not the track: a 2→6 crossover on a six-channel REAPER track is
 bypassed to silence, and a 2-in, 2-out filter given six inputs and two
-outputs bypasses to inputs 1 and 2. With no filter playing, the track's
-counts decide. Mix has no effect when the filter's counts differ: the sound
-stays fully filtered at any Mix.
+outputs bypasses to inputs 1 and 2. Mix has no effect when the filter's
+counts differ: the sound stays fully filtered at any Mix.
+
+When no filter plays, bypass and Mix pass the input only where Convolver can
+tell that is safe:
+
+| Situation | Bypass and Mix |
+| --- | --- |
+| No filter loaded yet, on a track with as many inputs as outputs | Pass the input |
+| A filter is kept but does not suit the track (for example another sample rate) | Pass the input only if the filter and the track each have as many inputs as outputs. A kept 2→6 crossover stays silent |
+| A load failed and no earlier filter is kept: a missing or unreadable file or preset, a first filter that does not fit, or a project saved after such a failure | Silent: Convolver cannot tell that the failed filter was not a crossover |
+| The track's inputs and outputs differ | Silent |
+
+On a mono instance (one input, one output) the input always passes when no
+filter plays, as there is only one output. Status says which applies: after a
+failure, `Silent: ...` means bypass and Mix pass nothing. The Convolver log's
+`Settings:` and the window's copied diagnostics give the reason, such as `mix
+100% wet (a load failed and no filter is kept, so there is no dry signal)`.
 
 This is Convolver's own **Bypass** (the host's bypass button where it uses
 it). A host that takes the effect out of the signal path altogether, such as

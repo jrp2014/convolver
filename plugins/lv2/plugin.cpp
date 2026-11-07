@@ -387,8 +387,11 @@ void activate_locked(Instance& p) {
     }
     if (!p.host) {
         try {
+            // Nothing plays, not even the dry signal, as host_status() says
+            // of a filter that could not be started (PLUG-23: a failed
+            // configuration has none).
             p.host = std::make_unique<HostProcessor>(unfiltered_configuration(p.layout, true),
-                                                     p.max_block);
+                                                     p.max_block, HostSettings{}, p.layout.inputs);
         } catch (...) {
         }
         try { // error() builds the text, which needs memory (ROBUST-7).

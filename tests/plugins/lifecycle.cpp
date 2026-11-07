@@ -371,10 +371,25 @@ struct Audible {
         return kind == dry ? "the dry input" : kind == silence ? "silence" : "a filter";
     }
 };
+// Contract, bypass: the dry signal needs as many inputs as outputs in what
+// plays: the filter when it plays; with none playing, the host, and a kept
+// filter too. After a failed load with no filter kept there is none (PLUG-23,
+// jrp, 7 November 2026). With one input and one output there always is one
+// when no filter plays.
+bool has_dry(const Context& x, const Model& m) {
+    const auto& h = m.host;
+    const bool host_equal = h.inputs == h.outputs, mono = host_equal && h.outputs == 1;
+    if (m.filter) {
+        const auto& c = configuration(x.filters, *m.filter);
+        const bool equal = c.input_channels == c.output_channels;
+        return mismatch(c, h) ? host_equal && (mono || equal) : equal;
+    }
+    return host_equal && (mono || !m.failed);
+}
 Audible audible(const Context& x, const Model& m) {
     const auto& h = m.host;
     if (m.bypass)
-        return {h.inputs == h.outputs ? Audible::dry : Audible::silence, {}};
+        return {has_dry(x, m) ? Audible::dry : Audible::silence, {}};
     if (m.filter) {
         const auto& c = configuration(x.filters, *m.filter);
         if (mismatch(c, h))

@@ -68,6 +68,7 @@ cannot be used ([when a filter does not fit](plugins.md#when-a-filter-does-not-f
 | No preset is loaded, and the input and output counts differ (a crossover, for example) | Load a preset |
 | The project was saved after its first preset failed | Load a matching preset |
 | Bypass is on, and the filter's input and output counts differ | Switch bypass off |
+| Bypass is on (or Mix below 100%) after a load failed and no earlier filter is kept, or with a kept filter whose counts differ, such as a crossover at the wrong rate | Fix the load as above. Bypass passes nothing here on purpose: Convolver cannot tell that the failed filter was not a crossover ([bypass](plugins.md#bypass)) |
 | The filter plays but some channels are missing, and Status ends "plug-in inputs … ignored" | The track gives more inputs than the filter reads: it reads the first ones only. Put the source on those inputs ([channels](plugins.md#channels)) |
 
 To see why, read the plug-in's **Status** parameter in the host's generic

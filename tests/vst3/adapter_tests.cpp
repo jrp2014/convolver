@@ -360,6 +360,27 @@ void multichannel() {
     restored.addParameterData(bypass_id, at = 0)->addPoint(0, 0, at);
     d.inputParameterChanges = &restored;
     require(p.process(d) == kResultOk, "Mix 100% and bypass off again");
+    // jrp, 7 November 2026: kept at the wrong rate, the crossover plays
+    // nothing, and with no dry signal bypass stays silent too.
+    p.setProcessing(false);
+    p.setActive(false);
+    auto slower = setup;
+    slower.sampleRate = 44100;
+    require(p.setupProcessing(slower) == kResultOk && p.setActive(true) == kResultOk,
+            "2x6 preset at 44.1 kHz on 6x6 buses must activate, silent");
+    p.setProcessing(true);
+    for (ParameterChanges* changes : {&bypassed, &dry_mix}) {
+        d.inputParameterChanges = changes;
+        for (int c = 0; c < 6; ++c)
+            outs[c].fill(1);
+        require(p.process(d) == kResultOk, "kept 2x6 preset process");
+        for (int c = 0; c < 6; ++c)
+            for (int i = 0; i < 300; ++i)
+                require(outs[c][i] == 0,
+                        "a kept 2x6 preset that does not suit the host passes the input");
+    }
+    d.inputParameterChanges = &restored;
+    require(p.process(d) == kResultOk, "Mix 100% and bypass off once more");
     d.inputParameterChanges = nullptr;
     p.setProcessing(false);
     p.setActive(false);

@@ -84,9 +84,9 @@ UnfilteredSound unfiltered_sound(const HostSettings&, bool identity);
 // neither ("99.96", not "100"). The window's sliders show the same text.
 std::string setting_text(double value, double low, double high);
 // PLUG-10: the settings in words, such as "gain 0 dB, mix 100% wet, latency
-// 256 frames".
-// `equal_counts` false says the mix does not apply.
-std::string settings_words(const HostSettings&, bool equal_counts);
+// 256 frames". Without a dry signal (`dry`, dry_signal_rule()) it says the
+// mix does not apply, and why.
+std::string settings_words(const HostSettings&, HostDrySignal dry);
 // What plays under `host` and why, in full: the silent failure (with what
 // Mix's dry share still lets through), the filter with any speaker notice,
 // or what passes with no filter. The part of started_line() after the
@@ -94,10 +94,11 @@ std::string settings_words(const HostSettings&, bool equal_counts);
 // too, so the window and the log say the same.
 std::string playing_words(const HostFilter&, const HostLayout& host, const HostSettings&);
 // DIAG-2: what plays because of a failure, as a sentence: "The previous
-// filter keeps playing.", "Convolver plays silence.", or with equal counts
-// and Mix below 100%, what of the dry signal still plays. `host` null: not
-// started yet, so Mix's share is not known.
-std::string failure_consequence(const HostFailure&, const HostLayout* host, const HostSettings&);
+// filter keeps playing.", "Convolver plays silence.", or with a dry signal
+// (`dry`, dry_signal()) and Mix below 100%, what of it still plays. `host`
+// null: not started yet, so Mix's share is not known.
+std::string failure_consequence(const HostFailure&, const HostLayout* host, const HostSettings&,
+                                bool dry);
 // DIAG-2: why saved plug-in state could not be read, for HostFilter::reject(),
 // from decode_host_state()'s exception (NewerHostState gives its own fix).
 Advice state_read_message(const std::exception&);

@@ -4,6 +4,7 @@
 #include "convolver_version.hpp"
 #include "host_log.hpp"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -88,7 +89,8 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         auto a = failure_message(*failure);
         a.problem = short_problem(std::move(a.problem), *failure);
         take(a);
-        m.plays = failure_consequence(*failure, layout, facts.settings);
+        m.plays = failure_consequence(*failure, layout, facts.settings,
+                                      layout && dry_signal(filter, *layout));
         if (chosen_away(failure->kind))
             m.action = choose;
         // Faults the load failure hides from the status.
@@ -407,15 +409,16 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
 
     r.audio = audio_facts(filter, facts);
     const auto& host = facts.host;
-    const bool equal =
-        host ? dry_signal(filter, *host) : !c || c->input_channels == c->output_channels;
-    r.settings = settings_words(facts.settings, equal);
-    if (!equal) // PLUG-23: the filter's counts while it plays, otherwise the host's.
-        r.mix_note = c && !(failure && failure->silent)
-                         ? "The filter's inputs and outputs differ, so there is no dry signal: "
-                           "Mix has no effect, and bypass plays silence."
-                         : "Inputs and outputs differ, so there is no dry signal: Mix has no "
-                           "effect, and bypass plays silence.";
+    // Before the host starts the instance only the filter's counts are known.
+    const auto dry = host ? dry_signal_rule(filter, *host)
+                     : !c || c->input_channels == c->output_channels ? HostDrySignal::present
+                                                                     : HostDrySignal::filter_counts;
+    r.settings = settings_words(facts.settings, dry);
+    if (dry != HostDrySignal::present) { // PLUG-23 (dry_signal_rule()).
+        r.mix_note = std::string(no_dry_reason(dry)) +
+                     ", so there is no dry signal: Mix has no effect, and bypass plays silence.";
+        r.mix_note[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(r.mix_note[0])));
+    }
     r.sample_rate = host ? host->sample_rate : 0;
     r.latency_waits = latency_waits(facts);
 

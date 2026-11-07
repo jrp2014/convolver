@@ -193,6 +193,17 @@ Until 1.0 the C++ API may change between minor versions.
   The same in VST3, the Audio Unit and LV2 (an LV2 layout with more inputs
   than the filter now plays it too). The audio of a filter on exactly its
   own counts is unchanged.
+- Plug-ins (PLUG-23): bypass and Mix pass nothing when no filter plays and
+  passing the input could send full-range audio to a driver. A kept filter
+  that does not suit the host (another rate, say) has a dry signal only if
+  its own input and output counts are equal, so a 2→6 crossover kept at the
+  wrong rate stays silent bypassed. After a failed load with no filter kept
+  (a missing or unreadable file or preset, a first filter that does not fit,
+  or a project saved after such a failure) bypass and Mix pass nothing at
+  all, where they used to pass the input on a track with as many inputs as
+  outputs; a mono instance still passes it. A failed first load fades its dry
+  signal out with it. Status, the log's settings and the window's report give
+  the reason.
 - Documentation (DOC-7): finished items in [TODO](TODO.md#done) are one line
   each again, as the workflow guide asks: ID, title, date, pull request and
   the page that describes the result. Their earlier full entries, with the
