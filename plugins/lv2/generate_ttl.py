@@ -34,7 +34,7 @@ PREFIXES = """\
 """
 
 # Status port values, as in plugin.hpp's Status.
-STATUS = [(0, 'Running'), (1, 'No filter'), (2, 'Load failed'), (3, 'Loading'), (4, 'Fault')]
+STATUS = [(0, 'Active'), (1, 'No filter'), (2, 'Load failed'), (3, 'Loading'), (4, 'Fault')]
 # The filter parameter's suffix and the atom ports' buffer size, as in plugin.hpp.
 FILTER = 'filter'
 ATOM_BUFFER_BYTES = 8192

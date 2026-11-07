@@ -43,7 +43,7 @@ These pages are in `docs/use/` and are shipped in preview packages.
 | Page | Kind | What it covers |
 | --- | --- | --- |
 | [Using Convolver](use/README.md) | How-to | Choosing how to run it; the tools in a preview package |
-| [Concepts](use/concepts.md) | Background | Audio terms, latency, tails, files versus streams |
+| [Concepts](use/concepts.md) | Background | Audio terms, the words Convolver uses for filters, presets and projects, latency, tails, files versus streams |
 | [Your first filter](use/first-filter.md) | Tutorial | The bundled examples with the command-line tool |
 | [Your first sound in a host](use/first-sound-in-a-host.md) | Tutorial | The example presets in a plug-in host |
 | [Check a stereo filter in a host](use/check-a-stereo-filter.md) | Tutorial | Download to checked host render: checksum, install, render, `--compare`, save and reopen, a preset that does not fit |

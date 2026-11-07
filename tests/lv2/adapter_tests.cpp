@@ -230,7 +230,7 @@ void bundle(host::World& world) {
         LilvScalePoints* points = lilv_port_get_scale_points(p, port(lv2::status_port));
         check(points && lilv_scale_points_size(points) == 5, uri + ": five status labels");
         const std::pair<lv2::Status, std::string> labels[] = {
-            {lv2::Status::running, "Running"},
+            {lv2::Status::running, "Active"},
             {lv2::Status::no_filter, "No filter"},
             {lv2::Status::load_failed, "Load failed"},
             {lv2::Status::loading, "Loading"},

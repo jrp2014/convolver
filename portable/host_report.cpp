@@ -17,9 +17,6 @@ namespace {
 std::string ports(std::size_t inputs, std::size_t outputs) {
     return std::to_string(inputs) + " in, " + std::to_string(outputs) + " out";
 }
-std::string filter_words(const Configuration& c) {
-    return std::to_string(c.sample_rate) + " Hz, " + ports(c.input_channels, c.output_channels);
-}
 std::string seconds(std::size_t frames, int rate) {
     if (rate <= 0)
         return {};
@@ -64,11 +61,10 @@ std::string short_problem(std::string problem, const HostFailure& failure) {
 // What the window says to do with no filter loaded.
 std::string load_fix(bool chooses_files) {
     return chooses_files
-               ? "Choose a .cfg, configuration list or sound file (or drop one on this window), "
-                 "or load a Convolver preset (made with convolver-preset) from the host's preset "
-                 "menu."
-               : "Load a Convolver preset (made with convolver-preset) from the host's preset "
-                 "menu.";
+               ? "Choose an IR file, .cfg or configuration list (or drop one on this window), or "
+                 "load a Convolver preset from the host's preset menu."
+               : "Load a Convolver preset from the host's preset menu (convolver-preset makes "
+                 "one from an IR file, .cfg or configuration list).";
 }
 // Failures the window's Choose Filter… puts right.
 bool chosen_away(HostFailureKind kind) {
@@ -123,13 +119,12 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
                  : "The outputs are silent: with " + ports(c.input_channels, c.output_channels) +
                        ", the filter has no unfiltered signal to play.") +
             " Turn bypass off to hear the filter.";
-    } else if (const auto& c = filter.filter()) {
+    } else if (filter.filter()) {
         // PLUG-22: while it plays, the window's heading names the filter and
         // the Audio section describes it, so nothing is said here.
         if (!host)
-            m.plays = "A filter for " + filter_words(*c) +
-                      " is loaded. It is checked against the host's sample rate and channels "
-                      "when the host starts the plug-in.";
+            m.plays = "Waiting for audio settings from the host. The filter then plays if it fits "
+                      "the host's sample rate and channels.";
         if (host && !filter.notice().empty())
             take(filter.notice());
     } else if (filter.failed()) {
@@ -144,7 +139,7 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         m.action = choose;
     }
     if (!host && !(filter.filter() && !failure))
-        m.plays += " The host has not started the plug-in yet.";
+        m.plays += " The host has not sent its audio settings yet.";
     if (latency_waits(facts))
         add_note(m, "Latency " + std::to_string(facts.settings.latency) +
                         " frames is chosen but not in use yet, so the plug-in keeps " +
@@ -246,7 +241,7 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
     const auto& c = filter.filter();
     const auto& failure = filter.failure();
     const int rate = host ? host->sample_rate : 0;
-    constexpr const char* not_started = "not known until the host starts the plug-in";
+    constexpr const char* not_started = "not known until the host sends its audio settings";
 
     HostFact sample_rate{"Host sample rate",
                          host ? host_rate_text(*host) : std::string(not_started),

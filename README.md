@@ -13,8 +13,9 @@ as:
 - an **Equalizer APO export**, for filtering everything Windows plays;
 - a **C++20 library** you can build into your own program.
 
-A filter is a multichannel impulse-response (IR) sound file, or a Convolver
-**`.cfg`** file describing filters and routes. Roon, JRiver and Audiolense use
+A filter is an IR file (a multichannel impulse response in a sound file such
+as WAV), a Convolver **`.cfg`** configuration describing filters and routes, or
+a configuration list naming several of them. Roon, JRiver and Audiolense use
 variants of the `.cfg` format ([other programs](docs/use/other-programs.md)).
 Coming from the old Windows Convolver? Your `.cfg` files may need a few
 edits ([how](docs/use/other-programs.md#configurations-from-the-old-windows-convolver)).

@@ -205,7 +205,7 @@ def failure_message_tests(d):
         (
             ['--filter', nan_ir, '--input', good, '--output', out],
             None,
-            ['cannot read audio file', 'frame 1), channel 1', 'Export it again'],
+            ['cannot read sound file', 'frame 1), channel 1', 'Export it again'],
             False,
         ),
         (
