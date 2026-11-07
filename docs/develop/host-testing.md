@@ -42,7 +42,7 @@ Host facts were checked on 23 October 2026.
 | Host | Format tested | Cost | What it adds | Limits for this test |
 | --- | --- | --- | --- | --- |
 | [REAPER](https://www.reaper.fm/download.php) 7 (Cockos) | VST3 | Free 60-day evaluation, fully functional; it keeps running afterwards with a reminder, though the licence then expects a purchase | Projects that save plug-in state, offline rendering, latency compensation, CPU meter. Also loads AU on macOS, for AU-4 later | Tracks have at least two channels, so mono presets are not part of its smoke test |
-| [Audacity](https://www.audacityteam.org/download/) 4.0 or later (GPL) | VST3 | Free | An audio editor: real-time effects on a track, and effects applied to a selection. Version 4.0 (3 September 2026) loads VST3 and, on macOS, AU | Its preset menu imports only Audacity's own text files, not `.vstpreset`; presets come from the system VST3 preset folder instead ([preparation](#prepare-the-mac)). It asks Convolver for stereo on every track. Real-time effects play at the rate of *Audio setup › Audio settings › Default sample rate*, which in 4.0.2 can differ from the project's and the export's rate (seen 7 November 2026) |
+| [Audacity](https://www.audacityteam.org/download/) 4.0 or later (GPL) | VST3 | Free | An audio editor: real-time effects on a track, and effects applied to a selection. Version 4.0 (3 September 2026) loads VST3 and, on macOS, AU | Its preset menu imports only Audacity's own text files, not `.vstpreset`; presets come from the system VST3 preset folder instead ([preparation](#prepare-the-mac)). It asks Convolver for stereo on every track. Real-time effects play at the rate of *Audio setup › Audio settings › Default sample rate*, which in 4.0.2 can differ from the rate an export uses (seen 7 November 2026) |
 | GarageBand 10.4 (Apple) | Audio Unit only | Free with macOS | Apple's own host, with the same Audio Unit check as Logic | Projects run at 44.1 kHz only, so only the `44100` presets apply. GarageBand runs an effect in mono (1 in, 1 out) on a track whose input is mono and in stereo on a stereo track (seen 25 October 2026), and Convolver plays silence when the preset does not match. It offers no other layouts. Install the Audio Unit from the macOS preview package (`Components/Convolver.component`) |
 
 Record each result under HOST-1 (VST3 hosts) or AU-4 (GarageBand) in
@@ -245,9 +245,9 @@ except the Audio Unit build, which runs in a source checkout.
    (`sudo rm -r /Library/Audio/Presets/Convolver`).
    In jrp's Audacity 4.0.2 session (7 November 2026) the administrator
    prompt was cancelled, so this folder is not yet confirmed in a test;
-   copies in `~/Library/Audio/Presets/Convolver/Convolver/` were not
-   listed. Without it, load each filter in step 3 with Convolver's
-   **Choose…** instead (the example folders hold each preset's
+   copies in the user's `~/Library/Audio/Presets` folder were not how
+   Audacity found presets. Without it, load each filter in steps 3, 6 and
+   7 with Convolver's **Choose…** instead (the example folders hold each preset's
    `filter.cfg`).
 4. Have a stereo test file at 44.1 kHz and one at 48 kHz, with clear
    transients (a click track or spoken word). For the 48 kHz checks, the
@@ -351,15 +351,15 @@ except the Audio Unit build, which runs in a source checkout.
 jrp ran these steps in Audacity 4.0.2 on 7 November 2026, from PR #131's
 candidate, with exports compared with `convolver --compare`
 ([record](../archive/reviews/2026-11-07-host1-audacity.md)); what that left
-unverified is listed under HOST-1 in [TODO](../../TODO.md). Steps 2, 3 and 9
-include what it found.
+unverified is listed under HOST-1 in [TODO](../../TODO.md). Step 3 of the
+preparation and steps 2, 3 and 9 below include what it found.
 
 1. Use the Audacity build for your Mac's processor. On start, Audacity offers
    to validate new plug-ins: accept. Otherwise use *Effect › Plugin manager ›
    Rescan plugins*. Convolver should be listed with the VST3 effects.
 2. Open *Audio setup › Audio settings* and set **Default sample rate** to
-   48000 Hz: real-time effects play at that rate, which can differ from the
-   project's rate and from the rate an export uses (Audacity's own default
+   48000 Hz: real-time effects play at that rate, which can differ from
+   the rate an export uses (Audacity's own default
    is 44100 Hz; restore it after testing if you want it). In a new project,
    import the 48 kHz stereo file and check that the project rate is
    48000 Hz. When you first play, check the log's `Started at` line: it is

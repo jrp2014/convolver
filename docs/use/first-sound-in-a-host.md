@@ -39,8 +39,8 @@ from, and `impulse.wav`.
    [plug-in presets](presets.md#load-it-in-a-host) says where to put the file,
    or, on macOS, choose the folder's `filter.cfg` with **Choose…** in
    Convolver's window instead. Audacity plays real-time effects at the rate
-   in *Audio setup › Audio settings › Default sample rate*, which can differ
-   from the project's rate: set it to the preset's rate.
+   in *Audio setup › Audio settings › Default sample rate*: set it, and the
+   project's rate, to the preset's rate.
 4. Play quiet audio and watch the meters. Identity leaves the sound unchanged,
    apart from a delay of 256 samples that most hosts make up for.
 5. Load the matching `echo` preset. Its filter is half the input at once plus a

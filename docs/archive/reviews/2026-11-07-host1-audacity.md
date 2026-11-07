@@ -4,20 +4,20 @@
 > **Dated record.** jrp's results from the Audacity part of HOST-1 (the VST3
 > plug-in, stereo), posted in the project thread on 7 November 2026 at 23:25
 > UTC, and the Audacity settings guide that came with it, posted at 23:26
-> UTC, both copied here verbatim below the line. The links and file names in
-> them name files on jrp's Mac (the settings guide, the file-loading review,
-> the JSON comparisons, projects, exports and logs); they are not in this
-> repository; the settings guide's text is the [second part](#settings-guide)
-> of this page.
+> UTC, both copied here verbatim below the line, without the SPDX line each
+> began with; the separator, heading and italic note before the settings
+> guide are added. The links and file names in them name files on jrp's Mac
+> (the file-loading review, the JSON comparisons, projects, exports and
+> logs) and are not in this repository, except the settings guide, whose
+> text is the [second part](#settings-guide) of this page.
 >
-> The candidate was built from PR #131 (PLUG-23) at `c3dbf0d`, merged with
-> the `main` of that time (0.10.13), so it has the window from before PR
+> The candidate was built from PR #131 (PLUG-23) at `c3dbf0d`, as the merge
+> `1b0d873` with the `main` of that time (0.10.13), so it has the window from before PR
 > #128 (PLUG-22) and before the 0.11 and 0.12 version steps. What it adds to
 > HOST-1, what remains and the TODO items it led to are in
 > [TODO](../../../TODO.md) under HOST-1; the Audacity steps it changed are in
 > [host testing](../../develop/host-testing.md#audacity-vst3). The proposed
-> Status wording in its fifth integration problem is handled by DOC-9 (PR
-> #136).
+> Status wording in its fifth integration problem is left to PR #136.
 
 ---
 
@@ -162,8 +162,8 @@ notes are retained as a chronological record. Nothing was committed or pushed.
 
 ## Settings guide
 
-Posted with the report at 23:26 UTC; the file `audacity-settings.md` the
-report links to.
+*Added: posted with the report at 23:26 UTC; the file `audacity-settings.md`
+the report links to.*
 
 # Show Convolver's full editor in Audacity
 
