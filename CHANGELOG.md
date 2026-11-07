@@ -584,7 +584,10 @@ Until 1.0 the C++ API may change between minor versions.
   changed its rate or buses, is now kept silent rather than refused, and
   replaces the filter that was loaded; saving then saves it. The log says
   whether the host had played audio and whether it said it was restoring a
-  project.
+  project. jrp's retest in REAPER 7.85 at `c3dbf0d` passed: the crossover
+  came back after reopening and after FX Online, and survived a save, quit
+  and reopen with the new build (REAPER does not say it is restoring a
+  project).
 - Plug-ins (PLUG-23): after a refused load, if the host later changes to a
   rate or channels the refused filter would suit, Status no longer shows
   counts that look as if they conflict ("the filter has 2 in, 6 out, the

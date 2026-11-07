@@ -19,12 +19,14 @@ preset for another rate or channel count must leave it playing.
 **Status:** Convolver is a developer preview, and these steps have not yet
 been followed in a host from start to finish. How a host gives an effect more
 outputs than inputs differs most between hosts, so the routing steps below
-are the most likely to differ from what you see. In the one REAPER session so
-far (REAPER 7.85 on macOS) they did not work: REAPER gave the
-VST3 plug-in 6 inputs and 6 outputs, so the crossover preset was refused
-([details](../develop/host-testing.md#unresolved-host-findings)). Convolver
-now plays a filter on a wider input bus, reading its first inputs, but that
-has not yet been tried in REAPER. The
+are the most likely to differ from what you see. In REAPER 7.85 on macOS
+the VST3 plug-in gets 6 inputs and 6 outputs on a six-channel track; it
+plays the crossover from inputs 1 and 2 and ignores the rest. On 7 November
+2026 the crossover played there with a preview candidate, its render matched
+the expected output, and it survived saving, quitting and reopening, and FX
+Offline then Online
+([record](../archive/reviews/2026-11-07-reaper-crossover-retest.md)). The
+Audio Unit steps have not yet been tried. The
 [status page](../project/status.md) says what is ready.
 
 The steps name REAPER, whose menus they were written for.

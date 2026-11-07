@@ -6,8 +6,9 @@
 > 7 November 2026 at 18:17 UTC and copied here verbatim below the line. The
 > file names in it are files on jrp's Mac (renders, projects, logs and
 > scripts); they are not in this repository. The save-and-reopen failure it
-> reports was fixed in the same pull request; the open state is in
-> [host testing](../../develop/host-testing.md#unresolved-host-findings).
+> reports was fixed in the same pull request (eeaa843 and c3dbf0d), and jrp's
+> second retest of that fix, posted at 19:24 UTC the same day, is copied
+> verbatim [below](#second-retest-c3dbf0d).
 
 ---
 
@@ -138,3 +139,77 @@ See `final-state.txt`.
 ReaScripts used, including intermediate diagnostic attempts; these are a record
 of the session, not a clean unattended end-to-end runner. No repository source
 was changed and no GitHub comment was posted.
+
+---
+
+## Second retest, c3dbf0d
+
+> Copied verbatim from jrp's message of 7 November 2026, 19:24 UTC.
+
+# PR #131: restoration retest on c3dbf0d
+
+7 November 2026. **The previously failing REAPER restoration checks now pass.**
+
+### Candidate
+
+- Requested run: [42404299284](https://github.com/jrp2014/convolver/actions/runs/42404299284), Plug-in distribution candidates; completed successfully.
+- PR head: `c3dbf0db5faf383e33295c27f1b226bb838068bd`.
+- Artifact: `candidate-macos-arm64`, ID `13587465282`.
+- Package: Convolver 0.10.13; source commit `1b0d873729f65cfba768e2dada1675cccec953fa` (PR merge commit).
+- Package SHA-256: `64196c430cf9e7c9c9eab53bb8c71367d311983bb440bb75543cfd6775addc75`.
+- All four asset hashes matched the candidate manifest. The extracted and installed VST3 bundles passed strict/deep signature verification.
+- Previous installed bundle preserved in `previous-Convolver.vst3`; original project and earlier evidence retained in the preceding retest folder.
+- Host: REAPER 7.85/macOS-arm64, macOS 27.2 build 26B123. Project/device 48000 Hz; 512-frame device blocks.
+
+### Method
+
+Focused retest of the previous save/reopen and FX Offline/Online failures, with Mix and bypass controls. Native ReaScripts drove the installed REAPER application. No filter preset was imported during this run: the filter had to survive exclusively through saved state.
+
+First, reopened a copy of the working project saved by the previous candidate. Then took FX offline and online, rendered the restored output, checked Mix 0% and plug-in bypass, and saved again with normal settings. Quit REAPER completely and reopened the new build's saved project for a second restoration render.
+
+The six-channel track feeds a six-channel master, with float32 WAV output, unity levels, no fades/normalization/dither, and 1000 ms tail. Explicitly brought media online and briefly played before rendering, using the working procedure established in the previous retest.
+
+### Results
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Open the old candidate's saved crossover | **Pass** | `reopened.wav`; correct Status before playback; all six outputs match expected. |
+| FX Offline | **Observed expected host bypass** | `offline.wav`: exact source on channels 1-2, channels 3-6 zero. |
+| FX Online again | **Pass** | `online-restored.wav`; crossover returns automatically, with no preset import. |
+| Mix 0% | **Pass** | `mix-zero.wav`; sample-identical to the normal six-channel render. |
+| Convolver bypass | **Pass** | `plugin-bypass.wav`; every sample on all six outputs exactly zero. |
+| Restore normal settings | **Pass** | `normal-restored.wav`; same audio as baseline. |
+| Save with new build, quit and reopen | **Pass** | `roundtrip.wav`; same audio as baseline, without reimporting the preset. |
+
+All five filtered renders match the packaged reference. Worst error is
+**1.19e-07**, **-128.47 dB relative to expected peak**, at channel 5, frame 1748.
+They are also sample-for-sample identical to each other. Each has 52096 frames;
+the reference has 4249 frames and the additional rendered tail is silent.
+No timing alignment or level correction was applied during comparison.
+
+Status after each restoration, including before playback:
+
+> Filter loaded: 48000 Hz, 2 in, 6 out; plug-in inputs 3-6 ignored.
+
+The log now records the previously destructive sequence correctly: it retains
+the crossover silently during the temporary stereo activation, explaining that
+the host has not played audio yet, then starts it successfully on 6-in/6-out
+buses. This happened both on reopening and when bringing FX online. The log uses
+the untagged-state fallback reason; it does not say REAPER identified the state
+as project restoration.
+
+### Scope and final state
+
+This closes the specific REAPER restoration failure observed with candidate
+`5d188a7`. It does not qualify every host or lifecycle order. Wrong-rate recovery,
+insufficient-input rejection, editor interactions, listening quality and Latency
+changes were not repeated in this focused run; earlier results remain dated to
+their tested candidate.
+
+REAPER is left open and stopped at the start of `crossover.rpp`, with the
+crossover loaded, 48000 Hz, Gain 0 dB, Mix 100%, 256-frame latency and both
+bypasses off. The new build's saved project has now survived a full restart.
+
+Evidence: `restore-checks.txt`, `roundtrip.txt`, `Convolver-retest.log`,
+`audio-verification.json`, `*-compare.txt`, the WAV renders and `scripts/`.
+No repository source was changed and no report was posted to GitHub.
