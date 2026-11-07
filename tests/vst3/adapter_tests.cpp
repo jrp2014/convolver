@@ -1764,6 +1764,142 @@ void report_and_files() {
     c.terminate();
     p.terminate();
 }
+// PLUG-22: the controller state keeps the chosen file's name, which the
+// window shows again after the project is reopened, but only while the
+// filter it belongs to plays; and Bypass from the controller reads as
+// Bypassed at once.
+void saved_filter_name() {
+    // The format: anything not ours reads as no name.
+    const ControllerState kept{"room (left).wav", "0123456789abcdef"};
+    const auto encoded = encode_controller_state(kept);
+    const auto back = decode_controller_state(encoded);
+    require(back.name == kept.name && back.identity == kept.identity,
+            "controller state round trip");
+    for (const auto& bad : {std::string(), encoded.substr(0, encoded.size() - 1),
+                            std::string("CVCS"), std::string("CVCX") + encoded.substr(4),
+                            encode_controller_state({"", ""}).substr(0, 9)}) {
+        const auto none = decode_controller_state(bad);
+        require(none.name.empty() && none.identity.empty(), "damaged controller state read");
+    }
+    auto newer = encoded;
+    newer[4] = 2;
+    require(decode_controller_state(newer).name.empty(), "a newer controller state read");
+    auto long_name =
+        encode_controller_state({std::string(convolver::max_filter_name_bytes + 1, 'a'), "1"});
+    require(decode_controller_state(long_name).name.empty(), "an over-long name read");
+
+    const auto field = [](const std::vector<std::pair<std::string, std::string>>& report,
+                          const char* name) {
+        for (const auto& [key, value] : report)
+            if (key == name)
+                return value;
+        return std::string("(missing)");
+    };
+    struct Instance {
+        HostApplication context;
+        Handler handler;
+        Processor p;
+        Controller c;
+        Instance() {
+            require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                        c.setComponentHandler(&handler) == kResultOk &&
+                        p.connect(&c) == kResultOk && c.connect(&p) == kResultOk,
+                    "name instance");
+            SpeakerArrangement mono = SpeakerArr::kMono;
+            ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+            require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk &&
+                        p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+                    "name activate");
+        }
+        ~Instance() {
+            p.setActive(false);
+            p.disconnect(&c);
+            c.disconnect(&p);
+            c.terminate();
+            p.terminate();
+        }
+    };
+    // Before PLUG-22 the controller state was empty; it still is with no file.
+    {
+        Instance fresh;
+        MemoryStream empty;
+        require(fresh.c.getState(&empty) == kResultOk && empty.getSize() == 0,
+                "a controller state without a file");
+        empty.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(fresh.c.setState(&empty) == kResultOk && fresh.c.setState(nullptr) == kResultOk,
+                "an empty controller state refused");
+    }
+#if defined(__APPLE__) || defined(CONVOLVER_VST3_TESTS_IO)
+    const auto folder = private_temp("convolver-vst3-name");
+    std::filesystem::create_directories(folder);
+    const auto good = folder / "room.wav", other = folder / "hall.wav";
+    write_wav(good, 48000, 1, 8);
+    write_wav(other, 48000, 1, 16);
+    const auto* reader = convolver::vst3::test_file_reader;
+#if defined(CONVOLVER_VST3_TESTS_IO) && !defined(__APPLE__)
+    convolver::vst3::test_file_reader = &convolver::detail::libsndfile_files();
+#endif
+    MemoryStream component, controller, hall;
+    std::string identity;
+    {
+        Instance first;
+        require(first.c.load_file(good.string()), "name file not loaded");
+        const auto report = first.c.report();
+        identity = field(report, "filter identity");
+        require(identity.size() == 16, "no filter identity");
+        // Bypass from the host or the window: Bypassed before audio runs.
+        require(first.c.setParamNormalized(bypass_id, 1) == kResultOk &&
+                    field(first.c.report(), "status name") == "Bypassed",
+                "bypass not shown at once");
+        require(first.c.setParamNormalized(bypass_id, 0) == kResultOk &&
+                    field(first.c.report(), "status name") == "Active",
+                "bypass off not shown at once");
+        require(first.p.getState(&component) == kResultOk &&
+                    first.c.getState(&controller) == kResultOk,
+                "save with a file");
+        controller.seek(0, IBStream::kIBSeekSet, nullptr);
+        std::string bytes(static_cast<std::size_t>(controller.getSize()), '\0');
+        int32 read = 0;
+        controller.read(bytes.data(), static_cast<int32>(bytes.size()), &read);
+        const auto saved = decode_controller_state(bytes);
+        require(saved.name == "room.wav" && saved.identity == identity,
+                "controller state does not hold the name");
+        // Another filter's state, for the mismatch below.
+        require(first.c.load_file(other.string()) && first.p.getState(&hall) == kResultOk,
+                "second file");
+        require(field(first.c.report(), "filter identity") != identity,
+                "two filters with one identity");
+    }
+    {
+        // Reopened as hosts do: component state, then the controller's.
+        Instance reopened;
+        component.seek(0, IBStream::kIBSeekSet, nullptr);
+        controller.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(reopened.p.setState(&component) == kResultOk, "reopen component");
+        component.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(reopened.c.setComponentState(&component) == kResultOk &&
+                    reopened.c.setState(&controller) == kResultOk,
+                "reopen controller");
+        auto report = reopened.c.report();
+        require(field(report, "filter name") == "room.wav" && field(report, "filter path").empty(),
+                "name not shown after reopening");
+        require(reopened.c.diagnostics().find("\nFilter: room.wav") != std::string::npos,
+                "diagnostics do not name the file after reopening");
+        // Saved again without choosing a file: the name is kept.
+        MemoryStream again;
+        require(reopened.c.getState(&again) == kResultOk && again.getSize() == controller.getSize(),
+                "name lost when saved again");
+        // A preset of another filter: the name no longer applies.
+        hall.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(reopened.p.setState(&hall) == kResultOk, "other preset");
+        report = reopened.c.report();
+        require(field(report, "filter name") == "From the saved project or preset",
+                "a saved name shown for another filter");
+    }
+    convolver::vst3::test_file_reader = reader;
+    std::filesystem::remove_all(folder);
+#endif
+}
 // VST3-15: what a host may put between the components
 // (IConnectionPoint): a proxy that passes each message on at once and
 // returns the receiver's answer, as the SDK's ConnectionProxy does, or one
@@ -2025,6 +2161,7 @@ int run(const std::filesystem::path& preset_path) {
         controller_conversions();
         settings_parameters();
         report_and_files();
+        saved_filter_name();
         messages_through_proxies();
         settings_at_state_limit();
         tail_measured_at_output();

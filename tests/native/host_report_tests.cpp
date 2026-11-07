@@ -328,9 +328,24 @@ void cases() {
                 contains(fact(w, "Host sample rate").value, "not known until the host starts") &&
                 fact(w, "Host sample rate").note.empty() && fact(w, "Host channels").note.empty(),
             "filter facts before the host starts: " + w.filter_rate + " | " + w.filter_speakers);
+        // PLUG-22: the identity a saved name is matched against: 16 hex
+        // digits, the same for the same filter, different for another.
+        require(r.filter_identity.size() == 16 &&
+                    r.filter_identity.find_first_not_of("0123456789abcdef") == std::string::npos &&
+                    field("filter identity") == r.filter_identity &&
+                    host_report(f, facts(stereo)).filter_identity == r.filter_identity &&
+                    w.filter_identity.size() == 16 && w.filter_identity != r.filter_identity,
+                "filter identity: " + r.filter_identity + " | " + w.filter_identity);
+        auto quieter = labelled;
+        quieter.paths.at(0).impulse.at(0) *= .5f;
+        HostFilter other(8);
+        other.load(HostState{quieter}, std::nullopt);
+        require(host_report(other, facts(std::nullopt)).filter_identity != w.filter_identity,
+                "a changed sample keeps the identity");
         const auto none = host_report(HostFilter(8), facts(std::nullopt));
         require(none.filter_rate.empty() && none.filter_channels.empty() &&
-                    none.filter_length.empty() && none.filter_speakers.empty(),
+                    none.filter_length.empty() && none.filter_speakers.empty() &&
+                    none.filter_identity.empty(),
                 "filter facts without a filter");
     }
     require(r.audio.front().label == "Host sample rate" &&

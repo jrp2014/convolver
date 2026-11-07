@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // The edit controller (VST3-14: moved from processor.cpp, unchanged).
+#include "bytes.hpp"
 #include "editor.hpp"
 #include "host_report.hpp"
+#include "pluginterfaces/base/ibstream.h"
 #include "processor.hpp"
 #include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include <mutex>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -15,6 +21,39 @@ namespace convolver::vst3 {
 using namespace Steinberg;
 using namespace Steinberg::Vst;
 namespace {
+constexpr std::string_view controller_magic = "CVCS";
+constexpr std::uint32_t controller_version = 1;
+constexpr std::size_t max_controller_state = 4096; // Name, identity and headers fit easily.
+
+void append_le32(std::string& out, std::uint32_t value) {
+    std::array<std::byte, 4> bytes{};
+    detail::write_le32(bytes, value);
+    for (const auto byte : bytes)
+        out.push_back(static_cast<char>(byte));
+}
+std::optional<std::uint32_t> take_le32(std::string_view& in) {
+    if (in.size() < 4)
+        return std::nullopt;
+    const auto value = detail::read_le32(std::as_bytes(std::span(in.data(), 4)));
+    in.remove_prefix(4);
+    return value;
+}
+std::optional<std::string> take_text(std::string_view& in, std::size_t most) {
+    const auto size = take_le32(in);
+    if (!size || *size > most || *size > in.size())
+        return std::nullopt;
+    std::string text(in.substr(0, *size));
+    in.remove_prefix(*size);
+    return text;
+}
+// A report field's value, or empty.
+std::string field(const std::vector<std::pair<std::string, std::string>>& report,
+                  std::string_view name) {
+    for (const auto& [key, value] : report)
+        if (key == name)
+            return value;
+    return {};
+}
 void copy(const std::string& text, String128 out) {
     std::size_t i = 0;
     for (; i < text.size() && i < 127; ++i) // ASCII (HostStatusLine), widened.
@@ -22,6 +61,63 @@ void copy(const std::string& text, String128 out) {
     out[i] = 0;
 }
 } // namespace
+std::string encode_controller_state(const ControllerState& state) {
+    std::string out(controller_magic);
+    append_le32(out, controller_version);
+    append_le32(out, static_cast<std::uint32_t>(state.name.size()));
+    out += state.name;
+    append_le32(out, static_cast<std::uint32_t>(state.identity.size()));
+    out += state.identity;
+    return out;
+}
+ControllerState decode_controller_state(std::string_view in) {
+    if (!in.starts_with(controller_magic))
+        return {};
+    in.remove_prefix(controller_magic.size());
+    if (take_le32(in) != controller_version)
+        return {};
+    auto name = take_text(in, max_filter_name_bytes);
+    auto identity = take_text(in, 64);
+    if (!name || !identity)
+        return {};
+    return {std::move(*name), std::move(*identity)};
+}
+tresult PLUGIN_API Controller::setState(IBStream* stream) {
+    if (!stream)
+        return kResultOk;
+    std::string bytes;
+    constexpr int32 chunk = 512;
+    char buffer[chunk];
+    while (bytes.size() <= max_controller_state) {
+        int32 count = 0;
+        if (stream->read(buffer, chunk, &count) != kResultOk || count <= 0)
+            break;
+        bytes.append(buffer, static_cast<std::size_t>(std::min(count, chunk)));
+    }
+    // Too long to be ours, or not ours: no name, as before PLUG-22.
+    auto state =
+        bytes.size() > max_controller_state ? ControllerState{} : decode_controller_state(bytes);
+    std::lock_guard lock(status_lock_);
+    name_ = std::move(state.name);
+    identity_ = std::move(state.identity);
+    return kResultOk;
+}
+tresult PLUGIN_API Controller::getState(IBStream* stream) {
+    std::string bytes;
+    {
+        std::lock_guard lock(status_lock_);
+        if (name_.empty() || identity_.empty())
+            return kResultOk; // Nothing to keep: the empty state of earlier versions.
+        bytes = encode_controller_state({name_, identity_});
+    }
+    if (!stream)
+        return kResultFalse;
+    int32 written = 0;
+    return stream->write(bytes.data(), static_cast<int32>(bytes.size()), &written) == kResultOk &&
+                   written == static_cast<int32>(bytes.size())
+               ? kResultOk
+               : kResultFalse;
+}
 tresult PLUGIN_API Controller::initialize(FUnknown* context) {
     auto result = EditController::initialize(context);
     if (result == kResultOk) {
@@ -118,6 +214,13 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         status_text_.swap(text);
         status_value_ = static_cast<int>(status);
         if (!report.empty()) {
+            // PLUG-22: a filter file the processor accepted: its name and
+            // identity are what the controller state keeps.
+            if (!field(report, "filter path").empty() &&
+                !field(report, "filter identity").empty()) {
+                name_ = field(report, "filter name");
+                identity_ = field(report, "filter identity");
+            }
             report_.swap(report);
             report_text_.swap(report_text);
             format_.swap(format);
@@ -164,6 +267,22 @@ void Controller::latency_chosen(std::size_t frames) {
     }
 }
 tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) {
+    if (id == bypass_id) {
+        // PLUG-22: the processor shows Bypassed at once (bypass_message).
+        const bool before = getParamNormalized(bypass_id) >= .5;
+        const auto result = EditController::setParamNormalized(id, value);
+        const bool after = getParamNormalized(bypass_id) >= .5;
+        if (result == kResultOk && after != before) {
+            if (auto message = owned(allocateMessage())) {
+                message->setMessageID(bypass_message);
+                if (auto* attributes = message->getAttributes()) {
+                    attributes->setInt("bypass", after ? 1 : 0);
+                    sendMessage(message);
+                }
+            }
+        }
+        return result;
+    }
     if (id == latency_id) {
         const auto before = latency_frames(getParamNormalized(latency_id));
         const auto result = EditController::setParamNormalized(id, value);
@@ -261,7 +380,18 @@ std::vector<std::pair<std::string, std::string>> Controller::report() {
         sendMessage(message);
     }
     std::lock_guard lock(status_lock_);
-    return report_;
+    return named_report();
+}
+std::vector<std::pair<std::string, std::string>> Controller::named_report() const {
+    auto report = report_;
+    // From saved state (no file path), and the filter the name belongs to.
+    if (name_.empty() || !field(report, "filter path").empty() ||
+        field(report, "filter identity") != identity_)
+        return report;
+    for (auto& [key, value] : report)
+        if (key == "filter name")
+            value = name_;
+    return report;
 }
 std::string Controller::diagnostics() {
     std::string text, format;
@@ -269,6 +399,12 @@ std::string Controller::diagnostics() {
         std::lock_guard lock(status_lock_);
         text = report_text_;
         format = format_;
+        // The saved name in the text's Filter line too.
+        const auto saved = field(report_, "filter name"),
+                   named = field(named_report(), "filter name");
+        const auto line = text.find("\nFilter: " + saved);
+        if (saved != named && line != std::string::npos)
+            text.replace(line + 9, saved.size(), named);
     }
     if (format.empty())
         return {};

@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -329,6 +330,45 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
     return audio;
 }
 
+// PLUG-22: FNV-1a over what tells filters apart cheaply, read on every
+// report (twice a second while a window is open), so not every sample.
+std::string identity(const Configuration& c, double peak) {
+    std::uint64_t hash = 14695981039346656037ULL;
+    const auto add = [&](const void* data, std::size_t size) {
+        const auto* bytes = static_cast<const unsigned char*>(data);
+        for (std::size_t i = 0; i < size; ++i) {
+            hash ^= bytes[i];
+            hash *= 1099511628211ULL;
+        }
+    };
+    const auto add_value = [&](auto value) { add(&value, sizeof value); };
+    add_value(static_cast<std::int64_t>(c.sample_rate));
+    add_value(static_cast<std::uint64_t>(c.input_channels));
+    add_value(static_cast<std::uint64_t>(c.output_channels));
+    add_value(c.channel_mask);
+    for (const auto* delays : {&c.input_delays, &c.output_delays}) {
+        add_value(static_cast<std::uint64_t>(delays->size()));
+        for (const auto d : *delays)
+            add_value(static_cast<std::uint64_t>(d));
+    }
+    add_value(static_cast<std::uint64_t>(c.paths.size()));
+    for (const auto& path : c.paths) {
+        add_value(static_cast<std::uint64_t>(path.impulse.size()));
+        add(path.impulse.data(), std::min<std::size_t>(path.impulse.size(), 256) * sizeof(float));
+        for (const auto* routes : {&path.inputs, &path.outputs}) {
+            add_value(static_cast<std::uint64_t>(routes->size()));
+            for (const auto& route : *routes) {
+                add_value(static_cast<std::uint64_t>(route.channel));
+                add_value(route.gain);
+            }
+        }
+    }
+    add_value(peak);
+    char text[17] = {};
+    std::snprintf(text, sizeof text, "%016llx", static_cast<unsigned long long>(hash));
+    return text;
+}
+
 std::string request_reference(const HostRequest& r) {
     return (r.source == HostFilterSource::file && !r.path.empty()
                 ? r.path
@@ -377,6 +417,7 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
         r.filter_taps = std::to_string(taps) + " taps";
         r.filter_length = length.empty() ? r.filter_taps : length;
         // A list on its own, so it starts with a capital: "Front left, front right".
+        r.filter_identity = identity(*c, filter.filter_peak());
         r.filter_speakers = speaker_names(c->channel_mask, c->output_channels);
         if (!r.filter_speakers.empty())
             r.filter_speakers[0] =
@@ -467,6 +508,7 @@ std::vector<std::pair<std::string, std::string>> report_fields(const HostReport&
             {"filter channels", r.filter_channels},
             {"filter length", r.filter_length},
             {"filter taps", r.filter_taps},
+            {"filter identity", r.filter_identity},
             {"filter speakers", r.filter_speakers},
             {"filter note", r.filter_note},
             {"filter path", r.filter_path},

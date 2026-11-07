@@ -356,7 +356,7 @@ void Processor::write_log() noexcept {
 }
 HostStatusLine Processor::status_locked() const {
     return host_status(filter_, host_ ? std::optional(layout()) : known_layout(),
-                       host_log_written(), settings());
+                       host_log_written(), settings(), shown_bypass_.load());
 }
 HostStatusLine Processor::status() {
     std::lock_guard lock(control_);
@@ -370,6 +370,7 @@ HostReport Processor::report_locked() const {
     facts.settings = settings();
     facts.latency_frames = host_ ? host_->latency_frames() : facts.settings.latency;
     facts.tail_frames = tail_.load();
+    facts.bypassed = shown_bypass_.load();
     facts.log_written = host_log_written();
     facts.chooses_files = files_ != nullptr || test_file_reader != nullptr;
     if (files_)
@@ -462,6 +463,15 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
         }
         if (faulted)
             write_log();
+        send_status();
+        return kResultOk;
+    }
+    if (id == bypass_message) {
+        int64 bypass = 0;
+        auto* attributes = message->getAttributes();
+        if (!attributes || attributes->getInt("bypass", bypass) != kResultOk)
+            return kInvalidArgument;
+        shown_bypass_.store(bypass != 0);
         send_status();
         return kResultOk;
     }
@@ -560,6 +570,7 @@ void Processor::install(HostState next, const HostRequest& request, bool restore
     tail_.store(host_ ? static_cast<uint32>(host_->tail_frames()) : inactive_tail);
     if (restore) {
         bypass_.store(bypass);
+        shown_bypass_.store(bypass);
         gain_db_.store(saved.gain_db);
         mix_.store(saved.mix);
         choose_latency(saved.latency);
@@ -749,6 +760,7 @@ tresult PLUGIN_API Processor::process(ProcessData& d) {
                     return signal_faults(d), kInvalidArgument;
                 position = offset;
                 bypass_.store(value >= .5);
+                shown_bypass_.store(value >= .5);
             }
         }
     }

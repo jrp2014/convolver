@@ -80,6 +80,12 @@ struct HostReport {
     // All empty without a filter.
     std::string filter_rate, filter_channels, filter_length, filter_speakers;
     std::string filter_taps; // "65536 taps": the longest path, for the length's tooltip.
+    // PLUG-22: which filter this is, as 16 hex digits, so a name saved
+    // beside it (VST3's controller state) is shown only while that filter
+    // plays: a hash of its shape (rate, counts, mask, delays, routes, path
+    // lengths), the first samples of each path and its peak. Empty without
+    // a filter.
+    std::string filter_identity;
     // VST3-11: the accepted filter's file as chosen (UTF-8; empty when it came
     // from saved state), which the window's Reload reads again, and every
     // file it was read from (HostRequest::files), which the window watches
