@@ -1761,6 +1761,37 @@ void status_lines() {
     check(host_status(f, stereo), Status::load_failed,
           "Load failed, previous filter kept: the filter has 2 in, 6 out, the plug-in 2 in, 2 out.",
           "refused replacement");
+    // The host then gives buses the refused filter would suit (PLUG-23: six
+    // inputs and six outputs): the line names only what was refused, not
+    // counts that look as if they conflict (jrp's REAPER retest, 7 November).
+    const HostLayout six{48000, 6, 6};
+    check(host_status(f, six), Status::load_failed,
+          "Load failed, previous filter kept: the filter has 2 in, 6 out; the channels have "
+          "changed since. Details in the Convolver log.",
+          "refused replacement, suitable buses now");
+    refused([&] { f.load(HostState{other_rate}, stereo); });
+    check(host_status(f, HostLayout{44100, 2, 2}), Status::load_failed,
+          "Load failed, previous filter kept: the filter is for 44100 Hz; the rate has changed "
+          "since. Details in the Convolver log.",
+          "refused replacement, suitable rate now");
+    // Restored while the host may still change its buses (VST3 before audio
+    // has played): a filter that does not suit is kept, silent, with the
+    // reason, and plays once the host's buses suit it.
+    {
+        HostFilter kept(8);
+        kept.load(HostState{a}, stereo);
+        kept.load(HostState{crossover}, stereo, {}, {}, nullptr, true);
+        require(kept.filter() && kept.filter()->output_channels == 6 && kept.failure() &&
+                    kept.failure()->silent && kept.failure()->kind == HostFailureKind::channels &&
+                    !kept.rejection(),
+                "a restored filter that does not suit yet was not kept silent");
+        check(host_status(kept, stereo), Status::load_failed,
+              "Silent: the filter has 2 in, 6 out, the plug-in 2 in, 2 out.", "kept, unsuited");
+        static_cast<void>(kept.activate(six));
+        require(!kept.failure(), "the kept filter does not play on buses that suit it");
+        check(host_status(kept, six), Status::active, "Filter loaded: 48000 Hz, 2 in, 6 out",
+              "kept, then suited");
+    }
     // The longest common line still fits when the log cannot be written.
     refused([&] { f.load(HostState{other_rate}, stereo); });
     check(host_status(f, stereo, false), Status::load_failed,

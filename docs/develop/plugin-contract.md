@@ -56,7 +56,7 @@ behaviour:
 | --- | --- | --- | --- |
 | **Empty instance:** no filter was ever loaded | Equal input and output counts: identity (input *c* to output *c*). Unequal counts: silence, because an unfiltered 2→6 crossover would send full-range audio to whatever is on outputs 1 and 2 | "No filter" status where the format has one | As specified |
 | **Failed initial load:** the first filter (a session restore or the first preset) cannot be used: missing file without an embedded copy, wrong rate or channel counts, corrupt state | Silence, never a silent fallback to identity: a room correction or crossover that quietly plays unfiltered audio is worse than an obvious failure | Error returned to the host where the format allows it, status "load failed", and the explanatory message in the host's log | Silence; `setState` returns `kResultFalse`. A mismatch found at activation plays silence; until DIAG-1 it did so with no message (accepted until VST3-3). Since DIAG-1 the Status parameter says why and the Convolver log explains (see [status and log](#status-and-log)) |
-| **Failed replacement:** a working filter is running and a new one is rejected | The working filter keeps running, unchanged | Error returned to the host, status "load failed", message in the log; saved state still describes the working filter | As specified, active or inactive once the plug-in has been activated at the current rate and buses; `setState` returns `kResultFalse` |
+| **Failed replacement:** a working filter is running and a new one is rejected | The working filter keeps running, unchanged | Error returned to the host, status "load failed", message in the log; saved state still describes the working filter | As specified, active or inactive once the plug-in has been activated at the current rate and buses and has played audio since; `setState` returns `kResultFalse`. Before that, restored state that does not suit is kept, silent (see the VST3 note under [state that arrives before the host is configured](#loading-and-failure)) |
 
 The control side of these rules is shared code in the host layer, so every
 adapter gets the same decisions and messages: `HostFilter` (which filter a load
@@ -103,11 +103,28 @@ before they set the sample rate and channel layout (VST3 `setState` before
 - LV2 knows the sample rate at instantiation and its ports are fixed, so its
   configuration is always known and both kinds of check run in `restore()`.
 - VST3 counts its configuration as known once the plug-in has been activated
-  with it, and while the rate and buses stay the same. `setupProcessing` alone
-  is not binding: JUCE-based hosts, pluginval among them, call it with
-  placeholder values (44.1 kHz) before restoring state made for another rate,
-  which a check at that point would wrongly reject (found by
-  `vst3.pluginval.acceptance` in VST3-7).
+  with it and has played audio since (a `process` call with samples), and
+  while the rate and buses stay the same. `setupProcessing` alone is not
+  binding: JUCE-based hosts, pluginval among them, call it with placeholder
+  values (44.1 kHz) before restoring state made for another rate, which a
+  check at that point would wrongly reject (found by
+  `vst3.pluginval.acceptance` in VST3-7). Activation alone is not binding
+  either: on reopening a project, and on FX Offline then Online, REAPER
+  activates the plug-in on stereo buses, restores the saved state, then
+  deactivates it and gives it the track's channels (jrp's crossover retest,
+  7 November 2026), so a check at that point refused a saved 2→6 crossover
+  and left nothing to play on six channels. State the host marks as a
+  project (`IStreamAttributes`, `PresetAttributes::kStateType` "Project") is
+  never refused for not suiting the host. Restored state that arrives while
+  the configuration is not binding is kept even if it does not suit: if the
+  plug-in is active, it plays silence with the reason as a failure found at
+  activation (`HostFilter::load` with `keep_mismatch`), and the next
+  activation checks it again. A filter file chosen in the window is checked
+  as soon as the plug-in has been activated. A preset the host loads into a
+  new instance before it has played audio is therefore kept silent rather
+  than refused; VST3 gives no other way to tell it from a restored project
+  when the host does not say. `processor.cpp`'s `install()` holds the rule,
+  and `vst3.adapter`'s `restored_while_host_settles` replays REAPER's order.
 
 ## Failure reasons
 

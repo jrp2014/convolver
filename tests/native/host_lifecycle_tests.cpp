@@ -23,8 +23,8 @@ class Reference final : public lc::Driver {
         using lc::Op;
         lc::Format f;
         f.name = "host layer";
-        // As VST3: the configuration binds at activation and stays known while
-        // it is unchanged.
+        // The configuration binds at activation and stays known while it is
+        // unchanged (VST3 also waits until audio has played).
         f.known = lc::Known::activation;
         f.operations = {Op::state_a,
                         Op::state_b,

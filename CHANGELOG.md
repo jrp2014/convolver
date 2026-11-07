@@ -585,6 +585,28 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- VST3 (PLUG-23, from jrp's REAPER crossover retest at `5d188a7`): a project
+  saved with the 2→6 crossover on a six-channel track played silence after
+  reopening, and after FX Offline then Online. REAPER starts the plug-in on
+  stereo buses, restores the saved state, and only then gives it the track's
+  six inputs and outputs; the plug-in refused the crossover against the
+  stereo buses, so nothing was left to play on six. Restored state is now
+  refused for not suiting the host's rate or channels only once the host has
+  played audio with them, and never when the host says it is restoring a
+  project (VST 3.6 `IStreamAttributes`). Until then a filter that does not
+  suit is kept, plays silence with the reason in Status and the log, and
+  plays as soon as the host starts the plug-in on buses that suit it. A
+  preset that does not suit an instance that has played audio is still
+  refused, and the previous filter keeps playing. A preset loaded into a new
+  instance before the host has played any audio is now kept silent rather
+  than refused. The log says whether the host had played audio and whether
+  it said it was restoring a project.
+- Plug-ins (PLUG-23): after a refused load, if the host later changes to a
+  rate or channels the refused filter would suit, Status no longer shows
+  counts that look as if they conflict ("the filter has 2 in, 6 out, the
+  plug-in 6 in, 6 out"); it says "the filter has 2 in, 6 out; the channels
+  have changed since." (or "the rate has changed since."), and the log keeps
+  the counts the load was refused against.
 - Tests (CI-33): `native.cli`'s no-clip case compared each pair of renders
   byte for byte, so its float case failed when the two files' `PEAK` chunks,
   in which libsndfile records the second a float WAV file was written,

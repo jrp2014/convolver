@@ -337,7 +337,7 @@ void HostFilter::refuse(HostFailureKind kind, Advice why, const HostRequest& req
 
 void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
                       const std::function<void(const Configuration&)>& install, HostRequest request,
-                      HostProcessor* counting) {
+                      HostProcessor* counting, bool keep_mismatch) {
     request = numbered(std::move(request));
     auto& next = state.configuration;
     const Configuration* carried = next ? &*next : nullptr;
@@ -347,7 +347,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     // saved never part (jrp's review of 0.4.30). Without the host's
     // configuration, activation checks the speakers.
     Advice notice;
-    std::optional<HostFailure> saved_failure;
+    std::optional<HostFailure> saved_failure, kept_failure;
     double peak = 0;
     try {
         if (state.failed && next)
@@ -376,9 +376,23 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
             if (auto why = host_state_size_error(state); !why.empty())
                 refuse(HostFailureKind::too_large, std::move(why), request, carried);
         if (host && next) {
-            if (auto m = mismatch(*next, *host))
-                refuse(m->kind, std::move(m->why), request, carried);
-            notice = speaker_notice(*next, *host);
+            if (auto m =
+                    mismatch(*next, *host, keep_mismatch ? "the saved filter" : "the filter")) {
+                if (!keep_mismatch)
+                    refuse(m->kind, std::move(m->why), request, carried);
+                // Kept, as activate() keeps a filter that does not suit.
+                HostFailure f;
+                f.kind = m->kind;
+                f.request = request;
+                f.sample_rate = next->sample_rate;
+                f.inputs = next->input_channels;
+                f.outputs = next->output_channels;
+                f.silent = true;
+                f.message = std::move(m->why);
+                kept_failure = std::move(f);
+            } else {
+                notice = speaker_notice(*next, *host);
+            }
         }
         // For the window's Loudest peak; on the control side with the rest of
         // the preparation, so a report never has to compute it.
@@ -397,10 +411,18 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
             saved_failure = std::move(f);
         }
         if (host && install) {
+            // A kept filter that does not suit plays silence; the dry signal
+            // follows dry_signal_rule() for a kept filter.
             const auto unfiltered =
-                next ? Configuration{} : unfiltered_configuration(*host, state.failed);
+                kept_failure
+                    ? unfiltered_configuration(
+                          *host, true,
+                          host->inputs == host->outputs &&
+                              (host->outputs == 1 || next->input_channels == next->output_channels))
+                : next ? Configuration{}
+                       : unfiltered_configuration(*host, state.failed);
             try {
-                install(next ? *next : unfiltered);
+                install(next && !kept_failure ? *next : unfiltered);
             } catch (const SupersededRequest&) {
                 throw; // Abandoned: nothing recorded or changed.
             } catch (const std::exception& e) {
@@ -432,7 +454,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     failed_ = state.failed;
     accepted_ = std::move(request);
     load_failure_ = std::move(saved_failure);
-    activation_failure_.reset();
+    activation_failure_ = std::move(kept_failure);
     notice_ = std::move(notice);
     // A new filter, or a new start for the same one: Fault clears. One
     // snapshot of the processor's counts is the baseline of both the audio
@@ -660,6 +682,11 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
         if (f.sample_rate <= 0) // Not recorded: say only what is known.
             return host ? "the filter is not for the host's " + host_rate_text(*host) + "."
                         : "the filter is for another rate.";
+        // A refused load's rate may suit the host now (it changed its rate
+        // since): say only what was refused.
+        if (host && host->fractional_rate == 0 && host->sample_rate == f.sample_rate)
+            return "the filter is for " + std::to_string(f.sample_rate) +
+                   " Hz; the rate has changed since.";
         return "the filter is for " + std::to_string(f.sample_rate) + " Hz" +
                (host ? ", the host runs at " + host_rate_text(*host) + "." : ".");
     case HostFailureKind::channels:
@@ -667,10 +694,15 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
             return host ? "the filter does not suit the plug-in's " +
                               ports(host->inputs, host->outputs) + "."
                         : "the filter has other channel counts.";
+        // PLUG-23: a refused load's counts may suit the host now (it
+        // changed its buses since): then say only what was refused, not
+        // counts that look as if they still conflict (jrp's crossover
+        // retest, 7 November 2026).
+        if (host && f.inputs <= host->inputs && f.outputs == host->outputs)
+            return "the filter has " + ports(f.inputs, f.outputs) +
+                   "; the channels have changed since.";
         return "the filter has " + ports(f.inputs, f.outputs) +
-               (host && (host->inputs != f.inputs || host->outputs != f.outputs)
-                    ? ", the plug-in " + ports(host->inputs, host->outputs) + "."
-                    : ".");
+               (host ? ", the plug-in " + ports(host->inputs, host->outputs) + "." : ".");
     case HostFailureKind::preparation:
         return "the filter could not be prepared.";
     case HostFailureKind::activation:

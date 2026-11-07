@@ -5,7 +5,9 @@
 #include "filter_file.hpp"
 #include "host_log.hpp"
 #include "pluginterfaces/base/ibstream.h"
+#include "pluginterfaces/vst/ivstattributes.h"
 #include "pluginterfaces/vst/ivstparameterchanges.h"
+#include "pluginterfaces/vst/vstpresetkeys.h"
 #include <algorithm>
 #include <array>
 #include <charconv>
@@ -257,6 +259,7 @@ HostLayout Processor::layout() const {
 // with placeholder values before restoring a project's state at another rate.
 // Until then, restored state is kept and checked at activation (the shared
 // adapter contract's "state that arrives before the host is configured").
+// For restored state, install() also waits until audio has played.
 std::optional<HostLayout> Processor::known_layout() const {
     const auto now = layout();
     if (!activated_ || !same_rate(*activated_, now) || activated_->inputs != now.inputs ||
@@ -284,6 +287,7 @@ tresult Processor::activate(TBool state) {
             tail_.store(static_cast<uint32>(next->tail_frames()));
             next->set_bypass(bypass_.load());
             next->reset();
+            played_.store(false);
             host_ = std::move(next);
             active_latency_.store(host_->latency_frames());
             hold_fault_signal();
@@ -518,6 +522,22 @@ tresult PLUGIN_API Processor::setState(IBStream* stream) {
     send_status();
     return result;
 }
+namespace {
+// What the host says the state is (VST 3.6 IStreamAttributes, optional):
+// "Project", "Default" or another of PresetAttributes::kStateType's values,
+// or empty when it does not say.
+std::string state_type(IBStream* stream) {
+    FUnknownPtr<IStreamAttributes> attributes(stream);
+    IAttributeList* list = attributes ? attributes->getAttributes() : nullptr;
+    String128 text{};
+    if (!list || list->getString(PresetAttributes::kStateType, text, sizeof text) != kResultTrue)
+        return {};
+    std::string type;
+    for (std::size_t i = 0; i < std::size(text) - 1 && text[i]; ++i)
+        type += text[i] > 0 && text[i] < 128 ? static_cast<char>(text[i]) : '?';
+    return type;
+}
+} // namespace
 tresult Processor::load_state(IBStream* stream) {
     std::lock_guard lock(control_);
     observe_faults(); // Explained under the filter that played; an accepted load clears them.
@@ -533,17 +553,28 @@ tresult Processor::load_state(IBStream* stream) {
             filter_.reject(HostFailureKind::state_unreadable, state_read_message(e));
             throw;
         }
-        install(std::move(next), {}, true);
+        install(std::move(next), {}, true, state_type(stream) == StateType::kProject);
         return kResultOk;
     } catch (...) {
         refused(was_failed);
         return kResultFalse;
     }
 }
-void Processor::install(HostState next, const HostRequest& request, bool restore) {
-    // While active, the host's configuration is known and a prepared
-    // replacement is published; inactive, the next activation installs it.
-    const auto host = host_ ? std::optional(layout()) : known_layout();
+void Processor::install(HostState next, const HostRequest& request, bool restore, bool project) {
+    // While active, a prepared replacement is published; inactive, the next
+    // activation installs it. A file chosen in the window is checked against
+    // the host's configuration once the host has started the plug-in with it.
+    // Restored state is refused for not suiting the host only once the host
+    // has also played audio with it, and never when the host says it is
+    // restoring a project: hosts start the plug-in on placeholder buses
+    // before they restore a project (REAPER: stereo, then the track's six
+    // channels; jrp's crossover retest, 7 November 2026). Until then a
+    // restored filter that does not suit is kept, silent, and checked again
+    // at the next activation, as the shared adapter contract keeps state
+    // that arrives before the host is configured.
+    const bool binding = !restore || (!project && played_.load());
+    const bool keep = host_ && !binding;
+    const auto host = host_ ? std::optional(layout()) : binding ? known_layout() : std::nullopt;
     const bool bypass = next.bypass;
     // VST3-4: the state's settings, or the defaults for a state without
     // them (an older state, or a preset from convolver-preset).
@@ -565,7 +596,7 @@ void Processor::install(HostState next, const HostRequest& request, bool restore
             if (host_)
                 host_->replace(c);
         },
-        request, host_.get());
+        request, host_.get(), keep);
     // Nothing from here on can throw: the request is accepted.
     hold_fault_signal();
     tail_.store(host_ ? static_cast<uint32>(host_->tail_frames()) : inactive_tail);
@@ -579,7 +610,18 @@ void Processor::install(HostState next, const HostRequest& request, bool restore
     logged_.clear(); // A later failure is logged even if it repeats an earlier one.
     try {            // Accepted: nothing here may turn that into a rejection.
         // A restored failed load says why it plays silence.
-        log(loaded_line(filter_, host), filter_.failure().has_value() || !filter_.notice().empty());
+        auto line = loaded_line(filter_, host);
+        const auto& f = filter_.failure();
+        if (keep && f && f->silent && filter_.filter())
+            line += " It does not suit the host's present configuration, so it is kept and plays "
+                    "silence until it does: " +
+                    detail::advice_line(f->message);
+        if (restore && !binding)
+            line += project ? " The host said it is restoring a project, so its channels and rate "
+                              "may still change."
+                            : " The host has not played audio since it started the plug-in, so "
+                              "its channels and rate may still change.";
+        log(line, f.has_value() || !filter_.notice().empty());
     } catch (...) { // Out of memory for the line: it is dropped.
     }
 }
@@ -718,6 +760,8 @@ tresult PLUGIN_API Processor::process(ProcessData& d) {
         return kInvalidArgument;
     if (d.numSamples && (!host_ || canProcessSampleSize(d.symbolicSampleSize) != kResultOk))
         return kInvalidArgument;
+    if (d.numSamples) // Restored state is now checked against the host (install()).
+        played_.store(true, std::memory_order_relaxed);
     if (d.numOutputs && d.outputs)
         d.outputs[0].silenceFlags = 0; // Set again below once the output is known.
     auto render = [&](int32 first, int32 count) {
