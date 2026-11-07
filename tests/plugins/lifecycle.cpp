@@ -105,7 +105,7 @@ struct Model {
     // last activation or reset; until then a filter is installed directly.
     bool started = false;
     bool settled_bypass = false;   // Bypass as of that activation or reset (no ramp).
-    std::optional<Host> committed; // Known while stopped (Known::activation, rendering).
+    std::optional<Host> committed; // Known while stopped (activation, played, rendering).
     bool bypass = false;
     // What the instance keeps and saves.
     std::optional<Which> filter;
@@ -147,6 +147,9 @@ bool known(const Context& x, const Model& m) {
     case Known::always:
         return true;
     case Known::activation:
+        return m.active || m.committed == m.host;
+    case Known::played:
+        return m.rendered && (m.active || m.committed == m.host);
     case Known::rendering:
         return m.active || m.committed == m.host;
     }
@@ -179,10 +182,14 @@ void restore(const Context& x, Model& m, std::optional<Which> filter, bool faile
     const auto request = ++m.requests;
     if (malformed)
         return reject(m, HostFailureKind::state_unreadable, request);
-    if (filter && known(x, m))
-        if (auto kind = mismatch(configuration(x.filters, *filter), m.host))
-            return reject(m, *kind, request);
+    const auto kind = filter ? mismatch(configuration(x.filters, *filter), m.host) : std::nullopt;
+    if (kind && known(x, m))
+        return reject(m, *kind, request);
     accept(x, m, filter, failed, request, false);
+    // VST3: restored while active but before audio has played, a filter that
+    // does not suit is kept silent, as at activation (jrp's REAPER retest).
+    if (kind && m.active && x.format.known == Known::played)
+        m.activation_failure = Failure{*kind, request, true};
 }
 // Contract, failure reasons: a mismatch found at activation belongs to the
 // request that supplied the filter, comes first, and clears at the next
@@ -196,7 +203,7 @@ void start(const Context& x, Model& m) {
     if (m.filter)
         if (auto kind = mismatch(configuration(x.filters, *m.filter), m.host))
             m.activation_failure = Failure{*kind, m.accepted, true};
-    if (x.format.known == Known::activation)
+    if (x.format.known == Known::activation || x.format.known == Known::played)
         m.committed = m.host;
 }
 void stop(const Context& x, Model& m) {

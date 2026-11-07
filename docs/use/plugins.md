@@ -157,8 +157,13 @@ happens next depends on the format:
 
 - **VST3 and Audio Unit** keep the filter. Set the host back to the filter's
   rate and layout and the filter returns; saving the project in between keeps
-  it. Some hosts briefly try a default 44.1 kHz before setting the real rate;
-  that does not count.
+  it. Some hosts briefly try a default 44.1 kHz before setting the real rate,
+  or, like REAPER, start the plug-in on stereo buses before giving it the
+  track's channels; that does not count. In VST3, a preset that does not fit
+  is refused only once the host has played audio with its rate and channels;
+  one loaded into a newly added instance before that is kept and plays
+  silence, with the reason in Status, until the host's rate and channels
+  suit it.
 - **LV2** refuses the filter as soon as the session opens, and `status` shows
   Load failed. **Do not save the session**: saving records the failure and
   drops the filter. Close it without saving and reopen it at the filter's rate,

@@ -196,8 +196,9 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // VST3-3: the common step of setState and a chosen file, under control_.
     // Loads `next`; with `restore` (setState) its bypass and settings apply
     // too, while a chosen file keeps them. Throws if it is refused, which
-    // HostFilter has recorded.
-    void install(HostState next, const HostRequest&, bool restore);
+    // HostFilter has recorded. `project`: the host said (IStreamAttributes)
+    // that it is restoring a project.
+    void install(HostState next, const HostRequest&, bool restore, bool project = false);
     // Under control_, after a refused request: a failed first load plays
     // silence, and the log says why.
     void refused(bool was_failed) noexcept;
@@ -229,6 +230,11 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // The rate and buses of the last activation. The host's configuration counts
     // as known only while it still matches: setupProcessing alone is not binding.
     std::optional<HostLayout> activated_;
+    // Whether process() has played audio since the last activation. Restored
+    // state is checked against the host only then: until the host plays,
+    // it may still be changing its buses (REAPER starts the plug-in on
+    // stereo buses before it restores a project and gives it the track's).
+    std::atomic<bool> played_{false};
     bool layout_refusal_logged_ = false; // Refused layouts are logged once per instance.
     std::string logged_;                 // The last line log() queued.
     std::vector<std::pair<std::string, bool>> unlogged_; // Lines and whether each is a problem.

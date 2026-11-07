@@ -329,10 +329,15 @@ class HostFilter {
     // is saved, even when memory runs out. `request` says where the state came from (numbered if
     // 0). `counting`: the processor that plays (if any). An accepted load clears its fault baseline
     // (HostProcessor::clear_faults()) and observes from the same snapshot, so faults shown
-    // afterwards are only the new filter's.
+    // afterwards are only the new filter's. `keep_mismatch`: a filter that does not suit `host`
+    // is accepted all the same, as activate() keeps one: it plays silence with the reason as
+    // failure() until an activation suits it. For restored state while the host may still be
+    // changing its configuration (VST3: REAPER starts the plug-in on stereo buses, restores the
+    // project, then gives it the track's channels; jrp's crossover retest, 7 November 2026).
     void load(HostState, const std::optional<HostLayout>& host,
               const std::function<void(const Configuration&)>& install = {},
-              HostRequest request = {}, HostProcessor* counting = nullptr);
+              HostRequest request = {}, HostProcessor* counting = nullptr,
+              bool keep_mismatch = false);
     // A load that failed before decoding (malformed state, unreadable file):
     // recorded as load() records a rejection. Does not throw: if memory runs
     // out, the record keeps the kind and the request's number and source
