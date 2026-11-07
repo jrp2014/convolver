@@ -7,7 +7,7 @@ implemented. Finished items are listed briefly under [done](#done); what they
 delivered is described in the guides and the [CHANGELOG](CHANGELOG.md).
 
 **In short:** the next milestone is end-to-end testing: an independent user
-running an exact preview package from the 0.10 series. The
+running an exact preview package from the 0.11 series. The
 [order of work](#execution-priorities) gets there in four steps: finish the
 open fixes (done), run jrp's host smoke tests (HOST-1), finish the package
 and the user journeys (PLUG-5, REL-2; the journeys are written, and the CLI,
@@ -45,7 +45,7 @@ request before starting so independent tasks do not duplicate changes.
 22 October 2026): an independent user installs and uses an exact preview
 package, following only the documentation. This is the end-to-end test. "Ready" means the
 REL-2 journeys work, not that a set of items is ticked. The first preview is
-cut from the 0.10 series and is macOS-only
+cut from the 0.11 series and is macOS-only
 ([decided](docs/project/decisions.md#plug-in-behaviour)): the VST3 plug-in and the
 Audio Unit with the existing shared window and their Gain, Mix and Latency
 settings, the `convolver` CLI and the preset tool. The Windows and Linux
@@ -66,7 +66,7 @@ boundary and C++20 in the core.
 | 3. Alongside step 2 | **PLUG-5** first-preview contents: in the candidates since PR #115 (the Audio Unit on macOS, the VST trademark notice; the `convolver` CLI and the first-use presets since PR #101); what remains is qualifying one exact candidate (HOST-1, AU-4, REL-3) and jrp's publication. **REL-2** (done): the stereo, 2→6 crossover and CLI journeys are written in `docs/use/` | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
 | Early walkthrough (macOS) (done) | **REL-5**: an explicitly limited walkthrough of an exact candidate on macOS, the stereo journey only | Done on 1 November 2026 as a package and command-line check only, by jrp's choice ([done](#done)); its host steps moved to HOST-1's REAPER smoke test and REL-3. It did not change the first preview's contents and does not replace REL-3. |
 | 4. Settings, windows and the Audio Unit | The **HOST-2** editor as the macOS-only first preview has it: **PLUG-9** (the report and loading from a file) and **PLUG-10** (Gain, Mix and Latency), **VST3-3**, **VST3-4**, **AU-7**, and the window **VST3-11** shared with the Audio Unit in **AU-6**; and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview, in the macOS candidates since PR #115). For later previews: **VST3-12** (Windows), **VST3-13** (Linux), and PLUG-9, PLUG-10 and AU-7's remaining gain modes and meters | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items) the first preview needs, each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the [preview workloads](#loading-responsiveness), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). |
-| 5. The milestone | A candidate from a 0.10.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
+| 5. The milestone | A candidate from a 0.11.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
 | 6. Later previews | Windows and Linux (**VST3-12**, **VST3-13**), the remaining gain modes and meters (**PLUG-9**, **PLUG-10**, **AU-7**), PERF-3's supported workloads; **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need. Not a first-preview gate: the loading-responsiveness gate uses the finite preview workloads instead. |
 | Supporting, cheap | **PERF-1**, **HOST-4** | HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
@@ -360,9 +360,9 @@ LV2 (Linux first; also PipeWire system audio):
   loads the highest (minor, micro) it finds, so 1.0.0 mapped this way would
   lose to an old 0.4.x left in `~/.lv2`. The mapping must keep increasing,
   with minor even and non-zero and micro even for releases. Mapped this way,
-  0.10.x builds are minor 10, which LV2 accepts, but every odd patch number
-  is a micro version LV2 reads as a development version (0.9.x was minor 9,
-  a development version; LV2 is not in the first preview).
+  0.11.x builds are minor 11, which LV2 reads as a development version, and
+  every odd patch number is a micro version LV2 reads the same way (0.10.x
+  was minor 10, which LV2 accepts; LV2 is not in the first preview).
 - [ ] **LV2-6 — Editor report and UI (optional).** Only if Linux users show a
   need: generic UIs already offer the `filter` file chooser and the status
   port. The report as `patch:Set` atoms on the notify port, prepared in
