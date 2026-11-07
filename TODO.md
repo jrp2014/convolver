@@ -19,8 +19,9 @@ blocks the preview, and [decisions](docs/project/decisions.md) what jrp has
 decided. Other open themes are the later LV2 and AU previews, diagnostics
 (DIAG), documentation checks (DOC), files kept from releases (COMPAT), other configuration readers (CFG),
 large files and resampling (IO), no-clip headroom (GAIN), stress testing
-(ROBUST), a parked FFmpeg filter (FFMPEG), and FFT or performance work only
-where measurements justify it (FFT, PERF). The
+(ROBUST), a parked FFmpeg filter (FFMPEG), FFT or performance work only
+where measurements justify it (FFT, PERF), and the edges over the leading
+convolution plug-ins to build after the first walkthrough (EDGE). The
 [limitations table](#documented-limitations) lists current constraints.
 
 To take an item on, open a draft pull request titled with its ID; that is the
@@ -67,9 +68,10 @@ boundary and C++20 in the core.
 | 6. Later previews | Windows and Linux (**VST3-12**, **VST3-13**), the remaining gain modes and meters (**PLUG-9**, **PLUG-10**, **AU-7**), PERF-3's supported workloads; **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need. Not a first-preview gate: the loading-responsiveness gate uses the finite preview workloads instead. |
 | Supporting, cheap | **PERF-1**, **HOST-4** | HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
+| After the milestone: edges over other convolvers | The easy wins over room-correction convolvers (**EDGE-1**, **EDGE-9**, **EDGE-2**, **EDGE-4**, **EDGE-5**), then long reverbs (**PERF-3**'s long-reverb workloads, then **PERF-2** and **EDGE-10**), then **EDGE-3** and **EDGE-6** to **EDGE-8**, in the ranked order of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) | jrp's goal (6 November 2026): be better than the most popular reverb plug-ins. Waits for REL-3 unless jrp lifts the freeze; each item starts with the owner's decision its plan row names, and keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#non-negotiables). PERF-2 still waits for PERF-3's budgets. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. |
 | Optional editor work | **PLUG-11** (FFT planning in FFTW-built plug-ins), **LV2-6** (an LV2 window, only if Linux users ask) | Not needed for any preview. |
-| On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **PERF-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
+| On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
 
 The CFG-1, IO-1, IO-2 and ROBUST-1 items
 remain open supporting work; take them up when a reproducible defect or the milestone
@@ -729,7 +731,11 @@ so the preset file path is not needed).
   Latency setting (PLUG-10). Nonuniform partitions are
   the route to low latency and low CPU together. Preserve routing, tail,
   delay and reset behavior; account for changed floating-point accumulation order.
-  Shared forward transforms are already implemented.
+  Shared forward transforms are already implemented. A user need is now
+  stated: long reverbs at low CPU with lower and finer latency, rank 6 of
+  the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build), which sets out the
+  techniques to consider and what is still a hypothesis. PERF-3's
+  long-reverb measurements come first.
 - [ ] **PERF-3 — Resource budgets and supported workloads.** Measure, on
   named machines, the distribution of callback durations (median, 99th
   percentile, 99.9th percentile and maximum, not only the average), memory in
@@ -742,7 +748,16 @@ so the preset file path is not needed).
   workloads (for example "8 channels of 65536 taps at 96 kHz uses under N% of
   one core and M MB") in the user guides. Only these results decide whether
   partitioning (PERF-2), memory layout or another FFT (FFT-2) deserves work,
-  and whether slow preparation needs VST3-5. PERF-1 keeps the throughput
+  and whether slow preparation needs VST3-5. Include long reverbs ([edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build)):
+  10, 30 and 60 s filters, stereo and true stereo (four paths), at 48 and
+  96 kHz, with callback maxima while playing, replacing and resetting.
+  Distinguish core and command-line benchmarks from supported plug-in
+  workloads, and record the encoded saved-state size beside CPU and memory:
+  a 60 s, 96 kHz true-stereo filter needs about 88 MiB, over the 64 MiB
+  limit, so the command line renders it but the plug-ins refuse it. A
+  workload over the limit needs a separate storage decision before plug-in
+  qualification; the same budget applies to multi-rate states (EDGE-1) and
+  A/B comparison (EDGE-4). PERF-1 keeps the throughput
   benchmarks reproducible; ROBUST-1 adds stress under repeated changes.
   Progress: `convolver_callback_benchmark` (PR #70) times callbacks at a host
   callback size chosen apart from B, for warmed processing, startup, reset,
@@ -944,6 +959,78 @@ only where they leave the library (DIAG-4).
 No new general framework. Such moves keep saved state, diagnostic text,
 allocation guards and numerical results unchanged, and never share a pull
 request with a DSP change.
+
+## Edges over other convolvers
+
+jrp's goal: be better than the leading reverbs that play impulse responses
+and the room-correction convolvers. The [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md) holds the
+comparison, the ranking, the rationale and the measurements; the items below
+hold only what each must deliver. They wait for REL-3 unless jrp lifts the
+freeze on optional features. Order: the easy room-correction wins (EDGE-1,
+EDGE-9, EDGE-2, EDGE-4, EDGE-5), then long reverbs (PERF-3's long-reverb
+workloads, then PERF-2 and EDGE-10), then the reverb features. Every item
+keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#non-negotiables).
+
+- [ ] **EDGE-1 — A filter for every sample rate in one plug-in state.**
+  Done when a list's entries that fit the host's channels are kept in the
+  saved state, the entry for the host's rate plays and a rate change
+  switches with the usual crossfade; a rate no entry has is refused as now;
+  states over the saved-state limit are refused with a clear message.
+  Needs jrp's decision on the state format and the preset tool's options.
+  [Plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build). Effort M.
+- [ ] **EDGE-2 — Show what a filter does.** Done when `--inspect --json`
+  and the library report each path's magnitude, phase, group delay and
+  energy decay, checked against an independent computation, and the macOS
+  window plots them (layout approved by jrp as an addition to the
+  [editor plan](docs/project/plans/2026-10-24-plugin-editor.md)). Effort M.
+- [ ] **EDGE-3 — Reverb file layouts without a configuration.** Done when a
+  mono response on a stereo instance and true stereo (one four-channel file
+  or two stereo files) load without a `.cfg`, giving the same routes and
+  output as the equivalent `.cfg`, and an ambiguous file is never guessed
+  silently. Needs jrp's decision on the four-channel order and how the
+  layout is chosen. Effort S to M.
+- [ ] **EDGE-4 — Compare two filters, level-matched.** Done when two filters
+  can be held and switched with the replacement crossfade at matched
+  loudness, within the saved-state limit for both together. Needs jrp's
+  decision on the saved state and the loudness measure. Effort M.
+- [ ] **EDGE-5 — Publish the workloads and the evidence.** Done when the
+  user guides state PERF-3's supported plug-in workloads (CPU, memory and
+  saved-state size) beside the open convolvers measured on the same
+  machines, and a `docs/use/` page shows a null test with `--compare`
+  against a shipped reference render. jrp approves the claims. Effort S
+  for the page, M for the comparison.
+- [ ] **EDGE-6 — A reverb's pre-delay, start, length and fades.** Done when
+  these settings shape the filter when it loads (never on the audio
+  thread), match the shaped response computed independently, and leave the
+  output unchanged at their defaults. Needs jrp's decision on parameter IDs
+  and saving. Effort M.
+- [ ] **EDGE-7 — Decay and damping.** Per-band decay reshaping when the
+  filter loads. Only after EDGE-6 is in use and reverb users ask; jrp
+  decides whether to do it. Effort L.
+- [ ] **EDGE-8 — Immersive layouts beyond 8 channels.** Done when 7.1.4,
+  9.1.6 or up to 16 × 16 load in the plug-ins, with existing identities and
+  saved sessions preserved; additional identities only where a separate
+  variant requires them, such as further fixed-layout LV2 variants. Changes
+  the recorded [channel layouts](docs/develop/plugin-identities.md#channel-layouts)
+  only if jrp decides so. Effort M to L.
+- [ ] **EDGE-9 — Delays finer than a sample.** Done when an opt-in
+  fractional delay is baked into the prepared filter, with any added taps,
+  processing cost and integer delay measured, and its supported bandwidth
+  and approximation error stated and tested against an independent
+  computation. `.cfg` delays stay truncated to whole samples; jrp decides
+  how the finer delay is given. Effort S to M.
+- [ ] **EDGE-10 — Sound-aware and platform-aware optimisation.** Done when
+  each [candidate](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#sound-aware-and-platform-aware-optimisation) has
+  been benchmarked on PERF-3's long-reverb workloads and either adopted as
+  its own item or set aside with its numbers. Exact and rounding-only
+  changes keep the oracle and divergence bounds; a bounded approximation
+  needs jrp's decision on its bound. OpenMP only where it causes no
+  cross-platform incompatibility (offline paths, optional, serial build
+  byte-identical); `libomp` ships on macOS only for a meaningful gain there,
+  measured beside `dispatch_apply`. Explicit NEON or vDSP kernels only with
+  a new workload, hardware target or hypothesis, measured against the
+  [24 October 2026 vDSP experiment](docs/archive/reviews/2026-10-24-apple-vdsp.md).
+  Goes with PERF-2. Effort M for the survey.
 
 ## Developer tooling
 
