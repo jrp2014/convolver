@@ -63,11 +63,13 @@ cannot be used ([when a filter does not fit](plugins.md#when-a-filter-does-not-f
 | Cause | Fix |
 | --- | --- |
 | The preset's sample rate differs from the host's | Set the host to the preset's rate, or make a preset at the host's rate; Convolver does not resample |
-| The preset's channel counts differ from the track's | Use a track or bus with the preset's input and output counts, or a matching preset |
+| The track has fewer inputs than the preset, or a different number of outputs | Use a track or bus with at least the preset's inputs and exactly its outputs, or a matching preset |
 | A project was opened at another rate or layout | VST® 3 and Audio Unit: set the host back to the rate and layout the filter was made for, and the filter returns. LV2: do not save; reopen the session at the filter's rate, or load the preset again ([details](plugins.md#when-a-filter-does-not-fit)) |
 | No preset is loaded, and the input and output counts differ (a crossover, for example) | Load a preset |
 | The project was saved after its first preset failed | Load a matching preset |
-| Bypass is on with different input and output counts | Switch bypass off |
+| Bypass is on, and the filter's input and output counts differ | Switch bypass off |
+| Bypass is on (or Mix below 100%) after a load failed and no earlier filter is kept, or with a kept filter whose counts differ, such as a crossover at the wrong rate | Fix the load as above. Bypass passes nothing here on purpose: Convolver cannot tell that the failed filter was not a crossover ([bypass](plugins.md#bypass)) |
+| The filter plays but some channels are missing, and Status ends "plug-in inputs … ignored" | The track gives more inputs than the filter reads: it reads the first ones only. Put the source on those inputs ([channels](plugins.md#channels)) |
 
 To see why, read the plug-in's **Status** parameter in the host's generic
 plug-in window or parameter list (VST3 and Audio Unit), then the

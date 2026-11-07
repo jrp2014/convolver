@@ -8,6 +8,7 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <vector>
 
 using namespace Steinberg;
 using namespace Steinberg::Vst;
@@ -22,10 +23,22 @@ class Vst3 final : public test::Adapter {
     void create(const test::Setup& setup) override {
         create_unconfigured();
         configure(setup);
-        // A VST3 host commits to its rate and buses at activation; setupProcessing
-        // alone may carry placeholder values (JUCE hosts restore state after it).
-        // So a "configured" instance is one that has been activated with the setup.
+        // A VST3 host commits to its rate and buses once it has started the
+        // plug-in with them and played audio: setupProcessing alone may carry
+        // placeholder values (JUCE hosts restore state after it), and REAPER
+        // starts the plug-in on stereo buses before it restores a project.
+        // So a "configured" instance has been activated with the setup and
+        // has played a block.
         check(activate(), "first activation");
+        std::vector<std::vector<float>> in(setup.inputs, std::vector<float>(setup.max_block)),
+            out(setup.outputs, std::vector<float>(setup.max_block));
+        std::vector<const float*> ins;
+        std::vector<float*> outs;
+        for (auto& c : in)
+            ins.push_back(c.data());
+        for (auto& c : out)
+            outs.push_back(c.data());
+        check(process({ins, outs, setup.max_block, 0}), "first block");
         deactivate();
     }
     bool create_unconfigured() override {

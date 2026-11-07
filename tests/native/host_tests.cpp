@@ -21,6 +21,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -49,6 +50,9 @@ using namespace convolver;
 void require(bool value, const char* message) {
     if (!value)
         throw std::runtime_error(message);
+}
+void require(bool value, const std::string& message) {
+    require(value, message.c_str());
 }
 // A message's text, for searching: DIAG-4 records keep their parts.
 const std::string& text_of(const std::string& text) {
@@ -426,9 +430,9 @@ void filter_contract() {
             "failed replacement lost the working filter");
     require(running.error().find("the filter could not be prepared") == 0 &&
                 !running.failure()->silent &&
-                failure_consequence(*running.failure(), &stereo, {}) ==
+                failure_consequence(*running.failure(), &stereo, {}, true) ==
                     "The previous filter keeps playing." &&
-                failure_consequence(*running.failure(), nullptr, {}) ==
+                failure_consequence(*running.failure(), nullptr, {}, true) ==
                     "The previous filter is kept.",
             "failed replacement not explained");
 
@@ -715,9 +719,320 @@ void unequal_bypass() {
                 require(out[o][i] == 0, "unequal bypass must play silence");
     }
 }
+// PLUG-23: REAPER gives a VST3 plug-in as many inputs as outputs, so a 2-in,
+// 6-out crossover on a six-channel track gets 6 of each. The filter reads
+// inputs 1-2 and ignores the rest, and with no dry signal of its own, bypass
+// and Mix never pass input c to output c, though the host's counts are equal.
+void wider_inputs() {
+    const HostLayout six{48000, 6, 6};
+    Configuration x{48000, 2, 6, 0, {}, {}, {}};
+    x.paths.push_back({{1, .5f}, {{0, 1}}, {{0, 1}}});
+    x.paths.push_back({{.25f}, {{1, 1}}, {{5, 1}}});
+    const auto expect_rejection = [](auto&& load, const char* what) {
+        try {
+            load();
+        } catch (const std::invalid_argument&) {
+            return;
+        }
+        throw std::runtime_error(what);
+    };
+
+    // The filter: accepted on the wider bus, refused with too few inputs or
+    // other outputs.
+    HostFilter f(8);
+    Configuration installed;
+    f.load(HostState{x}, six, [&](const Configuration& c) { installed = c; });
+    require(installed.input_channels == 2 && f.activate(six).input_channels == 2 && !f.failure(),
+            "a filter with fewer inputs than the host's is refused");
+    require(ignored_inputs(x, six) == "inputs 3–6" && ignored_inputs(x, six, "-") == "inputs 3-6" &&
+                ignored_inputs(x, {48000, 3, 6}) == "input 3" &&
+                ignored_inputs(x, {48000, 2, 6}).empty(),
+            "ignored inputs in words");
+    auto three = x;
+    three.input_channels = 3;
+    expect_rejection([&] { HostFilter(8).load(HostState{three}, HostLayout{48000, 2, 6}); },
+                     "a filter with more inputs than the host's accepted");
+    expect_rejection([&] { HostFilter(8).load(HostState{x}, HostLayout{48000, 6, 2}); },
+                     "a filter with other outputs accepted");
+    HostFilter stereo_filter(8);
+    expect_rejection(
+        [&] { stereo_filter.load(HostState{unfiltered_configuration({48000, 2, 2}, false)}, six); },
+        "a 2-out filter accepted on 6 outputs");
+    require(stereo_filter.error().find("at least its inputs") != std::string::npos,
+            "the channel refusal does not explain the rule");
+
+    // What the status, the log and the settings say.
+    require(host_status(f, six).text ==
+                "Filter loaded: 48000 Hz, 2 in, 6 out; plug-in inputs 3-6 ignored.",
+            "status: " + host_status(f, six).text);
+    require(host_status(f, six, true, {0, 0}).text.find("dry") == std::string::npos,
+            "Mix 0% is said to play the dry signal of a filter that has none");
+    require(!dry_signal(f, six) && dry_signal(HostFilter(8), six),
+            "the dry signal follows the host's counts, not the filter's");
+    const auto playing = playing_words(f, six, {});
+    require(playing.find("Inputs 3–6 are ignored: the filter reads inputs 1–2.") !=
+                std::string::npos,
+            "playing words: " + playing);
+    require(loaded_line(f, std::optional(six)).find("Inputs 3–6 are ignored") !=
+                    std::string::npos &&
+                loaded_line(f, std::optional<HostLayout>()).find("ignored") == std::string::npos,
+            "loaded line: " + loaded_line(f, std::optional(six)));
+    require(started_line(f, six, 512, nullptr).find("Inputs 3–6 are ignored") != std::string::npos,
+            "started line");
+
+    // The processor: the extra inputs are read and ignored, so it plays as a
+    // 2-input processor does. The filter's counts differ, so there is no dry
+    // signal: Mix 0% still plays the filtered sound (fully wet), and bypass
+    // plays silence.
+    const HostSettings fast{0, 1, 64};
+    HostProcessor wide(x, 32, fast, 6), narrow(x, 32, fast);
+    std::vector<std::vector<float>> in(6, std::vector<float>(32)), a(6, std::vector<float>(32)),
+        b(6, std::vector<float>(32));
+    std::mt19937 noise(22);
+    std::uniform_real_distribution<float> sample(-.5f, .5f);
+    const auto play = [&](HostProcessor& p, std::vector<std::vector<float>>& out,
+                          std::size_t inputs) {
+        std::vector<const float*> from;
+        std::vector<float*> to;
+        for (std::size_t c = 0; c < inputs; ++c)
+            from.push_back(in[c].data());
+        for (auto& o : out)
+            to.push_back(o.data());
+        audio_thread = true;
+        const bool ok = p.process(from, to, 32);
+        audio_thread = false;
+        require(ok, "a processor refused its inputs");
+    };
+    float loudest = 0;
+    for (int k = 0; k < 12; ++k) {
+        for (auto& channel : in)
+            for (auto& v : channel)
+                v = sample(noise);
+        play(wide, a, 6);
+        play(narrow, b, 2);
+        for (std::size_t o = 0; o < 6; ++o)
+            for (std::size_t i = 0; i < 32; ++i) {
+                require(a[o][i] == b[o][i], "the ignored inputs changed the output");
+                loudest = std::max(loudest, std::abs(a[o][i]));
+            }
+    }
+    require(loudest > .1f, "the filter played nothing");
+    wide.set_mix(0);
+    narrow.set_mix(0);
+    loudest = 0;
+    for (int k = 0; k < 6; ++k) {
+        for (auto& channel : in)
+            for (auto& v : channel)
+                v = sample(noise);
+        play(wide, a, 6);
+        play(narrow, b, 2);
+        for (std::size_t o = 0; o < 6; ++o)
+            for (std::size_t i = 0; i < 32; ++i) {
+                require(a[o][i] == b[o][i], "Mix 0% on a wider bus is not the filtered sound");
+                loudest = std::max(loudest, std::abs(a[o][i]));
+            }
+    }
+    require(loudest > .1f, "Mix 0% silenced a filter with no dry signal");
+    wide.set_mix(1);
+    wide.set_bypass(true);
+    for (int k = 0; k < 6; ++k)
+        play(wide, a, 6); // Past the 64-frame bypass ramp.
+    for (std::size_t o = 0; o < 6; ++o)
+        for (std::size_t i = 0; i < 32; ++i)
+            require(a[o][i] == 0, "bypass passes input to output on a wider bus");
+    wide.set_bypass(false);
+
+    // Replacements may have any input count up to the host's, and must keep
+    // the outputs.
+    auto one = x;
+    one.input_channels = 1;
+    one.paths.resize(1);
+    static_cast<void>(wide.prepare(one));
+    auto seven = x;
+    seven.input_channels = 7;
+    expect_rejection([&] { static_cast<void>(wide.prepare(seven)); },
+                     "a replacement with more inputs than the host's accepted");
+    expect_rejection(
+        [&] { static_cast<void>(wide.prepare(unfiltered_configuration({48000, 6, 2}, false))); },
+        "a replacement with other outputs accepted");
+
+    // Replacements between a filter with a dry signal and one without, while
+    // bypassed, on the six-channel track: an empty instance (identity, so
+    // bypass passes input c to output c), then the crossover, then a 6-in,
+    // 6-out filter, then the crossover again. The dry signal fades with the
+    // filter that has it, so the output never jumps, ends silent under the
+    // crossover and plays the input again under the 6x6 filter. Constant
+    // input 1: the crossfade (256 frames at 48 kHz) moves at most 1/256 a frame.
+    HostProcessor bypassed(unfiltered_configuration(six, false), 32, fast, 6);
+    bypassed.set_bypass(true);
+    for (auto& channel : in)
+        std::fill(channel.begin(), channel.end(), 1.f);
+    std::vector<float> last(6, 0.f);
+    const auto settle = [&](float want, const std::string& what) {
+        float step = 0;
+        for (int k = 0; k < 16; ++k) { // 512 frames: past the 64-frame warm-up and the fade.
+            play(bypassed, a, 6);
+            for (std::size_t o = 0; o < 6; ++o)
+                for (std::size_t i = 0; i < 32; ++i) {
+                    step = std::max(step, std::abs(a[o][i] - last[o]));
+                    last[o] = a[o][i];
+                }
+        }
+        require(step <= 1.f / 200,
+                what + ": the bypassed output jumped by " + std::to_string(step) + " in one frame");
+        for (std::size_t o = 0; o < 6; ++o)
+            require(a[o][31] == want, what + ": output " + std::to_string(o + 1) + " ends at " +
+                                          std::to_string(a[o][31]));
+    };
+    // The bypass ramp itself (64 frames) starts from silence: let it pass.
+    for (int k = 0; k < 4; ++k)
+        play(bypassed, a, 6);
+    for (std::size_t o = 0; o < 6; ++o)
+        last[o] = a[o][31];
+    require(a[2][31] == 1, "bypass on an empty instance does not pass the input");
+    auto equal = unfiltered_configuration(six, false); // A 6x6 filter with a dry signal.
+    for (auto& path : equal.paths)
+        for (auto& v : path.impulse)
+            v *= .5f;
+    bypassed.publish(bypassed.prepare(x));
+    settle(0, "identity to the crossover");
+    bypassed.publish(bypassed.prepare(equal));
+    settle(1, "the crossover to a 6x6 filter");
+    bypassed.publish(bypassed.prepare(x));
+    settle(0, "a 6x6 filter to the crossover");
+    // The same replacements playing (not bypassed) at Mix 0% and 50%: each
+    // filter applies Mix by its own rule (the crossover is fully wet, the 6x6
+    // filter mixes in the dry signal), and the output crossfades between the
+    // two without a gap or dip. Constant input 1: the 6x6 filter plays
+    // 0.5 wet, so m * 0.5 + (1 - m); the crossover 1.5 on output 1 and 0.25
+    // on output 6.
+    for (const float m : {0.f, .5f}) {
+        const auto label = "Mix " + std::to_string(static_cast<int>(m * 100)) + "%, ";
+        HostProcessor playing(equal, 32, HostSettings{0, m, 64}, 6);
+        for (int k = 0; k < 8; ++k)
+            play(playing, a, 6);
+        const float mixed = m * .5f + (1 - m);
+        for (std::size_t o = 0; o < 6; ++o) {
+            require(std::abs(a[o][31] - mixed) < 1e-6f,
+                    label + "the 6x6 filter plays " + std::to_string(a[o][31]));
+            last[o] = a[o][31];
+        }
+        const std::vector<float> crossover{1.5f, 0, 0, 0, 0, .25f}, filtered(6, mixed);
+        for (const auto& [next, want, what] :
+             {std::tuple{&x, &crossover, "the 6x6 filter to the crossover"},
+              std::tuple{&equal, &filtered, "the crossover to the 6x6 filter"}}) {
+            playing.publish(playing.prepare(*next));
+            float step = 0;
+            for (int k = 0; k < 16; ++k) {
+                play(playing, a, 6);
+                for (std::size_t o = 0; o < 6; ++o)
+                    for (std::size_t i = 0; i < 32; ++i) {
+                        step = std::max(step, std::abs(a[o][i] - last[o]));
+                        last[o] = a[o][i];
+                    }
+            }
+            require(step <= 1.f / 200, label + what + ": the output jumped by " +
+                                           std::to_string(step) + " in one frame");
+            for (std::size_t o = 0; o < 6; ++o)
+                require(std::abs(a[o][31] - (*want)[o]) < 1e-6f,
+                        label + what + ": output " + std::to_string(o + 1) + " ends at " +
+                            std::to_string(a[o][31]));
+        }
+    }
+    // Bypass off and on again under the crossover: still silent.
+    bypassed.set_bypass(false);
+    play(bypassed, a, 6);
+    bypassed.set_bypass(true);
+    for (int k = 0; k < 4; ++k)
+        play(bypassed, a, 6);
+    for (const auto& channel : a)
+        for (auto v : channel)
+            require(v == 0, "bypass passes input under the crossover after a toggle");
+
+    // jrp, 7 November 2026: with no filter playing, a kept filter's counts
+    // decide too, and a failed load with no filter kept has no dry signal.
+    // The crossover kept at the wrong rate on the six-channel track: silent,
+    // bypassed or not, at any Mix.
+    const HostLayout slower{44100, 6, 6};
+    HostFilter kept(8);
+    kept.load(HostState{x}, std::nullopt);
+    const auto silent_crossover = kept.activate(slower);
+    require(kept.failure() && kept.failure()->silent &&
+                dry_signal_rule(kept, slower) == HostDrySignal::filter_counts &&
+                silent_crossover.input_channels == 1 && silent_crossover.output_channels == 6,
+            "a kept crossover that does not suit the host has a dry signal");
+    require(host_status(kept, slower, true, {0, .5}).text.rfind("Silent: ", 0) == 0,
+            "status: " + host_status(kept, slower, true, {0, .5}).text);
+    require(failure_consequence(*kept.failure(), &slower, {0, .5}, dry_signal(kept, slower)) ==
+                "Convolver plays silence.",
+            "a kept crossover is said to play the dry signal");
+    for (const float m : {0.f, 1.f}) {
+        HostProcessor q(silent_crossover, 32, HostSettings{0, m, 64}, 6);
+        q.set_bypass(m == 1);
+        for (int k = 0; k < 4; ++k) {
+            play(q, a, 6);
+            for (const auto& channel : a)
+                for (auto v : channel)
+                    require(v == 0, "a kept crossover that does not suit the host passes input");
+        }
+    }
+    // A kept 6x6 filter at the wrong rate keeps its dry signal.
+    HostFilter kept_equal(8);
+    kept_equal.load(HostState{equal}, std::nullopt);
+    const auto silent_equal = kept_equal.activate(slower);
+    require(dry_signal(kept_equal, slower) && silent_equal.input_channels == 6,
+            "a kept 6x6 filter that does not suit the host has no dry signal");
+    // A failed load with no filter kept (here, an unreadable state; a missing
+    // file is the same): no dry signal, whatever the counts.
+    HostFilter failed(8);
+    failed.reject(HostFailureKind::filter_file, {"The filter file could not be read."});
+    require(dry_signal_rule(failed, six) == HostDrySignal::failed_load &&
+                failed.activate(six).input_channels == 1 &&
+                unfiltered_configuration(six, true).input_channels == 1 &&
+                unfiltered_configuration(six, true, true).input_channels == 6 &&
+                unfiltered_configuration({48000, 1, 1}, true).input_channels == 1,
+            "a failed load with no filter kept has a dry signal");
+    require(host_status(failed, six, true, {0, .5}).text.rfind("Silent: ", 0) == 0,
+            "status: " + host_status(failed, six, true, {0, .5}).text);
+    // An empty instance that fails its first load while bypassed (the
+    // adapters' silence()): the dry signal ramps out with the filter, and a
+    // filter loaded afterwards brings it back by its own rule, never jumping.
+    for (const float m : {1.f, 0.f}) {
+        const auto label = std::string(m == 1 ? "bypassed" : "Mix 0%") + ", ";
+        HostProcessor empty(unfiltered_configuration(six, false), 32, HostSettings{0, m, 64}, 6);
+        empty.set_bypass(m == 1);
+        for (int k = 0; k < 4; ++k)
+            play(empty, a, 6);
+        for (std::size_t o = 0; o < 6; ++o) {
+            require(a[o][31] == 1, label + "an empty instance does not pass the input");
+            last[o] = 1;
+        }
+        const auto settle_on = [&](float want, const std::string& what) {
+            float step = 0;
+            for (int k = 0; k < 16; ++k) {
+                play(empty, a, 6);
+                for (std::size_t o = 0; o < 6; ++o)
+                    for (std::size_t i = 0; i < 32; ++i) {
+                        step = std::max(step, std::abs(a[o][i] - last[o]));
+                        last[o] = a[o][i];
+                    }
+            }
+            require(step <= 1.f / 32, label + what + ": the output jumped by " +
+                                          std::to_string(step) + " in one frame");
+            for (std::size_t o = 0; o < 6; ++o)
+                require(a[o][31] == want, label + what + ": output " + std::to_string(o + 1) +
+                                              " ends at " + std::to_string(a[o][31]));
+        };
+        empty.silence();
+        settle_on(0, "a failed first load");
+        empty.publish(empty.prepare(equal));
+        settle_on(m == 1 ? 1.f : .5f * m + (1 - m), "a 6x6 filter after the failure");
+    }
+}
 // mute(), the audio thread's own silence: the current filter ramps to 0 over
 // 64 frames and stays silent until a published filter takes over and fades in
-// from silence. Bypass still passes the dry signal; a reset keeps the silence.
+// from silence. Its dry signal goes with it unless there is one output
+// (PLUG-23); a reset keeps the silence.
 void muting() {
     std::array<float, 512> input{}, output{};
     input.fill(1);
@@ -746,6 +1061,8 @@ void muting() {
         require(std::abs(output[i] - 1.25f * (1 - static_cast<float>(i + 1) / 64)) < 1e-5,
                 "mute does not ramp over 64 frames");
     require(silent_from(63, 128), "muted output not exactly silent");
+    // With one output the dry signal stays (PLUG-23: wider_inputs() checks
+    // that it goes with more).
     host.set_bypass(true);
     run(host, 256);
     require(std::abs(output[255] - 1) < 1e-6, "bypass while muted does not pass the input");
@@ -1425,6 +1742,37 @@ void status_lines() {
     check(host_status(f, stereo), Status::load_failed,
           "Load failed, previous filter kept: the filter has 2 in, 6 out, the plug-in 2 in, 2 out.",
           "refused replacement");
+    // The host then gives buses the refused filter would suit (PLUG-23: six
+    // inputs and six outputs): the line names only what was refused, not
+    // counts that look as if they conflict (jrp's REAPER retest, 7 November).
+    const HostLayout six{48000, 6, 6};
+    check(host_status(f, six), Status::load_failed,
+          "Load failed, previous filter kept: the filter has 2 in, 6 out; the channels have "
+          "changed since. Details in the Convolver log.",
+          "refused replacement, suitable buses now");
+    refused([&] { f.load(HostState{other_rate}, stereo); });
+    check(host_status(f, HostLayout{44100, 2, 2}), Status::load_failed,
+          "Load failed, previous filter kept: the filter is for 44100 Hz; the rate has changed "
+          "since. Details in the Convolver log.",
+          "refused replacement, suitable rate now");
+    // Restored while the host may still change its buses (VST3 before audio
+    // has played): a filter that does not suit is kept, silent, with the
+    // reason, and plays once the host's buses suit it.
+    {
+        HostFilter kept(8);
+        kept.load(HostState{a}, stereo);
+        kept.load(HostState{crossover}, stereo, {}, {}, nullptr, true);
+        require(kept.filter() && kept.filter()->output_channels == 6 && kept.failure() &&
+                    kept.failure()->silent && kept.failure()->kind == HostFailureKind::channels &&
+                    !kept.rejection(),
+                "a restored filter that does not suit yet was not kept silent");
+        check(host_status(kept, stereo), Status::load_failed,
+              "Silent: the filter has 2 in, 6 out, the plug-in 2 in, 2 out.", "kept, unsuited");
+        static_cast<void>(kept.activate(six));
+        require(!kept.failure(), "the kept filter does not play on buses that suit it");
+        check(host_status(kept, six), Status::playing, "Filter loaded: 48000 Hz, 2 in, 6 out",
+              "kept, then suited");
+    }
     // The longest common line still fits when the log cannot be written.
     refused([&] { f.load(HostState{other_rate}, stereo); });
     check(host_status(f, stereo, false), Status::load_failed,
@@ -1667,6 +2015,7 @@ int main() {
         failure_reasons();
         speaker_notices();
         unequal_bypass();
+        wider_inputs();
         muting();
         control_silence();
         allocation_failures();

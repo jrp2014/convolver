@@ -38,8 +38,9 @@ class Vst3 final : public lc::Driver {
         lc::Format f;
         f.name = "VST3";
         // Contract, loading and failure: VST3 counts its configuration as
-        // known once activated with it, while the rate and buses stay the same.
-        f.known = lc::Known::activation;
+        // known once activated with it and audio has played, while the rate
+        // and buses stay the same.
+        f.known = lc::Known::played;
         // Contract, bypass: VST3 saves its bypass parameter with the state.
         f.state_bypass = true;
         f.operations = {Op::state_a,
@@ -270,6 +271,11 @@ int main(int argc, char** argv) {
                  // is recorded, before audio and while it plays.
                  "start state-malformed-starved listen",
                  "start play state-malformed-starved listen",
+                 // Audio played at one rate or layout does not settle the
+                 // next: restored state after the host changes them, before
+                 // it plays again, is kept (jrp's REAPER retest; c3dbf0d).
+                 "start play stop rate start state-A listen stop rate start listen",
+                 "start play stop layout start state-A listen stop layout start listen",
              })
             options.fixed.push_back(lc::parse(s));
         std::size_t failures = 0;

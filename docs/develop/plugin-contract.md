@@ -22,8 +22,12 @@ and are maintained here.
   sample rate and channels as soon as the host has settled them.
 - Every failure keeps a structured reason on the control side, for the host's
   log, LV2's status port and, later, a status display in the other formats.
+- A filter plays on exactly its outputs and at least its inputs: on a wider
+  input bus it reads the first inputs and ignores the rest, and says so.
 - Bypass ramps over 1.33 ms (64 samples at 48 kHz) to the input delayed by
-  the latency, or to silence when the counts differ.
+  the latency, or to silence when there is no dry signal: the filter's
+  counts differ, or with no filter playing, the host's or a kept filter's
+  differ, or a load failed and no filter is kept ([bypass](#bypass)).
 - Gain and mix are host parameters whose defaults keep the sound unchanged
   ([settings](#settings)); the Audio Unit has them first.
 - Nothing on the audio thread allocates, locks or does I/O; filters are
@@ -52,7 +56,7 @@ behaviour:
 | --- | --- | --- | --- |
 | **Empty instance:** no filter was ever loaded | Equal input and output counts: identity (input *c* to output *c*). Unequal counts: silence, because an unfiltered 2→6 crossover would send full-range audio to whatever is on outputs 1 and 2 | "No filter" status where the format has one | As specified |
 | **Failed initial load:** the first filter (a session restore or the first preset) cannot be used: missing file without an embedded copy, wrong rate or channel counts, corrupt state | Silence, never a silent fallback to identity: a room correction or crossover that quietly plays unfiltered audio is worse than an obvious failure | Error returned to the host where the format allows it, status "load failed", and the explanatory message in the host's log | Silence; `setState` returns `kResultFalse`. A mismatch found at activation plays silence; until DIAG-1 it did so with no message (accepted until VST3-3). Since DIAG-1 the Status parameter says why and the Convolver log explains (see [status and log](#status-and-log)) |
-| **Failed replacement:** a working filter is running and a new one is rejected | The working filter keeps running, unchanged | Error returned to the host, status "load failed", message in the log; saved state still describes the working filter | As specified, active or inactive once the plug-in has been activated at the current rate and buses; `setState` returns `kResultFalse` |
+| **Failed replacement:** a working filter is running and a new one is rejected | The working filter keeps running, unchanged | Error returned to the host, status "load failed", message in the log; saved state still describes the working filter | As specified, active or inactive once the plug-in has been activated at the current rate and buses and has played audio with them; `setState` returns `kResultFalse`. Before that, restored state that does not suit is kept, silent (see the VST3 note under [state that arrives before the host is configured](#loading-and-failure)) |
 
 The control side of these rules is shared code in the host layer, so every
 adapter gets the same decisions and messages: `HostFilter` (which filter a load
@@ -99,11 +103,32 @@ before they set the sample rate and channel layout (VST3 `setState` before
 - LV2 knows the sample rate at instantiation and its ports are fixed, so its
   configuration is always known and both kinds of check run in `restore()`.
 - VST3 counts its configuration as known once the plug-in has been activated
-  with it, and while the rate and buses stay the same. `setupProcessing` alone
-  is not binding: JUCE-based hosts, pluginval among them, call it with
-  placeholder values (44.1 kHz) before restoring state made for another rate,
-  which a check at that point would wrongly reject (found by
-  `vst3.pluginval.acceptance` in VST3-7).
+  with it and has played audio with it (a `process` call with samples, in
+  that activation or an earlier one since the rate or buses last changed),
+  and while the rate and buses stay the same. `setupProcessing` alone is not
+  binding: JUCE-based hosts, pluginval among them, call it with placeholder
+  values (44.1 kHz) before restoring state made for another rate, which a
+  check at that point would wrongly reject (found by
+  `vst3.pluginval.acceptance` in VST3-7). Activation alone is not binding
+  either: on reopening a project, and on FX Offline then Online, REAPER
+  activates the plug-in on stereo buses, restores the saved state, then
+  deactivates it and gives it the track's channels (jrp's crossover retest,
+  7 November 2026), so a check at that point refused a saved 2→6 crossover
+  and left nothing to play on six channels. State the host marks as a
+  project (`IStreamAttributes`, `PresetAttributes::kStateType` "Project") is
+  never refused for not suiting the host. REAPER 7.85 does not mark its
+  state this way: in jrp's second retest (7 November 2026) the log gave the
+  "has not played audio" reason on reopening and on FX Online. Restored state that arrives while
+  the configuration is not binding is kept even if it does not suit: if the
+  plug-in is active, it plays silence with the reason as a failure found at
+  activation (`HostFilter::load` with `keep_mismatch`), and the next
+  activation checks it again. A filter file chosen in the window is checked
+  as soon as the plug-in has been activated. A preset the host loads into a
+  new instance before it has played audio, or just after the host changed
+  its rate or buses and before it plays again, is therefore kept silent
+  rather than refused; VST3 gives no other way to tell it from a restored project
+  when the host does not say. `processor.cpp`'s `install()` holds the rule,
+  and `vst3.adapter`'s `restored_while_host_settles` replays REAPER's order.
 
 ## Failure reasons
 
@@ -173,9 +198,10 @@ format.
   and channels. Adapters with [settings](#settings) pass them, so that the
   line says what is heard when no filter plays (jrp's review of 0.5.5): the
   input at the level Gain and Mix give it when no filter is loaded, and only
-  the dry signal, not "Silent", after a failed load at a Mix below 1. Before
-  the host's configuration is known it cannot tell whether a dry signal will
-  play (equal counts only), so it says "no filter plays". The Audio Unit
+  the dry signal, not "Silent", when a kept filter does not suit the host at
+  a Mix below 1 and there is a dry signal ([bypass](#bypass)). Before the
+  host's configuration is known it cannot tell whether a dry signal will
+  play, so it says "no filter plays". The Audio Unit
   recomputes the line each time a host reads it, as Gain and Mix may have
   changed. The parameter is not automatable and is not part of the host
   state. VST3: parameter ID 1001 (Bypass is 1000), a list parameter with `kIsReadOnly`; the
@@ -401,6 +427,40 @@ Bypass ramps over 1.33 ms to the dry signal and back, with the dry path
 delayed by the reported latency so wet and dry line up. Wet processing carries
 on during bypass, so switching back does not lose history.
 
+Which counts decide is what plays (`dry_signal_rule()` in `host.hpp`):
+
+- **A filter plays:** its own counts, not the host's. A 2→6 crossover on a
+  6-in, 6-out bus has no dry signal; a 2→2 filter on a 6-in, 2-out bus has
+  one.
+- **No filter plays, none loaded:** the host's counts.
+- **A kept filter does not suit the host** (another rate, say): the host's
+  counts and the kept filter's must both be equal. A 2→6 crossover kept at
+  the wrong rate on a 6-in, 6-out bus has no dry signal (jrp, 7 November
+  2026).
+- **A load failed and no filter is kept** (`HostFilter::failed()`): no dry
+  signal, whatever the counts (jrp, 7 November 2026). A missing or
+  unreadable file, unreadable state and a saved failure record no counts,
+  and nothing shows that the failed filter was not a crossover.
+- **One input and one output:** a dry signal whenever no filter plays, as
+  there is only one output to feed. The silent configuration cannot have
+  fewer inputs than outputs there.
+
+`HostFilter::activate()` builds the silence to match: without a dry signal
+`unfiltered_configuration()` reads only the first input, so it has fewer
+inputs than outputs. A failed first load while the instance plays mutes the
+processor (`silence()`), and a muted filter's dry signal ramps out with it.
+Status (`Silent: ...`), the log's `Settings:` and the window report's
+`mix_note` use the same rule and give its reason. Each filter applies Mix by its own rule (a filter with no dry signal is
+fully wet), so when a replacement changes whether there is a dry signal,
+each filter's output, dry share included, crossfades with that filter (the
+replacement's warm-up, then the crossfade), and neither bypass nor Mix
+jumps. A filter that gains a dry signal is heard only after its warm-up of
+one block, by which time the delay line holds only fresh input.
+
+Bypass here is the plug-in's own bypass parameter. A host that removes the
+effect from its signal path (off, offline, or its own pass-through) routes
+around the plug-in, and no adapter can stop that.
+
 - **Equal input and output counts:** the dry signal is input *c* on output *c*.
 - **Unequal counts:** every output ramps to silence. No output has an unfiltered counterpart: bypassing a 2→6
   crossover must not send full-range audio to a tweeter, and a 1→2 filter that
@@ -451,10 +511,12 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   mix; the dry path stays the untouched input. Range −100 to +24 dB, linear
   in decibels (jrp). During a replacement both filters play at the same gain.
 - **Mix** is the filtered share, 0 to 1, of the output before bypass; the
-  rest is the latency-aligned dry signal that bypass uses. With unequal input
-  and output counts there is no dry signal ([bypass](#bypass)), so the mix is
-  always 1. Like bypass, a mix below 1 still passes its dry share while a
-  failed first load plays silence (equal counts only).
+  rest is the latency-aligned dry signal that bypass uses. Without a dry
+  signal ([bypass](#bypass): unequal counts, or a load failed and no filter
+  is kept) the mix is always 1, and the window report's `mix_note` field says
+  why (the window does not show it yet). Like bypass, a mix below 1 still
+  passes its dry share while a kept filter that does not suit the host plays
+  silence, where there is a dry signal.
 - **Latency** is the block size `HostProcessor` is built with, the engine's
   uniform partition (the CLI's `--block-size`): one of `host_latencies`, 64 to
   4096 frames in powers of two, default 256 (jrp). Smaller is less delay and
@@ -547,6 +609,20 @@ recorded layout are treated, and the per-format details are in
 In short: version-1 presets load on any arrangement with matching channel
 counts, and a recorded output speaker mask only ever gives a notice.
 
+**A wider input bus (PLUG-23).** A filter is accepted when the host gives it
+exactly its outputs and at least its inputs (`HostFilter::mismatch()`); fewer
+inputs, or other outputs, are refused as before. Some hosts give a plug-in as
+many inputs as outputs (REAPER does for VST3, found in HOST-1), so a 2→6
+crossover would otherwise never load there. The filter reads the first
+inputs and the rest are ignored: `HostProcessor` takes the host's input count
+and widens each prepared engine to it, the extra inputs routed nowhere, so
+every filter in one processor shares the input stride while keeping its own
+dry rule ([bypass](#bypass) for the fade when that changes). The user is told: Status ends "plug-in inputs 3-6 ignored.",
+the loaded, playing and started log lines add "Inputs 3–6 are ignored: the
+filter reads inputs 1–2.", and the window report's Channels fact says the
+same (`ignored_inputs()`). Outputs stay exact: a filter is never spread over,
+or cut to, other outputs.
+
 ## Replacement and threads
 
 The host owns the audio device, clock and scheduling. Each callback supplies
@@ -585,8 +661,10 @@ thread calls process, reset, set_bypass and mute, and reads publications.
 filter ramps to silence over 1.33 ms, 64 frames at 48 kHz (or is silent from
 the first sample, when nothing has been processed since construction or reset) and stays silent until a filter published after
 the mute takes over and fades in from silence; one published before it but
-not yet picked up by the audio thread is silenced too. Bypass still passes the
-dry signal. `silence()` is the same mute requested from the control side, for
+not yet picked up by the audio thread is silenced too. The muted filter's dry
+signal (bypass, Mix's dry share) ramps out and stays silent with it, except
+with one output: a failed first load has no dry signal ([bypass](#bypass)).
+`silence()` is the same mute requested from the control side, for
 a failed first load (ROBUST-3): it only stores the number of publications so
 far, so it cannot allocate or fail, and the audio thread mutes at the start of
 its next `process()`, before adopting a pending filter. Destruction and

@@ -378,7 +378,8 @@ void activate_locked(Instance& p) {
     try {
         // A fresh processor: the filter plays from the first frame, its tail
         // and history start afresh, and LV2's activate() is also its reset.
-        p.host = std::make_unique<HostProcessor>(p.filter.activate(p.layout), p.max_block);
+        p.host = std::make_unique<HostProcessor>(p.filter.activate(p.layout), p.max_block,
+                                                 HostSettings{}, p.layout.inputs);
     } catch (const std::exception& e) {
         record_activation_failure(p, e.what());
     } catch (...) {
@@ -386,8 +387,11 @@ void activate_locked(Instance& p) {
     }
     if (!p.host) {
         try {
+            // Nothing plays, and no dry signal unless there is one output
+            // (dry_signal_rule()), as host_status() says of a filter that
+            // could not be started.
             p.host = std::make_unique<HostProcessor>(unfiltered_configuration(p.layout, true),
-                                                     p.max_block);
+                                                     p.max_block, HostSettings{}, p.layout.inputs);
         } catch (...) {
         }
         try { // error() builds the text, which needs memory (ROBUST-7).

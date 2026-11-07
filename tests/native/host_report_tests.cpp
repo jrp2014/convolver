@@ -145,7 +145,9 @@ void cases() {
           "Fix: Load a filter made for 44100 Hz, or set the host's project or audio device to "
           "48000 Hz."},
          {"stereo track"}},
-        // jrp's review of 0.5.5: a rejected first load with Mix 50% is not silent.
+        // jrp's review of 0.5.5: the report says what a rejected first load at
+        // Mix 50% plays. PLUG-23 (jrp, 7 November 2026): with no filter kept
+        // there is no dry signal, so that is silence.
         {"failed first load, Mix 50%",
          [&] {
              HostFilter f(8);
@@ -153,9 +155,20 @@ void cases() {
              return host_report(f, facts(stereo, {0, .5}));
          },
          HostStatus::load_failed,
-         {"The saved state could not be read. With Mix at 50% wet, only the dry signal plays: "
-          "the input at -6.0 dB."},
-         {"load a Convolver preset"}},
+         {"The saved state could not be read. Convolver plays silence."},
+         {"load a Convolver preset", "only the dry signal"}},
+        // A kept filter with equal counts that does not suit the host still
+        // passes the dry signal at Mix 50%.
+        {"wrong rate, Mix 50%",
+         [] {
+             HostFilter f(8);
+             f.load(HostState{filter(48000, 2)}, std::nullopt);
+             static_cast<void>(f.activate({44100, 2, 2}));
+             return host_report(f, facts(HostLayout{44100, 2, 2}, {0, .5}));
+         },
+         HostStatus::load_failed,
+         {"With Mix at 50% wet, only the dry signal plays: the input at -6.0 dB."},
+         {"no dry signal"}},
         {"refused replacement",
          [&] {
              HostFilter f(8);
@@ -228,8 +241,8 @@ void cases() {
              {"status",      "status name",   "summary",     "title",       "explanation",
               "problem",     "plays",         "cause",       "fix",         "note",
               "action",      "filter name",   "filter note", "filter path", "filter files",
-              "sample rate", "latency waits", "audio",       "reference",   "log path",
-              "log written"}) {
+              "sample rate", "latency waits", "mix note",    "audio",       "reference",
+              "log path",    "log written"}) {
             bool found = false;
             for (const auto& [k, v] : fields)
                 found = found || k == key;
@@ -279,7 +292,7 @@ void cases() {
             "filter row: " + r.filter_name + " / " + r.filter_note);
     require(reference(r, "Filter file") == "a saved project or preset, request 1",
             "filter file: " + reference(r, "Filter file"));
-    require(r.settings == settings_words({-6, .25}, true), "settings words");
+    require(r.settings == settings_words({-6, .25}, HostDrySignal::present), "settings words");
     require(!contains(reference(r, "Software"), "Session:"), "software line");
     require(contains(report_text(r), "Settings: " + r.settings + "\n") &&
                 contains(report_text(r), "Sample rate: 44100 Hz (the filter's rate too)\n") &&
@@ -513,12 +526,70 @@ void log_agrees() {
 }
 } // namespace
 
+// PLUG-23: a 2-in, 6-out crossover on REAPER's 6 inputs and 6 outputs: the
+// Channels line says which inputs the filter reads, and Mix has its own note
+// (no dry signal), for the window to show by the Mix row.
+void wider_inputs() {
+    const HostLayout six{48000, 6, 6};
+    Configuration x{48000, 2, 6, 0, {}, {}, {}};
+    x.paths.push_back({{1.f}, {{0, 1}}, {{0, 1}}});
+    x.paths.push_back({{1.f}, {{1, 1}}, {{5, 1}}});
+    HostFilter f(8);
+    f.load(HostState{x}, six);
+    static_cast<void>(f.activate(six));
+    const auto r = host_report(f, facts(six));
+    require(r.status.status == HostStatus::playing && r.problem.empty(),
+            "a crossover on a wider bus is reported as a problem: " + r.explanation);
+    const auto& channels = fact(r, "Channels");
+    require(channels.value == "6 in, 6 out" &&
+                channels.note == "(the filter reads inputs 1–2, inputs 3–6 are ignored)" &&
+                !channels.problem,
+            "Channels: " + channels.value + " " + channels.note);
+    require(r.mix_note == "The filter's inputs and outputs differ, so there is no dry signal: Mix "
+                          "has no effect, and bypass plays silence.",
+            "mix note: " + r.mix_note);
+    // An empty instance on the same track has a dry signal; a stereo filter
+    // on a stereo track has no Mix note.
+    HostFilter empty(8);
+    require(host_report(empty, facts(six)).mix_note.empty(), "an empty instance has a mix note");
+    HostFilter stereo(8);
+    stereo.load(HostState{filter(48000, 2)}, HostLayout{48000, 2, 2});
+    const auto rs = host_report(stereo, facts(HostLayout{48000, 2, 2}));
+    require(rs.mix_note.empty() && fact(rs, "Channels").note.find("ignored") == std::string::npos,
+            "a stereo filter has a mix note or ignored inputs");
+    // Without a filter and with unequal counts, the host's counts decide.
+    HostFilter none(8);
+    require(contains(host_report(none, facts(HostLayout{48000, 2, 6})).mix_note,
+                     "Inputs and outputs differ"),
+            "no mix note for an empty instance with unequal counts");
+    // jrp, 7 November 2026: the crossover kept at the wrong rate on the
+    // six-channel track, and a failed load with no filter kept, have no dry
+    // signal either.
+    HostFilter kept(8);
+    kept.load(HostState{x}, std::nullopt);
+    const HostLayout slower{44100, 6, 6};
+    static_cast<void>(kept.activate(slower));
+    const auto rk = host_report(kept, facts(slower, {0, .5}));
+    require(rk.mix_note == r.mix_note && contains(rk.explanation, "Convolver plays silence.") &&
+                contains(rk.settings, "mix 100% wet (the filter's inputs and outputs differ"),
+            "a kept crossover that does not suit the host: " + rk.mix_note + " | " +
+                rk.explanation + " | " + rk.settings);
+    HostFilter failed(8);
+    failed.reject(HostFailureKind::filter_file, {"The filter file could not be read."});
+    const auto rf = host_report(failed, facts(six, {0, .5}));
+    require(rf.mix_note == "A load failed and no filter is kept, so there is no dry signal: Mix "
+                           "has no effect, and bypass plays silence." &&
+                contains(rf.settings, "mix 100% wet (a load failed and no filter is kept"),
+            "a failed load with no filter kept: " + rf.mix_note + " | " + rf.settings);
+}
+
 int main() {
     try {
         cases();
         actions();
         log_agrees();
         diagnostics();
+        wider_inputs();
     } catch (const std::exception& e) {
         std::cerr << "FAIL: " << e.what() << "\n";
         return 1;

@@ -27,8 +27,10 @@ struct HostSettings {
     // max_gain_db (clamped there by HostProcessor).
     double gain_db = 0;
     // The share of the filtered signal, 0 to 1; the rest is the input delayed
-    // by the latency. Ignored (always 1) when input and output counts differ,
-    // as there is no dry signal (the bypass rule). Clamped to 0..1.
+    // by the latency. Ignored (always 1) when there is no dry signal
+    // (dry_signal(): the filter's input and output counts differ, or the
+    // host's, or a load failed and no filter is kept), as for bypass.
+    // Clamped to 0..1.
     double mix = 1;
     // The latency in frames, one of host_latencies. Unlike gain and mix it
     // cannot change while a processor runs: it is the block size the
@@ -124,8 +126,23 @@ Advice speaker_notice(const Configuration&, const HostLayout&);
 // What an instance plays without a usable filter, under the shared adapter
 // contract: identity (input c to output c) for an empty instance with equal
 // counts; exact silence for unequal counts or when `failed` (a failed initial
-// load or a filter that does not suit the host).
-Configuration unfiltered_configuration(const HostLayout&, bool failed);
+// load or a filter that does not suit the host). Silence has a dry signal
+// (Mix's dry share and bypass) only when `dry` and the host's counts are
+// equal (HostFilter::activate() passes it for a kept filter with equal
+// counts; dry_signal()). Without one it reads only the first input, so it has
+// fewer inputs than outputs (PLUG-23). A plug-in with one input and one
+// output has no such configuration and keeps its dry signal.
+Configuration unfiltered_configuration(const HostLayout&, bool failed, bool dry);
+// The same with a dry signal only when not `failed`: an empty instance's.
+inline Configuration unfiltered_configuration(const HostLayout& host, bool failed) {
+    return unfiltered_configuration(host, failed, !failed);
+}
+// PLUG-23: a filter may have fewer inputs than the host gives the plug-in
+// (REAPER gives a VST3 plug-in as many inputs as outputs, so a 2-in, 6-out
+// crossover gets 6 of each); it reads the first ones and the rest are
+// ignored. The ignored ones in words, "inputs 3–6" or "input 2" with `dash`
+// between two numbers; empty when the filter reads every input the host gives.
+std::string ignored_inputs(const Configuration&, const HostLayout&, const char* dash = "–");
 
 class HostProcessor;
 
@@ -312,10 +329,15 @@ class HostFilter {
     // is saved, even when memory runs out. `request` says where the state came from (numbered if
     // 0). `counting`: the processor that plays (if any). An accepted load clears its fault baseline
     // (HostProcessor::clear_faults()) and observes from the same snapshot, so faults shown
-    // afterwards are only the new filter's.
+    // afterwards are only the new filter's. `keep_mismatch`: a filter that does not suit `host`
+    // is accepted all the same, as activate() keeps one: it plays silence with the reason as
+    // failure() until an activation suits it. For restored state while the host may still be
+    // changing its configuration (VST3: REAPER starts the plug-in on stereo buses, restores the
+    // project, then gives it the track's channels; jrp's crossover retest, 7 November 2026).
     void load(HostState, const std::optional<HostLayout>& host,
               const std::function<void(const Configuration&)>& install = {},
-              HostRequest request = {}, HostProcessor* counting = nullptr);
+              HostRequest request = {}, HostProcessor* counting = nullptr,
+              bool keep_mismatch = false);
     // A load that failed before decoding (malformed state, unreadable file):
     // recorded as load() records a rejection. Does not throw: if memory runs
     // out, the record keeps the kind and the request's number and source
@@ -406,9 +428,41 @@ inline constexpr std::size_t max_status_text = 127; // VST3's String128, less it
 // not only what the filter does.
 HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& host,
                            bool log_written = true, const HostSettings& settings = {});
+// Whether a dry signal exists under `host` (Mix's dry share and bypass pass
+// input c to output c), and if not, why.
+enum class HostDrySignal {
+    present,
+    // The filter's inputs and outputs differ: the one playing (PLUG-23: its
+    // own counts, not the host's), or one kept that does not suit the host.
+    filter_counts,
+    // A load failed and no filter is kept (HostFilter::failed()): Convolver
+    // cannot tell that the failed filter was not a crossover (jrp, 7
+    // November 2026).
+    failed_load,
+    // No filter plays and the host's inputs and outputs differ.
+    host_counts,
+};
+// A dry signal exists only when what plays has as many inputs as outputs:
+// the filter when one plays; with none playing, the host, and a kept filter
+// too. None after a failed load with no filter kept. A plug-in with one input
+// and one output always has one when no filter plays. Allocates nothing.
+HostDrySignal dry_signal_rule(const HostFilter&, const HostLayout& host) noexcept;
+inline bool dry_signal(const HostFilter& filter, const HostLayout& host) noexcept {
+    return dry_signal_rule(filter, host) == HostDrySignal::present;
+}
+// Why there is no dry signal, in words completing "..., so there is no dry
+// signal" ("the filter's inputs and outputs differ"); empty when there is one.
+const char* no_dry_reason(HostDrySignal) noexcept;
 
 // Prepared planar host boundary. Float DSP with float/double host buffers.
 // Input and output channel counts follow the configuration and may differ.
+// PLUG-23: the processor may take more inputs than the configuration has
+// (`inputs`, the host's input count); the filter reads the first ones and the
+// others are ignored. Each filter keeps its own rule for the dry signal
+// (Mix's dry share and bypass): input c to output c only when the filter
+// itself has as many inputs as outputs, never because the host's counts are
+// equal, so a 2-in, 6-out crossover on 6 inputs never sends unfiltered audio
+// to an output.
 // Control: construction, replace, prepare, publish, silence, collect,
 // destruction; serialize these calls. Audio: process, set_bypass, reset, mute,
 // publications; one audio thread per instance. Control and audio may overlap
@@ -421,6 +475,11 @@ class HostProcessor {
     // and the latency as the block size. Throws std::invalid_argument if the
     // latency is not one of host_latencies.
     HostProcessor(const Configuration&, std::size_t max_frames, const HostSettings&);
+    // PLUG-23: the same, taking `inputs` input channels (at least the
+    // configuration's; 0 means the configuration's). Replacements may have
+    // any input count from 1 to `inputs`, and the same rate and outputs.
+    HostProcessor(const Configuration&, std::size_t max_frames, const HostSettings&,
+                  std::size_t inputs);
     ~HostProcessor();
     HostProcessor(const HostProcessor&) = delete;
     HostProcessor& operator=(const HostProcessor&) = delete;
@@ -464,10 +523,13 @@ class HostProcessor {
     // silent at once, before any audio since construction or reset) and
     // stays silent until a filter published after this call takes over,
     // which then fades in from silence as any replacement does; one published
-    // before it (still waiting for the audio thread) is silenced too. Bypass
-    // still passes the dry signal. For a failure the audio thread finds
-    // itself: LV2's run() refusing an empty instance's first load (no
-    // worker, or a full worker queue). The control side uses silence().
+    // before it (still waiting for the audio thread) is silenced too. The
+    // filter's dry signal (bypass and Mix's dry share) ramps and stays silent
+    // with it, except with one output: a failed first load passes nothing
+    // (PLUG-23, dry_signal()).
+    // For a failure the audio thread finds itself: LV2's run() refusing an
+    // empty instance's first load (no worker, or a full worker queue). The
+    // control side uses silence().
     void mute() noexcept;
     // The same for publications up to `through`, a count publications()
     // returned. An adapter that decides to mute from a flag its control side
