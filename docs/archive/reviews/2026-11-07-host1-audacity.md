@@ -17,7 +17,8 @@
 > HOST-1, what remains and the TODO items it led to are in
 > [TODO](../../../TODO.md) under HOST-1; the Audacity steps it changed are in
 > [host testing](../../develop/host-testing.md#audacity-vst3). The proposed
-> Status wording in its fifth integration problem is left to PR #136.
+> Status wording in its fifth integration problem was taken up by DOC-9 (PR
+> #136).
 
 ---
 

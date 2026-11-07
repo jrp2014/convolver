@@ -1386,8 +1386,9 @@ void status_parameter() {
         "refused replacement not shown or logged: " + shown());
     // A state refused before it reaches the filter is logged too, with why.
     require(unit.restore(CFSTR("not a preset")) != noErr, "a string accepted as ClassInfo");
-    require(contains(log_text(), "the saved state is not an Audio Unit preset dictionary."),
-            "refused state not logged");
+    require(
+        contains(log_text(), "the saved project or preset is not an Audio Unit preset dictionary."),
+        "refused state not logged");
     // Another value reads as its name.
     AudioUnitParameterValue playing = 0;
     AudioUnitParameterStringFromValue request{au::status_parameter, &playing, nullptr};

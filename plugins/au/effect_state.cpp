@@ -68,8 +68,8 @@ std::string foreign(CFDictionaryRef dict, const AudioComponentDescription& desc)
     };
     SInt32 version = -1, subtype = 0, manufacturer = 0;
     if (CFDictionaryContainsKey(dict, CFSTR(kAUPresetPartKey)))
-        return detail::advice_text({"the preset holds the state of one part of a multi-part "
-                                    "instrument, not of a whole effect",
+        return detail::advice_text({"the preset is for one part of a multi-part instrument, "
+                                    "not a whole effect",
                                     {},
                                     "Make a Convolver preset with convolver-preset.",
                                     {}});
@@ -393,7 +393,7 @@ bool Effect::read_state(CFPropertyListRef plist, HostState& next,
                         std::optional<SavedSettings>& saved, bool& settings_unreadable) {
     if (!plist || CFGetTypeID(plist) != CFDictionaryGetTypeID()) {
         reject(HostFailureKind::state_unreadable,
-               {"the saved state is not an Audio Unit preset dictionary",
+               {"the saved project or preset is not an Audio Unit preset dictionary",
                 {},
                 "Load the filter again, then save the project.",
                 {}});

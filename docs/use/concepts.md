@@ -4,7 +4,8 @@
 [Using Convolver](README.md)
 
 For anyone who wants to understand the terms the other pages use: what a
-filter does to audio, latency, tails, and files versus live streams.
+filter does to audio, the words for the files you give Convolver, latency,
+tails, and files versus live streams.
 
 ## What goes in and what comes out
 
@@ -30,7 +31,6 @@ they are not automatically normalized.
 | Sample | One numeric value for one audio channel at one instant |
 | Frame | One sample for every channel at the same instant; stereo has two samples per frame |
 | Sample rate | Frames per second, such as 48,000 Hz |
-| IR or coefficients | The finite sequence that defines the filter; stored in a sound file or in memory |
 | Interleaved | Samples ordered by frame: left, right, left, right, … |
 | Planar | One separate sample buffer per channel, as used by many plug-in hosts |
 | Block size B | The number of frames the engine processes as one convolution partition |
@@ -42,7 +42,25 @@ they are not automatically normalized.
 | PCM | Pulse-code modulation; the CLI's PCM format names refer to integer samples, such as 16-bit or 24-bit WAV |
 | Dither | Low-level noise added before integer rounding to reduce signal-dependent quantization distortion |
 | Noise shaping | Feedback that changes the frequency distribution of quantization error |
-| DAW / host | A digital audio workstation, or another application that schedules audio processing and loads plug-ins |
+| DAW / host | A digital audio workstation, or another application that schedules audio processing and loads plug-ins; its rate and channels are shown as "Host sample rate" and "Host channels" |
+
+## Words Convolver uses
+
+The command-line tool, the plug-ins' windows and messages, and these pages
+use these words for the files you give Convolver and for what a host saves.
+
+| Word | Means | Not called |
+| --- | --- | --- |
+| Filter | What Convolver applies to audio. You give it as an IR file, a `.cfg` or a configuration list; a preset or project carries a copy of it. The file you choose is the filter file | |
+| Impulse response (IR) | The finite sequence of coefficients that filters one channel | |
+| IR file | A sound file holding one IR per channel: WAV, AIFF, CAF, FLAC and other formats Convolver reads. Used directly as a filter, or named by a `.cfg`. A headerless `.pcm` or `.raw` IR file is a raw filter ([filter files](configuration.md#filter-files)) | IR sound file, audio file |
+| Sound file | Any file of audio samples: an IR file, or the input and output of the command-line tool. Used where the file's format matters | |
+| Configuration, `.cfg` | Convolver's text file that routes inputs through IRs to outputs ([configuration files](configuration.md)) | config, config file, filter configuration |
+| Configuration list | A text file that names several configurations or IR files; Convolver uses the first that fits the audio | list file |
+| Preset | A plug-in's filter and settings saved in the host's preset format (`.vstpreset`, `.aupreset` or an LV2 preset bundle) and loaded from the host's preset menu. A Convolver preset holds the whole filter. The host saves one from its preset menu, and `convolver-preset` makes one from a filter ([plug-in presets](presets.md)) | a `.cfg` or IR file |
+| Project | The host's saved document, which keeps Convolver's filter and settings as a preset does. Ardour calls it a session | |
+| Settings | Gain, Mix, Latency and Bypass, in Convolver's window; hosts list them as parameters, with the read-only Status ([settings](plugins.md#settings)) | |
+| Audio settings | The sample rate and channels the host gives the plug-in, usually when the plug-in is added or the project opens, not when you press Play. Until then the Status parameter of a plug-in with a filter loaded reads Waiting: Convolver cannot yet tell whether the filter fits | |
 
 At 48 kHz, 256 frames of latency is about 5.33 ms. That is Convolver's delay;
 audio devices and the host can add more. A smaller block reduces this delay but

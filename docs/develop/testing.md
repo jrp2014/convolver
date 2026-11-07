@@ -184,7 +184,7 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
 - `native.filter_file`: a filter file chosen in a plug-in and refused, through
   `read_filter_file()` and `HostFilter::reject()` as the Audio Unit and LV2
   use them. The short status text gives the refused file's own channels
-  ("the filter has 1 in, 1 out, the plug-in 2 in, 2 out") or rate, never
+  ("the filter has 1 in, 1 out, the host 2 in, 2 out") or rate, never
   "0 in, 0 out" or "0 Hz", also when no filter was carried. A list's status
   names the host's channels or rate rather than one entry's, and is refused
   for the rate only when no entry has the host's rate. The full explanation

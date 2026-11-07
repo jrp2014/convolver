@@ -193,15 +193,16 @@ are silent or refused a load in two places, with the same words in every
 format.
 
 - **A read-only Status parameter** whose value is a `HostStatus` (Active, No
-  filter, Load failed, Not checked yet, Fault, Bypassed; PLUG-22 renamed
+  filter, Load failed, Waiting, Fault, Bypassed; PLUG-22 renamed
   Playing to Active and added Bypassed as the last value, so saved automation
-  of other parameters is unaffected) and whose text for the current value
+  of other parameters is unaffected; DOC-9 renamed Not checked yet to Waiting,
+  the value unchanged) and whose text for the current value
   is `host_status()`'s one line of at most 127 ASCII characters
   ([`host.hpp`](../../include/convolver/host.hpp)). The status follows
   `HostFilter::failure()`, so a refused replacement shows Load failed while
   the previous filter plays, as LV2's status port does. Before the host's
-  configuration is known it is Not checked yet and names the filter's rate
-  and channels. Adapters with [settings](#settings) pass them, so that the
+  configuration is known it is Waiting and names the filter's rate and
+  channels ("waiting for audio settings from the host"). Adapters with [settings](#settings) pass them, so that the
   line says what is heard when no filter plays (jrp's review of 0.5.5): the
   input at the level Gain and Mix give it when no filter is loaded, and only
   the dry signal, not "Silent", when a kept filter does not suit the host at
@@ -384,7 +385,7 @@ format.
   report covered yet), whose `work()` logs through `log:log`; without
   a worker, the next save, restore, activation or deactivation does.
 
-LV2 keeps its own routes (the `status` port, whose values are Running, No
+LV2 keeps its own routes (the `status` port, whose values are Active, No
 filter, Load failed, Loading and Fault, and `log:log`) and does not write
 the file. An editor (HOST-2) would show the same text.
 

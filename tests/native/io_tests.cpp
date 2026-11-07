@@ -1332,7 +1332,7 @@ void run(const fs::path& dir) {
         };
         wave(dir / "mono.wav", 48000, 1, {1, .5f});
         const auto mono = failure(dir / "mono.wav", {48000, 2, 0});
-        require(has(mono, "is a sound-file filter (48000 Hz, 1 channel)") &&
+        require(has(mono, "is an IR file used directly as the filter (48000 Hz, 1 channel)") &&
                     has(mono, "it takes 1 input channel, not 2") &&
                     has(mono, "To apply this mono IR to all 2 channels") &&
                     has(mono, "    48000 2 2 0\n") &&
@@ -1361,7 +1361,7 @@ void run(const fs::path& dir) {
         require(has(outputs, "none of the 3 filters in the configuration list") &&
                     has(outputs, "upmix.cfg (configuration, 48000 Hz, 2 in, 6 out): it produces 6 "
                                  "output channels, not 3") &&
-                    has(outputs, "44100.wav (sound file, 44100 Hz, 1 channel)") &&
+                    has(outputs, "44100.wav (IR file, 44100 Hz, 1 channel)") &&
                     has(outputs, "none produces 3 output channels"),
                 "list mismatch lists each entry and the missing property");
         const auto unrated = failure(dir / "outputs.txt", {96000, 0, 0});

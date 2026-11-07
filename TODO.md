@@ -192,8 +192,8 @@ is superseded.
   while the export ran at 48000 Hz, so a 48 kHz `.cfg` was refused until
   the playback rate was changed (PLUG-25); and Convolver's window shows
   only with *Preset options › Use vendor UI* on. The Status wording it
-  found unclear ("checked when the host starts it") is reworded in PR
-  #136. Still to run in Audacity, from a candidate with the current window:
+  found unclear ("checked when the host starts it") is reworded by
+  DOC-9, with jrp's proposed "waiting for audio settings from the host". Still to run in Audacity, from a candidate with the current window:
   listening (clicks, preset changes, whether a preset chosen during
   playback is heard at once); a successful **Choose…** of a `.cfg` with
   playback at the filter's rate; the system preset folder route in
@@ -388,7 +388,7 @@ LV2 (Linux first; also PipeWire system audio):
   decide with jrp: whether a refusal for the rate should add, in its Fix,
   that a host's playback rate can differ from its export rate, and whether the window should mark a host rate from a copy that
   has not processed audio as not yet confirmed. Builds on the Status
-  wording of PR #136. Diagnostic text only, no sound change; waits for the
+  wording of DOC-9. Diagnostic text only, no sound change; waits for the
   freeze unless jrp brings it forward.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
@@ -1361,6 +1361,9 @@ entries written before 7 November 2026, with their evidence, are
   progress](docs/develop/workflow.md#recording-progress-in-todo).
 - [x] **DOC-8 — Tune the agent guidance and workflow.** 6 November 2026,
   PR #129, from jrp's review; [workflow](docs/develop/workflow.md#kinds-of-task).
+- [x] **DOC-9 — Consistent words for filters, presets and projects.** 7
+  November 2026, PR #136, from jrp's review, with clearer Waiting status wording;
+  [words Convolver uses](docs/use/concepts.md#words-convolver-uses).
 - [x] **FFMPEG-1 — Test the pipe workflow.** 5 November 2026;
   [tests](docs/develop/testing.md#native-production-tests).
 - [x] **FFT-1 — Check that we have the latest Ooura version.** 21 October 2026;
