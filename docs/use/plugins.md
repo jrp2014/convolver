@@ -250,7 +250,16 @@ its copy usually reads "Not checked yet", but Audacity may start it briefly at
 filter is for 48000 Hz, the host runs at 44100 Hz` while the playing copy is
 fine. When the window and the sound disagree, trust the log: each copy has its
 own number (`VST3 #1`, `VST3 #2`), and the one playing logs `Started at` with
-your project's rate.
+the rate the host plays at.
+
+**The rate a host plays at can differ from its project's or export's rate.**
+Audacity 4.0.2 plays real-time effects at the rate in *Audio setup › Audio
+settings › Default sample rate* (44100 Hz unless changed), while an export
+of the same project ran at the 48000 Hz chosen for it (seen 7 November
+2026), so a 48000 Hz `.cfg` was refused during playback until the
+playback rate was changed. Check the `Started at` line in the log, or the
+window's Host sample rate, for the rate the playing copy runs at, and set
+the host's playback rate to the filter's.
 
 **The Convolver log** is a text file with one line for each filter loaded,
 each time the host starts the plug-in (with the sample rate, channels and block

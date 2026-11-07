@@ -105,8 +105,15 @@ already holds one filter.
   `/usr/local/share/vst3/presets/Convolver/Convolver/` on Linux (copying there
   needs an administrator), then restart Audacity. They appear in the
   effect's preset menu under their file names, so give each preset its own
-  name, such as `room-48000.vstpreset`. Audacity always runs Convolver with
-  two channels, even on a mono track, so use a stereo (2-in, 2-out) preset.
+  name, such as `room-48000.vstpreset`. Audacity 4.0.2 did not list copies
+  in `~/Library/Audio/Presets/` (seen 7 November 2026). On macOS you can
+  instead choose the preset's `.cfg` or IR file with **Choose…** in
+  Convolver's window (turn on *Preset options › Use vendor UI* if Audacity
+  shows only its own controls). Audacity always runs Convolver with
+  two channels, even on a mono track, so use a stereo (2-in, 2-out) preset,
+  and it plays real-time effects at the rate in *Audio setup › Audio
+  settings › Default sample rate*, which can differ from the project's
+  rate.
 - **AU:** load the `.aupreset` from the host's preset menu. Logic and
   GarageBand list user presets saved under
   `~/Library/Audio/Presets/Convolver/Convolver/`.
