@@ -45,10 +45,6 @@ const std::vector<AUChannelInfo>& channel_infos() {
 std::string hz(double rate) {
     return std::to_string(static_cast<long long>(rate));
 }
-
-bool same(const HostLayout& a, const HostLayout& b) {
-    return a.sample_rate == b.sample_rate && a.inputs == b.inputs && a.outputs == b.outputs;
-}
 } // namespace
 
 // AU-12: Apple's coalescing wake-up ("Dispatch Sources" in the Dispatch
@@ -140,7 +136,7 @@ HostLayout Effect::layout() {
 // default format (44.1 kHz stereo) is not a choice the host has made.
 std::optional<HostLayout> Effect::known_layout() {
     const auto now = layout();
-    if (host_ || (committed_ && same(*committed_, now)))
+    if (host_ || (committed_ && same_configuration(*committed_, now)))
         return now;
     return std::nullopt;
 }

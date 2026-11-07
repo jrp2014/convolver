@@ -387,10 +387,9 @@ void activate_locked(Instance& p) {
     }
     if (!p.host) {
         try {
-            // Nothing plays, and no dry signal unless there is one output
-            // (dry_signal_rule()), as host_status() says of a filter that
-            // could not be started.
-            p.host = std::make_unique<HostProcessor>(unfiltered_configuration(p.layout, true),
+            // Nothing plays, not even a dry signal, as host_status() says of
+            // a filter that could not be started.
+            p.host = std::make_unique<HostProcessor>(unfiltered_playback(p.layout, true, false),
                                                      p.max_block, HostSettings{}, p.layout.inputs);
         } catch (...) {
         }
@@ -485,7 +484,7 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
     try {
         p.filter.load(
             std::move(*next), p.layout,
-            [&](const Configuration& c) {
+            [&](const HostPlayback& c) {
                 if (!p.host) { // Inactive: the next activation installs it.
                     if (r.generation != newest())
                         throw SupersededRequest();
@@ -990,7 +989,7 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
     // configuration is always known and checked here. While active, a
     // prepared replacement is published (installed directly if no audio has
     // run yet); inactive, the next activation installs it.
-    const auto install = [&](const Configuration& c) {
+    const auto install = [&](const HostPlayback& c) {
         if (p.host)
             p.host->replace(c);
     };

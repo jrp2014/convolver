@@ -188,9 +188,12 @@ void restore(const Context& x, Model& m, std::optional<Which> filter, bool faile
     if (kind && known(x, m))
         return reject(m, *kind, request);
     accept(x, m, filter, failed, request, false);
-    // VST3: restored while active but before audio has played, a filter that
-    // does not suit is kept silent, as at activation (jrp's REAPER retest).
-    if (kind && m.active && x.format.known == Known::played)
+    // VST3: restored once the host has started the plug-in with its
+    // configuration but before audio has played with it, a filter that does
+    // not suit is kept silent, with the reason, as at activation (jrp's
+    // REAPER retest; HostLoadCheck::keep_until_suited).
+    if (kind && x.format.known == Known::played && m.configured &&
+        (m.active || m.committed == m.host))
         m.activation_failure = Failure{*kind, request, true};
 }
 // Contract, failure reasons: a mismatch found at activation belongs to the
@@ -383,18 +386,17 @@ struct Audible {
 };
 // Contract, bypass: the dry signal needs as many inputs as outputs in what
 // plays: the filter when it plays; with none playing, the host, and a kept
-// filter too. After a failed load with no filter kept there is none (PLUG-23,
-// jrp, 7 November 2026). With one input and one output there always is one
-// when no filter plays.
+// filter too. After a failed load with no filter kept there is none, with
+// one input and one output too (PLUG-23, jrp, 7 November 2026).
 bool has_dry(const Context& x, const Model& m) {
     const auto& h = m.host;
-    const bool host_equal = h.inputs == h.outputs, mono = host_equal && h.outputs == 1;
+    const bool host_equal = h.inputs == h.outputs;
     if (m.filter) {
         const auto& c = configuration(x.filters, *m.filter);
         const bool equal = c.input_channels == c.output_channels;
-        return mismatch(c, h) ? host_equal && (mono || equal) : equal;
+        return mismatch(c, h) ? host_equal && equal : equal;
     }
-    return host_equal && (mono || !m.failed);
+    return host_equal && !m.failed;
 }
 Audible audible(const Context& x, const Model& m) {
     const auto& h = m.host;

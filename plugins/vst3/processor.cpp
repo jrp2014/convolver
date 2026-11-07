@@ -262,8 +262,7 @@ HostLayout Processor::layout() const {
 // For restored state, install() also waits until audio has played with them.
 std::optional<HostLayout> Processor::known_layout() const {
     const auto now = layout();
-    if (!activated_ || !same_rate(*activated_, now) || activated_->inputs != now.inputs ||
-        activated_->outputs != now.outputs)
+    if (!activated_ || !same_configuration(*activated_, now))
         return std::nullopt;
     return now;
 }
@@ -289,8 +288,7 @@ tresult Processor::activate(TBool state) {
             next->reset();
             // Audio played with these rate and buses before still counts:
             // only a new configuration needs the host to play again.
-            if (!activated_ || !same_rate(*activated_, host) || activated_->inputs != host.inputs ||
-                activated_->outputs != host.outputs)
+            if (!activated_ || !same_configuration(*activated_, host))
                 played_.store(false);
             host_ = std::move(next);
             active_latency_.store(host_->latency_frames());
@@ -588,28 +586,41 @@ tresult Processor::load_state(IBStream* stream) {
             filter_.reject(HostFailureKind::state_unreadable, state_read_message(e));
             throw;
         }
-        install(std::move(next), {}, true, state_type(stream) == StateType::kProject);
+        install(std::move(next), {},
+                state_type(stream) == StateType::kProject ? Origin::project : Origin::state);
         return kResultOk;
     } catch (...) {
         refused(was_failed);
         return kResultFalse;
     }
 }
-void Processor::install(HostState next, const HostRequest& request, bool restore, bool project) {
-    // While active, a prepared replacement is published; inactive, the next
-    // activation installs it. A file chosen in the window is checked against
-    // the host's configuration once the host has started the plug-in with it.
+HostLoadCheck Processor::load_check(Origin origin) const noexcept {
+    // A file chosen in the window is checked against the host's configuration
+    // once the host has started the plug-in with it (known_layout()).
     // Restored state is refused for not suiting the host only once the host
     // has also played audio with it, and never when the host says it is
     // restoring a project: hosts start the plug-in on placeholder buses
     // before they restore a project (REAPER: stereo, then the track's six
     // channels; jrp's crossover retest, 7 November 2026). Until then a
     // restored filter that does not suit is kept, silent, and checked again
-    // at the next activation, as the shared adapter contract keeps state
-    // that arrives before the host is configured.
-    const bool binding = !restore || (!project && played_.load());
-    const bool keep = host_ && !binding;
-    const auto host = host_ ? std::optional(layout()) : binding ? known_layout() : std::nullopt;
+    // at the next activation.
+    switch (origin) {
+    case Origin::chosen_file:
+        return HostLoadCheck::refuse_mismatch;
+    case Origin::state:
+        return played_.load() ? HostLoadCheck::refuse_mismatch : HostLoadCheck::keep_until_suited;
+    case Origin::project:
+        return HostLoadCheck::keep_until_suited;
+    }
+    return HostLoadCheck::refuse_mismatch;
+}
+void Processor::install(HostState next, const HostRequest& request, Origin origin) {
+    // While active, a prepared replacement is published; inactive, the next
+    // activation installs it. load_check() says what a filter that does not
+    // suit the host means.
+    const bool restore = origin != Origin::chosen_file;
+    const auto check = load_check(origin);
+    const auto host = host_ ? std::optional(layout()) : known_layout();
     const bool bypass = next.bypass;
     // VST3-4: the state's settings, or the defaults for a state without
     // them (an older state, or a preset from convolver-preset).
@@ -627,11 +638,11 @@ void Processor::install(HostState next, const HostRequest& request, bool restore
     }
     filter_.load(
         std::move(next), host,
-        [&](const Configuration& c) {
+        [&](const HostPlayback& c) {
             if (host_)
                 host_->replace(c);
         },
-        request, host_.get(), keep);
+        request, host_.get(), check);
     // Nothing from here on can throw: the request is accepted.
     hold_fault_signal();
     tail_.store(host_ ? static_cast<uint32>(host_->tail_frames()) : inactive_tail);
@@ -647,15 +658,17 @@ void Processor::install(HostState next, const HostRequest& request, bool restore
         // A restored failed load says why it plays silence.
         auto line = loaded_line(filter_, host);
         const auto& f = filter_.failure();
-        if (keep && f && f->silent && filter_.filter())
+        const bool kept = check == HostLoadCheck::keep_until_suited;
+        if (kept && host && f && f->silent && filter_.filter())
             line += " It does not suit the host's present configuration, so it is kept and plays "
                     "silence until it does: " +
                     detail::advice_line(f->message);
-        if (restore && !binding)
-            line += project ? " The host said it is restoring a project, so its channels and rate "
-                              "may still change."
-                            : " The host has not played audio since it started the plug-in, so "
-                              "its channels and rate may still change.";
+        if (kept)
+            line += origin == Origin::project
+                        ? " The host said it is restoring a project, so its channels and rate "
+                          "may still change."
+                        : " The host has not played audio since it started the plug-in, so "
+                          "its channels and rate may still change.";
         log(line, f.has_value() || !filter_.notice().empty());
     } catch (...) { // Out of memory for the line: it is dropped.
     }
@@ -705,7 +718,7 @@ bool Processor::load_file(std::string_view chosen) {
             filter_.reject(why.kind, why.message, request, why.filter());
             throw std::runtime_error("refused");
         }
-        install(std::move(*next), request, false);
+        install(std::move(*next), request, Origin::chosen_file);
     } catch (...) {
         refused(was_failed);
         return false;

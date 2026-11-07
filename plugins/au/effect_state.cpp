@@ -235,7 +235,7 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
             }
             filter_.load(
                 std::move(next), host,
-                [&](const Configuration& c) {
+                [&](const HostPlayback& c) {
                     if (host_)
                         host_->replace(c);
                 },

@@ -627,15 +627,15 @@ void lifecycle(host::World& world, const Fixture& f, unsigned seed,
     // What a fresh start plays: the saved filter, or what an instance without
     // one plays (identity for equal counts, silence otherwise or after a
     // failure), wet or bypassed. Bypass passes the input only with equal
-    // counts, and not after a failed load with no filter kept unless there
-    // is only one output (PLUG-23).
+    // counts, and not after a failed load with no filter kept, with one
+    // output too (PLUG-23, jrp, 7 November 2026).
     const auto fresh_output_ok = [&] {
         const auto c = m.saved ? *m.saved : unfiltered_configuration(layout, m.failed);
         const auto length = frames + test::tail(c) + 2 * latency;
         const auto out = render(*p, f.input, length, 300);
         if (m.bypass) {
             std::vector<double> dry(out.size());
-            if (ni == no && (no == 1 || m.saved || !m.failed))
+            if (ni == no && (m.saved || !m.failed))
                 for (std::size_t t = latency; t < length && t - latency < frames; ++t)
                     for (std::size_t ch = 0; ch < no; ++ch)
                         dry[t * no + ch] = f.input[(t - latency) * ni + ch];

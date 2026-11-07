@@ -500,24 +500,34 @@ void diagnostics_follow_settings() {
          "Silent: the filter is for 44100 Hz",
          "Convolver plays silence. The filter is for 44100 Hz",
          HostStatus::load_failed},
+        // No dry signal after a failed load with no filter kept, with one
+        // input and one output too (jrp, 7 November 2026).
         {"refused first load, mix 50%",
          mono,
          true,
          false,
          {0, .5},
-         .25f,
-         "Load failed, only the dry signal plays: the filter is for 44100 Hz",
-         "With Mix at 50% wet, only the dry signal plays: the input at -6.0 dB. The filter is for "
-         "44100 Hz",
+         0,
+         "Silent: the filter is for 44100 Hz",
+         "Convolver plays silence. The filter is for 44100 Hz",
          HostStatus::load_failed},
         {"refused first load, gain +24 dB, mix 0%",
          mono,
          true,
          false,
          {24, 0},
-         .5f,
-         "Load failed, only the dry signal plays:",
-         "With Mix at 0% wet, only the dry signal plays: the input unchanged.",
+         0,
+         "Silent: the filter is for 44100 Hz",
+         "Convolver plays silence.",
+         HostStatus::load_failed},
+        {"refused first load, 2 in 2 out, mix 0%",
+         {48000, 2, 2},
+         true,
+         false,
+         {0, 0},
+         0,
+         "Silent: the filter is for 44100 Hz",
+         "Convolver plays silence.",
          HostStatus::load_failed},
         {"refused first load, 1 in 2 out, mix 50%",
          split,
@@ -596,8 +606,8 @@ void diagnostics_follow_settings() {
     const auto failed_start = host_status(unstarted, mono, true, HostSettings{0, .5});
     require(contains(failed_start.text, "Silent: the plug-in could not start the filter."),
             "activation failure at Mix 50%: " + failed_start.text);
-    // Before the host is known, a refused first load cannot say whether
-    // Mix's dry share will play (it does only with equal counts).
+    // Before the host is known, a refused first load already knows that no
+    // dry signal will play (jrp, 7 November 2026).
     HostFilter unknown;
     try {
         unknown.load(HostState{Configuration{44100, 1, 1, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}}},
@@ -605,7 +615,7 @@ void diagnostics_follow_settings() {
     } catch (const std::invalid_argument&) {
     }
     const auto line = host_status(unknown, std::nullopt, true, HostSettings{0, .5});
-    require(contains(line.text, "Load failed, no filter plays: "),
+    require(contains(line.text, "Silent: the filter is for 44100 Hz."),
             "unknown host, mix 50%: " + line.text);
     require(contains(host_status(unknown, std::nullopt).text, "Silent: "),
             "unknown host, defaults: " + host_status(unknown, std::nullopt).text);

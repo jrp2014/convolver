@@ -214,12 +214,18 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     void mark_silence(Steinberg::Vst::ProcessData&) noexcept;
     // VST3-4, under control_: a Latency chosen in the controller.
     void choose_latency(std::size_t frames);
+    // Where a load comes from: a file chosen in the window, state the host
+    // restores (setState), or state the host says (IStreamAttributes) is a
+    // project being restored.
+    enum class Origin { chosen_file, state, project };
+    // What a filter that does not suit the host means for a load from
+    // `origin` (HostLoadCheck), under control_.
+    HostLoadCheck load_check(Origin) const noexcept;
     // VST3-3: the common step of setState and a chosen file, under control_.
-    // Loads `next`; with `restore` (setState) its bypass and settings apply
-    // too, while a chosen file keeps them. Throws if it is refused, which
-    // HostFilter has recorded. `project`: the host said (IStreamAttributes)
-    // that it is restoring a project.
-    void install(HostState next, const HostRequest&, bool restore, bool project = false);
+    // Loads `next`; restored state's bypass and settings apply too, while a
+    // chosen file keeps them. Throws if it is refused, which HostFilter has
+    // recorded.
+    void install(HostState next, const HostRequest&, Origin);
     // Under control_, after a refused request: a failed first load plays
     // silence, and the log says why.
     void refused(bool was_failed) noexcept;

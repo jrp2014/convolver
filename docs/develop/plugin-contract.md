@@ -447,16 +447,21 @@ Which counts decide is what plays (`dry_signal_rule()` in `host.hpp`):
   the wrong rate on a 6-in, 6-out bus has no dry signal (jrp, 7 November
   2026).
 - **A load failed and no filter is kept** (`HostFilter::failed()`): no dry
-  signal, whatever the counts (jrp, 7 November 2026). A missing or
-  unreadable file, unreadable state and a saved failure record no counts,
-  and nothing shows that the failed filter was not a crossover.
-- **One input and one output:** a dry signal whenever no filter plays, as
-  there is only one output to feed. The silent configuration cannot have
-  fewer inputs than outputs there.
+  signal, whatever the counts, one input and one output included (jrp,
+  7 November 2026: "After a failed load with no retained filter, Convolver
+  should remain silent, including its own bypass and Mix controls. Apply
+  this to mono too"). A missing or unreadable file, unreadable state and a
+  saved failure record no counts, and nothing shows that the failed filter
+  was not a crossover. An untouched instance passes its input, and a failed
+  replacement keeps the previous filter with its own rule.
 
-`HostFilter::activate()` builds the silence to match: without a dry signal
-`unfiltered_configuration()` reads only the first input, so it has fewer
-inputs than outputs. A failed first load while the instance plays mutes the
+Each prepared filter carries the answer: `HostPlayback` holds the
+configuration and whether it has a dry signal, and `HostFilter::activate()`,
+the `HostFilter::load()` install callback and `HostProcessor` take it.
+`filter_playback()` gives a playing filter its own counts' answer and
+`unfiltered_playback()` the answer for no filter; processing, bypass, Mix and
+the diagnostics all follow that flag, never the shape of the silent
+configuration. A failed first load while the instance plays mutes the
 processor (`silence()`), and a muted filter's dry signal ramps out with it.
 Status (`Silent: ...`), the log's `Settings:` and the window report's
 `mix_note` use the same rule and give its reason. Each filter applies Mix by its own rule (a filter with no dry signal is
@@ -672,8 +677,8 @@ filter ramps to silence over 1.33 ms, 64 frames at 48 kHz (or is silent from
 the first sample, when nothing has been processed since construction or reset) and stays silent until a filter published after
 the mute takes over and fades in from silence; one published before it but
 not yet picked up by the audio thread is silenced too. The muted filter's dry
-signal (bypass, Mix's dry share) ramps out and stays silent with it, except
-with one output: a failed first load has no dry signal ([bypass](#bypass)).
+signal (bypass, Mix's dry share) ramps out and stays silent with it, with
+one output too: a failed first load has no dry signal ([bypass](#bypass)).
 `silence()` is the same mute requested from the control side, for
 a failed first load (ROBUST-3): it only stores the number of publications so
 far, so it cannot allocate or fail, and the audio thread mutes at the start of

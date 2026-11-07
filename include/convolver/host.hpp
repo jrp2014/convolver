@@ -112,6 +112,10 @@ void set_host_rate(HostLayout&, double hertz) noexcept;
 std::string host_rate_text(const HostLayout&);
 // The same rate: equal whole parts and equal fractional rates.
 bool same_rate(const HostLayout&, const HostLayout&) noexcept;
+// The same configuration for checking a filter: the same rate and the same
+// input and output counts (speakers aside). Adapters count the host's
+// configuration as known while it stays the same as one they started with.
+bool same_configuration(const HostLayout&, const HostLayout&) noexcept;
 
 // Advisory check of the speakers a filter's outputs are labelled for (its
 // channel mask) against the host's output speakers. Empty when they agree, or
@@ -123,20 +127,28 @@ bool same_rate(const HostLayout&, const HostLayout&) noexcept;
 // the labels say (docs/develop/plugin-identities.md#channel-layouts).
 Advice speaker_notice(const Configuration&, const HostLayout&);
 
+// What a HostProcessor plays: a filter, and whether it has a dry signal
+// (input c to output c, which bypass and Mix's dry share pass). Decided once,
+// by HostFilter (dry_signal_rule()), and carried with the filter, so that
+// processing, bypass, Mix and diagnostics never read it differently from a
+// configuration's counts (jrp's review, 7 November 2026).
+struct HostPlayback {
+    Configuration filter;
+    bool dry = false;
+};
+// A filter that plays: a dry signal only when the filter itself has as many
+// inputs as outputs (PLUG-23), never because the host's counts are equal.
+HostPlayback filter_playback(Configuration);
+
 // What an instance plays without a usable filter, under the shared adapter
 // contract: identity (input c to output c) for an empty instance with equal
 // counts; exact silence for unequal counts or when `failed` (a failed initial
-// load or a filter that does not suit the host). Silence has a dry signal
-// (Mix's dry share and bypass) only when `dry` and the host's counts are
-// equal (HostFilter::activate() passes it for a kept filter with equal
-// counts; dry_signal()). Without one it reads only the first input, so it has
-// fewer inputs than outputs (PLUG-23). A plug-in with one input and one
-// output has no such configuration and keeps its dry signal.
-Configuration unfiltered_configuration(const HostLayout&, bool failed, bool dry);
-// The same with a dry signal only when not `failed`: an empty instance's.
-inline Configuration unfiltered_configuration(const HostLayout& host, bool failed) {
-    return unfiltered_configuration(host, failed, !failed);
-}
+// load or a filter that does not suit the host).
+Configuration unfiltered_configuration(const HostLayout&, bool failed);
+// The same, with a dry signal only when `dry` and the host's counts are equal
+// (HostFilter passes dry_signal() for a kept filter, none after a failed load
+// with no filter kept, and a dry signal for an empty instance).
+HostPlayback unfiltered_playback(const HostLayout&, bool failed, bool dry);
 // PLUG-23: a filter may have fewer inputs than the host gives the plug-in
 // (REAPER gives a VST3 plug-in as many inputs as outputs, so a 2-in, 6-out
 // crossover gets 6 of each); it reads the first ones and the rest are
@@ -152,6 +164,22 @@ std::string ignored_inputs(const Configuration&, const HostLayout&, const char* 
 std::uint64_t configuration_identity(const Configuration&) noexcept;
 
 class HostProcessor;
+
+// What a filter that does not suit the host's configuration means for a load
+// (the shared adapter contract, "state that arrives before the host is
+// configured"). The adapter decides which applies; HostFilter applies it.
+enum class HostLoadCheck {
+    // The host's configuration is settled: the load is refused, and what was
+    // accepted before stays (a failed first load if nothing was).
+    refuse_mismatch,
+    // The host may still change its configuration (it is restoring a project):
+    // the filter is accepted all the same and kept, playing silence with the
+    // reason as failure() until an activation suits it, as activate() keeps
+    // one. VST3: REAPER starts the plug-in on stereo buses, restores the
+    // project, then gives it the track's channels (jrp's crossover retest,
+    // 7 November 2026).
+    keep_until_suited,
+};
 
 // PLUG-8: why a request to load a filter failed, or why an instance plays
 // silence, kept as a value on the control side and never touched by the audio
@@ -350,15 +378,12 @@ class HostFilter {
     // is saved, even when memory runs out. `request` says where the state came from (numbered if
     // 0). `counting`: the processor that plays (if any). An accepted load clears its fault baseline
     // (HostProcessor::clear_faults()) and observes from the same snapshot, so faults shown
-    // afterwards are only the new filter's. `keep_mismatch`: a filter that does not suit `host`
-    // is accepted all the same, as activate() keeps one: it plays silence with the reason as
-    // failure() until an activation suits it. For restored state while the host may still be
-    // changing its configuration (VST3: REAPER starts the plug-in on stereo buses, restores the
-    // project, then gives it the track's channels; jrp's crossover retest, 7 November 2026).
+    // afterwards are only the new filter's. `check` says what a filter that does not suit `host`
+    // means (HostLoadCheck).
     void load(HostState, const std::optional<HostLayout>& host,
-              const std::function<void(const Configuration&)>& install = {},
+              const std::function<void(const HostPlayback&)>& install = {},
               HostRequest request = {}, HostProcessor* counting = nullptr,
-              bool keep_mismatch = false);
+              HostLoadCheck check = HostLoadCheck::refuse_mismatch);
     // A load that failed before decoding (malformed state, unreadable file):
     // recorded as load() records a rejection. Does not throw: if memory runs
     // out, the record keeps the kind and the request's number and source
@@ -383,7 +408,7 @@ class HostFilter {
     // What to play under `host` at activation: the accepted filter when it
     // suits the host. Otherwise silence and an error, keeping the filter, so
     // correcting the host's rate or layout brings it back.
-    Configuration activate(const HostLayout& host);
+    HostPlayback activate(const HostLayout& host);
     // The adapter could not build a processor for what activate() returned,
     // so it plays silence; recorded until the next activate().
     void fail_activation(std::string why);
@@ -474,8 +499,8 @@ enum class HostDrySignal {
 };
 // A dry signal exists only when what plays has as many inputs as outputs:
 // the filter when one plays; with none playing, the host, and a kept filter
-// too. None after a failed load with no filter kept. A plug-in with one input
-// and one output always has one when no filter plays. Allocates nothing.
+// too. None after a failed load with no filter kept, with one output too
+// (jrp, 7 November 2026). Allocates nothing.
 HostDrySignal dry_signal_rule(const HostFilter&, const HostLayout& host) noexcept;
 inline bool dry_signal(const HostFilter& filter, const HostLayout& host) noexcept {
     return dry_signal_rule(filter, host) == HostDrySignal::present;
@@ -510,6 +535,10 @@ class HostProcessor {
     // any input count from 1 to `inputs`, and the same rate and outputs.
     HostProcessor(const Configuration&, std::size_t max_frames, const HostSettings&,
                   std::size_t inputs);
+    // The same, with the dry signal as `playback` says (the adapters' form).
+    // Taking a Configuration, a processor plays it as filter_playback() does.
+    HostProcessor(const HostPlayback& playback, std::size_t max_frames, const HostSettings& = {},
+                  std::size_t inputs = 0);
     ~HostProcessor();
     HostProcessor(const HostProcessor&) = delete;
     HostProcessor& operator=(const HostProcessor&) = delete;
@@ -520,6 +549,7 @@ class HostProcessor {
     // newer filter plays at once), so a filter published before audio resumes
     // is installed directly.
     void replace(const Configuration&);
+    void replace(const HostPlayback&);
     // replace() in two steps, so an adapter can check between them that the
     // request is still the newest (LV2-2). prepare() builds and plans the
     // filter off the audio thread and may throw; publish() hands it to the
@@ -540,6 +570,7 @@ class HostProcessor {
         std::unique_ptr<Data> data_;
     };
     Replacement prepare(const Configuration&) const;
+    Replacement prepare(const HostPlayback&) const;
     void publish(Replacement&&) noexcept;
     void collect() noexcept; // Retire old FFT plans off-thread.
     void reset() noexcept;
@@ -555,7 +586,7 @@ class HostProcessor {
     // which then fades in from silence as any replacement does; one published
     // before it (still waiting for the audio thread) is silenced too. The
     // filter's dry signal (bypass and Mix's dry share) ramps and stays silent
-    // with it, except with one output: a failed first load passes nothing
+    // with it, with one output too: a failed first load passes nothing
     // (PLUG-23, dry_signal()).
     // For a failure the audio thread finds itself: LV2's run() refusing an
     // empty instance's first load (no worker, or a full worker queue). The

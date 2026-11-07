@@ -76,7 +76,7 @@ class Reference final : public lc::Driver {
             // Contract, replacement and threads: while active, a prepared
             // replacement is published; stopped, activation installs it.
             const auto host = known();
-            filter_->load(std::move(state), host, [&](const Configuration& c) {
+            filter_->load(std::move(state), host, [&](const HostPlayback& c) {
                 if (processor_)
                     processor_->replace(c);
             });
