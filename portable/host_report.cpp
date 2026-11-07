@@ -112,15 +112,17 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         if (filter.faults().processing_failure)
             m.action = "copy diagnostics";
     } else if (facts.bypassed && filter.filter()) {
-        // PLUG-22: as HostProcessor bypasses, the input for equal counts,
-        // otherwise silence.
+        // PLUG-22: as HostProcessor bypasses, the input when there is a dry
+        // signal, otherwise silence (dry_signal_rule(), PLUG-23).
         // Nothing is wrong, so turning it off is part of the sentence, not a fix.
-        m.plays = (!host ? std::string("No filter is applied while bypassed.")
-                   : host->inputs == host->outputs
-                       ? std::string("The input plays unfiltered.")
-                       : "The outputs are silent: with " + ports(host->inputs, host->outputs) +
-                             " there is no unfiltered signal to play.") +
-                  " Turn bypass off to hear the filter.";
+        const auto& c = *filter.filter();
+        m.plays =
+            (!host ? std::string("No filter is applied while bypassed.")
+             : dry_signal(filter, *host)
+                 ? std::string("The input plays unfiltered.")
+                 : "The outputs are silent: with " + ports(c.input_channels, c.output_channels) +
+                       ", the filter has no unfiltered signal to play.") +
+            " Turn bypass off to hear the filter.";
     } else if (const auto& c = filter.filter()) {
         // PLUG-22: while it plays, the window's heading names the filter and
         // the Audio section describes it, so nothing is said here.

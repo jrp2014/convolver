@@ -207,7 +207,9 @@ format.
   (DIAG-4), and all of it as one explanation text with `Cause:`, `Fix:`
   and `Note:` lines ([`advice.hpp`](../../portable/advice.hpp)); then
   the filter's name for the heading (the file's name with its extension;
-  after a restore the name saved with the project, `HostRequest::name`, or
+  after a restore the name saved with the project, `HostRequest::name` in
+  the Audio Unit, or VST3's controller state while the report's
+  `filter_identity` matches the one saved beside it, or
   "From the saved project or preset" without one; PLUG-22) and a note when
   the newest request was
   refused, the filter's own values for under its name (rate, channels,
@@ -499,7 +501,8 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   rest is the latency-aligned dry signal that bypass uses. Without a dry
   signal ([bypass](#bypass): unequal counts, or a load failed and no filter
   is kept) the mix is always 1, and the window report's `mix_note` field says
-  why (the window does not show it yet). Like bypass, a mix below 1 still
+  why; the macOS window shows it under Mix and dims the Mix slider
+  (PLUG-22). Like bypass, a mix below 1 still
   passes its dry share while a kept filter that does not suit the host plays
   silence, where there is a dry signal.
 - **Latency** is the block size `HostProcessor` is built with, the engine's
@@ -779,7 +782,14 @@ How each adapter meets the contract where its format differs:
   reset is one each), with `setParamNormalized` for the controller's own
   copy; the Bypass checkbox edits the bypass parameter (1000) the same way,
   one edit per click; the report as `ConvolverReport` and the copy the processor sent;
-  a chosen or dropped file as `ConvolverLoad`. The view's blocks hold a
+  a chosen or dropped file as `ConvolverLoad`. A bypass change through
+  the controller's `setParamNormalized` also sends `ConvolverBypass`, so the
+  processor's status and report say Bypassed before the audio thread sees
+  the change (PLUG-22). The controller state (`getState`, `setState`) holds
+  the accepted file's name and its filter's identity (`"CVCS"`, version 1,
+  each string as a little-endian 32-bit length and UTF-8); an empty or
+  unknown stream reads as no name, so projects saved before PLUG-22, whose
+  controller state is empty, still open. The view's blocks hold a
   shared link that the editor clears in its destructor, so nothing the view
   does afterwards (a timer, a closing file dialog) reaches a controller the
   host has released. The view does not touch the processor or the audio

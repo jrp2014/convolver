@@ -218,7 +218,7 @@ void cases() {
              return host_report(f, bypassed);
          },
          HostStatus::bypassed,
-         {"The outputs are silent: with 2 in, 4 out there is no unfiltered signal"},
+         {"The outputs are silent: with 2 in, 4 out, the filter has no unfiltered signal"},
          {"plays unfiltered"}},
         {"bypassed without a filter",
          [&] {

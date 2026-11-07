@@ -185,9 +185,11 @@ struct HostRequest {
     std::vector<std::string> files{};
     // PLUG-22: for state, the name saved beside it for the window to show
     // (UTF-8, at most max_filter_name_bytes): the file's name with its
-    // extension, never its folder, as the Audio Unit's preset name or VST3's
-    // controller state keeps it. Empty when unknown; a file's request leaves
-    // it empty, as the window takes the name from `path`.
+    // extension, never its folder, as the Audio Unit's preset name keeps it.
+    // Empty when unknown; a file's request leaves it empty, as the window
+    // takes the name from `path`. VST3 keeps the name in the controller
+    // state, apart from the component's, and its controller puts it in the
+    // report itself (HostReport::filter_identity).
     std::string name{};
 };
 inline constexpr std::size_t max_filter_name_bytes = 1024;

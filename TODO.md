@@ -336,19 +336,6 @@ LV2 (Linux first; also PipeWire system audio):
   it as follow-up work after the preview. Done when the macOS window (shared
   by VST3 and the Audio Unit) shows the logo and notice somewhere a user can
   find them, without crowding the settings, and its tests cover it.
-- [ ] **PLUG-22 — Name the filter in the window, and say each fact once.**
-  jrp, 6 November 2026: after reopening a project the window says "From the
-  saved project or preset" instead of the filter's name. The project keeps
-  the file's name (with its extension, not its folder): the Audio Unit as
-  its preset name, VST3 in its controller state, shown only while it belongs
-  to the filter that plays. The macOS window puts the name at the top with
-  the status beside it; a problem and its fix sit under it; the Audio
-  section keeps its lines except Added delay, which the Latency row shows.
-  "A filter for…" goes while a filter plays. The status Playing becomes
-  Active, and Bypassed is added. Done when both formats show the name after
-  reopening, the window matches the
-  [mockup](https://claude.ai/artifact/38xxK5FQdjBqwayRbubb7v) and the tests
-  and guides cover it.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
@@ -1360,6 +1347,9 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **PERF-14 — Load timing from a full history.** 5 November 2026.
 - [x] **PLUG-23 — A filter reads the first inputs of a wider input bus.** 6
   November 2026; [channels](docs/use/plugins.md#channels).
+- [x] **PLUG-22 — Name the filter in the window, and say each fact once.** 7
+  November 2026, PR #128; [Convolver's
+  window](docs/use/plugins.md#convolvers-window).
 - [x] **PLUG-21 — Teardown tested at chosen stages.** 5 November 2026.
 - [x] **PERF-13 — Load-timing records as JSON.** 5 November 2026; [load
   timing](docs/develop/testing.md#load-timing-perf-9).

@@ -70,7 +70,8 @@ ones and ignores the rest. Some hosts give a plug-in as many inputs as
 outputs: REAPER gives the VST3 plug-in six inputs on a six-channel track, so a
 2→6 crossover reads inputs 1 and 2 and ignores 3 to 6. Status then ends with
 "plug-in inputs 3-6 ignored.", and the [Convolver log](#status-and-the-convolver-log)
-and the window's Channels line say the same. Make sure the source plays on
+and the window's Host channels line say the same (`6 in, 6 out (inputs 3–6
+ignored)`). Make sure the source plays on
 the inputs the filter reads. A filter with more inputs than the host gives,
 or with a different number of outputs, is refused.
 
@@ -337,8 +338,9 @@ From the top, the window has:
   (orange).
 - **The message**, under the heading, only when there is something to say.
   A problem sits in a box tinted with the status colour; Bypassed's line
-  ("The input plays unfiltered. Turn bypass off to hear the filter.") and a
-  note are plain text. It explains as the log does, in parts:
+  ("The input plays unfiltered. Turn bypass off to hear the filter.", or
+  that the outputs are silent when there is no dry signal, as with a
+  crossover; see [bypass](#bypass)) and a note are plain text. It explains as the log does, in parts:
 
   | Part | What it says |
   | --- | --- |
@@ -427,7 +429,9 @@ From the top, the window has:
   in its own box.
   Leaving a box without changing it sets nothing, so the rounded value it
   shows does not replace a more exact one, or one the host has set since.
-  Mix is labelled Dry and Wet at its ends. A host that shows
+  Mix is labelled Dry and Wet at its ends. When there is no dry signal
+  (a crossover, say: see [bypass](#bypass)) Mix has no effect, so its
+  label and slider are dimmed and a note under them says why. A host that shows
   Convolver's window shows it instead of its generic controls, so the
   settings are here. Moving a slider changes the setting and tells the
   host, and the sliders follow changes the host makes (automation, its own
@@ -488,6 +492,11 @@ except:
   it is the same as the host's own bypass button, which it follows, and the
   host's undo and automation record it. The Audio Unit's window has none,
   since Audio Unit hosts show their own bypass button.
+- The filter's name after reopening comes from the controller state, and
+  is shown only while the filter saved with it plays: a preset or an undo
+  that brings another filter shows "From the saved project or preset".
+- Bypass changed in the window or by the host shows as Bypassed at once,
+  before audio next runs.
 - The window grows when the file, software and log lines are shown, and
   asks the host to make its window fit; the user cannot resize it.
 - The software line names macOS AudioToolbox as the reader of filter files,
