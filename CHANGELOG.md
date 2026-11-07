@@ -366,11 +366,14 @@ Until 1.0 the C++ API may change between minor versions.
   `native.kernel_divergence`'s 1e-35 case is held to an absolute limit
   (1000 times `FLT_MIN`, 1.2e-35) where flushing applies. `convolver_callback_benchmark` gains
   `--filter decaying` and `--thread-denormals gradual|flush`.
-- The version is now 0.10.0 (jrp, 5 November 2026), the minor step for the
-  library changes in DIAG-3 and DIAG-4 below, after 0.9.0. CMake consumers
-  request `find_package(Convolver 0.10)`, and the first preview is cut from
-  the 0.10 series. The LV2 plug-in reports minor version 10, which LV2
-  accepts as a release.
+- The version is now 0.11.0 (jrp, 7 November 2026), the minor step for
+  PLUG-23's incompatible library changes below, after 0.10.13. CMake
+  consumers request `find_package(Convolver 0.11)`, and the first preview is
+  cut from the 0.11 series. The LV2 plug-in reports minor version 11, which
+  LV2 reads as a development version; LV2 is not in the first preview.
+- 0.10.0 (jrp, 5 November 2026) was the minor step for the library changes
+  in DIAG-3 and DIAG-4 below, after 0.9.0; its LV2 plug-in reported minor
+  version 10, which LV2 accepts as a release.
 - 0.9.0 was the milestone step before jrp's host smoke tests (HOST-1), from
   which the first preview was first to be cut (jrp, 5 November 2026). Its
   CMake consumers request `find_package(Convolver 0.9)`, and its LV2 plug-in

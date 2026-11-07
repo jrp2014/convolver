@@ -34,7 +34,7 @@ run the Audio Unit and its window in GarageBand; the VST3 hosts (REAPER,
 Audacity) have not been run, and no independent user has followed the
 instructions. The next milestone is end-to-end testing of a fixed feature
 set: an independent user installing and using an exact preview package, cut
-from the 0.10 series that `main` is now in.
+from the 0.11 series that `main` is now in.
 [What still blocks it](#what-still-blocks-the-first-preview) lists the
 remaining work by TODO item.
 
@@ -146,7 +146,7 @@ first independent walkthrough, optional features and further hardening wait;
 crashes, lost state, wrong audio, ordinary compatibility failures and
 demonstrated dropouts are still fixed at once.
 
-The first preview is cut from a 0.10.x tag.
+The first preview is cut from a 0.11.x tag.
 
 | Condition | Source | Item | Status |
 | --- | --- | --- | --- |
