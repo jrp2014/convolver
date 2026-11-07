@@ -481,8 +481,10 @@ class ProjectStream final : public MemoryStream, public IStreamAttributes {
 // FX Offline then Online, REAPER starts the plug-in on stereo buses, restores
 // the saved state, then gives it the track's six inputs and outputs. The
 // saved 2-in, 6-out crossover must survive the stereo start and play on six.
-// Each order: state while active or after deactivation; and a host that has
-// played audio on stereo buses but says it is restoring a project.
+// Each order: state while active or after deactivation; a host that has
+// played audio on stereo buses but says it is restoring a project; and the
+// state saved while the crossover was kept silent on stereo buses (jrp's
+// review of eeaa843: saving then must not lose the filter).
 void restored_while_host_settles() {
     convolver::HostState saved;
     saved.configuration = convolver::Configuration{48000, 2, 6, 0, {}, {}, {}};
@@ -492,117 +494,148 @@ void restored_while_host_settles() {
     const std::array<std::array<float, 2>, 6> expected{
         {{1, 0}, {2, 0}, {0, 0}, {.5f, 0}, {0, 2}, {0, -2}}};
     SpeakerArrangement stereo = SpeakerArr::kStereo, surround = SpeakerArr::k51;
-    for (const bool while_active : {true, false})
-        for (const bool project : {false, true}) {
-            const std::string order = std::string(while_active ? "active" : "inactive") +
-                                      (project ? ", host says project" : "") + ": ";
-            const auto need = [&](bool v, const char* what) { require(v, (order + what).c_str()); };
-            HostApplication context;
-            Processor p;
-            need(p.initialize(&context) == kResultOk, "initialize");
-            need(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "stereo buses");
-            p.activateBus(kAudio, kInput, 0, true);
-            p.activateBus(kAudio, kOutput, 0, true);
-            ProcessSetup setup{kRealtime, kSample32, 300, 48000};
-            need(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
-                 "stereo start");
-            p.setProcessing(true);
-            if (project) // Played already: only the host's word marks a restore.
-                play_block(p, 2, 2, 300);
-            if (!while_active) {
-                p.setProcessing(false);
-                p.setActive(false);
-            }
-            std::unique_ptr<MemoryStream> state =
-                project ? std::make_unique<ProjectStream>() : std::make_unique<MemoryStream>();
-            need(write_state(state.get(), saved), "encode the crossover");
-            state->seek(0, IBStream::kIBSeekSet, nullptr);
-            need(p.setState(state.get()) == kResultOk,
-                 "the saved crossover was refused on the host's stereo start");
-            if (while_active) {
-                // Kept but silent on stereo buses, with the reason, and no
-                // dry signal: the crossover's counts differ.
-                const auto f = p.failure();
-                need(f && f->silent && f->kind == convolver::HostFailureKind::channels,
-                     "the kept crossover gives no reason for its silence");
-                // Past any transition from what played before (the empty
-                // instance's unchanged input, once audio has played).
-                for (int k = 0; k < 4; ++k) {
-                    std::array<std::array<float, 300>, 2> ins{}, outs{};
-                    ins[0].fill(1);
-                    ins[1].fill(1);
-                    float* in_ptr[] = {ins[0].data(), ins[1].data()};
-                    float* out_ptr[] = {outs[0].data(), outs[1].data()};
-                    AudioBusBuffers input{}, output{};
-                    input.numChannels = output.numChannels = 2;
-                    input.channelBuffers32 = in_ptr;
-                    output.channelBuffers32 = out_ptr;
-                    ProcessData d{};
-                    d.symbolicSampleSize = kSample32;
-                    d.numInputs = d.numOutputs = 1;
-                    d.inputs = &input;
-                    d.outputs = &output;
-                    d.numSamples = 300;
-                    need(p.process(d) == kResultOk, "stereo process");
-                    if (project && k < 3)
-                        continue;
-                    for (const auto& channel : outs)
-                        for (const float v : channel)
-                            need(v == 0, "the kept crossover is not silent on stereo buses");
-                }
-                p.setProcessing(false);
-                p.setActive(false);
-            }
-            need(p.setBusArrangements(&surround, 1, &surround, 1) == kResultOk &&
-                     p.setActive(true) == kResultOk,
-                 "six-channel start");
-            p.setProcessing(true);
-            need(!p.failure(), "the restored crossover does not play on six channels");
-            std::array<std::array<float, 300>, 6> six{}, outs{};
-            std::array<float*, 6> in_ptr{}, out_ptr{};
-            for (int c = 0; c < 6; ++c) {
-                six[c][0] = c == 0 ? 1.f : c == 1 ? 2.f : 7.f;
-                in_ptr[c] = six[c].data();
-                out_ptr[c] = outs[c].data();
-            }
-            AudioBusBuffers input{}, output{};
-            input.numChannels = output.numChannels = 6;
-            input.channelBuffers32 = in_ptr.data();
-            output.channelBuffers32 = out_ptr.data();
-            ProcessData d{};
-            d.symbolicSampleSize = kSample32;
-            d.numInputs = d.numOutputs = 1;
-            d.inputs = &input;
-            d.outputs = &output;
-            d.numSamples = 300;
-            need(p.process(d) == kResultOk, "six-channel process");
-            for (int c = 0; c < 6; ++c)
-                for (int i = 0; i < 300; ++i) {
-                    const float want = i == 256 ? expected[c][0] : i == 257 ? expected[c][1] : 0.f;
-                    need(std::abs(outs[c][i] - want) < 1e-5, "routing on six channels");
-                }
-            // Once the host has played with its buses, a preset that does not
-            // suit them is refused and the crossover keeps playing.
-            convolver::HostState stereo_filter;
-            stereo_filter.configuration =
-                convolver::Configuration{48000, 2, 2, 0, {}, {}, {{{.5f}, {{0, 1}}, {{1, 1}}}}};
-            MemoryStream preset;
-            need(write_state(&preset, stereo_filter), "encode a stereo preset");
-            preset.seek(0, IBStream::kIBSeekSet, nullptr);
-            need(p.setState(&preset) == kResultFalse,
-                 "a stereo preset was accepted on six settled outputs");
-            const auto f = p.failure();
-            need(f && !f->silent, "the refused preset silenced the crossover");
-            MemoryStream kept;
-            need(p.getState(&kept) == kResultOk, "save");
-            kept.seek(0, IBStream::kIBSeekSet, nullptr);
-            const auto restored = read_state(&kept).configuration;
-            need(restored && restored->input_channels == 2 && restored->output_channels == 6,
-                 "the crossover is not what is saved");
+    struct Order {
+        bool while_active, project, resaved;
+    };
+    std::vector<char> silent_save; // From the first order, while kept silent.
+    for (const auto [while_active, project, resaved] :
+         {Order{true, false, false}, Order{true, true, false}, Order{false, false, false},
+          Order{false, true, false}, Order{true, false, true}}) {
+        const std::string order = std::string(while_active ? "active" : "inactive") +
+                                  (project ? ", host says project" : "") +
+                                  (resaved ? ", saved while kept silent" : "") + ": ";
+        const auto need = [&](bool v, const char* what) { require(v, (order + what).c_str()); };
+        HostApplication context;
+        Processor p;
+        need(p.initialize(&context) == kResultOk, "initialize");
+        need(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "stereo buses");
+        p.activateBus(kAudio, kInput, 0, true);
+        p.activateBus(kAudio, kOutput, 0, true);
+        ProcessSetup setup{kRealtime, kSample32, 300, 48000};
+        need(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+             "stereo start");
+        p.setProcessing(true);
+        if (project) // Played already: only the host's word marks a restore.
+            play_block(p, 2, 2, 300);
+        if (!while_active) {
             p.setProcessing(false);
             p.setActive(false);
-            p.terminate();
         }
+        std::unique_ptr<MemoryStream> state =
+            project ? std::make_unique<ProjectStream>() : std::make_unique<MemoryStream>();
+        if (resaved)
+            need(state->write(silent_save.data(), static_cast<int32>(silent_save.size()),
+                              nullptr) == kResultOk,
+                 "copy the state saved while kept silent");
+        else
+            need(write_state(state.get(), saved), "encode the crossover");
+        state->seek(0, IBStream::kIBSeekSet, nullptr);
+        need(p.setState(state.get()) == kResultOk,
+             "the saved crossover was refused on the host's stereo start");
+        if (while_active) {
+            // Kept but silent on stereo buses, with the reason, and no
+            // dry signal: the crossover's counts differ.
+            const auto f = p.failure();
+            need(f && f->silent && f->kind == convolver::HostFailureKind::channels,
+                 "the kept crossover gives no reason for its silence");
+            // Past any transition from what played before (the empty
+            // instance's unchanged input, once audio has played).
+            for (int k = 0; k < 4; ++k) {
+                std::array<std::array<float, 300>, 2> ins{}, outs{};
+                ins[0].fill(1);
+                ins[1].fill(1);
+                float* in_ptr[] = {ins[0].data(), ins[1].data()};
+                float* out_ptr[] = {outs[0].data(), outs[1].data()};
+                AudioBusBuffers input{}, output{};
+                input.numChannels = output.numChannels = 2;
+                input.channelBuffers32 = in_ptr;
+                output.channelBuffers32 = out_ptr;
+                ProcessData d{};
+                d.symbolicSampleSize = kSample32;
+                d.numInputs = d.numOutputs = 1;
+                d.inputs = &input;
+                d.outputs = &output;
+                d.numSamples = 300;
+                need(p.process(d) == kResultOk, "stereo process");
+                if (project && k < 3)
+                    continue;
+                for (const auto& channel : outs)
+                    for (const float v : channel)
+                        need(v == 0, "the kept crossover is not silent on stereo buses");
+            }
+            // What the host saves now is the crossover, not the failure.
+            MemoryStream now;
+            need(p.getState(&now) == kResultOk, "save while kept silent");
+            const auto bytes = static_cast<std::size_t>(now.getSize());
+            if (!resaved && !project)
+                silent_save.assign(now.getData(), now.getData() + bytes);
+            now.seek(0, IBStream::kIBSeekSet, nullptr);
+            const auto held = read_state(&now);
+            need(!held.failed && held.configuration && held.configuration->input_channels == 2 &&
+                     held.configuration->output_channels == 6,
+                 "saved while kept silent, the state lost the crossover");
+            p.setProcessing(false);
+            p.setActive(false);
+        }
+        need(p.setBusArrangements(&surround, 1, &surround, 1) == kResultOk &&
+                 p.setActive(true) == kResultOk,
+             "six-channel start");
+        p.setProcessing(true);
+        need(!p.failure(), "the restored crossover does not play on six channels");
+        std::array<std::array<float, 300>, 6> six{}, outs{};
+        std::array<float*, 6> in_ptr{}, out_ptr{};
+        for (int c = 0; c < 6; ++c) {
+            six[c][0] = c == 0 ? 1.f : c == 1 ? 2.f : 7.f;
+            in_ptr[c] = six[c].data();
+            out_ptr[c] = outs[c].data();
+        }
+        AudioBusBuffers input{}, output{};
+        input.numChannels = output.numChannels = 6;
+        input.channelBuffers32 = in_ptr.data();
+        output.channelBuffers32 = out_ptr.data();
+        ProcessData d{};
+        d.symbolicSampleSize = kSample32;
+        d.numInputs = d.numOutputs = 1;
+        d.inputs = &input;
+        d.outputs = &output;
+        d.numSamples = 300;
+        need(p.process(d) == kResultOk, "six-channel process");
+        for (int c = 0; c < 6; ++c)
+            for (int i = 0; i < 300; ++i) {
+                const float want = i == 256 ? expected[c][0] : i == 257 ? expected[c][1] : 0.f;
+                need(std::abs(outs[c][i] - want) < 1e-5, "routing on six channels");
+            }
+        // Once the host has played with its buses, a preset that does not
+        // suit them is refused and the crossover keeps playing.
+        convolver::HostState stereo_filter;
+        stereo_filter.configuration =
+            convolver::Configuration{48000, 2, 2, 0, {}, {}, {{{.5f}, {{0, 1}}, {{1, 1}}}}};
+        MemoryStream preset;
+        need(write_state(&preset, stereo_filter), "encode a stereo preset");
+        preset.seek(0, IBStream::kIBSeekSet, nullptr);
+        need(p.setState(&preset) == kResultFalse,
+             "a stereo preset was accepted on six settled outputs");
+        const auto f = p.failure();
+        need(f && !f->silent, "the refused preset silenced the crossover");
+        // Restarted on the same buses, the host has still played with
+        // them: the preset is refused before any new audio too.
+        p.setProcessing(false);
+        p.setActive(false);
+        need(p.setActive(true) == kResultOk, "restart on six channels");
+        p.setProcessing(true);
+        preset.seek(0, IBStream::kIBSeekSet, nullptr);
+        need(p.setState(&preset) == kResultFalse,
+             "a stereo preset was accepted after a restart on the same buses");
+        MemoryStream kept;
+        need(p.getState(&kept) == kResultOk, "save");
+        kept.seek(0, IBStream::kIBSeekSet, nullptr);
+        const auto restored = read_state(&kept).configuration;
+        need(restored && restored->input_channels == 2 && restored->output_channels == 6,
+             "the crossover is not what is saved");
+        p.setProcessing(false);
+        p.setActive(false);
+        p.terminate();
+    }
 }
 // PLUG-4: version-1 state records counts and an advisory output mask, no layout.
 // It is "unspecified" (discrete): it must load on every arrangement with matching

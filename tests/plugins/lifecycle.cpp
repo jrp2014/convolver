@@ -101,6 +101,8 @@ struct Model {
     Host host;
     bool configured = true, active = false;
     bool rendered = false; // AU: this initialization has rendered audio.
+    // VST3: an earlier activation with the committed configuration rendered.
+    bool played = false;
     // Contract, replacement and threads: audio has been processed since the
     // last activation or reset; until then a filter is installed directly.
     bool started = false;
@@ -149,7 +151,7 @@ bool known(const Context& x, const Model& m) {
     case Known::activation:
         return m.active || m.committed == m.host;
     case Known::played:
-        return m.rendered && (m.active || m.committed == m.host);
+        return (m.rendered || m.played) && (m.active || m.committed == m.host);
     case Known::rendering:
         return m.active || m.committed == m.host;
     }
@@ -196,6 +198,7 @@ void restore(const Context& x, Model& m, std::optional<Which> filter, bool faile
 // activation that suits the filter.
 void start(const Context& x, Model& m) {
     m.active = true;
+    m.played = (m.played || m.rendered) && m.committed == m.host;
     m.rendered = false;
     m.started = false;
     m.settled_bypass = m.bypass;

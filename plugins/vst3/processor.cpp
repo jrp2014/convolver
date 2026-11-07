@@ -259,7 +259,7 @@ HostLayout Processor::layout() const {
 // with placeholder values before restoring a project's state at another rate.
 // Until then, restored state is kept and checked at activation (the shared
 // adapter contract's "state that arrives before the host is configured").
-// For restored state, install() also waits until audio has played.
+// For restored state, install() also waits until audio has played with them.
 std::optional<HostLayout> Processor::known_layout() const {
     const auto now = layout();
     if (!activated_ || !same_rate(*activated_, now) || activated_->inputs != now.inputs ||
@@ -287,7 +287,11 @@ tresult Processor::activate(TBool state) {
             tail_.store(static_cast<uint32>(next->tail_frames()));
             next->set_bypass(bypass_.load());
             next->reset();
-            played_.store(false);
+            // Audio played with these rate and buses before still counts:
+            // only a new configuration needs the host to play again.
+            if (!activated_ || !same_rate(*activated_, host) || activated_->inputs != host.inputs ||
+                activated_->outputs != host.outputs)
+                played_.store(false);
             host_ = std::move(next);
             active_latency_.store(host_->latency_frames());
             hold_fault_signal();
