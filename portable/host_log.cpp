@@ -157,15 +157,15 @@ std::string loaded_line(const HostFilter& filter, bool host_known) {
     const auto request = request_words(filter.accepted());
     if (const auto& f = filter.failure(); f && f->kind == HostFailureKind::saved_failure)
         return request +
-               "Loaded saved state that records a failed load, so Convolver plays "
-               "silence: " +
+               "Loaded a saved project or preset that records a failed load, so "
+               "Convolver plays silence: " +
                detail::advice_line(f->message);
     if (const auto& c = filter.filter())
         return request + "Loaded " + filter_words(*c) +
-               (!host_known               ? "; it is checked when the host starts the plug-in."
+               (!host_known               ? "; waiting for the host to start audio."
                 : filter.notice().empty() ? "."
                                           : "; " + detail::advice_line(filter.notice()));
-    return request + "Loaded state with no filter.";
+    return request + "Loaded a saved project or preset with no filter.";
 }
 
 std::string loaded_line(const HostFilter& filter, const std::optional<HostLayout>& host) {

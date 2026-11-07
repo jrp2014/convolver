@@ -185,6 +185,25 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Wording (DOC-9, from jrp's review of 7 November 2026): one set of words for
+  filters, IR files, configurations, presets and projects, listed in
+  [words Convolver uses](docs/use/concepts.md#words-convolver-uses) and used
+  by the window, the Status text, the log, the tools' help and messages, and
+  the documentation. A filter given as a sound file is an "IR file" (the
+  window, `--inspect` and list messages said "sound file"; one reader message
+  said "audio file"); a `.cfg` is a "configuration", never a "config"; a list
+  is a "configuration list". `convolver --help` and `--inspect --help` name
+  the filter argument `FILTER` (was `IR_OR_CFG` and `CONFIG`). Messages about
+  unreadable saved data say "the saved project or preset" rather than "the
+  saved state". Channel mismatches name the host's channels, as the window's
+  "Host channels" does: "the filter has 2 in, 6 out, the host 2 in, 2 out"
+  (was "the plug-in 2 in, 2 out"). The Status value "Not checked yet" is now
+  **Waiting** ("Filter loaded: 48000 Hz, 2 in, 2 out; waiting for the host to
+  start audio."; was "checked when the host starts it"), with the same value
+  and icon, and the window says "Waiting for the host to start audio. Then
+  the filter plays if it fits the host's sample rate and channels." The LV2
+  status port's first label is Active, as in the VST3 and Audio Unit (was
+  Running); its value is unchanged. No sound changes.
 - Plug-ins (PLUG-22, from jrp's review of 6 and 7 November 2026): the macOS
   window (Audio Unit and VST3) names the filter at the top, with its
   extension, and keeps the name after the project is reopened: the Audio

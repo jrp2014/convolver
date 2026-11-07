@@ -63,7 +63,7 @@ void run(const fs::path& dir) {
     impulse(dir / "mono.wav", 44100, 1);
     impulse(dir / "fast.wav", 48000, 2);
     const auto channels = refused(dir / "mono.wav", stereo, HostFailureKind::channels);
-    require(has(channels, "the filter has 1 in, 1 out, the plug-in 2 in, 2 out."),
+    require(has(channels, "the filter has 1 in, 1 out, the host 2 in, 2 out."),
             "channel counts: " + channels);
     const auto rate = refused(dir / "fast.wav", stereo, HostFailureKind::sample_rate);
     require(has(rate, "the filter is for 48000 Hz, the host runs at 44100 Hz."), "rate: " + rate);
@@ -180,8 +180,7 @@ void run(const fs::path& dir) {
         list << "mono.wav\nfast-mono.wav\n";
     }
     const auto mixed = refused(dir / "mixed.txt", fast_stereo, HostFailureKind::channels);
-    require(has(mixed, "the filter does not suit the plug-in's 2 in, 2 out.") &&
-                !has(mixed, "44100"),
+    require(has(mixed, "the filter does not fit the host's 2 in, 2 out.") && !has(mixed, "44100"),
             "list with an entry at the host's rate: " + mixed);
     {
         std::ofstream list(dir / "slow.txt");
@@ -248,7 +247,7 @@ void run(const fs::path& dir) {
         const auto line = host_status(filter, stereo).text;
         std::cout << "no filter carried: " << line << '\n';
         require(!has(line, "0 in, 0 out") && !has(line, " 0 Hz"), "unknown values shown: " + line);
-        require(has(line, kind == HostFailureKind::channels ? "the plug-in's 2 in, 2 out"
+        require(has(line, kind == HostFailureKind::channels ? "the host's 2 in, 2 out"
                                                             : "the host's 44100 Hz"),
                 "the host's values: " + line);
     }

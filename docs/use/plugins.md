@@ -107,7 +107,7 @@ before any audio plays starts at once; one loaded during playback fades in
 ([replacing a filter](#replacing-a-filter)).
 
 In the Audio Unit, and in the VST3 plug-in on macOS, you can also choose the
-`.cfg` file, list or impulse response itself, in Convolver's window:
+IR file, `.cfg` or configuration list itself, in Convolver's window:
 **Choose…** under the filter's name, or drop the file on the window
 ([Convolver's window](#convolvers-window)). In LV2
 you choose it with the host's file chooser
@@ -134,7 +134,7 @@ channel counts. Each plug-in checks it against the host:
 | The filter is too large to save with the project | As for a filter that does not fit: silence for a first filter, otherwise the working filter |
 
 **Size limit.** The host saves the whole filter in the project, and
-Convolver's saved state holds at most 64 MiB: just under 16,777,216 samples
+what Convolver saves in it holds at most 64 MiB: just under 16,777,216 samples
 counting every impulse response in the filter together: a stereo filter with
 one impulse response per channel can be about 2.9 minutes long at 48 kHz. A larger filter is refused when it is loaded,
 with the reason in Status and the log, so a project never plays a filter it
@@ -205,8 +205,8 @@ example (some hosts show only the status name in the first column):
 | Active | `Filter loaded: 48000 Hz, 2 in, 2 out.` |
 | No filter | `No filter: audio passes unchanged. Load a Convolver preset.` |
 | Load failed (silence) | `Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in the Convolver log.` |
-| Load failed (previous filter kept) | `Load failed, previous filter kept: the filter has 2 in, 6 out, the plug-in 2 in, 2 out. Details in the Convolver log.` |
-| Not checked yet | `Filter loaded: 44100 Hz, 2 in, 2 out; checked when the host starts it.` |
+| Load failed (previous filter kept) | `Load failed, previous filter kept: the filter has 2 in, 6 out, the host 2 in, 2 out. Details in the Convolver log.` |
+| Waiting | `Filter loaded: 44100 Hz, 2 in, 2 out; waiting for the host to start audio.` |
 | Fault | `Fault: output too large, silenced and the filter restarted. Details in the Convolver log.` |
 | Bypassed | `Bypassed: the input plays unfiltered.` (`Bypassed: silent, as the filter's inputs and outputs differ.` for a filter with different input and output counts, such as a crossover) |
 
@@ -242,10 +242,12 @@ a filter loaded do not come back once it plays; the log still records them. Some
 while playing but fill in the log line and the text only when the project is
 saved or the host restarts the plug-in.
 
-"Not checked yet" means the host has not started the plug-in at a sample rate
-and channel layout yet. Some hosts show a separate copy of the plug-in in its
-window, not the one that plays. Audacity's real-time effects window is one:
-its copy usually reads "Not checked yet", but Audacity may start it briefly at
+**Waiting** means a filter is loaded but the host has not started audio for
+the plug-in yet, so Convolver does not know the host's sample rate and
+channels. When the host starts it, the status becomes Active if the filter
+fits, or Load failed if it does not. Some hosts show a separate copy of the
+plug-in in its window, not the one that plays. Audacity's real-time effects
+window is one: its copy usually reads Waiting, but Audacity may start it briefly at
 44100 Hz, whatever the project's rate, and then it can read `Silent: the
 filter is for 48000 Hz, the host runs at 44100 Hz` while the playing copy is
 fine. When the window and the sound disagree, trust the log: each copy has its
@@ -253,7 +255,7 @@ own number (`VST3 #1`, `VST3 #2`), and the one playing logs `Started at` with
 your project's rate.
 
 **The Convolver log** is a text file with one line for each filter loaded,
-each time the host starts the plug-in (with the sample rate, channels and block
+each time the host starts audio (with the sample rate, channels and block
 size), and each failure, explained in full with what to change. Each line
 starts with the time, the Convolver version, the format and instance (`VST3 #2`),
 the host program and its process number. Loads and refusals are numbered
@@ -339,7 +341,7 @@ From the top, the window has:
   small text: a note when the newest file was refused, and a reminder that
   a file can be dropped on the window.
 - **The status** beside the name (Active, Bypassed, No filter, Load failed,
-  Not checked yet or Fault), the same as the Status parameter, as a symbol
+  Waiting or Fault), the same as the Status parameter, as a symbol
   and a word, coloured for Active (green), Load failed (red) and Fault
   (orange).
 - **The message**, under the heading, only when there is something to say.
@@ -361,7 +363,7 @@ From the top, the window has:
   Diagnostics** for a fault in Convolver itself.
 
   For example, a stereo preset on a GarageBand mono track reads "**The saved
-  filter has 2 inputs and 2 outputs, and the plug-in has 1 input and 1
+  filter has 2 inputs and 2 outputs, and the host gives it 1 input and 1
   output.** Convolver plays silence.", then Cause: "A filter plays only with
   the channel counts it was made for.", **Fix**: "Give the plug-in 2 inputs
   and 2 outputs in the host's track or routing settings, or load a filter
@@ -372,8 +374,8 @@ From the top, the window has:
   With no filter, Fix says what to load, and Choose… is highlighted.
 - **Choose…**, **Recent**, **Reload** and **Reload when the file changes**,
   on one row under the message.
-  Choose… opens the file dialog for a `.cfg` file, a
-  configuration list or a sound file; dropping the file anywhere on the
+  Choose… opens the file dialog for an IR file, a `.cfg` or a
+  configuration list; dropping the file anywhere on the
   window does the same. The Audio Unit reads sound files with macOS's own reader, so
   it needs nothing installed beside it: WAV, AIFF, CAF, W64, RF64, FLAC and
   the other formats macOS reads, and headerless `.pcm` or `.raw` filters
@@ -657,7 +659,7 @@ URIs are `https://github.com/jrp2014/convolver/lv2#discrete-N-M`.
 | --- | --- | --- | --- |
 | 0 | `enabled` | Control input | 1 processes, 0 bypasses (a 1.3 ms fade) |
 | 1 | `latency` | Control output | 256 samples |
-| 2 | `status` | Control output | 0 Running, 1 No filter, 2 Load failed, 3 Loading, 4 Fault |
+| 2 | `status` | Control output | 0 Active, 1 No filter, 2 Load failed, 3 Loading, 4 Fault |
 | 3… | `in_1` … `in_N` | Audio input | Input channels in order |
 | then | `out_1` … `out_M` | Audio output | Output channels in order |
 | then | `control` | Atom input | The host sets or asks for the filter file |
@@ -677,13 +679,13 @@ lilv's `lv2apply`) cannot load it.
 The LV2 plug-in has one parameter, **Filter**
 (`https://github.com/jrp2014/convolver/lv2#filter`, a path). Hosts that show
 LV2 file parameters, such as Ardour and Jalv, give it a file chooser: choose
-the `.cfg` file, list or impulse response you would pass to the
+the IR file, `.cfg` or configuration list you would pass to the
 [command-line tool](command-line.md). The file is read for the plug-in's
 sample rate and channel counts, so a list chooses its entry exactly as the
 command-line tool does, and nothing is resampled.
 
 The file is loaded on the host's worker thread, so audio carries on
-meanwhile: the status port shows Loading, then Running once the new filter
+meanwhile: the status port shows Loading, then Active once the new filter
 plays (fading in, or starting at once if no audio has played yet). If you
 choose several files quickly, only the newest is loaded; one that was still
 being loaded when you chose another is never heard, and if it fails, its

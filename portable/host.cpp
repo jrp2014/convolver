@@ -59,7 +59,7 @@ std::optional<Mismatch> mismatch(const Configuration& c, const HostLayout& host,
     if (c.input_channels > host.inputs || c.output_channels != host.outputs) {
         const auto made = counts(c.input_channels, c.output_channels),
                    given = counts(host.inputs, host.outputs);
-        Advice a{filter + " has " + made + ", and the plug-in has " + given,
+        Advice a{filter + " has " + made + ", and the host gives it " + given,
                  "A filter plays only with the outputs it was made for, and with at least its "
                  "inputs: it reads the first ones and ignores any others.",
                  "Give the plug-in " + made +
@@ -157,7 +157,7 @@ const Advice& failure_message(const HostFailure& f) {
 
 Advice state_read_message(const std::exception& e) {
     auto a = detail::parse_advice(e.what());
-    a.problem = "the saved state could not be read: " + a.problem;
+    a.problem = "the saved project or preset could not be read: " + a.problem;
     if (a.fix.empty()) {
         a.cause = "The project or preset is damaged, or was not saved by Convolver.";
         a.fix = "Load the filter again, then save the project.";
@@ -427,9 +427,9 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     try {
         if (state.failed && next)
             refuse(HostFailureKind::state_unreadable,
-                   {"the saved state is inconsistent: it records a failed load and also holds a "
-                    "filter",
-                    "The state was damaged, or written by another program.",
+                   {"the saved project or preset is inconsistent: it records a failed load and "
+                    "also holds a filter",
+                    "The project or preset is damaged, or was not saved by Convolver.",
                     "Load the filter again, then save the project.",
                     {}},
                    request, carried);
@@ -481,7 +481,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
             f.request = request;
             f.silent = true;
             f.message = {"a filter had failed to load when this project or preset was saved",
-                         "The saved state records the failure, not a filter.",
+                         "It records the failure, not a filter.",
                          "Load a filter made for the host's sample rate and channels, then save "
                          "again.",
                          {}};
@@ -760,7 +760,7 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
     case HostFailureKind::filter_file:
         return "the filter file could not be read.";
     case HostFailureKind::state_unreadable:
-        return "the preset or saved state could not be read.";
+        return "the saved project or preset could not be read.";
     case HostFailureKind::state_newer:
         return "the preset was saved by a newer Convolver.";
     case HostFailureKind::sample_rate:
@@ -776,7 +776,7 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
                (host ? ", the host runs at " + host_rate_text(*host) + "." : ".");
     case HostFailureKind::channels:
         if (f.inputs == 0 && f.outputs == 0) // Not recorded (jrp's GarageBand run).
-            return host ? "the filter does not suit the plug-in's " +
+            return host ? "the filter does not fit the host's " +
                               ports(host->inputs, host->outputs) + "."
                         : "the filter has other channel counts.";
         // PLUG-23: a refused load's counts may suit the host now (it
@@ -787,7 +787,7 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
             return "the filter has " + ports(f.inputs, f.outputs) +
                    "; the channels have changed since.";
         return "the filter has " + ports(f.inputs, f.outputs) +
-               (host ? ", the plug-in " + ports(host->inputs, host->outputs) + "." : ".");
+               (host ? ", the host " + ports(host->inputs, host->outputs) + "." : ".");
     case HostFailureKind::preparation:
         return "the filter could not be prepared.";
     case HostFailureKind::activation:
@@ -884,7 +884,7 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
         const auto ignored = host ? ignored_inputs(*c, *host, "-") : std::string();
         line.text = "Filter loaded: " + std::to_string(c->sample_rate) + " Hz, " +
                     ports(c->input_channels, c->output_channels) +
-                    (!host             ? "; checked when the host starts it."
+                    (!host             ? "; waiting for the host to start audio."
                      : ignored.empty() ? "."
                                        : "; plug-in " + ignored + " ignored.");
         if (host && !filter.notice().empty())

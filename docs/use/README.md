@@ -12,8 +12,10 @@ helps you choose how to run it and points to the page for each step.
   streams, the **plug-ins** filter audio inside a plug-in host such as a
   digital audio workstation (DAW), and an **Equalizer APO export** filters
   everything a Windows computer plays.
-- A filter is an impulse response (IR) sound file, or a `.cfg` configuration
-  file that routes channels through IRs. The same files work in all three.
+- A filter is an IR file (an impulse response in a sound file such as WAV), a
+  `.cfg` configuration that routes channels through IRs, or a configuration
+  list naming several of them. The same files work in all three
+  ([words Convolver uses](concepts.md#words-convolver-uses)).
 - The filter's sample rate and channel counts must match the audio. Convolver
   never resamples.
 

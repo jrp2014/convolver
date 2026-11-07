@@ -26,8 +26,8 @@ constexpr const char* usage =
     "Writes a Convolver filter as an Equalizer APO configuration, so Windows can\n"
     "apply it to everything played through a device (except ASIO and WASAPI\n"
     "exclusive-mode playback, which bypass Equalizer APO).\n"
-    "  INPUT       an impulse response (WAV or another libsndfile format), a .cfg,\n"
-    "              or a configuration list; every entry of a list is exported\n"
+    "  INPUT       an IR file (an impulse response in WAV or another sound file),\n"
+    "              a .cfg or a configuration list; every entry of a list is exported\n"
     "  NEW_FOLDER  a new folder to create, holding convolver.txt and the\n"
     "              impulse responses as WAV files\n"
     "A device that no exported filter fits (another sample rate or too few\n"
@@ -75,8 +75,8 @@ std::vector<eapo::Source> load(const fs::path& input) {
     if (sources.empty())
         throw std::runtime_error(
             advice_text({utf8(input) + " holds no configuration to export",
-                         "The configuration list names no configuration or sound file.",
-                         "Add the filters to the list, or export a .cfg or sound file directly.",
+                         "The configuration list names no configuration or IR file.",
+                         "Add the filters to the list, or export a .cfg or IR file directly.",
                          {}}));
     return sources;
 }
@@ -175,7 +175,7 @@ int export_folder(const fs::path& input, const fs::path& folder) {
                      "to config.txt there, and set the device's sample rate in Windows sound\n"
                      "settings to one listed above. A device that no filter fits is silenced\n"
                      "rather than played unfiltered. Copy the whole folder: Equalizer APO plays\n"
-                     "a path whose impulse response file it cannot read unfiltered.\n";
+                     "a path whose IR file it cannot read unfiltered.\n";
         return 0;
     } catch (const std::exception& e) {
         if (created) {

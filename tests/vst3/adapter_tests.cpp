@@ -1351,8 +1351,8 @@ void status_and_log() {
     damaged.write(const_cast<unsigned char*>(junk.data()), 16, nullptr);
     damaged.seek(0, IBStream::kIBSeekSet, nullptr);
     require(p.setState(&damaged) == kResultFalse &&
-                contains(shown(), "the preset or saved state could not be read") &&
-                contains(log_text(), "the saved state could not be read: "),
+                contains(shown(), "the saved project or preset could not be read") &&
+                contains(log_text(), "the saved project or preset could not be read: "),
             "damaged state not shown or logged");
     // DIAG-1, jrp's reproduction: extreme but finite input and filter values
     // overflow the output. The audio thread writes Fault to the Status

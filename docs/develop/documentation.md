@@ -72,6 +72,14 @@ pages help only if each sentence can be understood on its own.
    filter in your host"), nouns on reference pages ("Output formats"). Keep link
    text meaningful and tables small enough to scan.
 6. Call the project's owner jrp, and give dates as "23 October 2026".
+7. Use the [words Convolver uses](../use/concepts.md#words-convolver-uses) for
+   filters, IR files, configurations, presets and projects, in pages and in
+   every message a user reads (the window, the Status text, the log and the
+   tools' output). Developer pages add two words users never see: the saved
+   **state** is what a plug-in writes into a project or preset (a user
+   message says "the saved project or preset"), and a **CMake preset** or
+   **build configuration** is named in full wherever a plug-in preset or a
+   filter's configuration could be meant.
 
 On pages in `docs/use/`:
 

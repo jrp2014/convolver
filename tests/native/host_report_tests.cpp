@@ -95,7 +95,7 @@ void cases() {
              return r;
          },
          HostStatus::no_filter,
-         {"Fix: Choose a .cfg, configuration list or sound file", "load a Convolver preset"},
+         {"Fix: Choose an IR file, .cfg or configuration list", "load a Convolver preset"},
          {"Silent"}},
         {"empty, Gain -20 dB",
          [&] {
@@ -114,7 +114,7 @@ void cases() {
              return host_report(f, facts(mono));
          },
          HostStatus::load_failed,
-         {"The saved filter has 2 inputs and 2 outputs, and the plug-in has 1 input and 1 "
+         {"The saved filter has 2 inputs and 2 outputs, and the host gives it 1 input and 1 "
           "output. Convolver plays silence.",
           "Fix: Give the plug-in 2 inputs and 2 outputs",
           "load a filter made for 1 input and 1 output",
@@ -229,14 +229,14 @@ void cases() {
          HostStatus::no_filter,
          {"No filter"},
          {"bypass"}},
-        {"not checked yet",
+        {"waiting",
          [] {
              HostFilter f(8);
              f.load(HostState{filter(44100, 2)}, std::nullopt);
              return host_report(f, facts(std::nullopt));
          },
          HostStatus::unchecked,
-         {"is loaded", "checked against the host's sample rate and channels"},
+         {"Waiting for the host to start audio", "fits the host's sample rate and channels"},
          {"has not started"}},
         {"fault",
          [&] {
@@ -422,7 +422,7 @@ void cases() {
             !contains(report_text(unstarted), "Filter values:"),
         "facts before start");
     require(unstarted.filter_name == "None" && unstarted.problem.empty() &&
-                unstarted.plays == "No filter is loaded. The host has not started the plug-in yet.",
+                unstarted.plays == "No filter is loaded. The host has not started audio yet.",
             "empty filter row");
 
     // A refused file while the previous filter plays: the problem shows in
@@ -617,7 +617,7 @@ void actions() {
     const auto bare = host_report(unfiltered, choosing);
     require(bare.status.status == HostStatus::fault && bare.action == "choose filter" &&
                 !contains(bare.explanation, "filter keeps playing") &&
-                contains(bare.plays, "No filter") && contains(bare.note, "Choose a .cfg"),
+                contains(bare.plays, "No filter") && contains(bare.note, "Choose an IR file"),
             "fault with no filter: " + bare.explanation);
     // A refused file's message names its full path, for the log; the window's
     // problem names only the file.

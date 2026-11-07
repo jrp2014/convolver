@@ -1755,7 +1755,8 @@ void status_lines() {
     // window): what was loaded, not yet checked.
     f.load(HostState{other_rate}, std::nullopt);
     check(host_status(f, std::nullopt), Status::unchecked,
-          "Filter loaded: 44100 Hz, 2 in, 2 out; checked when the host starts it.", "unchecked");
+          "Filter loaded: 44100 Hz, 2 in, 2 out; waiting for the host to start audio.",
+          "unchecked");
     // Checked at activation: silence, and why.
     static_cast<void>(f.activate(stereo));
     check(host_status(f, stereo), Status::load_failed, "Silent: the filter is for 44100 Hz",
@@ -1785,7 +1786,7 @@ void status_lines() {
     // A refused replacement: the previous filter plays, and the line says so.
     refused([&] { f.load(HostState{crossover}, stereo); });
     check(host_status(f, stereo), Status::load_failed,
-          "Load failed, previous filter kept: the filter has 2 in, 6 out, the plug-in 2 in, 2 out.",
+          "Load failed, previous filter kept: the filter has 2 in, 6 out, the host 2 in, 2 out.",
           "refused replacement");
     // The host then gives buses the refused filter would suit (PLUG-23: six
     // inputs and six outputs): the line names only what was refused, not
@@ -1812,7 +1813,7 @@ void status_lines() {
                     !kept.rejection(),
                 "a restored filter that does not suit yet was not kept silent");
         check(host_status(kept, stereo), Status::load_failed,
-              "Silent: the filter has 2 in, 6 out, the plug-in 2 in, 2 out.", "kept, unsuited");
+              "Silent: the filter has 2 in, 6 out, the host 2 in, 2 out.", "kept, unsuited");
         static_cast<void>(kept.activate(six));
         require(!kept.failure(), "the kept filter does not play on buses that suit it");
         check(host_status(kept, six), Status::active, "Filter loaded: 48000 Hz, 2 in, 6 out",
@@ -1827,7 +1828,7 @@ void status_lines() {
     const std::array<std::pair<HostFailureKind, const char*>, 7> kinds{{
         {HostFailureKind::filter_file, "filter file could not be read"},
         {HostFailureKind::too_large, "too large to save with the project"},
-        {HostFailureKind::state_unreadable, "preset or saved state could not be read"},
+        {HostFailureKind::state_unreadable, "saved project or preset could not be read"},
         {HostFailureKind::state_newer, "saved by a newer Convolver"},
         {HostFailureKind::preparation, "could not be prepared"},
         // Rejected with no filter carried: no "0 Hz" or "0 in, 0 out" (jrp's
@@ -1861,15 +1862,16 @@ void status_lines() {
 
     // The log lines adapters write.
     HostFilter g(8);
-    require(loaded_line(g, true) == "Request 0: Loaded state with no filter." &&
+    require(loaded_line(g, true) == "Request 0: Loaded a saved project or preset with no filter." &&
                 contains(started_line(g, stereo, 512),
                          "Started at 48000 Hz, 2 in, 2 out, blocks of up to 512 frames. No "
                          "filter, so audio passes unchanged.") &&
                 contains(started_line(g, crossover_bus, 512), "plays silence"),
             "empty instance log lines");
     g.load(HostState{other_rate}, std::nullopt);
-    require(loaded_line(g, false) == "Request 1: Loaded a filter for 44100 Hz, 2 in, 2 out; it is "
-                                     "checked when the host starts the plug-in.",
+    require(loaded_line(g, false) ==
+                "Request 1: Loaded a filter for 44100 Hz, 2 in, 2 out; waiting "
+                "for the host to start audio.",
             "unchecked load line");
     require(rejected_line(g, true).empty(), "rejected line without a rejection");
     try {
@@ -1878,7 +1880,7 @@ void status_lines() {
     }
     require(rejected_line(g, true).rfind("Request 2: Not loaded; the previous filter keeps "
                                          "playing: the filter has 2 inputs and 6 outputs, and "
-                                         "the plug-in has 2 inputs and 2 outputs. Cause: ",
+                                         "the host gives it 2 inputs and 2 outputs. Cause: ",
                                          0) == 0 &&
                 rejected_line(g, true).find('\n') == std::string::npos,
             "rejected line");

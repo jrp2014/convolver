@@ -37,10 +37,12 @@
 
 namespace {
 constexpr auto help = R"(Convolver portable CLI
-Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
+Usage: convolver --filter FILTER --input FILE --output FILE [options]
        convolver --tune-fft NEW_WISDOM_FILE --block-size N [--fft-plan MODE]
-       convolver --inspect CONFIG | --validate CONFIG [options]  (see --inspect --help)
+       convolver --inspect FILTER | --validate FILTER [options]  (see --inspect --help)
        convolver --compare OUTPUT EXPECTED  (see --compare --help)
+FILTER is an IR file (an impulse response in WAV or another sound file), a .cfg
+or a configuration list.
   --block-size N       Partition payload in frames (default 256)
   --fft-plan MODE      estimate (render default), measure, patient (tune default)
                       or exhaustive

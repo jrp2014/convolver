@@ -3,17 +3,17 @@
 
 [Using Convolver](README.md) · [Command-line reference](command-line.md)
 
-For anyone writing or editing a filter configuration: the `.cfg` and list
+For anyone writing or editing a configuration: the `.cfg` and configuration list
 formats, line by line.
 
 A configuration describes how to route and filter audio. It does not contain
-the IR samples themselves: it names sound files holding them. Keep the
+the IR samples themselves: it names the IR files holding them. Keep the
 configuration and those files together when moving a setup to another computer.
 This page describes the current portable parser, not the old Windows installer.
 
 **In short:**
 
-- For a simple per-channel filter, pass a multichannel IR sound file directly;
+- For a simple per-channel filter, pass a multichannel IR file directly;
   use a `.cfg` file for routing, mixing, delays or sharing one mono IR.
 - A `.cfg` file is a header line, a line of input delays, a line of output
   delays, then four lines per path: IR file, IR channel, input routes, output
@@ -22,13 +22,13 @@ This page describes the current portable parser, not the old Windows installer.
   gain, so `1.25` is channel 1 at gain 0.25, and `-0` is channel 0 inverted.
 - Paths are relative to the file that names them. Use relative paths so a setup
   can be copied to another computer; Windows drive paths fail on macOS/Linux.
-- A list file names several configurations; the first that matches the input's
+- A configuration list names several configurations; the first that matches the input's
   sample rate and channel count is used. Check any file with `--validate` or
   `--inspect`.
 
-## The simplest filter: a sound file
+## The simplest filter: an IR file
 
-Pass an IR sound file directly to `--filter` to filter each input channel with
+Pass an IR file directly to `--filter` to filter each input channel with
 the matching IR channel. Input and IR must have the same sample rate and channel
 count. Use a `.cfg` file for cross-channel routing, delays, or applying one mono
 IR to multiple channels.
@@ -68,8 +68,8 @@ convolver --inspect room.cfg
 convolver --filter room.cfg --input music.wav --output corrected.wav
 ```
 
-These examples assume `convolver` is on PATH. From a local single-configuration
-build, use `./build/convolver` instead.
+These examples assume `convolver` is on PATH. From your own build, use its
+path instead, such as `./build/convolver`.
 
 ## File layout
 
@@ -165,8 +165,8 @@ and mixed separators work in relative references. Native absolute paths work
 on their own platform; Windows drive/UNC paths are not mapped onto macOS/Linux.
 Prefer relative paths and match the stored spelling and letter case exactly.
 
-A list is a text file containing one configuration, sound-file or nested-list
-filename per nonblank line:
+A configuration list is a text file containing one configuration, IR file or
+nested list filename per nonblank line:
 
 ```text
 filters/room-44100.cfg

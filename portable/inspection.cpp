@@ -358,12 +358,12 @@ class Inspector {
                  DiagnosticSeverity::error,
                  std::string(what) +
                      "; --syntax-only checks one configuration text file. Inspect without "
-                     "--syntax-only to verify sound files and lists",
+                     "--syntax-only to verify IR files and lists",
                  {path, 0, 0},
                  {}});
         };
         if (audio) {
-            scope("this is a sound file");
+            scope("this is an IR file");
             return;
         }
         ParsedDocument doc;
