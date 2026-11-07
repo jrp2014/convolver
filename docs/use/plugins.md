@@ -202,7 +202,7 @@ example (some hosts show only the status name in the first column):
 | Load failed (previous filter kept) | `Load failed, previous filter kept: the filter has 2 in, 6 out, the plug-in 2 in, 2 out. Details in the Convolver log.` |
 | Not checked yet | `Filter loaded: 44100 Hz, 2 in, 2 out; checked when the host starts it.` |
 | Fault | `Fault: output too large, silenced and the filter restarted. Details in the Convolver log.` |
-| Bypassed | `Bypassed: the input plays unfiltered.` (`Bypassed: silent, as inputs and outputs differ.` when the counts differ) |
+| Bypassed | `Bypassed: the input plays unfiltered.` (`Bypassed: silent, as the filter's inputs and outputs differ.` for a filter with different input and output counts, such as a crossover) |
 
 **Active** means a filter is loaded and the host has started the plug-in at
 a rate and channel layout the filter suits. It does not follow the host's

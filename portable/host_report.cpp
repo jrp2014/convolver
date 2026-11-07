@@ -339,7 +339,7 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
 
 // PLUG-22: FNV-1a over what tells filters apart cheaply, read on every
 // report (twice a second while a window is open), so not every sample.
-std::string identity(const Configuration& c, double peak) {
+std::string identity(const Configuration& c) {
     std::uint64_t hash = 14695981039346656037ULL;
     const auto add = [&](const void* data, std::size_t size) {
         const auto* bytes = static_cast<const unsigned char*>(data);
@@ -361,7 +361,11 @@ std::string identity(const Configuration& c, double peak) {
     add_value(static_cast<std::uint64_t>(c.paths.size()));
     for (const auto& path : c.paths) {
         add_value(static_cast<std::uint64_t>(path.impulse.size()));
-        add(path.impulse.data(), std::min<std::size_t>(path.impulse.size(), 256) * sizeof(float));
+        // The first and last samples as stored: exact on every machine,
+        // unlike a computed value such as the peak.
+        const auto ends = std::min<std::size_t>(path.impulse.size(), 256);
+        add(path.impulse.data(), ends * sizeof(float));
+        add(path.impulse.data() + (path.impulse.size() - ends), ends * sizeof(float));
         for (const auto* routes : {&path.inputs, &path.outputs}) {
             add_value(static_cast<std::uint64_t>(routes->size()));
             for (const auto& route : *routes) {
@@ -370,7 +374,6 @@ std::string identity(const Configuration& c, double peak) {
             }
         }
     }
-    add_value(peak);
     char text[17] = {};
     std::snprintf(text, sizeof text, "%016llx", static_cast<unsigned long long>(hash));
     return text;
@@ -423,8 +426,8 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
         const auto length = duration(taps, c->sample_rate);
         r.filter_taps = std::to_string(taps) + " taps";
         r.filter_length = length.empty() ? r.filter_taps : length;
+        r.filter_identity = identity(*c);
         // A list on its own, so it starts with a capital: "Front left, front right".
-        r.filter_identity = identity(*c, filter.filter_peak());
         r.filter_speakers = speaker_names(c->channel_mask, c->output_channels);
         if (!r.filter_speakers.empty())
             r.filter_speakers[0] =

@@ -1861,9 +1861,10 @@ void saved_filter_name() {
     const auto back = decode_controller_state(encoded);
     require(back.name == kept.name && back.identity == kept.identity,
             "controller state round trip");
-    for (const auto& bad : {std::string(), encoded.substr(0, encoded.size() - 1),
-                            std::string("CVCS"), std::string("CVCX") + encoded.substr(4),
-                            encode_controller_state({"", ""}).substr(0, 9)}) {
+    for (const auto& bad :
+         {std::string(), encoded.substr(0, encoded.size() - 1), std::string("CVCS"),
+          std::string("CVCX") + encoded.substr(4), encode_controller_state({"", ""}).substr(0, 9),
+          encode_controller_state({"room.wav", ""}), encode_controller_state({"", "1"})}) {
         const auto none = decode_controller_state(bad);
         require(none.name.empty() && none.identity.empty(), "damaged controller state read");
     }

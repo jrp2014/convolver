@@ -79,7 +79,7 @@ std::string encode_report(const std::vector<std::pair<std::string, std::string>>
 // PLUG-22: the controller state (Controller::setState): the filter file's
 // name and its filter's identity, and back. Decoding anything else (empty,
 // short, another version, a name longer than max_filter_name_bytes) gives
-// two empty strings.
+// two empty strings, as does an empty name or identity.
 struct ControllerState {
     std::string name, identity;
 };

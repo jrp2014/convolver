@@ -777,7 +777,9 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     // Choose Filter… only where the window can choose a file.
     if ([action isEqualToString:@"choose filter"] && !loader_)
         action = @"";
+    // Every refresh: reading the settings enables every control again.
     NSString* mixNote = field(report, @"mix note");
+    [self showMixNote:mixNote];
     NSString* text = [@[
         @(status).stringValue, problem, plays, cause, fix, advice, action, name, note, audio,
         reference, field(report, @"filter rate"), field(report, @"filter channels"),
@@ -796,7 +798,6 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _filterNoteField.stringValue = note;
     [self showAudio:audio];
     [self showGlance:report];
-    [self showMixNote:mixNote];
     _referenceField.attributedStringValue = reference_text(reference);
     [self fit];
 }

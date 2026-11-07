@@ -273,7 +273,11 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   files the window reloads and watches (an accepted file's, never a refused
   one's or saved state's), and the Latency that waits; and the Copy
   diagnostics text, which keeps only this process's lines for the instance
-  from a log written by several.
+  from a log written by several. PLUG-22: the filter's own facts under its
+  name (also before the host starts, and the speakers it names), the
+  Bypassed message for each dry-signal case, and the filter identity (16
+  hex digits, the same for the same filter, different for another or for
+  one changed sample).
 - `native.recent_files`: the windows' recent filter files (VST3-11) beside
   the log: newest first, no repeats, ten kept, paths with spaces and
   accents, no path with a line break, nothing left beside the list after
@@ -609,7 +613,15 @@ proxy and a deferring one, as a host may connect the components (VST3-15):
 the report, a new Latency (the host asked to restart only once the processor
 has it, and after three quick changes only for the last) and a chosen file accepted and refused (the project marked changed
 only for the accepted one). Where the build has no reader of its own
-(Linux and Windows), the test lends the processor libsndfile.
+(Linux and Windows), the test lends the processor libsndfile. PLUG-22's
+`saved_filter_name()` checks the controller state: its format read back,
+and damaged, newer, over-long or empty-field states read as no name; an
+instance with no file saving an empty state; a file's name saved,
+restored in a second instance in host order (component state, then the
+controller's) and shown with no file path, in the Copy Diagnostics text
+too, kept when saved again, and dropped for a preset of another filter;
+and Bypass set through the controller reading Bypassed, then Active, at
+once.
 
 On macOS `vst3.editor` opens the window (VST3-11) as a host does:
 `createView("editor")` (and nothing for another name), NSView only, not
@@ -623,7 +635,10 @@ edit per click, and following the host), a chosen WAV loaded and the
 project marked changed, the file in the Recent menu, Reload, a change to
 the file reloaded on the second check (not with the box unticked, and not
 when the file is gone), Copy Diagnostics, a resize request when the folded
-lines open, and `removed()`.
+lines open, and `removed()`. With a 2→6 crossover on a six-channel bus
+(PLUG-22 and PLUG-23) it checks that Mix is dimmed with the mix note under
+it over three refreshes, while Gain stays enabled, and that Host channels
+names the ignored inputs.
 
 The SDK validator runs in default and extensive (`-e`) modes. Extensive mode
 pairs 15 speaker arrangements (the adapter must accept or refuse each cleanly)

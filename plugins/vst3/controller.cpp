@@ -78,7 +78,7 @@ ControllerState decode_controller_state(std::string_view in) {
         return {};
     auto name = take_text(in, max_filter_name_bytes);
     auto identity = take_text(in, 64);
-    if (!name || !identity)
+    if (!name || !identity || name->empty() || identity->empty())
         return {};
     return {std::move(*name), std::move(*identity)};
 }
@@ -385,7 +385,7 @@ std::vector<std::pair<std::string, std::string>> Controller::report() {
 std::vector<std::pair<std::string, std::string>> Controller::named_report() const {
     auto report = report_;
     // From saved state (no file path), and the filter the name belongs to.
-    if (name_.empty() || !field(report, "filter path").empty() ||
+    if (name_.empty() || identity_.empty() || !field(report, "filter path").empty() ||
         field(report, "filter identity") != identity_)
         return report;
     for (auto& [key, value] : report)
