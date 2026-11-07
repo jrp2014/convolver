@@ -248,7 +248,7 @@ void properties(const au_test::LogSince& log) {
                                                        std::string(part) +
                                                        "\": " + text(r[@"explanation"]));
     require(contains(r[@"audio"], "Channels\t1 in, 1 out\tthe filter has 2 in, 2 out\tproblem\t") &&
-                contains(r[@"audio"], "Host blocks\tup to 512 frames\t"),
+                contains(r[@"audio"], "Host block size\tup to 512 frames\t"),
             "mono track Audio facts: " + text(r[@"audio"]));
     require(contains(r[@"reference"], "Software: Convolver "),
             "mono track reference: " + text(r[@"reference"]));
@@ -359,13 +359,13 @@ void window() {
         return nil;
     };
     require(
-        view.audioLabels.count >= 6 &&
-            [view.audioLabels[0].stringValue isEqualToString:@"Sample rate"] &&
-            [fact("Sample rate").stringValue hasPrefix:@"44100 Hz"] &&
-            contains(fact("Channels").stringValue, "1 in, 1 out") &&
-            contains(fact("Channels").stringValue, "\u26A0\uFE0E") &&
-            contains(fact("Channels").stringValue, "the filter has 2 in, 2 out") &&
-            fact("Channels").toolTip.length > 0 && fact("Routing") != nil &&
+        view.audioLabels.count >= 4 &&
+            [view.audioLabels[0].stringValue isEqualToString:@"Host sample rate"] &&
+            [fact("Host sample rate").stringValue hasPrefix:@"44100 Hz"] &&
+            contains(fact("Host channels").stringValue, "1 in, 1 out") &&
+            contains(fact("Host channels").stringValue, "\u26A0\uFE0E") &&
+            contains(fact("Host channels").stringValue, "the filter has 2 in, 2 out") &&
+            fact("Host channels").toolTip.length > 0 && fact("Routing") != nil &&
             fact("Added delay") == nil,
         "Audio facts: " +
             text([[view.audioLabels valueForKey:@"stringValue"] componentsJoinedByString:@", "]) +

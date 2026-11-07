@@ -17,7 +17,7 @@ constexpr CGFloat width = 560;
 constexpr CGFloat margin = 20;
 constexpr CGFloat inner = width - 2 * margin;
 constexpr CGFloat form_label = 64;  // "Latency:" and the other form labels.
-constexpr CGFloat fact_label = 104; // "Filter length" and the other Audio labels.
+constexpr CGFloat fact_label = 120; // "Host sample rate" and the other Audio labels.
 constexpr CGFloat icon = 18;        // The document symbol before the filter's name.
 constexpr CGFloat padding = 10;     // Inside the box round a problem.
 constexpr CGFloat text_width = inner - 2 * padding;
@@ -792,6 +792,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _glanceValues[0].stringValue = field(report, @"filter rate");
     _glanceValues[1].stringValue = field(report, @"filter channels");
     _glanceValues[2].stringValue = field(report, @"filter length");
+    _glanceValues[2].toolTip =
+        field(report, @"filter taps").length ? field(report, @"filter taps") : nil;
     _glanceValues[3].stringValue = speakers;
     _glanceValues[3].toolTip = speakers.length ? speakers : nil;
     _glanceValues[3].superview.hidden = speakers.length == 0;

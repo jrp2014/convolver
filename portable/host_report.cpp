@@ -231,7 +231,10 @@ std::string file_name(const std::string& path) {
     return slash == std::string::npos ? path : path.substr(slash + 1);
 }
 
-// The Audio section: what plays, in plain words
+// The Audio section: the host's values and what plays, each a short value
+// with a short note; a mismatch is a problem note naming the filter's
+// value (jrp, 7 November 2026: "Host sample rate" and the like rather than
+// prose). The filter's own values are the facts under its name.
 // (docs/use/plugins.md#convolvers-window).
 std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFacts& facts) {
     std::vector<HostFact> audio;
@@ -241,7 +244,7 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
     const int rate = host ? host->sample_rate : 0;
     constexpr const char* not_started = "not known until the host starts the plug-in";
 
-    HostFact sample_rate{"Sample rate",
+    HostFact sample_rate{"Host sample rate",
                          host ? host_rate_text(*host) : std::string(not_started),
                          {},
                          false,
@@ -250,31 +253,20 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
     if (failure && failure->kind == HostFailureKind::sample_rate && failure->sample_rate > 0) {
         sample_rate.note = refused_words(*failure) + std::to_string(failure->sample_rate) + " Hz";
         sample_rate.problem = true;
-    } else if (c) {
-        sample_rate.note = host ? "(the filter's rate too)"
-                                : "(the filter is for " + std::to_string(c->sample_rate) + " Hz)";
     }
     audio.push_back(std::move(sample_rate));
 
-    HostFact channels{"Channels",
+    HostFact channels{"Host channels",
                       host ? ports(host->inputs, host->outputs) : not_started,
                       {},
                       false,
-                      "The inputs and outputs the host gives the plug-in, and the speakers the "
-                      "filter's outputs are labelled for."};
+                      "The inputs and outputs the host gives the plug-in."};
     if (failure && failure->kind == HostFailureKind::channels &&
         (failure->inputs || failure->outputs)) {
         channels.note = (failure->silent ? std::string("the filter has ")
                                          : std::string("the refused file has ")) +
                         ports(failure->inputs, failure->outputs);
         channels.problem = true;
-    } else if (c) {
-        const auto speakers = speaker_names(c->channel_mask, c->output_channels);
-        if (!host)
-            channels.note = "(the filter has " + ports(c->input_channels, c->output_channels) +
-                            (speakers.empty() ? "" : ": " + speakers) + ")";
-        else if (!speakers.empty())
-            channels.note = "(" + speakers + ")";
     }
     audio.push_back(std::move(channels));
 
@@ -283,33 +275,27 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
         // but it does not play.
         const bool idle = failure && failure->silent;
         audio.push_back({"Routing", routing_words(*c),
-                         idle          ? "(this filter is not playing)"
+                         idle          ? "(not playing)"
                          : delayed(*c) ? "(with input or output delays)"
                                        : "",
                          false,
                          "Which input feeds which output through the filter; ×0.5 is a gain "
                          "on that route."});
-        const auto taps = longest_taps(*c);
-        const auto length = duration(taps, c->sample_rate);
-        audio.push_back({"Filter length", length.empty() ? std::to_string(taps) + " taps" : length,
-                         length.empty() ? "" : "(" + std::to_string(taps) + " taps)", false,
-                         "The longest filter, in time and in taps (samples)."});
     } else {
-        audio.push_back({"Routing", "none", "(no filter is loaded)", false,
+        audio.push_back({"Routing", "none", "(no filter)", false,
                          "Which input feeds which output through the filter."});
     }
 
     // PLUG-22: the latency is not a fact here; the Latency setting shows the
     // time it adds, and the note says when a choice is not in use yet.
     const auto frames = [](std::size_t n) { return std::to_string(n) + " frames"; };
-    audio.push_back({"Ring-out",
-                     facts.tail_frames == 0 ? std::string("none")
-                     // Under 0.05 ms reads as frames, not "0.0 ms".
-                     : rate && facts.tail_frames * 20000.0 >= rate
-                         ? duration(facts.tail_frames, rate)
-                         : frames(facts.tail_frames),
-                     facts.tail_frames ? "after the input stops" : "", false,
-                     "How long the output goes on after the input stops (the filter's tail)."});
+    audio.push_back(
+        {"Ring-out",
+         facts.tail_frames == 0 ? std::string("none")
+         // Under 0.05 ms reads as frames, not "0.0 ms".
+         : rate && facts.tail_frames * 20000.0 >= rate ? duration(facts.tail_frames, rate)
+                                                       : frames(facts.tail_frames),
+         "", false, "How long the output goes on after the input stops (the filter's tail)."});
 
     if (c && filter.filter_peak() > 0) {
         // As HostProcessor::process() applies them: Gain on the filtered
@@ -329,18 +315,17 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
         audio.push_back(
             {"Loudest peak", decibels(20 * std::log10(peak)),
              mix == 0 || bound <= 1 + 1e-9
-                 ? "at most, for full-scale input; it cannot clip at this Gain and Mix"
-                 : "at most, for full-scale input; Gain " + decibels(-20 * std::log10(peak)) +
-                       " or lower rules out clipping",
+                 ? "(cannot clip at this Gain and Mix)"
+                 : "(Gain " + decibels(-20 * std::log10(peak)) + " or lower rules out clipping)",
              false,
-             "The loudest output any full-scale input could make through the filter. Music is "
-             "usually quieter: this is a guarantee, not an estimate."});
+             "The loudest output any full-scale input could make through the filter, at most. "
+             "Music is usually quieter: this is a guarantee, not an estimate."});
     }
 
     if (facts.max_frames)
-        audio.push_back({"Host blocks", "up to " + frames(facts.max_frames),
-                         rate ? "(" + duration(facts.max_frames, rate) + ") per call" : "per call",
-                         false, "The largest block of audio the host sends at a time."});
+        audio.push_back({"Host block size", "up to " + frames(facts.max_frames),
+                         rate ? "(" + duration(facts.max_frames, rate) + ")" : "", false,
+                         "The largest block of audio the host sends at a time."});
     return audio;
 }
 
@@ -389,7 +374,8 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
                             std::to_string(c->output_channels) + " out";
         const auto taps = longest_taps(*c);
         const auto length = duration(taps, c->sample_rate);
-        r.filter_length = length.empty() ? std::to_string(taps) + " taps" : length;
+        r.filter_taps = std::to_string(taps) + " taps";
+        r.filter_length = length.empty() ? r.filter_taps : length;
         // A list on its own, so it starts with a capital: "Front left, front right".
         r.filter_speakers = speaker_names(c->channel_mask, c->output_channels);
         if (!r.filter_speakers.empty())
@@ -480,6 +466,7 @@ std::vector<std::pair<std::string, std::string>> report_fields(const HostReport&
             {"filter rate", r.filter_rate},
             {"filter channels", r.filter_channels},
             {"filter length", r.filter_length},
+            {"filter taps", r.filter_taps},
             {"filter speakers", r.filter_speakers},
             {"filter note", r.filter_note},
             {"filter path", r.filter_path},
@@ -496,6 +483,11 @@ std::string report_text(const HostReport& r) {
     auto text = "Convolver diagnostics\n" + r.title + "\nStatus: " + r.status_name + ". " +
                 r.status.text + "\n\n" + r.explanation + "\n\nFilter: " + r.filter_name +
                 (r.filter_note.empty() ? "" : " " + r.filter_note) + "\n";
+    // The filter's own values, as the window shows them under its name.
+    if (!r.filter_rate.empty())
+        text += "Filter values: " + r.filter_rate + ", " + r.filter_channels + ", " +
+                r.filter_length + " (" + r.filter_taps + ")" +
+                (r.filter_speakers.empty() ? "" : ", " + r.filter_speakers) + "\n";
     for (const auto& f : r.audio)
         text += f.label + ": " + fact_text(f) + "\n";
     text += "Settings: " + r.settings + "\n";

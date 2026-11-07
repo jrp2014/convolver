@@ -426,21 +426,23 @@ From the top, the window has:
   rate beside it ("adds 21.3 ms"); a new choice plays at once, and "not in
   use yet" shows only until it does ([settings](#settings)). The host is
   told the delay, so it can delay other tracks to keep them in time.
-- **Audio**: what plays, in plain words, with the technical term in
-  brackets. Hold the pointer over a line for what it means.
+- **Audio**: the host's values and what plays, each a short value. The
+  filter's own rate, channels, length and speakers are under its name, so
+  these lines say what the host gives, which need not be the same. Hold the
+  pointer over a line for what it means.
 
   | Line | What it says |
   | --- | --- |
-  | Sample rate | The host's rate, and whether the filter's matches (the filter's own rate when it does not) |
-  | Channels | The host's inputs and outputs, the speakers the filter's outputs are labelled for, and the filter's counts when they do not suit |
+  | Host sample rate | The rate the host runs the plug-in at |
+  | Host channels | The inputs and outputs the host gives the plug-in |
   | Routing | Which input feeds which output (`In 1 → Out 1`), with route gains such as `×0.5`; the first four paths, then how many more |
-  | Filter length | The longest filter, in time and in taps |
   | Ring-out | How long the output goes on after the input stops (the tail) |
   | Loudest peak | The loudest output any full-scale input could make through the filter, and the Gain that rules out clipping (or that it cannot clip at the current Gain and Mix) |
-  | Host blocks | The largest block the host sends at a time |
+  | Host block size | The largest block the host sends at a time |
 
   A line that does not match (a filter for another rate, say) is marked with
-  a warning sign and says what differs, in red.
+  a warning sign and says what differs, in red: `44100 Hz ⚠ the filter is
+  for 48000 Hz`.
 - **File, software and log**, folded away under a disclosure triangle: the
   filter file's path and request number (and a refused file's), the software
   (version, FFT library, CPU kernels, the plug-in SDK, and what reads the

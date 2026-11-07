@@ -283,20 +283,22 @@ void cases() {
         require(got.value == value && got.note == note && !got.problem && !got.help.empty(),
                 got.label + ": \"" + got.value + "\" \"" + got.note + "\"");
     };
-    check(fact(r, "Sample rate"), "44100 Hz", "(the filter's rate too)");
-    check(fact(r, "Channels"), "2 in, 2 out", "");
+    // jrp, 7 November 2026: short labelled values ("Host sample rate"), not
+    // prose; the filter's own values are under its name, so the Audio
+    // section neither repeats its rate and speakers nor lists its length.
+    check(fact(r, "Host sample rate"), "44100 Hz", "");
+    check(fact(r, "Host channels"), "2 in, 2 out", "");
     check(fact(r, "Routing"), "In 1 → Out 1, In 2 → Out 2", "");
-    check(fact(r, "Filter length"), "0.1 ms", "(3 taps)");
+    require(!has_fact(r, "Filter length"), "the filter's length repeated as a fact");
     // PLUG-22: the Latency setting shows the time it adds, so the Audio
     // section does not repeat it.
     require(!has_fact(r, "Added delay"), "the latency repeated as a fact");
-    check(fact(r, "Ring-out"), "2 frames", "after the input stops");
+    check(fact(r, "Ring-out"), "2 frames", "");
     // The identity paths have peak 1.75 (1 + .5 + .25): +4.9 dB. Gain
     // scales only the filtered path, which Mix then adds to the dry input:
     // at Gain -6 dB and Mix 25%, .25 * .501 * 1.75 + .75 = .97.
-    check(fact(r, "Loudest peak"), "+4.9 dB",
-          "at most, for full-scale input; it cannot clip at this Gain and Mix");
-    check(fact(r, "Host blocks"), "up to 512 frames", "(11.6 ms) per call");
+    check(fact(r, "Loudest peak"), "+4.9 dB", "(cannot clip at this Gain and Mix)");
+    check(fact(r, "Host block size"), "up to 512 frames", "(11.6 ms)");
     // jrp, 7 November 2026: the filter's own facts, under its name in the
     // window; the Audio section gives the host's.
     const auto fields = report_fields(r);
@@ -307,7 +309,8 @@ void cases() {
         throw std::runtime_error("no report field " + name);
     };
     require(r.filter_rate == "44100 Hz" && r.filter_channels == "2 in → 2 out" &&
-                r.filter_length == "0.1 ms" && r.filter_speakers.empty() &&
+                r.filter_length == "0.1 ms" && r.filter_taps == "3 taps" &&
+                r.filter_speakers.empty() && field("filter taps") == "3 taps" &&
                 field("filter rate") == "44100 Hz" && field("filter channels") == "2 in → 2 out" &&
                 field("filter length") == "0.1 ms" && field("filter speakers").empty(),
             "filter facts: " + r.filter_rate + " | " + r.filter_channels + " | " + r.filter_length +
@@ -319,32 +322,33 @@ void cases() {
         HostFilter waiting(8);
         waiting.load(HostState{labelled}, std::nullopt);
         const auto w = host_report(waiting, facts(std::nullopt));
-        require(w.filter_rate == "48000 Hz" && w.filter_channels == "2 in → 2 out" &&
-                    w.filter_speakers == "Front left, front right" &&
-                    contains(fact(w, "Sample rate").value, "not known until the host starts"),
-                "filter facts before the host starts: " + w.filter_rate + " | " +
-                    w.filter_speakers);
+        require(
+            w.filter_rate == "48000 Hz" && w.filter_channels == "2 in → 2 out" &&
+                w.filter_speakers == "Front left, front right" &&
+                contains(fact(w, "Host sample rate").value, "not known until the host starts") &&
+                fact(w, "Host sample rate").note.empty() && fact(w, "Host channels").note.empty(),
+            "filter facts before the host starts: " + w.filter_rate + " | " + w.filter_speakers);
         const auto none = host_report(HostFilter(8), facts(std::nullopt));
         require(none.filter_rate.empty() && none.filter_channels.empty() &&
                     none.filter_length.empty() && none.filter_speakers.empty(),
                 "filter facts without a filter");
     }
-    require(r.audio.front().label == "Sample rate" && r.audio.back().label == "Host blocks",
+    require(r.audio.front().label == "Host sample rate" &&
+                r.audio.back().label == "Host block size",
             "Audio order");
     const auto loud = host_report(f, facts(stereo));
-    require(fact(loud, "Loudest peak").note ==
-                "at most, for full-scale input; Gain −4.9 dB or lower rules out clipping",
+    require(fact(loud, "Loudest peak").note == "(Gain −4.9 dB or lower rules out clipping)",
             "loudest peak at 0 dB: " + fact(loud, "Loudest peak").note);
     // The Gain that rules out clipping does not depend on Mix (above 0):
     // at Mix 50% and Gain -3 dB, .5 * .708 * 1.75 + .5 = 1.12 can clip, and
     // at Mix 25% it still takes -4.9 dB. At Mix 0 nothing can clip.
     for (const HostSettings s : {HostSettings{-3, .5}, HostSettings{0, .25}})
         require(fact(host_report(f, facts(stereo, s)), "Loudest peak").note ==
-                    "at most, for full-scale input; Gain −4.9 dB or lower rules out clipping",
+                    "(Gain −4.9 dB or lower rules out clipping)",
                 "loudest peak at gain " + std::to_string(s.gain_db) + ", mix " +
                     std::to_string(s.mix));
     require(fact(host_report(f, facts(stereo, {24, 0})), "Loudest peak").note ==
-                "at most, for full-scale input; it cannot clip at this Gain and Mix",
+                "(cannot clip at this Gain and Mix)",
             "loudest peak at mix 0");
     require(r.filter_name == "From the saved project or preset" && r.filter_note.empty(),
             "filter row: " + r.filter_name + " / " + r.filter_note);
@@ -352,10 +356,12 @@ void cases() {
             "filter file: " + reference(r, "Filter file"));
     require(r.settings == settings_words({-6, .25}, true), "settings words");
     require(!contains(reference(r, "Software"), "Session:"), "software line");
-    require(contains(report_text(r), "Settings: " + r.settings + "\n") &&
-                contains(report_text(r), "Sample rate: 44100 Hz (the filter's rate too)\n") &&
-                contains(report_text(r), "Filter file: a saved project or preset, request 1\n"),
-            "report text:\n" + report_text(r));
+    require(
+        contains(report_text(r), "Settings: " + r.settings + "\n") &&
+            contains(report_text(r), "Host sample rate: 44100 Hz\n") &&
+            contains(report_text(r), "Filter values: 44100 Hz, 2 in → 2 out, 0.1 ms (3 taps)\n") &&
+            contains(report_text(r), "Filter file: a saved project or preset, request 1\n"),
+        "report text:\n" + report_text(r));
     // Active: the status word says it; nothing is wrong, so there is no
     // problem, fix or action, and the heading and Audio section say what
     // plays (PLUG-22).
@@ -365,10 +371,12 @@ void cases() {
 
     // Before the host starts: what is known.
     const auto unstarted = host_report(HostFilter(8), facts(std::nullopt));
-    require(contains(fact(unstarted, "Sample rate").value, "not known until the host starts") &&
-                fact(unstarted, "Routing").value == "none" &&
-                !has_fact(unstarted, "Loudest peak") && !has_fact(unstarted, "Host blocks"),
-            "facts before start");
+    require(
+        contains(fact(unstarted, "Host sample rate").value, "not known until the host starts") &&
+            fact(unstarted, "Routing").value == "none" && !has_fact(unstarted, "Loudest peak") &&
+            !has_fact(unstarted, "Host block size") &&
+            !contains(report_text(unstarted), "Filter values:"),
+        "facts before start");
     require(unstarted.filter_name == "None" && unstarted.problem.empty() &&
                 unstarted.plays == "No filter is loaded. The host has not started the plug-in yet.",
             "empty filter row");
@@ -384,14 +392,15 @@ void cases() {
     } catch (const std::invalid_argument&) {
     }
     const auto rr = host_report(refused, facts(stereo));
-    require(fact(rr, "Sample rate").problem &&
-                fact(rr, "Sample rate").note == "the refused file is for 48000 Hz",
-            "refused rate: " + fact(rr, "Sample rate").note);
+    require(fact(rr, "Host sample rate").problem &&
+                fact(rr, "Host sample rate").note == "the refused file is for 48000 Hz",
+            "refused rate: " + fact(rr, "Host sample rate").note);
     require(rr.filter_note == "room-48k.cfg was refused." &&
                 reference(rr, "Refused file") == "/filters/room-48k.cfg, request 2",
             "refused file: " + rr.filter_note);
-    require(contains(report_text(rr), "Sample rate: 44100 Hz; the refused file is for 48000 Hz\n"),
-            "refused report text:\n" + report_text(rr));
+    require(
+        contains(report_text(rr), "Host sample rate: 44100 Hz; the refused file is for 48000 Hz\n"),
+        "refused report text:\n" + report_text(rr));
     // VST3-11: the window's Reload and its watch on the files take the
     // accepted file's path and files, never a refused one's or saved state's.
     require(rr.filter_path.empty() && rr.filter_files.empty(), "path from saved state");
@@ -433,10 +442,10 @@ void cases() {
     idle.load(HostState{filter(44100, 2)}, std::nullopt);
     static_cast<void>(idle.activate({44100, 1, 1}));
     const auto ri = host_report(idle, facts(HostLayout{44100, 1, 1}));
-    require(
-        fact(ri, "Channels").problem && fact(ri, "Channels").note == "the filter has 2 in, 2 out" &&
-            fact(ri, "Routing").note == "(this filter is not playing)" && ri.filter_note.empty(),
-        "mono track facts: " + report_text(ri));
+    require(fact(ri, "Host channels").problem &&
+                fact(ri, "Host channels").note == "the filter has 2 in, 2 out" &&
+                fact(ri, "Routing").note == "(not playing)" && ri.filter_note.empty(),
+            "mono track facts: " + report_text(ri));
 
     // PLUG-10: a Latency chosen but not yet in use (not applied yet, or it
     // could not be), and the window says so.

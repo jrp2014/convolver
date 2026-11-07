@@ -79,15 +79,16 @@ struct HostReport {
     // empty when it names none).
     // All empty without a filter.
     std::string filter_rate, filter_channels, filter_length, filter_speakers;
+    std::string filter_taps; // "65536 taps": the longest path, for the length's tooltip.
     // VST3-11: the accepted filter's file as chosen (UTF-8; empty when it came
     // from saved state), which the window's Reload reads again, and every
     // file it was read from (HostRequest::files), which the window watches
     // to reload when one changes.
     std::string filter_path;
     std::vector<std::string> filter_files;
-    // The real data, in the order the window lists it: sample rate,
-    // channels, routing, filter length, added delay, ring-out, loudest peak,
-    // host blocks (each only when known).
+    // The Audio section, in the order the window lists it: host sample
+    // rate, host channels, routing, ring-out, loudest peak, host block size
+    // (each only when known).
     std::vector<HostFact> audio;
     // The settings in words (settings_words()), for the text report; the
     // window shows them as its controls.

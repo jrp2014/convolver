@@ -205,10 +205,11 @@ format.
   after a restore the name saved with the project, `HostRequest::name`, or
   "From the saved project or preset" without one; PLUG-22) and a note when
   the newest request was
-  refused, the Audio facts in plain words (`HostFact`: sample rate,
-  channels and speakers, routing, filter length, ring-out,
-  loudest peak from `HostFilter::filter_peak()`, host blocks; each with a
-  note, a problem flag for what does not match, and help text), the
+  refused, the filter's own values for under its name (rate, channels,
+  length and taps, speakers; PLUG-22), the Audio facts as short labelled
+  values (`HostFact`: host sample rate, host channels, routing, ring-out,
+  loudest peak from `HostFilter::filter_peak()`, host block size; each with a
+  short note, a problem flag for what does not match, and help text), the
   settings in words, and reference lines: the filter file and request,
   `execution_line()` and the log. Everything a window says about the
   filter and the audio comes from here, so the VST3 windows (VST3-11 to
