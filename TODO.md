@@ -1050,8 +1050,11 @@ PERF-2 and EDGE-10); then the reverb features.
   jrp wants OpenMP used where it causes no cross-platform incompatibility:
   as an optional build feature for the offline paths, using only what
   MSVC's OpenMP 2.0 supports, with a serial build that compiles and gives
-  byte-identical output where OpenMP is missing (Apple's compiler has none;
-  shipping `libomp` in a package is a dependency for jrp to approve).
+  byte-identical output where OpenMP is missing. Apple's compiler has none:
+  ship `libomp` in the macOS packages only if the benchmarks show a
+  meaningful gain there, otherwise the OpenMP annotations are simply
+  inactive on macOS (jrp). Report Grand Central Dispatch's `dispatch_apply`
+  beside it, as the macOS-native alternative.
   Parallel results must not depend on thread scheduling: each path computed
   as now, outputs summed in a fixed order.
   Exact and rounding-only changes keep the oracle and divergence bounds;

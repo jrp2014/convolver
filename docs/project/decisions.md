@@ -50,6 +50,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
 | 6 November 2026 | Qualifying that choice: easy wins over the room-correction convolvers, where Convolver started, come first ("if there are easy wins over room correction reverbs (which is where we started) prioritise those") | [Edges plan](plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) |
 | 6 November 2026 | Optimisations take each platform's floating-point characteristics fully into account, as the subnormal flushing did, and use what is known about sound: "Optimizations that reflect that we are dealing with DSP and so sound characteristics are the added value that we can bring" (EDGE-10) | [Edges plan](plans/2026-11-06-edges-over-other-convolvers.md#sound-aware-and-platform-aware-optimisation) |
 | 7 November 2026 | Benchmark the EDGE-10 candidates, and use OpenMP where it would not lead to cross-platform incompatibilities ("Try to use OpenMP where it would not lead to cross-platform incompatibilities"): the offline paths, optional, with a serial fallback | [TODO](../../TODO.md) EDGE-10 |
+| 7 November 2026 | Ship `libomp` in the macOS packages only if OpenMP gives a meaningful gain on macOS; otherwise its annotations stay inactive there ("ship openmp if there are meaningful performance differences on macos, otherwise just make it a platform-specific annotation") | [TODO](../../TODO.md) EDGE-10 |
 
 ## Releases
 
