@@ -225,6 +225,29 @@ boundary. A new library or language standard should earn its deployment cost.
 Alternative FFT implementations are investigations in
 [TODO](../../TODO.md#fft-libraries-and-performance), not implicit fallbacks.
 
+### Platform optimisation
+
+Make full use of each platform's built-in optimisation methods for audio
+processing, while keeping every platform building and behaving alike
+([decided](../project/decisions.md#direction) by jrp). In use now:
+Accelerate's FFT on macOS, AVX2 and FMA kernels chosen at run time on
+x86-64 (PERF-4), and the processor's flush-to-zero controls while
+processing (PERF-15). Candidates are benchmarked in EDGE-10: real-time
+helper threads through Apple's audio workgroups and Windows MMCSS, Grand
+Central Dispatch, OpenMP where it causes no cross-platform incompatibility,
+and AArch64 kernels. Each platform-specific path:
+
+- sits behind a portable interface at the FFT, kernel, thread or host
+  boundary, with a portable fallback that builds and passes the tests on
+  every platform;
+- gives the same output as the fallback, or stays within the stated bound
+  (the oracle tolerance, `native.kernel_divergence`);
+- is adopted only for a measured gain on a stated workload: a native path
+  is not automatically faster (the
+  [24 October 2026 vDSP experiment](../archive/reviews/2026-10-24-apple-vdsp.md)
+  found none);
+- adds no shipped dependency without jrp's decision.
+
 ## Where future work belongs
 
 Keep this page about implemented structure. Put open work in [TODO](../../TODO.md),

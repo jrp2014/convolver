@@ -110,6 +110,10 @@ Full rules: [source versioning](docs/develop/versioning.md).
   limitations in [TODO.md](TODO.md). Distinguish tests you ran from configured
   CI coverage, and preserve dated evidence and historical originals.
 
+- Platform optimisation: use each platform's built-in optimisation methods
+  behind a portable interface with a portable fallback, adopting each only
+  for a measured gain and keeping output the same or within its stated
+  bound ([platform optimisation](docs/develop/architecture.md#platform-optimisation)).
 - Real-time path: `Engine::process` and everything it calls must not allocate,
   lock or do I/O (`engine_tests.cpp` checks allocation). Preparation, FFTW
   planning and wisdom stay outside processing.
