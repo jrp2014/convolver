@@ -83,8 +83,9 @@ enum class Known {
     always,     // LV2: fixed at instantiation.
     activation, // The host layer's reference driver: once activated with
                 // them, while they stay the same.
-    played,     // VST3: once activated with them and audio has played since,
-                // while they stay the same. Before that, restored state that
+    played,     // VST3: once activated with them and audio has played with
+                // them (in any activation since they last changed), while
+                // they stay the same. Before that, restored state that
                 // does not suit an active instance is kept, silent.
     rendering,  // AU: while initialized, and afterwards while they match the
                 // last initialization that rendered audio (plugins/au/effect.hpp).

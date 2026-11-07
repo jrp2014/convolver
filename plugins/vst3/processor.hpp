@@ -230,7 +230,8 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // The rate and buses of the last activation. The host's configuration counts
     // as known only while it still matches: setupProcessing alone is not binding.
     std::optional<HostLayout> activated_;
-    // Whether process() has played audio since the last activation. Restored
+    // Whether process() has played audio with the rate and buses of the last
+    // activation (any activation with them since they last changed). Restored
     // state is checked against the host only then: until the host plays,
     // it may still be changing its buses (REAPER starts the plug-in on
     // stereo buses before it restores a project and gives it the track's).

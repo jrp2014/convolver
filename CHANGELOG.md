@@ -578,10 +578,13 @@ Until 1.0 the C++ API may change between minor versions.
   suit is kept, plays silence with the reason in Status and the log, and
   plays as soon as the host starts the plug-in on buses that suit it. A
   preset that does not suit an instance that has played audio is still
-  refused, and the previous filter keeps playing. A preset loaded into a new
-  instance before the host has played any audio is now kept silent rather
-  than refused. The log says whether the host had played audio and whether
-  it said it was restoring a project.
+  refused, and the previous filter keeps playing, also after the host
+  restarts the plug-in on the same rate and buses. A preset loaded into a
+  new instance before the host has played any audio, or just after the host
+  changed its rate or buses, is now kept silent rather than refused, and
+  replaces the filter that was loaded; saving then saves it. The log says
+  whether the host had played audio and whether it said it was restoring a
+  project.
 - Plug-ins (PLUG-23): after a refused load, if the host later changes to a
   rate or channels the refused filter would suit, Status no longer shows
   counts that look as if they conflict ("the filter has 2 in, 6 out, the
