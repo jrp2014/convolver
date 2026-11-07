@@ -548,8 +548,10 @@ tell that is safe:
 | A load failed and no earlier filter is kept: a missing or unreadable file or preset, a first filter that does not fit, or a project saved after such a failure | Silent: Convolver cannot tell that the failed filter was not a crossover |
 | The track's inputs and outputs differ | Silent |
 
-On a mono instance (one input, one output) the input always passes when no
-filter plays, as there is only one output. Status says which applies at Mix
+The same applies to a mono instance (one input, one output). Only an
+instance that has never had a load fail passes its input with no filter. If
+a replacement fails, the previous filter keeps playing with its own bypass
+and Mix. Status says which applies at Mix
 below 100%: after a failure, `Silent: ...` means Mix passes nothing either.
 At Mix 100%, and for bypass, the Convolver log's `Settings:` line and the
 window's copied diagnostics say whether there is a dry signal, and why not,

@@ -856,6 +856,16 @@ so the preset file path is not needed).
   day agrees, measurement first: remove such redundant work (as GAIN-2 did
   for `--gain-db no-clip`) before any new planar engine or more elaborate
   partitioning.
+- [ ] **PERF-19 — Copies of whole configurations on the control side.**
+  From jrp's review of PLUG-23 (7 November 2026): a filter's configuration,
+  every tap included, is copied where the control side hands it on:
+  `HostFilter::activate()` returns a copy in a `HostPlayback` at each
+  activation, the install callback's filter is copied into the prepared
+  engine, and saving copies it into `HostState`. For a 30-second stereo
+  reverb at 48 kHz each copy is at least 11 MB. Profiling targets only: measure the preview loading
+  workloads with a profiler first, and remove a copy only where it shows in
+  preparation time or peak memory, with saved state, diagnostics and audio
+  unchanged. Waits for the freeze.
 - [ ] **PERF-8 — Split spectra straight from the FFT.** From the project
   review of 5 November 2026, after PERF-3: the engine stores spectra split
   (real parts, then imaginary), but the backends hand them over interleaved
@@ -990,17 +1000,22 @@ explained; AU-12 removed that worker, which is not a diagnosis.
 
 ### Keeping `host.cpp` manageable
 
-Guidance, not an item (external review of `91fcf1f`, 0.8.13, 5 November
-2026): `portable/host.cpp` combines filter acceptance, failure policy,
-diagnostic wording, status text and the real-time `HostProcessor`. When one
-of these next changes, move the control-side filter policy apart from
-`HostProcessor`'s audio code, as VST3-14 and AU-11 moved code out of the
-adapters, with public APIs and ownership unchanged. Diagnostics already stay
-in their structured parts (problem, cause, fix) inside and are formatted
+From the external review of `91fcf1f` (0.8.13, 5 November 2026):
+`portable/host.cpp` combines filter acceptance, failure policy, diagnostic
+wording, status text and the real-time `HostProcessor`. Diagnostics already
+stay in their structured parts (problem, cause, fix) inside and are formatted
 only where they leave the library (DIAG-4).
-No new general framework. Such moves keep saved state, diagnostic text,
-allocation guards and numerical results unchanged, and never share a pull
-request with a DSP change.
+
+- [ ] **PLUG-24 — `HostProcessor` in its own source file.** From jrp's review
+  of PLUG-23 (7 November 2026), which grew `host.cpp` again: move
+  `HostProcessor`'s audio code into its own source file, apart from the
+  control-side filter policy, as VST3-14 and AU-11 moved code out of the
+  adapters, with public APIs and ownership unchanged. PLUG-23 already
+  gathered the rate and channel comparison (`same_configuration()`) and the
+  dry-signal answer (`HostPlayback`) in one place each. No new general
+  framework. The move keeps saved state, diagnostic text, allocation guards
+  and numerical results unchanged, and never shares a pull request with a
+  DSP change. Waits for the freeze.
 
 ## Edges over other convolvers
 

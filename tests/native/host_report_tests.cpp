@@ -172,9 +172,9 @@ void cases() {
         {"refused replacement",
          [&] {
              HostFilter f(8);
-             f.load(HostState{filter(44100, 2)}, stereo, [](const Configuration&) {});
+             f.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {});
              try {
-                 f.load(HostState{filter(48000, 2)}, stereo, [](const Configuration&) {});
+                 f.load(HostState{filter(48000, 2)}, stereo, [](const HostPlayback&) {});
              } catch (const std::invalid_argument&) {
              }
              return host_report(f, facts(stereo));
@@ -186,7 +186,7 @@ void cases() {
         {"playing",
          [&] {
              HostFilter f(8);
-             f.load(HostState{filter(44100, 2)}, stereo, [](const Configuration&) {});
+             f.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {});
              return host_report(f, facts(stereo));
          },
          HostStatus::playing,
@@ -204,7 +204,7 @@ void cases() {
         {"fault",
          [&] {
              HostFilter f(8);
-             f.load(HostState{filter(44100, 2)}, stereo, [](const Configuration&) {});
+             f.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {});
              HostFaults totals;
              totals.rejected_input = 3;
              static_cast<void>(f.observe(totals));
@@ -253,7 +253,7 @@ void cases() {
 
     // The Audio facts, in plain words, and the reference lines.
     HostFilter f(8);
-    f.load(HostState{filter(44100, 2)}, stereo, [](const Configuration&) {});
+    f.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {});
     const auto r = host_report(f, facts(stereo, {-6, .25}));
     const auto check = [](const HostFact& got, const std::string& value, const std::string& note) {
         require(got.value == value && got.note == note && !got.problem && !got.help.empty(),
@@ -318,10 +318,10 @@ void cases() {
     // A refused file while the previous filter plays: the problem shows in
     // the fact, naming the refused file, and the file in the row.
     HostFilter refused(8);
-    refused.load(HostState{filter(44100, 2)}, stereo, [](const Configuration&) {});
+    refused.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {});
     try {
         refused.load(
-            HostState{filter(48000, 2)}, stereo, [](const Configuration&) {},
+            HostState{filter(48000, 2)}, stereo, [](const HostPlayback&) {},
             HostRequest{HostFilterSource::file, "/filters/room-48k.cfg"});
     } catch (const std::invalid_argument&) {
     }
@@ -340,10 +340,10 @@ void cases() {
     HostFilter chosen(8);
     HostRequest from_file{HostFilterSource::file, "/filters/room.cfg"};
     from_file.files = {"/filters/room.cfg", "/filters/left.wav", "/filters/right.wav"};
-    chosen.load(HostState{filter(44100, 2)}, stereo, [](const Configuration&) {}, from_file);
+    chosen.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {}, from_file);
     try {
         chosen.load(
-            HostState{filter(48000, 2)}, stereo, [](const Configuration&) {},
+            HostState{filter(48000, 2)}, stereo, [](const HostPlayback&) {},
             HostRequest{HostFilterSource::file, "/filters/room-48k.cfg"});
     } catch (const std::invalid_argument&) {
     }
@@ -456,16 +456,16 @@ void actions() {
                 host_report(empty, facts(stereo)).action.empty(),
             "no filter: Choose Filter… only where the window chooses files");
     HostFilter refused(8);
-    refused.load(HostState{filter(44100, 2)}, stereo, [](const Configuration&) {});
+    refused.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {});
     try {
-        refused.load(HostState{filter(48000, 2)}, stereo, [](const Configuration&) {});
+        refused.load(HostState{filter(48000, 2)}, stereo, [](const HostPlayback&) {});
     } catch (const std::invalid_argument&) {
     }
     require(host_report(refused, choosing).action == "choose filter", "refused file");
     HostFilter unprepared(8);
     try {
         unprepared.load(HostState{filter(44100, 2)}, stereo,
-                        [](const Configuration&) { throw std::bad_alloc(); });
+                        [](const HostPlayback&) { throw std::bad_alloc(); });
     } catch (const std::invalid_argument&) {
     }
     const auto prepared = host_report(unprepared, choosing);
@@ -473,7 +473,7 @@ void actions() {
                 contains(prepared.fix, "Close other projects or programs"),
             "preparation failure: " + prepared.explanation);
     HostFilter bug(8);
-    bug.load(HostState{filter(44100, 2)}, stereo, [](const Configuration&) {});
+    bug.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {});
     HostFaults totals;
     totals.processing_failure = 2;
     totals.rejected_input = 1;

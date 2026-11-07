@@ -206,9 +206,19 @@ Until 1.0 the C++ API may change between minor versions.
   (a missing or unreadable file or preset, a first filter that does not fit,
   or a project saved after such a failure) bypass and Mix pass nothing at
   all, where they used to pass the input on a track with as many inputs as
-  outputs; a mono instance still passes it. A failed first load fades its dry
-  signal out with it. Status, the log's settings and the window's report give
-  the reason.
+  outputs, a mono instance included (jrp). An instance with no filter that
+  has never had a load fail still passes the input. A failed first load
+  fades its dry signal out with it. Status, the log's settings and the
+  window's report give the reason; Status no longer says "Load failed, no
+  filter plays" before the host has started the plug-in, as nothing plays.
+- Library (PLUG-23, jrp's review): a prepared filter carries whether it has
+  a dry signal. `HostFilter::activate()` returns a `HostPlayback`, and the
+  `HostFilter::load()` install callback, `HostProcessor`'s constructor,
+  `prepare()` and `replace()` take one (`filter_playback()` and
+  `unfiltered_playback()` build them); the `Configuration` overloads remain.
+  `HostFilter::load()` takes a `HostLoadCheck` that says whether a filter
+  that does not suit the host is refused or kept until it does, and
+  `same_configuration()` compares two layouts' rates and channels.
 - Development (DOC-8, from jrp's review of the agent guidance at `f6895f3`):
   the [workflow guide](docs/develop/workflow.md#verification-for-each-kind-of-change)
   says what each kind of change must run before a push (a prose-only change
