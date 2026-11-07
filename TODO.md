@@ -638,7 +638,7 @@ means a patched FFmpeg build with `--enable-gpl`.
 - [ ] **IO-2 — Optional offline IR resampling.** Only add as an explicit operation
   with tests for gain, delay, length and reported metadata; retain mismatch errors
   by default. Users cite missing rates, and resampled responses that changed
-  level or clipped elsewhere; rank 1 of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build),
+  level or clipped elsewhere; rank 1 of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#1-a-filter-for-every-sample-rate),
   with EDGE-1. jrp decides whether Convolver resamples at all. Compare [libsamplerate](https://libsndfile.github.io/libsamplerate/)
   and other suitable implementations before choosing a dependency.
 - [ ] **ROBUST-1 — Longer fuzz and transition stress.** Keep discovered inputs as
@@ -750,10 +750,13 @@ so the preset file path is not needed).
   delay and reset behavior; account for changed floating-point accumulation order.
   Shared forward transforms are already implemented. A user need is now
   stated: long reverbs at low CPU with lower and finer latency, rank 3 of
-  the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build), which sets out the
+  the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#3-long-reverbs-at-low-cpu-and-latency), which sets out the
   techniques to consider and what is still a hypothesis. PERF-3's
-  long-reverb measurements and EDGE-11 come first. A worker thread, if
-  added, processes synchronously when the host renders offline.
+  long-reverb measurements and EDGE-11 come first. Work moved off the
+  calling thread must be correct under realtime, prefetch and offline
+  scheduling and the switches between them: results ready when their
+  samples are needed, never assumed from wall-clock time (the plan's
+  [scheduling rule](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#3-long-reverbs-at-low-cpu-and-latency)).
 - [ ] **PERF-3 — Resource budgets and supported workloads.** Measure, on
   named machines, the distribution of callback durations (median, 99th
   percentile, 99.9th percentile and maximum, not only the average), memory in
@@ -766,7 +769,7 @@ so the preset file path is not needed).
   workloads (for example "8 channels of 65536 taps at 96 kHz uses under N% of
   one core and M MB") in the user guides. Only these results decide whether
   partitioning (PERF-2), memory layout or another FFT (FFT-2) deserves work,
-  and whether slow preparation needs VST3-5. Include long reverbs ([edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build)):
+  and whether slow preparation needs VST3-5. Include long reverbs ([edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#3-long-reverbs-at-low-cpu-and-latency)):
   10, 30 and 60 s filters, stereo and true stereo (four paths), at 48 and
   96 kHz, with callback maxima while playing, replacing and resetting.
   Distinguish core and command-line benchmarks from supported plug-in
@@ -989,7 +992,11 @@ waits for the walkthroughs (jrp, 7 November 2026). Order: first the
 limitations users cite (EDGE-1 with IO-2, PERF-3 with EDGE-11, PERF-2 with
 EDGE-10, EDGE-3, EDGE-13), then edges nobody was found citing (EDGE-12,
 then the easy room-correction wins EDGE-9, EDGE-2, EDGE-4, EDGE-5), then
-the reverb features (EDGE-6 to EDGE-8). Every item
+the reverb features (EDGE-6 to EDGE-8). An item starts only after the
+plan's [gate](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#before-an-item-starts): a reproducible Convolver
+limitation, an affected intended workflow and a measurable acceptance
+criterion. Optimisations are experiments with a stated gain and permission
+to stop. Every item
 keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#non-negotiables).
 
 - [ ] **EDGE-1 — A filter for every sample rate in one plug-in state.**
@@ -998,7 +1005,7 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   switches with the usual crossfade; a rate no entry has is refused as now;
   states over the saved-state limit are refused with a clear message.
   Needs jrp's decision on the state format and the preset tool's options.
-  [Plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build). Effort M.
+  [Plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#1-a-filter-for-every-sample-rate). Effort M.
 - [ ] **EDGE-2 — Show what a filter does.** Done when `--inspect --json`
   and the library report each path's magnitude, phase, group delay and
   energy decay, checked against an independent computation, and the macOS
@@ -1042,8 +1049,9 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   how the finer delay is given. Effort S to M.
 - [ ] **EDGE-10 — Sound-aware and platform-aware optimisation.** Done when
   each [candidate](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#sound-aware-and-platform-aware-optimisation) has
-  been benchmarked on PERF-3's long-reverb workloads and either adopted as
-  its own item or set aside with its numbers. Exact and rounding-only
+  been benchmarked on PERF-3's long-reverb workloads against the gain the
+  plan states for it, and either adopted as its own item or stopped and set
+  aside with its numbers. Exact and rounding-only
   changes keep the oracle and divergence bounds; a bounded approximation
   needs jrp's decision on its bound. OpenMP only where it causes no
   cross-platform incompatibility (offline paths, optional, serial build
@@ -1053,7 +1061,9 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   [24 October 2026 vDSP experiment](docs/archive/reviews/2026-10-24-apple-vdsp.md).
   Goes with PERF-2. Effort M for the survey.
 - [ ] **EDGE-11 — Savings in today's engine.** Done when each of these has
-  been measured on PERF-3's workloads and kept only for a gain. Exact, with
+  been measured on PERF-3's workloads and kept only if it reaches the gain
+  the plan states for it, or stopped with its numbers; sharing identical
+  spectra and removing unnecessary work come first. Exact, with
   bit-identical output: idling once silent input has outlasted the tail;
   skipping all-zero filter blocks; holding identical responses once;
   reading each input history once for all its paths. Rounding only, within
@@ -1063,20 +1073,27 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   output where outputs are fewer than paths. The oracle tests pass with the
   worst error reported, and nothing new allocates or locks on the audio
   thread.
-  [Plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build), rank 2. Effort S to M each.
+  [Plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#2-savings-in-todays-engine), rank 2. Effort S to M each.
 - [ ] **EDGE-12 — Filters larger than the saved-state limit.** Done when a
   plug-in accepts a filter whose samples exceed 64 MiB (such as a 60 s
   true-stereo filter at 96 kHz, about 88 MiB) through the storage jrp
   chooses, saves and restores it, and refuses clearly when what it needs is
   missing or changed. Needs jrp's decision on the storage. Effort M.
 - [ ] **EDGE-13 — Report a filter's own delay, as an option.** Done when an
-  opt-in setting adds the filter's main delay (found from the filter or
-  given by the user) to the reported latency, the output is otherwise
-  unchanged, Mix and bypass stay aligned (a dry delay of up to about 0.7 s,
-  prepared off the audio thread), and a host's latency compensation is
-  shown to line it up. Needs jrp's decision on whether to offer it, how the
-  delay is found and what a replacement with a different delay does, since
-  the latency is fixed for a processor's life. Effort S to M.
+  opt-in setting adds a delay given by the user, or a common linear-phase
+  delay verified across the paths concerned, to the reported latency, and
+  tests show: each path's delay is its centre of symmetry (never its
+  largest peak) plus its configured delays; a path outside the symmetry
+  tolerance gets no verified delay; differing path delays add nothing and
+  the Status says why; a half-sample centre is rounded down and the
+  remainder reported (the [plan's proposed handling](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#5-report-a-filters-own-delay),
+  as jrp confirms it); the wet convolution is unchanged; Mix and bypass
+  delay the dry signal by the reported latency (a buffer as long as the
+  delay, prepared off the audio thread); and a host's latency compensation
+  is shown to line it up.
+  Needs jrp's decision on whether to offer it, how the delay is found and
+  what a replacement with a different delay does, since the latency is
+  fixed for a processor's life. Effort S to M.
 
 ## Developer tooling
 
