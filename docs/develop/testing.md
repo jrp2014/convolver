@@ -277,7 +277,8 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   name (also before the host starts, and the speakers it names), the
   Bypassed message for each dry-signal case, and the filter identity (16
   hex digits, the same for the same filter, different for another or for
-  one changed sample).
+  one changed sample, also in the middle of a 1024-tap filter), cached
+  when the filter is accepted.
 - `native.recent_files`: the windows' recent filter files (VST3-11) beside
   the log: newest first, no repeats, ten kept, paths with spaces and
   accents, no path with a line break, nothing left beside the list after

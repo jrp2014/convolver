@@ -97,9 +97,27 @@ tresult PLUGIN_API Controller::setState(IBStream* stream) {
     // Too long to be ours, or not ours: no name, as before PLUG-22.
     auto state =
         bytes.size() > max_controller_state ? ControllerState{} : decode_controller_state(bytes);
-    std::lock_guard lock(status_lock_);
-    name_ = std::move(state.name);
-    identity_ = std::move(state.identity);
+    {
+        std::lock_guard lock(status_lock_);
+        name_ = state.name;
+        identity_ = state.identity;
+    }
+    // The processor puts the name in its report and the report's text; it
+    // answers with a new status_message.
+    if (auto message = owned(allocateMessage())) {
+        message->setMessageID(name_message);
+        if (auto* attributes = message->getAttributes()) {
+            // No name sends neither (the SDK's host attributes leak an empty
+            // binary value); decode_controller_state() gives both or neither.
+            if (!state.name.empty()) {
+                attributes->setBinary("name", state.name.data(),
+                                      static_cast<uint32>(state.name.size()));
+                attributes->setBinary("identity", state.identity.data(),
+                                      static_cast<uint32>(state.identity.size()));
+            }
+            sendMessage(message);
+        }
+    }
     return kResultOk;
 }
 tresult PLUGIN_API Controller::getState(IBStream* stream) {
@@ -380,18 +398,7 @@ std::vector<std::pair<std::string, std::string>> Controller::report() {
         sendMessage(message);
     }
     std::lock_guard lock(status_lock_);
-    return named_report();
-}
-std::vector<std::pair<std::string, std::string>> Controller::named_report() const {
-    auto report = report_;
-    // From saved state (no file path), and the filter the name belongs to.
-    if (name_.empty() || identity_.empty() || !field(report, "filter path").empty() ||
-        field(report, "filter identity") != identity_)
-        return report;
-    for (auto& [key, value] : report)
-        if (key == "filter name")
-            value = name_;
-    return report;
+    return report_;
 }
 std::string Controller::diagnostics() {
     std::string text, format;
@@ -399,12 +406,6 @@ std::string Controller::diagnostics() {
         std::lock_guard lock(status_lock_);
         text = report_text_;
         format = format_;
-        // The saved name in the text's Filter line too.
-        const auto saved = field(report_, "filter name"),
-                   named = field(named_report(), "filter name");
-        const auto line = text.find("\nFilter: " + saved);
-        if (saved != named && line != std::string::npos)
-            text.replace(line + 9, saved.size(), named);
     }
     if (format.empty())
         return {};

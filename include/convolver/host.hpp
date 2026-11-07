@@ -143,6 +143,13 @@ inline Configuration unfiltered_configuration(const HostLayout& host, bool faile
 // ignored. The ignored ones in words, "inputs 3–6" or "input 2" with `dash`
 // between two numbers; empty when the filter reads every input the host gives.
 std::string ignored_inputs(const Configuration&, const HostLayout&, const char* dash = "–");
+// PLUG-22: which filter this is, so a name saved beside it (VST3's
+// controller state) is shown only while it plays: a 64-bit FNV-1a hash of
+// every stored value (rate, counts, mask, delays, and each path's routes,
+// gains and samples as their bits), the same on every machine. Two filters
+// that differ anywhere differ here, but for a 1 in 2^64 chance. Reads every
+// sample, so it runs once, when a filter is accepted (HostFilter).
+std::uint64_t configuration_identity(const Configuration&) noexcept;
 
 class HostProcessor;
 
@@ -188,8 +195,8 @@ struct HostRequest {
     // extension, never its folder, as the Audio Unit's preset name keeps it.
     // Empty when unknown; a file's request leaves it empty, as the window
     // takes the name from `path`. VST3 keeps the name in the controller
-    // state, apart from the component's, and its controller puts it in the
-    // report itself (HostReport::filter_identity).
+    // state, apart from the component's, and the processor names its report
+    // with it while HostFilter::filter_identity() matches the saved one.
     std::string name{};
 };
 inline constexpr std::size_t max_filter_name_bytes = 1024;
@@ -279,6 +286,11 @@ class HostFilter {
     // worst_case_peak() of filter(), found when it was accepted; 0 without one.
     double filter_peak() const noexcept {
         return peak_;
+    }
+    // PLUG-22: configuration_identity() of filter(), found when it was
+    // accepted, so a report never computes it; 0 without one.
+    std::uint64_t filter_identity() const noexcept {
+        return identity_;
     }
     // True after a failed initial load: nothing accepted, and a load failed.
     bool failed() const noexcept {
@@ -397,8 +409,9 @@ class HostFilter {
                                     const Configuration*) noexcept;
     std::size_t max_channels_;
     std::optional<Configuration> filter_;
-    double peak_ = 0;      // filter_peak()
-    HostRequest accepted_; // The request that supplied filter_ (or the saved failure).
+    double peak_ = 0;            // filter_peak()
+    std::uint64_t identity_ = 0; // filter_identity()
+    HostRequest accepted_;       // The request that supplied filter_ (or the saved failure).
     std::uint64_t requests_ = 0;
     bool failed_ = false;
     std::optional<HostFailure> load_failure_, activation_failure_;

@@ -384,7 +384,13 @@ HostReport Processor::report_locked() const {
     facts.chooses_files = files_ != nullptr || test_file_reader != nullptr;
     if (files_)
         facts.file_reader = "macOS AudioToolbox";
-    return host_report(filter_, facts);
+    auto report = host_report(filter_, facts);
+    // PLUG-22: saved state (no file path) of the filter the saved name
+    // belongs to is named, in the fields and the text alike.
+    if (!saved_name_.empty() && report.filter_path.empty() && !report.filter_identity.empty() &&
+        report.filter_identity == saved_identity_)
+        report.filter_name = saved_name_;
+    return report;
 }
 void Processor::send_status(const StatusAnswer& answer) noexcept {
     try {
@@ -472,6 +478,31 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
         }
         if (faulted)
             write_log();
+        send_status();
+        return kResultOk;
+    }
+    if (id == name_message) {
+        // PLUG-22: the controller state's name and identity (Controller::setState).
+        const void* name = nullptr;
+        const void* identity = nullptr;
+        uint32 name_size = 0, identity_size = 0;
+        auto* attributes = message->getAttributes();
+        if (!attributes)
+            return kInvalidArgument;
+        // Neither: no name (an empty or older controller state).
+        const bool has_name = attributes->getBinary("name", name, name_size) == kResultOk;
+        const bool has_identity =
+            attributes->getBinary("identity", identity, identity_size) == kResultOk;
+        if (has_name != has_identity || (name_size && !name) || (identity_size && !identity) ||
+            name_size > max_filter_name_bytes || identity_size > 64)
+            return kInvalidArgument;
+        try {
+            std::lock_guard lock(control_);
+            saved_name_.assign(static_cast<const char*>(name), name_size);
+            saved_identity_.assign(static_cast<const char*>(identity), identity_size);
+        } catch (...) {
+            return kOutOfMemory;
+        }
         send_status();
         return kResultOk;
     }
@@ -675,11 +706,21 @@ bool Processor::load_file(std::string_view chosen) {
             throw std::runtime_error("refused");
         }
         install(std::move(*next), request, false);
-        return true;
     } catch (...) {
         refused(was_failed);
         return false;
     }
+    // PLUG-22: the file's name and its filter's identity, as the controller
+    // records them from the report for its state.
+    try {
+        const auto report = report_locked();
+        saved_name_ = report.filter_name;
+        saved_identity_ = report.filter_identity;
+    } catch (...) {
+        saved_name_.clear(); // Out of memory: no name rather than another filter's.
+        saved_identity_.clear();
+    }
+    return true;
 }
 Advice Processor::notice() {
     std::lock_guard lock(control_);

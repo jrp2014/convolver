@@ -116,6 +116,10 @@ inline constexpr const char* latency_message = "ConvolverLatency";
 // or the window changes Bypass, so the Status reads Bypassed at once rather
 // than when the audio thread next sees the change.
 inline constexpr const char* bypass_message = "ConvolverBypass";
+// PLUG-22: the controller's name_message ("name" and "identity", binary
+// UTF-8, or neither for no name) after it reads its state, so the processor's report names saved
+// state of that filter (Processor::report_locked).
+inline constexpr const char* name_message = "ConvolverName";
 inline constexpr std::size_t default_latency_index = 2;
 static_assert(host_latencies[default_latency_index] == default_host_latency);
 // The settings' normalized values (0 to 1), as the host and the controller
@@ -238,6 +242,10 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // thread's value, or the controller's when it told the processor first
     // (bypass_message).
     std::atomic<bool> shown_bypass_{false};
+    // PLUG-22, under control_: the name the report gives saved state whose
+    // filter identity is saved_identity_: from the controller state
+    // (name_message), or the file last accepted, as the controller records it.
+    std::string saved_name_, saved_identity_;
     // VST3-4: Gain and Mix as process() last received them (or a state
     // restored), and the chosen Latency in frames.
     std::atomic<double> gain_db_{0}, mix_{1};
@@ -288,7 +296,9 @@ class Controller final : public Steinberg::Vst::EditController,
     // the project is reopened, but only while that filter plays (a preset
     // or an undo may bring another). Never the file's folder. The format:
     // "CVCS", a version (1), then the name and the identity, each as a
-    // little-endian 32-bit length and UTF-8 bytes. Before PLUG-22 hosts
+    // little-endian 32-bit length and UTF-8 bytes. setState sends both to the
+    // processor (name_message), which names its report and the report's text
+    // with them. Before PLUG-22 hosts
     // saved an empty controller state, so an empty stream, a shorter one or
     // another version reads as no name, never as a failure (VST3-8).
     Steinberg::tresult PLUGIN_API setState(Steinberg::IBStream*) override;
@@ -337,10 +347,6 @@ class Controller final : public Steinberg::Vst::EditController,
     REFCOUNT_METHODS(EditController)
 
   private:
-    // PLUG-22, under status_lock_: the report with the saved name in place of
-    // "From the saved project or preset" while the filter that plays is the
-    // one the name belongs to.
-    std::vector<std::pair<std::string, std::string>> named_report() const;
     // Sends `frames` to the processor; the host is asked to restart when the
     // processor answers that it has them (notify), since the host reads the
     // latency during the restart.

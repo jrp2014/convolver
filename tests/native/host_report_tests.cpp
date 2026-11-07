@@ -355,6 +355,22 @@ void cases() {
         other.load(HostState{quieter}, std::nullopt);
         require(host_report(other, facts(std::nullopt)).filter_identity != w.filter_identity,
                 "a changed sample keeps the identity");
+        // jrp's review of c496cba: two 1024-tap filters that differ only in
+        // the middle tap had the same identity when only the ends were
+        // hashed. Every sample counts now.
+        Configuration long_one{48000, 1, 1, 0, {}, {}, {}};
+        long_one.paths.push_back({std::vector<float>(1024, .001f), {{0, 1}}, {{0, 1}}});
+        auto middle = long_one;
+        middle.paths[0].impulse[512] = .002f;
+        require(configuration_identity(long_one) != configuration_identity(middle) &&
+                    configuration_identity(long_one) ==
+                        configuration_identity(Configuration(long_one)),
+                "a middle tap does not change the identity");
+        HostFilter cached(8);
+        cached.load(HostState{middle}, std::nullopt);
+        require(cached.filter_identity() == configuration_identity(middle) &&
+                    HostFilter(8).filter_identity() == 0,
+                "the accepted filter's identity is not cached");
         const auto none = host_report(HostFilter(8), facts(std::nullopt));
         require(none.filter_rate.empty() && none.filter_channels.empty() &&
                     none.filter_length.empty() && none.filter_speakers.empty() &&

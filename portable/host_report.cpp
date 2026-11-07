@@ -339,43 +339,10 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
 
 // PLUG-22: FNV-1a over what tells filters apart cheaply, read on every
 // report (twice a second while a window is open), so not every sample.
-std::string identity(const Configuration& c) {
-    std::uint64_t hash = 14695981039346656037ULL;
-    const auto add = [&](const void* data, std::size_t size) {
-        const auto* bytes = static_cast<const unsigned char*>(data);
-        for (std::size_t i = 0; i < size; ++i) {
-            hash ^= bytes[i];
-            hash *= 1099511628211ULL;
-        }
-    };
-    const auto add_value = [&](auto value) { add(&value, sizeof value); };
-    add_value(static_cast<std::int64_t>(c.sample_rate));
-    add_value(static_cast<std::uint64_t>(c.input_channels));
-    add_value(static_cast<std::uint64_t>(c.output_channels));
-    add_value(c.channel_mask);
-    for (const auto* delays : {&c.input_delays, &c.output_delays}) {
-        add_value(static_cast<std::uint64_t>(delays->size()));
-        for (const auto d : *delays)
-            add_value(static_cast<std::uint64_t>(d));
-    }
-    add_value(static_cast<std::uint64_t>(c.paths.size()));
-    for (const auto& path : c.paths) {
-        add_value(static_cast<std::uint64_t>(path.impulse.size()));
-        // The first and last samples as stored: exact on every machine,
-        // unlike a computed value such as the peak.
-        const auto ends = std::min<std::size_t>(path.impulse.size(), 256);
-        add(path.impulse.data(), ends * sizeof(float));
-        add(path.impulse.data() + (path.impulse.size() - ends), ends * sizeof(float));
-        for (const auto* routes : {&path.inputs, &path.outputs}) {
-            add_value(static_cast<std::uint64_t>(routes->size()));
-            for (const auto& route : *routes) {
-                add_value(static_cast<std::uint64_t>(route.channel));
-                add_value(route.gain);
-            }
-        }
-    }
+// 16 hex digits of HostFilter::filter_identity().
+std::string identity_text(std::uint64_t identity) {
     char text[17] = {};
-    std::snprintf(text, sizeof text, "%016llx", static_cast<unsigned long long>(hash));
+    std::snprintf(text, sizeof text, "%016llx", static_cast<unsigned long long>(identity));
     return text;
 }
 
@@ -426,7 +393,7 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
         const auto length = duration(taps, c->sample_rate);
         r.filter_taps = std::to_string(taps) + " taps";
         r.filter_length = length.empty() ? r.filter_taps : length;
-        r.filter_identity = identity(*c);
+        r.filter_identity = identity_text(filter.filter_identity());
         // A list on its own, so it starts with a capital: "Front left, front right".
         r.filter_speakers = speaker_names(c->channel_mask, c->output_channels);
         if (!r.filter_speakers.empty())

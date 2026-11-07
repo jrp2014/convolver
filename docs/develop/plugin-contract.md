@@ -229,8 +229,9 @@ format.
   and `Note:` lines ([`advice.hpp`](../../portable/advice.hpp)); then
   the filter's name for the heading (the file's name with its extension;
   after a restore the name saved with the project, `HostRequest::name` in
-  the Audio Unit, or VST3's controller state while the report's
-  `filter_identity` matches the one saved beside it, or
+  the Audio Unit, or VST3's controller state while the filter's identity
+  (`HostFilter::filter_identity()`, a hash of every stored value, found once
+  when the filter is accepted) matches the one saved beside it, or
   "From the saved project or preset" without one; PLUG-22) and a note when
   the newest request was
   refused, the filter's own values for under its name (rate, channels,
@@ -810,7 +811,9 @@ How each adapter meets the contract where its format differs:
   the accepted file's name and its filter's identity (`"CVCS"`, version 1,
   each string as a little-endian 32-bit length and UTF-8); an empty or
   unknown stream reads as no name, so projects saved before PLUG-22, whose
-  controller state is empty, still open. The view's blocks hold a
+  controller state is empty, still open. `setState` passes the name and
+  identity to the processor as `ConvolverName`, and the processor names its
+  report before the fields and the copied text are made from it. The view's blocks hold a
   shared link that the editor clears in its destructor, so nothing the view
   does afterwards (a timer, a closing file dialog) reaches a controller the
   host has released. The view does not touch the processor or the audio
