@@ -19,10 +19,14 @@ preset for another rate or channel count must leave it playing.
 **Status:** Convolver is a developer preview, and these steps have not yet
 been followed in a host from start to finish. How a host gives an effect more
 outputs than inputs differs most between hosts, so the routing steps below
-are the most likely to differ from what you see. In the one REAPER session so
-far (REAPER 7.85 on macOS) they did not work: REAPER gave the
-VST3 plug-in 6 inputs and 6 outputs, so the crossover preset was refused
-([details](../develop/host-testing.md#unresolved-host-findings)). The
+are the most likely to differ from what you see. In REAPER 7.85 on macOS
+the VST3 plug-in gets 6 inputs and 6 outputs on a six-channel track; it
+plays the crossover from inputs 1 and 2 and ignores the rest. On 7 November
+2026 the crossover played there with a preview candidate, its render matched
+the expected output, and it survived saving, quitting and reopening, and FX
+Offline then Online
+([record](../archive/reviews/2026-11-07-reaper-crossover-retest.md)). The
+Audio Unit steps have not yet been tried. The
 [status page](../project/status.md) says what is ready.
 
 The steps name REAPER, whose menus they were written for.
@@ -79,7 +83,10 @@ they are not a crossover ready for real speakers.
 4. Load `examples/first-use/crossover/filter.vstpreset` from the host's
    preset menu (REAPER: the **+** button beside the preset menu, then the
    item that imports a VST preset file). Status reads
-   `Filter loaded: 48000 Hz, 2 in, 6 out.`
+   `Filter loaded: 48000 Hz, 2 in, 6 out.`, or on a track that gives the
+   plug-in six inputs, `Filter loaded: 48000 Hz, 2 in, 6 out; plug-in inputs
+   3-6 ignored.` Convolver then reads inputs 1 and 2, so put the stereo
+   source there.
 
    If Status instead reads `Silent: the filter has 2 in, 6 out, the plug-in
    6 in, 6 out. Details in the Convolver log.` (or other counts for the
@@ -132,9 +139,9 @@ prints `Match`: the project kept the filter and its six outputs.
 
 REAPER also loads Audio Units. Install `Components/Convolver.component` as
 [install](install.md) says, insert Convolver's Audio Unit in step 3 in place
-of the VST3 plug-in, and load the filter in its window: **Choose…** beside
-Filter, then `examples/first-use/crossover/filter.cfg`. The window reads
-Playing with 48000 Hz, 2 in, 6 out, and the render and comparison are as
+of the VST3 plug-in, and load the filter in its window: **Choose…** under
+the filter's name, then `examples/first-use/crossover/filter.cfg`. The window reads
+`filter.cfg`, Active, and its Audio section 48000 Hz, 2 in, 6 out, and the render and comparison are as
 above. Its preset menu takes `.aupreset` files rather than `.vstpreset`
 ([plug-in presets](presets.md)).
 

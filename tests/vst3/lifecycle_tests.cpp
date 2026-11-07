@@ -38,8 +38,9 @@ class Vst3 final : public lc::Driver {
         lc::Format f;
         f.name = "VST3";
         // Contract, loading and failure: VST3 counts its configuration as
-        // known once activated with it, while the rate and buses stay the same.
-        f.known = lc::Known::activation;
+        // known once activated with it and audio has played, while the rate
+        // and buses stay the same.
+        f.known = lc::Known::played;
         // Contract, bypass: VST3 saves its bypass parameter with the state.
         f.state_bypass = true;
         f.operations = {Op::state_a,

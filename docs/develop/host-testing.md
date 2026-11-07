@@ -311,8 +311,8 @@ except the Audio Unit build, which runs in a source checkout.
     differ from REAPER's.
 11. The window and settings (macOS, VST3-11). Use a source checkout's
     `examples/first-use/stereo/filter.cfg` (48 kHz). In Convolver's window
-    click **Choose…**, pick that file: the status reads Playing, the Filter
-    row reads `filter.cfg`, and REAPER marks the project changed (an
+    click **Choose…**, pick that file: the status reads Active, the heading
+    reads `filter.cfg`, and REAPER marks the project changed (an
     asterisk in the title bar). Drag Gain to about −12 dB while playing:
     the level drops without a click, and *Edit › Undo* undoes the whole drag
     in one step. Set Mix to 0%: you hear the dry track. Option-click both
@@ -452,7 +452,6 @@ until its cause is known: record what was observed, as below.
 | Finding | Seen in | What was observed | Not yet known | Evidence |
 | --- | --- | --- | --- | --- |
 | A new Latency is not used until the project is reopened (VST3) | REAPER 7.85, macOS 27.2 arm64, candidate 0.10.9 (`83aa64d`), 6 November 2026 | The log said `Latency set to 1024 frames`; the window said the new latency was not in use yet, with 256 frames still active; REAPER's delay-compensation display stayed at 256 samples, also after playback stopped. After save, quit and reopen both read 1024. The gap and the alignment at 1024 were not checked | Whether REAPER received Convolver's restart request, and what it did with it; whether the audio lines up after the change | [Record](../archive/reviews/2026-11-06-host1-reaper.md#part-c-window-and-settings) (step C5) |
-| The 2→6 crossover cannot be routed (VST3) | As above | On a six-channel track REAPER gave the plug-in 6 inputs and 6 outputs. Its *Request VST3 bus channel count* setting changes inputs and outputs together; no separate control was found. The 2-in, 6-out crossover preset was refused with `Load failed. Silent: the filter has 2 in, 6 out, the plug-in 6 in, 6 out.` The render, save-and-reopen and refused-preset steps were not run | Whether any REAPER setting gives a VST3 effect 2 inputs and 6 outputs | [Record](../archive/reviews/2026-11-06-host1-reaper.md#part-d-crossover-routing-blocker) (steps D1 to D5) |
 
 ## Production qualification
 

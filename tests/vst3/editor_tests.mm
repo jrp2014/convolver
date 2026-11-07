@@ -11,6 +11,7 @@
 // replaced meanwhile), and that a taller view asks the host to resize.
 #import "diagnostic_view.h"
 #include "processor.hpp"
+#include "public.sdk/source/common/memorystream.h"
 #include "public.sdk/source/vst/hosting/hostclasses.h"
 #include "recent_files.hpp"
 #import <AppKit/AppKit.h>
@@ -245,7 +246,7 @@ void window() {
                 p.getLatencySamples() == 1024,
             "restart");
     [shown refresh];
-    require([shown.settingValues[2].stringValue isEqualToString:@"21.3 ms"],
+    require([shown.settingValues[2].stringValue isEqualToString:@"adds 21.3 ms"],
             "Latency note after the restart " + text(shown.settingValues[2].stringValue));
 
     // Bypass: a click is one edit of the bypass parameter, and the host's
@@ -281,7 +282,7 @@ void window() {
     const auto file = folder / "room.wav";
     write_wav(file);
     require([shown loadFile:@(file.c_str())] && handler.dirty == 1, "file not loaded");
-    require([shown.statusField.stringValue isEqualToString:@"Playing"] &&
+    require([shown.statusField.stringValue isEqualToString:@"Active"] &&
                 [shown.filterNameField.stringValue isEqualToString:@"room.wav"],
             "after loading: " + text(shown.statusField.stringValue) + ", " +
                 text(shown.filterNameField.stringValue));
@@ -398,6 +399,74 @@ void window() {
     c.terminate();
     p.terminate();
 }
+// PLUG-22 with PLUG-23: a 2->6 crossover on a six-channel track has no dry
+// signal, so Mix is dimmed with the report's note under it, and stays
+// disabled across refreshes (reading the settings enables the controls).
+void mix_note() {
+    HostApplication context;
+    Handler handler;
+    Frame frame;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk && p.connect(&c) == kResultOk &&
+                c.connect(&p) == kResultOk,
+            "mix note initialize");
+    SpeakerArrangement six = SpeakerArr::k51;
+    require(p.setBusArrangements(&six, 1, &six, 1) == kResultOk, "mix note buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    convolver::HostState saved;
+    convolver::Configuration x{48000, 2, 6, 0, {}, {}, {}};
+    for (std::size_t o = 0; o < 6; ++o)
+        x.paths.push_back({{1.f}, {{o % 2, 1}}, {{o, 1}}});
+    saved.configuration = x;
+    MemoryStream state;
+    require(write_state(&state, saved), "mix note state");
+    state.seek(0, IBStream::kIBSeekSet, nullptr);
+    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+    require(p.setState(&state) == kResultOk && p.setupProcessing(setup) == kResultOk &&
+                p.setActive(true) == kResultOk,
+            "mix note activate");
+    IPlugView* view = c.createView(ViewType::kEditor);
+    ViewRect size;
+    require(view && view->getSize(&size) == kResultTrue && view->setFrame(&frame) == kResultTrue,
+            "mix note view");
+    NSWindow* host =
+        [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, size.getWidth(), size.getHeight())
+                                    styleMask:NSWindowStyleMaskTitled
+                                      backing:NSBackingStoreBuffered
+                                        defer:NO];
+    host.releasedWhenClosed = NO;
+    require(view->attached((__bridge void*)host.contentView, kPlatformTypeNSView) == kResultOk,
+            "mix note attach");
+    CONVOLVER_DIAGNOSTIC_VIEW* shown = find_view(host.contentView);
+    require(shown != nil, "mix note: no view");
+    for (int i = 0; i < 3; ++i) {
+        [shown refresh];
+        require([shown.statusField.stringValue isEqualToString:@"Active"] &&
+                    !shown.mixNoteField.superview.hidden &&
+                    [shown.mixNoteField.stringValue rangeOfString:@"Mix has no effect"].location !=
+                        NSNotFound &&
+                    !shown.settingSliders[1].enabled && !shown.settingValues[1].enabled &&
+                    shown.settingSliders[0].enabled,
+                "Mix not dimmed with a note, refresh " + std::to_string(i) + ": " +
+                    text(shown.mixNoteField.stringValue));
+    }
+    bool ignored = false;
+    for (NSTextField* value in shown.audioValues)
+        ignored = ignored ||
+                  [value.stringValue rangeOfString:@"inputs 3–6 ignored"].location != NSNotFound;
+    require(ignored, "Host channels does not name the ignored inputs");
+    require(view->removed() == kResultOk, "mix note remove");
+    view->release();
+    [host close];
+    p.setActive(false);
+    p.disconnect(&c);
+    c.disconnect(&p);
+    c.terminate();
+    p.terminate();
+}
 } // namespace
 
 int main() {
@@ -405,6 +474,7 @@ int main() {
         try {
             [NSApplication sharedApplication];
             window();
+            mix_note();
         } catch (const std::exception& e) {
             std::cerr << e.what() << '\n';
             return 1;

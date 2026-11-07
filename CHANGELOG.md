@@ -185,6 +185,49 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Plug-ins (PLUG-22, from jrp's review of 6 and 7 November 2026): the macOS
+  window (Audio Unit and VST3) names the filter at the top, with its
+  extension, and keeps the name after the project is reopened: the Audio
+  Unit as its preset name, VST3 in its controller state, shown only while
+  the filter saved with it plays. Beside the name is the status, now
+  **Active** in place of Playing, plus a new **Bypassed**; the host's Status
+  parameter reads the same. Under the name, the filter's own sample rate,
+  channels, length and speakers as labelled columns; a problem and its fix
+  sit in a box under them. The Audio section gives the host's values with
+  short labels (Host sample rate, Host channels, Host block size), says
+  which inputs a wider bus leaves unused, and drops Filter length and
+  Added delay, which the facts and the Latency row show. With no dry
+  signal (a crossover, say) the Mix slider dims with a note saying why it
+  has no effect, and Bypassed says the outputs are silent. VST3 shows
+  Bypassed as soon as the host or the window changes Bypass. Projects saved
+  by earlier versions open as before, without a name. No audible effect.
+- Library (PLUG-22): `HostStatus::playing` is renamed `HostStatus::active`,
+  and `HostStatus::bypassed` is added after `fault`; `host_status()` takes
+  whether the instance is bypassed. Hence version 0.11.0.
+- Plug-ins (PLUG-23): a filter now plays when the host gives more inputs than
+  it has, reading the first inputs and ignoring the rest; its outputs must
+  still match exactly. REAPER gives the VST3 plug-in six inputs on a
+  six-channel track, so the 2→6 crossover was refused there (HOST-1). Status
+  ends "plug-in inputs 3-6 ignored.", and the log and the window's report
+  say which inputs the filter reads. Whether there is a dry signal now
+  follows the filter's own counts, so a crossover still bypasses to silence
+  and stays fully filtered at any Mix, whatever the host's counts. Each filter
+  applies Mix by its own rule, so a replacement that changes whether there
+  is a dry signal crossfades without a gap or a jump, playing or bypassed.
+  The same in VST3, the Audio Unit and LV2 (an LV2 layout with more inputs
+  than the filter now plays it too). The audio of a filter on exactly its
+  own counts is unchanged.
+- Plug-ins (PLUG-23): bypass and Mix pass nothing when no filter plays and
+  passing the input could send full-range audio to a driver. A kept filter
+  that does not suit the host (another rate, say) has a dry signal only if
+  its own input and output counts are equal, so a 2→6 crossover kept at the
+  wrong rate stays silent bypassed. After a failed load with no filter kept
+  (a missing or unreadable file or preset, a first filter that does not fit,
+  or a project saved after such a failure) bypass and Mix pass nothing at
+  all, where they used to pass the input on a track with as many inputs as
+  outputs; a mono instance still passes it. A failed first load fades its dry
+  signal out with it. Status, the log's settings and the window's report give
+  the reason.
 - Development (DOC-8, from jrp's review of the agent guidance at `f6895f3`):
   the [workflow guide](docs/develop/workflow.md#verification-for-each-kind-of-change)
   says what each kind of change must run before a push (a prose-only change
@@ -542,6 +585,34 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- VST3 (PLUG-23, from jrp's REAPER crossover retest at `5d188a7`): a project
+  saved with the 2→6 crossover on a six-channel track played silence after
+  reopening, and after FX Offline then Online. REAPER starts the plug-in on
+  stereo buses, restores the saved state, and only then gives it the track's
+  six inputs and outputs; the plug-in refused the crossover against the
+  stereo buses, so nothing was left to play on six. Restored state is now
+  refused for not suiting the host's rate or channels only once the host has
+  played audio with them, and never when the host says it is restoring a
+  project (VST 3.6 `IStreamAttributes`). Until then a filter that does not
+  suit is kept, plays silence with the reason in Status and the log, and
+  plays as soon as the host starts the plug-in on buses that suit it. A
+  preset that does not suit an instance that has played audio is still
+  refused, and the previous filter keeps playing, also after the host
+  restarts the plug-in on the same rate and buses. A preset loaded into a
+  new instance before the host has played any audio, or just after the host
+  changed its rate or buses, is now kept silent rather than refused, and
+  replaces the filter that was loaded; saving then saves it. The log says
+  whether the host had played audio and whether it said it was restoring a
+  project. jrp's retest in REAPER 7.85 at `c3dbf0d` passed: the crossover
+  came back after reopening and after FX Online, and survived a save, quit
+  and reopen with the new build (REAPER does not say it is restoring a
+  project).
+- Plug-ins (PLUG-23): after a refused load, if the host later changes to a
+  rate or channels the refused filter would suit, Status no longer shows
+  counts that look as if they conflict ("the filter has 2 in, 6 out, the
+  plug-in 6 in, 6 out"); it says "the filter has 2 in, 6 out; the channels
+  have changed since." (or "the rate has changed since."), and the log keeps
+  the counts the load was refused against.
 - Tests (CI-33): `native.cli`'s no-clip case compared each pair of renders
   byte for byte, so its float case failed when the two files' `PEAK` chunks,
   in which libsndfile records the second a float WAV file was written,

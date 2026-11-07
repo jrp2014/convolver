@@ -23,4 +23,19 @@ inline cf_owned<CFStringRef> cf_string(const std::string& text) {
         CFStringCreateWithBytes(nullptr, reinterpret_cast<const UInt8*>(text.data()),
                                 static_cast<CFIndex>(text.size()), kCFStringEncodingUTF8, false));
 }
+
+// A CFString's text as UTF-8; empty if `value` is not a string. Allocates, so
+// it may throw std::bad_alloc.
+inline std::string utf8_text(CFTypeRef value) {
+    if (!value || CFGetTypeID(value) != CFStringGetTypeID())
+        return {};
+    const auto text = static_cast<CFStringRef>(value);
+    const auto range = CFRangeMake(0, CFStringGetLength(text));
+    CFIndex used = 0;
+    CFStringGetBytes(text, range, kCFStringEncodingUTF8, 0, false, nullptr, 0, &used);
+    std::string out(static_cast<std::size_t>(used), '\0');
+    CFStringGetBytes(text, range, kCFStringEncodingUTF8, 0, false,
+                     reinterpret_cast<UInt8*>(out.data()), used, nullptr);
+    return out;
+}
 } // namespace convolver::au

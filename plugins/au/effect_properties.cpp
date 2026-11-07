@@ -157,7 +157,8 @@ void Effect::update_status() noexcept {
         }
         status_log_written_ = host_log_written();
         // Gain and Mix change what plays without a filter (PLUG-10).
-        status_ = host_status(filter_, known_layout(), status_log_written_, settings());
+        status_ =
+            host_status(filter_, known_layout(), status_log_written_, settings(), bypass_.load());
         if (host_) // Render must not show Fault over a load failure.
             host_->hold_fault_signal(filter_.failure_shown());
         Globals()->SetParameter(status_parameter,
@@ -172,7 +173,8 @@ void Effect::update_status() noexcept {
 // independent review).
 void Effect::refresh_status_text() noexcept {
     try {
-        auto line = host_status(filter_, known_layout(), status_log_written_, settings());
+        auto line =
+            host_status(filter_, known_layout(), status_log_written_, settings(), bypass_.load());
         if (line.status == status_.status)
             status_.text = std::move(line.text);
     } catch (...) { // Out of memory: the previous text stays.
@@ -224,6 +226,7 @@ HostReport Effect::report_locked(std::string& faults) {
     facts.latency_frames = latency_.load();
     facts.tail_frames = tail_.load();
     facts.log_written = status_log_written_;
+    facts.bypassed = bypass_.load();
     facts.chooses_files = true; // Choose Filter in the window (load_property).
 #if defined(CONVOLVER_AU_READER_LIBSNDFILE)
     facts.file_reader = sndfile_version();
@@ -563,6 +566,25 @@ OSStatus Effect::SetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         UInt32 value = 0;
         std::memcpy(&value, data, sizeof value);
         bypass_.store(value != 0);
+        // PLUG-22: the Status says Bypassed. Faults Render met are explained
+        // first, so the new status does not hide them. While a load holds
+        // the lock this waits for nothing: the load's own update reads the
+        // bypass.
+        std::string faults;
+        bool updated = false;
+        try {
+            std::unique_lock lock(control_, std::try_to_lock);
+            if (lock.owns_lock()) {
+                faults = observe_faults();
+                update_status();
+                updated = true;
+            }
+        } catch (...) { // Out of memory: the status follows at the next update.
+        }
+        if (!faults.empty())
+            log_faults(faults);
+        if (updated)
+            notify_status();
         return noErr;
     }
     if (id == load_property) {

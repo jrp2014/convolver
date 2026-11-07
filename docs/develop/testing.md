@@ -268,12 +268,16 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   out clipping (the same at any Mix above 0; nothing clips at Mix 0), the message's parts and
   the window's action for each kind (DIAG-2: Choose Filter… only where the window chooses
   files, none for a preparation failure, Copy Diagnostics for a processing failure, other
-  faults in its note), the Filter row and
+  faults in its note), the filter's name and
   reference lines for a saved and a refused file, the filter path and
   files the window reloads and watches (an accepted file's, never a refused
   one's or saved state's), and the Latency that waits; and the Copy
   diagnostics text, which keeps only this process's lines for the instance
-  from a log written by several.
+  from a log written by several. PLUG-22: the filter's own facts under its
+  name (also before the host starts, and the speakers it names), the
+  Bypassed message for each dry-signal case, and the filter identity (16
+  hex digits, the same for the same filter, different for another or for
+  one changed sample).
 - `native.recent_files`: the windows' recent filter files (VST3-11) beside
   the log: newest first, no repeats, ten kept, paths with spaces and
   accents, no path with a line break, nothing left beside the list after
@@ -603,13 +607,21 @@ second instance, with one sample more refused. And the window's messages
 (VST3-3): the report's fields, a fresh report on request after a Gain
 change, no request for the host to reread the parameters while the
 Status line stays the same, a chosen WAV accepted (the project marked changed, the status
-Playing, the filter named and saved) or refused for its rate, an empty path,
+Active, the filter named and saved) or refused for its rate, an empty path,
 and a build with no file reader. The messages also go through a forwarding
 proxy and a deferring one, as a host may connect the components (VST3-15):
 the report, a new Latency (the host asked to restart only once the processor
 has it, and after three quick changes only for the last) and a chosen file accepted and refused (the project marked changed
 only for the accepted one). Where the build has no reader of its own
-(Linux and Windows), the test lends the processor libsndfile.
+(Linux and Windows), the test lends the processor libsndfile. PLUG-22's
+`saved_filter_name()` checks the controller state: its format read back,
+and damaged, newer, over-long or empty-field states read as no name; an
+instance with no file saving an empty state; a file's name saved,
+restored in a second instance in host order (component state, then the
+controller's) and shown with no file path, in the Copy Diagnostics text
+too, kept when saved again, and dropped for a preset of another filter;
+and Bypass set through the controller reading Bypassed, then Active, at
+once.
 
 On macOS `vst3.editor` opens the window (VST3-11) as a host does:
 `createView("editor")` (and nothing for another name), NSView only, not
@@ -623,7 +635,10 @@ edit per click, and following the host), a chosen WAV loaded and the
 project marked changed, the file in the Recent menu, Reload, a change to
 the file reloaded on the second check (not with the box unticked, and not
 when the file is gone), Copy Diagnostics, a resize request when the folded
-lines open, and `removed()`.
+lines open, and `removed()`. With a 2→6 crossover on a six-channel bus
+(PLUG-22 and PLUG-23) it checks that Mix is dimmed with the mix note under
+it over three refreshes, while Gain stays enabled, and that Host channels
+names the ignored inputs.
 
 The SDK validator runs in default and extensive (`-e`) modes. Extensive mode
 pairs 15 speaker arrangements (the adapter must accept or refuse each cleanly)
@@ -765,7 +780,7 @@ Five CTest tests run when the adapter is built (label `au`):
   Show Log at the right of the disclosure row, in that order, the view
   ending just under that row, the folded file, software and log lines making it taller
   when opened and closing back to the same height, the Audio facts (the mono track's Channels line marked
-  as a problem in words), the Filter row, the Gain and Mix sliders (ranges,
+  as a problem in words), the heading (the filter's name and status), the Gain and Mix sliders (ranges,
   a slider setting its parameter, a value typed through the field editor
   setting it and keeping the box's focus after Return, clamped at the
   range's end, text that is not a number changing nothing, the reset that
@@ -776,7 +791,7 @@ Five CTest tests run when the adapter is built (label `au`):
   change), a host change moving the slider), the window following the
   host window's light and dark appearance, the Latency menu
   (its choices, the time it adds, a choice setting the parameter and the
-  Added delay fact showing the new latency in use, a host change moving
+  Latency row showing the new latency in use, a host change moving
   the menu), its status and
   text before and after the fix, Copy Diagnostics (onto a
   private pasteboard), the accessibility names (AppKit sets the buttons'
@@ -785,12 +800,12 @@ Five CTest tests run when the adapter is built (label `au`):
   shown and the window accepts dropped file URLs (neither the
   file dialog nor a drag is driven: a headless runner has no user to answer
   them), then the view's load step, which both use: a stereo WAV plays, the
-  Filter row, the reference lines and the load property name it, and the saved state equals
+  heading, the reference lines and the load property name it, and the saved state equals
   `filter_file_state()`'s with the same reader; the accepted file sends
   `ClassInfo` and `PresentPreset` notifications and becomes the present
   preset, whose name the saved state carries and a restore in another unit
   brings back; a mono WAV and a missing file are refused with the file
-  named (the Filter row notes the refused file), the stereo filter still playing and saved and the preset name
+  named (the note under the heading names the refused file), the stereo filter still playing and saved and the preset name
   kept; on an empty unit a refused first file leaves it silent. The
   dialog's answer is driven in two steps (`startChoosing`,
   `finishChoosing:URL:`), without a dialog or the mouse: only the pending
@@ -801,7 +816,7 @@ Five CTest tests run when the adapter is built (label `au`):
   while it holds the control lock (the adapter's `load_started_for_tests`
   hook, null in the component), and a report read must return within 10 s
   with the last report ("No filter"); once the load is released the report
-  says Playing within 10 s (the restore also wakes the Latency worker, which
+  says Active within 10 s (the restore also wakes the Latency worker, which
   may hold the lock a moment longer). A file chosen in the window is read on
   the main thread, so this does not cover it. Then faults: invalid input rendered, the
   report says Fault and keeps Render's Fault value, and repeated reads, as an

@@ -101,11 +101,13 @@ struct Model {
     Host host;
     bool configured = true, active = false;
     bool rendered = false; // AU: this initialization has rendered audio.
+    // VST3: an earlier activation with the committed configuration rendered.
+    bool played = false;
     // Contract, replacement and threads: audio has been processed since the
     // last activation or reset; until then a filter is installed directly.
     bool started = false;
     bool settled_bypass = false;   // Bypass as of that activation or reset (no ramp).
-    std::optional<Host> committed; // Known while stopped (Known::activation, rendering).
+    std::optional<Host> committed; // Known while stopped (activation, played, rendering).
     bool bypass = false;
     // What the instance keeps and saves.
     std::optional<Which> filter;
@@ -147,6 +149,9 @@ bool known(const Context& x, const Model& m) {
     case Known::always:
         return true;
     case Known::activation:
+        return m.active || m.committed == m.host;
+    case Known::played:
+        return (m.rendered || m.played) && (m.active || m.committed == m.host);
     case Known::rendering:
         return m.active || m.committed == m.host;
     }
@@ -179,16 +184,21 @@ void restore(const Context& x, Model& m, std::optional<Which> filter, bool faile
     const auto request = ++m.requests;
     if (malformed)
         return reject(m, HostFailureKind::state_unreadable, request);
-    if (filter && known(x, m))
-        if (auto kind = mismatch(configuration(x.filters, *filter), m.host))
-            return reject(m, *kind, request);
+    const auto kind = filter ? mismatch(configuration(x.filters, *filter), m.host) : std::nullopt;
+    if (kind && known(x, m))
+        return reject(m, *kind, request);
     accept(x, m, filter, failed, request, false);
+    // VST3: restored while active but before audio has played, a filter that
+    // does not suit is kept silent, as at activation (jrp's REAPER retest).
+    if (kind && m.active && x.format.known == Known::played)
+        m.activation_failure = Failure{*kind, request, true};
 }
 // Contract, failure reasons: a mismatch found at activation belongs to the
 // request that supplied the filter, comes first, and clears at the next
 // activation that suits the filter.
 void start(const Context& x, Model& m) {
     m.active = true;
+    m.played = (m.played || m.rendered) && m.committed == m.host;
     m.rendered = false;
     m.started = false;
     m.settled_bypass = m.bypass;
@@ -196,7 +206,7 @@ void start(const Context& x, Model& m) {
     if (m.filter)
         if (auto kind = mismatch(configuration(x.filters, *m.filter), m.host))
             m.activation_failure = Failure{*kind, m.accepted, true};
-    if (x.format.known == Known::activation)
+    if (x.format.known == Known::activation || x.format.known == Known::played)
         m.committed = m.host;
 }
 void stop(const Context& x, Model& m) {
@@ -371,10 +381,25 @@ struct Audible {
         return kind == dry ? "the dry input" : kind == silence ? "silence" : "a filter";
     }
 };
+// Contract, bypass: the dry signal needs as many inputs as outputs in what
+// plays: the filter when it plays; with none playing, the host, and a kept
+// filter too. After a failed load with no filter kept there is none (PLUG-23,
+// jrp, 7 November 2026). With one input and one output there always is one
+// when no filter plays.
+bool has_dry(const Context& x, const Model& m) {
+    const auto& h = m.host;
+    const bool host_equal = h.inputs == h.outputs, mono = host_equal && h.outputs == 1;
+    if (m.filter) {
+        const auto& c = configuration(x.filters, *m.filter);
+        const bool equal = c.input_channels == c.output_channels;
+        return mismatch(c, h) ? host_equal && (mono || equal) : equal;
+    }
+    return host_equal && (mono || !m.failed);
+}
 Audible audible(const Context& x, const Model& m) {
     const auto& h = m.host;
     if (m.bypass)
-        return {h.inputs == h.outputs ? Audible::dry : Audible::silence, {}};
+        return {has_dry(x, m) ? Audible::dry : Audible::silence, {}};
     if (m.filter) {
         const auto& c = configuration(x.filters, *m.filter);
         if (mismatch(c, h))

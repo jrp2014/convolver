@@ -27,10 +27,11 @@ does not fit. Installing is in [install](install.md); making presets is in
   the wet/dry mix and the latency; the LV2 plug-in does not have them yet
   (its latency stays 256 samples).
 - A filter that does not fit the host's sample rate or channel counts never
-  lets unfiltered audio through (unless you bypass the plug-in or set its
-  Mix below 100%): a first filter that does not fit plays silence, and one
-  that replaces a working filter is refused, leaving the working filter
-  playing.
+  lets unfiltered audio through: a first filter that does not fit plays
+  silence, even bypassed, and one that replaces a working filter is refused,
+  leaving the working filter playing. Only a kept filter with as many inputs
+  as outputs still lets bypass and Mix pass the input (see
+  [bypass](#bypass)).
 
 Contents: [formats](#formats) · [channels](#channels) ·
 [loading a filter](#loading-a-filter) ·
@@ -62,6 +63,17 @@ Contents: [formats](#formats) · [channels](#channels) ·
 The plug-in has one input and one output. Each has 1 to 8 channels, and the
 counts may differ. More channels, or more inputs and outputs, are refused; use
 the [command-line tool](command-line.md) for wider filters.
+
+**More inputs than the filter needs.** A filter plays on its own number of
+outputs, exactly, and on at least its number of inputs: it reads the first
+ones and ignores the rest. Some hosts give a plug-in as many inputs as
+outputs: REAPER gives the VST3 plug-in six inputs on a six-channel track, so a
+2→6 crossover reads inputs 1 and 2 and ignores 3 to 6. Status then ends with
+"plug-in inputs 3-6 ignored.", and the [Convolver log](#status-and-the-convolver-log)
+and the window's Host channels line say the same (`6 in, 6 out (inputs 3–6
+ignored)`). Make sure the source plays on
+the inputs the filter reads. A filter with more inputs than the host gives,
+or with a different number of outputs, is refused.
 
 Channels are numbered in the host's order, and the `.cfg` routes refer to them
 in that order. For VST3 the order follows the speaker arrangement: 5.1 is left,
@@ -95,13 +107,16 @@ before any audio plays starts at once; one loaded during playback fades in
 
 In the Audio Unit, and in the VST3 plug-in on macOS, you can also choose the
 `.cfg` file, list or impulse response itself, in Convolver's window:
-**Choose…** beside Filter, or drop the file on the window
+**Choose…** under the filter's name, or drop the file on the window
 ([Convolver's window](#convolvers-window)). In LV2
 you choose it with the host's file chooser
 ([LV2 filter files](#lv2-filter-files)). Either way the plug-in reads the
 file as `convolver-preset` does, for the rate and channels the host has
 set, and the project then holds the filter itself, as with a preset: moving
-or deleting the file afterwards changes nothing.
+or deleting the file afterwards changes nothing. In the Audio Unit and VST3
+the project also keeps the file's name, with its extension, so the window
+names the filter after reopening; it does not keep the file's folder, so a
+project passed to someone else does not carry your folder names.
 
 ## When a filter does not fit
 
@@ -112,6 +127,7 @@ channel counts. Each plug-in checks it against the host:
 | --- | --- |
 | No filter loaded yet, equal input and output counts | The input, unchanged (after the latency) |
 | No filter loaded yet, different counts | Silence |
+| The host gives more inputs than the filter needs, and the outputs match | The filter, reading the first inputs; the rest are ignored ([channels](#channels)) |
 | The first filter does not fit, or its preset is damaged | Silence |
 | A new filter does not fit while another is playing | The working filter, unchanged; the project keeps saving it |
 | The filter is too large to save with the project | As for a filter that does not fit: silence for a first filter, otherwise the working filter |
@@ -145,8 +161,13 @@ happens next depends on the format:
 
 - **VST3 and Audio Unit** keep the filter. Set the host back to the filter's
   rate and layout and the filter returns; saving the project in between keeps
-  it. Some hosts briefly try a default 44.1 kHz before setting the real rate;
-  that does not count.
+  it. Some hosts briefly try a default 44.1 kHz before setting the real rate,
+  or, like REAPER, start the plug-in on stereo buses before giving it the
+  track's channels; that does not count. In VST3, a preset that does not fit
+  is refused only once the host has played audio with its rate and channels;
+  one loaded into a newly added instance before that is kept and plays
+  silence, with the reason in Status, until the host's rate and channels
+  suit it.
 - **LV2** refuses the filter as soon as the session opens, and `status` shows
   Load failed. **Do not save the session**: saving records the failure and
   drops the filter. Close it without saving and reopen it at the filter's rate,
@@ -180,18 +201,30 @@ example (some hosts show only the status name in the first column):
 
 | Status | Example text |
 | --- | --- |
-| Playing | `Filter loaded: 48000 Hz, 2 in, 2 out.` |
+| Active | `Filter loaded: 48000 Hz, 2 in, 2 out.` |
 | No filter | `No filter: audio passes unchanged. Load a Convolver preset.` |
 | Load failed (silence) | `Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in the Convolver log.` |
 | Load failed (previous filter kept) | `Load failed, previous filter kept: the filter has 2 in, 6 out, the plug-in 2 in, 2 out. Details in the Convolver log.` |
 | Not checked yet | `Filter loaded: 44100 Hz, 2 in, 2 out; checked when the host starts it.` |
 | Fault | `Fault: output too large, silenced and the filter restarted. Details in the Convolver log.` |
+| Bypassed | `Bypassed: the input plays unfiltered.` (`Bypassed: silent, as the filter's inputs and outputs differ.` for a filter with different input and output counts, such as a crossover) |
+
+**Active** means a filter is loaded and the host has started the plug-in at
+a rate and channel layout the filter suits. It does not follow the host's
+transport: a paused or stopped project still reads Active, as the filter is
+ready to play the moment audio arrives. **Bypassed** shows while the host's
+bypass (or, in VST3, the window's Bypass checkbox) is on and a filter is
+loaded; a problem (Load failed, Fault) still shows first. A host that
+switches the effect off altogether, rather than bypassing it, may route the
+audio around Convolver and stop calling it, so the status can stay as it
+was; what you hear then is the host's doing.
 
 The text also follows the [settings](#settings) when no filter
 is heard. With no filter loaded and Gain or Mix changed, it reads, for
-example, `No filter: audio passes at -20.0 dB (Gain and Mix).`; after a
-failed load with Mix below 100%, `Load failed, only the dry signal plays:
-...` instead of `Silent: ...`, as the dry share still plays. A filter at Mix
+example, `No filter: audio passes at -20.0 dB (Gain and Mix).`; when a
+kept filter does not fit and Mix is below 100%, `Load failed, only the dry
+signal plays: ...` instead of `Silent: ...`, as the dry share still plays
+(only where there is a dry signal: see [bypass](#bypass)). A filter at Mix
 0% adds `Mix 0%: only the dry signal plays.`
 
 **Fault** means something went wrong in the audio while it played, with or
@@ -287,9 +320,32 @@ From the top, the window has:
   plug-in process" when the host runs plug-ins in Apple's separate service,
   as GarageBand does (the Software line names that process). The VST3
   plug-in's Bypass checkbox sits at its right-hand end.
-- **The status** (Playing, No filter, Load failed, Not checked yet or Fault),
-  the same as the Status parameter, as a symbol and a coloured word, and
-  under them **the message**, as the log explains it, in parts:
+- **The filter's name** as the heading: the name of the file that plays,
+  with its extension (`Living room 48k.cfg`), so the kind of filter shows
+  too. A long name loses its middle, never its extension; hold the pointer
+  over it for all of it. The project and the host's presets keep the name
+  with the filter (the Audio Unit as its preset name, VST3 in its
+  controller state), so it is still there after reopening the project, but
+  not the file's folder: see [loading a filter](#loading-a-filter). A
+  project saved by an earlier Convolver, or a preset that holds no name,
+  shows "From the saved project or preset". With no filter it reads
+  "None". Under the name, the filter's own facts as labelled columns:
+  **Sample rate**, **Channels** (`2 in → 2 out`), **Length** and, when the
+  filter names them, **Speakers** (cut short with "…" if they do not fit;
+  hold the pointer over them for all of them). The Audio section further
+  down gives the host's values, which need not be the same: a filter made
+  for 2 inputs on a host track with 6, say. Under the facts, in
+  small text: a note when the newest file was refused, and a reminder that
+  a file can be dropped on the window.
+- **The status** beside the name (Active, Bypassed, No filter, Load failed,
+  Not checked yet or Fault), the same as the Status parameter, as a symbol
+  and a word, coloured for Active (green), Load failed (red) and Fault
+  (orange).
+- **The message**, under the heading, only when there is something to say.
+  A problem sits in a box tinted with the status colour; Bypassed's line
+  ("The input plays unfiltered. Turn bypass off to hear the filter.", or
+  that the outputs are silent when there is no dry signal, as with a
+  crossover; see [bypass](#bypass)) and a note are plain text. It explains as the log does, in parts:
 
   | Part | What it says |
   | --- | --- |
@@ -308,11 +364,10 @@ From the top, the window has:
   made for 1 input and 1 output.", the Choose Filter… button, and Note:
   "Hosts run an effect with one channel on a mono track (GarageBand does):
   put Convolver on a stereo track instead." While a filter simply plays,
-  the message is only the filter's rate and channels; with no filter, Fix
-  says what to load, with Choose Filter… under it.
-- **Filter:** the name of the file that plays (or "From the saved project or
-  preset" after reopening a project, which saves the filter itself, not the
-  file), a note when the newest file was refused, and **Choose…** beside it.
+  there is no message: the heading and the Audio section say what plays.
+  With no filter, Fix says what to load, with Choose Filter… under it.
+- **Choose…**, **Recent**, **Reload** and **Reload when the file changes**,
+  on one row under the message.
   Choose… opens the file dialog for a `.cfg` file, a
   configuration list or a sound file; dropping the file anywhere on the
   window does the same. The Audio Unit reads sound files with macOS's own reader, so
@@ -343,7 +398,7 @@ From the top, the window has:
   beside it. Where a sandbox refuses, the explanation says permission was
   denied. A preset always works.
 
-  Under the file name:
+  Beside Choose…:
 
   - **Recent** lists the filter files last loaded in a Convolver window, in
     any host or format (up to ten, newest first, each with its folder's
@@ -379,7 +434,9 @@ From the top, the window has:
   in its own box.
   Leaving a box without changing it sets nothing, so the rounded value it
   shows does not replace a more exact one, or one the host has set since.
-  Mix is labelled Dry and Wet at its ends. A host that shows
+  Mix is labelled Dry and Wet at its ends. When there is no dry signal
+  (a crossover, say: see [bypass](#bypass)) Mix has no effect, so its
+  label and slider are dimmed and a note under them says why. A host that shows
   Convolver's window shows it instead of its generic controls, so the
   settings are here. Moving a slider changes the setting and tells the
   host, and the sliders follow changes the host makes (automation, its own
@@ -388,24 +445,27 @@ From the top, the window has:
   automation from it may record each step separately; not yet tried in
   GarageBand.
 - **Latency**: a menu of block sizes, with the delay it adds at the host's
-  rate beside it. A new choice plays once the plug-in restarts with it,
-  and until then the row says it is "not in use yet" ([settings](#settings)).
-- **Audio**: what plays, in plain words, with the technical term in
-  brackets. Hold the pointer over a line for what it means.
+  rate beside it ("adds 21.3 ms"). A new choice plays once the plug-in
+  restarts with it, and until then the row says it is "not in use yet"
+  ([settings](#settings)). The host is told the delay, so it can delay
+  other tracks to keep them in time.
+- **Audio**: the host's values and what plays, each a short value. The
+  filter's own rate, channels, length and speakers are under its name, so
+  these lines say what the host gives, which need not be the same. Hold the
+  pointer over a line for what it means.
 
   | Line | What it says |
   | --- | --- |
-  | Sample rate | The host's rate, and whether the filter's matches (the filter's own rate when it does not) |
-  | Channels | The host's inputs and outputs, the speakers the filter's outputs are labelled for, and the filter's counts when they do not suit |
+  | Host sample rate | The rate the host runs the plug-in at |
+  | Host channels | The inputs and outputs the host gives the plug-in |
   | Routing | Which input feeds which output (`In 1 → Out 1`), with route gains such as `×0.5`; the first four paths, then how many more |
-  | Filter length | The longest filter, in time and in taps |
-  | Added delay | The latency, in time and frames, and a chosen one not in use yet |
   | Ring-out | How long the output goes on after the input stops (the tail) |
   | Loudest peak | The loudest output any full-scale input could make through the filter, and the Gain that rules out clipping (or that it cannot clip at the current Gain and Mix) |
-  | Host blocks | The largest block the host sends at a time |
+  | Host block size | The largest block the host sends at a time |
 
   A line that does not match (a filter for another rate, say) is marked with
-  a warning sign and says what differs, in red.
+  a warning sign and says what differs, in red: `44100 Hz ⚠ the filter is
+  for 48000 Hz`.
 - **File, software and log**, folded away under a disclosure triangle: the
   filter file's path and request number (and a refused file's), the software
   (version, FFT library, CPU kernels, the plug-in SDK, and what reads the
@@ -437,6 +497,11 @@ except:
   it is the same as the host's own bypass button, which it follows, and the
   host's undo and automation record it. The Audio Unit's window has none,
   since Audio Unit hosts show their own bypass button.
+- The filter's name after reopening comes from the controller state, and
+  is shown only while the filter saved with it plays: a preset or an undo
+  that brings another filter shows "From the saved project or preset".
+- Bypass changed in the window or by the host shows as Bypassed at once,
+  before audio next runs.
 - The window grows when the file, software and log lines are shown, and
   asks the host to make its window fit; the user cannot resize it.
 - The software line names macOS AudioToolbox as the reader of filter files,
@@ -452,7 +517,7 @@ defaults play exactly as Convolver did before the settings existed.
 | Setting | Values | Default | What it does |
 | --- | --- | --- | --- |
 | **Gain** | −100 to +24 dB | 0 dB | Scales the filtered signal, as the command line's `--gain-db` does. Negative values make room for a filter that boosts some frequencies; positive values make up level. |
-| **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. With different input and output counts there is no dry signal, so the mix stays at 100%. Like bypass, the input share still plays when a filter fails to load and the filtered sound is silent. |
+| **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. Whenever bypass plays silence there is no dry signal, so the mix stays at 100%: when the filter's input and output counts differ, and in the cases [bypass](#bypass) lists when no filter plays. Where bypass passes the input, the input share of Mix still plays while a kept filter is silent. |
 | **Latency** | 64, 128, 256, 512, 1024, 2048 or 4096 frames | 256 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. Smaller values mean less delay and more processor load; larger values the opposite. It is the old Convolver's partitions setting in modern form, and the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
 
 - Gain and Mix changes fade over 1.3 ms (64 samples at 48 kHz, 128 at
@@ -511,9 +576,35 @@ The host's bypass switch fades over 1.3 ms to the input, delayed by the
 latency so nothing jumps in time, and back. The filter keeps running
 underneath, so switching back loses nothing.
 
-With different input and output counts, bypass fades every output to silence
-instead: no output has an unfiltered counterpart, and bypassing a crossover
-must not send full-range audio to a tweeter.
+When the filter's input and output counts differ, bypass fades every output
+to silence instead: no output has an unfiltered counterpart, and bypassing a
+crossover must not send full-range audio to a tweeter. What counts is the
+filter, not the track: a 2→6 crossover on a six-channel REAPER track is
+bypassed to silence, and a 2-in, 2-out filter given six inputs and two
+outputs bypasses to inputs 1 and 2. Mix has no effect when the filter's
+counts differ: the sound stays fully filtered at any Mix.
+
+When no filter plays, bypass and Mix pass the input only where Convolver can
+tell that is safe:
+
+| Situation | Bypass and Mix |
+| --- | --- |
+| No filter loaded yet, on a track with as many inputs as outputs | Pass the input |
+| A filter is kept but does not suit the track (for example another sample rate) | Pass the input only if the filter and the track each have as many inputs as outputs. A kept 2→6 crossover stays silent |
+| A load failed and no earlier filter is kept: a missing or unreadable file or preset, a first filter that does not fit, or a project saved after such a failure | Silent: Convolver cannot tell that the failed filter was not a crossover |
+| The track's inputs and outputs differ | Silent |
+
+On a mono instance (one input, one output) the input always passes when no
+filter plays, as there is only one output. Status says which applies: after a
+failure, `Silent: ...` means bypass and Mix pass nothing. The Convolver log's
+`Settings:` and the window's copied diagnostics give the reason, such as `mix
+100% wet (a load failed and no filter is kept, so there is no dry signal)`.
+
+This is Convolver's own **Bypass** (the host's bypass button where it uses
+it). A host that takes the effect out of the signal path altogether, such as
+switching it off or offline, may route the track's audio around Convolver,
+unfiltered, to its outputs; Convolver cannot prevent that. With a crossover,
+check in the host which kind of bypass its button uses before relying on it.
 
 VST3 saves bypass with the filter. Audio Unit and LV2 hosts save and restore
 the bypass switch themselves (in LV2 it is the `enabled` control), so loading
@@ -546,7 +637,9 @@ is installed at once.
 
 An LV2 plug-in's inputs and outputs are fixed, so each layout is its own
 plug-in: 1→1, 2→2, 1→2, 2→4, 2→6, 2→8, 6→6 and 8→8. Choose the one whose
-counts match your filter; [`convolver-preset`](presets.md) says which. Their
+counts match your filter; [`convolver-preset`](presets.md) says which. One with
+the filter's outputs and more inputs also plays it, reading the first inputs
+([channels](#channels)). Their
 URIs are `https://github.com/jrp2014/convolver/lv2#discrete-N-M`.
 
 ## LV2 ports

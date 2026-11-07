@@ -17,9 +17,9 @@
 // not a stable interface.
 namespace convolver {
 // The Status parameter's value names, in HostStatus order.
-inline constexpr std::array<const char*, 5> host_status_names{"Playing", "No filter", "Load failed",
-                                                              "Not checked yet", "Fault"};
-static_assert(static_cast<std::size_t>(HostStatus::fault) == host_status_names.size() - 1);
+inline constexpr std::array<const char*, 6> host_status_names{
+    "Active", "No filter", "Load failed", "Not checked yet", "Fault", "Bypassed"};
+static_assert(static_cast<std::size_t>(HostStatus::bypassed) == host_status_names.size() - 1);
 
 // What the adapter knows besides its HostFilter, under its control lock.
 struct HostReportFacts {
@@ -31,6 +31,8 @@ struct HostReportFacts {
     // not yet in use when they differ), and the tail.
     std::size_t latency_frames = 0, tail_frames = 0;
     bool log_written = true; // host_log_written()
+    // PLUG-22: the instance is bypassed (the host's switch or the window's).
+    bool bypassed = false;
     // The format's window can load a filter file (the Audio Unit's Choose
     // Filter), so an empty instance is told about it as well as presets.
     bool chooses_files = false;
@@ -65,19 +67,34 @@ struct HostReport {
     // All of it as text: the problem and what plays, then "Cause: ", "Fix: "
     // and "Note: " lines (advice.hpp), for the text report.
     std::string explanation;
-    // The window's Filter row: the accepted filter's file name ("From the
-    // saved project or preset" when it came from saved state, "None"), and
-    // a note about the newest request when it was refused.
+    // The window's heading: the accepted filter's file name, with its
+    // extension (for saved state, the name saved beside it, PLUG-22; "From
+    // the saved project or preset" when none was; "None"), and a note about
+    // the newest request when it was refused.
     std::string filter_name, filter_note;
+    // Under the name, the accepted filter's own values (jrp, 7 November
+    // 2026), which the Audio section's host values need not match: its rate
+    // ("48000 Hz"), channels ("2 in → 2 out"), length ("1.37 s") and the
+    // speakers its outputs are labelled for ("Front left, front right";
+    // empty when it names none).
+    // All empty without a filter.
+    std::string filter_rate, filter_channels, filter_length, filter_speakers;
+    std::string filter_taps; // "65536 taps": the longest path, for the length's tooltip.
+    // PLUG-22: which filter this is, as 16 hex digits, so a name saved
+    // beside it (VST3's controller state) is shown only while that filter
+    // plays: a hash of its shape (rate, counts, mask, delays, routes, path
+    // lengths) and the first and last 256 samples of each path, exact on
+    // every machine. Empty without a filter.
+    std::string filter_identity;
     // VST3-11: the accepted filter's file as chosen (UTF-8; empty when it came
     // from saved state), which the window's Reload reads again, and every
     // file it was read from (HostRequest::files), which the window watches
     // to reload when one changes.
     std::string filter_path;
     std::vector<std::string> filter_files;
-    // The real data, in the order the window lists it: sample rate,
-    // channels, routing, filter length, added delay, ring-out, loudest peak,
-    // host blocks (each only when known).
+    // The Audio section, in the order the window lists it: host sample
+    // rate, host channels, routing, ring-out, loudest peak, host block size
+    // (each only when known).
     std::vector<HostFact> audio;
     // The settings in words (settings_words()), for the text report; the
     // window shows them as its controls.
@@ -87,6 +104,10 @@ struct HostReport {
     // and whether the chosen Latency is not in use yet (latency_waits()).
     int sample_rate = 0;
     bool latency_waits = false;
+    // PLUG-23: for the window's Mix row, empty when Mix applies: why there
+    // is no dry signal (the filter's inputs and outputs differ, or with no
+    // filter the host's), so Mix has no effect and bypass plays silence.
+    std::string mix_note;
     // Reference material for problem reports, smaller and folded away in
     // the window: the filter file and request, software, log.
     std::vector<std::pair<std::string, std::string>> reference;
@@ -101,8 +122,9 @@ HostReport host_report(const HostFilter&, const HostReportFacts&);
 // summary (the status line), title, explanation, problem, plays, cause, fix,
 // note, action, filter name,
 // filter note, filter path, filter files (one per line), sample rate (digits, or empty), latency
-// waits ("yes" or "no"), audio (one line per fact: label, value, note, "problem" or empty, and
-// help, separated by tabs), reference (one "Label: value" line each), log path and log written
+// waits ("yes" or "no"), mix note, audio (one line per fact: label, value, note, "problem" or
+// empty, and help, separated by tabs), reference (one "Label: value" line each), log path and log
+// written
 // ("yes" or "no").
 std::vector<std::pair<std::string, std::string>> report_fields(const HostReport&);
 

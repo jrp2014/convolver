@@ -168,8 +168,8 @@ OSStatus Effect::Initialize() {
             // A filter that does not suit the host plays silence, and is kept so
             // that correcting the rate or channels brings it back. Gain and Mix
             // apply from the first frame, and the Latency is the block size.
-            auto next = std::make_unique<HostProcessor>(filter_.activate(host),
-                                                        GetMaxFramesPerSlice(), current);
+            auto next = std::make_unique<HostProcessor>(
+                filter_.activate(host), GetMaxFramesPerSlice(), current, host.inputs);
             next->set_bypass(bypass_.load());
             next->reset();
             tail_.store(next->tail_frames());
@@ -343,7 +343,8 @@ void Effect::apply_latency() noexcept {
             try {
                 // As Initialize builds it; Render switches at its next call.
                 next = std::make_unique<HostProcessor>(filter_.activate(*initialized_),
-                                                       GetMaxFramesPerSlice(), current);
+                                                       GetMaxFramesPerSlice(), current,
+                                                       initialized_->inputs);
                 next->set_bypass(bypass_.load());
                 next->reset();
             } catch (const std::exception& e) {

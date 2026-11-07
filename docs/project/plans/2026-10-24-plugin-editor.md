@@ -469,7 +469,9 @@ shared function so both use one code path.
   project is reopened it says the filter came from the saved project. Keeping
   the path for display across sessions would be a saved-format change
   (VST3's controller state, which is empty today, or an extra AU `ClassInfo`
-  key): see [decisions](#decisions-for-jrp).
+  key): see [decisions](#decisions-for-jrp). Superseded on 6 November 2026
+  by PLUG-22: the file's name (not its folder) is kept, as the Audio Unit's
+  preset name and in VST3's controller state.
 - **Settings are parameters.** The window changes gain, mode, mix and
   latency as any generic host control would (VST3 `beginEdit`,
   `performEdit`, `endEdit`; AU `AUParameterSet` with gesture events; LV2
@@ -792,6 +794,9 @@ them: the Gain range (PLUG-10), new parameter IDs and LV2 port symbols.
 7. **The chosen path (decided):** shown for the current session and written
    to the log, not saved with the project. Saving it for display would add
    VST3 controller state and an AU `ClassInfo` key, a format change.
+   Superseded by PLUG-22 (jrp, 6 November 2026): the project keeps the
+   file's name, with its extension and without its folder, for the window
+   ([decisions](../decisions.md)).
 8. **Accessibility (decided):** highly desirable, not essential. The goals
    above are checked in each window phase (VoiceOver in REAPER), and gaps are
    recorded rather than blocking.

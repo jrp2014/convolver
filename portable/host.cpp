@@ -54,11 +54,14 @@ std::optional<Mismatch> mismatch(const Configuration& c, const HostLayout& host,
                  made + ".",
              {}}};
     }
-    if (c.input_channels != host.inputs || c.output_channels != host.outputs) {
+    // PLUG-23: more inputs than the filter's are fine (it reads the first
+    // ones); fewer are not, and the outputs must match.
+    if (c.input_channels > host.inputs || c.output_channels != host.outputs) {
         const auto made = counts(c.input_channels, c.output_channels),
                    given = counts(host.inputs, host.outputs);
         Advice a{filter + " has " + made + ", and the plug-in has " + given,
-                 "A filter plays only with the channel counts it was made for.",
+                 "A filter plays only with the outputs it was made for, and with at least its "
+                 "inputs: it reads the first ones and ignores any others.",
                  "Give the plug-in " + made +
                      " in the host's track or routing settings, or load a filter made for " +
                      given + ".",
@@ -228,12 +231,16 @@ bool same_rate(const HostLayout& a, const HostLayout& b) noexcept {
     return a.sample_rate == b.sample_rate && a.fractional_rate == b.fractional_rate;
 }
 
-Configuration unfiltered_configuration(const HostLayout& host, bool failed) {
+Configuration unfiltered_configuration(const HostLayout& host, bool failed, bool dry) {
     Configuration c;
     c.sample_rate = host.sample_rate;
     c.input_channels = host.inputs;
     c.output_channels = host.outputs;
-    if (failed || host.inputs != host.outputs) {
+    if (failed || !dry || host.inputs != host.outputs) {
+        // PLUG-23: fewer inputs than outputs, so no dry signal (HostProcessor
+        // follows the configuration's counts).
+        if (!dry && host.inputs == host.outputs && host.outputs > 1)
+            c.input_channels = 1;
         // One all-zero response: exact silence on every output, and no tail.
         c.paths.push_back({{0.f}, {{0, 1}}, {{0, 1}}});
         return c;
@@ -241,6 +248,15 @@ Configuration unfiltered_configuration(const HostLayout& host, bool failed) {
     for (std::size_t i = 0; i < host.inputs; ++i)
         c.paths.push_back({{1.f}, {{i, 1}}, {{i, 1}}});
     return c;
+}
+
+std::string ignored_inputs(const Configuration& c, const HostLayout& host, const char* dash) {
+    if (host.inputs <= c.input_channels)
+        return {};
+    const auto first = std::to_string(c.input_channels + 1);
+    if (host.inputs == c.input_channels + 1)
+        return "input " + first;
+    return "inputs " + first + dash + std::to_string(host.inputs);
 }
 
 std::string HostFilter::error() const {
@@ -321,7 +337,7 @@ void HostFilter::refuse(HostFailureKind kind, Advice why, const HostRequest& req
 
 void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
                       const std::function<void(const Configuration&)>& install, HostRequest request,
-                      HostProcessor* counting) {
+                      HostProcessor* counting, bool keep_mismatch) {
     request = numbered(std::move(request));
     auto& next = state.configuration;
     const Configuration* carried = next ? &*next : nullptr;
@@ -331,7 +347,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     // saved never part (jrp's review of 0.4.30). Without the host's
     // configuration, activation checks the speakers.
     Advice notice;
-    std::optional<HostFailure> saved_failure;
+    std::optional<HostFailure> saved_failure, kept_failure;
     double peak = 0;
     try {
         if (state.failed && next)
@@ -360,9 +376,23 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
             if (auto why = host_state_size_error(state); !why.empty())
                 refuse(HostFailureKind::too_large, std::move(why), request, carried);
         if (host && next) {
-            if (auto m = mismatch(*next, *host))
-                refuse(m->kind, std::move(m->why), request, carried);
-            notice = speaker_notice(*next, *host);
+            if (auto m =
+                    mismatch(*next, *host, keep_mismatch ? "the saved filter" : "the filter")) {
+                if (!keep_mismatch)
+                    refuse(m->kind, std::move(m->why), request, carried);
+                // Kept, as activate() keeps a filter that does not suit.
+                HostFailure f;
+                f.kind = m->kind;
+                f.request = request;
+                f.sample_rate = next->sample_rate;
+                f.inputs = next->input_channels;
+                f.outputs = next->output_channels;
+                f.silent = true;
+                f.message = std::move(m->why);
+                kept_failure = std::move(f);
+            } else {
+                notice = speaker_notice(*next, *host);
+            }
         }
         // For the window's Loudest peak; on the control side with the rest of
         // the preparation, so a report never has to compute it.
@@ -381,10 +411,18 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
             saved_failure = std::move(f);
         }
         if (host && install) {
+            // A kept filter that does not suit plays silence; the dry signal
+            // follows dry_signal_rule() for a kept filter.
             const auto unfiltered =
-                next ? Configuration{} : unfiltered_configuration(*host, state.failed);
+                kept_failure
+                    ? unfiltered_configuration(
+                          *host, true,
+                          host->inputs == host->outputs &&
+                              (host->outputs == 1 || next->input_channels == next->output_channels))
+                : next ? Configuration{}
+                       : unfiltered_configuration(*host, state.failed);
             try {
-                install(next ? *next : unfiltered);
+                install(next && !kept_failure ? *next : unfiltered);
             } catch (const SupersededRequest&) {
                 throw; // Abandoned: nothing recorded or changed.
             } catch (const std::exception& e) {
@@ -416,7 +454,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     failed_ = state.failed;
     accepted_ = std::move(request);
     load_failure_ = std::move(saved_failure);
-    activation_failure_.reset();
+    activation_failure_ = std::move(kept_failure);
     notice_ = std::move(notice);
     // A new filter, or a new start for the same one: Fault clears. One
     // snapshot of the processor's counts is the baseline of both the audio
@@ -460,7 +498,7 @@ Configuration HostFilter::activate(const HostLayout& host) {
         f.silent = true;
         f.message = std::move(m->why);
         activation_failure_ = std::move(f);
-        return unfiltered_configuration(host, true);
+        return unfiltered_configuration(host, true, dry_signal(*this, host));
     }
     notice_ = speaker_notice(*filter_, host);
     return *filter_;
@@ -644,6 +682,11 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
         if (f.sample_rate <= 0) // Not recorded: say only what is known.
             return host ? "the filter is not for the host's " + host_rate_text(*host) + "."
                         : "the filter is for another rate.";
+        // A refused load's rate may suit the host now (it changed its rate
+        // since): say only what was refused.
+        if (host && host->fractional_rate == 0 && host->sample_rate == f.sample_rate)
+            return "the filter is for " + std::to_string(f.sample_rate) +
+                   " Hz; the rate has changed since.";
         return "the filter is for " + std::to_string(f.sample_rate) + " Hz" +
                (host ? ", the host runs at " + host_rate_text(*host) + "." : ".");
     case HostFailureKind::channels:
@@ -651,10 +694,15 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
             return host ? "the filter does not suit the plug-in's " +
                               ports(host->inputs, host->outputs) + "."
                         : "the filter has other channel counts.";
+        // PLUG-23: a refused load's counts may suit the host now (it
+        // changed its buses since): then say only what was refused, not
+        // counts that look as if they still conflict (jrp's crossover
+        // retest, 7 November 2026).
+        if (host && f.inputs <= host->inputs && f.outputs == host->outputs)
+            return "the filter has " + ports(f.inputs, f.outputs) +
+                   "; the channels have changed since.";
         return "the filter has " + ports(f.inputs, f.outputs) +
-               (host && (host->inputs != f.inputs || host->outputs != f.outputs)
-                    ? ", the plug-in " + ports(host->inputs, host->outputs) + "."
-                    : ".");
+               (host ? ", the plug-in " + ports(host->inputs, host->outputs) + "." : ".");
     case HostFailureKind::preparation:
         return "the filter could not be prepared.";
     case HostFailureKind::activation:
@@ -668,14 +716,54 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
 }
 } // namespace
 
+HostDrySignal dry_signal_rule(const HostFilter& filter, const HostLayout& host) noexcept {
+    const auto& f = filter.failure();
+    const auto& c = filter.filter();
+    const auto counts = [](std::size_t inputs, std::size_t outputs) {
+        return inputs == outputs ? HostDrySignal::present : HostDrySignal::filter_counts;
+    };
+    if (c && !(f && f->silent)) // A filter plays: its own counts (PLUG-23).
+        return counts(c->input_channels, c->output_channels);
+    if (host.inputs != host.outputs)
+        return HostDrySignal::host_counts;
+    // No filter plays. A kept filter's counts decide too, and with none kept
+    // after a failed load there is no dry signal (jrp, 7 November 2026): a
+    // kept crossover must not send full-range audio to a driver, and nothing
+    // shows that a filter that failed to load was not one. With one output
+    // there is no driver to protect (and unfiltered_configuration() has no
+    // silence without a dry signal).
+    if (host.outputs == 1)
+        return HostDrySignal::present;
+    if (c)
+        return counts(c->input_channels, c->output_channels);
+    if (filter.failed() || (f && f->silent))
+        return HostDrySignal::failed_load;
+    return HostDrySignal::present; // An empty instance passes its input.
+}
+
+const char* no_dry_reason(HostDrySignal rule) noexcept {
+    switch (rule) {
+    case HostDrySignal::present:
+        return "";
+    case HostDrySignal::filter_counts:
+        return "the filter's inputs and outputs differ";
+    case HostDrySignal::failed_load:
+        return "a load failed and no filter is kept";
+    case HostDrySignal::host_counts:
+        return "inputs and outputs differ";
+    }
+    return "";
+}
+
 HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLayout>& host,
-                           bool log_written, const HostSettings& settings) {
+                           bool log_written, const HostSettings& settings, bool bypassed) {
     const char* details =
         log_written ? " Details in the Convolver log." : " The log could not be written.";
     HostStatusLine line;
     // PLUG-10: Mix lets the dry input through only with equal counts, which
-    // are known once the host has started the instance.
-    const bool dry_known = host && host->inputs == host->outputs;
+    // are known once the host has started the instance (PLUG-23: the
+    // filter's own counts while it plays).
+    const bool dry_known = host && dry_signal(filter, *host);
     const bool dry_unknown = !host && clamp_mix(settings.mix) < 1;
     // What plays with no filter heard, before the reason: "Silent: " only
     // when Mix lets no dry signal through.
@@ -698,11 +786,23 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
     } else if (filter.faults().any() && !filter.failed()) {
         line.status = HostStatus::fault;
         line.text = "Fault: " + short_fault(filter.faults()) + details;
+    } else if (bypassed && filter.filter()) {
+        // As HostProcessor bypasses: the delayed input on each output when
+        // there is a dry signal, otherwise silence (dry_signal_rule).
+        line.status = HostStatus::bypassed;
+        const auto rule = host ? dry_signal_rule(filter, *host) : HostDrySignal::present;
+        line.text = !host ? "Bypassed: no filter is applied."
+                    : rule == HostDrySignal::present
+                        ? "Bypassed: the input plays unfiltered."
+                        : std::string("Bypassed: silent, as ") + no_dry_reason(rule) + ".";
     } else if (const auto& c = filter.filter()) {
-        line.status = host ? HostStatus::playing : HostStatus::unchecked;
+        line.status = host ? HostStatus::active : HostStatus::unchecked;
+        const auto ignored = host ? ignored_inputs(*c, *host, "-") : std::string();
         line.text = "Filter loaded: " + std::to_string(c->sample_rate) + " Hz, " +
                     ports(c->input_channels, c->output_channels) +
-                    (host ? "." : "; checked when the host starts it.");
+                    (!host             ? "; checked when the host starts it."
+                     : ignored.empty() ? "."
+                                       : "; plug-in " + ignored + " ignored.");
         if (host && !filter.notice().empty())
             line.text += log_written ? " Speaker labels differ; see the Convolver log."
                                      : " Speaker labels differ.";
@@ -749,13 +849,28 @@ constexpr std::size_t frames_at(int rate, std::size_t frames) noexcept {
 static_assert(frames_at(48000, 64) == 64 && frames_at(48000, 256) == 256);
 static_assert(frames_at(44100, 64) == 59 && frames_at(96000, 256) == 512);
 static_assert(frames_at(8000, 64) == 11 && frames_at(768000, 256) == 4096);
+// PLUG-23: the engine for `c` reading `inputs` inputs: the inputs it does
+// not have are added with no route from them, so they are read and ignored.
+Engine fitted_engine(const Configuration& c, std::size_t block, std::size_t inputs) {
+    if (c.input_channels >= inputs)
+        return Engine(c, block);
+    auto wider = c;
+    wider.input_channels = inputs;
+    if (!wider.input_delays.empty())
+        wider.input_delays.resize(inputs, 0);
+    return Engine(wider, block);
+}
 } // namespace
 struct HostProcessor::Impl {
     struct Prepared {
         Engine engine;
+        // The filter's own rule for the dry signal (PLUG-23): input c to
+        // output c only when it has as many inputs as outputs.
+        bool dry;
         Prepared* next_retired = nullptr;
         std::uint64_t number = 0; // Publications are numbered from 1, in order.
-        explicit Prepared(const Configuration& c, std::size_t block) : engine(c, block) {}
+        Prepared(const Configuration& c, std::size_t block, std::size_t inputs)
+            : engine(fitted_engine(c, block, inputs)), dry(c.input_channels == c.output_channels) {}
     };
     static_assert(std::atomic<Prepared*>::is_always_lock_free);
     static_assert(std::atomic<std::size_t>::is_always_lock_free);
@@ -817,14 +932,15 @@ struct HostProcessor::Impl {
     bool bypass = false;
     bool started = false; // Audio processed since construction or reset.
     Impl(const Configuration& c, std::size_t maximum_, std::size_t block_,
-         const HostSettings& settings = {})
-        : rate(c.sample_rate), inputs(c.input_channels), outputs(c.output_channels),
-          maximum(maximum_), block(block_) {
-        if (!inputs || !outputs || inputs > max_channel_count || outputs > max_channel_count ||
-            !maximum || maximum > max_block_frames ||
-            std::max(inputs, outputs) * maximum > (1U << 24))
+         const HostSettings& settings = {}, std::size_t inputs_ = 0)
+        : rate(c.sample_rate), inputs(std::max(inputs_, c.input_channels)),
+          outputs(c.output_channels), maximum(maximum_), block(block_) {
+        if (!c.input_channels || !outputs || inputs > max_channel_count ||
+            outputs > max_channel_count || !maximum || maximum > max_block_frames ||
+            std::max(inputs, outputs) * maximum > (1U << 24) ||
+            (inputs_ && inputs_ < c.input_channels))
             throw std::invalid_argument("invalid host channel count or callback capacity");
-        auto prepared = std::make_unique<Prepared>(c, block);
+        auto prepared = std::make_unique<Prepared>(c, block, inputs);
         input.resize(inputs * maximum);
         wet.resize(outputs * maximum);
         old_wet.resize(wet.size());
@@ -836,8 +952,10 @@ struct HostProcessor::Impl {
         mix_setting = static_cast<float>(clamp_mix(settings.mix));
         mix = mix_target = target_mix();
     }
+    // Mix ramps as set; each filter applies it only if it has a dry signal
+    // (process()), so a replacement that changes that never jumps.
     float target_mix() const noexcept {
-        return inputs == outputs ? mix_setting : 1.f;
+        return mix_setting;
     }
     // Audio thread, at the start of a call: a new gain or mix starts a ramp.
     void retarget() noexcept {
@@ -867,9 +985,10 @@ struct HostProcessor::Impl {
         }
     }
     std::unique_ptr<Prepared> prepare(const Configuration& c) const {
-        if (c.sample_rate != rate || c.input_channels != inputs || c.output_channels != outputs)
+        if (c.sample_rate != rate || !c.input_channels || c.input_channels > inputs ||
+            c.output_channels != outputs)
             throw std::invalid_argument("replacement must preserve sample rate and channels");
-        return std::make_unique<Prepared>(c, block);
+        return std::make_unique<Prepared>(c, block, inputs);
     }
     void publish(std::unique_ptr<Prepared> prepared) noexcept {
         collect();
@@ -956,6 +1075,12 @@ struct HostProcessor::Impl {
                     // directly, so output follows the filter from the first frame.
                     retire(current);
                 }
+                // PLUG-23: the new filter may have a dry signal when the old
+                // one had none, or the reverse; each one's dry share fades
+                // with it (below). The delay line needs no clearing: a new
+                // filter is heard only after its warm-up, which is one
+                // block, the line's whole length, and the line is written
+                // throughout it.
                 current = next;
                 // A filter published before mute() is as silenced as the
                 // one it replaces (jrp's contract: silent until the next
@@ -1020,26 +1145,62 @@ struct HostProcessor::Impl {
                 --level_frames;
             if (previous_muted && previous_level_frames)
                 --previous_level_frames;
+            // PLUG-23: each filter mixes with its own dry rule: Mix applies
+            // only to a filter with a dry signal (otherwise it is fully
+            // wet), and bypass passes the dry signal only as far as such a
+            // filter plays. While a filter with a dry signal replaces one
+            // without, or the reverse, both fade with the crossfade, so
+            // neither bypass nor Mix jumps.
+            const bool dry_now = current->dry, dry_before = previous && previous->dry;
+            const float mix_now = dry_now ? mix : 1.f;
+            const float mix_before = dry_before ? mix : 1.f;
+            const bool same_rule = !previous || dry_now == dry_before;
             const float dry_mix = share(dry_frames), level = share(level_frames),
                         previous_level = share(previous_level_frames);
+            // A muted filter's dry signal ramps and stays silent with it
+            // (PLUG-23: a failed first load passes nothing), except with one
+            // output (dry_signal_rule()). An unmuted filter's level is exactly
+            // 1, which leaves every value as before.
+            const bool dry_mutes = outputs > 1;
+            const float dry_level = dry_mutes ? level : 1.f;
+            const float previous_dry_level = dry_mutes && previous ? previous_level : 1.f;
+            // Both filters' dry shares, crossfaded, where they apply alike.
+            const float shared_dry = dry_level == 1 && previous_dry_level == 1 ? 1.f
+                                     : previous
+                                         ? blend * dry_level + (1 - blend) * previous_dry_level
+                                         : dry_level;
+            const float dry_share = same_rule ? (dry_now ? shared_dry : 0.f)
+                                    : dry_now ? blend * dry_level
+                                              : (1.f - blend) * previous_dry_level;
             for (std::size_t c = 0; c < outputs; ++c) {
-                // Bypass passes input c to output c when the counts are equal. With
-                // unequal counts it plays silence on every output (owner's decision,
-                // 22 October 2026): no channel has an unfiltered counterpart, and a
-                // crossover must not send full-range audio to a driver.
+                // Bypass passes input c to output c when the filter's counts are
+                // equal. With unequal counts it plays silence on every output
+                // (owner's decision, 22 October 2026): no channel has an
+                // unfiltered counterpart, and a crossover must not send
+                // full-range audio to a driver. PLUG-23: the filter's counts,
+                // not the host's (a 2-in, 6-out filter on 6 inputs has no dry
+                // signal); with a dry signal, outputs <= inputs.
                 auto index = t * outputs + c;
                 auto& delayed = dry[dry_position * outputs + c];
-                float dry_value = delayed;
-                delayed = inputs == outputs ? input[t * inputs + c] : 0.f;
+                const float dry_value = delayed;
+                delayed = dry_now || dry_before ? input[t * inputs + c] : 0.f;
                 double value = level * static_cast<double>(wet[index]);
-                if (previous)
-                    value = (1.0 - blend) * previous_level * old_wet[index] + blend * value;
-                // Gain 1 and mix 1 (the defaults) leave every value exactly
-                // as it was before the settings existed.
-                value *= gain;
-                if (mix != 1)
-                    value = mix * value + (1.0 - mix) * dry_value;
-                value = (1.0 - dry_mix) * value + dry_mix * dry_value;
+                if (same_rule) {
+                    if (previous)
+                        value = (1.0 - blend) * previous_level * old_wet[index] + blend * value;
+                    // Gain 1 and mix 1 (the defaults) leave every value
+                    // exactly as it was before the settings existed.
+                    value *= gain;
+                    if (mix_now != 1)
+                        value = mix_now * value + (1.0 - mix_now) * shared_dry * dry_value;
+                } else {
+                    const double before = gain * previous_level * old_wet[index];
+                    value =
+                        blend * (mix_now * gain * value + (1.0 - mix_now) * dry_level * dry_value) +
+                        (1.0 - blend) * (mix_before * before +
+                                         (1.0 - mix_before) * previous_dry_level * dry_value);
+                }
+                value = (1.0 - dry_mix) * value + dry_mix * dry_share * dry_value;
                 if (!std::isfinite(value) || std::abs(value) > std::numeric_limits<float>::max()) {
                     value = 0;
                     invalid_output = true;
@@ -1077,6 +1238,10 @@ std::size_t offered_latency(std::size_t frames) {
 HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum,
                              const HostSettings& settings)
     : impl_(std::make_unique<Impl>(c, maximum, offered_latency(settings.latency), settings)) {}
+HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum,
+                             const HostSettings& settings, std::size_t inputs)
+    : impl_(std::make_unique<Impl>(c, maximum, offered_latency(settings.latency), settings,
+                                   inputs)) {}
 HostProcessor::~HostProcessor() = default;
 void HostProcessor::replace(const Configuration& c) {
     impl_->replace(c);
