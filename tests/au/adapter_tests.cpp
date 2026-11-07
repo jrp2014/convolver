@@ -912,11 +912,18 @@ void latency_parameter() {
         return eventually([&] { return u.seconds(kAudioUnitProperty_Latency) == frames / 48000; });
     };
     // The unit's Latency queue applies a choice: uninitialized, the reported latency
-    // follows it, and the host is told once.
+    // follows it, and the host is told once. The choices above woke the queue
+    // too, and its runs for them may notify after the listener is added: wait
+    // for them first, so that the count is this choice's alone (on 7 November
+    // 2026 a slow macOS Intel runner never saw exactly one). A run notifies
+    // before it reports itself finished, so once settled the count is final.
+    require(latency_settled(unit), "the Latency work for the earlier choices did not finish");
     seen.clear();
     set_parameter(unit, au::latency_parameter, 3);
-    require(eventually([&] { return seen.of(kAudioUnitProperty_Latency) == 1; }),
-            "no notification for a new Latency");
+    require(latency_settled(unit), "the Latency work for a new choice did not finish");
+    require(seen.of(kAudioUnitProperty_Latency) == 1,
+            "a new Latency notified " + std::to_string(seen.of(kAudioUnitProperty_Latency)) +
+                " times, not once");
     require(reports(unit, 512), "uninitialized latency is not the chosen 512 frames");
     set_parameter(unit, au::latency_parameter, 3);
     // The work for that choice has finished, so a notification would have come.
