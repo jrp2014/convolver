@@ -1755,7 +1755,7 @@ void status_lines() {
     // window): what was loaded, not yet checked.
     f.load(HostState{other_rate}, std::nullopt);
     check(host_status(f, std::nullopt), Status::unchecked,
-          "Filter loaded: 44100 Hz, 2 in, 2 out; waiting for the host to start audio.",
+          "Filter loaded: 44100 Hz, 2 in, 2 out; waiting for audio settings from the host.",
           "unchecked");
     // Checked at activation: silence, and why.
     static_cast<void>(f.activate(stereo));
@@ -1871,19 +1871,20 @@ void status_lines() {
     g.load(HostState{other_rate}, std::nullopt);
     require(loaded_line(g, false) ==
                 "Request 1: Loaded a filter for 44100 Hz, 2 in, 2 out; waiting "
-                "for the host to start audio.",
+                "for audio settings from the host.",
             "unchecked load line");
     require(rejected_line(g, true).empty(), "rejected line without a rejection");
     try {
         g.load(HostState{crossover}, stereo);
     } catch (const std::invalid_argument&) {
     }
-    require(rejected_line(g, true).rfind("Request 2: Not loaded; the previous filter keeps "
-                                         "playing: the filter has 2 inputs and 6 outputs, and "
-                                         "the host gives it 2 inputs and 2 outputs. Cause: ",
-                                         0) == 0 &&
-                rejected_line(g, true).find('\n') == std::string::npos,
-            "rejected line");
+    require(
+        rejected_line(g, true).rfind("Request 2: Not loaded; the previous filter keeps "
+                                     "playing: the filter has 2 inputs and 6 outputs, and "
+                                     "the host gives the plug-in 2 inputs and 2 outputs. Cause: ",
+                                     0) == 0 &&
+            rejected_line(g, true).find('\n') == std::string::npos,
+        "rejected line");
     // Before the host starts the plug-in, the kept filter does not play yet.
     require(rejected_line(g, false).rfind("Request 2: Not loaded; the previous filter is kept: ",
                                           0) == 0,

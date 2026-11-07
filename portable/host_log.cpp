@@ -162,7 +162,7 @@ std::string loaded_line(const HostFilter& filter, bool host_known) {
                detail::advice_line(f->message);
     if (const auto& c = filter.filter())
         return request + "Loaded " + filter_words(*c) +
-               (!host_known               ? "; waiting for the host to start audio."
+               (!host_known               ? "; waiting for audio settings from the host."
                 : filter.notice().empty() ? "."
                                           : "; " + detail::advice_line(filter.notice()));
     return request + "Loaded a saved project or preset with no filter.";

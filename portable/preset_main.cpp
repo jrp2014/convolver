@@ -42,7 +42,7 @@ constexpr const char* usage =
     "                        [--name NAME] INPUT NEW_PRESET [NEW_PRESET...]\n"
     "Writes a self-contained plug-in preset: the filter is embedded, so the preset\n"
     "keeps working if the original files move or are deleted.\n"
-    "  INPUT        an IR file (an impulse response in WAV or another sound file),\n"
+    "  INPUT        an IR file (an impulse response in a WAV or other sound file),\n"
     "               a .cfg, a configuration list, or a .vstpreset to convert\n"
     "  NEW_PRESET   the format follows the name; each must be a new path:\n"
     "                 NAME.vstpreset   VST3 preset file\n"

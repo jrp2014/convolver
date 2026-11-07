@@ -133,7 +133,7 @@ prints `Match`: the project kept the filter and its six outputs.
    Convolver log.`
 3. Render again and compare: still `Match`. To recover from a preset that
    does not fit, load the crossover preset from step 3 again, or a preset made
-   for your host's rate and the plug-in's 2 inputs and 6 outputs.
+   for your host's rate and the host's 2 inputs and 6 outputs.
 
 ## With the Audio Unit (macOS)
 

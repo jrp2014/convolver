@@ -26,7 +26,7 @@ constexpr const char* usage =
     "Writes a Convolver filter as an Equalizer APO configuration, so Windows can\n"
     "apply it to everything played through a device (except ASIO and WASAPI\n"
     "exclusive-mode playback, which bypass Equalizer APO).\n"
-    "  INPUT       an IR file (an impulse response in WAV or another sound file),\n"
+    "  INPUT       an IR file (an impulse response in a WAV or other sound file),\n"
     "              a .cfg or a configuration list; every entry of a list is exported\n"
     "  NEW_FOLDER  a new folder to create, holding convolver.txt and the\n"
     "              impulse responses as WAV files\n"

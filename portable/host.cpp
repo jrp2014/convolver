@@ -59,7 +59,7 @@ std::optional<Mismatch> mismatch(const Configuration& c, const HostLayout& host,
     if (c.input_channels > host.inputs || c.output_channels != host.outputs) {
         const auto made = counts(c.input_channels, c.output_channels),
                    given = counts(host.inputs, host.outputs);
-        Advice a{filter + " has " + made + ", and the host gives it " + given,
+        Advice a{filter + " has " + made + ", and the host gives the plug-in " + given,
                  "A filter plays only with the outputs it was made for, and with at least its "
                  "inputs: it reads the first ones and ignores any others.",
                  "Give the plug-in " + made +
@@ -762,7 +762,7 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
     case HostFailureKind::state_unreadable:
         return "the saved project or preset could not be read.";
     case HostFailureKind::state_newer:
-        return "the preset was saved by a newer Convolver.";
+        return "the project or preset was saved by a newer Convolver.";
     case HostFailureKind::sample_rate:
         if (f.sample_rate <= 0) // Not recorded: say only what is known.
             return host ? "the filter is not for the host's " + host_rate_text(*host) + "."
@@ -884,7 +884,7 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
         const auto ignored = host ? ignored_inputs(*c, *host, "-") : std::string();
         line.text = "Filter loaded: " + std::to_string(c->sample_rate) + " Hz, " +
                     ports(c->input_channels, c->output_channels) +
-                    (!host             ? "; waiting for the host to start audio."
+                    (!host             ? "; waiting for audio settings from the host."
                      : ignored.empty() ? "."
                                        : "; plug-in " + ignored + " ignored.");
         if (host && !filter.notice().empty())

@@ -57,10 +57,10 @@ use these words for the files you give Convolver and for what a host saves.
 | Sound file | Any file of audio samples: an IR file, or the input and output of the command-line tool. Used where the file's format matters | |
 | Configuration, `.cfg` | Convolver's text file that routes inputs through IRs to outputs ([configuration files](configuration.md)) | config, config file, filter configuration |
 | Configuration list | A text file that names several configurations or IR files; Convolver uses the first that fits the audio | list file |
-| Preset | A plug-in's filter and settings saved in the host's preset format (`.vstpreset`, `.aupreset` or an LV2 preset bundle) and loaded from the host's preset menu. A Convolver preset holds the whole filter. The host saves one from its preset menu, and `convolver-preset` makes one from a filter ([plug-in presets](presets.md)) | A `.cfg` or IR file is never a preset |
+| Preset | A plug-in's filter and settings saved in the host's preset format (`.vstpreset`, `.aupreset` or an LV2 preset bundle) and loaded from the host's preset menu. A Convolver preset holds the whole filter. The host saves one from its preset menu, and `convolver-preset` makes one from a filter ([plug-in presets](presets.md)) | a `.cfg` or IR file |
 | Project | The host's saved document, which keeps Convolver's filter and settings as a preset does. Ardour calls it a session | |
 | Settings | Gain, Mix, Latency and Bypass, in Convolver's window; hosts list them as parameters, with the read-only Status ([settings](plugins.md#settings)) | |
-| Start audio | The host starts the plug-in with its sample rate and channels. Until then the plug-in's status is Waiting: a filter can be loaded, but Convolver cannot yet tell whether it fits | |
+| Audio settings | The sample rate and channels the host gives the plug-in, usually when the plug-in is added or the project opens, not when you press Play. Until then the Status parameter of a plug-in with a filter loaded reads Waiting: Convolver cannot yet tell whether the filter fits | |
 
 At 48 kHz, 256 frames of latency is about 5.33 ms. That is Convolver's delay;
 audio devices and the host can add more. A smaller block reduces this delay but

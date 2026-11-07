@@ -78,7 +78,8 @@ void cases() {
              return host_report(f, facts(std::nullopt));
          },
          HostStatus::no_filter,
-         {"No filter is loaded.", "has not started", "Fix: Load a Convolver preset"},
+         {"No filter is loaded.", "has not sent its audio settings",
+          "Fix: Load a Convolver preset"},
          {"Silent"}},
         // The Audio Unit's window has Choose Filter.
         {"empty, the window chooses files",
@@ -114,8 +115,8 @@ void cases() {
              return host_report(f, facts(mono));
          },
          HostStatus::load_failed,
-         {"The saved filter has 2 inputs and 2 outputs, and the host gives it 1 input and 1 "
-          "output. Convolver plays silence.",
+         {"The saved filter has 2 inputs and 2 outputs, and the host gives the plug-in 1 input "
+          "and 1 output. Convolver plays silence.",
           "Fix: Give the plug-in 2 inputs and 2 outputs",
           "load a filter made for 1 input and 1 output",
           "Note: Hosts run an effect with one channel on a mono track",
@@ -236,8 +237,8 @@ void cases() {
              return host_report(f, facts(std::nullopt));
          },
          HostStatus::unchecked,
-         {"Waiting for the host to start audio", "fits the host's sample rate and channels"},
-         {"has not started"}},
+         {"Waiting for audio settings from the host", "fits the host's sample rate and channels"},
+         {"has not sent"}},
         {"fault",
          [&] {
              HostFilter f(8);
@@ -338,7 +339,8 @@ void cases() {
         require(
             w.filter_rate == "48000 Hz" && w.filter_channels == "2 in → 2 out" &&
                 w.filter_speakers == "Front left, front right" &&
-                contains(fact(w, "Host sample rate").value, "not known until the host starts") &&
+                contains(fact(w, "Host sample rate").value,
+                         "not known until the host sends its audio settings") &&
                 fact(w, "Host sample rate").note.empty() && fact(w, "Host channels").note.empty(),
             "filter facts before the host starts: " + w.filter_rate + " | " + w.filter_speakers);
         // PLUG-22: the identity a saved name is matched against: 16 hex
@@ -415,14 +417,15 @@ void cases() {
 
     // Before the host starts: what is known.
     const auto unstarted = host_report(HostFilter(8), facts(std::nullopt));
-    require(
-        contains(fact(unstarted, "Host sample rate").value, "not known until the host starts") &&
-            fact(unstarted, "Routing").value == "none" && !has_fact(unstarted, "Loudest peak") &&
-            !has_fact(unstarted, "Host block size") &&
-            !contains(report_text(unstarted), "Filter values:"),
-        "facts before start");
+    require(contains(fact(unstarted, "Host sample rate").value,
+                     "not known until the host sends its audio settings") &&
+                fact(unstarted, "Routing").value == "none" &&
+                !has_fact(unstarted, "Loudest peak") && !has_fact(unstarted, "Host block size") &&
+                !contains(report_text(unstarted), "Filter values:"),
+            "facts before start");
     require(unstarted.filter_name == "None" && unstarted.problem.empty() &&
-                unstarted.plays == "No filter is loaded. The host has not started audio yet.",
+                unstarted.plays ==
+                    "No filter is loaded. The host has not sent its audio settings yet.",
             "empty filter row");
 
     // A refused file while the previous filter plays: the problem shows in

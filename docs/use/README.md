@@ -36,7 +36,7 @@ and the plug-ins have not yet been tested in named DAWs. The
 
 | Page | Kind | What it covers |
 | --- | --- | --- |
-| [Concepts](concepts.md) | Background | Audio terms, latency, tails, files versus streams |
+| [Concepts](concepts.md) | Background | Audio terms, the words Convolver uses for filters, presets and projects, latency, tails, files versus streams |
 | [Your first filter](first-filter.md) | Tutorial | The bundled example filters with the command-line tool |
 | [Your first sound in a host](first-sound-in-a-host.md) | Tutorial | The example presets in a plug-in host |
 | [Check a stereo filter in a host](check-a-stereo-filter.md) | Tutorial | From download to a host render checked against the expected output |

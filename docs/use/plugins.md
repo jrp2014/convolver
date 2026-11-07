@@ -134,7 +134,7 @@ channel counts. Each plug-in checks it against the host:
 | The filter is too large to save with the project | As for a filter that does not fit: silence for a first filter, otherwise the working filter |
 
 **Size limit.** The host saves the whole filter in the project, and
-what Convolver saves in it holds at most 64 MiB: just under 16,777,216 samples
+Convolver can save at most 64 MiB in it: just under 16,777,216 samples
 counting every impulse response in the filter together: a stereo filter with
 one impulse response per channel can be about 2.9 minutes long at 48 kHz. A larger filter is refused when it is loaded,
 with the reason in Status and the log, so a project never plays a filter it
@@ -206,7 +206,7 @@ example (some hosts show only the status name in the first column):
 | No filter | `No filter: audio passes unchanged. Load a Convolver preset.` |
 | Load failed (silence) | `Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in the Convolver log.` |
 | Load failed (previous filter kept) | `Load failed, previous filter kept: the filter has 2 in, 6 out, the host 2 in, 2 out. Details in the Convolver log.` |
-| Waiting | `Filter loaded: 44100 Hz, 2 in, 2 out; waiting for the host to start audio.` |
+| Waiting | `Filter loaded: 44100 Hz, 2 in, 2 out; waiting for audio settings from the host.` |
 | Fault | `Fault: output too large, silenced and the filter restarted. Details in the Convolver log.` |
 | Bypassed | `Bypassed: the input plays unfiltered.` (`Bypassed: silent, as the filter's inputs and outputs differ.` for a filter with different input and output counts, such as a crossover) |
 
@@ -242,10 +242,10 @@ a filter loaded do not come back once it plays; the log still records them. Some
 while playing but fill in the log line and the text only when the project is
 saved or the host restarts the plug-in.
 
-**Waiting** means a filter is loaded but the host has not started audio for
-the plug-in yet, so Convolver does not know the host's sample rate and
-channels. When the host starts it, the status becomes Active if the filter
-fits, or Load failed if it does not. Some hosts show a separate copy of the
+**Waiting** means a filter is loaded but the host has not sent its audio
+settings (sample rate and channels) yet, usually because it has not started
+the plug-in; pressing Play is not needed. Once it sends them, the status
+becomes Active if the filter fits, or Load failed if it does not. Some hosts show a separate copy of the
 plug-in in its window, not the one that plays. Audacity's real-time effects
 window is one: its copy usually reads Waiting, but Audacity may start it briefly at
 44100 Hz, whatever the project's rate, and then it can read `Silent: the
@@ -255,7 +255,7 @@ own number (`VST3 #1`, `VST3 #2`), and the one playing logs `Started at` with
 your project's rate.
 
 **The Convolver log** is a text file with one line for each filter loaded,
-each time the host starts audio (with the sample rate, channels and block
+each time the host sends its audio settings (the sample rate, channels and block
 size), and each failure, explained in full with what to change. Each line
 starts with the time, the Convolver version, the format and instance (`VST3 #2`),
 the host program and its process number. Loads and refusals are numbered
@@ -363,8 +363,8 @@ From the top, the window has:
   Diagnostics** for a fault in Convolver itself.
 
   For example, a stereo preset on a GarageBand mono track reads "**The saved
-  filter has 2 inputs and 2 outputs, and the host gives it 1 input and 1
-  output.** Convolver plays silence.", then Cause: "A filter plays only with
+  filter has 2 inputs and 2 outputs, and the host gives the plug-in 1 input
+  and 1 output.** Convolver plays silence.", then Cause: "A filter plays only with
   the channel counts it was made for.", **Fix**: "Give the plug-in 2 inputs
   and 2 outputs in the host's track or routing settings, or load a filter
   made for 1 input and 1 output." (with Choose… highlighted), and Note:
@@ -423,7 +423,7 @@ From the top, the window has:
     the same by itself while the window is open, even behind other windows:
     once a second it checks the file and, for a `.cfg` or list, the files it
     names that make up the filter that plays (for a list, the lists and
-    `.cfg` files it reads and the sound files of the entry chosen, not those
+    `.cfg` files it reads and the IR files of the entry chosen, not those
     of other entries, which need not be installed), and reloads a second
     after one has changed, so a file still being written is not read half
     way. A file that has gone (moved or deleted)

@@ -198,10 +198,11 @@ Until 1.0 the C++ API may change between minor versions.
   saved state". Channel mismatches name the host's channels, as the window's
   "Host channels" does: "the filter has 2 in, 6 out, the host 2 in, 2 out"
   (was "the plug-in 2 in, 2 out"). The Status value "Not checked yet" is now
-  **Waiting** ("Filter loaded: 48000 Hz, 2 in, 2 out; waiting for the host to
-  start audio."; was "checked when the host starts it"), with the same value
-  and icon, and the window says "Waiting for the host to start audio. Then
-  the filter plays if it fits the host's sample rate and channels." The LV2
+  **Waiting** ("Filter loaded: 48000 Hz, 2 in, 2 out; waiting for audio
+  settings from the host."; was "checked when the host starts it", wording
+  from jrp's Audacity walkthrough), with the same value and icon, and the
+  window says "Waiting for audio settings from the host. The filter then
+  plays if it fits the host's sample rate and channels." The LV2
   status port's first label is Active, as in the VST3 and Audio Unit (was
   Running); its value is unchanged. No sound changes.
 - Plug-ins (PLUG-22, from jrp's review of 6 and 7 November 2026): the macOS

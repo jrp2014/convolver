@@ -202,7 +202,7 @@ format.
   `HostFilter::failure()`, so a refused replacement shows Load failed while
   the previous filter plays, as LV2's status port does. Before the host's
   configuration is known it is Waiting and names the filter's rate and
-  channels ("waiting for the host to start audio"). Adapters with [settings](#settings) pass them, so that the
+  channels ("waiting for audio settings from the host"). Adapters with [settings](#settings) pass them, so that the
   line says what is heard when no filter plays (jrp's review of 0.5.5): the
   input at the level Gain and Mix give it when no filter is loaded, and only
   the dry signal, not "Silent", when a kept filter does not suit the host at

@@ -356,7 +356,7 @@ except the Audio Unit build, which runs in a source checkout.
    only after stopping and starting playback again. The effect's window lists
    a read-only Status. Audacity's window has its own copy of the plug-in,
    which normally is not started, so Status should read `Filter loaded: 48000
-   Hz, 2 in, 2 out; waiting for the host to start audio.` Audacity may start that
+   Hz, 2 in, 2 out; waiting for audio settings from the host.` Audacity may start that
    copy briefly at 44100 Hz, and then Status reads `Silent: the filter is for
    48000 Hz, the host runs at 44100 Hz. ...` although the playing copy is
    fine. Record what it shows, and which `VST3 #n` lines the log has.

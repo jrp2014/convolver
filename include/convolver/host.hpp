@@ -459,8 +459,8 @@ enum class HostStatus {
     active = 0,
     no_filter = 1,   // An empty instance: identity, or silence for unequal counts.
     load_failed = 2, // The newest request failed, or the instance plays silence.
-    unchecked = 3,   // "Waiting": a filter is accepted, but the host has not started audio yet.
-    fault = 4,       // HostFilter::faults(): the audio met a problem while playing.
+    unchecked = 3, // "Waiting": a filter is accepted, but the host has sent no audio settings yet.
+    fault = 4,     // HostFilter::faults(): the audio met a problem while playing.
     // PLUG-22: the host or the window bypasses an instance with a filter, and
     // nothing is wrong: the input plays unfiltered, or silence for unequal
     // counts. Without a filter the status stays No filter.

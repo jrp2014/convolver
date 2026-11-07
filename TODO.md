@@ -1314,7 +1314,7 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **DOC-8 — Tune the agent guidance and workflow.** 6 November 2026,
   PR #129, from jrp's review; [workflow](docs/develop/workflow.md#kinds-of-task).
 - [x] **DOC-9 — Consistent words for filters, presets and projects.** 7
-  November 2026, from jrp's review, with clearer Waiting status wording;
+  November 2026, PR #136, from jrp's review, with clearer Waiting status wording;
   [words Convolver uses](docs/use/concepts.md#words-convolver-uses).
 - [x] **FFMPEG-1 — Test the pipe workflow.** 5 November 2026;
   [tests](docs/develop/testing.md#native-production-tests).

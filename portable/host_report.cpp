@@ -123,8 +123,8 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         // PLUG-22: while it plays, the window's heading names the filter and
         // the Audio section describes it, so nothing is said here.
         if (!host)
-            m.plays = "Waiting for the host to start audio. Then the filter plays if it fits the "
-                      "host's sample rate and channels.";
+            m.plays = "Waiting for audio settings from the host. The filter then plays if it fits "
+                      "the host's sample rate and channels.";
         if (host && !filter.notice().empty())
             take(filter.notice());
     } else if (filter.failed()) {
@@ -139,7 +139,7 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         m.action = choose;
     }
     if (!host && !(filter.filter() && !failure))
-        m.plays += " The host has not started audio yet.";
+        m.plays += " The host has not sent its audio settings yet.";
     if (latency_waits(facts))
         add_note(m, "Latency " + std::to_string(facts.settings.latency) +
                         " frames is chosen but not in use yet, so the plug-in keeps " +
@@ -241,7 +241,7 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
     const auto& c = filter.filter();
     const auto& failure = filter.failure();
     const int rate = host ? host->sample_rate : 0;
-    constexpr const char* not_started = "not known until the host starts audio";
+    constexpr const char* not_started = "not known until the host sends its audio settings";
 
     HostFact sample_rate{"Host sample rate",
                          host ? host_rate_text(*host) : std::string(not_started),

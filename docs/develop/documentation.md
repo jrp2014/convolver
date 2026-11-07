@@ -77,7 +77,8 @@ pages help only if each sentence can be understood on its own.
    every message a user reads (the window, the Status text, the log and the
    tools' output). Developer pages add two words users never see: the saved
    **state** is what a plug-in writes into a project or preset (a user
-   message says "the saved project or preset"), and a **CMake preset** or
+   message says "the saved project or preset"; only the technical detail
+   after it, such as "truncated host state", may name the state), and a **CMake preset** or
    **build configuration** is named in full wherever a plug-in preset or a
    filter's configuration could be meant.
 

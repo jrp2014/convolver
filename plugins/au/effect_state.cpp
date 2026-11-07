@@ -68,8 +68,8 @@ std::string foreign(CFDictionaryRef dict, const AudioComponentDescription& desc)
     };
     SInt32 version = -1, subtype = 0, manufacturer = 0;
     if (CFDictionaryContainsKey(dict, CFSTR(kAUPresetPartKey)))
-        return detail::advice_text({"the preset holds the state of one part of a multi-part "
-                                    "instrument, not of a whole effect",
+        return detail::advice_text({"the preset is for one part of a multi-part instrument, "
+                                    "not a whole effect",
                                     {},
                                     "Make a Convolver preset with convolver-preset.",
                                     {}});
