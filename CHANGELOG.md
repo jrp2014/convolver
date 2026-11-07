@@ -204,7 +204,7 @@ Until 1.0 the C++ API may change between minor versions.
   by earlier versions open as before, without a name. No audible effect.
 - Library (PLUG-22): `HostStatus::playing` is renamed `HostStatus::active`,
   and `HostStatus::bypassed` is added after `fault`; `host_status()` takes
-  whether the instance is bypassed. Hence version 0.11.0.
+  whether the instance is bypassed. Hence version 0.12.0 (PLUG-23 takes 0.11.0).
 - Plug-ins (PLUG-23): a filter now plays when the host gives more inputs than
   it has, reading the first inputs and ignoring the rest; its outputs must
   still match exactly. REAPER gives the VST3 plug-in six inputs on a
