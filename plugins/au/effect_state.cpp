@@ -265,7 +265,7 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                     })) {
                     const auto counts = host ? *host : layout();
                     message += " Restored settings: " +
-                               settings_words(settings(), dry_signal(filter_, counts)) + ".";
+                               settings_words(settings(), dry_signal_rule(filter_, counts)) + ".";
                 }
             }
         } catch (...) { // Out of memory for the message: it is dropped.
