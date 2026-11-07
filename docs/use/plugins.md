@@ -354,19 +354,22 @@ From the top, the window has:
   | What plays | What you hear now: the previous filter, silence, or the dry signal Mix lets through |
   | Cause | Why, in the host's terms |
   | **Fix** | What to do, the most likely fix first |
-  | A button | Under the fix, when the window can carry it out: **Choose Filter…** (the same as Choose…) when a different filter puts it right, **Copy Diagnostics** for a fault in Convolver itself |
   | Note | In smaller text: the host or design limit behind it, and when the status clears |
+
+  When a button in the window carries out the fix, it is highlighted in the
+  accent colour: **Choose…** when a different filter puts it right, **Copy
+  Diagnostics** for a fault in Convolver itself.
 
   For example, a stereo preset on a GarageBand mono track reads "**The saved
   filter has 2 inputs and 2 outputs, and the plug-in has 1 input and 1
   output.** Convolver plays silence.", then Cause: "A filter plays only with
   the channel counts it was made for.", **Fix**: "Give the plug-in 2 inputs
   and 2 outputs in the host's track or routing settings, or load a filter
-  made for 1 input and 1 output.", the Choose Filter… button, and Note:
+  made for 1 input and 1 output." (with Choose… highlighted), and Note:
   "Hosts run an effect with one channel on a mono track (GarageBand does):
   put Convolver on a stereo track instead." While a filter simply plays,
   there is no message: the heading and the Audio section say what plays.
-  With no filter, Fix says what to load, with Choose Filter… under it.
+  With no filter, Fix says what to load, and Choose… is highlighted.
 - **Choose…**, **Recent**, **Reload** and **Reload when the file changes**,
   on one row under the message.
   Choose… opens the file dialog for a `.cfg` file, a

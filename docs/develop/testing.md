@@ -266,7 +266,7 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   marked as problems, the Routing of a filter that is not playing, what is
   known before the host starts), the Loudest peak and the Gain that rules
   out clipping (the same at any Mix above 0; nothing clips at Mix 0), the message's parts and
-  the window's action for each kind (DIAG-2: Choose Filter… only where the window chooses
+  the window's action for each kind (DIAG-2: choose filter only where the window chooses
   files, none for a preparation failure, Copy Diagnostics for a processing failure, other
   faults in its note), the filter's name and
   reference lines for a saved and a refused file, the filter path and
@@ -776,8 +776,8 @@ Five CTest tests run when the adapter is built (label `au`):
   logged once), then the view the factory makes, attached to an off-screen
   window: its size fitted to the content whatever size the host offers
   (between 300 and 680 points high), the message (problem, what plays, and
-  the Cause and Fix rows), the Choose Filter… button under it and aligned
-  with the fix, the note's row, the Audio facts, and Copy Diagnostics and
+  the Cause and Fix rows), Choose… highlighted as the fix's button (no
+  second button in the message), the note's row, the Audio facts, and Copy Diagnostics and
   Show Log at the right of the disclosure row, in that order, the view
   ending just under that row, the folded file, software and log lines making it taller
   when opened and closing back to the same height, the Audio facts (the mono track's Channels line marked

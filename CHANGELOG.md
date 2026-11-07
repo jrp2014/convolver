@@ -193,7 +193,8 @@ Until 1.0 the C++ API may change between minor versions.
   **Active** in place of Playing, plus a new **Bypassed**; the host's Status
   parameter reads the same. Under the name, the filter's own sample rate,
   channels, length and speakers as labelled columns; a problem and its fix
-  sit in a box under them. The Audio section gives the host's values with
+  sit in a box under them, without a second Choose Filter… button: the
+  window's Choose… (or Copy Diagnostics) is highlighted instead. The Audio section gives the host's values with
   short labels (Host sample rate, Host channels, Host block size), says
   which inputs a wider bus leaves unused, and drops Filter length and
   Added delay, which the facts and the Latency row show. With no dry

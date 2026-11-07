@@ -112,9 +112,6 @@ typedef BOOL (^ConvolverFileLoader)(NSString* path);
 // The report's problem (semibold) and what plays, then its cause and fix as
 // labelled rows; empty and hidden while nothing needs saying.
 @property(readonly, nonatomic) NSTextView* explanationView;
-// The fix's button, hidden when the report names no action the window can
-// take: Choose Filter… (as Choose…) or Copy Diagnostics.
-@property(readonly, nonatomic) NSButton* actionButton;
 // The report's note, in its own row ("Note:"), hidden when there is none.
 @property(readonly, nonatomic) NSTextField* noteField;
 // On one row under the message: Choose…, the Recent menu (a pull-down whose

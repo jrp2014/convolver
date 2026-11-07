@@ -346,10 +346,12 @@ void window() {
                 !view.noteField.hidden,
             "window text:\n" + text(view.explanationView.string) +
                 "\nNote: " + text(view.noteField.stringValue));
-    require([r[@"action"] isEqualToString:@"choose filter"] && !view.actionButton.hidden &&
-                [view.actionButton.title isEqualToString:@"Choose Filter…"] &&
-                view.actionButton.action == view.chooseButton.action,
-            "fix button: " + text(r[@"action"]) + " / " + text(view.actionButton.title));
+    // jrp, 7 November 2026: one Choose… button, highlighted, not a second
+    // one in the message.
+    require([r[@"action"] isEqualToString:@"choose filter"] &&
+                [view.chooseButton.bezelColor isEqual:[NSColor controlAccentColor]] &&
+                view.diagnosticsButton.bezelColor == nil,
+            "fix button: " + text(r[@"action"]));
     // The Audio facts in plain words, the mismatch marked in words too. The
     // sign is U+26A0 with its text-style selector U+FE0E: NSString matches
     // whole composed characters, so the sign alone would not be found.
@@ -386,8 +388,8 @@ void window() {
     const auto in_view = [&](NSView* v) { return [view convertRect:v.bounds fromView:v]; };
     const NSRect copy = in_view(view.diagnosticsButton), log_button = in_view(view.logButton),
                  explained = in_view(view.explanationView.enclosingScrollView),
-                 audio = in_view(view.audioValues.lastObject), action = in_view(view.actionButton),
-                 note = in_view(view.noteField), disclosure = in_view(view.referenceButton);
+                 audio = in_view(view.audioValues.lastObject), note = in_view(view.noteField),
+                 disclosure = in_view(view.referenceButton);
     const auto frames = [&] {
         return "view " + text(NSStringFromRect(view.frame)) + ", text " +
                text(NSStringFromRect(explained)) + ", last fact " + text(NSStringFromRect(audio)) +
@@ -398,8 +400,7 @@ void window() {
                 NSMinX(copy) > NSWidth(view.frame) / 3 && NSMaxY(copy) <= NSHeight(view.frame) &&
                 NSHeight(view.frame) - NSMaxY(copy) <= 24 && NSMinY(explained) >= 0 &&
                 NSMinY(audio) > NSMaxY(explained) && NSMinY(copy) > NSMaxY(audio) &&
-                NSMinY(action) >= NSMaxY(explained) && NSMinY(note) >= NSMaxY(action) &&
-                NSMinY(audio) > NSMaxY(note) && NSMinX(action) >= 64 &&
+                NSMinY(note) >= NSMaxY(explained) && NSMinY(audio) > NSMaxY(note) &&
                 std::abs(NSMidY(copy) - NSMidY(disclosure)) < 8,
             "layout: " + frames());
     // The file, software and log lines are folded away, and opening them

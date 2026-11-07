@@ -223,7 +223,6 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSStackView* messageStack_; // Its text, button and note.
     NSStackView* factsRow_;     // The facts under the name, hidden while they are not known.
     NSStackView* noteRow_;      // "Note:" and the note, hidden without one.
-    NSStackView* actionRow_;    // The fix's button, hidden without one.
     NSStackView* mixRow_;       // Mix's row, whose label dims when Mix has no effect.
     NSStackView* mixNoteRow_;   // The mix note's row, hidden while Mix applies.
     NSUInteger mix_;            // Mix's index among the settings (NSNotFound: none).
@@ -407,18 +406,10 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [_explanationView unregisterDraggedTypes];
     scroll_.documentView = _explanationView;
 
-    // The one button that carries out the fix, when the window can (Choose
-    // Filter… or Copy Diagnostics), aligned with the fix's text; an
-    // ordinary push button, so Return still goes to the host. Then the
-    // note, in the small secondary font.
-    _actionButton = [NSButton buttonWithTitle:@"" target:self action:nil];
-    _actionButton.hidden = YES;
-    NSView* action_indent = [[NSView alloc] init];
-    fixed_width(action_indent, form_label);
-    [action_indent.heightAnchor constraintEqualToConstant:1].active = YES;
-    actionRow_ =
-        stack(@[ action_indent, _actionButton ], NSUserInterfaceLayoutOrientationHorizontal, 10);
-    actionRow_.hidden = YES;
+    // Then the note, in the small secondary font. The fix's button is not
+    // repeated here: the window's own Choose… or Copy Diagnostics is
+    // highlighted instead (showAction:; jrp, 7 November 2026: "why do we
+    // have two buttons that seem to do the same thing").
     NSTextField* note_label = label(small_font(), [NSColor secondaryLabelColor]);
     note_label.stringValue = @"Note:";
     note_label.alignment = NSTextAlignmentRight;
@@ -434,7 +425,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     noteRow_.hidden = YES;
     fixed_width(noteRow_, text_width);
     NSStackView* message =
-        stack(@[ scroll_, actionRow_, noteRow_ ], NSUserInterfaceLayoutOrientationVertical, 8);
+        stack(@[ scroll_, noteRow_ ], NSUserInterfaceLayoutOrientationVertical, 8);
     messageStack_ = message;
     message_ = [[NSBox alloc] init];
     message_.boxType = NSBoxCustom;
@@ -841,7 +832,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 - (void)showMessage:(NSString*)problem status:(NSInteger)status {
     const BOOL text = _explanationView.string.length > 0;
     scroll_.hidden = !text;
-    message_.hidden = !text && actionRow_.hidden && noteRow_.hidden;
+    message_.hidden = !text && noteRow_.hidden;
     const BOOL boxed = problem.length > 0;
     NSColor* tint = coloured(status) ? status_colour(status) : [NSColor secondaryLabelColor];
     message_.fillColor = boxed ? [tint colorWithAlphaComponent:0.08] : [NSColor clearColor];
@@ -851,20 +842,14 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
         boxed ? NSEdgeInsetsMake(padding, padding, padding, padding) : NSEdgeInsetsMake(0, 0, 0, 0);
 }
 
-// The fix's button: Choose Filter… (as Choose…) or Copy Diagnostics, or none.
+// The button that carries out the fix, highlighted in the accent colour:
+// Choose… or Copy Diagnostics, or neither. Not the default button, so
+// Return still goes to the host.
 - (void)showAction:(NSString*)action {
-    if ([action isEqualToString:@"choose filter"]) {
-        _actionButton.title = @"Choose Filter…";
-        _actionButton.action = @selector(chooseFilter:);
-        _actionButton.toolTip = _chooseButton.toolTip;
-    } else if ([action isEqualToString:@"copy diagnostics"]) {
-        _actionButton.title = @"Copy Diagnostics";
-        _actionButton.action = @selector(putDiagnosticsOnPasteboard:);
-        _actionButton.toolTip = _diagnosticsButton.toolTip;
-    }
-    _actionButton.hidden = !([action isEqualToString:@"choose filter"] ||
-                             [action isEqualToString:@"copy diagnostics"]);
-    actionRow_.hidden = _actionButton.hidden;
+    _chooseButton.bezelColor =
+        [action isEqualToString:@"choose filter"] ? [NSColor controlAccentColor] : nil;
+    _diagnosticsButton.bezelColor =
+        [action isEqualToString:@"copy diagnostics"] ? [NSColor controlAccentColor] : nil;
 }
 
 - (BOOL)checkForChanges {
@@ -1064,8 +1049,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     }
     [_pasteboard clearContents];
     [_pasteboard setString:text forType:NSPasteboardTypeString];
-    // The button pressed (this one or the fix's) says so for two seconds.
-    NSButton* pressed = sender == _actionButton ? _actionButton : _diagnosticsButton;
+    // The button says so for two seconds.
+    NSButton* pressed = _diagnosticsButton;
     pressed.title = @"Copied";
     __weak NSButton* weakPressed = pressed;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, static_cast<int64_t>(2 * NSEC_PER_SEC)),
