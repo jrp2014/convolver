@@ -411,11 +411,8 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
     const auto& host = facts.host;
     // Before the host starts the instance only the filter's counts are known,
     // and a failed load with no filter kept has no dry signal whatever the
-    // host (jrp, 7 November 2026).
-    const auto dry = host                    ? dry_signal_rule(filter, *host)
-                     : !c && filter.failed() ? HostDrySignal::failed_load
-                     : !c || c->input_channels == c->output_channels ? HostDrySignal::present
-                                                                     : HostDrySignal::filter_counts;
+    // host (jrp, 7 November 2026), as Status says.
+    const auto dry = host ? dry_signal_rule(filter, *host) : dry_signal_before_host(filter);
     r.settings = settings_words(facts.settings, dry);
     if (dry != HostDrySignal::present) { // PLUG-23 (dry_signal_rule()).
         r.mix_note = std::string(no_dry_reason(dry)) +

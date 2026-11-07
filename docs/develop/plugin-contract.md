@@ -119,15 +119,19 @@ before they set the sample rate and channel layout (VST3 `setState` before
   never refused for not suiting the host. REAPER 7.85 does not mark its
   state this way: in jrp's second retest (7 November 2026) the log gave the
   "has not played audio" reason on reopening and on FX Online. Restored state that arrives while
-  the configuration is not binding is kept even if it does not suit: if the
-  plug-in is active, it plays silence with the reason as a failure found at
-  activation (`HostFilter::load` with `keep_mismatch`), and the next
-  activation checks it again. A filter file chosen in the window is checked
+  the configuration is not binding is kept even if it does not suit
+  (`HostFilter::load` with `HostLoadCheck::keep_until_suited`): while the
+  host's configuration is known (the plug-in is active, or inactive with the
+  configuration it was last started with), it is recorded at once as a
+  failure found at activation and plays silence with the reason, and the
+  next activation checks it again; otherwise it is checked at the next
+  activation. A filter file chosen in the window is checked
   as soon as the plug-in has been activated. A preset the host loads into a
   new instance before it has played audio, or just after the host changed
   its rate or buses and before it plays again, is therefore kept silent
   rather than refused; VST3 gives no other way to tell it from a restored project
-  when the host does not say. `processor.cpp`'s `install()` holds the rule,
+  when the host does not say. `processor.cpp`'s `load_check()` holds the rule
+  (each load names its origin: a chosen file, a state or a project),
   and `vst3.adapter`'s `restored_while_host_settles` replays REAPER's order.
 
 ## Failure reasons

@@ -143,7 +143,9 @@ HostPlayback filter_playback(Configuration);
 // What an instance plays without a usable filter, under the shared adapter
 // contract: identity (input c to output c) for an empty instance with equal
 // counts; exact silence for unequal counts or when `failed` (a failed initial
-// load or a filter that does not suit the host).
+// load or a filter that does not suit the host). It carries no answer on the
+// dry signal: given to a HostProcessor as a Configuration it plays as
+// filter_playback() would, with one, so give a processor unfiltered_playback().
 Configuration unfiltered_configuration(const HostLayout&, bool failed);
 // The same, with a dry signal only when `dry` and the host's counts are equal
 // (HostFilter passes dry_signal() for a kept filter, none after a failed load
@@ -475,6 +477,10 @@ HostDrySignal dry_signal_rule(const HostFilter&, const HostLayout& host) noexcep
 inline bool dry_signal(const HostFilter& filter, const HostLayout& host) noexcept {
     return dry_signal_rule(filter, host) == HostDrySignal::present;
 }
+// Before the host is known: failed_load when nothing can give a dry signal
+// whatever the host (no filter kept after a failure), otherwise the filter's
+// own counts (present with no filter). Status and the report both use it.
+HostDrySignal dry_signal_before_host(const HostFilter&) noexcept;
 // Why there is no dry signal, in words completing "..., so there is no dry
 // signal" ("the filter's inputs and outputs differ"); empty when there is one.
 const char* no_dry_reason(HostDrySignal) noexcept;
