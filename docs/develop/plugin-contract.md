@@ -192,8 +192,10 @@ named-host smoke tests): adapters without a host log interface show why they
 are silent or refused a load in two places, with the same words in every
 format.
 
-- **A read-only Status parameter** whose value is a `HostStatus` (Playing, No
-  filter, Load failed, Not checked yet, Fault) and whose text for the current value
+- **A read-only Status parameter** whose value is a `HostStatus` (Active, No
+  filter, Load failed, Not checked yet, Fault, Bypassed; PLUG-22 renamed
+  Playing to Active and added Bypassed as the last value, so saved automation
+  of other parameters is unaffected) and whose text for the current value
   is `host_status()`'s one line of at most 127 ASCII characters
   ([`host.hpp`](../../include/convolver/host.hpp)). The status follows
   `HostFilter::failure()`, so a refused replacement shows Load failed while
@@ -229,11 +231,18 @@ format.
   diagnostics"), taken from the failure's or notice's parts as they are
   (DIAG-4), and all of it as one explanation text with `Cause:`, `Fix:`
   and `Note:` lines ([`advice.hpp`](../../portable/advice.hpp)); then
-  the Filter row (the file's name and a note when the newest request was
-  refused), the Audio facts in plain words (`HostFact`: sample rate,
-  channels and speakers, routing, filter length, added delay, ring-out,
-  loudest peak from `HostFilter::filter_peak()`, host blocks; each with a
-  note, a problem flag for what does not match, and help text), the
+  the filter's name for the heading (the file's name with its extension;
+  after a restore the name saved with the project, `HostRequest::name` in
+  the Audio Unit, or VST3's controller state while the filter's identity
+  (`HostFilter::filter_identity()`, a hash of every stored value, found once
+  when the filter is accepted) matches the one saved beside it, or
+  "From the saved project or preset" without one; PLUG-22) and a note when
+  the newest request was
+  refused, the filter's own values for under its name (rate, channels,
+  length and taps, speakers; PLUG-22), the Audio facts as short labelled
+  values (`HostFact`: host sample rate, host channels, routing, ring-out,
+  loudest peak from `HostFilter::filter_peak()`, host block size; each with a
+  short note, a problem flag for what does not match, and help text), the
   settings in words, and reference lines: the filter file and request,
   `execution_line()` and the log. Everything a window says about the
   filter and the audio comes from here, so the VST3 windows (VST3-11 to
@@ -523,7 +532,8 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   rest is the latency-aligned dry signal that bypass uses. Without a dry
   signal ([bypass](#bypass): unequal counts, or a load failed and no filter
   is kept) the mix is always 1, and the window report's `mix_note` field says
-  why (the window does not show it yet). Like bypass, a mix below 1 still
+  why; the macOS window shows it under Mix and dims the Mix slider
+  (PLUG-22). Like bypass, a mix below 1 still
   passes its dry share while a kept filter that does not suit the host plays
   silence, where there is a dry signal.
 - **Latency** is the block size `HostProcessor` is built with, the engine's
@@ -803,7 +813,16 @@ How each adapter meets the contract where its format differs:
   reset is one each), with `setParamNormalized` for the controller's own
   copy; the Bypass checkbox edits the bypass parameter (1000) the same way,
   one edit per click; the report as `ConvolverReport` and the copy the processor sent;
-  a chosen or dropped file as `ConvolverLoad`. The view's blocks hold a
+  a chosen or dropped file as `ConvolverLoad`. A bypass change through
+  the controller's `setParamNormalized` also sends `ConvolverBypass`, so the
+  processor's status and report say Bypassed before the audio thread sees
+  the change (PLUG-22). The controller state (`getState`, `setState`) holds
+  the accepted file's name and its filter's identity (`"CVCS"`, version 1,
+  each string as a little-endian 32-bit length and UTF-8); an empty or
+  unknown stream reads as no name, so projects saved before PLUG-22, whose
+  controller state is empty, still open. `setState` passes the name and
+  identity to the processor as `ConvolverName`, and the processor names its
+  report before the fields and the copied text are made from it. The view's blocks hold a
   shared link that the editor clears in its destructor, so nothing the view
   does afterwards (a timer, a closing file dialog) reaches a controller the
   host has released. The view does not touch the processor or the audio

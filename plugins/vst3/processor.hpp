@@ -10,6 +10,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
@@ -38,12 +39,15 @@ inline constexpr Steinberg::Vst::ParamID status_id = identity::vst3_status_param
 inline constexpr const char* status_message = "ConvolverStatus";
 // The Status parameter's values, in HostStatus order, and a status as the
 // parameter's normalized value.
-inline constexpr std::array<const char*, 5> status_names{"Playing", "No filter", "Load failed",
-                                                         "Not checked yet", "Fault"};
-static_assert(static_cast<std::size_t>(HostStatus::fault) == status_names.size() - 1);
+inline constexpr auto& status_names = host_status_names;
 constexpr Steinberg::Vst::ParamValue normalized_status(HostStatus status) {
     return static_cast<Steinberg::Vst::ParamValue>(status) /
            static_cast<Steinberg::Vst::ParamValue>(status_names.size() - 1);
+}
+// The status value nearest `value`: a host that keeps normalized values as
+// float hands back 0.8 (Fault, since PLUG-22 added Bypassed) as 0.80000001.
+inline long status_index(Steinberg::Vst::ParamValue value) {
+    return std::lround(value * static_cast<Steinberg::Vst::ParamValue>(status_names.size() - 1));
 }
 // VST3-3: the status_message also carries the PLUG-9 report for the window
 // ("report": report_fields() as UTF-8 name and value pairs, each ended by a
@@ -72,6 +76,15 @@ struct StatusAnswer {
 inline constexpr const char* load_message = "ConvolverLoad";
 // The report's name and value pairs as the messages carry them, and back.
 std::string encode_report(const std::vector<std::pair<std::string, std::string>>&);
+// PLUG-22: the controller state (Controller::setState): the filter file's
+// name and its filter's identity, and back. Decoding anything else (empty,
+// short, another version, a name longer than max_filter_name_bytes) gives
+// two empty strings, as does an empty name or identity.
+struct ControllerState {
+    std::string name, identity;
+};
+std::string encode_controller_state(const ControllerState&);
+ControllerState decode_controller_state(std::string_view);
 std::vector<std::pair<std::string, std::string>> decode_report(std::string_view);
 // How the plug-in reads the sound files a chosen filter file names: macOS's
 // AudioToolbox on macOS, as the Audio Unit does; none elsewhere until the
@@ -99,6 +112,14 @@ inline constexpr Steinberg::Vst::ParamID gain_id = identity::vst3_gain_parameter
 inline constexpr Steinberg::Vst::ParamID mix_id = identity::vst3_mix_parameter_id;
 inline constexpr Steinberg::Vst::ParamID latency_id = identity::vst3_latency_parameter_id;
 inline constexpr const char* latency_message = "ConvolverLatency";
+// PLUG-22: the controller's bypass_message ("bypass": 0 or 1) when the host
+// or the window changes Bypass, so the Status reads Bypassed at once rather
+// than when the audio thread next sees the change.
+inline constexpr const char* bypass_message = "ConvolverBypass";
+// PLUG-22: the controller's name_message ("name" and "identity", binary
+// UTF-8, or neither for no name) after it reads its state, so the processor's report names saved
+// state of that filter (Processor::report_locked).
+inline constexpr const char* name_message = "ConvolverName";
 inline constexpr std::size_t default_latency_index = 2;
 static_assert(host_latencies[default_latency_index] == default_host_latency);
 // The settings' normalized values (0 to 1), as the host and the controller
@@ -223,6 +244,14 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     HostFilter filter_{max_bus_channels}; // The shared adapter contract's control side.
     std::unique_ptr<HostProcessor> host_;
     std::atomic<bool> bypass_{false};
+    // PLUG-22: Bypass as the Status and the report show it: the audio
+    // thread's value, or the controller's when it told the processor first
+    // (bypass_message).
+    std::atomic<bool> shown_bypass_{false};
+    // PLUG-22, under control_: the name the report gives saved state whose
+    // filter identity is saved_identity_: from the controller state
+    // (name_message), or the file last accepted, as the controller records it.
+    std::string saved_name_, saved_identity_;
     // VST3-4: Gain and Mix as process() last received them (or a state
     // restored), and the chosen Latency in frames.
     std::atomic<double> gain_db_{0}, mix_{1};
@@ -267,16 +296,19 @@ class Controller final : public Steinberg::Vst::EditController,
     // VST3-11: the window (editor.hpp) for ViewType::kEditor; none on
     // systems without one yet.
     Steinberg::IPlugView* PLUGIN_API createView(Steinberg::FIDString name) override;
-    // The controller keeps no state of its own; hosts call these on every save
-    // and load, so they succeed rather than report kNotImplemented (VST3-8).
-    // Hosts therefore save an empty controller state: any controller state
-    // added later must accept an empty stream.
-    Steinberg::tresult PLUGIN_API setState(Steinberg::IBStream*) override {
-        return Steinberg::kResultOk;
-    }
-    Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream*) override {
-        return Steinberg::kResultOk;
-    }
+    // PLUG-22: the controller state holds the name of the filter file last
+    // chosen in the window, with its extension, and that filter's identity
+    // (HostReport::filter_identity), so the window names the filter after
+    // the project is reopened, but only while that filter plays (a preset
+    // or an undo may bring another). Never the file's folder. The format:
+    // "CVCS", a version (1), then the name and the identity, each as a
+    // little-endian 32-bit length and UTF-8 bytes. setState sends both to the
+    // processor (name_message), which names its report and the report's text
+    // with them. Before PLUG-22 hosts
+    // saved an empty controller state, so an empty stream, a shorter one or
+    // another version reads as no name, never as a failure (VST3-8).
+    Steinberg::tresult PLUGIN_API setState(Steinberg::IBStream*) override;
+    Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream*) override;
 
     // The processor's status_message: the Status parameter's value and text.
     Steinberg::tresult PLUGIN_API notify(Steinberg::Vst::IMessage*) override;
@@ -339,5 +371,8 @@ class Controller final : public Steinberg::Vst::EditController,
     bool load_accepted_ = false;
     Steinberg::int64 latency_requests_ = 0;
     bool latency_waiting_ = false;
+    // PLUG-22, under status_lock_: the filter file's name and the identity
+    // of the filter read from it, saved in the controller state.
+    std::string name_, identity_;
 };
 } // namespace convolver::vst3

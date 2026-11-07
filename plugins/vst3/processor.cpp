@@ -363,7 +363,7 @@ void Processor::write_log() noexcept {
 }
 HostStatusLine Processor::status_locked() const {
     return host_status(filter_, host_ ? std::optional(layout()) : known_layout(),
-                       host_log_written(), settings());
+                       host_log_written(), settings(), shown_bypass_.load());
 }
 HostStatusLine Processor::status() {
     std::lock_guard lock(control_);
@@ -377,11 +377,18 @@ HostReport Processor::report_locked() const {
     facts.settings = settings();
     facts.latency_frames = host_ ? host_->latency_frames() : facts.settings.latency;
     facts.tail_frames = tail_.load();
+    facts.bypassed = shown_bypass_.load();
     facts.log_written = host_log_written();
     facts.chooses_files = files_ != nullptr || test_file_reader != nullptr;
     if (files_)
         facts.file_reader = "macOS AudioToolbox";
-    return host_report(filter_, facts);
+    auto report = host_report(filter_, facts);
+    // PLUG-22: saved state (no file path) of the filter the saved name
+    // belongs to is named, in the fields and the text alike.
+    if (!saved_name_.empty() && report.filter_path.empty() && !report.filter_identity.empty() &&
+        report.filter_identity == saved_identity_)
+        report.filter_name = saved_name_;
+    return report;
 }
 void Processor::send_status(const StatusAnswer& answer) noexcept {
     try {
@@ -469,6 +476,40 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
         }
         if (faulted)
             write_log();
+        send_status();
+        return kResultOk;
+    }
+    if (id == name_message) {
+        // PLUG-22: the controller state's name and identity (Controller::setState).
+        const void* name = nullptr;
+        const void* identity = nullptr;
+        uint32 name_size = 0, identity_size = 0;
+        auto* attributes = message->getAttributes();
+        if (!attributes)
+            return kInvalidArgument;
+        // Neither: no name (an empty or older controller state).
+        const bool has_name = attributes->getBinary("name", name, name_size) == kResultOk;
+        const bool has_identity =
+            attributes->getBinary("identity", identity, identity_size) == kResultOk;
+        if (has_name != has_identity || (name_size && !name) || (identity_size && !identity) ||
+            name_size > max_filter_name_bytes || identity_size > 64)
+            return kInvalidArgument;
+        try {
+            std::lock_guard lock(control_);
+            saved_name_.assign(static_cast<const char*>(name), name_size);
+            saved_identity_.assign(static_cast<const char*>(identity), identity_size);
+        } catch (...) {
+            return kOutOfMemory;
+        }
+        send_status();
+        return kResultOk;
+    }
+    if (id == bypass_message) {
+        int64 bypass = 0;
+        auto* attributes = message->getAttributes();
+        if (!attributes || attributes->getInt("bypass", bypass) != kResultOk)
+            return kInvalidArgument;
+        shown_bypass_.store(bypass != 0);
         send_status();
         return kResultOk;
     }
@@ -607,6 +648,7 @@ void Processor::install(HostState next, const HostRequest& request, Origin origi
     tail_.store(host_ ? static_cast<uint32>(host_->tail_frames()) : inactive_tail);
     if (restore) {
         bypass_.store(bypass);
+        shown_bypass_.store(bypass);
         gain_db_.store(saved.gain_db);
         mix_.store(saved.mix);
         choose_latency(saved.latency);
@@ -677,11 +719,21 @@ bool Processor::load_file(std::string_view chosen) {
             throw std::runtime_error("refused");
         }
         install(std::move(*next), request, Origin::chosen_file);
-        return true;
     } catch (...) {
         refused(was_failed);
         return false;
     }
+    // PLUG-22: the file's name and its filter's identity, as the controller
+    // records them from the report for its state.
+    try {
+        const auto report = report_locked();
+        saved_name_ = report.filter_name;
+        saved_identity_ = report.filter_identity;
+    } catch (...) {
+        saved_name_.clear(); // Out of memory: no name rather than another filter's.
+        saved_identity_.clear();
+    }
+    return true;
 }
 Advice Processor::notice() {
     std::lock_guard lock(control_);
@@ -810,6 +862,7 @@ tresult PLUGIN_API Processor::process(ProcessData& d) {
                     return signal_faults(d), kInvalidArgument;
                 position = offset;
                 bypass_.store(value >= .5);
+                shown_bypass_.store(value >= .5);
             }
         }
     }

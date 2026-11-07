@@ -1312,7 +1312,7 @@ void status_parameter() {
                                au::status_parameter, &info, &size),
           "Status parameter info");
     require(info.unit == kAudioUnitParameterUnit_Indexed && info.minValue == 0 &&
-                info.maxValue == 4 && (info.flags & kAudioUnitParameterFlag_IsReadable) &&
+                info.maxValue == 5 && (info.flags & kAudioUnitParameterFlag_IsReadable) &&
                 !(info.flags & kAudioUnitParameterFlag_IsWritable) &&
                 (info.flags & kAudioUnitParameterFlag_ValuesHaveStrings),
             "Status parameter not a read-only indexed parameter");
@@ -1323,7 +1323,7 @@ void status_parameter() {
     check(AudioUnitGetProperty(au, kAudioUnitProperty_ParameterValueStrings, kAudioUnitScope_Global,
                                au::status_parameter, &names, &size),
           "Status value strings");
-    require(names && CFArrayGetCount(names) == 5, "Status value strings");
+    require(names && CFArrayGetCount(names) == 6, "Status value strings");
     CFRelease(names);
     const auto value = [&] {
         AudioUnitParameterValue v = -1;
@@ -1363,12 +1363,20 @@ void status_parameter() {
                                  "44100 Hz, and the host runs at 48000 Hz."),
             "failed first load not logged");
     check(unit.load(state_of(stereo(48000))), "status good preset");
-    require(shown() == "Filter loaded: 48000 Hz, 2 in, 2 out." && value() == HostStatus::playing,
+    require(shown() == "Filter loaded: 48000 Hz, 2 in, 2 out." && value() == HostStatus::active,
             "good load not shown: " + shown());
     // A host cannot write the status.
     check(AudioUnitSetParameter(au, au::status_parameter, kAudioUnitScope_Global, 0, 3, 0),
           "Status write");
-    require(value() == HostStatus::playing, "a host write changed the status");
+    require(value() == HostStatus::active, "a host write changed the status");
+    // PLUG-22: the host's bypass shows as Bypassed, and switching it off
+    // brings Active back.
+    unit.set_bypass(true);
+    require(value() == HostStatus::bypassed && shown() == "Bypassed: the input plays unfiltered.",
+            "bypass not shown: " + shown());
+    unit.set_bypass(false);
+    require(value() == HostStatus::active && shown() == "Filter loaded: 48000 Hz, 2 in, 2 out.",
+            "bypass off not shown: " + shown());
     // A wrong preset while a filter plays: it keeps playing, and both say so.
     require(unit.load(state_of(stereo(44100))) != noErr, "wrong-rate replacement accepted");
     require(
@@ -1388,7 +1396,7 @@ void status_parameter() {
                                kAudioUnitScope_Global, 0, &request, &size),
           "Status name");
     require(request.outString &&
-                CFStringCompare(request.outString, CFSTR("Playing"), 0) == kCFCompareEqualTo,
+                CFStringCompare(request.outString, CFSTR("Active"), 0) == kCFCompareEqualTo,
             "Status value name");
     CFRelease(request.outString);
     // DIAG-1, jrp's reproduction: extreme but finite input and filter values
@@ -1420,7 +1428,7 @@ void status_parameter() {
                 contains(log_text(), "Lower the level going into Convolver"),
             "fault not logged");
     check(unit.load(state_of(stereo(48000))), "load after a fault");
-    require(value() == HostStatus::playing && contains(shown(), "Filter loaded"),
+    require(value() == HostStatus::active && contains(shown(), "Filter loaded"),
             "a load does not clear Fault: " + shown());
     // jrp's review of 0.4.43: Render must not write Fault over Load failed,
     // which comes first; an accepted load releases the signal.

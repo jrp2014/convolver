@@ -311,8 +311,8 @@ except the Audio Unit build, which runs in a source checkout.
     differ from REAPER's.
 11. The window and settings (macOS, VST3-11). Use a source checkout's
     `examples/first-use/stereo/filter.cfg` (48 kHz). In Convolver's window
-    click **Choose…**, pick that file: the status reads Playing, the Filter
-    row reads `filter.cfg`, and REAPER marks the project changed (an
+    click **Choose…**, pick that file: the status reads Active, the heading
+    reads `filter.cfg`, and REAPER marks the project changed (an
     asterisk in the title bar). Drag Gain to about −12 dB while playing:
     the level drops without a click, and *Edit › Undo* undoes the whole drag
     in one step. Set Mix to 0%: you hear the dry track. Option-click both

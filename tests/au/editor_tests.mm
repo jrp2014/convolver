@@ -247,8 +247,9 @@ void properties(const au_test::LogSince& log) {
         require(contains(r[@"explanation"], part), "mono track explanation lacks \"" +
                                                        std::string(part) +
                                                        "\": " + text(r[@"explanation"]));
-    require(contains(r[@"audio"], "Channels\t1 in, 1 out\tthe filter has 2 in, 2 out\tproblem\t") &&
-                contains(r[@"audio"], "Host blocks\tup to 512 frames\t"),
+    require(contains(r[@"audio"],
+                     "Host channels\t1 in, 1 out\tthe filter has 2 in, 2 out\tproblem\t") &&
+                contains(r[@"audio"], "Host block size\tup to 512 frames\t"),
             "mono track Audio facts: " + text(r[@"audio"]));
     require(contains(r[@"reference"], "Software: Convolver "),
             "mono track reference: " + text(r[@"reference"]));
@@ -345,10 +346,12 @@ void window() {
                 !view.noteField.hidden,
             "window text:\n" + text(view.explanationView.string) +
                 "\nNote: " + text(view.noteField.stringValue));
-    require([r[@"action"] isEqualToString:@"choose filter"] && !view.actionButton.hidden &&
-                [view.actionButton.title isEqualToString:@"Choose Filter…"] &&
-                view.actionButton.action == view.chooseButton.action,
-            "fix button: " + text(r[@"action"]) + " / " + text(view.actionButton.title));
+    // jrp, 7 November 2026: one Choose… button, highlighted, not a second
+    // one in the message.
+    require([r[@"action"] isEqualToString:@"choose filter"] &&
+                [view.chooseButton.bezelColor isEqual:[NSColor controlAccentColor]] &&
+                view.diagnosticsButton.bezelColor == nil,
+            "fix button: " + text(r[@"action"]));
     // The Audio facts in plain words, the mismatch marked in words too. The
     // sign is U+26A0 with its text-style selector U+FE0E: NSString matches
     // whole composed characters, so the sign alone would not be found.
@@ -359,21 +362,20 @@ void window() {
         return nil;
     };
     require(
-        view.audioLabels.count >= 6 &&
-            [view.audioLabels[0].stringValue isEqualToString:@"Sample rate"] &&
-            [fact("Sample rate").stringValue hasPrefix:@"44100 Hz"] &&
-            contains(fact("Channels").stringValue, "1 in, 1 out") &&
-            contains(fact("Channels").stringValue, "\u26A0\uFE0E") &&
-            contains(fact("Channels").stringValue, "the filter has 2 in, 2 out") &&
-            fact("Channels").toolTip.length > 0 && fact("Routing") != nil &&
-            fact("Added delay") != nil,
+        view.audioLabels.count >= 4 &&
+            [view.audioLabels[0].stringValue isEqualToString:@"Host sample rate"] &&
+            [fact("Host sample rate").stringValue hasPrefix:@"44100 Hz"] &&
+            contains(fact("Host channels").stringValue, "1 in, 1 out") &&
+            contains(fact("Host channels").stringValue, "\u26A0\uFE0E") &&
+            contains(fact("Host channels").stringValue, "the filter has 2 in, 2 out") &&
+            fact("Host channels").toolTip.length > 0 && fact("Routing") != nil &&
+            fact("Added delay") == nil,
         "Audio facts: " +
             text([[view.audioLabels valueForKey:@"stringValue"] componentsJoinedByString:@", "]) +
             "\n" +
             text([[view.audioValues valueForKey:@"stringValue"] componentsJoinedByString:@"\n"]));
     require([view.filterNameField.stringValue isEqualToString:r[@"filter name"]] &&
-                [view.filterNameField.stringValue
-                    isEqualToString:@"From the saved project or preset"] &&
+                [view.filterNameField.stringValue isEqualToString:@"test"] &&
                 contains(view.filterNoteField.stringValue, "drop"),
             "Filter row: " + text(view.filterNameField.stringValue) + " / " +
                 text(view.filterNoteField.stringValue));
@@ -386,8 +388,8 @@ void window() {
     const auto in_view = [&](NSView* v) { return [view convertRect:v.bounds fromView:v]; };
     const NSRect copy = in_view(view.diagnosticsButton), log_button = in_view(view.logButton),
                  explained = in_view(view.explanationView.enclosingScrollView),
-                 audio = in_view(view.audioValues.lastObject), action = in_view(view.actionButton),
-                 note = in_view(view.noteField), disclosure = in_view(view.referenceButton);
+                 audio = in_view(view.audioValues.lastObject), note = in_view(view.noteField),
+                 disclosure = in_view(view.referenceButton);
     const auto frames = [&] {
         return "view " + text(NSStringFromRect(view.frame)) + ", text " +
                text(NSStringFromRect(explained)) + ", last fact " + text(NSStringFromRect(audio)) +
@@ -398,8 +400,7 @@ void window() {
                 NSMinX(copy) > NSWidth(view.frame) / 3 && NSMaxY(copy) <= NSHeight(view.frame) &&
                 NSHeight(view.frame) - NSMaxY(copy) <= 24 && NSMinY(explained) >= 0 &&
                 NSMinY(audio) > NSMaxY(explained) && NSMinY(copy) > NSMaxY(audio) &&
-                NSMinY(action) >= NSMaxY(explained) && NSMinY(note) >= NSMaxY(action) &&
-                NSMinY(audio) > NSMaxY(note) && NSMinX(action) >= 64 &&
+                NSMinY(note) >= NSMaxY(explained) && NSMinY(audio) > NSMaxY(note) &&
                 std::abs(NSMidY(copy) - NSMidY(disclosure)) < 8,
             "layout: " + frames());
     // The file, software and log lines are folded away, and opening them
@@ -442,6 +443,10 @@ void window() {
     require(gain.minValue == -100 && gain.maxValue == 24 && gain.doubleValue == 0 &&
                 mix.minValue == 0 && mix.maxValue == 100 && mix.doubleValue == 100,
             "slider ranges or values");
+    // PLUG-23: equal counts have a dry signal, so Mix applies and no note.
+    require(mix.enabled && view.settingValues[1].enabled && view.mixNoteField.superview.hidden &&
+                view.mixNoteField.stringValue.length == 0,
+            "a mix note with a dry signal");
     require([view.settingValues[0].stringValue isEqualToString:@"0"] &&
                 [view.settingValues[1].stringValue isEqualToString:@"100"] &&
                 view.settingValues[0].editable && view.settingValues[1].editable &&
@@ -588,12 +593,12 @@ void window() {
 
     // Latency as a menu of block sizes (PLUG-10). A choice sets the
     // parameter, the unit's worker thread applies it at once, and the
-    // Latency row and the Added delay fact show it.
-    const auto shows = [&](NSString* time, const char* frames) {
+    // Latency row shows the time it adds, without "not in use yet" once the
+    // unit uses it.
+    const auto shows = [&](NSString* time) {
         for (int i = 0; i < 500; ++i) {
             [view refresh];
-            if ([view.settingValues[2].stringValue isEqualToString:time] &&
-                contains(fact("Added delay").stringValue, frames))
+            if ([view.settingValues[2].stringValue isEqualToString:time])
                 return true;
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
@@ -604,20 +609,19 @@ void window() {
                 [latency.itemTitles[6] isEqualToString:@"4096 frames"] &&
                 latency.indexOfSelectedItem == 2 &&
                 [latency.accessibilityLabel isEqualToString:@"Latency"] &&
-                [view.settingValues[2].stringValue isEqualToString:@"5.8 ms"],
+                [view.settingValues[2].stringValue isEqualToString:@"adds 5.8 ms"],
             "Latency menu: " + text([latency.itemTitles componentsJoinedByString:@", "]));
     [latency selectItemAtIndex:3];
     [latency sendAction:latency.action to:latency.target];
     check(AudioUnitGetParameter(unit.get(), au::latency_parameter, kAudioUnitScope_Global, 0, &now),
           "Latency value");
     require(now == 3, "the Latency menu did not set Latency: " + std::to_string(now));
-    require(shows(@"11.6 ms", "512 frames") && !contains(view.explanationView.string, "is chosen"),
+    require(shows(@"adds 11.6 ms") && !contains(view.explanationView.string, "is chosen"),
             "the window does not show the new Latency in use:\n" +
-                text(view.explanationView.string) + "\n" + text(view.settingValues[2].stringValue) +
-                "\n" + text(fact("Added delay").stringValue));
+                text(view.explanationView.string) + "\n" + text(view.settingValues[2].stringValue));
     check(AudioUnitSetParameter(unit.get(), au::latency_parameter, kAudioUnitScope_Global, 0, 2, 0),
           "Latency from the host");
-    require(shows(@"5.8 ms", "256 frames") && latency.indexOfSelectedItem == 2 &&
+    require(shows(@"adds 5.8 ms") && latency.indexOfSelectedItem == 2 &&
                 !contains(view.explanationView.string, "is chosen"),
             "the Latency menu did not follow the host");
 
@@ -639,7 +643,7 @@ void window() {
     check(unit.load(state_of(identity(44100, 1))), "mono preset");
     check(unit.initialize(), "mono initialization with a mono filter");
     [view refresh];
-    require([view.statusField.stringValue isEqualToString:@"Playing"],
+    require([view.statusField.stringValue isEqualToString:@"Active"],
             "window status after the fix " + text(view.statusField.stringValue));
 
     // A host may close the window and keep the view in it: the twice-a-second
@@ -683,18 +687,27 @@ void files() {
     require([view loadFile:@(stereo.c_str())], "the stereo file was refused");
     // The project must be marked changed: GarageBand 10.4.14 ignored the
     // ClassInfo notification alone (jrp's run of d1dc0a2), so an accepted
-    // file is also the present preset, a user preset named after it.
+    // file is also the present preset, a user preset named after it, with
+    // its extension (PLUG-22).
     require(class_info_changes > 0 && preset_changes > 0,
             "a chosen file sent no ClassInfo or PresentPreset notification");
-    require(present_preset(unit) == "stereo", "present preset: " + present_preset(unit));
+    require(present_preset(unit) == "stereo.wav", "present preset: " + present_preset(unit));
     auto r = report(unit);
-    require([r[@"status name"] isEqualToString:@"Playing"] &&
-                [view.statusField.stringValue isEqualToString:@"Playing"],
+    require([r[@"status name"] isEqualToString:@"Active"] &&
+                [view.statusField.stringValue isEqualToString:@"Active"],
             "after the stereo file: " + text(r[@"status name"]) + ": " + text(r[@"explanation"]));
     require(contains(r[@"reference"], stereo.c_str()) &&
                 [view.filterNameField.stringValue isEqualToString:@"stereo.wav"],
             "the window does not name the file:\n" + text(r[@"reference"]) + "\n" +
                 text(view.filterNameField.stringValue));
+    // jrp, 7 November 2026: the filter's own facts under its name, as
+    // labelled columns (here the same as the host's).
+    require(view.glanceValues.count == 4 && !view.glanceValues[0].superview.superview.hidden &&
+                [view.glanceValues[0].stringValue isEqualToString:@"44100 Hz"] &&
+                [view.glanceValues[1].stringValue isEqualToString:@"2 in → 2 out"] &&
+                view.glanceValues[2].stringValue.length > 0,
+            "facts under the name: " + text([[view.glanceValues valueForKey:@"stringValue"]
+                                           componentsJoinedByString:@" | "]));
     require(loaded_path(unit) == stereo.string(), "filter file property " + loaded_path(unit));
     require(encode_host_state(unit.saved()) ==
                 encode_host_state(filter_file_state(stereo, {44100, 2, 2}, unit_reader())),
@@ -721,24 +734,29 @@ void files() {
                 contains(r[@"explanation"], "load it in Convolver instead"),
             "mono file advice: " + text(r[@"explanation"]));
     require(loaded_path(unit) == stereo.string(), "the refused file replaced the stereo one");
-    require(present_preset(unit) == "stereo", "a refused file renamed the present preset");
+    require(present_preset(unit) == "stereo.wav", "a refused file renamed the present preset");
     {
         // The saved state carries the preset name, and restoring it in
-        // another unit (a reopened project) brings the name back.
+        // another unit (a reopened project) brings the name back, and the
+        // window names the filter by it (PLUG-22).
         const auto plist = unit.class_info_now();
         const auto saved_name = static_cast<CFStringRef>(
             CFDictionaryGetValue(static_cast<CFDictionaryRef>(plist), CFSTR(kAUPresetNameKey)));
         const bool named = saved_name && CFGetTypeID(saved_name) == CFStringGetTypeID() &&
-                           text((__bridge NSString*)saved_name) == "stereo";
+                           text((__bridge NSString*)saved_name) == "stereo.wav";
         Unit reopened;
         check(reopened.configure(44100, 2, 2, 512), "reopened formats");
         check(reopened.initialize(), "reopened initialization");
         const auto restored = reopened.restore(plist);
         CFRelease(plist);
-        require(named, "the saved state does not name the preset \"stereo\"");
+        require(named, "the saved state does not name the preset \"stereo.wav\"");
         check(restored, "restoring the saved state");
-        require(present_preset(reopened) == "stereo",
+        require(present_preset(reopened) == "stereo.wav",
                 "restored present preset: " + present_preset(reopened));
+        const auto reopened_report = report(reopened);
+        require([reopened_report[@"filter name"] isEqualToString:@"stereo.wav"] &&
+                    [reopened_report[@"filter path"] length] == 0,
+                "reopened filter name: " + text(reopened_report[@"filter name"]));
         reopened.uninitialize();
     }
     const auto kept = unit.failure();
@@ -841,11 +859,11 @@ void responsive() {
     std::string after;
     for (int i = 0; i < 1000; ++i) {
         after = text(report(unit)[@"status name"]);
-        if (after == "Playing")
+        if (after == "Active")
             break;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-    require(after == "Playing", "after the load: " + after);
+    require(after == "Active", "after the load: " + after);
     std::cout << "report read during a held load: '" << during << "', then '" << after << "'\n";
     unit.uninitialize();
 }

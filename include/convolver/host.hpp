@@ -157,6 +157,13 @@ HostPlayback unfiltered_playback(const HostLayout&, bool failed, bool dry);
 // ignored. The ignored ones in words, "inputs 3–6" or "input 2" with `dash`
 // between two numbers; empty when the filter reads every input the host gives.
 std::string ignored_inputs(const Configuration&, const HostLayout&, const char* dash = "–");
+// PLUG-22: which filter this is, so a name saved beside it (VST3's
+// controller state) is shown only while it plays: a 64-bit FNV-1a hash of
+// every stored value (rate, counts, mask, delays, and each path's routes,
+// gains and samples as their bits), the same on every machine. Two filters
+// that differ anywhere differ here, but for a 1 in 2^64 chance. Reads every
+// sample, so it runs once, when a filter is accepted (HostFilter).
+std::uint64_t configuration_identity(const Configuration&) noexcept;
 
 class HostProcessor;
 
@@ -213,7 +220,16 @@ struct HostRequest {
     // passed over), as read_filter_file() gives them, so a window can reload
     // the filter when one changes. Empty for state and for a refused file.
     std::vector<std::string> files{};
+    // PLUG-22: for state, the name saved beside it for the window to show
+    // (UTF-8, at most max_filter_name_bytes): the file's name with its
+    // extension, never its folder, as the Audio Unit's preset name keeps it.
+    // Empty when unknown; a file's request leaves it empty, as the window
+    // takes the name from `path`. VST3 keeps the name in the controller
+    // state, apart from the component's, and the processor names its report
+    // with it while HostFilter::filter_identity() matches the saved one.
+    std::string name{};
 };
+inline constexpr std::size_t max_filter_name_bytes = 1024;
 struct HostFailure {
     HostFailureKind kind = HostFailureKind::state_unreadable;
     HostRequest request;
@@ -300,6 +316,11 @@ class HostFilter {
     // worst_case_peak() of filter(), found when it was accepted; 0 without one.
     double filter_peak() const noexcept {
         return peak_;
+    }
+    // PLUG-22: configuration_identity() of filter(), found when it was
+    // accepted, so a report never computes it; 0 without one.
+    std::uint64_t filter_identity() const noexcept {
+        return identity_;
     }
     // True after a failed initial load: nothing accepted, and a load failed.
     bool failed() const noexcept {
@@ -415,8 +436,9 @@ class HostFilter {
                                     const Configuration*) noexcept;
     std::size_t max_channels_;
     std::optional<Configuration> filter_;
-    double peak_ = 0;      // filter_peak()
-    HostRequest accepted_; // The request that supplied filter_ (or the saved failure).
+    double peak_ = 0;            // filter_peak()
+    std::uint64_t identity_ = 0; // filter_identity()
+    HostRequest accepted_;       // The request that supplied filter_ (or the saved failure).
     std::uint64_t requests_ = 0;
     bool failed_ = false;
     std::optional<HostFailure> load_failure_, activation_failure_;
@@ -432,11 +454,17 @@ class HostFilter {
 // failure(): a refused replacement shows "load failed" although the previous
 // filter keeps playing, as LV2's status port does.
 enum class HostStatus {
-    playing = 0,     // A filter is accepted and suits the host.
+    // A filter is accepted and suits the host (PLUG-22: "Active", not
+    // "Playing": the plug-in cannot tell whether the host's transport runs).
+    active = 0,
     no_filter = 1,   // An empty instance: identity, or silence for unequal counts.
     load_failed = 2, // The newest request failed, or the instance plays silence.
     unchecked = 3,   // A filter is accepted, but the host's configuration is not known yet.
     fault = 4,       // HostFilter::faults(): the audio met a problem while playing.
+    // PLUG-22: the host or the window bypasses an instance with a filter, and
+    // nothing is wrong: the input plays unfiltered, or silence for unequal
+    // counts. Without a filter the status stays No filter.
+    bypassed = 5,
 };
 struct HostStatusLine {
     HostStatus status = HostStatus::no_filter;
@@ -452,9 +480,11 @@ inline constexpr std::size_t max_status_text = 127; // VST3's String128, less it
 // be written, instead of pointing to it. `settings` are the instance's Gain
 // and Mix (PLUG-10): without a filter, or after a failed load, the text says
 // what they let through (the input at a changed level, or the dry signal),
-// not only what the filter does.
+// not only what the filter does. `bypassed`: the instance is bypassed; a load
+// failure or a fault still comes first, as both need attention.
 HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& host,
-                           bool log_written = true, const HostSettings& settings = {});
+                           bool log_written = true, const HostSettings& settings = {},
+                           bool bypassed = false);
 // Whether a dry signal exists under `host` (Mix's dry share and bypass pass
 // input c to output c), and if not, why.
 enum class HostDrySignal {

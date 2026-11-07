@@ -98,7 +98,7 @@ void run(const fs::path& dir) {
         const auto report = host_report(empty, facts);
         require(std::any_of(report.audio.begin(), report.audio.end(),
                             [](const HostFact& f) {
-                                return f.label == "Sample rate" && f.value == "47952.04795 Hz";
+                                return f.label == "Host sample rate" && f.value == "47952.04795 Hz";
                             }),
                 "the report's Sample rate fact is not the exact rate");
     }

@@ -149,12 +149,13 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     return @(text.c_str());
 }
 
-// The time a Latency choice adds at the host's rate ("5.3 ms"), and whether
-// it is not in use yet; the item titles begin with the frames ("256 frames").
+// The time a Latency choice adds at the host's rate ("adds 5.3 ms"), and
+// whether it is not in use yet; the item titles begin with the frames ("256
+// frames"). The Audio section does not repeat it (PLUG-22).
 - (NSString*)latencyNote:(NSPopUpButton*)menu {
     const double frames = menu.titleOfSelectedItem.doubleValue;
     NSString* time = sampleRate_ > 0 && frames > 0
-                         ? [NSString stringWithFormat:@"%.1f ms", 1000 * frames / sampleRate_]
+                         ? [NSString stringWithFormat:@"adds %.1f ms", 1000 * frames / sampleRate_]
                          : @"";
     if (!latencyWaits_)
         return time;

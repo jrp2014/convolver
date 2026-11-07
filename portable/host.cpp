@@ -266,6 +266,44 @@ Configuration unfiltered_configuration(const HostLayout& host, bool failed) {
     return c;
 }
 
+std::uint64_t configuration_identity(const Configuration& c) noexcept {
+    // FNV-1a over 32-bit words: every sample counts, at a quarter of the
+    // byte-wise cost.
+    std::uint64_t hash = 14695981039346656037ULL;
+    const auto add = [&](std::uint32_t word) {
+        hash ^= word;
+        hash *= 1099511628211ULL;
+    };
+    const auto add64 = [&](std::uint64_t value) {
+        add(static_cast<std::uint32_t>(value));
+        add(static_cast<std::uint32_t>(value >> 32));
+    };
+    const auto add_float = [&](float value) { add(std::bit_cast<std::uint32_t>(value)); };
+    add64(static_cast<std::uint64_t>(static_cast<std::int64_t>(c.sample_rate)));
+    add64(c.input_channels);
+    add64(c.output_channels);
+    add(c.channel_mask);
+    for (const auto* delays : {&c.input_delays, &c.output_delays}) {
+        add64(delays->size());
+        for (const auto d : *delays)
+            add64(static_cast<std::uint64_t>(d));
+    }
+    add64(c.paths.size());
+    for (const auto& path : c.paths) {
+        add64(path.impulse.size());
+        for (const auto sample : path.impulse)
+            add_float(sample);
+        for (const auto* routes : {&path.inputs, &path.outputs}) {
+            add64(routes->size());
+            for (const auto& route : *routes) {
+                add64(route.channel);
+                add_float(route.gain);
+            }
+        }
+    }
+    return hash;
+}
+
 std::string ignored_inputs(const Configuration& c, const HostLayout& host, const char* dash) {
     if (host.inputs <= c.input_channels)
         return {};
@@ -385,6 +423,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     Advice notice;
     std::optional<HostFailure> saved_failure, kept_failure;
     double peak = 0;
+    std::uint64_t identity = 0;
     try {
         if (state.failed && next)
             refuse(HostFailureKind::state_unreadable,
@@ -432,8 +471,10 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
         }
         // For the window's Loudest peak; on the control side with the rest of
         // the preparation, so a report never has to compute it.
-        if (next)
+        if (next) {
             peak = worst_case_peak(*next);
+            identity = configuration_identity(*next);
+        }
         if (state.failed) {
             HostFailure f;
             f.kind = HostFailureKind::saved_failure;
@@ -494,6 +535,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
                   std::is_nothrow_move_assignable_v<Advice>);
     filter_ = std::move(next);
     peak_ = peak;
+    identity_ = identity;
     failed_ = state.failed;
     accepted_ = std::move(request);
     load_failure_ = std::move(saved_failure);
@@ -796,7 +838,7 @@ const char* no_dry_reason(HostDrySignal rule) noexcept {
 }
 
 HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLayout>& host,
-                           bool log_written, const HostSettings& settings) {
+                           bool log_written, const HostSettings& settings, bool bypassed) {
     const char* details =
         log_written ? " Details in the Convolver log." : " The log could not be written.";
     HostStatusLine line;
@@ -828,8 +870,17 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
     } else if (filter.faults().any() && !filter.failed()) {
         line.status = HostStatus::fault;
         line.text = "Fault: " + short_fault(filter.faults()) + details;
+    } else if (bypassed && filter.filter()) {
+        // As HostProcessor bypasses: the delayed input on each output when
+        // there is a dry signal, otherwise silence (dry_signal_rule).
+        line.status = HostStatus::bypassed;
+        const auto rule = host ? dry_signal_rule(filter, *host) : HostDrySignal::present;
+        line.text = !host ? "Bypassed: no filter is applied."
+                    : rule == HostDrySignal::present
+                        ? "Bypassed: the input plays unfiltered."
+                        : std::string("Bypassed: silent, as ") + no_dry_reason(rule) + ".";
     } else if (const auto& c = filter.filter()) {
-        line.status = host ? HostStatus::playing : HostStatus::unchecked;
+        line.status = host ? HostStatus::active : HostStatus::unchecked;
         const auto ignored = host ? ignored_inputs(*c, *host, "-") : std::string();
         line.text = "Filter loaded: " + std::to_string(c->sample_rate) + " Hz, " +
                     ports(c->input_channels, c->output_channels) +

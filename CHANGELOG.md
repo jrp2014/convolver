@@ -185,6 +185,26 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Plug-ins (PLUG-22, from jrp's review of 6 and 7 November 2026): the macOS
+  window (Audio Unit and VST3) names the filter at the top, with its
+  extension, and keeps the name after the project is reopened: the Audio
+  Unit as its preset name, VST3 in its controller state, shown only while
+  the filter saved with it plays. Beside the name is the status, now
+  **Active** in place of Playing, plus a new **Bypassed**; the host's Status
+  parameter reads the same. Under the name, the filter's own sample rate,
+  channels, length and speakers as labelled columns; a problem and its fix
+  sit in a box under them, without a second Choose Filter… button: the
+  window's Choose… (or Copy Diagnostics) is highlighted instead. The Audio section gives the host's values with
+  short labels (Host sample rate, Host channels, Host block size), says
+  which inputs a wider bus leaves unused, and drops Filter length and
+  Added delay, which the facts and the Latency row show. With no dry
+  signal (a crossover, say) the Mix slider dims with a note saying why it
+  has no effect, and Bypassed says the outputs are silent. VST3 shows
+  Bypassed as soon as the host or the window changes Bypass. Projects saved
+  by earlier versions open as before, without a name. No audible effect.
+- Library (PLUG-22): `HostStatus::playing` is renamed `HostStatus::active`,
+  and `HostStatus::bypassed` is added after `fault`; `host_status()` takes
+  whether the instance is bypassed. Hence version 0.12.0.
 - Plug-ins (PLUG-23): a filter now plays when the host gives more inputs than
   it has, reading the first inputs and ignoring the rest; its outputs must
   still match exactly. REAPER gives the VST3 plug-in six inputs on a
@@ -366,11 +386,12 @@ Until 1.0 the C++ API may change between minor versions.
   `native.kernel_divergence`'s 1e-35 case is held to an absolute limit
   (1000 times `FLT_MIN`, 1.2e-35) where flushing applies. `convolver_callback_benchmark` gains
   `--filter decaying` and `--thread-denormals gradual|flush`.
-- The version is now 0.11.0 (jrp, 7 November 2026), the minor step for
-  PLUG-23's incompatible library changes below, after 0.10.13. CMake
-  consumers request `find_package(Convolver 0.11)`, and the first preview is
-  cut from the 0.11 series. The LV2 plug-in reports minor version 11, which
-  LV2 reads as a development version; LV2 is not in the first preview.
+- The version is now 0.12.0, the minor step for PLUG-22's incompatible
+  library change below, after PLUG-23's 0.11.0 (jrp, 7 November 2026) for
+  its own, after 0.10.13. CMake consumers request
+  `find_package(Convolver 0.12)`, and the first preview is cut from the 0.12
+  series. The LV2 plug-in reports minor version 12, which LV2 accepts as a
+  release; LV2 is not in the first preview.
 - 0.10.0 (jrp, 5 November 2026) was the minor step for the library changes
   in DIAG-3 and DIAG-4 below, after 0.9.0; its LV2 plug-in reported minor
   version 10, which LV2 accepts as a release.
