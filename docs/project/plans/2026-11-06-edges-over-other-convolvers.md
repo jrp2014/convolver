@@ -78,6 +78,7 @@ Contents: [the products compared](#the-products-compared) ·
 [before an item starts](#before-an-item-starts) ·
 [ranked edges to build](#ranked-edges-to-build) ·
 [automatic gain](#automatic-gain) ·
+[other convolvers and algorithms](#other-convolvers-and-algorithms) ·
 [sound-aware optimisation](#sound-aware-and-platform-aware-optimisation) ·
 [not pursued](#not-pursued) · [non-negotiables](#non-negotiables) ·
 [decisions for jrp](#decisions-for-jrp) · [sources](#sources)
@@ -320,6 +321,11 @@ recommendation is no thread: the spread schedule is synchronous, so it is
 correct in realtime, prefetch and offline processing without the
 scheduling rule's machinery.
 
+**Other convolvers and algorithms.** The design combines what WDL (Cockos),
+LSP and zita-convolver each do, and no algorithm beyond partitioned
+convolution beats it with exact output; block sizes still need tuning on
+each platform ([review](#other-convolvers-and-algorithms)).
+
 **Recommendation for usability.** Make zero latency the plug-ins' default
 once this engine is in, as reverb users expect (KlangFalter and REEV-R are
 zero-latency, and Reverberate offers zero): no delay to compensate, nothing for Mix to
@@ -547,6 +553,75 @@ way, a Status warning when a loaded filter plays more than 12 dB louder
 than its input at 100% Mix, offering "Match loudness" or Gain, removes the
 loud surprise without changing anyone's sound.
 
+## Other convolvers and algorithms
+
+jrp asked on 7 November 2026 for a review of other open-source convolvers and
+of algorithms beyond partitioned convolution, before choosing an approach for
+[rank 3](#3-long-reverbs-at-low-cpu-and-latency). Each engine below was read
+from source at the commit given.
+
+| Engine (commit, licence) | Used in | Partitions | Latency | Long blocks' work |
+| --- | --- | --- | --- | --- |
+| zita-convolver 4.0.3 ([GrandOrgue mirror](https://github.com/GrandOrgue/ZitaConvolver) `b60b4a3`, GPL-3.0) | jconvolver, Ardour's convolver, x42 convoLV2, Guitarix | Blocks from 64 to 8192 that double or quadruple, with the count per size chosen from a model of FFT and multiply-add cost | The host period at best; no direct head, so never zero | One thread per block size, with real-time priorities that fall as blocks grow. A late result is a gap in the output, flagged; a synchronous mode waits instead, for offline use |
+| [BruteFIR](https://github.com/atorger/brutefir) 1.x (`051e7af`, ISC since 2025, GPL before) | Linux room correction | Uniform | Twice the block | Spread over several processes on several cores |
+| [CamillaDSP](https://github.com/HEnquist/camilladsp) 3 (`05e9cfc`, GPL-3.0 or MPL-2.0) | Room correction on Linux, macOS, Windows | Uniform, one block per chunk | The chunk size | On the processing thread; 64-bit floats by default |
+| PipeWire's filter-chain convolver ([`convolver.c`](https://github.com/PipeWire/pipewire), `46d9214`, MIT, adapted from FFTConvolver) | Linux desktop audio | Doubling stages from the block (64 to 256 by default) to the tail size (4096) | The block | Each stage runs whole at its block boundary; the thread code is there but switched off |
+| JUCE `dsp::Convolution` ([JUCE](https://github.com/juce-framework/JUCE) `d60b7a7`, AGPL-3.0 or commercial) | Many JUCE plug-ins | Uniform by default; optionally a head and one tail stage | Zero by default (a transform per call), or a fixed latency | Inline |
+| WDL convolution engine ([WDL](https://github.com/justinfrankel/WDL) `03c6e56`, zlib) | Cockos's own library (REAPER's maker) | A direct 64-tap head, then stages of three blocks each, the blocks growing fourfold (the code notes this was about 10% faster than doubling) up to 16384 | Zero | Each stage whole at its boundary, one thread |
+| LSP `Convolver` ([lsp-dsp-units](https://github.com/lsp-plugins/lsp-dsp-units) `b7a2475`, LGPL-3.0) | LSP Impulse Reverb and Impulse Responses | A direct 128-tap head, doubling stages, then uniform tail blocks | Zero | The tail's multiply-adds are spread over the callbacks of each frame |
+| OpenAL Soft convolution effect ([openal-soft](https://github.com/kcat/openal-soft) `2fc9933`, LGPL-2.0) | Games | Uniform 128-sample blocks, the first applied directly | Zero | Inline |
+| SuperCollider `PartConv` ([supercollider](https://github.com/supercollider/supercollider) `97e4952`, GPL-3.0) | SuperCollider | Uniform | One block | Multiply-adds spread over the spare blocks |
+| libHybridConv 0.1.1 (Christian Borss, 2009, GPL-2.0-or-later; in [Equalizer APO](https://github.com/TheFireKahuna/equalizerAPO64)) | Equalizer APO | One, two or three uniform stages | The first stage's block | Spread over steps; Equalizer APO uses one stage at the device period |
+| [Steam Audio](https://github.com/ValveSoftware/steam-audio) (`480dd64`, Apache-2.0) | Games | Uniform | One block | Optionally on an AMD GPU (TrueAudio Next); a "hybrid" mode replaces the late tail with a parametric reverb |
+| KlangFalter's FFTConvolver (above) | KlangFalter, REEV-R | A head and one tail stage | Zero | The tail on a thread that the audio thread waits for |
+
+**What this shows.**
+
+- **The experiment's design is the established one, not KlangFalter's.** A
+  direct head for zero latency (WDL, LSP, OpenAL Soft), stages that grow
+  (zita-convolver, WDL, PipeWire) and the large blocks' work spread over
+  callbacks on the calling thread (LSP's tail, SuperCollider,
+  libHybridConv) each appear in a maintained engine; the prototype combines
+  them. KlangFalter's two stages and waiting tail thread are what it
+  avoids.
+- **Threads.** zita-convolver depends on Linux real-time priorities and
+  plays a gap when a thread is late; PipeWire switched its thread off; JUCE
+  and WDL use none. Battenberg and Avizienis (DAFx 2011) found a
+  multi-threaded scheduler faster on a desktop, but the time-distributed one
+  better suited to a plug-in inside a host. The prototype's measurement
+  agrees for plug-ins, and the [scheduling
+  rule](#3-long-reverbs-at-low-cpu-and-latency) would make any thread
+  costly to get right.
+- **Block sizes are tuned, not derived.** zita-convolver picks doubling or
+  quadrupling from a cost model; WDL's comment says growing fourfold was
+  about 10% faster than doubling; BruteFIR's manual says only trial and error finds the
+  best partitioning on given hardware; Wefers and Vorländer (DAFx 2011)
+  found no closed form and recommend benchmarking on the target. So the
+  sizes (64, then fourfold to 8192 in the prototype) are measured again on
+  each platform before they are fixed, Apple silicon first.
+- **Smaller ideas already listed.** Holding identical responses once
+  (zita-convolver links them) is in [sound-aware
+  optimisation](#sound-aware-and-platform-aware-optimisation); per-rate file
+  choice and resampling (PipeWire, JUCE, CamillaDSP) are rank 1. BruteFIR
+  can stop if the output exceeds a set level; EDGE-14's warning covers the
+  common case (a loud filter), so it is not proposed.
+
+**Algorithms beyond partitioned convolution.**
+
+| Algorithm | What it offers | Verdict for Convolver |
+| --- | --- | --- |
+| Optimal non-uniform partitions by search (Garcia, AES 2002; Wefers, 2015) | The cheapest sizes and counts for a filter length and latency | A refinement of the prototype: the tuning step above |
+| Optimal FFT size other than twice the block (Wefers and Vorländer, DAFx 2011) | Up to 1.65 times faster for uniform partitions with long filters and short blocks | Needs sizes that are not powers of two; Ooura has none, and Accelerate only 3, 5 and 15 times a power of two. Not pursued: the non-uniform stages already make the tail cheap |
+| A time-distributed FFT (Hurchalla, AES 2010) | Splits one large transform across several callbacks | The prototype spreads whole transforms and multiply-adds instead, and its worst 64-frame callback is already about 0.2 ms; adopt only if one transform becomes the worst callback |
+| Fast direct-form FIR (Winograd, Toom-Cook) for the head | Fewer multiplies for short filters | The 64-tap head is a small share of the work; not pursued |
+| Number-theoretic transforms | Exact integer convolution, no rounding | Needs integer input and wide words, has no platform libraries and is slower than a SIMD float FFT; float error is already about −131 dB. Not pursued, as double precision was not |
+| GPU convolution (GPU Audio; Steam Audio; an [auralisation study](https://arxiv.org/abs/2509.04390), 2025) | Up to 60 times a CPU for 32 to 128 channels on a workstation GPU | Not portable (CUDA, one vendor), transfers add latency and a plug-in shares the GPU with the host; a 60 s stereo reverb already needs under 5% of a core. Not pursued |
+| Models of the late tail: a feedback-delay-network tail after a convolved head (Steam Audio's hybrid mode; Carpentier and others, DAFx 2014), velvet-noise tails (Välimäki and others, 2017), modal or IIR fits, subband tails | Much less work for long tails | They change the sound away from the response, so they are algorithmic reverb, [not pursued](#not-pursued). A lower-rate tail, lower-precision storage and stopping at the audible end are already listed as bounded approximations for jrp to judge |
+
+No algorithm found beats non-uniform partitions with a spread schedule while
+keeping the output exact. What remains is tuning the block sizes on each
+platform, and the exact savings in rank 2.
+
 ## Sound-aware and platform-aware optimisation
 
 jrp's direction: take each platform's floating-point characteristics fully
@@ -717,5 +792,23 @@ Checked on 6 November 2026 unless stated.
   `f2cdeb0`); [REEV-R](https://github.com/tiagolr/reevr) (`e4d553a`);
   [quantumVerb](https://github.com/QVbDev/quantumVerb) (`6801e01`);
   [VSL Hybrid Reverb manual](https://www.vsl.co.at/manuals/vienna-suite/hybrid-reverb)
+- Other open-source convolvers, read from source on 7 November 2026: the
+  commits in the [table](#other-convolvers-and-algorithms); BruteFIR's
+  manual (`brutefir.html` in its repository)
+- Algorithms: Gardner, "Efficient convolution without input-output delay",
+  JAES 43(3), 1995; Garcia, [optimal filter partition for efficient
+  convolution with short input/output delay](https://www.aes.org/e-lib/browse.cfm?elib=11275),
+  AES 113th Convention, 2002; Hurchalla, [a time-distributed FFT for
+  efficient low-latency convolution](https://www.aes.org/e-lib/browse.cfm?elib=15679),
+  AES 129th Convention, 2010; Wefers and Vorländer, [optimal filter
+  partitions for uniformly-partitioned convolution](https://dafx.de/paper-archive/details/fWi-8K36aSnULRLT-W7z2A),
+  DAFx 2011; Battenberg and Avizienis, [real-time partitioned convolution on
+  conventional operating systems](https://dafx.de/paper-archive/details/S8X2gFWs-CsSUhrhJ7KeWQ),
+  DAFx 2011; Wefers, *Partitioned convolution algorithms for real-time
+  auralization*, Logos, 2015; Carpentier and others, [hybrid reverberation
+  processor with perceptual control](https://dafx.de/paper-archive/details/ar34-t6tsn7TfoIpzLzu7Q),
+  DAFx 2014; Välimäki and others, [late reverberation synthesis using
+  filtered velvet noise](https://mdpi.com/2076-3417/7/5/483), Applied
+  Sciences, 2017
 - X-MCFX: [readme](https://www.angelofarina.it/Public/X-MCFX_convolver/X-MCFX-readme.txt),
   [repository](https://github.com/JB-Luke/X-MCFX)

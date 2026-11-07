@@ -19,7 +19,10 @@ Until 1.0 the C++ API may change between minor versions.
   oracle, and `auto_gain.py` measures what automatic gain would do to
   reverb and room-correction filters. Results are in the
   [measurements](docs/develop/fft-measurements.md#long-reverbs-and-zero-latency)
-  and the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#automatic-gain);
+  and the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#automatic-gain),
+  with a review of eleven other open-source convolvers and of algorithms
+  beyond partitioned convolution
+  ([other convolvers](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#other-convolvers-and-algorithms));
   the product is unchanged.
 - Host checks (HOST-1): a reusable 20-second, 48 kHz stereo listening WAV
   with quiet clicks and sustained tones, a standard-library Python generator,
