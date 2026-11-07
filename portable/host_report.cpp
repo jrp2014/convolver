@@ -409,8 +409,11 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
 
     r.audio = audio_facts(filter, facts);
     const auto& host = facts.host;
-    // Before the host starts the instance only the filter's counts are known.
-    const auto dry = host ? dry_signal_rule(filter, *host)
+    // Before the host starts the instance only the filter's counts are known,
+    // and a failed load with no filter kept has no dry signal whatever the
+    // host (jrp, 7 November 2026).
+    const auto dry = host                    ? dry_signal_rule(filter, *host)
+                     : !c && filter.failed() ? HostDrySignal::failed_load
                      : !c || c->input_channels == c->output_channels ? HostDrySignal::present
                                                                      : HostDrySignal::filter_counts;
     r.settings = settings_words(facts.settings, dry);
