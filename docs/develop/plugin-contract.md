@@ -116,7 +116,9 @@ before they set the sample rate and channel layout (VST3 `setState` before
   7 November 2026), so a check at that point refused a saved 2→6 crossover
   and left nothing to play on six channels. State the host marks as a
   project (`IStreamAttributes`, `PresetAttributes::kStateType` "Project") is
-  never refused for not suiting the host. Restored state that arrives while
+  never refused for not suiting the host. REAPER 7.85 does not mark its
+  state this way: in jrp's second retest (7 November 2026) the log gave the
+  "has not played audio" reason on reopening and on FX Online. Restored state that arrives while
   the configuration is not binding is kept even if it does not suit: if the
   plug-in is active, it plays silence with the reason as a failure found at
   activation (`HostFilter::load` with `keep_mismatch`), and the next

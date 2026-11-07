@@ -164,6 +164,12 @@ is superseded.
   REAPER gave the plug-in 6 inputs and 6 outputs, so the 2→6 crossover was
   refused and its render, reopen and refusal steps were not run. Audacity,
   and REAPER's display of the Status parameter, remain.
+  Progress (7 November 2026, PR #131): with PLUG-23 the VST3 crossover
+  passed part D in REAPER 7.85: render, Mix 0%, bypass, a refused six-input
+  preset, the wrong rate, and (after a restore fix in the same PR) saving,
+  quitting and reopening, and FX Offline then Online
+  ([record](docs/archive/reviews/2026-11-07-reaper-crossover-retest.md)).
+  The Latency finding stays open (VST3-16).
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
   now requested (progress below). Write adapters against the
