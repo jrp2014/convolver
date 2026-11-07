@@ -362,8 +362,8 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 - [ ] **AU-3 — Validation.** `auval` and pluginval in macOS CI. `auval -strict`
   runs since PR #44; still to add: pluginval on the component, and a
   ThreadSanitizer build of `au.adapter` (bypass switched while rendering).
-  Needed for the first preview; whether the ThreadSanitizer build still is,
-  now that further hardening waits for the first walkthrough, is jrp's to say.
+  Needed for the first preview, the ThreadSanitizer build included
+  ([decisions](docs/project/decisions.md#plug-in-behaviour)).
   Progress (6 November 2026): pluginval validates the installed component
   at strictness 10, editor tests included, in the Audio Unit workflow
   ([pluginval](docs/develop/testing.md#pluginval)); the ThreadSanitizer build
@@ -897,8 +897,8 @@ reset, through each adapter's load and restore entry points. PERF-3's wider
 measurements (6- and 8-channel routing, 96 kHz, other block sizes, memory)
 become stated supported workloads after the first preview; they are not a
 preview gate. What remains for the gate: the release qualification run on
-the intended machine ([REL-6](docs/develop/releasing.md#responsiveness-qualification);
-whether it gates the first preview is jrp's to say) and, if the 30 s case
+the intended machine ([REL-6](docs/develop/releasing.md#responsiveness-qualification),
+a first-preview gate) and, if the 30 s case
 exceeds 250 ms on a supported platform, jrp's choice between background
 preparation in VST3 and the Audio Unit (VST3-5) and a higher limit with the
 pause documented.

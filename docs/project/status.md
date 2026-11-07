@@ -189,10 +189,9 @@ detail.
    on its finite preview workloads (stereo filters of 1, 10 and 30 s),
    qualified on the intended machine ([performance](#performance-what-is-measured)
    below).
-5. **jrp's decisions:** who the REL-3 tester is, and whether the
-   Audio Unit's ThreadSanitizer build and the qualification of the loading
-   gate on the intended machine (REL-6) stay first-preview gates now that
-   further hardening waits for the first walkthrough. The LV2 version mapping
+   Both the ThreadSanitizer build and that qualification stay first-preview
+   gates ([decisions](decisions.md#plug-in-behaviour)).
+5. **jrp's decisions:** who the REL-3 tester is. The LV2 version mapping
    (LV2-5) is needed only before LV2 joins a preview.
 
 jrp's review of `276c7dc` (1 November 2026): qualify this fixed feature set

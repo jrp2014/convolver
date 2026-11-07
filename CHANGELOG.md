@@ -216,6 +216,8 @@ Until 1.0 the C++ API may change between minor versions.
   10 and 30 s filters its test already runs; PERF-3's wider supported
   workloads come after the preview. TODO, the status page (whose summary
   now describes 0.10.8), the release steps and the decisions log say so.
+  The Audio Unit's ThreadSanitizer build (AU-3) and the named-machine
+  responsiveness qualification (REL-6) stay first-preview gates.
 - Inspection (ROBUST-2, jrp's answers on PR #118): when `--all-configurations`
   stops at a limit, the `limit` error now ends "The check is incomplete: this
   entry and every entry after it were not checked.", and the selection reason
