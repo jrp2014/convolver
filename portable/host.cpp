@@ -329,6 +329,26 @@ class Refused : public std::invalid_argument {
 };
 } // namespace
 
+namespace {
+// The dry signal when no filter plays (dry_signal_rule()), from what is kept:
+// a filter that does not suit (its counts decide too), or none after a failed
+// load (jrp, 7 November 2026): a kept crossover must not send full-range audio
+// to a driver, and nothing shows that a filter that failed to load was not
+// one. With one output there is no driver to protect (and
+// unfiltered_configuration() has no silence without a dry signal).
+HostDrySignal unplayed_dry(const Configuration* kept, bool failed,
+                           const HostLayout& host) noexcept {
+    if (host.inputs != host.outputs)
+        return HostDrySignal::host_counts;
+    if (host.outputs == 1)
+        return HostDrySignal::present;
+    if (kept)
+        return kept->input_channels == kept->output_channels ? HostDrySignal::present
+                                                             : HostDrySignal::filter_counts;
+    return failed ? HostDrySignal::failed_load : HostDrySignal::present;
+}
+} // namespace
+
 void HostFilter::refuse(HostFailureKind kind, Advice why, const HostRequest& request,
                         const Configuration* carried) {
     record(kind, std::move(why), request, carried);
@@ -411,14 +431,12 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
             saved_failure = std::move(f);
         }
         if (host && install) {
-            // A kept filter that does not suit plays silence; the dry signal
-            // follows dry_signal_rule() for a kept filter.
+            // A kept filter that does not suit plays silence, with the dry
+            // signal dry_signal_rule() gives it once committed.
             const auto unfiltered =
                 kept_failure
                     ? unfiltered_configuration(
-                          *host, true,
-                          host->inputs == host->outputs &&
-                              (host->outputs == 1 || next->input_channels == next->output_channels))
+                          *host, true, unplayed_dry(&*next, true, *host) == HostDrySignal::present)
                 : next ? Configuration{}
                        : unfiltered_configuration(*host, state.failed);
             try {
@@ -724,21 +742,8 @@ HostDrySignal dry_signal_rule(const HostFilter& filter, const HostLayout& host) 
     };
     if (c && !(f && f->silent)) // A filter plays: its own counts (PLUG-23).
         return counts(c->input_channels, c->output_channels);
-    if (host.inputs != host.outputs)
-        return HostDrySignal::host_counts;
-    // No filter plays. A kept filter's counts decide too, and with none kept
-    // after a failed load there is no dry signal (jrp, 7 November 2026): a
-    // kept crossover must not send full-range audio to a driver, and nothing
-    // shows that a filter that failed to load was not one. With one output
-    // there is no driver to protect (and unfiltered_configuration() has no
-    // silence without a dry signal).
-    if (host.outputs == 1)
-        return HostDrySignal::present;
-    if (c)
-        return counts(c->input_channels, c->output_channels);
-    if (filter.failed() || (f && f->silent))
-        return HostDrySignal::failed_load;
-    return HostDrySignal::present; // An empty instance passes its input.
+    // No filter plays; an empty instance passes its input.
+    return unplayed_dry(c ? &*c : nullptr, filter.failed() || (f && f->silent), host);
 }
 
 const char* no_dry_reason(HostDrySignal rule) noexcept {

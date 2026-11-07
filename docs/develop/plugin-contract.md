@@ -124,8 +124,9 @@ before they set the sample rate and channel layout (VST3 `setState` before
   activation (`HostFilter::load` with `keep_mismatch`), and the next
   activation checks it again. A filter file chosen in the window is checked
   as soon as the plug-in has been activated. A preset the host loads into a
-  new instance before it has played audio is therefore kept silent rather
-  than refused; VST3 gives no other way to tell it from a restored project
+  new instance before it has played audio, or just after the host changed
+  its rate or buses and before it plays again, is therefore kept silent
+  rather than refused; VST3 gives no other way to tell it from a restored project
   when the host does not say. `processor.cpp`'s `install()` holds the rule,
   and `vst3.adapter`'s `restored_while_host_settles` replays REAPER's order.
 

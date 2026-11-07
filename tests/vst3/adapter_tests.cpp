@@ -636,6 +636,40 @@ void restored_while_host_settles() {
         p.setActive(false);
         p.terminate();
     }
+    // Audio played on six channels does not settle the stereo buses the host
+    // changes to next: restored there before audio plays, the crossover is
+    // kept, and plays when the host returns to six (the independent review
+    // of c3dbf0d).
+    HostApplication context;
+    Processor p;
+    require(p.initialize(&context) == kResultOk, "changed buses: initialize");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    ProcessSetup setup{kRealtime, kSample32, 300, 48000};
+    require(p.setBusArrangements(&surround, 1, &surround, 1) == kResultOk &&
+                p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "changed buses: six-channel start");
+    p.setProcessing(true);
+    play_block(p, 6, 6, 300);
+    p.setProcessing(false);
+    p.setActive(false);
+    require(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk &&
+                p.setActive(true) == kResultOk,
+            "changed buses: stereo start");
+    MemoryStream state;
+    require(write_state(&state, saved), "changed buses: encode the crossover");
+    state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&state) == kResultOk,
+            "changed buses: the crossover was refused before audio played on stereo buses");
+    const auto f = p.failure();
+    require(f && f->silent && f->kind == convolver::HostFailureKind::channels,
+            "changed buses: the kept crossover gives no reason for its silence");
+    p.setActive(false);
+    require(p.setBusArrangements(&surround, 1, &surround, 1) == kResultOk &&
+                p.setActive(true) == kResultOk && !p.failure(),
+            "changed buses: the crossover does not play on six channels again");
+    p.setActive(false);
+    p.terminate();
 }
 // PLUG-4: version-1 state records counts and an advisory output mask, no layout.
 // It is "unspecified" (discrete): it must load on every arrangement with matching

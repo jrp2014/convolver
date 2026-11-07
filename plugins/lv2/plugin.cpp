@@ -387,9 +387,9 @@ void activate_locked(Instance& p) {
     }
     if (!p.host) {
         try {
-            // Nothing plays, not even the dry signal, as host_status() says
-            // of a filter that could not be started (PLUG-23: a failed
-            // configuration has none).
+            // Nothing plays, and no dry signal unless there is one output
+            // (dry_signal_rule()), as host_status() says of a filter that
+            // could not be started.
             p.host = std::make_unique<HostProcessor>(unfiltered_configuration(p.layout, true),
                                                      p.max_block, HostSettings{}, p.layout.inputs);
         } catch (...) {
