@@ -703,6 +703,13 @@ void wider_inputs() {
                            "has no effect, and bypass plays silence." &&
                 contains(rf.settings, "mix 100% wet (a load failed and no filter is kept"),
             "a failed load with no filter kept: " + rf.mix_note + " | " + rf.settings);
+    // The same before the host has started the instance, and on a mono
+    // instance (jrp, 7 November 2026).
+    for (const auto& host : {std::optional<HostLayout>{}, std::optional{HostLayout{48000, 1, 1}}})
+        require(host_report(failed, facts(host, {0, .5})).mix_note == rf.mix_note,
+                "a failed load with no filter kept, host " +
+                    std::string(host ? "mono" : "unknown") + ": " +
+                    host_report(failed, facts(host, {0, .5})).mix_note);
 }
 
 int main() {
