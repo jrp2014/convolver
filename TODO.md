@@ -779,6 +779,17 @@ so the preset file path is not needed).
   scheduling and the switches between them: results ready when their
   samples are needed, never assumed from wall-clock time (the plan's
   [scheduling rule](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#3-long-reverbs-at-low-cpu-and-latency)).
+  Progress: a prototype experiment (7 November 2026, at jrp's request;
+  `convolver_long_reverb_benchmark`, not in the product) measured
+  non-uniform partitions with a direct head for zero latency and the large
+  blocks' work spread over the callbacks of their slack: about 15 to 35
+  times less CPU than the engine at Latency 256 for 30 and 60 s reverbs, no
+  extra cost at zero latency, worst 64-frame callback near 0.2 ms, oracle
+  worst −131 dB; a worker thread did not help
+  ([measurements](docs/develop/fft-measurements.md#long-reverbs-and-zero-latency)).
+  Next, after jrp's decisions in the plan's rank 3: move the spread
+  non-uniform scheme into `Engine`, keeping routing, delays, tail, reset and
+  shared forward transforms.
 - [ ] **PERF-3 — Resource budgets and supported workloads.** Measure, on
   named machines, the distribution of callback durations (median, 99th
   percentile, 99.9th percentile and maximum, not only the average), memory in
@@ -1131,6 +1142,16 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   Needs jrp's decision on whether to offer it, how the delay is found and
   what a replacement with a different delay does, since the latency is
   fixed for a processor's life. Effort S to M.
+- [ ] **EDGE-14 — Match the loudness of a reverb response, as an option.**
+  Done when a Level setting offers "As designed" and "Match loudness" (the
+  wet signal's K-weighted loudness for pink noise matched to the dry
+  signal, computed when the filter loads and applied as one fixed gain); a
+  `.cfg` configuration always plays as designed; the gain is the same at
+  every sample rate for the same response; and the Status warns when a
+  filter plays more than 12 dB louder than its input at 100% Mix. Evidence
+  and the methods compared: the plan's [automatic gain](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#automatic-gain).
+  Needs jrp's decision on offering it, its default, its parameter ID and
+  how it is saved. Effort S to M.
 
 ## Developer tooling
 

@@ -8,7 +8,7 @@ Nothing here is implemented. Optional features wait until the first
 independent walkthrough (REL-3, [decided](../decisions.md#plug-in-behaviour)),
 and platform- and chip-level micro-optimisation waits for the walkthroughs
 (jrp, 7 November 2026). This plan names the edges, ranks them and turns them
-into TODO items (EDGE-1 to EDGE-13, with PERF-2, PERF-3 and IO-2) to take
+into TODO items (EDGE-1 to EDGE-14, with PERF-2, PERF-3 and IO-2) to take
 up afterwards in the order given here, unless jrp
 [decides otherwise](#decisions-for-jrp). Last revised on 7 November 2026
 after jrp's review of `ecd087a`; his decisions along the way are in
@@ -77,6 +77,7 @@ Contents: [the products compared](#the-products-compared) ·
 [limitations users cite](#limitations-users-cite) ·
 [before an item starts](#before-an-item-starts) ·
 [ranked edges to build](#ranked-edges-to-build) ·
+[automatic gain](#automatic-gain) ·
 [sound-aware optimisation](#sound-aware-and-platform-aware-optimisation) ·
 [not pursued](#not-pursued) · [non-negotiables](#non-negotiables) ·
 [decisions for jrp](#decisions-for-jrp) · [sources](#sources)
@@ -105,6 +106,8 @@ ease of use.
 | Waves IR-1, IR-L, IR-360 (2005 news item) | Convolution reverbs | IR-360 then Pro Tools HD only | IR-360: mono or stereo to 5.0, 5.1 to 5.1 | | IR-1: start, early-reflection build-up, wet and dry gain; IR-L: reverb time, start, length, low-CPU mode, up to 96 kHz | Commercial |
 | Hang Loose Convolver (Accurate Sound) | Room-correction convolver | Windows, macOS; standalone, VST3, AU | Stereo and 7.1 reviewed | Block 256 by default, up to 8192 | A `.cfg` listing rate, channels and per-path WAV files with level and delay; several filter sets switched in real time, with level matching; filters fitted to the playback rate | US$129 |
 | CamillaDSP | Audio-device DSP engine, not a plug-in | Linux, macOS, Windows | Any, through mixers | Set by its chunk size (segmented convolution) | WAV, raw and text filters; `$samplerate$` in a filter's path picks a file per rate; resamples the signal, not the filter | Free, GPL-3.0 |
+| KlangFalter (HiFi-LoFi; checked 7 November 2026) | Open-source convolution reverb, dormant since 2019 | macOS AU, VST2, VST3; Linux via DISTRHO Ports | Mono, stereo, true stereo | Zero (two-stage partitions, tail on a thread that the audio thread waits for) | Pre-delay, start, end, attack and decay envelope, reverse, stretch, two-band EQ, energy auto gain (on by default) | Free, GPL-3.0 |
+| REEV-R (tiagolr; checked 7 November 2026) | Open-source convolution reverb with rhythmic modulation | Windows, Linux, macOS; VST3, LV2, AU | Stereo, true stereo | Zero (KlangFalter's engine) | Stretch, trim, reverse, attack, decay, EQ and per-frequency decay; energy normalisation always on, never boosting; replacement warmed with recent input | Free, GPL-3.0 |
 | X-MCFX (fork of mcfx_convolver) | Multichannel matrix convolver for ambisonics and arrays | Windows, macOS; VST2, VST3 | Up to 128 × 128 | | Whole matrix from one multichannel WAV | Free (GPL-3.0, per its repository) |
 
 ## Edges Convolver already has
@@ -301,9 +304,36 @@ of magnitude for filters this long is a hypothesis from the general
 literature, not an established result here; PERF-3's measurements and a
 prototype in the benchmark harness test it.
 
-**jrp decides first.** Whether "zero" means zero samples or one small
-block; whether a worker thread is acceptable; what happens to the old tail
-on replacement.
+**Experiment (7 November 2026).** A prototype on the PERF-2 branch
+([measurements](../../develop/fft-measurements.md#long-reverbs-and-zero-latency))
+answers the hypothesis on a cloud VM: non-uniform partitions (blocks of 64,
+256, 1024 and 4096 frames, then 8192 for the rest), with a direct sum of the
+first 64 taps for zero latency, took about 15 to 35 times less CPU than
+today's engine at Latency 256 for 30 and 60 s stereo reverbs (a 60 s filter:
+2.7–4.8% of a core against 90–136%), passed the double-precision oracle
+(worst −131 dB), and cost no more at zero latency than at 256. Spreading
+each large block's work over the callbacks of its slack, on the calling
+thread, kept the worst 64-frame callback near 0.2 ms; without spreading, or
+with KlangFalter's inline tail, single callbacks took 3 to 8 ms. A worker
+thread cost two to three times the CPU and did not help, so the
+recommendation is no thread: the spread schedule is synchronous, so it is
+correct in realtime, prefetch and offline processing without the
+scheduling rule's machinery.
+
+**Recommendation for usability.** Make zero latency the plug-ins' default
+once this engine is in, as reverb users expect (KlangFalter and REEV-R are
+zero-latency, and Reverberate offers zero): no delay to compensate, nothing for Mix to
+align, and live monitoring works. Keep larger Latency values only as a
+compatibility choice; they no longer save meaningful CPU. When a filter is
+replaced, warm the new engine with the recent input on the preparation
+thread before the crossfade (as REEV-R does, though on its audio thread),
+so a long reverb's tail does not drop out.
+
+**jrp decides first.** Zero latency as the default, and what the Latency
+setting keeps; adopting non-uniform partitions in the engine (a DSP change
+under the non-negotiables, with the oracle at every partition boundary);
+what happens to the old tail on replacement (warm the new engine, or let
+the old one ring out).
 
 ### 4. Reverb file layouts without a `.cfg`
 
@@ -468,6 +498,55 @@ XL reaches 9.1.6 and X-MCFX 128 × 128.
 sessions are preserved, with additional identities only where a separate
 variant requires them (such as further fixed-layout LV2 variants).
 
+## Automatic gain
+
+jrp asked on 7 November 2026 what automatic gain would bring. Reverbs that
+play impulse responses scale a loaded response so the wet signal has a
+consistent level: KlangFalter (energy, on by default), REEV-R (energy,
+always, never boosting), quantumVerb (peak, always), VSL's Hybrid Reverb
+("Auto Gain"), JUCE's `dsp::Convolution` (energy) and Space Designer
+(perceived-volume compensation). Convolver plays every filter at its own
+level. [`auto_gain.py`](../../../tests/native/benchmarks/auto_gain.py)
+measured, from the frequency response, 20 synthetic reverbs (RT60 0.4 to
+12 s, bright and dark, with and without direct sound, peak-normalised as
+responses are usually distributed) and three room-correction and crossover
+filters ([output](../../benchmarks/2026-11-07-auto-gain.txt)):
+
+| Method | Wet level spread across the reverbs (bright / pink / dark input) | Loudest wet vs dry | Room correction and crossovers |
+| --- | --- | --- | --- |
+| None (Convolver today) | 31.5 / 30.4 / 29.5 dB | +34 dB | Unchanged, as designed |
+| Peak to 0.5 (quantumVerb) | 31.5 / 30.4 / 29.5 dB | +28 dB | −5 to +28 dB |
+| Energy (KlangFalter, JUCE) | 1.8 / 4.6 / 6.9 dB | +4.6 dB | +1 to +17 dB |
+| Energy, never boosting (REEV-R) | 1.8 / 4.6 / 6.9 dB | +4.6 dB | Unchanged |
+| K-weighted loudness (BS.1770, pink noise) | 2.8 / 0.0 / 2.6 dB | 0 dB | +2 to +7 dB |
+
+- **For reverbs the benefit is large.** A peak-normalised long reverb at
+  100% Mix plays up to 34 dB louder than its input today, a risk to ears
+  and speakers when it loads. Automatic gain brings every response to
+  within a few dB, so switching responses, comparing them (EDGE-4) and
+  setting Mix work as users expect.
+- **Loudness beats energy.** Energy normalisation weights all frequencies
+  up to half the sample rate equally, so dark reverbs end up 4 to 7 dB
+  louder than bright ones, and the same response resampled to 96 kHz ends
+  up 2.9 dB louder than at 48 kHz (half its band is empty, so its energy
+  halves): a cause of the level changes users report after resampling.
+  K-weighted loudness over 20 Hz to 20 kHz is the same at every rate.
+- **For room correction and crossovers it is harmful.** These filters are
+  designed with a calibrated level and headroom; any automatic gain moves
+  that level (a crossover leg by up to +28 dB with peak normalisation) and
+  can push the response above 0 dB, so it would clip.
+- **Peak normalisation does not help**: it leaves the spread unchanged.
+
+**Proposal (EDGE-14).** A Level setting with two values: "As designed"
+(today's behaviour, and always for a `.cfg` configuration) and "Match
+loudness" (K-weighted loudness of the wet signal matched to the dry signal,
+computed when the filter loads, then a fixed gain). The default needs
+jrp's decision: "As designed" keeps every existing project and room
+correction unchanged; "Match loudness" is what reverb users expect. Either
+way, a Status warning when a loaded filter plays more than 12 dB louder
+than its input at 100% Mix, offering "Match loudness" or Gain, removes the
+loud surprise without changing anyone's sound.
+
 ## Sound-aware and platform-aware optimisation
 
 jrp's direction: take each platform's floating-point characteristics fully
@@ -596,6 +675,12 @@ Every EDGE item, and PERF-2, keeps these; a change that cannot is not done.
    [experiments table](#sound-aware-and-platform-aware-optimisation) are
    proposals, to be confirmed or changed before the measurements.
 5. Each item's own question, listed in its section above, when it starts.
+6. **Long reverbs and zero latency** (7 November 2026 experiment, [rank
+   3](#3-long-reverbs-at-low-cpu-and-latency)): adopt non-uniform
+   partitions with the spread schedule; zero latency as the default; warm a
+   replacement with recent input.
+7. **Automatic gain** ([EDGE-14](#automatic-gain)): whether to offer
+   "Match loudness", its default, and the loud-filter warning.
 
 ## Sources
 
@@ -626,5 +711,11 @@ Checked on 6 November 2026 unless stated.
   [Steinberg forum, REVerence memory (2011)](https://forums.steinberg.net/t/reverence-ram-consumption-opinions-welcome/599701);
   [WiiM forum, FIR latency (April 2024)](https://forum.wiimhome.com/threads/convolver-for-digital-room-correction-and-eq-fir-filters.390/page-2);
   [miniDSP forum, latency](https://www.minidsp.com/community/threads/latency.19880/page-3)
+- Open-source reverbs, read from source on 7 November 2026:
+  [KlangFalter](https://github.com/HiFi-LoFi/KlangFalter) (`a91da61`) and its
+  engine [FFTConvolver](https://github.com/HiFi-LoFi/FFTConvolver) (MIT,
+  `f2cdeb0`); [REEV-R](https://github.com/tiagolr/reevr) (`e4d553a`);
+  [quantumVerb](https://github.com/QVbDev/quantumVerb) (`6801e01`);
+  [VSL Hybrid Reverb manual](https://www.vsl.co.at/manuals/vienna-suite/hybrid-reverb)
 - X-MCFX: [readme](https://www.angelofarina.it/Public/X-MCFX_convolver/X-MCFX-readme.txt),
   [repository](https://github.com/JB-Luke/X-MCFX)

@@ -289,6 +289,33 @@ if(CONVOLVER_BUILD_NATIVE)
         target_include_directories(convolver_kernel_benchmark PRIVATE portable)
         target_link_libraries(convolver_kernel_benchmark PRIVATE convolver_core)
         list(APPEND native_targets convolver_benchmark convolver_kernel_benchmark)
+        # PERF-2 experiment: non-uniform partitions and zero latency for long
+        # reverbs. CONVOLVER_FFTCONVOLVER_DIR may name a checkout of
+        # HiFi-LoFi/FFTConvolver (MIT, KlangFalter's engine) to compare it too;
+        # run_long_reverb.sh fetches a pinned copy. Never part of the product.
+        set(CONVOLVER_FFTCONVOLVER_DIR "" CACHE PATH
+            "Optional FFTConvolver checkout for the long-reverb benchmark")
+        add_executable(convolver_long_reverb_benchmark tests/native/benchmarks/long_reverb.cpp)
+        target_include_directories(convolver_long_reverb_benchmark PRIVATE portable tests/native)
+        target_link_libraries(convolver_long_reverb_benchmark PRIVATE convolver_core)
+        if(CONVOLVER_FFTCONVOLVER_DIR)
+            target_sources(convolver_long_reverb_benchmark PRIVATE
+                "${CONVOLVER_FFTCONVOLVER_DIR}/AudioFFT.cpp"
+                "${CONVOLVER_FFTCONVOLVER_DIR}/FFTConvolver.cpp"
+                "${CONVOLVER_FFTCONVOLVER_DIR}/TwoStageFFTConvolver.cpp"
+                "${CONVOLVER_FFTCONVOLVER_DIR}/Utilities.cpp")
+            target_include_directories(convolver_long_reverb_benchmark PRIVATE "${CONVOLVER_FFTCONVOLVER_DIR}")
+            target_compile_definitions(convolver_long_reverb_benchmark PRIVATE CONVOLVER_WITH_FFTCONVOLVER)
+            if(fft_backend STREQUAL "FFTW")
+                # The same FFT library as the engine, so only the partitioning differs.
+                target_compile_definitions(convolver_long_reverb_benchmark PRIVATE AUDIOFFT_FFTW3)
+                target_link_libraries(convolver_long_reverb_benchmark PRIVATE ${fft_library})
+            elseif(fft_backend STREQUAL "ACCELERATE")
+                target_compile_definitions(convolver_long_reverb_benchmark PRIVATE AUDIOFFT_APPLE_ACCELERATE)
+                target_link_libraries(convolver_long_reverb_benchmark PRIVATE "-framework Accelerate")
+            endif()
+        endif()
+        list(APPEND native_targets convolver_long_reverb_benchmark)
         if(CONVOLVER_BUILD_IO)
             # Startup, reset, replacement and loading at a host callback size (PERF-5).
             add_executable(convolver_callback_benchmark tests/native/callback_benchmark.cpp)

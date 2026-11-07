@@ -12,6 +12,15 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Long-reverb experiment (PERF-2, in progress): `convolver_long_reverb_benchmark`
+  compares today's engine with prototype non-uniform partitions (zero
+  latency, large blocks' work spread over callbacks, or on a worker thread)
+  and with KlangFalter's engine, checks each against the double-precision
+  oracle, and `auto_gain.py` measures what automatic gain would do to
+  reverb and room-correction filters. Results are in the
+  [measurements](docs/develop/fft-measurements.md#long-reverbs-and-zero-latency)
+  and the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#automatic-gain);
+  the product is unchanged.
 - Host checks (HOST-1): a reusable 20-second, 48 kHz stereo listening WAV
   with quiet clicks and sustained tones, a standard-library Python generator,
   and [usage notes](examples/host-audio/README.md). The REAPER smoke-test

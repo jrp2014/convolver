@@ -30,6 +30,7 @@ Contents: [processing benchmark](#processing-benchmark) ·
 [overlap-add and overlap-save](#overlap-add-and-overlap-save) ·
 [compiler flags and AVX2 kernels](#compiler-flags-and-avx2-kernels) ·
 [startup, reset and filter loading](#startup-reset-and-filter-loading) ·
+[long reverbs and zero latency](#long-reverbs-and-zero-latency) ·
 [reproduce](#reproduce)
 
 ## Processing benchmark
@@ -619,6 +620,118 @@ size) took a median of 2.42 ms before and 0.86 ms after (2.8×), because the
 file is opened and decoded once instead of six times (PERF-6). The remaining
 time is parsing, path resolution and copying each path's channel.
 
+## Long reverbs and zero latency
+
+An experiment for PERF-2 (7 November 2026, at jrp's request): ways of
+making long reverbs cheaper, zero latency above all, measured beside the
+engine and beside KlangFalter's engine. None of it is in the product. Machine:
+the 4-vCPU Intel Xeon cloud VM at 2.30 GHz, Ubuntu 24.04, GCC 13.3, Release,
+Ubuntu FFTW 3.3.10 (estimate plans for Convolver's code, measure plans for
+KlangFalter's), AVX2+FMA kernels. One run of 5 s of audio per workload; it
+is a shared machine, and repeated workloads differed by up to about 30%,
+so read the tables for their order of magnitude.
+[Raw data](../benchmarks/2026-11-07-x86-long-reverb.csv), made with
+[`run_long_reverb.sh`](../../tests/native/benchmarks/run_long_reverb.sh)
+and [`long_reverb.cpp`](../../tests/native/benchmarks/long_reverb.cpp).
+
+The candidates, each one input and one output per path:
+
+- **Today's engine**: uniform partitions of the Latency block, at Latency
+  256 (the default) and 1024.
+- **Non-uniform partitions** (Gardner 1995; Garcia 2002), built from the
+  engine's own FFT and multiply-accumulate kernels: blocks of 64, 256, 1024,
+  4096 and then 8192 frames for the rest of the filter (growth 4, largest
+  8192, chosen from the tuning runs below). At zero latency a direct
+  time-domain sum covers the first 64 taps, so nothing is delayed. Each
+  larger block has one block period of slack before its output is needed,
+  and three schedules use it differently: **no spreading** (all of a block's
+  work at its boundary), **spread** (its work divided by estimated cost over
+  the boundaries of its slack, on the calling thread, with no thread at
+  all), and **worker** (the multiply-accumulates and inverse transform on a
+  worker thread; when a result is late, the calling thread computes it
+  itself and never waits).
+- **KlangFalter** (its FFTConvolver, MIT, at commit `f2cdeb0`, fetched by the
+  script and never copied into the tree): head block = host callback, tail
+  block 8192, as KlangFalter configures it; its tail run inline, and on a
+  thread with KlangFalter's blocking wait.
+
+Every candidate passed the direct double-precision oracle at irregular
+callback sizes from 1 to 300 frames (`--mode check`, a 20,000-tap filter
+with small blocks so that every stage boundary is crossed): worst error
+2.3e-7 to 2.7e-7 of the output peak for the non-uniform candidates (−131 to
+−133 dB), 4.9e-7 for the engine at B = 64 and 4.3e-7 for KlangFalter. The
+worker schedule was checked both faster than real time, where most results
+came from the calling thread's fallback, and paced, where most came from the
+worker.
+
+The workloads are a stereo reverb (two paths, each a decaying-noise filter)
+at 48 kHz. CPU is the whole process's CPU time per second of audio (one core
+= 100%), so it includes worker threads; p99.9 and max are the calling
+thread's callback times. The callback periods are 1.33, 5.33 and 21.3 ms for
+64, 256 and 1024 frames: a callback slower than its period is a dropout.
+
+| Filter | Today, Latency 256: CPU, p99.9 at 64 / 256 / 1024 frames | Non-uniform, zero latency, spread: CPU, p99.9 at 64 / 256 / 1024 frames |
+| --- | --- | --- |
+| 10 s | 11–15%; 0.69 / 1.38 / 3.03 ms | 0.9–1.3%; 0.13 / 0.32 / 0.38 ms |
+| 30 s | 30–47%; **3.43** / 1.85 / 7.89 ms | 1.6–1.9%; 0.16 / 0.24 / 0.60 ms |
+| 60 s | 90–136%; **10.6 / 14.9 / 48.9** ms | 2.7–4.8%; 0.16 / 0.39 / 1.27 ms |
+
+The bold values exceed the callback period. The 30 s filter's 4-path true
+stereo at 256 frames: today 120% CPU, non-uniform 6.6%, KlangFalter inline
+4.5%. At 96 kHz (30 s, 256 frames): today 235%, non-uniform 11.5%,
+KlangFalter inline 10.3%.
+
+All candidates at 30 s (CPU; p99.9 / max in ms):
+
+| Candidate | Latency | 64 frames | 256 frames | 1024 frames |
+| --- | --- | --- | --- | --- |
+| Today, Latency 256 | 256 | 46.6%; 3.43 / 4.29 | 29.6%; 1.85 / 1.92 | 31.1%; 7.89 / 8.35 |
+| Today, Latency 1024 | 1024 | 9.5%; 2.41 / 4.78 | 8.7%; 2.82 / 2.85 | 7.8%; 1.84 / 1.88 |
+| Non-uniform, no spreading | 0 | 1.8%; 2.47 / 3.30 | 1.8%; 4.04 / 4.04 | 1.6%; 3.11 / 3.17 |
+| Non-uniform, spread | 0 | 1.9%; 0.16 / 0.22 | 1.9%; 0.24 / 0.28 | 1.6%; 0.60 / 0.63 |
+| Non-uniform, spread | 256 | 1.4%; 0.15 / 0.18 | 1.7%; 0.23 / 0.23 | 1.5%; 0.53 / 0.55 |
+| Non-uniform, worker | 0 | 6.7%; 0.34 / 0.40 | 5.8%; 0.82 / 2.24 | 3.6%; 0.57 / 0.66 |
+| KlangFalter, tail inline | 0 | 2.7%; 2.64 / 4.26 | 1.8%; 4.02 / 4.13 | 1.3%; 3.22 / 3.36 |
+| KlangFalter, tail thread | 0 | 7.1%; 0.20 / 0.79 | 3.9%; 0.95 / 1.82 | 2.7%; 0.21 / 0.22 |
+
+What this shows:
+
+- **Non-uniform partitions cut CPU by about 15 to 35 times** for 30 and
+  60 s filters (about 12 times at 10 s), as the edges plan's hypothesis
+  expected, and make 60 s filters playable at all: today's engine needs
+  more than one core for them at Latency 256.
+- **Zero latency costs almost nothing extra** with non-uniform partitions:
+  at most about half a percentage point of a core over the same layout at
+  latency 256, within the run-to-run noise, because only the first 64 taps
+  are summed directly.
+- **Spreading is what removes the spikes.** Without it the largest blocks
+  land in one callback (3 to 8 ms), as do KlangFalter's inline tail and
+  today's engine with callbacks smaller than its block. Spread, the worst
+  callback stays under a sixth of the period at 64 frames, with no thread.
+- **A worker thread did not pay.** It took two to three and a half times
+  the total CPU (thread wake-ups and cache traffic, not profiled) and
+  lowered the calling thread's worst callbacks only for the 60 s filter at
+  1024 frames. Within a 1024-frame callback the stage deadlines all fall
+  inside the one call, so 56% of the jobs fell back to the calling thread. KlangFalter's thread lowers its peaks only by blocking the audio
+  thread when the tail is late.
+- **KlangFalter's mean cost is close to the non-uniform candidate's** (same
+  8192 tail block, measured FFTW plans); its weakness is the spike of its
+  inline tail or the blocking wait of its threaded one.
+
+Layout tuning, 30 s at zero latency (largest block × growth; CPU, and p99.9
+in ms at 64 / 256 frames; the full rows are in the raw data):
+
+| Largest block | Growth 2 | Growth 4 |
+| --- | --- | --- |
+| 4096 | 3.2–3.3%; 0.12 / 0.35 | 3.1–3.8%; 0.25 / 0.42 |
+| 8192 | 2.1–2.2%; 0.21 / 0.27 | 1.6–2.5%; 0.22 / 0.34 |
+| 16384 | 1.8%; 0.44 / 0.47 | 1.1–1.9%; 0.41 / 0.39 |
+| 32768 | 1.5–1.6%; 0.86 / 0.98 | 1.2–1.4%; 0.65 / 1.01 |
+
+Larger final blocks cost less on average but make larger single transforms,
+which no schedule can split; 8192 with growth 4 balances the two here, and
+the right value may differ on Apple silicon.
+
 ## Reproduce
 
 The benchmark programs and scripts are in
@@ -742,6 +855,30 @@ scenario on its own, for example jrp's baseline at B = 1024:
 build/convolver_callback_benchmark --scenario warm --taps 65536 --inputs 6 --outputs 6 \
     --layout matrix --block 1024 --callback 64 --seconds 5
 ```
+
+### Long reverbs and zero latency
+
+Needs the default build's libraries, CMake, git and network access (the
+script fetches FFTConvolver, MIT, at a pinned commit into the build
+directory):
+
+```sh
+sh tests/native/benchmarks/run_long_reverb.sh > long-reverb.csv   # about 20 minutes
+sh tests/native/benchmarks/run_long_reverb.sh --quick             # 1 s per workload
+build-long-reverb/convolver_long_reverb_benchmark --mode check    # oracle check, all candidates
+```
+
+One workload on its own, for example the candidate layout at zero latency:
+
+```sh
+build-long-reverb/convolver_long_reverb_benchmark --candidate nonuniform --schedule spread \
+    --first 64 --largest 8192 --ratio 4 --latency 0 --ir-seconds 30 --callback 64 --seconds 5
+```
+
+The automatic-gain analysis in the
+[edges plan](../project/plans/2026-11-06-edges-over-other-convolvers.md#automatic-gain)
+needs only Python and numpy:
+`python3 tests/native/benchmarks/auto_gain.py` ([output](../benchmarks/2026-11-07-auto-gain.txt)).
 
 ### Comparing backends
 
