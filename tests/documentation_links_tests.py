@@ -77,6 +77,20 @@ class DocumentationLinks(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_repository_skills_are_checked(self):
+        skill = '.claude/skills/todo-item/SKILL.md'
+        files = {
+            'README.md': '# Home\n',
+            'docs/develop/workflow.md': '# Workflow\n## Before you start\n',
+            skill: '---\nname: todo-item\n---\n# Skill\n[Start](../../../docs/develop/workflow.md#before-you-start)\n',
+        }
+        result = self.run_check(files)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        files[skill] += '[Renamed](../../../docs/develop/workflow.md#starting)\n'
+        result = self.run_check(files)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(f'{skill}:6: missing anchor', result.stderr)
+
     def test_html_anchors_in_markdown_code_are_not_destinations(self):
         result = self.run_check(
             {

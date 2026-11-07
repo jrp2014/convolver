@@ -17,13 +17,39 @@ This page applies to people and coding agents alike. Several streams of work
 often in sessions that end without warning. These rules let one contributor
 continue where another stopped.
 
-Contents: [before you start](#before-you-start) ·
+Contents: [kinds of task](#kinds-of-task) ·
+[before you start](#before-you-start) ·
 [while working](#while-working) · [handoff note](#handoff-note) ·
 [picking up someone else's work](#picking-up-someone-elses-work) ·
+[verification](#verification-for-each-kind-of-change) ·
 [definition of done](#definition-of-done) ·
 [independent review](#independent-review) ·
 [merging](#merging-and-afterwards) ·
 [recording progress in TODO](#recording-progress-in-todo)
+
+## Kinds of task
+
+Decide first which kind of task you have been given. Only a change alters the
+repository; recording a review's or a host test's results in it is a change.
+
+- **A review** of a pull request, a branch, a page or the repository is
+  read-only. Read the files, and build and run tests in a scratch build
+  folder if that helps, but change no tracked file, create no branch or
+  commit, and post nothing on GitHub unless the person asks. Give the
+  findings to whoever asked, in the conversation. The
+  [independent review](#independent-review) of an open pull request is the
+  exception: it is posted on that pull request ([report](#report)).
+  Fixing the findings is a change, started only when the person asks for it.
+- **Local host testing** is steps jrp runs in a host on his own computer.
+  Write the steps, then record what jrp reports as dated evidence where the
+  task says (a pull request, the TODO item's `Progress` line, or a host
+  record). Record a result as it was observed, including a step that did
+  not work; do not turn it into a new sequence of host operations nobody
+  has tried ([while working](#while-working)). A fix the testing calls for
+  is a separate change.
+- **A change** to the repository: one TODO item, or a tightly coupled group,
+  on its own branch with a draft pull request. The rest of this page is about
+  changes.
 
 ## Before you start
 
@@ -89,7 +115,10 @@ Contents: [before you start](#before-you-start) ·
 
 Whenever you stop, even part-way:
 
-1. Run `pre-commit run --all-files`, then commit and push everything.
+1. Run `pre-commit run --all-files`, then commit and push all of this item's
+   work on its branch. Leave out anything unrelated to the item (a scratch
+   file, a local experiment, another item's fix): keep it uncommitted, or
+   give it its own branch.
 2. Replace the handoff note in the pull request description (below).
 3. If a partial merge is useful, add a `Progress` line to the TODO item
    ([recording progress](#recording-progress-in-todo)).
@@ -115,14 +144,33 @@ rather than appending, so it always describes the branch as it is now:
    branch, start it from theirs, and say in both pull requests which one
    replaces the other, then ask jrp to close the old one.
 
+## Verification for each kind of change
+
+Verify in proportion to the change. Every push runs `pre-commit run --all-files`;
+the rest depends on what changed. A change that spans several rows needs every
+row it touches, and when unsure which row applies, take the later one. Say in
+the pull request which rows you followed and what you ran.
+
+| What changed | Run before pushing | Not needed |
+| --- | --- | --- |
+| **Prose:** Markdown whose commands no test runs (most of `docs/develop/`, `docs/project/`, `TODO.md`, `CHANGELOG.md`, `AGENTS.md`, `.claude/skills/`, and pages in `docs/use/` whose marked commands did not change) | `pre-commit run --all-files`: Markdown lint, links and anchors, the repository rules | A native build, CTest or clang-tidy. CI runs only Lint, and for `docs/use/`, which the packages ship, the candidate workflow too ([documentation-only pull requests](testing.md#documentation-only-pull-requests)) |
+| **Executable examples:** `README.md`, `examples/first-use/README.md` and `docs/use/first-filter.md` (`examples.first_use` runs their commands), or a command marked `<!-- executable-example -->` or `<!-- refused-example -->` in `docs/use/` | An [everyday build](build.md#everyday-build) and `ctest --test-dir build -R '^examples\.first_use$' --output-on-failure`; run each changed marked command with that build's `convolver` and check its output against the page (the [candidate workflow](testing.md#plug-in-candidate-checks) runs them from a package) | The sanitizer build and clang-tidy, unless code changed too |
+| **Tooling:** Python under `scripts/` or `tests/` that CTest does not run, `.pre-commit-config.yaml`, `.github/`, `.claude/hooks/` | pre-commit (ruff, actionlint, and the checkers' own tests); the script's own tests, such as `python3 tests/repository_checks_tests.py`; for a workflow, the CI run on the draft pull request | A native build, unless the script is run by CTest or builds something |
+| **Code:** C++, CMake, or a test CTest runs, outside the DSP path (CLI, I/O, configuration, presets, host lifecycle) | The [sanitizer build](build.md#sanitizer-build-for-changes) with the full CTest configuration; clang-tidy on the changed portable sources ([CONTRIBUTING](../../CONTRIBUTING.md#formatting-and-analysis)); the focused tests in the [change and test map](architecture.md#change-and-test-map) | |
+| **DSP:** convolution, routes, delays, FFT backends, kernels, dither | As for code, and report the worst error of the direct double-precision oracle tests in `tests/native/engine_tests.cpp`; measure any speed claim in a separate Release build ([how to measure](fft-measurements.md#reproduce)) | |
+| **Plug-in adapter or window:** `plugins/`, or shared host code they call | As for code, configured with the format's SDK; the format's validator, its [PLUG-2 comparisons](testing.md#plug-in-comparisons-plug-2) and [pluginval](testing.md#pluginval) where they apply. What only macOS builds (the window, the Audio Unit) runs in CI if you have no Mac; say so | Host steps, unless the change is about behaviour only a host shows ([host testing](host-testing.md)) |
+| **Versioning:** `VERSION`, `SOURCE_PATHS`, the version workflow | `python3 tests/versioning_tests.py` ([source versioning](versioning.md)) | Running the version helper, which commits and tags |
+
 ## Definition of done
 
 A pull request is ready for review when all of these hold, and the template's
 checklist says so:
 
-- **Built and tested, as reported.** The full CTest configuration passes; say
-  which platform, compiler and options you ran. Do not claim something passes
-  unless you ran it, and keep results you ran apart from what CI is
+- **Built and tested, as reported.** The checks in the
+  [verification table](#verification-for-each-kind-of-change) for every kind
+  of change in the pull request pass; for code, the full CTest configuration,
+  saying which platform, compiler and options you ran. Do not claim something
+  passes unless you ran it, and keep results you ran apart from what CI is
   configured to run.
 - **DSP changes:** the direct double-precision oracle tests in
   `tests/native/engine_tests.cpp` pass; report the worst error relative to
@@ -130,8 +178,9 @@ checklist says so:
   kernel set and B it came from.
 - **Plug-in changes:** the format's validator and the PLUG-2 comparisons pass,
   and pluginval where it applies ([pluginval](testing.md#pluginval)).
-- **Checks:** `pre-commit run --all-files` (formatting included) and
-  clang-tidy, as in [CONTRIBUTING](../../CONTRIBUTING.md#lint-checks).
+- **Checks:** `pre-commit run --all-files` (formatting included), and
+  clang-tidy when portable C++ changed, as in
+  [CONTRIBUTING](../../CONTRIBUTING.md#lint-checks).
 - **Documentation:** the guide that owns the behaviour is updated
   ([page ownership](documentation.md#one-home-for-each-topic)); a new page is in
   the [index](../README.md); user-visible changes and every finished TODO
@@ -214,9 +263,12 @@ and say what you ran.
 
 ### Report
 
-Post the review on the pull request: each finding with file and
+Post the review on the pull request it reviews: each finding with file and
 line, why it matters and a suggested fix; then a short list of what you checked
-and found sound. Say plainly if you found nothing. The author answers each
+and found sound. Change no files and push nothing: the author fixes the
+findings. A review that is not this step, such as a review of `main` or of
+another contributor's draft, goes to whoever asked for it, and onto GitHub
+only if they ask. Say plainly if you found nothing. The author answers each
 finding: fixed (with the commit), or not fixed and why. Reviewers do not
 approve or merge; jrp does that.
 
@@ -227,7 +279,15 @@ approve or merge; jrp does that.
 - CI must be green on the final commit. A failure that is also red on `main`
   is reported in the pull request, not ignored.
 - After a merge, the version workflow bumps `VERSION` and tags `main`
-  ([source versioning](versioning.md)). Delete the merged branch.
+  ([source versioning](versioning.md)).
+- Merged branches are kept for a while, so their history can still be
+  read, and jrp deletes them periodically (his choice, 6 November 2026;
+  GitHub's automatic deletion stays off). Cloud agent sessions cannot delete
+  branches; a reminder every two weeks lists the branches whose work is all
+  in `main` (squash merges compared by content) and that have no open pull
+  request, with a script jrp runs from a clone. Further work after a merge starts
+  again from current `main`, even on a branch of the same name; a merged
+  pull request is never reused.
 
 ## Recording progress in TODO
 

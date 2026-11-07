@@ -27,10 +27,10 @@ Open as a draft when you start; that is the claim. See docs/develop/workflow.md.
 
 <!-- Only what you actually ran: platform, compiler, options, result. CI coverage is separate. -->
 
-- [ ] Full CTest configuration (state the configuration):
+- [ ] Verification for each kind of change (docs/develop/workflow.md#verification-for-each-kind-of-change): rows followed and what ran; for code, the full CTest configuration:
 - [ ] DSP change: oracle tests pass; worst error relative to peak (with its group and B):
 - [ ] Plug-in change: validator, PLUG-2 comparisons, pluginval where it applies
-- [ ] `pre-commit run --all-files` (includes clang-format) and clang-tidy
+- [ ] `pre-commit run --all-files` (includes clang-format), and clang-tidy when portable C++ changed
 
 ## Documentation and tracking
 

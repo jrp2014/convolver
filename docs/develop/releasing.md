@@ -178,7 +178,7 @@ whoever he names) qualifies it on a named machine (REL-6 in
    ```
 
 5. **The verdict.** The limits are those in
-   [load timing](testing.md#load-timing-perf-9) and are not relaxed here. The
+   [load timing](load-timing.md) and are not relaxed here. The
    release qualifies only if every entry in every run printed "passed" or
    "reported only". An entry that failed, or was "not qualified", means the
    release is not qualified on that machine. That stays true even if a

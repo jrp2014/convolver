@@ -15,6 +15,7 @@ how the project reached its present state.
 | [Repository review, 20 October 2026](2026-10-20-repository-review.md) | Status guide mapping implemented behaviour to source and checks at `2fe503e`; root `REVIEW.md` until 23 October 2026 | [Status](../../project/status.md), [implementation map](../../develop/architecture.md) |
 | [Documentation review, 20 October 2026](2026-10-20-documentation-review.md) | Reorganized the maintained guides at `2fe503e` (0.4.0); pre-review copies are in [documentation-2026-10-20](../documentation-2026-10-20/README.md) | [Documentation guide](../../develop/documentation.md) |
 | [RequestWorker and its watchdog, 1 to 5 November 2026](2026-11-05-request-worker.md) | The Audio Unit's Latency thread, its tests and the CI-22 to CI-25 evidence, until AU-12 replaced it with a dispatch source | [Plug-in contract: Audio Unit](../../develop/plugin-contract.md), [testing](../../develop/testing.md#intermittent-failures) |
+| [HOST-1 REAPER session, 6 November 2026](2026-11-06-host1-reaper.md) | jrp's first REAPER session with candidate 0.10.9 (`83aa64d`) on macOS arm64: the stereo journey passed; the Latency change and the 2→6 crossover did not work as the guides said | [Host testing: unresolved findings](../../develop/host-testing.md#unresolved-host-findings) |
 
 The first two reports describe different intermediate patches, not the final
 merged implementation. The [reconciliation](../../review-2026-10/reconciliation.md)

@@ -107,8 +107,9 @@ can act on it without a separate copy of the rules:
 - Keep anchors stable; skills and `AGENTS.md` link to sections by anchor.
 - Put every rule on exactly one page. `AGENTS.md` lists the rules that apply
   everywhere and links to the rest; a repository skill in `.claude/skills/`
-  only says when it applies and which section to follow. If a skill needs
-  more than that, the missing text belongs on the page.
+  only says when it applies and links to the section to follow, by anchor,
+  so the [link check](#automated-checks) catches a renamed section. If a
+  skill needs more than that, the missing text belongs on the page.
 
 ## One home for each topic
 
@@ -135,8 +136,8 @@ can act on it without a separate copy of the rules:
 | Status, evidence levels and direction | [Status](../project/status.md) | TODO, open pull requests, GitHub releases, host records |
 | jrp's decisions | [Decisions](../project/decisions.md), with the details on the page each row links to; other pages state decisions as plain fact ([rule](workflow.md#while-working)) | TODO, the guides and pull requests that describe the work |
 | Dependency choices: which FFT and sound-file library each build uses, and how to change it | [Build from source](build.md#which-libraries-each-build-uses); the reasons in the [implementation map](architecture.md#dependency-choices) | `CMakeLists.txt`, the release policy |
-| FFT selection and performance evidence | [FFT guide](fft-backends.md) | Adapter contract; dated measurement artifacts |
-| Verification | [Testing](testing.md) | CMake registrations, workflow matrix, actual run results |
+| FFT selection and performance evidence | [FFT guide](fft-backends.md); the dated records on [FFT and engine measurements](fft-measurements.md) | Adapter contract; dated measurement artifacts |
+| Verification | [Testing](testing.md); the load-timing method on [load timing](load-timing.md) | CMake registrations, workflow matrix, actual run results |
 | Open work | [TODO](../../TODO.md) | Current source and linked issues/plans |
 | Claiming, handing over and reviewing work | [Workflow](workflow.md) | Pull request template, repository checks, `.claude/skills/` (pointers only) |
 | How documentation is organised and written | This page | The index, the link and repository checks |
@@ -203,7 +204,8 @@ our vendored copy is current.
 The pre-commit configuration used by lint CI (which also checks C++ formatting) runs
 [`check_doc_links.py`](../../scripts/check_doc_links.py) and its
 [regression tests](../../tests/documentation_links_tests.py). The checker scans
-top-level `.md` files and Markdown under `docs/`, excluding `archive/`,
+top-level `.md` files, the repository skills under `.claude/skills/` and
+Markdown under `docs/`, excluding `archive/`,
 `historical/` and `review-2026-10/` as source pages. Open plans in `project/plans/` are
 checked like maintained guides. Links to the excluded
 records are still checked. This keeps preserved evidence separate from maintained

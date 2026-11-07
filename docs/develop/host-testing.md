@@ -18,6 +18,7 @@ Contents: [first hosts](#first-hosts) · [hosts in CI](#hosts-in-ci) ·
 [Steinberg's SDK hosts](#steinbergs-sdk-hosts) · [every report](#every-report) ·
 [smoke test](#smoke-test-for-an-unsigned-preview) ·
 [smoke test in each first host](#smoke-test-in-each-first-host) ·
+[unresolved host findings](#unresolved-host-findings) ·
 [production qualification](#production-qualification) ·
 [Equalizer APO on a real device](#equalizer-apo-on-a-real-device)
 
@@ -243,7 +244,9 @@ except the Audio Unit build, which runs in a source checkout.
    open. Remove the folder after testing
    (`sudo rm -r /Library/Audio/Presets/Convolver`).
 4. Have a stereo test file at 44.1 kHz and one at 48 kHz, with clear
-   transients (a click track or spoken word).
+   transients (a click track or spoken word). For the 48 kHz checks, the
+   repository includes a [quiet stereo listening clip](../../examples/host-audio/README.md)
+   with clicks and sustained tones.
 5. Start each host's test with an empty
    [Convolver log](../use/plugins.md#status-and-the-convolver-log), and copy it
    into the report afterwards:
@@ -313,11 +316,12 @@ except the Audio Unit build, which runs in a source checkout.
     asterisk in the title bar). Drag Gain to about −12 dB while playing:
     the level drops without a click, and *Edit › Undo* undoes the whole drag
     in one step. Set Mix to 0%: you hear the dry track. Option-click both
-    sliders to reset them. Choose 1024 frames in the Latency menu: after a
-    short gap the sound carries on, the window's Latency row reads
-    `21.3 ms`, the log has `Latency set to 1024 frames`, and the track stays
-    in time with the source. Record where REAPER shows the plug-in's latency
-    (its delay compensation) and whether it reads 1024 samples. Open the
+    sliders to reset them. Choose 1024 frames in the Latency menu while
+    playing, and record what the window's Latency row and the log say,
+    what REAPER shows as the plug-in's latency (its delay compensation),
+    and when, if ever, the new latency comes into use. In REAPER 7.85 it
+    stayed unused until the project was reopened
+    ([unresolved](#unresolved-host-findings)). Open the
     disclosure triangle: REAPER's FX window grows to fit.
     Click **Copy Diagnostics** and paste into the report. Save, quit and
     reopen: Gain, Mix and Latency come back.
@@ -326,10 +330,13 @@ except the Audio Unit build, which runs in a source checkout.
     in a new project, from the same candidate package as the steps above:
     a six-channel track, the crossover preset, a six-channel render
     compared with `convolver --compare`, save and reopen, and the presets
-    that do not fit. Record how REAPER gave Convolver 2 inputs and 6 outputs
-    (the track's channels, the plug-in's routing, and what Status and the
-    log said), the render settings, each `--compare` result and the
-    save-and-reopen result, and every place the guide differs from REAPER.
+    that do not fit. No REAPER routing that gives the VST3 plug-in 2 inputs
+    and 6 outputs is known yet ([unresolved](#unresolved-host-findings)):
+    record the layout REAPER offered (the track's channels, the plug-in's
+    routing, and what Status and the log said). If the preset is refused,
+    stop there and record it; otherwise record the render settings, each
+    `--compare` result and the save-and-reopen result, and every place the
+    guide differs from REAPER.
     This is the guide's first run in a host; REL-3 reuses the record where
     it applies.
 
@@ -434,6 +441,18 @@ except the Audio Unit build, which runs in a source checkout.
     Latency detail reads 1024 frames again (the log's `Latency changed`
     line after `Restored settings` shows it was applied after GarageBand
     started the plug-in).
+
+## Unresolved host findings
+
+Results from a host that differ from what the guides describe and are not yet
+explained or fixed. Each names the host and build it was seen in; it is not a
+claim about other hosts or versions. Do not add host steps to work around one
+until its cause is known: record what was observed, as below.
+
+| Finding | Seen in | What was observed | Not yet known | Evidence |
+| --- | --- | --- | --- | --- |
+| A new Latency is not used until the project is reopened (VST3) | REAPER 7.85, macOS 27.2 arm64, candidate 0.10.9 (`83aa64d`), 6 November 2026 | The log said `Latency set to 1024 frames`; the window said the new latency was not in use yet, with 256 frames still active; REAPER's delay-compensation display stayed at 256 samples, also after playback stopped. After save, quit and reopen both read 1024. The gap and the alignment at 1024 were not checked | Whether REAPER received Convolver's restart request, and what it did with it; whether the audio lines up after the change | [Record](../archive/reviews/2026-11-06-host1-reaper.md#part-c-window-and-settings) (step C5) |
+| The 2→6 crossover cannot be routed (VST3) | As above | On a six-channel track REAPER gave the plug-in 6 inputs and 6 outputs. Its *Request VST3 bus channel count* setting changes inputs and outputs together; no separate control was found. The 2-in, 6-out crossover preset was refused with `Load failed. Silent: the filter has 2 in, 6 out, the plug-in 6 in, 6 out.` The render, save-and-reopen and refused-preset steps were not run | Whether the crossover now plays there: since PLUG-23 a filter reads the first inputs of a wider bus, so on 6 inputs and 6 outputs it reads inputs 1–2. Not yet retested in REAPER (HOST-1 part D) | [Record](../archive/reviews/2026-11-06-host1-reaper.md#part-d-crossover-routing-blocker) (steps D1 to D5) |
 
 ## Production qualification
 
