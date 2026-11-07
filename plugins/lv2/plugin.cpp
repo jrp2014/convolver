@@ -911,7 +911,7 @@ std::optional<HostState> read_state(Instance& p, const void* value, std::size_t 
     if (type != p.uris.chunk) {
         status = LV2_STATE_ERR_BAD_TYPE;
         p.filter.reject(HostFailureKind::state_unreadable,
-                        Advice{"the saved state has the wrong type",
+                        Advice{"the saved session or preset has the wrong type",
                                "It should be a chunk of bytes (atom:Chunk, or "
                                "xsd:base64Binary in a preset file).",
                                "Load the filter again, then save the session.",

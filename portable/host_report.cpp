@@ -119,7 +119,7 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
                  : "The outputs are silent: with " + ports(c.input_channels, c.output_channels) +
                        ", the filter has no unfiltered signal to play.") +
             " Turn bypass off to hear the filter.";
-    } else if (const auto& c = filter.filter()) {
+    } else if (filter.filter()) {
         // PLUG-22: while it plays, the window's heading names the filter and
         // the Audio section describes it, so nothing is said here.
         if (!host)

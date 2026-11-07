@@ -1526,8 +1526,8 @@ void status_and_log() {
     String128 text{};
     d.getParamStringByValue(status_id, d.getParamNormalized(status_id), text);
     require(text[0] == 'F' && d.status_text() ==
-                                  "Filter loaded: 44100 Hz, 2 in, 2 out; checked when the "
-                                  "host starts it.",
+                                  "Filter loaded: 44100 Hz, 2 in, 2 out; waiting for the "
+                                  "host to start audio.",
             "unchecked state not shown");
     q.disconnect(&d);
     d.disconnect(&q);

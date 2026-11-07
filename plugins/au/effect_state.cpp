@@ -393,7 +393,7 @@ bool Effect::read_state(CFPropertyListRef plist, HostState& next,
                         std::optional<SavedSettings>& saved, bool& settings_unreadable) {
     if (!plist || CFGetTypeID(plist) != CFDictionaryGetTypeID()) {
         reject(HostFailureKind::state_unreadable,
-               {"the saved state is not an Audio Unit preset dictionary",
+               {"the saved project or preset is not an Audio Unit preset dictionary",
                 {},
                 "Load the filter again, then save the project.",
                 {}});
