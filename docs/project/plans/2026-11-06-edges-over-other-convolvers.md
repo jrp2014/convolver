@@ -17,9 +17,9 @@ saved-state limit, fractional-delay costs, the earlier vDSP experiment,
 estimates kept apart from results, Altiverb on Windows, and plug-in
 identities. Re-ranked later on 7 November 2026 by jrp's rule that
 limitations users cite come first, after matching public complaints against
-the edges and new performance candidates; jrp confirmed that the
-walkthroughs come before any of it, platform- and chip-level optimisation
-included. Rationale and measurements live here; TODO holds each item's
+the edges and new performance candidates. The freeze until the first
+walkthrough still holds, and jrp confirmed that platform- and chip-level
+micro-optimisation waits for the walkthroughs. Rationale and measurements live here; TODO holds each item's
 acceptance criteria.
 
 For jrp, deciding which edges to pursue and in what order, and for whoever
@@ -53,18 +53,19 @@ then takes up one of the EDGE items.
   is published yet, and the first preview is macOS-only).
 - **What users complain about** ([limitations users cite](#limitations-users-cite)).
   CPU spikes and dropouts with long responses at small host buffers; a
-  filter needed for every sample rate, with resampled filters that changed
-  level or clipped; memory per instance; strict true-stereo file rules;
+  filter recommended for every sample rate, with resampled filters that
+  changed level; memory per instance; strict true-stereo file rules;
   room-correction delay that breaks lip sync; and bounces that drop out with
   threaded convolvers. jrp's rule: remove the limitations users cite first.
 - **The ranked edges to build** (each a TODO item, after REL-3). First
   those that answer a complaint: a filter for every sample rate in one
-  plug-in state, with opt-in resampling (EDGE-1, IO-2); exact savings in
-  today's engine, measured first (PERF-3, EDGE-11); long reverbs at low CPU
-  with lower and finer latency (PERF-2, with EDGE-10); filters larger than
-  the saved-state limit (EDGE-12); true-stereo and other file layouts
-  without a `.cfg` (EDGE-3); and an opt-in report of a filter's own delay
-  (EDGE-13). Then the easy room-correction wins nobody was found citing:
+  plug-in state, with opt-in resampling (EDGE-1, IO-2); savings in today's
+  engine, measured first (PERF-3, EDGE-11); long reverbs at low CPU with
+  lower and finer latency (PERF-2, with EDGE-10); true-stereo and other file
+  layouts without a `.cfg` (EDGE-3); and an opt-in report of a filter's own
+  delay, which answers the lip-sync complaint in part (EDGE-13). Then edges
+  nobody was found citing: filters larger than the saved-state limit that
+  Convolver itself sets (EDGE-12), and the easy room-correction wins,
   delays finer than a sample (EDGE-9), showing a filter's response (EDGE-2),
   level-matched comparison (EDGE-4) and published evidence (EDGE-5). Then
   the reverb features: pre-delay, start, length and fades (EDGE-6), decay
@@ -137,8 +138,9 @@ host is told the exact latency, with Mix delaying the dry signal to match
 jrp's rule (7 November 2026): where Convolver can remove a limitation that
 users cite, that comes first. The complaints below come from public forums
 and vendors' own help pages, gathered on 7 November 2026. They are
-anecdotes, not a survey; some are years old, and each concerns the product
-named. Each is matched with what Convolver does today and the ranked edge
+anecdotes, not a survey; some are years old, each concerns the product
+named, and the JUCE and HISE threads come from plug-in developers rather
+than end users. Each is matched with what Convolver does today and the ranked edge
 that answers it.
 
 | What users cite | Where (when) | Convolver today | Answer |
@@ -146,37 +148,39 @@ that answers it.
 | CPU spikes or dropouts with long responses at small host buffers; only one or two instances before the host overloads | Ableton's Hybrid Reverb FAQ advises a larger buffer or a shorter decay; JUCE forum: uniform partitions are "not really suited" to responses over a second (April 2018), and tiny host buffers force frequent transforms (August 2018); Vienna Suite users: "Two instances MAX" (undated); HISE forum dropouts (2021–22) | Uniform partitions. With a host callback smaller than the Latency block, one callback in every few does all the work. A 30 s filter's longest 512-frame callbacks took 8–12 ms of a 10.7 ms period (PERF-15), and silent input costs as much as music | Ranks 2 and 3 |
 | Zero latency costs a lot of CPU; a Hang Loose Convolver user asked to turn its zero-latency filter switching off to save CPU | The Gear Forum (January 2023); AV NIRVANA (1 November 2023) | Latency is a setting from 64 to 4096 frames, so users already trade latency for CPU; zero latency is not offered | Rank 3 |
 | Bounces drop out with convolvers that use a background thread, which a faster-than-real-time render outruns | HISE forum: Cubase Direct Offline Processing and Pro Tools (2021–22) | No thread on the audio path, so offline renders are exact | A rule for rank 3: a worker thread processes synchronously when the host renders offline |
-| A filter is needed for every sample rate, and users lack some rates; resampled responses changed level (up to +9.6 dB at 192 kHz in JUCE's convolution) or clipped; pops when the rate changes | Roon's guidance and users (October 2021); JUCE forum (March 2021 to June 2022); Audirvana with the Audiolense and Acourate convolvers (undated) | A configuration list plays the entry for the host's rate, but a plug-in keeps only that entry; a missing rate plays silence with a clear Status; nothing is resampled | Rank 1 |
-| Memory per instance: hundreds of megabytes each for Steinberg's REVerence | Steinberg forum (February–March 2011) | Each path holds its own filter spectra, even when two paths hold the same response; a filter over the 64 MiB saved-state limit is refused | Ranks 2 (identical responses held once) and 4 |
-| True-stereo files must be two stereo files of equal length named Left and Right; users are unsure how to give separate left and right filters | Ableton's Hybrid Reverb FAQ; Roon forum, where the guide is "woefully inadequate" for newcomers (April 2024) | True stereo needs a hand-written `.cfg` | Rank 5 |
-| Long linear-phase room-correction filters delay the sound far beyond lip sync: about 0.7 s for 65,536 symmetric taps at 48 kHz | WiiM forum (5 April 2024); miniDSP forum (undated) | Reports the engine's latency only, not the filter's own delay | Rank 6 |
+| Roon recommends a filter for every sample rate, and users lack some rates; resampled responses changed level (up to +9.6 dB at 192 kHz in JUCE's convolution), and one user's upsampled filters clipped; pops when the rate changes | Roon's guidance and users (October 2021); JUCE forum (March 2021 to June 2022); Audirvana with the Audiolense and Acourate convolvers (undated) | A configuration list plays the entry for the host's rate, but a plug-in keeps only that entry; a missing rate plays silence with a clear Status; nothing is resampled | Rank 1 |
+| Memory per instance: hundreds of megabytes each for Steinberg's REVerence | Steinberg forum (February–March 2011) | Each path holds its own filter spectra, even when two paths hold the same response; a filter over the 64 MiB saved-state limit is refused | Rank 2 (identical responses held once) |
+| True-stereo files must be two stereo files of equal length named Left and Right; users are unsure how to give separate left and right filters | Ableton's Hybrid Reverb FAQ; Roon forum, where the guide is "woefully inadequate" for newcomers (April 2024) | True stereo needs a hand-written `.cfg` | Rank 4 |
+| Long linear-phase room-correction filters delay the sound far beyond lip sync: about 0.7 s for 65,536 symmetric taps at 48 kHz | WiiM forum (5 April 2024) and miniDSP forum (undated), both about players and streamers | Reports the engine's latency only, not the filter's own delay | Rank 5, in part: it helps hosts that compensate plug-in latency, not players |
 | A convolver says nothing about what went wrong, and `.cfg` variations need editing by hand | AV NIRVANA, a user of Hang Loose Convolver (1 November 2023; another user said it does log errors) | The Status and log explain each refusal; `.cfg` files are read as Roon, JRiver and Audiolense write them | Already an [edge](#edges-convolver-already-has) |
 | The tap count shown is not the filter's | Roon forum (May 2023 to September 2024) | `--inspect` and the window report the rate, lengths, delay and peak of what is loaded | Already an edge; EDGE-2 adds the response |
 
 This search found nobody citing the lack of delays finer than a sample, a
-response display or level-matched comparison. Those edges stay, ranked
-below the ones that answer a complaint.
+response display or level-matched comparison, nor the saved-state limit,
+which is Convolver's own. Those edges stay, ranked below the ones that
+answer a complaint.
 
 ## Ranked edges to build
 
 Ranked by jrp's priorities. First the edges that answer a limitation users
-cite ([above](#limitations-users-cite)), the room-correction ones first
-(ranks 1 to 6); then the easy room-correction wins nobody was found citing
-(ranks 7 to 10); then the reverb features (ranks 11 to 13). Within each
-group, by value to users, how clearly the gap shows and effort.
+cite ([above](#limitations-users-cite)) (ranks 1 to 5); then edges nobody
+was found citing: the saved-state limit Convolver itself sets on long
+reverbs (rank 6) and the easy room-correction wins (ranks 7 to 10); then
+the reverb features (ranks 11 to 13). Within each group, by value to users,
+how clearly the gap shows and effort.
 Effort: **S** about a pull request, **M** a few, **L** a design and several.
-Nothing starts before REL-3: jrp confirmed on 7 November 2026 that the
-walkthroughs come before any of this, platform- and chip-level optimisation
-included.
+Nothing starts before REL-3 unless jrp lifts the freeze
+([decisions for jrp](#decisions-for-jrp)); platform- and chip-level
+micro-optimisation waits for the walkthroughs (jrp, 7 November 2026).
 
 | Rank | Edge | The gap today | Effort | TODO | jrp decides first |
 | --- | --- | --- | --- | --- | --- |
 | 1 | **A filter for every sample rate in one plug-in state, and resampling as an opt-in.** Keep each entry of a configuration list in the state and play the one matching the host's rate; switch when the rate changes, with the usual crossfade so there is no pop. For a rate with no filter, an opt-in resampling of the filter when it loads (IO-2), with its level preserved and its error stated, instead of silence. | A list already picks the entry for the host's rate, but the plug-in keeps only that entry, so a project opened at another rate plays silence. Hang Loose Convolver loads the matching-rate filter when the rate changes, and CamillaDSP picks a file per rate; room-correction tools write one filter per rate. Users who lack a rate resample the filter themselves, and the level faults reported for JUCE's resampled responses are what IO-2 must avoid. | M | EDGE-1, IO-2 | The saved-state format (a new host state version); all the rates together must fit the saved-state limit; whether Convolver resamples at all (today it never does; refusal stays the default) |
-| 2 | **Exact savings in today's engine**, each measured on PERF-3's workloads first: do the older filter blocks' multiply-adds in the callbacks between engine blocks when host callbacks are smaller than the Latency block, so only the newest block waits; go idle once silent input has outlasted the tail; skip filter blocks that are all zeros; hold identical responses once; read each input history once for all the paths that use it; and sum each output's spectra before one inverse transform (the one rounding-only change). | With a 64-frame host callback and the default 256-frame block, every fourth callback does all the work, and that peak is what hosts and users see. Silent input costs as much as music. A leading silence or zero padding is multiplied like any other block. A mono reverb on both channels, or one correction on left and right, is stored twice. True stereo reads each input history twice and inverts four transforms for two outputs. All of these are arithmetic estimates until PERF-3 measures them. | S–M each | PERF-3, EDGE-11 | None for the exact changes; the summed inverse transforms stay within the kernels' divergence bound |
-| 3 | **Long reverbs at low CPU, with lower and finer latency.** First measure long reverbs (10, 30 and 60 s; stereo and true stereo; 48 and 96 kHz) in PERF-3, and take rank 2's exact savings. Then, in PERF-2: non-uniform partitions (short blocks at the start for latency, ever longer blocks for the tail); spreading the long blocks' work evenly over callbacks, or onto a worker thread without locks, so no callback spikes (a worker thread processes synchronously when the host renders offline, VST3's offline process mode or the Audio Unit's offline render, so bounces cannot drop out as the HISE users' did); and a cheaper replacement than running two whole engines together, for example crossfading only the start of the filter, once what happens to the old filter's sounding tail is specified (left to ring out, which keeps its tail work running until it decays, or faded, which cuts it). Latency can then be any value the partitions allow, not only a power of two, down to zero with a direct (time-domain) head. | Every block of a filter is processed for every engine block: with 256-frame engine blocks, a 30 s filter at 48 kHz is about 5,600 blocks, so each engine block costs about 1.4 million complex multiply-adds and reads 12 MB of filter spectra per path (a 512-frame host callback runs two engine blocks); the multiply-accumulate dominates (the FFTs were a few per cent of the work in the October FFTW measurements). These are arithmetic estimates. With a 30 s filter the longest 512-frame callbacks took 8–12 ms of a 10.7 ms period on a cloud machine (PERF-15), and a replacement misses its budget. Latency is a power of two from 64 to 4096 frames in VST3 and the Audio Unit (LV2 stays at 256); Reverberate 2 offers zero, Space Designer 128 samples. That non-uniform partitions would cut this by about an order of magnitude for filters this long is a hypothesis from the general literature, not an established result here; PERF-3's measurements and a prototype in the benchmark harness test it. | L | PERF-3, then PERF-2 and EDGE-10 | Whether "zero" means zero samples or one small block; whether a worker thread is acceptable; what happens to the old tail on replacement |
-| 4 | **Filters larger than the saved-state limit.** Let the plug-ins accept a long filter whose samples exceed 64 MiB, by a storage the owner chooses: for example the samples compressed without loss, or a reference to the file with its hash and a clear refusal when the file is missing or changed. | A 60 s true-stereo filter at 96 kHz needs about 88 MiB: the command line renders it, the plug-ins refuse it (see the paragraph below the table). Users already count memory per instance against reverbs. | M | EDGE-12 | The storage, and what a project carries when it moves to another machine |
-| 5 | **Reverb file layouts without a `.cfg`.** Mono on stereo, true stereo as one four-channel file or two stereo files. | A sound file filters channel by channel only; true stereo needs a hand-written `.cfg`. Reverb responses are commonly distributed in these layouts; Ableton's true stereo needs two stereo files of equal length named Left and Right. | S–M | EDGE-3 | The channel order assumed for four-channel files, and how the layout is chosen |
-| 6 | **Report a filter's own delay, as an option.** Add the filter's main delay (the peak of a linear-phase filter, or a value the user gives) to the latency reported to the host, as linear-phase equalisers report theirs, so a host that compensates plug-in latency keeps picture and sound in sync. The sound is unchanged; Mix and bypass delay the dry signal by the reported latency as now. | Long linear-phase room-correction filters delay the sound by up to about 0.7 s. Convolver reports its engine latency only, so the host cannot compensate for the rest. Players that do not host plug-ins do not benefit. | S | EDGE-13 | Whether to offer it, and how the delay is found |
+| 2 | **Savings in today's engine**, each measured on PERF-3's workloads first. Exact: go idle once silent input has outlasted the tail; skip filter blocks that are all zeros; hold identical responses once; read each input history once for all the paths that use it. Rounding only, within the kernels' divergence bound: when host callbacks are smaller than the Latency block, do the older filter blocks' multiply-adds in the callbacks between engine blocks, so only the newest block waits (this changes the summation order); and sum each output's spectra before one inverse transform where outputs are fewer than paths. | With a 64-frame host callback and the default 256-frame block, every fourth callback does all the work, and that peak is what hosts and users see. Silent input costs as much as music. A leading silence or zero padding is multiplied like any other block. A mono reverb on both channels, or one correction on left and right, is stored twice. True stereo reads each input history twice and inverts four transforms for two outputs. All of these are arithmetic estimates until PERF-3 measures them. | S–M each | PERF-3, EDGE-11 | None: the exact changes keep the output bit-identical, and the rounding-only ones stay within the kernels' divergence bound |
+| 3 | **Long reverbs at low CPU, with lower and finer latency.** First measure long reverbs (10, 30 and 60 s; stereo and true stereo; 48 and 96 kHz) in PERF-3, and take rank 2's savings. Then, in PERF-2: non-uniform partitions (short blocks at the start for latency, ever longer blocks for the tail); spreading the long blocks' work evenly over callbacks, or onto a worker thread without locks, so no callback spikes (a worker thread processes synchronously when the host renders offline, VST3's offline process mode or the Audio Unit's offline render, so bounces cannot drop out as reported on the HISE forum); and a cheaper replacement than running two whole engines together, for example crossfading only the start of the filter, once what happens to the old filter's sounding tail is specified (left to ring out, which keeps its tail work running until it decays, or faded, which cuts it). Latency can then be any value the partitions allow, not only a power of two, down to zero with a direct (time-domain) head. | Every block of a filter is processed for every engine block: with 256-frame engine blocks, a 30 s filter at 48 kHz is about 5,600 blocks, so each engine block costs about 1.4 million complex multiply-adds and reads 12 MB of filter spectra per path (a 512-frame host callback runs two engine blocks); the multiply-accumulate dominates (the FFTs were a few per cent of the work in the October FFTW measurements). These are arithmetic estimates. With a 30 s filter the longest 512-frame callbacks took 8–12 ms of a 10.7 ms period on a cloud machine (PERF-15), and a replacement misses its budget. Latency is a power of two from 64 to 4096 frames in VST3 and the Audio Unit (LV2 stays at 256); Reverberate 2 offers zero, Space Designer 128 samples. That non-uniform partitions would cut this by about an order of magnitude for filters this long is a hypothesis from the general literature, not an established result here; PERF-3's measurements and a prototype in the benchmark harness test it. | L | PERF-3, then PERF-2 and EDGE-10 | Whether "zero" means zero samples or one small block; whether a worker thread is acceptable; what happens to the old tail on replacement |
+| 4 | **Reverb file layouts without a `.cfg`.** Mono on stereo, true stereo as one four-channel file or two stereo files. | A sound file filters channel by channel only; true stereo needs a hand-written `.cfg`. Reverb responses are commonly distributed in these layouts; Ableton's true stereo needs two stereo files of equal length named Left and Right. | S–M | EDGE-3 | The channel order assumed for four-channel files, and how the layout is chosen |
+| 5 | **Report a filter's own delay, as an option.** Add the filter's main delay (the peak of a linear-phase filter, or a value the user gives) to the latency reported to the host, as linear-phase equalisers report theirs, so a host that compensates plug-in latency keeps picture and sound in sync. The sound is unchanged, but Mix and bypass must delay the dry signal by the larger latency, which needs a dry buffer of up to about 0.7 s per channel instead of one block; and the latency is fixed for a processor's life ([adapter contract](../../develop/plugin-contract.md)), so a replacement filter with a different delay needs the host to restart processing. | Long linear-phase room-correction filters delay the sound by up to about 0.7 s. Convolver reports its engine latency only, so the host cannot compensate for the rest. Players that do not host plug-ins do not benefit, so this answers the lip-sync complaint only in part. | S–M | EDGE-13 | Whether to offer it, how the delay is found, and what a replacement with a different delay does |
+| 6 | **Filters larger than the saved-state limit.** Let the plug-ins accept a long filter whose samples exceed 64 MiB, by a storage the owner chooses: for example the samples compressed without loss, or a reference to the file with its hash and a clear refusal when the file is missing or changed. | A 60 s true-stereo filter at 96 kHz needs about 88 MiB: the command line renders it, the plug-ins refuse it (see the paragraph below the table). Users already count memory per instance against reverbs. | M | EDGE-12 | The storage, and what a project carries when it moves to another machine |
 | 7 | **Delays finer than a sample.** An opt-in fractional part for each delay, baked into the prepared filter (a band-limited fractional delay), so no separate delay stage runs while playing. Baking may lengthen the filter and so add blocks; the added taps, processing cost and integer delay are measured, and the supported bandwidth and approximation error stated. | `.cfg` delays are truncated to whole samples, a compatibility rule that stays. One sample at 48 kHz is about 7 mm of speaker distance, which matters when aligning a crossover's drivers. | S–M | EDGE-9 | How the finer delay is given (a setting or an option, never a change to `.cfg` syntax) |
 | 8 | **Show what a filter does.** Magnitude, phase, group delay and the decay (energy-time) of each path, as data from `--inspect` and as a plot in the window. | The report gives rate, lengths, delay and peak, not the response. Room-correction users check filters in REW; reverb users expect to see the decay. | M (data S, window M) | EDGE-2 | The window's layout (an addition to the editor plan) |
 | 9 | **Compare two filters, level-matched.** Hold two filters and switch between them with the existing crossfade, at matched loudness. | Hang Loose Convolver switches filter sets in real time, with level matching. Convolver replaces one filter with another. | M | EDGE-4 | The saved state (two filters together must fit the 64 MiB saved-state limit), and the loudness measure used for matching |
@@ -203,10 +207,10 @@ EDGE-1 and both filters held by EDGE-4.
 Measured performance comes first for ranks 2 and 3: PERF-3's measurements
 decide which savings are worth taking and the partition sizes, and the result must pass the same oracle tests at every
 partition boundary, with the worst error reported, and keep everything
-`.cfg` defines (routing, delays, tail, reset). Ranks 1, 4, 5, 8 and 9 are
+`.cfg` defines (routing, delays, tail, reset). Ranks 1, 4, 6, 8 and 9 are
 mostly control-side work and keep the engine as it is (rank 1's resampling,
-like rank 7, changes only the filter that is prepared); rank 6 changes only
-the latency reported.
+like rank 7, changes only the filter that is prepared); rank 5 changes the
+latency reported and the dry path that follows it.
 
 ## Sound-aware and platform-aware optimisation
 
@@ -224,8 +228,8 @@ is built; PERF-3's long-reverb workloads are the yardstick. Candidates:
 | Explicit platform kernels for Apple silicon and other AArch64 processors (NEON intrinsics or Accelerate's vDSP) | Rounding only | Already tried: the [24 October 2026 vDSP experiment](../../archive/reviews/2026-10-24-apple-vdsp.md) on an M5 Max found no substantial whole-engine gain and failed the divergence gates, and showed that the baseline kernels are already compiled to NEON with FMA. Revisit only with a new workload (such as long reverbs), hardware target or implementation hypothesis, measured against that experiment. Compiler options were measured on x86-64 only (PERF-4: `-O3` is already on, AVX2 alone helped); MSVC is unmeasured | A second kernel set to keep within `native.kernel_divergence`'s bound |
 | FFT sizes each backend handles well: Accelerate and Ooura round 2B up to a power of two | Exact | Choosing B (and non-uniform block sizes) so that 2B is a power of two avoids nearly doubling the transform | Constrains PERF-2's block sizes |
 | Parallelism where it is safe: filter preparation and the command line's offline render across paths and channels; on the audio thread only through each platform's real-time mechanism (an audio workgroup joined to the host's on macOS, MMCSS on Windows), never a general thread pool such as OpenMP's | Exact | Faster loads of long filters and faster multichannel renders; on the audio thread, the tail's long blocks on a second core (with PERF-2) | OpenMP's runtime can block, allocate and wake threads late, so it suits only the offline paths, where jrp wants it used as long as it causes no cross-platform incompatibility: optional, MSVC's OpenMP 2.0 subset only, a serial build with byte-identical output where it is missing (Apple's compiler ships none); hosts already spread tracks across cores, so extra audio threads compete with them |
-| Rank 2's exact savings (EDGE-11): spread the older blocks' work over callbacks smaller than the Latency block, idle after the tail, skip all-zero filter blocks, hold identical responses once, read each input history once for all its paths | Exact | Lower callback peaks at small host buffers, nothing spent on silence, less memory and memory traffic for true stereo and duplicated responses | Bookkeeping per block; each measured on PERF-3's workloads before it is kept |
-| Sum each output's spectra before one inverse transform | Rounding only | Two inverse transforms instead of four for true stereo; most for short filters and many channels | A changed accumulation order, kept within `native.kernel_divergence`'s bound |
+| [Rank 2](#ranked-edges-to-build)'s exact savings (EDGE-11) | Exact | See rank 2 | Each measured on PERF-3's workloads before it is kept |
+| [Rank 2](#ranked-edges-to-build)'s rounding-only savings (EDGE-11) | Rounding only | See rank 2 | Kept within `native.kernel_divergence`'s bound |
 | Stop each late block at its audible bandwidth: high frequencies decay first, so a late block keeps only the frequency bins still above the stated level | Bounded approximation | Work and memory fall along the tail, beyond what the whole-block audible end cuts | The bound is jrp's decision; a bin range per block |
 | Process the late tail at a lower sample rate | Bounded approximation, research | A quarter-rate tail would cost about a quarter (an estimate) | Resampling filters add error and latency of their own; research first |
 | Large memory pages for the filter spectra (huge pages on Linux, superpages on macOS, large pages on Windows, which need a privilege there) | Exact | Fewer address-translation misses over spectra of 10 MB and more | Kept only for a measured gain, with ordinary pages where unavailable |
@@ -297,16 +301,17 @@ Every EDGE item, and PERF-2, keeps these; a change that cannot is not done.
    reverb out ([decisions](../decisions.md#direction)).
 2. **Adopt this order?** Re-ranked on 7 November 2026 by jrp's rule that
    limitations users cite come first ([limitations users
-   cite](#limitations-users-cite)): ranks 1 to 6 answer complaints, the
-   room-correction ones first; ranks 7 to 10 are the easy room-correction
-   wins nobody was found citing; ranks 11 to 13 are the reverb features.
+   cite](#limitations-users-cite)): ranks 1 to 5 answer complaints; rank 6
+   (the saved-state limit) and the easy room-correction wins (ranks 7 to
+   10) answer none that was found; ranks 11 to 13 are the reverb features.
    It also weighs the standing direction to favour stability and longevity
    over features ([decisions](../decisions.md#direction)): each item keeps
    the [non-negotiables](#non-negotiables), and the reverb-shaping items
    wait for users to ask.
-3. **Does the freeze hold for all of it?** Answered on 7 November 2026: the
-   walkthroughs come first, and platform- and chip-level optimisation waits
-   for them too. EDGE-5's user page states only what is already true and
+3. **Does the freeze hold for all of it?** Platform- and chip-level
+   micro-optimisation waits for the walkthroughs (jrp, 7 November 2026).
+   Open: whether putting the limitations users cite first lifts the freeze
+   for any of them, such as EDGE-1 or EDGE-11. EDGE-5's user page states only what is already true and
    could be written before REL-3; a dropout that PERF-3 measures would be a
    fix the freeze allows, not an optional feature.
 4. Each item's own question, listed in its row above, when it starts.

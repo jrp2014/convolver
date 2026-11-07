@@ -68,7 +68,7 @@ boundary and C++20 in the core.
 | 6. Later previews | Windows and Linux (**VST3-12**, **VST3-13**), the remaining gain modes and meters (**PLUG-9**, **PLUG-10**, **AU-7**), PERF-3's supported workloads; **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need. Not a first-preview gate: the loading-responsiveness gate uses the finite preview workloads instead. |
 | Supporting, cheap | **PERF-1**, **HOST-4** | HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
-| After the milestone: edges over other convolvers | First the limitations users cite: **EDGE-1** with **IO-2**, **PERF-3**'s long-reverb workloads with **EDGE-11**, then **PERF-2** with **EDGE-10**, **EDGE-12**, **EDGE-3** and **EDGE-13**; then **EDGE-9**, **EDGE-2**, **EDGE-4** and **EDGE-5**; then **EDGE-6** to **EDGE-8**, in the ranked order of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) | jrp's goal (6 November 2026): be better than the most popular reverb plug-ins. Waits for REL-3 unless jrp lifts the freeze; each item starts with the owner's decision its plan row names, and keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#non-negotiables). PERF-2 still waits for PERF-3's budgets. |
+| After the milestone: edges over other convolvers | First the limitations users cite: **EDGE-1** with **IO-2**, **PERF-3**'s long-reverb workloads with **EDGE-11**, then **PERF-2** with **EDGE-10**, **EDGE-3** and **EDGE-13**; then **EDGE-12**, **EDGE-9**, **EDGE-2**, **EDGE-4** and **EDGE-5**; then **EDGE-6** to **EDGE-8**, in the ranked order of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) | jrp's goal (6 November 2026): be better than the most popular reverb plug-ins. Waits for REL-3 unless jrp lifts the freeze; each item starts with the owner's decision its plan row names, and keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#non-negotiables). PERF-2 still waits for PERF-3's budgets. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. |
 | Optional editor work | **PLUG-11** (FFT planning in FFTW-built plug-ins), **LV2-6** (an LV2 window, only if Linux users ask) | Not needed for any preview. |
 | On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
@@ -969,12 +969,12 @@ jrp's goal: be better than the leading reverbs that play impulse responses
 and the room-correction convolvers. The [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md) holds the
 comparison, the ranking, the rationale and the measurements; the items below
 hold only what each must deliver. They wait for REL-3 unless jrp lifts the
-freeze on optional features (jrp, 7 November 2026: the walkthroughs come
-first, platform- and chip-level optimisation included). Order: first the
+freeze on optional features; platform- and chip-level micro-optimisation
+waits for the walkthroughs (jrp, 7 November 2026). Order: first the
 limitations users cite (EDGE-1 with IO-2, PERF-3 with EDGE-11, PERF-2 with
-EDGE-10, EDGE-12, EDGE-3, EDGE-13), then the easy room-correction wins
-nobody was found citing (EDGE-9, EDGE-2, EDGE-4, EDGE-5), then the reverb
-features (EDGE-6 to EDGE-8). Every item
+EDGE-10, EDGE-3, EDGE-13), then edges nobody was found citing (EDGE-12,
+then the easy room-correction wins EDGE-9, EDGE-2, EDGE-4, EDGE-5), then
+the reverb features (EDGE-6 to EDGE-8). Every item
 keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#non-negotiables).
 
 - [ ] **EDGE-1 — A filter for every sample rate in one plug-in state.**
@@ -1037,16 +1037,17 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   a new workload, hardware target or hypothesis, measured against the
   [24 October 2026 vDSP experiment](docs/archive/reviews/2026-10-24-apple-vdsp.md).
   Goes with PERF-2. Effort M for the survey.
-- [ ] **EDGE-11 — Exact savings in today's engine.** Done when each of
-  these has been measured on PERF-3's workloads and kept only for a gain:
-  the older filter blocks' multiply-adds done in the callbacks between
-  engine blocks when host callbacks are smaller than the Latency block;
-  idling once silent input has outlasted the tail; skipping all-zero
-  filter blocks; holding identical responses once; reading each input
-  history once for all its paths; and one inverse transform per output
-  (rounding only, within `native.kernel_divergence`'s bound). Output is
-  otherwise bit-identical, the oracle tests pass with the worst error
-  reported, and nothing new allocates or locks on the audio thread.
+- [ ] **EDGE-11 — Savings in today's engine.** Done when each of these has
+  been measured on PERF-3's workloads and kept only for a gain. Exact, with
+  bit-identical output: idling once silent input has outlasted the tail;
+  skipping all-zero filter blocks; holding identical responses once;
+  reading each input history once for all its paths. Rounding only, within
+  `native.kernel_divergence`'s bound: the older filter blocks'
+  multiply-adds done in the callbacks between engine blocks when host
+  callbacks are smaller than the Latency block; one inverse transform per
+  output where outputs are fewer than paths. The oracle tests pass with the
+  worst error reported, and nothing new allocates or locks on the audio
+  thread.
   [Plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build), rank 2. Effort S to M each.
 - [ ] **EDGE-12 — Filters larger than the saved-state limit.** Done when a
   plug-in accepts a filter whose samples exceed 64 MiB (such as a 60 s
@@ -1056,9 +1057,11 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
 - [ ] **EDGE-13 — Report a filter's own delay, as an option.** Done when an
   opt-in setting adds the filter's main delay (found from the filter or
   given by the user) to the reported latency, the output is otherwise
-  unchanged, Mix and bypass stay aligned, and a host's latency compensation
-  is shown to line it up. Needs jrp's decision on whether to offer it and
-  how the delay is found. Effort S.
+  unchanged, Mix and bypass stay aligned (a dry delay of up to about 0.7 s,
+  prepared off the audio thread), and a host's latency compensation is
+  shown to line it up. Needs jrp's decision on whether to offer it, how the
+  delay is found and what a replacement with a different delay does, since
+  the latency is fixed for a processor's life. Effort S to M.
 
 ## Developer tooling
 

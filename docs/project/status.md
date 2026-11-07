@@ -281,9 +281,10 @@ behaviour ([other programs](../use/other-programs.md)).
    itself and free source on every platform, and then the ranked edges of the
    [edges plan](plans/2026-11-06-edges-over-other-convolvers.md) (the
    limitations users cite first: sample rates, CPU spikes with long filters,
-   filters over the saved-state limit, true-stereo files and a filter's own
-   delay; then finer delays, showing a filter's response and comparison;
-   then reverb features), after the walkthroughs, with its open questions
+   true-stereo files and a filter's own delay; then filters over the
+   saved-state limit, finer delays, showing a filter's response, comparison
+   and published evidence; then reverb features), after the walkthroughs,
+   with its open questions
    for jrp. Precision beyond what can be heard is not a goal.
 
 The plug-in direction is the [plug-in formats plan](plans/2026-10-21-plugin-formats.md):
