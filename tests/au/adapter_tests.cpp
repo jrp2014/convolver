@@ -1264,18 +1264,21 @@ void settings_in_diagnostics() {
     set_parameter(unit, au::mix_parameter, 50);
     check(unit.initialize(), "mix status initialization");
     require(unit.load(state_of(stereo(44100))) != noErr, "wrong-rate preset accepted");
-    require(std::abs(steady_output(unit, 3) - .25f) < 1e-5, "Mix 50% after a refused first load");
+    // PLUG-23 (jrp, 7 November 2026): a failed load with no filter kept has
+    // no dry signal, so Mix 50% plays silence too, and Status says so.
+    require(std::abs(steady_output(unit, 3)) < 1e-6, "Mix 50% after a refused first load");
     const auto shown = status_text(unit);
-    require(shown == "Load failed, only the dry signal plays: the filter is for 44100 Hz, the "
-                     "host runs at 48000 Hz. Details in the Convolver log.",
+    require(shown == "Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in "
+                     "the Convolver log.",
             "refused first load at Mix 50%: " + shown);
-    // Started again, the start line says the dry half plays.
+    // Started again, the start line says why Mix plays nothing.
     unit.uninitialize();
     check(unit.initialize(), "mix status restart");
-    require(contains(log.text(),
-                     "With Mix at 50% wet, only the dry signal plays: the input at -6.0 dB."),
+    require(contains(log.text(), "mix 100% wet (a load failed and no filter is kept, so there "
+                                 "is no dry signal)"),
             "start line after a refused first load at Mix 50%: " + log.text());
-    // At Mix 100% it is silent again, and Status says so.
+    require(std::abs(steady_output(unit, 3)) < 1e-6, "Mix 50% after a restart");
+    // At Mix 100% it is silent as well, and Status says so.
     set_parameter(unit, au::mix_parameter, 100);
     require(std::abs(steady_output(unit, 3)) < 1e-6, "Mix 100% after a refused first load");
     require(contains(status_text(unit), "Silent: the filter is for 44100 Hz"),
