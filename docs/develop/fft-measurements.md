@@ -8,9 +8,9 @@
 - These are dated records, each with its machine, build, workload and raw
   data; they explain the choices in the [FFT guide](fft-backends.md), which
   states the conclusions.
-- For long filters nearly all the time is the per-partition
-  multiply-accumulate, so FFT libraries and their tuning matter little there;
-  SIMD (NEON, AVX2) and `-O3` matter most.
+- In the uniform-engine measurements, long filters spent most of their time
+  in the per-partition multiply-accumulate. That finding does not establish
+  the FFT share of the nonuniform engine proposed in PERF-2.
 - Measure again on the target machine before a speed claim
   ([reproduce](#reproduce)).
 
@@ -25,12 +25,294 @@ measurements ([reproduce](#reproduce)). The conclusions that guide current
 choices are in the FFT guide; read this page when you need the evidence or
 are about to measure again.
 
-Contents: [processing benchmark](#processing-benchmark) ·
+Contents: [comparing Accelerate and FFTW](#comparing-accelerate-and-fftw) ·
+[PERF-2 backend and wisdom comparison](#perf-2-backend-and-wisdom-comparison) ·
+[Ooura with the new engine](#ooura-with-the-nonuniform-engine) ·
+[PFFFT experiment](#pffft-ordered-transform-experiment) ·
+[processing benchmark](#processing-benchmark) ·
 [x86-64 FFTW tuning and split spectra](#fftw-tuning-on-x86-64-and-split-spectra) ·
 [overlap-add and overlap-save](#overlap-add-and-overlap-save) ·
 [compiler flags and AVX2 kernels](#compiler-flags-and-avx2-kernels) ·
 [startup, reset and filter loading](#startup-reset-and-filter-loading) ·
 [reproduce](#reproduce)
+
+## Comparing Accelerate and FFTW
+
+Separate a change of FFT library from a change of convolution engine:
+
+| Record | What changed | What it establishes |
+| --- | --- | --- |
+| [18 October backend comparison](#processing-benchmark) | Accelerate versus FFTW 3.3.11 with NEON, using the same uniform engine | Processing and preparation costs for those builds and workloads; not a prediction for the nonuniform engine |
+| [8 November PERF-2 Mac results](https://github.com/jrp2014/convolver/pull/139#issuecomment-6727945108) | v0.12.12 (`7451d76`) versus candidate `6cf7260`, both using Accelerate | The engine improvement at latency 256, and the candidate's extra CPU cost at latency 0; not an Accelerate-versus-FFTW comparison |
+| [8 November backend and wisdom comparison](#perf-2-backend-and-wisdom-comparison) | Accelerate, FFTW estimation and FFTW with saved patient wisdom, all at PERF-2 candidate `c607fe9` | Backend and planning differences within the new engine, with corrected timing after warm-up |
+
+The PERF-2 run used an M5 Max and five rounds per case. At latency 256,
+the candidate was about 15–17 times faster for 30-second filters. That gain
+came from the engine change, not a different FFT library. The report keeps
+the callback outliers, unequal percentile sample counts and machine conditions
+explicit; it does not qualify dropout-free host playback.
+
+Do not apply the older backend ratios to the new engine: use the separate
+comparison below. A backend comparison must keep the engine revision,
+routing, filter, latency, callback
+size and compiler settings fixed. Record the FFTW version and SIMD build,
+planning mode and any imported wisdom. Measure preparation separately, start
+the processing timer after warm-up, and report the measured callback count
+alongside throughput and callback percentiles. Passing the same numerical
+checks remains a prerequisite.
+
+Multiple partition lengths do not prevent FFTW tuning: each transform size
+has its own plans. In PERF-2, preparation creates the stage plans and
+`--tune-fft` covers the stage sizes. FFTW selects how to execute those
+transforms; it does not choose Convolver's partition layout or scheduling,
+or accelerate the direct convolution at the start of a zero-latency filter.
+Measured planning and saved wisdom are explicit CLI options, not automatic
+plug-in tuning ([tuning instructions](../use/command-line.md#fftw-plan-tuning)).
+
+For Mac distribution, Accelerate remains the default: it is part of macOS
+and avoids shipping FFTW and coordinating its shared planner with other
+plug-ins. The new measurements demonstrate an FFTW speed benefit, not that
+those integration costs disappear. FFTW remains an optional build for
+measured gains or CLI tuning
+([backend selection](fft-backends.md#accelerate-by-default-on-macos)).
+
+## PERF-2 backend and wisdom comparison
+
+Measured on 8 November 2026 using the nonuniform-engine candidate `c607fe9`
+(0.13.0), before its merge. All three cases used the same source, Release
+settings, baseline convolution kernels and single-threaded Convolver
+processing on an Apple M5 Max, 128 GB, macOS 27.2:
+
+- **Accelerate:** the macOS framework, with no manual tuning.
+- **FFTW estimate:** official FFTW 3.3.11, single precision, native ARM64
+  with NEON, `-O3 -fomit-frame-pointer -mtune=native -fstrict-aliasing`,
+  statically linked. No saved wisdom was imported.
+- **FFTW patient wisdom:** the same FFTW binary, importing plans made with
+  `--tune-fft` and `--fft-plan patient`. Before measurement, a small test-only
+  wrapper required patient wisdom for forward and inverse transforms at
+  every stage size; missing wisdom would fail rather than silently estimate.
+  Plan creation and wisdom import took place outside timed processing.
+
+Both backends passed the FFT and convolution oracles (largest reported
+relative engine error 3.14e-7). All 12 first-use fixture renders, covering
+both latencies and wisdom use, passed; their worst error was 1.49e-7.
+
+Six rounds used every ordering of the three cases once. Each warmed case
+measured at least one second **after preparation and warm-up**, with 64- and
+512-frame callbacks, latencies 0 and 256, and stereo, true-stereo and 2-to-6
+crossover routing. All 648 rows completed, each with at least 3,968 measured
+callbacks. AC power and Low Power Mode off were recorded at the start; AC
+power was recorded at the end. Other apps remained active, so this is not a
+quiet-machine or host-playback qualification.
+
+### Processing savings
+
+Each figure uses the median ns/frame over six rounds per case. Ranges cover
+the routing and callback combinations. The wisdom column compares with
+**FFTW estimation**, not with Accelerate; do not add the two percentages.
+
+| Filter taps | Latency | Less processing time: FFTW estimate versus Accelerate | Further saving: patient wisdom versus FFTW estimate |
+| --- | ---: | ---: | --- |
+| 4,096 | 0 | 19.4–27.3% | 0.8% slower to 10.9% faster |
+| 4,096 | 256 | 25.8–28.1% | 4.0–5.5% |
+| 65,536 | 0 | 18.2–22.2% | 3.4–4.9% |
+| 65,536 | 256 | 18.5–20.1% | 6.5–7.5% |
+| 1,440,000 (30 s at 48 kHz) | 0 | 12.1–16.2% | 0.1–2.4% |
+| 1,440,000 (30 s at 48 kHz) | 256 | 9.7–13.7% | 2.2–3.3% |
+
+Wisdom's median saving across the 36 distinct workload/settings combinations
+was **3.7%**, with no guarantee of a gain in every case. Differences around
+1% should not drive a deployment choice on this interactive machine.
+
+**Relative speed is not the same as whole-machine CPU usage.** For the
+30-second stereo filter at latency 0 and callback 64, median costs were
+187.023 ns/frame with Accelerate, 156.8185 with FFTW estimation, and 153.007
+with wisdom. At 48 kHz those correspond to about **0.90%, 0.75% and 0.73% of
+one core's processing capacity**. FFTW estimation reduced this instance's
+processing time by 16.2%, but saved only about 0.15 percentage points of one
+core. Wisdom saved a further 2.4% of the FFTW work, about 0.018 percentage
+points of one core. These are estimates from elapsed processing time, not
+DAW CPU-meter readings. A saving may matter with many instances or a busy
+audio thread even when one instance is inexpensive.
+
+One row in **each** mode had a maximum callback duration above its budget
+(64 frames at 48 kHz allows 1,333.3 microseconds): Accelerate 1,475 us, FFTW
+estimate 1,587.46 us and wisdom 1,387.54 us. Their p99 values were far below
+the budget. The raw files retain these outliers; neither the speedups nor
+the larger sample counts prove dropout-free host playback. A callback is
+one block of audio processed by the plug-in. Measuring thousands of blocks
+gives more useful percentile samples than the earlier harness's minimum
+64, but does not remove operating-system scheduling effects.
+
+### Tuning and preparation costs
+
+Patient tuning took **1.72 seconds** and wrote a **5,362-byte** wisdom file
+for all stage sizes on this Mac. No time limit was imposed. A long-standing
+FFTW setup can pay that cost once and reuse the file across sessions; wisdom
+is about transform sizes and execution settings, not particular filter
+coefficients. It avoids repeating the search, rather than making a saved
+plan inherently faster than the same plan obtained by measuring again.
+
+Separate preparation measurements used stereo, callback 64, six rounds and
+repeated preparations in each process. Medians below include engine/FFT plan
+construction and filter spectra, but exclude decoding, process startup,
+wisdom import and the wrapper's matching-plan checks. Repeated preparations
+can reuse FFTW's process-local planner knowledge, so these are not cold
+plug-in loading times.
+
+| Filter taps | Latency | Accelerate preparation ms | FFTW estimate ms | FFTW wisdom ms |
+| --- | ---: | ---: | ---: | ---: |
+| 4,096 | 0 | 0.046 | 0.044 | 0.036 |
+| 4,096 | 256 | 0.041 | 0.034 | 0.024 |
+| 1,440,000 | 0 | 8.308 | 8.485 | 6.346 |
+| 1,440,000 | 256 | 8.226 | 8.406 | 6.316 |
+
+For ordinary Mac plug-in users, no wisdom step is required: the distributed
+plug-in uses Accelerate. A custom FFTW plug-in currently has no wisdom-file
+control and does not discover CLI-generated wisdom automatically. The
+measured tuning benefit is available through the
+[explicit FFTW CLI workflow](../use/command-line.md#fftw-plan-tuning), or
+through an application that integrates the core's wisdom API. Generating a
+file alone does not change a plug-in's performance.
+
+### SIMD is different from threading
+
+NEON processes several numbers per instruction on one core; it was enabled
+in this FFTW build. OpenMP spreads work over threads; it was not enabled,
+nor was FFTW's separate POSIX-thread backend. OpenMP can be provided on
+macOS by an additional compiler/runtime installation; FFTW also supports
+[POSIX threads on macOS](https://www.fftw.org/fftw3_doc/Installation-and-Supported-Hardware_002fSoftware.html).
+Its absence here does not disable NEON or make the build scalar.
+
+This is an optimized single-threaded build, not proof of a globally optimal
+configuration. No threaded comparison was performed. FFTW documents
+[synchronization overhead and size-dependent benefits](https://www.fftw.org/fftw3_doc/How-Many-Threads-to-Use_003f.html);
+extra threads would also change Convolver's audio scheduling and deployment
+requirements. Neither threads nor a different default backend are implied
+by this measurement.
+
+Raw evidence and reproduction material:
+
+- [Processing CSV](../benchmarks/2026-11-08-perf2-fft-processing.csv): all
+  rounds, sample counts, percentiles and maxima.
+- [Preparation CSV](../benchmarks/2026-11-08-perf2-fft-preparation.csv): all
+  72 preparation measurements.
+- [Run record](../benchmarks/2026-11-08-perf2-fft-record.json): machine,
+  revisions, build choices, source hash, tuning time, correctness output,
+  test-only wrapper patch and CMake recipe. Local paths identify the run;
+  substitute a scratch directory when reproducing.
+- [Comparison driver](../benchmarks/2026-11-08-perf2-fft-run.py): invoke with
+  the prepared scratch directory described in the run record. Production
+  engine and plug-in code were not modified.
+
+## Ooura with the nonuniform engine
+
+Measured on the same M5 Max on 8 November 2026 at `c607fe9`, in a separate
+paired run against fresh Accelerate controls. Four rounds alternated which
+backend ran first; settings and workloads match the preceding comparison.
+All 288 processing rows and 32 preparation rows completed, with at least
+3,968 callbacks per processing row. This is not a simultaneous four-way
+comparison with FFTW, and it does not predict Linux or Windows performance.
+
+Ooura passed the FFT and engine oracles, and all eight first-use fixture
+renders across the two backends and latencies passed (worst error 1.49e-7).
+Other applications remained active. No row exceeded its callback budget in
+this run; that is an observation, not a guarantee about host playback.
+
+For **stereo, 64-frame callbacks at 48 kHz**, median processing costs were:
+
+| Filter taps | Latency frames | Accelerate ns/frame | Ooura ns/frame | Accelerate: % of one core | Ooura: % of one core |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 4,096 | 0 | 52.082 | 44.893 | 0.250 | 0.215 |
+| 4,096 | 256 | 30.087 | 25.479 | 0.144 | 0.122 |
+| 65,536 | 0 | 74.206 | 77.409 | 0.356 | 0.372 |
+| 65,536 | 256 | 51.408 | 56.704 | 0.247 | 0.272 |
+| 1,440,000 (30 s) | 0 | 187.069 | 182.243 | 0.898 | 0.875 |
+| 1,440,000 (30 s) | 256 | 159.502 | 159.892 | 0.766 | 0.767 |
+
+The calculation is `ns/frame × 48,000 / 10,000,000`. It estimates the share
+of one core's time needed to keep pace with the stream, not total-machine
+CPU use or a DAW meter. Across routing and callback combinations, Ooura used
+about 11–16% less processing time for 4,096 taps, 3–12% more for 65,536 taps,
+and stayed within about 4% for the 30-second filter. Its age alone is not a
+reason to replace it.
+
+Preparation is a separate cost: median repeated preparation for the
+30-second stereo filter was 13.43 ms with Ooura versus 8.31 ms with
+Accelerate at latency 0, and 12.86 versus 8.26 ms at latency 256. The short
+filter took about 0.024 ms with Ooura. These figures exclude file decoding
+and are not first-load host measurements.
+
+Evidence: [processing CSV](../benchmarks/2026-11-08-perf2-ooura-processing.csv),
+[preparation CSV](../benchmarks/2026-11-08-perf2-ooura-preparation.csv), and
+[run record](../benchmarks/2026-11-08-perf2-ooura-record.json). Reproduce with
+[the comparison driver](../benchmarks/2026-11-08-perf2-fft-run.py) and its
+`--ooura` option after preparing the two builds.
+
+## PFFFT ordered-transform experiment
+
+Measured on 8 November 2026 on the same M5 Max at Convolver `c607fe9`, with
+PFFFT pinned to `237ffa283b17e5ef88ef8198b465f41b0268011d`. This is an
+**experimental adapter outside production source**, not a supported backend.
+It uses PFFFT's ordered real transforms and NEON, Release `-O3 -DNDEBUG`,
+prepared aligned workspace and our unchanged spectrum/MAC contract. Thus
+its timing includes PFFFT's reordering. Existing Ooura handles transforms
+below 32 points for the custom tiny test layouts; every transform in the
+timed workloads is at least 128 points and uses PFFFT.
+
+Four rounds alternated PFFFT and fresh Ooura controls. All 288 processing
+rows and 32 preparation rows completed, with at least 4,096 callbacks per
+processing row. The same filter lengths, latencies, routing and callbacks
+as above were used. The direct FFT and engine oracles passed; the largest
+relative engine error was 3.14e-7. Eight first-use fixture comparisons passed,
+with worst error 1.34e-7. These checks establish numerical agreement on this
+build; they are not Windows, Linux or DAW qualification.
+
+The ranges below use median ns/frame over four rounds per case and cover
+stereo, true stereo, crossover and both callback sizes. The last columns
+are the **stereo, 64-frame callback** case at 48 kHz.
+
+| Filter taps | Latency frames | PFFFT: less processing time than Ooura | Ooura: % of one core | PFFFT: % of one core |
+| --- | ---: | ---: | ---: | ---: |
+| 4,096 | 0 | 12.9–20.8% | 0.214 | 0.172 |
+| 4,096 | 256 | 20.3–23.6% | 0.122 | 0.096 |
+| 65,536 | 0 | 21.0–30.3% | 0.369 | 0.259 |
+| 65,536 | 256 | 33.4–35.7% | 0.271 | 0.175 |
+| 1,440,000 (30 s) | 0 | 12.4–16.9% | 0.868 | 0.724 |
+| 1,440,000 (30 s) | 256 | 12.6–17.0% | 0.758 | 0.629 |
+
+For the 30-second stereo filter at latency 0, Ooura took 180.926 ns/frame
+and PFFFT 150.7845. That saves about **0.145 percentage points of one core**,
+not 14.5% of the Mac. These are elapsed-time capacity estimates, as above.
+Separate sessions must not be read as a precise PFFFT-versus-FFTW ranking.
+
+Repeated preparation of that long filter took median 6.81 ms with PFFFT
+versus 13.35 ms with Ooura at latency 0; at latency 256, 6.73 versus
+13.06 ms. The short filter took about 0.013 ms versus 0.024 ms. As above,
+preparation excludes file decoding and process startup.
+
+Two PFFFT rows had a maximum above the 1,333.3 us budget for 64 frames:
+1,526.5 us (true stereo, 65,536 taps, latency 256) and 1,963.17 us (true
+stereo, 30 s, latency 256). Their p99 values were 9.75 and 36.417 us.
+Ooura had no over-budget row in this paired run. Other apps remained active;
+these occasional maxima cannot establish a backend-specific cause, nor may
+they be discarded to claim dropout-free playback.
+
+**Conclusion:** retain the existing defaults. The absolute saving is small
+for one instance; do not add backend-specific storage, tiny-transform
+special cases or new deployment work for a marginal gain. If a Linux or
+Windows workload warrants further work, measure the ordered adapter there
+first. A spectrum-storage redesign was not needed to demonstrate a gain
+on this Mac. The remaining integration questions and
+PocketFFT/KissFFT assessment are in the
+[alternatives review](fft-backends.md#alternatives-for-linux-and-windows).
+
+Evidence: [processing CSV](../benchmarks/2026-11-08-perf2-pffft-processing.csv),
+[preparation CSV](../benchmarks/2026-11-08-perf2-pffft-preparation.csv), and
+[run record](../benchmarks/2026-11-08-perf2-pffft-record.json). The record
+contains the scratch adapter, build recipe, pinned dependency and oracle
+output; the [driver](../benchmarks/2026-11-08-perf2-fft-run.py) accepts
+`--pffft-build PATH`. No installed plug-in or production engine was changed.
 
 ## Processing benchmark
 
