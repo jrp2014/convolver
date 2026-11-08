@@ -245,6 +245,17 @@ share the window. A filter tail longer than a clip's silent ending (an
 Audacity export question HOST-1 lists) is recorded as unverified rather
 than checked.
 
+A limitation DOC-10's review found
+([PR #157](https://github.com/jrp2014/convolver/pull/157), which parks the
+fix as a TODO item): **Choose…** needs the filter's input count to match
+the host's exactly, while a preset needs only at least that many inputs,
+so in REAPER on a six-channel track the crossover's `filter.cfg` is
+refused through **Choose…** and its preset plays; the guide loads the
+preset there. It is a known limitation of the preview unless jrp has it
+fixed before the final candidate. A fix changes plug-in code after
+v0.12.8, so the host checks it touches (loading through **Choose…** in
+checks 1, 4 and 5) would run again on the final candidate.
+
 Outside this list, and not smoke-test steps: the Audio Unit in REAPER,
 other hosts and two instances side by side, follow-up work under HOST-1 and
 AU-4 once the [stop rule](plans/2026-11-08-preview-acceptance.md#2-preview-acceptance-criteria)
