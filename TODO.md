@@ -237,6 +237,17 @@ is superseded.
   candidate, so the earlier results are shown to hold for the current
   window and code: in REAPER that repeats the window and settings steps
   (part C) on the window PLUG-22 redesigned.
+  Progress (8 November 2026): jrp ran REAPER part C with the 0.12.5
+  candidate from `main` (run 42437291088, `4117a6d`, tagged `v0.12.5`;
+  [record](docs/archive/reviews/2026-11-08-host1-reaper-window.md)): on the
+  redesigned window **Choose…**, Gain, Mix, undo, reset, the details and
+  **Copy Diagnostics** worked, and save, quit and reopen kept the filter,
+  Gain −6 dB, Mix 70% and Latency 1024; the VST3-16 latency renders lined
+  up again. Listening and REAPER's display of the Status parameter were not
+  checked. PLUG-31 changes the candidate; jrp decided these results stand
+  for the final one, where part C needs only a packaged preset, save and
+  reopen, listening and the Status display, with the rest of the REAPER
+  and Audacity steps.
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
   now requested (progress below). Write adapters against the
@@ -585,6 +596,18 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   remain. GarageBand's smoke test, with the checks that passed on earlier
   builds, runs on the preview candidate.
   Needed for the first preview.
+  Progress (8 November 2026): jrp ran GarageBand 10.4.14 with the Audio
+  Unit from the 0.12.5 candidate (run 42437291088, `4117a6d`;
+  [record](docs/archive/reviews/2026-11-08-au4-garageband.md)): the presets,
+  **Choose…** of a packaged `filter.cfg`, a refused 48 kHz preset that kept
+  the filter, Gain, Mix and Latency kept after save and reopen, and two
+  echo exports matching the CLI (worst error −112.99 dB; GarageBand's
+  *Export projects at full volume* must be off for a comparison). Not
+  checked: listening to the presets and to Gain and Mix, a click when
+  bypassing, whether the track stays in time after a Latency change,
+  VoiceOver and the Recent list. jrp decided these results stand for the
+  final candidate after PLUG-31, where a packaged preset, save and reopen
+  and the unchecked steps remain.
 - [ ] **AU-5 — Release.** In the first preview. Unsigned preview component under PLUG-5 (ad-hoc
   signed, documented quarantine removal). Developer ID signing and
   notarization follow at the production gate.

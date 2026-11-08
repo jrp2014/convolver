@@ -111,8 +111,8 @@ macOS 14 or later. Checked on 23 October 2026:
   macOS 26, repeat the step with another VST3 plug-in before blaming
   Convolver.
 - **GarageBand:** the version from the App Store for your macOS is native on
-  both architectures. Build the Audio Unit on the Mac that runs GarageBand, so
-  it matches.
+  both architectures. Install the Audio Unit from the package for that Mac's
+  processor (`macos-arm64` or `macos-x86_64`).
 
 ## Hosts in CI
 
@@ -194,8 +194,7 @@ what you actually chose. Play quiet audio and keep the volume low.
 
 ### Prepare the Mac
 
-Do this once. Run the commands in the extracted preview package folder,
-except the Audio Unit build, which runs in a source checkout.
+Do this once. Run the commands in the extracted preview package folder.
 
 1. Get the package for your Mac's processor (`macos-arm64` on Apple silicon,
    `macos-x86_64` on Intel). Until a preview is published, download the
@@ -205,9 +204,12 @@ except the Audio Unit build, which runs in a source checkout.
    the [install guide](../use/install.md) says, and clear the quarantine for
    the bundle and for `bin/` only
    ([unsigned previews](../use/install.md#unsigned-previews)).
-2. For GarageBand, build the Audio Unit ([Audio Unit build](build.md#audio-unit)),
-   copy `build-au/plugins/au/Convolver.component` to
-   `~/Library/Audio/Plug-Ins/Components/` and check it:
+2. For GarageBand, install the package's Audio Unit,
+   `Components/Convolver.component`, as the [install guide](../use/install.md)
+   says, and clear its quarantine
+   ([unsigned previews](../use/install.md#unsigned-previews)). The smoke test checks the candidate's own
+   component (AU-5), so first move aside any copy built from source, in
+   either Components folder. Then check it:
 
    ```sh
    killall -9 AudioComponentRegistrar 2>/dev/null || true
