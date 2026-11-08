@@ -95,19 +95,6 @@ is superseded.
   The plan is written; qualification is not claimed complete. CI-34 is
   separate and does not gate the walkthrough.
 
-- [ ] **REL-8 — Rehearse publishing before the preview.** From jrp's
-  8 November 2026 request to stop adding edge-case tests and smoke test the
-  whole packaging and release path instead. Every step up to the candidate
-  had run (the v0.12.5 tag run 42437291088 passed all seven jobs); the
-  publication itself never had. The "Draft preview release" workflow now
-  checks a tag's candidate run and its files and creates a draft
-  pre-release with the macOS files, the source and generated notes
-  ([publishing](docs/develop/releasing.md#publishing-an-unsigned-preview));
-  pull requests that change it run a dry run. Done when jrp has run it once
-  from `main` on a tag candidate, read the draft and deleted it. A rehearsal
-  may use the v0.12.5 run; the preview itself is published only from the
-  final candidate, on a tag that holds this workflow and the guides it links.
-
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The candidate workflow
   builds unsigned packages with pinned dependencies, corresponding source,
   staging, installers, artifact verification and promotion gates
@@ -1476,6 +1463,11 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **REL-8 — Rehearse publishing before the preview.** 8 November
+  2026, PR #152; jrp's rehearsal from `main` on the v0.12.5 candidate
+  ([run 42505146594](https://github.com/jrp2014/convolver/actions/runs/42505146594))
+  made the draft, which he read ("That looked fine to me") and deleted;
+  [publishing](docs/develop/releasing.md#publishing-an-unsigned-preview).
 - [x] **DOC-13 — Shorter backlog, superseded plans and evidence archived.** 8
   November 2026; [archived TODO entries](docs/archive/todo/README.md),
   [archived plans](docs/archive/plans/README.md).
