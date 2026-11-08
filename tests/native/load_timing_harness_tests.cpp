@@ -429,7 +429,7 @@ class Mock final : public lc::Driver {
         return f;
     }
     void create(const lc::Host&, bool) override {
-        saved_ = {};
+        state_.clear();
     }
     void configure(const lc::Host&) override {}
     void destroy() override {}
@@ -437,7 +437,11 @@ class Mock final : public lc::Driver {
         std::this_thread::sleep_for(load);
         if (refuse)
             return false;
-        saved_ = convolver::decode_host_state(state);
+        // Kept as bytes and decoded when asked for (saved()), so that the
+        // timed load costs nothing beyond `load` even for the warm runs' half
+        // second of filter, which takes about 8 ms to decode in a sanitizer
+        // build and was preempted far longer on a busy runner.
+        state_.assign(state.begin(), state.end());
         return true;
     }
     bool start() override {
@@ -458,7 +462,7 @@ class Mock final : public lc::Driver {
         return false;
     }
     convolver::HostState saved() override {
-        return saved_;
+        return state_.empty() ? convolver::HostState{} : convolver::decode_host_state(state_);
     }
     std::optional<convolver::HostFailure> failure() override {
         return std::nullopt;
@@ -468,7 +472,7 @@ class Mock final : public lc::Driver {
     }
 
   private:
-    convolver::HostState saved_;
+    std::vector<std::byte> state_;
 };
 
 // A folder of its own, so that builds testing at once do not share one.
@@ -498,11 +502,20 @@ timing::Result run(Mock& mock, int attempts, Ms limit = 100ms, bool warm = false
 }
 
 // A little with real threads: the renderer's records reach the verdict.
-// The delays are far beyond the limit, so the verdicts hold on any machine.
+// On 8 November 2026 a busy macOS runner (run 42522591379 on 59a093f,
+// sanitizer build, callbacks waking up to 128 ms late) held the warm run's
+// load 130 ms, over the 100 ms these runs used: that load decoded half a
+// second of filter, which was preempted. The mock's load now only copies the
+// state, and runs that should pass the hold get 250 ms, about twice the worst
+// lateness seen there, yet below the 0.3 s each load's phase then waits, so
+// a hold timed over that wait still fails them. The slow loader can only get
+// slower, so its 20 ms limit fails it on any machine.
+constexpr Ms passing_limit = 250ms;
+
 void integration() {
     {
         Mock mock;
-        const auto r = run(mock, 1);
+        const auto r = run(mock, 1, passing_limit);
         const auto every_phase_heard = [&] {
             for (const auto& rec : r.records)
                 for (const auto& p : rec.phases)
@@ -548,7 +561,7 @@ void integration() {
         // not judged. The verdict itself depends on the runner's scheduling
         // (macOS CI's thread woke late), so only the hold is checked.
         Mock mock;
-        const auto r = run(mock, 1, 100ms, true);
+        const auto r = run(mock, 1, passing_limit, true);
         std::string names;
         bool reported_only_warm = true;
         for (const auto& p : r.records.at(0).phases) {
