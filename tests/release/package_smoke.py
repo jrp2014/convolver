@@ -154,7 +154,9 @@ def check(root, validator=None, probe=None):
             config_output = folder / 'from config.vstpreset'
             subprocess.run([str(tool), str(folder / 'filter.cfg'), str(config_output)], check=True)
             assert original == config_output.read_bytes(), 'WAV and config conversion disagree'
-            assert original == (folder / 'filter.vstpreset').read_bytes(), 'shipped example differs from converter'
+            shipped = folder / f'{example["name"]}.vstpreset'
+            assert original == shipped.read_bytes(), 'shipped example differs from converter'
+            assert not (folder / 'filter.vstpreset').exists(), 'example preset still has the old name'
             other_formats = [folder / 'other ü.aupreset', folder / 'other ü.preset.lv2']
             subprocess.run([str(tool), str(folder / 'filter.cfg'), *map(str, other_formats)], check=True)
             assert all(path.exists() for path in other_formats), 'AU/LV2 presets not written'

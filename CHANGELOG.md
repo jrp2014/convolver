@@ -185,6 +185,15 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Packages (PLUG-28, from jrp's file-loading review; jrp chose to do it
+  before the first preview): the 18 example presets in `presets/` are named
+  after their folder, such as `presets/repeat-48000-stereo/repeat-48000-stereo.vstpreset`,
+  instead of each being `filter.vstpreset`, so hosts that list presets by
+  file name, such as Audacity, show what each one is and copying them into
+  a preset folder needs no renaming. The presets' contents are unchanged;
+  the first-use examples in `examples/first-use/` keep `filter.vstpreset`
+  beside their filter (`filter.cfg`, or `impulse.wav` for mono),
+  `input.wav` and `expected.wav`.
 - Documentation (DOC-10, from jrp's file-loading review of 7 November 2026,
   [recorded](docs/archive/reviews/2026-11-07-file-loading-review.md)):
   [plug-in presets](docs/use/presets.md) no longer says the plug-ins have no

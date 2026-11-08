@@ -399,9 +399,10 @@ LV2 (Linux first; also PipeWire system audio):
   and the exports passed. Refusing the filter is correct; what was hard was
   telling the rate the playing copy runs at from the export's rate. The
   guides now say so ([plug-ins](docs/use/plugins.md#status-and-the-convolver-log),
-  [Audacity steps](docs/develop/host-testing.md#audacity-vst3)). jrp agreed
-  (8 November 2026): a refusal for the rate adds one line to its Fix, that
-  the host may play at a different rate from the one it exports at. Still
+  [Audacity steps](docs/develop/host-testing.md#audacity-vst3)). A refusal
+  for the rate adds one line to its Fix, that the host may play at a
+  different rate from the one it exports at
+  ([decided](docs/project/decisions.md#diagnostics)). Still
   to decide with jrp: whether the window should mark a host rate as not
   yet confirmed when it comes from a copy that has not processed audio
   (the copy in Audacity's effect window, which a host may start briefly at
@@ -422,10 +423,11 @@ LV2 (Linux first; also PipeWire system audio):
   `.vstpreset`, through one input reader shared with `convolver-preset`,
   reusing its decoder and identity and size checks; `.cfg` files, nested
   lists and their relative paths work as today. No `.aupreset` or LV2
-  reader only for symmetry. jrp decided (8 November 2026): choosing a
-  preset loads its Gain, Mix and Latency too, as the host's own preset
-  menu does; a preset made by `convolver-preset`, which holds only a
-  filter, leaves the current settings as they are. Done
+  reader only for symmetry. Choosing a preset loads its Gain, Mix and
+  Latency too, as the host's own preset menu does; a preset made by
+  `convolver-preset`, which holds only a filter, leaves the current
+  settings as they are ([decided](docs/project/decisions.md#plug-in-behaviour)).
+  Done
   when the same file loads from any user folder in VST3 and the Audio Unit
   with no installation, conversion or administrator step, saving and
   reopening reproduces the CLI's output, and another plug-in's preset or a
@@ -452,19 +454,6 @@ LV2 (Linux first; also PipeWire system audio):
   and [plug-ins guide](docs/use/plugins.md#loading-a-filter) say when a
   chosen file is checked. Waits for the freeze unless jrp
   brings it forward.
-- [ ] **PLUG-28 — Name the packaged presets after their filter.** From the
-  same review: every example preset is called `filter.vstpreset`, named
-  only by its folder (`scripts/release/generate_examples.py`), so copying
-  them into a host's preset folder means renaming each one first, and a
-  host that lists presets by file name, such as Audacity, shows only
-  "filter". Name new ones `KIND-RATE-LAYOUT.vstpreset` (for example
-  `repeat-48000-stereo.vstpreset`), keeping each `.cfg` and IR file beside
-  it; update the package manifest, the journeys, the release tests and the
-  guides that name the file together, and leave dated records alone. Done
-  when the package and its release tests use the new names and the
-  journeys and host-testing steps no longer rename files. jrp decided
-  (8 November 2026): before the first preview, so the independent tester
-  learns the final names.
 - [ ] **PLUG-29 — Keep the Recent list out of the log folder.** From the
   same review: the window's Recent list is saved beside the log
   (`recent-filters.txt` in `~/Library/Logs/Convolver/`,
@@ -1504,6 +1493,8 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **PERF-12 — Load-timing verdicts from records, tested without timing.** 5
   November 2026; [load timing](docs/develop/testing.md#load-timing-perf-9).
 - [x] **PERF-14 — Load timing from a full history.** 5 November 2026.
+- [x] **PLUG-28 — Name the packaged presets after their filter.** 8
+  November 2026, PR #141; [first sound in a host](docs/use/first-sound-in-a-host.md#load-the-examples).
 - [x] **PLUG-23 — A filter reads the first inputs of a wider input bus.** 6
   November 2026; [channels](docs/use/plugins.md#channels).
 - [x] **PLUG-22 — Name the filter in the window, and say each fact once.** 7
