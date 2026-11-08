@@ -21,7 +21,9 @@ Until 1.0 the C++ API may change between minor versions.
   SHA-256, the run, the install guide, known limitations and the
   responsiveness result) and downloads the attached files again to compare
   them. Nothing is public until jrp publishes the draft. Pull requests that
-  change it run a dry run on the newest tag candidate.
+  change it run a dry run on the newest tag candidate. jrp rehearsed it on
+  8 November 2026 with the v0.12.5 candidate: the draft was right and was
+  deleted. REL-8 is done.
 - Tests (AU-3): the Audio Unit workflow runs `au.adapter` under
   ThreadSanitizer, in a Debug build with the defaults the packages use, on
   the runs where that workflow already runs. It switches bypass from another
