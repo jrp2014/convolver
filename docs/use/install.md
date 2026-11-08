@@ -12,8 +12,10 @@ package or from your own build. Afterwards, follow
 - The first preview is for macOS: its packages contain the VST® 3 plug-in
   and the Audio Unit. Windows and Linux packages come with later previews;
   until then, and for the LV2 plug-in (Linux), build from source.
-- Previews are not signed. On macOS, clear the download quarantine for the
-  Convolver bundles only; on Windows, an installer shows a SmartScreen warning.
+- Previews are not signed. On macOS, allow the installer once in
+  **Privacy & Security**, or, from the ZIP archive, clear the download
+  quarantine for the Convolver bundles only; on Windows, an installer shows a
+  SmartScreen warning.
 
 ## What a preview package contains
 
@@ -70,9 +72,18 @@ layout ([LV2 layouts](plugins.md#lv2-channel-layouts)).
 Previews are not yet signed with an Apple Developer ID or a Windows
 code-signing certificate.
 
-- **macOS:** the bundle carries only an ad-hoc signature. Files downloaded with
-  a browser are quarantined, and hosts may refuse to load a quarantined
-  unsigned bundle. After copying, clear the quarantine for this bundle only:
+- **macOS installer (`.pkg`):** check the file's SHA-256 against the release
+  notes first. The first time you open it, macOS says it cannot verify the
+  installer or its developer; close that message (**Done** or **OK**). Open
+  **System Settings**, then **Privacy & Security**, scroll down to the message
+  that the installer was blocked and choose **Open Anyway**. macOS asks once
+  more (**Open** or **Open Anyway**) and then for your password or Touch ID,
+  and the installer starts. **Open Anyway** is offered for about an hour after
+  the first attempt.
+- **macOS ZIP archive:** the bundle carries only an ad-hoc signature. Files
+  downloaded with a browser are quarantined, and hosts may refuse to load a
+  quarantined unsigned bundle. After copying, clear the quarantine for this
+  bundle only:
 
   ```sh
   xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/Convolver.vst3

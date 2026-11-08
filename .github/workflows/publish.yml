@@ -1,0 +1,174 @@
+---
+# SPDX-License-Identifier: GPL-2.0-or-later
+name: Draft preview release
+
+# REL-8: turns a passed candidate run on a vX.Y.Z tag into a DRAFT GitHub
+# pre-release, with the macOS files, the corresponding source and generated
+# notes. A draft is visible only to people with write access; nothing is
+# public until jrp reads it and presses Publish
+# (docs/develop/releasing.md#publishing-an-unsigned-preview).
+'on':
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: >-
+          Run ID of a passed "Plug-in distribution candidates" run started by
+          hand on the vX.Y.Z tag (the number in the run's address)
+        required: true
+      qualification:
+        description: >-
+          Loading responsiveness (REL-6) result for the release notes, for
+          example "Qualified on a MacBook Pro (M1 Pro, 32 GB, macOS 15.1)"
+        required: true
+  # A dry run on the newest such run when this workflow or its scripts
+  # change: every check and the notes, but no draft.
+  pull_request:
+    paths:
+      - .github/workflows/publish.yml
+      - scripts/release/prepare_release.py
+      - scripts/release/promotion_gate.py
+      - scripts/release/contract.py
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || 'draft' }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      run_id: ${{ steps.run.outputs.run_id }}
+      tag: ${{ steps.run.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Find the candidate run
+        id: run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ inputs.run_id }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          mkdir -p build
+          if [ -z "$RUN_ID" ] && [ "$EVENT" != pull_request ]; then
+            echo "::error::Give the candidate run's ID (the number in its address)."
+            exit 1
+          fi
+          if [ -z "$RUN_ID" ]; then
+            runs="repos/$REPO/actions/workflows/release.yml/runs?event=workflow_dispatch&status=success&per_page=50"
+            tagged='select((.head_branch // "") | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))'
+            RUN_ID=$(gh api "$runs" --jq "[.workflow_runs[] | $tagged][0].id // empty")
+            if [ -z "$RUN_ID" ]; then
+              echo "::error::No passed candidate run on a vX.Y.Z tag to rehearse with."
+              exit 1
+            fi
+            echo "Dry run with run $RUN_ID, the newest passed candidate run on a tag."
+          fi
+          if ! [[ "$RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::The run ID is the number in the run's address, not '$RUN_ID'."
+            exit 1
+          fi
+          gh api "repos/$REPO/actions/runs/$RUN_ID" > build/run.json
+          tag=$(jq -r .head_branch build/run.json)
+          if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Run $RUN_ID built '$tag', not a vX.Y.Z tag." \
+              "Run the candidate workflow by hand on the tag first."
+            exit 1
+          fi
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ steps.run.outputs.tag }}
+          path: tagged
+      - name: Download the run's complete candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ steps.run.outputs.run_id }}
+        run: gh run download "$RUN_ID" -R "$REPO" -n complete-preview-candidate -D build/candidate
+      - name: Check the candidate and write the release notes
+        env:
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.run.outputs.tag }}
+          QUALIFICATION: ${{ inputs.qualification }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            QUALIFICATION='Dry run: no qualification result.'
+          fi
+          python scripts/release/prepare_release.py --run build/run.json --root build/candidate \
+            --tagged tagged --tag "$TAG" --repository "$REPO" --qualification "$QUALIFICATION" \
+            --output build/release
+          {
+            echo "## $(cat build/release/title.txt)"
+            echo
+            cat build/release/notes.md
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: draft-release
+          path: build/release/*
+          if-no-files-found: error
+
+  draft:
+    needs: prepare
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: draft-release
+          path: build/release
+      - name: Create the draft pre-release and check its files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ needs.prepare.outputs.run_id }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          # Listed over REST so that a failed lookup stops here rather than
+          # passing for "none"; GitHub allows several drafts on one tag.
+          existing=$(gh api "repos/$REPO/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"$TAG\") | .id" | wc -l)
+          if [ "$existing" -ne 0 ]; then
+            echo "::error::A release or draft for $TAG already exists. Delete an unwanted draft first;" \
+              "a published preview is never replaced (a fix gets a new version)."
+            exit 1
+          fi
+          gh run download "$RUN_ID" -R "$REPO" -n complete-preview-candidate -D build/candidate
+          (cd build/candidate && sha256sum --strict -c ../release/SHA256SUMS)
+          mapfile -t names < <(cut -d' ' -f3- build/release/SHA256SUMS)
+          (cd build/candidate && gh release create "$TAG" -R "$REPO" --draft --prerelease --verify-tag \
+            --title "$(cat ../release/title.txt)" --notes-file ../release/notes.md "${names[@]}")
+          # Download every attached file again and compare it with its sum.
+          gh release download "$TAG" -R "$REPO" -D build/check
+          if ! (cd build/check && sha256sum --strict -c ../release/SHA256SUMS); then
+            echo "::error::The draft's files do not match their sums. Delete the draft and run this again."
+            exit 1
+          fi
+          count=$(find build/check -type f | wc -l)
+          if [ "$count" -ne "${#names[@]}" ]; then
+            echo "::error::The draft holds $count files, not ${#names[@]}."
+            exit 1
+          fi
+          url=$(gh release view "$TAG" -R "$REPO" --json url --jq .url)
+          echo "Draft pre-release, not yet public: $url" >> "$GITHUB_STEP_SUMMARY"
