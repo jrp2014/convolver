@@ -42,7 +42,7 @@ Host facts were checked on 23 October 2026.
 | Host | Format tested | Cost | What it adds | Limits for this test |
 | --- | --- | --- | --- | --- |
 | [REAPER](https://www.reaper.fm/download.php) 7 (Cockos) | VST3 | Free 60-day evaluation, fully functional; it keeps running afterwards with a reminder, though the licence then expects a purchase | Projects that save plug-in state, offline rendering, latency compensation, CPU meter. Also loads AU on macOS, for AU-4 later | Tracks have at least two channels, so mono presets are not part of its smoke test |
-| [Audacity](https://www.audacityteam.org/download/) 4.0 or later (GPL) | VST3 | Free | An audio editor: real-time effects on a track, and effects applied to a selection. Version 4.0 (3 September 2026) loads VST3 and, on macOS, AU | Its preset menu imports only Audacity's own text files, not `.vstpreset`; presets come from the system VST3 preset folder instead ([preparation](#prepare-the-mac)). It asks Convolver for stereo on every track |
+| [Audacity](https://www.audacityteam.org/download/) 4.0 or later (GPL) | VST3 | Free | An audio editor: real-time effects on a track, and effects applied to a selection. Version 4.0 (3 September 2026) loads VST3 and, on macOS, AU | Its preset menu imports only Audacity's own text files, not `.vstpreset`; presets come from the system VST3 preset folder instead ([preparation](#prepare-the-mac)). It asks Convolver for stereo on every track. Real-time effects play at the rate of *Audio setup › Audio settings › Default sample rate*, which in 4.0.2 can differ from the rate an export uses (seen 7 November 2026) |
 | GarageBand 10.4 (Apple) | Audio Unit only | Free with macOS | Apple's own host, with the same Audio Unit check as Logic | Projects run at 44.1 kHz only, so only the `44100` presets apply. GarageBand runs an effect in mono (1 in, 1 out) on a track whose input is mono and in stereo on a stereo track (seen 25 October 2026), and Convolver plays silence when the preset does not match. It offers no other layouts. Install the Audio Unit from the macOS preview package (`Components/Convolver.component`) |
 
 Record each result under HOST-1 (VST3 hosts) or AU-4 (GarageBand) in
@@ -223,26 +223,37 @@ except the Audio Unit build, which runs in a source checkout.
    mkdir -p ~/Library/Audio/Presets/Convolver/Convolver
    for kind in identity echo repeat; do
      for layout in mono stereo; do
-       ./bin/convolver-preset "presets/$kind-44100-$layout/filter.vstpreset" \
+       ./bin/convolver-preset "presets/$kind-44100-$layout/$kind-44100-$layout.vstpreset" \
          ~/Library/Audio/Presets/Convolver/Convolver/$kind-44100-$layout.aupreset
      done
    done
    ```
 
 3. For Audacity, copy the stereo VST3 examples into the system VST3 preset
-   folder, each under its own name (Audacity names a preset after its file,
-   and every example file is called `filter.vstpreset`):
+   folder (Audacity names a preset after its file):
 
    ```sh
    sudo mkdir -p /Library/Audio/Presets/Convolver/Convolver
-   for d in presets/*-stereo; do
-     sudo cp "$d/filter.vstpreset" "/Library/Audio/Presets/Convolver/Convolver/$(basename "$d").vstpreset"
-   done
+   sudo cp presets/*-stereo/*-stereo.vstpreset /Library/Audio/Presets/Convolver/Convolver/
    ```
 
    Audacity reads this folder once per session, so restart it if it was
-   open. Remove the folder after testing
-   (`sudo rm -r /Library/Audio/Presets/Convolver`).
+   open. After testing, remove only the files copied there (the folder may
+   hold other presets):
+
+   ```sh
+   for d in presets/*-stereo; do
+     sudo rm -f "/Library/Audio/Presets/Convolver/Convolver/$(basename "$d").vstpreset"
+   done
+   sudo rmdir /Library/Audio/Presets/Convolver/Convolver /Library/Audio/Presets/Convolver 2>/dev/null || true
+   ```
+
+   In jrp's Audacity 4.0.2 session (7 November 2026) the administrator
+   prompt was cancelled, so this folder is not yet confirmed in a test;
+   copies in the user's `~/Library/Audio/Presets` folder were not how
+   Audacity found presets. Without it, load each filter in steps 3, 6 and
+   7 with Convolver's **Choose…** instead (the example folders hold each preset's
+   `filter.cfg`).
 4. Have a stereo test file at 44.1 kHz and one at 48 kHz, with clear
    transients (a click track or spoken word). For the 48 kHz checks, the
    repository includes a [quiet stereo listening clip](../../examples/host-audio/README.md)
@@ -277,13 +288,13 @@ except the Audio Unit build, which runs in a source checkout.
    read-only **Status**, which should read `No filter: audio passes
    unchanged. Load a Convolver preset.` Record what REAPER shows.
 4. From the **+** button beside the FX window's preset menu, import
-   `presets/identity-48000-stereo/filter.vstpreset` (the import item for VST
+   `presets/identity-48000-stereo/identity-48000-stereo.vstpreset` (the import item for VST
    preset files). Play: the sound is unchanged. Import
-   `presets/echo-48000-stereo/filter.vstpreset`: about 5 dB quieter, with a
+   `presets/echo-48000-stereo/echo-48000-stereo.vstpreset`: about 5 dB quieter, with a
    hollow, comb-filtered tone. (Its echo comes 257 samples, about 5 ms, after
    the direct sound, too soon to hear as a separate repeat.) Status reads
    `Filter loaded: 48000 Hz, 2 in, 2 out.` Import
-   `presets/repeat-48000-stereo/filter.vstpreset`: each sound comes again,
+   `presets/repeat-48000-stereo/repeat-48000-stereo.vstpreset`: each sound comes again,
    quieter, a quarter of a second later. Import the echo preset again for the
    next steps.
 5. Toggle the plug-in's bypass (the checkbox beside its name) while playing.
@@ -293,7 +304,7 @@ except the Audio Unit build, which runs in a source checkout.
    late.
 7. Save the project, quit REAPER, reopen the project and play: the echo is
    still there.
-8. While the echo plays, import `presets/identity-44100-stereo/filter.vstpreset`.
+8. While the echo plays, import `presets/identity-44100-stereo/identity-44100-stereo.vstpreset`.
    The echo keeps playing. Status reads `Load failed, previous filter kept:
    the filter is for 44100 Hz, the host runs at 48000 Hz. Details in the
    Convolver log.`, and the log has a line `Request N: Not loaded; the
@@ -342,14 +353,30 @@ except the Audio Unit build, which runs in a source checkout.
 
 ### Audacity (VST3)
 
+jrp ran these steps in Audacity 4.0.2 on 7 November 2026, from PR #131's
+candidate, with exports compared with `convolver --compare`
+([record](../archive/reviews/2026-11-07-host1-audacity.md)); what that left
+unverified is listed under HOST-1 in [TODO](../../TODO.md). Step 3 of the
+preparation and steps 2, 3 and 9 below include what it found.
+
 1. Use the Audacity build for your Mac's processor. On start, Audacity offers
    to validate new plug-ins: accept. Otherwise use *Effect › Plugin manager ›
    Rescan plugins*. Convolver should be listed with the VST3 effects.
-2. In a new project, import the 48 kHz stereo file and check that the project
-   rate is 48000 Hz.
+2. Open *Audio setup › Audio settings* and set **Default sample rate** to
+   48000 Hz: real-time effects play at that rate, which can differ from
+   the rate an export uses (Audacity's own default
+   is 44100 Hz; restore it after testing if you want it). In a new project,
+   import the 48 kHz stereo file and check that the project rate is
+   48000 Hz. When you first play, check the log's `Started at` line: it is
+   the rate the playing copy runs at.
 3. Open the track's real-time effects (the track's **Effects** button, or
-   **E**) and add Convolver. In its preset menu choose `identity-48000-stereo`
-   (listed with the plug-in's own presets after [preparation](#prepare-the-mac)).
+   **E**) and add Convolver. If the window shows only Audacity's own Gain,
+   Mix, Latency and Bypass controls, turn on *Preset options › Use vendor
+   UI* to see Convolver's window; the choice changes the view, not the
+   filter or the settings. In its preset menu choose `identity-48000-stereo`
+   (listed with the plug-in's own presets after [preparation](#prepare-the-mac);
+   *Preset options › Import* reads only Audacity's own preset files, not
+   `.vstpreset`).
    Play: unchanged. Choose `echo-48000-stereo`: quieter and hollow, as in
    REAPER. Choose `repeat-48000-stereo`: each sound comes again a quarter of a
    second later; then choose `echo-48000-stereo` again. Record whether a preset chosen during playback is heard at once or
@@ -380,8 +407,12 @@ except the Audio Unit build, which runs in a source checkout.
 8. Record what a mono track does with a stereo preset; Audacity asks the
    plug-in for two channels even there, so no particular result is expected.
 9. The window (macOS, VST3-11). Open the real-time effect's window: it is
-   [Convolver's window](../use/plugins.md#convolvers-window). Choose
-   `examples/first-use/stereo/filter.cfg` with **Choose…** and play. Record
+   [Convolver's window](../use/plugins.md#convolvers-window) (with **Use
+   vendor UI** on, as in step 3). With playback at 48000 Hz (step 2), choose
+   `examples/first-use/stereo/filter.cfg` with **Choose…** and play (in
+   the 7 November run a 48000 Hz `.cfg` chosen this way was refused while
+   playback ran at 44100 Hz, as it should be, and was not tried again at
+   48000 Hz). Record
    whether the playing copy plays it (Audacity copies the window's copy's
    state to it; the log's `VST3 #n` lines show which copy loaded what), and
    what the window's own copy reads. Move Gain and Mix and listen.
@@ -414,7 +445,7 @@ except the Audio Unit build, which runs in a source checkout.
 7. Export the song (*Share › Export Song to Disk*) and check that the file holds
    the echo.
 8. Build a 48 kHz preset with `./bin/convolver-preset
-   presets/echo-48000-stereo/filter.vstpreset
+   presets/echo-48000-stereo/echo-48000-stereo.vstpreset
    ~/Library/Audio/Presets/Convolver/Convolver/echo-48000-stereo.aupreset`
    and choose it while the 44.1 kHz echo plays. The echo keeps playing. Record
    what GarageBand shows. Status, where it is shown, reads `Load failed,
