@@ -12,7 +12,7 @@
 > source under the recorded conditions. One condition departs from the
 > procedure's "nothing else open": at jrp's direction his usual
 > applications stayed open. jrp decided the result stands for the final
-> candidate while no engine, loading or plug-in code changes
+> candidate while no engine, loading or plug-in code changes after v0.12.8
 > ([decisions](../../project/decisions.md#releases),
 > [status, gate 5](../../project/status.md#what-still-blocks-the-first-preview)).
 > Before the line, jrp's summary from his release-readiness review (17:37
@@ -23,6 +23,28 @@
 > 43.2 ms, and the longest judged callback 2.95 ms, within the prescribed
 > limits. This establishes that candidate's result under the recorded
 > conditions; it does not automatically qualify every subsequent binary.
+
+## Evidence files on jrp's Mac
+
+The run took place between 02:10 and 02:29 on 8 November 2026 (local time),
+from jrp's listing of `rel3-0.12.5/evidence/` posted at 17:46 UTC.
+These files and `rel6-evidence.zip` stay on his Mac; `rel6-evidence.zip`
+goes with the release evidence:
+
+| File | Bytes |
+| --- | ---: |
+| `REL6-result.md` (below) | 1,564 |
+| `timing-summary.json` | 2,112 |
+| `vst3-cold-load-timing.json`, `vst3-warm-load-timing.json` | 80,270; 119,380 |
+| `au-cold-load-timing.json`, `au-warm-load-timing.json` | 80,518; 119,454 |
+| `cold-ctest.txt`, `warm-vst3.txt`, `warm-au.txt` | 9,964; 4,986; 4,976 |
+| `auval.txt` | 5,182 |
+| `configure.txt`, `build.txt`, `sdk-unpack.txt` | 1,994; 51,156; 2,324 |
+| `source-manifest.json`, `source-verification.json` | 129,345; 256 |
+| `machine-preparation.txt`, `conditions-start.json`, `power-end.txt` | 1,431; 98,862; 106 |
+
+Below the line, jrp's file as he posted it (its top heading is one level
+lower here).
 
 ---
 
@@ -58,21 +80,3 @@ not evidence of an all-other-applications-closed session.
 Full outputs, raw callback JSON, source manifest and machine conditions are in
 this evidence directory and ../rel6-evidence.zip. No host or listening pass
 is inferred from this result.
-
-## Evidence files on jrp's Mac
-
-The run took place between 02:10 and 02:29 on 8 November 2026 (local time),
-from jrp's listing of `rel3-0.12.5/evidence/` posted at 17:46 UTC.
-These files and `rel6-evidence.zip` stay on his Mac:
-
-| File | Bytes |
-| --- | ---: |
-| `REL6-result.md` (above) | 1,564 |
-| `timing-summary.json` | 2,112 |
-| `vst3-cold-load-timing.json`, `vst3-warm-load-timing.json` | 80,270; 119,380 |
-| `au-cold-load-timing.json`, `au-warm-load-timing.json` | 80,518; 119,454 |
-| `cold-ctest.txt`, `warm-vst3.txt`, `warm-au.txt` | 9,964; 4,986; 4,976 |
-| `auval.txt` | 5,182 |
-| `configure.txt`, `build.txt`, `sdk-unpack.txt` | 1,994; 51,156; 2,324 |
-| `source-manifest.json`, `source-verification.json` | 129,345; 256 |
-| `machine-preparation.txt`, `conditions-start.json`, `power-end.txt` | 1,431; 98,862; 106 |

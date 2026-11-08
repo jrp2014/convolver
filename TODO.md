@@ -63,7 +63,7 @@ boundary and C++20 in the core.
 
 | Order | Work | Exit criterion / dependency |
 | --- | --- | --- |
-| 1. Finish the open fixes | **DIAG-1** fault state after reloads and Load failed before Fault ([PR #73](https://github.com/jrp2014/convolver/pull/73)); from jrp's review of `6920a45` (31 October 2026), **PLUG-12** (a filter that loads but cannot be saved) and **ROBUST-3** (silence after a failed first load that cannot run out of memory); from his review of `276c7dc` (1 November 2026), **PLUG-13** (room for the settings in saved state, [PR #105](https://github.com/jrp2014/convolver/pull/105)); from jrp's HOST-1 REAPER run (6 November 2026), **VST3-16** (a new VST3 Latency comes into use in REAPER) | DIAG-1 done: merged on 25 October 2026 (`7ed7e38`), and the "Plug-in distribution candidates" run on that commit passed ([run](https://github.com/jrp2014/convolver/actions/runs/40145929436)). PLUG-12 and ROBUST-3 done: merged on 31 October 2026 ([PR #91](https://github.com/jrp2014/convolver/pull/91), `7542576`), each with a test of the sequence that failed. VST3-16 open: its fix is in draft [PR #134](https://github.com/jrp2014/convolver/pull/134). |
+| 1. Finish the open fixes | **DIAG-1** fault state after reloads and Load failed before Fault ([PR #73](https://github.com/jrp2014/convolver/pull/73)); from jrp's review of `6920a45` (31 October 2026), **PLUG-12** (a filter that loads but cannot be saved) and **ROBUST-3** (silence after a failed first load that cannot run out of memory); from his review of `276c7dc` (1 November 2026), **PLUG-13** (room for the settings in saved state, [PR #105](https://github.com/jrp2014/convolver/pull/105)); from jrp's HOST-1 REAPER run (6 November 2026), **VST3-16** (a new VST3 Latency comes into use in REAPER) | DIAG-1 done: merged on 25 October 2026 (`7ed7e38`), and the "Plug-in distribution candidates" run on that commit passed ([run](https://github.com/jrp2014/convolver/actions/runs/40145929436)). PLUG-12 and ROBUST-3 done: merged on 31 October 2026 ([PR #91](https://github.com/jrp2014/convolver/pull/91), `7542576`), each with a test of the sequence that failed. VST3-16 done: [PR #134](https://github.com/jrp2014/convolver/pull/134), accepted in REAPER on 8 November 2026. |
 | 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, the Audio Unit from the same candidate, which holds it since PR #115) at the same sitting | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 and AU-4 both gate the first preview, which holds the Audio Unit too. Needs no CLI in the package, so it can start now that step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
 | 3. Alongside step 2 | **PLUG-5** first-preview contents: in the candidates since PR #115 (the Audio Unit on macOS, the VST trademark notice; the `convolver` CLI and the first-use presets since PR #101); what remains is qualifying one exact candidate (HOST-1, AU-4, REL-3) and jrp's publication. **REL-2** (done): the stereo, 2→6 crossover and CLI journeys are written in `docs/use/`. **PLUG-28** (done, PR #141): the packaged presets named after their folder, before the first preview | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
 | Early walkthrough (macOS) (done) | **REL-5**: an explicitly limited walkthrough of an exact candidate on macOS, the stereo journey only | Done on 1 November 2026 as a package and command-line check only, by jrp's choice ([done](#done)); its host steps moved to HOST-1's REAPER smoke test and REL-3. It did not change the first preview's contents and does not replace REL-3. |
@@ -98,15 +98,13 @@ is superseded.
   v0.12.8, the checks still to run are one list,
   [checks left before publication](docs/project/status.md#checks-left-before-publication),
   which keeps the results jrp accepted and names what could be narrowed.
-  REL-6 qualified the 0.12.5 source on his MacBook Pro (all 24
-  combinations passed on the first run; longest hold 43.2 ms, longest
-  judged callback 2.95 ms;
-  [record](docs/archive/reviews/2026-11-08-rel6-qualification.md)).
+  REL-6 qualified the 0.12.5 source on his MacBook Pro
+  ([record](docs/archive/reviews/2026-11-08-rel6-qualification.md)).
   jrp chose the final candidate: the first tag after DOC-10 merges, with
-  the host checks run first on a v0.12.8 candidate and REL-6's 0.12.5
+  most host checks run first on a v0.12.8 candidate and REL-6's 0.12.5
   result standing while no engine, loading or plug-in code changes
-  ([decisions](docs/project/decisions.md#releases)). Remaining: those host
-  checks, DOC-10, the final tag's candidate, REL-3, then his publication.
+  ([decisions](docs/project/decisions.md#releases)). Remaining: the
+  checks in that list, then his publication.
 
 - [ ] **REL-8 — Rehearse publishing before the preview.** From jrp's
   8 November 2026 request to stop adding edge-case tests and smoke test the
@@ -266,7 +264,10 @@ is superseded.
   those that passed on earlier candidates, is run again on the preview
   candidate, so the earlier results are shown to hold for the current
   window and code: in REAPER that repeats the window and settings steps
-  (part C) on the window PLUG-22 redesigned.
+  (part C) on the window PLUG-22 redesigned. Since jrp's choice of final
+  candidate (8 November 2026), that means the v0.12.8 candidate, except
+  REAPER steps 10 and 12, which run on the final candidate
+  ([checks left](docs/project/status.md#checks-left-before-publication)).
   Progress (8 November 2026): jrp ran REAPER part C with the 0.12.5
   candidate from `main` (run 42437291088, `4117a6d`, tagged `v0.12.5`;
   [record](docs/archive/reviews/2026-11-08-host1-reaper-window.md)): on the
@@ -278,9 +279,9 @@ is superseded.
   for the final one. A packaged preset, and save and reopen, passed with
   the candidate from `f11a3dd` (PLUG-31 merged) on 8 November
   ([record](docs/archive/reviews/2026-11-08-plug31-reaper.md)), and jrp
-  decided those stand too, so on the final candidate part C needs only
-  listening and the Status display, with the rest of the REAPER and
-  Audacity steps.
+  decided those stand too, so part C needs only listening and the Status
+  display, with the rest of the REAPER and Audacity steps
+  ([checks left](docs/project/status.md#checks-left-before-publication)).
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
   now requested (progress below). Write adapters against the
@@ -613,9 +614,10 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   *Export projects at full volume* must be off for a comparison). Not
   checked: listening to the presets and to Gain and Mix, a click when
   bypassing, whether the track stays in time after a Latency change,
-  VoiceOver and the Recent list. jrp decided these results stand for the
-  final candidate after PLUG-31, where a packaged preset, save and reopen
-  and the unchecked steps remain.
+  VoiceOver and the Recent list. jrp decided these results stand after
+  PLUG-31; a packaged preset, save and reopen and the unchecked steps
+  remain, on the v0.12.8 candidate
+  ([checks left](docs/project/status.md#checks-left-before-publication)).
 - [ ] **AU-5 — Release.** In the first preview. Unsigned preview component under PLUG-5 (ad-hoc
   signed, documented quarantine removal). Developer ID signing and
   notarization follow at the production gate.
