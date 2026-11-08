@@ -119,12 +119,15 @@ that the renderer's records reach the verdict: a quick adapter records
 every phase, each callback's times in order (due, wake, entry, return) and
 its CPU time within the call; a 60 ms load over a 20 ms limit fails on both
 of two runs; a refused load fails at once; and with `--warm` the two warm
-phases appear, filled faster than real time and reported only. The runs
-that should pass the hold use a two-second limit, since a starved CI
-runner has held an instant load 130 ms (run 42522591379, 8 November 2026);
-they check that the hold reaches the verdict, not how fast the machine is. It takes about nine seconds, where the first
-version, which slept and spun, took 40 to 60. It also checks the input the
-audio thread plays: noise from -0.1 to 0.1 of both signs (PERF-11; the first
+phases appear, filled faster than real time and reported only. The mock's
+load only copies the state, and the runs that should pass the hold use a
+250 ms limit: a busy CI runner held the warm run's load, which then decoded
+half a second of filter, for 130 ms (run 42522591379, 8 November 2026).
+That limit stays below the 0.3 s each load's phase waits afterwards, so a
+hold timed over that wait would still fail. It takes about 13 seconds in a
+local sanitizer build (about 30 on macOS CI), where the first version,
+which slept and spun, took 40 to 60. It also checks the input the audio
+thread plays: noise from -0.1 to 0.1 of both signs (PERF-11; the first
 version wrapped its negative half to about 1.8e15).
 
 Each test also writes every run's records as JSON (PERF-13), as
