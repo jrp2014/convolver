@@ -194,8 +194,7 @@ what you actually chose. Play quiet audio and keep the volume low.
 
 ### Prepare the Mac
 
-Do this once. Run the commands in the extracted preview package folder,
-except the Audio Unit build, which runs in a source checkout.
+Do this once. Run the commands in the extracted preview package folder.
 
 1. Get the package for your Mac's processor (`macos-arm64` on Apple silicon,
    `macos-x86_64` on Intel). Until a preview is published, download the
@@ -205,9 +204,11 @@ except the Audio Unit build, which runs in a source checkout.
    the [install guide](../use/install.md) says, and clear the quarantine for
    the bundle and for `bin/` only
    ([unsigned previews](../use/install.md#unsigned-previews)).
-2. For GarageBand, build the Audio Unit ([Audio Unit build](build.md#audio-unit)),
-   copy `build-au/plugins/au/Convolver.component` to
-   `~/Library/Audio/Plug-Ins/Components/` and check it:
+2. For GarageBand, install the package's Audio Unit,
+   `Components/Convolver.component`, as the [install guide](../use/install.md)
+   says, and clear its quarantine. The smoke test checks the candidate's own
+   component (AU-5), so first move aside any copy built from source, in
+   either Components folder. Then check it:
 
    ```sh
    killall -9 AudioComponentRegistrar 2>/dev/null || true
