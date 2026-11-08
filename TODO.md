@@ -289,7 +289,8 @@ is superseded.
   CLI; REAPER's generic view lists Status after Bypass and it changed to
   Load failed with nothing else changing. After the refusal the window's
   heading changed from `impulse.wav` to "Restored filter" although the
-  old filter kept playing (follow-up). Audacity: a filter chosen with
+  old filter kept playing; fixed on PR #156 at jrp's request, with a
+  test of both orders of the two states. Audacity: a filter chosen with
   **Choose…** was not in the export (VST3-17); the window is shown and not
   clipped. Listening and VoiceOver were not checked in any host, and the
   rest of the Audacity steps remain.

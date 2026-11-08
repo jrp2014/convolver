@@ -256,10 +256,11 @@ fixed before the final candidate. A fix changes plug-in code after
 v0.12.8, so the host checks it touches (loading through **Choose…** in
 checks 1, 4 and 5) would run again on the final candidate.
 
-A follow-up from the v0.12.8 checks, not a blocker: in REAPER, after a
+Fixed after the v0.12.8 checks, at jrp's request: in REAPER, after a
 refused preset, the window's heading changed from the playing filter's
-name to "Restored filter" although that filter kept playing and Status
-said why; audio and saved state were right.
+name to "Restored filter" (audio was right). The fix changes plug-in code
+after v0.12.8, so REAPER's refusal step (check 2) runs again on the final
+candidate.
 
 Outside this list, and not smoke-test steps: the Audio Unit in REAPER,
 other hosts and two instances side by side, follow-up work under HOST-1 and

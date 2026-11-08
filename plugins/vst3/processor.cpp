@@ -387,9 +387,12 @@ HostReport Processor::report_locked() const {
     auto report = host_report(filter_, facts);
     // PLUG-22: saved state (no file path) of the filter the saved name
     // belongs to is named, in the fields and the text alike.
-    if (!saved_name_.empty() && report.filter_path.empty() && !report.filter_identity.empty() &&
-        report.filter_identity == saved_identity_)
-        report.filter_name = saved_name_;
+    if (report.filter_path.empty() && !report.filter_identity.empty()) {
+        if (!saved_name_.empty() && report.filter_identity == saved_identity_)
+            report.filter_name = saved_name_;
+        else if (!kept_name_.empty() && report.filter_identity == kept_identity_)
+            report.filter_name = kept_name_;
+    }
     return report;
 }
 void Processor::send_status(const StatusAnswer& answer) noexcept {
@@ -498,6 +501,14 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
             return kInvalidArgument;
         try {
             std::lock_guard lock(control_);
+            // The pair that names the playing filter is kept: a host sends
+            // a refused preset's controller state too, and that names a
+            // filter that does not play.
+            const auto playing = report_locked().filter_identity;
+            if (!saved_identity_.empty() && saved_identity_ == playing) {
+                kept_name_ = saved_name_;
+                kept_identity_ = saved_identity_;
+            }
             saved_name_.assign(static_cast<const char*>(name), name_size);
             saved_identity_.assign(static_cast<const char*>(identity), identity_size);
         } catch (...) {
@@ -808,9 +819,13 @@ bool Processor::load_file(std::string_view chosen) {
         const auto report = report_locked();
         saved_name_ = report.filter_name;
         saved_identity_ = report.filter_identity;
+        kept_name_.clear();
+        kept_identity_.clear();
     } catch (...) {
         saved_name_.clear(); // Out of memory: no name rather than another filter's.
         saved_identity_.clear();
+        kept_name_.clear();
+        kept_identity_.clear();
     }
     return true;
 }

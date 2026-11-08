@@ -751,6 +751,13 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- VST3 (HOST-1, from jrp's v0.12.8 REAPER check): after a refused preset,
+  the window's heading changed from the playing filter's name to
+  "Restored filter", and a project saved then kept the refused preset's
+  name, because the host sends that preset's controller state too. The
+  processor and the controller now keep the pair that named the playing
+  filter and use whichever pair matches it, in either order of the two
+  states; audio was not affected.
 - Guides (REL-8): the install guide now says how to open the unsigned macOS
   installer (**Open Anyway** in Privacy & Security); it described only
   clearing the quarantine of bundles copied from the ZIP archive. The limits

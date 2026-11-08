@@ -516,7 +516,9 @@ except:
   since Audio Unit hosts show their own bypass button.
 - The filter's name after reopening comes from the controller state, and
   is shown only while the filter saved with it plays: a preset or an undo
-  that brings another filter shows "Restored filter". A
+  that brings another filter shows "Restored filter". A refused preset
+  leaves the playing filter's name, on screen and in the saved project,
+  although the host sends that preset's controller state too. A
   preset made by `convolver-preset` holds a controller state too, naming
   the file it was made from.
 - Bypass changed in the window or by the host shows as Bypassed at once,
