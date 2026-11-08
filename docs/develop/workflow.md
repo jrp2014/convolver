@@ -18,6 +18,7 @@ often in sessions that end without warning. These rules let one contributor
 continue where another stopped.
 
 Contents: [kinds of task](#kinds-of-task) ·
+[ranking findings](#ranking-findings) ·
 [before you start](#before-you-start) ·
 [while working](#while-working) · [handoff note](#handoff-note) ·
 [picking up someone else's work](#picking-up-someone-elses-work) ·
@@ -25,6 +26,7 @@ Contents: [kinds of task](#kinds-of-task) ·
 [definition of done](#definition-of-done) ·
 [independent review](#independent-review) ·
 [merging](#merging-and-afterwards) ·
+[one purpose for each record](#one-purpose-for-each-record) ·
 [recording progress in TODO](#recording-progress-in-todo)
 
 ## Kinds of task
@@ -50,6 +52,27 @@ repository; recording a review's or a host test's results in it is a change.
 - **A change** to the repository: one TODO item, or a tightly coupled group,
   on its own branch with a draft pull request. The rest of this page is about
   changes.
+
+## Ranking findings
+
+Rank a finding by its consequence, not by how rarely it is triggered. A
+rarely seen wording inconsistency can wait; a rarely reached path that
+sends full-range audio to a tweeter cannot be dismissed on the same basis.
+"Not observed in a host" is useful evidence for ranking, not proof that
+something is harmless.
+
+Until the first preview is published, these are fixed at once, however rare:
+a crash, lost saved state, wrong or unsafe audio (silence where a filter
+should play, or unfiltered audio on a crossover output), a failure in a
+common workflow, an ordinary compatibility failure and a demonstrated
+dropout. Anything else is follow-up work in [TODO](../../TODO.md). Keep the
+existing allocation-failure protections and their tests, but do not extend
+them speculatively.
+
+While a candidate is being qualified it is held still: only a finding of
+the kinds above changes the plug-ins, the window, the presets or state
+handling, because each change invalidates its host evidence
+([when host qualification stops](host-testing.md#when-host-qualification-stops)).
 
 ## Before you start
 
@@ -265,7 +288,18 @@ and say what you ran.
 
 Post the review on the pull request it reviews: each finding with file and
 line, why it matters and a suggested fix; then a short list of what you checked
-and found sound. Change no files and push nothing: the author fixes the
+and found sound. Mark each finding **blocking** or **follow-up**:
+
+- **Blocking:** wrong behaviour or audio, a missing or wrong test of a
+  changed contract, a claim the evidence does not support, a broken check or
+  link, and incorrect installation or recovery instructions, which are
+  substantive however they are worded. Fix these before the pull request is
+  ready.
+- **Follow-up:** wording, style and suggestions. The author takes them in
+  the same pull request or leaves them, saying which, and a follow-up worth
+  keeping that is more than cosmetic becomes a TODO item. Follow-ups do not
+  start another round of review or another build.
+ Change no files and push nothing: the author fixes the
 findings. A review that is not this step, such as a review of `main` or of
 another contributor's draft, goes to whoever asked for it, and onto GitHub
 only if they ask. Say plainly if you found nothing. The author answers each
@@ -288,6 +322,21 @@ approve or merge; jrp does that.
   request, with a script jrp runs from a clone. Further work after a merge starts
   again from current `main`, even on a branch of the same name; a merged
   pull request is never reused.
+
+## One purpose for each record
+
+Each record answers one question, so a change updates only the record whose
+answer changed:
+
+- [TODO](../../TODO.md) owns outstanding work: open items, their
+  `Progress` lines and documented limitations.
+- The [changelog](../../CHANGELOG.md) records changes users will notice,
+  and each finished TODO item ([below](#recording-progress-in-todo)).
+- The [status page](../project/status.md) summarises the milestone's
+  readiness and links to the evidence. Update it when a gate or a feature's
+  level changes, not for each implementation detail.
+- The [decisions log](../project/decisions.md) records what jrp decided,
+  and dated records keep evidence as it was observed.
 
 ## Recording progress in TODO
 

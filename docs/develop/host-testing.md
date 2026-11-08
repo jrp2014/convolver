@@ -186,6 +186,43 @@ Keep private audio out of reports. Use the supplied synthetic examples.
    Convolver log must explain it in full. Record what the host itself
    displays, and where it shows the Status parameter, if it does.
 
+### When host qualification stops
+
+The preview needs ordinary host use to work reliably, not proof of every
+host interaction. Host qualification for a preview is finished when, on
+**one fixed candidate**, each agreed host (REAPER and Audacity for the VST3
+plug-in, GarageBand for the Audio Unit; [first hosts](#first-hosts)) has
+shown each of these, with the steps of its section below:
+
+1. installation from the package;
+2. loading a valid filter;
+3. playback with the expected result (a `Match` where a render can be
+   compared);
+4. the settings: Gain, Mix and Latency;
+5. save and reopen, with the filter and settings restored;
+6. refusal of an incompatible replacement, with the working filter kept;
+7. correct latency compensation after a Latency change, in a host that
+   compensates: an impulse lines up, measured in the audio rather than
+   read from a display.
+
+The 2→6 crossover's output safety is checked explicitly, in REAPER
+([check a crossover in a host](../use/check-a-crossover-in-a-host.md)): no
+output ever carries the unfiltered full-range input. A refused crossover
+keeps the working filter, bypass is silent, and Mix at 0% stays filtered.
+
+Once these pass, other host combinations (another layout or track type, a
+host feature no journey uses, a long tail, VoiceOver) are follow-up work in
+[TODO](../../TODO.md), not gates. The exceptions are a crash, lost saved
+state, unsafe output (such as unfiltered audio on a crossover output) or a
+failure in a common workflow. Fix those before the preview, then repeat the
+checks above that the fix touches on a new candidate. A result that has
+passed on the fixed candidate is recorded as passed for that candidate, not
+reopened by a later review ([ranking findings](workflow.md#ranking-findings)).
+
+Hold the candidate still while it is qualified. Each change to the plug-ins,
+the window, the presets or state handling invalidates the evidence and
+costs another host session, so only those four kinds of finding change it.
+
 ## Smoke test in each first host
 
 These follow the [smoke test](#smoke-test-for-an-unsigned-preview) above with

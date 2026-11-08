@@ -42,8 +42,9 @@ The **oracle** named below is a direct double-precision convolution computed
 independently of the engine, the project's reference for correct output
 ([testing](../develop/testing.md)).
 
-Update this page when an item below changes level, and keep the date and
-commit above current. Dated reviews stay as they were written. Detailed
+Update this page when a gate or a feature's level changes, not for each
+implementation detail, and keep the date and commit above current
+([one purpose for each record](../develop/workflow.md#one-purpose-for-each-record)). Dated reviews stay as they were written. Detailed
 progress has one home, the item's `Progress` lines in [TODO](../../TODO.md)
 ([recording progress](../develop/workflow.md#recording-progress-in-todo)):
 this page gives each feature's level and each condition's status in a
@@ -147,6 +148,18 @@ first independent walkthrough, optional features and further hardening wait;
 crashes, lost state, wrong audio, ordinary compatibility failures and
 demonstrated dropouts are still fixed at once.
 
+The preview is meant to be useful and dependable, with known limitations,
+not proof of every host interaction. Host qualification stops once one
+fixed candidate has passed the
+[stopping rule's checks](../develop/host-testing.md#when-host-qualification-stops)
+in the agreed hosts: installation, loading a valid filter, playback, the
+settings, save and reopen, refusal of an incompatible replacement and
+correct latency compensation, with the crossover's output safety checked
+explicitly. Other host combinations then become follow-up work unless they
+expose a crash, lost state, unsafe output or a common workflow failure.
+The candidate is held still while it is qualified: changes to the window,
+the presets or state handling would invalidate its evidence.
+
 The first preview is cut from a 0.12.x tag. The milestone's conditions
 already met are below; those still open are the gates in
 [what still blocks the first preview](#what-still-blocks-the-first-preview).
@@ -181,8 +194,8 @@ what remains and where the evidence is; the items hold the detail. Gates 2,
 | Gate | Item | Status | Evidence |
 | --- | --- | --- | --- |
 | 1. A new VST3 Latency comes into use in REAPER | VST3-16 | **Open fix.** In REAPER 7.85 a new Latency stayed unused until the project was reopened. The fix is in draft [PR #134](https://github.com/jrp2014/convolver/pull/134). Remaining: jrp's REAPER check from its candidate, an impulse lining up after a change in both directions (256 to 1024 frames and back) | [REAPER record, step C5](../archive/reviews/2026-11-06-host1-reaper.md#part-c-window-and-settings); [unresolved host findings](../develop/host-testing.md#unresolved-host-findings) |
-| 2. VST3 smoke tests in named hosts, with the current window | HOST-1, VST3-11 | REAPER passed on 6 November apart from the Latency (gate 1), and its crossover on 7 November; Audacity's exports all matched on 7 November. Both ran the window from before PLUG-22. Remaining, on the preview candidate: every REAPER and Audacity step again, those that passed included, so the earlier results hold for the current window (in REAPER, part C on the window PLUG-22 redesigned, with REAPER's display of the Status parameter), and the Audacity steps HOST-1 lists as not yet run, including listening, **Choose…**, a mono track, a Latency change, a long tail and VoiceOver | [REAPER](../archive/reviews/2026-11-06-host1-reaper.md), [crossover](../archive/reviews/2026-11-07-reaper-crossover-retest.md) and [Audacity](../archive/reviews/2026-11-07-host1-audacity.md) records; [smoke tests](../develop/host-testing.md#smoke-test-in-each-first-host) |
-| 3. The Audio Unit smoke test in GarageBand | AU-4, AU-6 | jrp's checks of the settings (25 October) and of the window up to `bbf94c5` (1 November) passed. Remaining, on the preview candidate: the full [smoke test](../develop/host-testing.md#garageband-audio-unit), Latency included, with the current window, the checks that passed on earlier builds and those still open under AU-6 | AU-4 and AU-6 in [TODO](../../TODO.md) |
+| 2. VST3 smoke tests in named hosts, with the current window | HOST-1, VST3-11 | REAPER passed on 6 November apart from the Latency (gate 1), and its crossover on 7 November; Audacity's exports all matched on 7 November. Both ran the window from before PLUG-22. Remaining, on the preview candidate: the [stopping rule's checks](../develop/host-testing.md#when-host-qualification-stops) in REAPER and Audacity, those that passed on earlier candidates included, so they hold for the current window (in REAPER, part C on the window PLUG-22 redesigned, with REAPER's display of the Status parameter, and the crossover's output safety; in Audacity, listening, **Choose…** where the preset folder is not available, and a Latency change). A mono track, a long tail and VoiceOver in Audacity are follow-up work unless they expose one of the rule's exceptions | [REAPER](../archive/reviews/2026-11-06-host1-reaper.md), [crossover](../archive/reviews/2026-11-07-reaper-crossover-retest.md) and [Audacity](../archive/reviews/2026-11-07-host1-audacity.md) records; [smoke tests](../develop/host-testing.md#smoke-test-in-each-first-host) |
+| 3. The Audio Unit smoke test in GarageBand | AU-4, AU-6 | jrp's checks of the settings (25 October) and of the window up to `bbf94c5` (1 November) passed. Remaining, on the preview candidate: the [stopping rule's checks](../develop/host-testing.md#when-host-qualification-stops) with the [GarageBand steps](../develop/host-testing.md#garageband-audio-unit), Latency included, with the current window; the other checks still open under AU-6 are follow-up work unless they expose one of the rule's exceptions | AU-4 and AU-6 in [TODO](../../TODO.md) |
 | 4. A ThreadSanitizer build of the Audio Unit | AU-3 | Remaining: `au.adapter` built with ThreadSanitizer, with bypass switched while rendering; `auval` and pluginval already run in CI. Kept as a first-preview gate by jrp | [Decisions](decisions.md#plug-in-behaviour) |
 | 5. Loading responsiveness qualified on a named machine | REL-6 (the procedure is written; the run remains), [loading responsiveness](../../TODO.md#loading-responsiveness) | The timing tests and jrp's limits are in place (PERF-9 to PERF-11), but CI's shared runners judge the callbacks only on Linux ([performance](#performance-what-is-measured) below). Not yet run on jrp's MacBook Pro from the candidate's source, cold and from a full history. An entry that fails or is not qualified means the release is not qualified on that machine; if the 30 s filter holds the host's thread over 250 ms, jrp chooses between background preparation (VST3-5) and a higher, documented limit. Kept as a first-preview gate by jrp | [Responsiveness qualification](../develop/releasing.md#responsiveness-qualification), [decisions](decisions.md#plug-in-behaviour) |
 | 6. One exact candidate from a 0.12.x tag | PLUG-5 | The candidates hold everything the preview ships ([what a package holds](../develop/releasing.md#what-a-package-holds)), with the example presets named after their folder since [PR #141](https://github.com/jrp2014/convolver/pull/141) (PLUG-28). Remaining: a candidate cut after gate 1, for gates 2, 3, 5 and 7 | PLUG-5 in [TODO](../../TODO.md) |

@@ -59,6 +59,20 @@ behaviour (as with `HostFilter`), do not generalise host lifecycle or release
 machinery beyond the requirements in hand, and keep libsndfile at the I/O
 boundary and C++20 in the core.
 
+**Qualifying the candidate** ([decided](docs/project/decisions.md#plug-in-behaviour)
+on 8 November 2026): the preview is to be useful and dependable, with known
+limitations. Host qualification stops once one fixed candidate passes the
+[stopping rule's checks](docs/develop/host-testing.md#when-host-qualification-stops)
+in the agreed hosts; other host combinations then become follow-up items
+unless they expose a crash, lost state, unsafe output or a common workflow
+failure. Hold the candidate still while qualifying it, and rank findings by
+consequence, not rarity ([ranking findings](docs/develop/workflow.md#ranking-findings)).
+A threading redesign and further CI infrastructure wait for specific
+evidence that the existing fixes are not enough. Alongside qualification,
+without touching the candidate: PLUG-32 (the state rules in the contract
+and the lifecycle runner, tests and documentation only) and CI-36, then
+CI-34 and CI-35 (less repeated CI work, measured first).
+
 | Order | Work | Exit criterion / dependency |
 | --- | --- | --- |
 | 1. Finish the open fixes | **DIAG-1** fault state after reloads and Load failed before Fault ([PR #73](https://github.com/jrp2014/convolver/pull/73)); from jrp's review of `6920a45` (31 October 2026), **PLUG-12** (a filter that loads but cannot be saved) and **ROBUST-3** (silence after a failed first load that cannot run out of memory); from his review of `276c7dc` (1 November 2026), **PLUG-13** (room for the settings in saved state, [PR #105](https://github.com/jrp2014/convolver/pull/105)); from jrp's HOST-1 REAPER run (6 November 2026), **VST3-16** (a new VST3 Latency comes into use in REAPER) | DIAG-1 done: merged on 25 October 2026 (`7ed7e38`), and the "Plug-in distribution candidates" run on that commit passed ([run](https://github.com/jrp2014/convolver/actions/runs/40145929436)). PLUG-12 and ROBUST-3 done: merged on 31 October 2026 ([PR #91](https://github.com/jrp2014/convolver/pull/91), `7542576`), each with a test of the sequence that failed. VST3-16 open: its fix is in draft [PR #134](https://github.com/jrp2014/convolver/pull/134). |
@@ -220,11 +234,14 @@ is superseded.
   ended in silence, so tails past the end of a clip are not qualified);
   VoiceOver and the window's layout (screen capture failed). REAPER's
   display of the Status parameter also remains.
-  Before the first preview, every REAPER and Audacity step, including
-  those that passed on earlier candidates, is run again on the preview
-  candidate, so the earlier results are shown to hold for the current
-  window and code: in REAPER that repeats the window and settings steps
-  (part C) on the window PLUG-22 redesigned.
+  Before the first preview, the
+  [stopping rule's checks](docs/develop/host-testing.md#when-host-qualification-stops),
+  including those that passed on earlier candidates, are run again on the
+  preview candidate, so the earlier results are shown to hold for the
+  current window and code: in REAPER that repeats the window and settings
+  steps (part C) on the window PLUG-22 redesigned. Of the Audacity steps
+  above, a mono track, the long tail and VoiceOver are follow-up work
+  unless they expose one of the rule's exceptions.
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
   now requested (progress below). Write adapters against the
@@ -494,6 +511,29 @@ LV2 (Linux first; also PipeWire system audio):
   queue. Done when each adapter's skip paths either follow that rule or
   are listed with why they are safe, with a held-lock test for each, as
   AU-16's. Waits for the freeze.
+- [ ] **PLUG-32 — What plays, what is saved and what the user sees.** From
+  jrp's priorities of 8 November 2026, after the defect-sources analysis
+  found the plug-in state and Status rules the largest source of
+  user-visible defects (about 25 fixes since 17 October). Consolidate the
+  rules rather than add a framework: extend the
+  [loading and failure table](docs/develop/plugin-contract.md#loading-and-failure)
+  so that each relevant transition (first load, failed first load, accepted
+  and refused replacement, state restored before the host is configured,
+  a rate or bus change, bypass, a Latency change, reset, saving after a
+  failure, reopening) states three things: what plays, what is saved, and
+  what the user sees (the Status value and text; the window and log only
+  where the contract already promises them). Extend the shared lifecycle
+  runner (`tests/plugins/lifecycle.hpp`, `lifecycle.cpp`) to check the
+  same three for every adapter where a test can observe them (it checks
+  Status only for LV2 today), each expectation citing its row and never
+  the implementation. Add a focused regression sequence for each failure
+  actually seen in a host that the runner does not already replay (such
+  as REAPER's restore before it gives the track's channels, which
+  `vst3.adapter`'s `restored_while_host_settles` replays for VST3 alone).
+  Not every visual observation becomes a lifecycle test. Tests and
+  documentation only: a defect it finds changes the held candidate only if
+  it is one of the [stopping rule's exceptions](docs/develop/host-testing.md#when-host-qualification-stops);
+  otherwise it becomes its own item.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
@@ -850,8 +890,9 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   `editorhost` is not used: it is an interactive program that runs until its
   window is closed, so pluginval's editor tests stand in for it. Remaining:
   the steps in REAPER and Audacity ([host testing](docs/develop/host-testing.md#reaper-vst3))
-  and VoiceOver for the first preview; the meters (with PLUG-10) for a later
-  preview.
+  for the first preview; VoiceOver as follow-up work under the
+  [stopping rule](docs/develop/host-testing.md#when-host-qualification-stops);
+  the meters (with PLUG-10) for a later preview.
 - [ ] **VST3-12 — Editor window on Windows.** The same window as a Win32 view
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.
@@ -1302,6 +1343,53 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   alone taking 35 s, so moving them would shorten no job. Take
   it up when one of them sets a job's or a contributor's run time. A DSP-focused
   run would then need a `dsp` answer from `scripts/ci_scope.py`.
+  The cheap oracle tests stay everyday gates whatever this item decides,
+  particularly with PERF-2's engine approaching (jrp, 8 November 2026).
+- [ ] **CI-34 — Build the candidates when they can find something new.**
+  From jrp's priorities of 8 November 2026. The candidate workflow
+  (`release.yml`) builds and packages on every pull request that changes
+  code, a packaged page or the VST3, Audio Unit or window files. From 17
+  October to 8 November 2026 it took about 207 of CI's 838 job-hours, and
+  it was the only workflow to fail on 18 commits (the defect-sources
+  analysis). Run it on pull requests only for packaging, build and
+  dependency changes (the paths to list in `scripts/ci_scope.py`, each
+  with its reason, such as `scripts/release/`, `packaging/`, `cmake/`,
+  `tests/release/` and the packaged pages), on demand ("Run workflow", or
+  a label on the pull request), and before a pull request that needs host
+  testing is marked ready. Keep the runs on `main`, the weekly run and the
+  full qualification of the release artifact. The candidates build a
+  different source and package configuration from the native jobs and
+  already leave out the consumer and timing tests
+  (`scripts/release/candidate.py`), so they are not covered elsewhere:
+  first check which of those 18 failures the narrowed paths would have
+  caught, and widen the list where they would not. Windows and macOS keep
+  running for relevant code changes, and prose stays as scoped today.
+  Done when `ci_scope.py` gives the answer with tests in
+  `tests/ci_scope_tests.py`, [CI triggers](docs/develop/testing.md#ci-triggers)
+  describes it, and CI-36's measures are compared before and after.
+- [ ] **CI-35 — Fuzz what a change can reach.** From jrp's priorities of 8
+  November 2026. The fuzz smoke campaigns run on every pull request that
+  changes code (about 61 job-hours from 17 October to 8 November 2026,
+  with no commit that only they failed). Run them on pull requests only
+  when a change reaches what the four harnesses read: configuration
+  parsing (`config_text`, `config_list`), saved-state decoding
+  (`host_state`) and audio I/O (`ir_file`), taking the paths from the
+  sources the fuzz targets build rather than from the configuration loader
+  alone, plus `tests/fuzz/` and `fuzz.yml`. Keep the replay of committed
+  regressions and seeds in the ordinary tests on every compiler, the 60 s
+  campaigns on `main`, and run longer campaigns on a schedule as well as
+  by hand ([fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns)).
+  Done when `ci_scope.py` gives the answer with tests, and the guide says
+  when each campaign runs.
+- [ ] **CI-36 — Measure time to an actionable result and macOS queue
+  occupancy.** From jrp's priorities of 8 November 2026: wall-clock delay
+  is the cost that matters to him, not job-hours, and no saving is
+  promised before it is measured. For recent pull request commits, from
+  the Actions API: the time from push to the first failing job's result,
+  or to every job passing, and how long macOS jobs wait for one of the
+  account's five macOS runners and how many are busy. A script run by
+  hand and a dated record, no new workflow. Measure before CI-34 and
+  CI-35, and again after each.
 
 ## Documented limitations
 
@@ -1474,6 +1562,10 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **DOC-11 — Reconcile the release status page.** 8 November 2026,
   PR #142, from jrp's review of `bf6a207`; [what still blocks the first
   preview](docs/project/status.md#what-still-blocks-the-first-preview).
+- [x] **DOC-12 — Record the dependable-preview priorities.** 8 November
+  2026, from jrp's priorities after the defect-sources analysis;
+  [when host qualification stops](docs/develop/host-testing.md#when-host-qualification-stops),
+  [ranking findings](docs/develop/workflow.md#ranking-findings).
 - [x] **FFMPEG-1 — Test the pipe workflow.** 5 November 2026;
   [tests](docs/develop/testing.md#native-production-tests).
 - [x] **FFT-1 — Check that we have the latest Ooura version.** 21 October 2026;

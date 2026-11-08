@@ -185,6 +185,22 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Process (DOC-12, from jrp's priorities of 8 November 2026): host
+  qualification has a [stopping rule](docs/develop/host-testing.md#when-host-qualification-stops).
+  On one fixed candidate, held still while it is qualified, each agreed
+  host shows installation, loading a valid filter, playback, the settings,
+  save and reopen, refusal of an incompatible replacement and latency
+  compensation, with the crossover's output safety checked explicitly;
+  other host combinations become follow-up work unless they expose a crash,
+  lost state, unsafe output or a common workflow failure. Findings are
+  [ranked by consequence](docs/develop/workflow.md#ranking-findings), not
+  rarity; reviews mark each finding blocking or follow-up; and TODO, the
+  changelog and status each have
+  [one purpose](docs/develop/workflow.md#one-purpose-for-each-record). The
+  status page's GarageBand and Audacity gates now list only the rule's
+  checks. New items plan the rest: the state rules in the adapter contract
+  and the lifecycle runner (PLUG-32), and less repeated CI work, measured
+  first (CI-34 to CI-36). No change to the plug-ins or the packages.
 - Documentation (DOC-11, from jrp's review of `main` at `bf6a207`, 8
   November 2026): the [status page](docs/project/status.md) agrees with the
   dated host records. It is dated 8 November 2026 against 0.12.1, no longer
