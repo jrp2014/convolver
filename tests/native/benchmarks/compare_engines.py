@@ -9,7 +9,9 @@ worktree, builds it (Release, benchmarks on), refuses two revisions whose engine
 source is the same, checks both against the direct double-precision references
 of the first-use fixtures (the stereo cross-feed and the 2-to-6 crossover), and
 then times convolver_callback_benchmark's warmed processing with production
-routing in one engine:
+routing in one engine (each row gives the number of timed callbacks behind
+its percentiles; before 0.13.0 the benchmark counted preparation and warm-up
+in --seconds, so a slow baseline case can have as few as 64):
 
   stereo     2 in, 2 out, two paths (diagonal)
   true       2 in, 2 out, four paths (matrix: true stereo, one engine)
@@ -164,7 +166,12 @@ class Build:
             text=True,
         )
         lines = [line for line in result.stdout.splitlines() if line.strip()]
-        return next(csv.DictReader(io.StringIO('\n'.join(lines[-2:]))))
+        row = next(csv.DictReader(io.StringIO('\n'.join(lines[-2:]))))
+        # The number of timed callbacks behind the percentiles. Builds older
+        # than the column time warm callbacks in batches of 64.
+        if not row.get('callbacks'):
+            row['callbacks'] = str(int(row['repetitions']) * 64)
+        return row
 
 
 def numbers(text):
@@ -219,6 +226,7 @@ def main():
         'p99_us',
         'p999_us',
         'max_us',
+        'callbacks',
     ]
     writer = csv.DictWriter(sys.stdout, fieldnames=fields, extrasaction='ignore')
     writer.writeheader()

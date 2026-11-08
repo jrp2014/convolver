@@ -828,8 +828,57 @@ Mean ns per output frame at 64-frame callbacks:
   memory); measure several lengths before tuning it.
 
 These are one cloud VM's figures. jrp asked (8 November 2026) that speed
-claims be measured on his Mac before they are quoted: PERF-3 and this
-comparison run there before #139 is merged.
+claims be measured on his Mac before they are quoted; the next section
+has those measurements.
+
+### On Apple silicon
+
+jrp's run of the same comparison (8 November 2026): the published preview
+v0.12.12 (`7451d76`) at Latency 256 against the candidate `6cf7260`
+(0.13.0) at 0 and 256. Machine: Apple M5 Max, 128 GB, macOS 27.2, separate
+Release builds, Accelerate, baseline kernels, sanitizers off, on AC power
+with Low Power Mode off, but with other applications running, so it was not
+a quiet machine. Command:
+`compare_engines.py --baseline v0.12.12 --candidate 6cf7260 --rounds 5`,
+all 450 measurements, with the build order alternating between rounds.
+Before timing, the fixtures rendered within tolerance (worst error 1.49e-7
+for the baseline, 8.94e-8 for the candidate). The raw data
+(`engines-mac.csv`, SHA-256 `838dc4b6…af802a1`) stays on jrp's Mac.
+
+Median over five rounds; each range covers the three layouts and both
+callback sizes:
+
+| Filter | v0.12.12 at 256 against 0.13.0 at 256 | 0.13.0 at 0: extra CPU over 0.13.0 at 256 |
+| --- | --- | --- |
+| 4,096 taps | 1.04 to 1.08× faster | 73 to 96% |
+| 16,384 | 1.44 to 1.73× | 55 to 74% |
+| 65,536 | 2.97 to 3.90× | 45 to 54% |
+| 480,000 (10 s) | 9.81 to 12.08× | 28 to 34% |
+| 1,440,000 (30 s) | 15.19 to 16.86× | 16 to 18% |
+
+- **The engine is faster at the same latency** for every filter length,
+  most of all for long reverbs.
+- **Zero latency costs more on this machine than on the VM**, from 16% for
+  a 30 s filter to nearly double for a 4,096-tap one (the absolute costs are
+  in jrp's raw data).
+- **Worst callbacks** (64-frame callbacks, period 1,333 µs): v0.12.12
+  exceeded the period in seven rows, including all five 30 s crossover
+  rows. The candidate at 256 exceeded it once (round 1, crossover, 65,536
+  taps, maximum 1,511 µs against a 99th percentile of 16 µs); at 0 it never
+  did. On a shared machine an isolated maximum neither shows a dropout nor
+  identifies its cause.
+- **Percentiles rest on unequal counts.** Up to 0.13.0 the benchmark started
+  its timer before preparation and warm-up, so a slow case could leave only
+  one batch of 64 timed callbacks, and p99.9 is not equally supported across
+  rows. The benchmark now starts timing after warm-up, and each row reports
+  its number of timed callbacks.
+
+The engine's stress and soak tests passed on the same machine:
+`convolver_engine_stress --trials 200 --seed 31 --longest 500000` (seven
+spreading cases and 200 trials, worst error 5.07e-7 of the peak) and
+`--soak 3600` (one hour of audio at Latency 0 and at 256, processed
+offline, four paths of 480,000 taps; worst error 1.39e-6 and 3.76e-6 of the
+callback peak, limit 1e-5; finite output and exact silence held).
 
 ## Reproduce
 

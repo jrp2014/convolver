@@ -1136,6 +1136,12 @@ so the preset file path is not needed).
   defaults change). jrp (8 November): it merges for the 0.13.0 pre-release
   after the Mac benchmarks, stress and soak, a focused REAPER and
   GarageBand session, and CI, compared against the published `v0.12.12`.
+  The Mac benchmarks, stress and soak passed on jrp's M5 Max at `6cf7260`
+  ([measurements](docs/develop/fft-measurements.md#on-apple-silicon)):
+  3 to 17 times faster than `v0.12.12` at the same Latency from 65,536
+  taps, and Latency 0 costing 16 to 96% more than 256, most for short
+  filters. The REAPER and GarageBand session is still open. jrp also asked
+  for a clear way to turn zero added latency on and off, on by default.
 - [ ] **PERF-3 — Resource budgets and supported workloads.** Measure, on
   named machines, the distribution of callback durations (median, 99th
   percentile, 99.9th percentile and maximum, not only the average), memory in
