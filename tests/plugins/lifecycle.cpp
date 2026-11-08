@@ -15,10 +15,11 @@
 
 namespace convolver::plugin_test::lifecycle {
 namespace {
-constexpr std::size_t latency = 256;    // The contract's reported latency.
-constexpr std::size_t transition = 512; // Warm-up and crossfade, 256 frames each.
-constexpr std::size_t ramp = 64;        // Bypass and mute ramps.
-constexpr double tolerance = 1e-5;      // PLUG-2's tolerance against the oracle.
+constexpr std::size_t latency = default_host_latency; // The contract's reported latency.
+// A replacement's warm-up (the latency) and crossfade (256 frames).
+constexpr std::size_t transition = latency + 256;
+constexpr std::size_t ramp = 64;   // Bypass and mute ramps.
+constexpr double tolerance = 1e-5; // PLUG-2's tolerance against the oracle.
 
 constexpr std::array<std::pair<Op, const char*>, 25> names{{
     {Op::state_a, "state-A"},

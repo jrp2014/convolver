@@ -21,7 +21,8 @@ FILTER is an IR file, a .cfg or a configuration list.
   --sample-rate HZ         Select as rendering would for this input rate
   --input-channels N       Select as rendering would for this input channel count
   --output-channels N      Select as rendering would for this output channel count
-  --block-size N           Partition size for latency/tail/storage (default 256)
+  --block-size N           Engine latency in frames for latency/tail/storage, 0
+                           for none (default 0, as rendering)
   --all-configurations     Validate every list entry (no rate/channel selectors)
   --syntax-only            Check one configuration's text; do not open IR files
   --profile P              convolver (default) or portable-paths
@@ -41,11 +42,13 @@ std::string text(const std::filesystem::path& p) {
 std::filesystem::path utf8_path(const std::string& s) {
     return std::filesystem::path(std::u8string(s.begin(), s.end()));
 }
-std::size_t count(std::string_view s, std::size_t limit, const char* what) {
+// An integer from `least` (1 unless stated) to `limit`.
+std::size_t count(std::string_view s, std::size_t limit, const char* what, std::size_t least = 1) {
     std::size_t n = 0;
     const auto [end, error] = std::from_chars(s.data(), s.data() + s.size(), n);
-    if (error != std::errc{} || end != s.data() + s.size() || n == 0 || n > limit)
-        throw Usage(std::string(what) + " must be an integer from 1 to " + std::to_string(limit));
+    if (error != std::errc{} || end != s.data() + s.size() || n < least || n > limit)
+        throw Usage(std::string(what) + " must be an integer from " + std::to_string(least) +
+                    " to " + std::to_string(limit));
     return n;
 }
 // Shortest decimal that reads back as the same float, in the C locale.
@@ -614,7 +617,7 @@ int run_inspection(int argc, char** argv) {
             else if (option == "--output-channels")
                 options.expected_outputs = count(value(), max_channel_count, "--output-channels");
             else if (option == "--block-size")
-                options.block_frames = count(value(), max_block_frames, "--block-size");
+                options.block_frames = count(value(), max_block_frames, "--block-size", 0);
             else if (option == "--all-configurations")
                 options.all_configurations = true;
             else if (option == "--syntax-only")

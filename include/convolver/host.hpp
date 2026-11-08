@@ -16,12 +16,12 @@ namespace convolver {
 // (docs/develop/plugin-contract.md#settings). The defaults leave the sound as
 // it was before the settings existed.
 inline constexpr double min_gain_db = -100, max_gain_db = 24; // jrp, 25 October 2026.
-// The latencies adapters offer, in frames: HostProcessor's block size, the
-// engine's uniform partition (the CLI's --block-size). Smaller is less delay
-// and more processor load. jrp, 25 October 2026: powers of two from 64 to
-// 4096, default 256.
-inline constexpr std::array<std::size_t, 7> host_latencies{64, 128, 256, 512, 1024, 2048, 4096};
-inline constexpr std::size_t default_host_latency = 256;
+// The latencies adapters offer, in frames: HostProcessor's and the engine's
+// latency (the CLI's --block-size). Larger can use less processor time.
+// jrp, 25 October 2026: powers of two from 64 to 4096; 7 November 2026
+// (PERF-2): zero latency added first, and the default.
+inline constexpr std::array<std::size_t, 8> host_latencies{0, 64, 128, 256, 512, 1024, 2048, 4096};
+inline constexpr std::size_t default_host_latency = 0;
 struct HostSettings {
     // The filtered signal's gain in decibels, within min_gain_db and
     // max_gain_db (clamped there by HostProcessor).

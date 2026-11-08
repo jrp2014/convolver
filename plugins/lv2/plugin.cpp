@@ -754,7 +754,7 @@ void run(LV2_Handle handle, std::uint32_t frames) {
     const auto ni = p.layout.inputs, no = p.layout.outputs;
     read_messages(p);
     if (p.latency)
-        *p.latency = static_cast<float>(p.host ? p.host->latency_frames() : 256);
+        *p.latency = static_cast<float>(p.host ? p.host->latency_frames() : default_host_latency);
     // lv2:enabled is 1 to process and 0 to bypass; anything else counts as on.
     const bool bypass = p.enabled && *p.enabled < .5f;
     p.bypass.store(bypass, std::memory_order_relaxed);

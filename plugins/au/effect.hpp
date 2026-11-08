@@ -36,8 +36,8 @@ inline constexpr AudioUnitParameterID status_parameter = identity::au_status_par
 inline constexpr AudioUnitParameterID gain_parameter = identity::au_gain_parameter_id;
 inline constexpr AudioUnitParameterID mix_parameter = identity::au_mix_parameter_id;
 inline constexpr AudioUnitParameterID latency_parameter = identity::au_latency_parameter_id;
-inline constexpr AudioUnitParameterValue default_latency_index = 2;
-static_assert(host_latencies[2] == default_host_latency);
+inline constexpr AudioUnitParameterValue default_latency_index = 0;
+static_assert(host_latencies[0] == default_host_latency);
 // The global parameters in the order GetParameterList gives them, which
 // RestoreState also notifies.
 inline constexpr std::array<AudioUnitParameterID, 4> parameter_order{

@@ -266,10 +266,10 @@ void run(const fs::path& dir) {
     rejects_argument(
         [&] {
             InspectionOptions o;
-            o.block_frames = 0;
+            o.block_frames = max_block_frames + 1;
             inspect_configuration(dir / "room.cfg", o);
         },
-        "zero block");
+        "latency above the limit");
     // Unicode, spaces and (where the filesystem allows) quotes in names survive.
 #ifdef _WIN32
     const std::u8string odd_name = u8"ïr 'q' ü.wav";

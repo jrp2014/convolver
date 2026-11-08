@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -120,7 +121,7 @@ inline constexpr const char* bypass_message = "ConvolverBypass";
 // UTF-8, or neither for no name) after it reads its state, so the processor's report names saved
 // state of that filter (Processor::report_locked).
 inline constexpr const char* name_message = "ConvolverName";
-inline constexpr std::size_t default_latency_index = 2;
+inline constexpr std::size_t default_latency_index = 0;
 static_assert(host_latencies[default_latency_index] == default_host_latency);
 // The settings' normalized values (0 to 1), as the host and the controller
 // hold them, and back.
@@ -158,7 +159,7 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // (kLatencyChanged) and reads it after setActive(true), as the SDK says.
     Steinberg::uint32 PLUGIN_API getLatencySamples() override {
         const auto running = active_latency_.load();
-        return static_cast<Steinberg::uint32>(running ? running : latency_.load());
+        return static_cast<Steinberg::uint32>(running != inactive ? running : latency_.load());
     }
     // How long the output keeps sounding after the input stops, measured at the
     // plug-in's output as Steinberg's tail test does: the filter's tail plus
@@ -256,7 +257,10 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // restored), and the chosen Latency in frames.
     std::atomic<double> gain_db_{0}, mix_{1};
     std::atomic<std::size_t> latency_{default_host_latency};
-    std::atomic<std::size_t> active_latency_{0}; // The running processor's; 0 while inactive.
+    // The running processor's latency; `inactive` while inactive (0 is a
+    // latency since PERF-2).
+    static constexpr std::size_t inactive = std::numeric_limits<std::size_t>::max();
+    std::atomic<std::size_t> active_latency_{inactive};
     std::atomic<Steinberg::uint32> tail_{0};
     int inputs_ = 2, outputs_ = 2;
     Steinberg::Vst::SpeakerArrangement input_arrangement_ = Steinberg::Vst::SpeakerArr::kStereo,

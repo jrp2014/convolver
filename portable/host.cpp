@@ -1178,6 +1178,16 @@ struct HostProcessor::Impl {
             }
         }
         retarget();
+        if (!started) {
+            // Before any audio since construction or reset there is nothing
+            // to ramp from: settings changed since then apply at once, as
+            // reset() applies them. A latency used to hide these ramps, but
+            // at zero latency the first frames are heard (PERF-2).
+            dry_frames = bypass ? setting_ramp : 0;
+            gain = gain_target;
+            mix = mix_target;
+            gain_ramp = mix_ramp = 0;
+        }
         started = true;
         bool invalid_input = false;
         for (std::size_t t = 0; t < frames; ++t)
@@ -1267,9 +1277,13 @@ struct HostProcessor::Impl {
                 // not the host's (a 2-in, 6-out filter on 6 inputs has no dry
                 // signal); with a dry signal, outputs <= inputs.
                 auto index = t * outputs + c;
-                auto& delayed = dry[dry_position * outputs + c];
-                const float dry_value = delayed;
-                delayed = dry_now || dry_before ? input[t * inputs + c] : 0.f;
+                const float dry_input = dry_now || dry_before ? input[t * inputs + c] : 0.f;
+                float dry_value = dry_input; // At zero latency the dry signal is not delayed.
+                if (block) {
+                    auto& delayed = dry[dry_position * outputs + c];
+                    dry_value = delayed;
+                    delayed = dry_input;
+                }
                 double value = level * static_cast<double>(wet[index]);
                 if (same_rule) {
                     if (previous)
@@ -1294,7 +1308,7 @@ struct HostProcessor::Impl {
                 if (c < out.size() && out[c])
                     out[c][t] = static_cast<T>(value);
             }
-            if (++dry_position == block)
+            if (block && ++dry_position == block)
                 dry_position = 0;
         }
         if (invalid_output) {
@@ -1316,8 +1330,8 @@ namespace {
 std::size_t offered_latency(std::size_t frames) {
     if (std::find(host_latencies.begin(), host_latencies.end(), frames) == host_latencies.end())
         throw std::invalid_argument("the latency " + std::to_string(frames) +
-                                    " frames is not one the plug-ins offer (64 to 4096 frames, "
-                                    "in powers of two)");
+                                    " frames is not one the plug-ins offer (0, or 64 to 4096 "
+                                    "frames in powers of two)");
     return frames;
 }
 } // namespace

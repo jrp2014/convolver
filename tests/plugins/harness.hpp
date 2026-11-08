@@ -18,6 +18,7 @@
 // starts passing fails the run, so the list cannot go stale.
 #pragma once
 #include "convolver/engine.hpp"
+#include "convolver/host.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -27,7 +28,7 @@
 #include <vector>
 
 namespace convolver::plugin_test {
-inline constexpr std::size_t latency = 256;
+inline constexpr std::size_t latency = default_host_latency; // The default Latency.
 inline constexpr double tolerance = 1e-5;
 
 // A filter to load. Fixtures have a source file (the .cfg or IR a user would

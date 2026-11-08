@@ -43,7 +43,7 @@ Usage: convolver --filter FILTER --input FILE --output FILE [options]
        convolver --compare OUTPUT EXPECTED  (see --compare --help)
 FILTER is an IR file (an impulse response in a WAV or other sound file), a .cfg
 or a configuration list.
-  --block-size N       Engine latency in frames, 0 for none (default 256); the
+  --block-size N       Engine latency in frames, 0 for none (default 0, as the plug-ins); the
                       output is aligned with the input unless --keep-latency
   --fft-plan MODE      estimate (render default), measure, patient (tune default)
                       or exhaustive
@@ -255,7 +255,9 @@ int run(int argc, char** argv) {
         std::optional<std::uint64_t> dither_seed;
         std::optional<convolver::NoiseShaping> shaping;
         unsigned valid_bits = 0;
-        std::size_t block = 256, output_channels = 0;
+        // The plug-ins' default Latency, so a default render matches their
+        // output sample for sample (PLUG-2).
+        std::size_t block = 0, output_channels = 0;
         float gain = 1;
         std::optional<std::string> automatic_gain;
         bool keep = false, speaker_map = false, raw_format = false, raw_filter_format = false;

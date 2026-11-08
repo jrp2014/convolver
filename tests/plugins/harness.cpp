@@ -241,7 +241,7 @@ struct Context {
         return {c().sample_rate, c().input_channels, c().output_channels, max_block};
     }
     // Frames to cover the input, the filter tail and the latency, then two
-    // more blocks, which must be silent (the oracle is zero there).
+    // more latencies, which must be silent (the oracle is zero there).
     std::size_t span(const Configuration& x) const {
         return f.frames() + test::tail(x) + 3 * latency;
     }
@@ -270,8 +270,9 @@ struct Context {
 void initial(const Context& x, std::vector<std::size_t> pattern, bool in_place) {
     const auto& c = x.c();
     auto s = x.start(&c, std::move(pattern), in_place);
-    require(x.adapter.latency_frames() == latency,
-            "latency " + std::to_string(x.adapter.latency_frames()) + ", expected 256");
+    require(x.adapter.latency_frames() == latency, "latency " +
+                                                       std::to_string(x.adapter.latency_frames()) +
+                                                       ", expected " + std::to_string(latency));
     x.tail_is(test::tail(c), "of a fresh processor");
     const auto frames = x.span(c);
     const auto out = s.render(x.f.input, 0, frames);
@@ -302,7 +303,7 @@ void restore_after_activation(const Context& x) {
 }
 
 // Live replacement: the new filter starts with fresh history, the old one plays
-// on for 256 frames, then a linear crossfade of 5.33 ms (256 frames at 48 kHz,
+// on for the latency, then a linear crossfade of 5.33 ms (256 frames at 48 kHz,
 // to the nearest frame at other rates; PLUG-17). Two loads before the
 // next callback coalesce: only the newest is heard.
 void live_replacement(const Context& x) {
@@ -325,8 +326,8 @@ void live_replacement(const Context& x) {
     std::vector<double> expected(frames * no);
     for (std::size_t t = 0; t < frames; ++t) {
         double blend = 0;
-        if (t >= at + 256)
-            blend = static_cast<float>(std::min<std::size_t>(t - at - 255, fade)) /
+        if (t >= at + latency)
+            blend = static_cast<float>(std::min<std::size_t>(t - at - latency + 1, fade)) /
                     static_cast<float>(fade);
         for (std::size_t c = 0; c < no; ++c) {
             const auto i = t * no + c;

@@ -76,8 +76,9 @@ ConfigurationAnalysis validate(const Configuration& c, std::size_t latency) {
             throw std::length_error("prepared engine exceeds storage limit");
     };
     const auto first = detail::partition_layout().first;
-    // Delayed input for one chunk, and the output buffers.
+    // Delayed input for one chunk, the direct sum's chunk, and the output buffers.
     account(checked_mul(c.input_channels, first));
+    account(first);
     account(checked_mul(c.output_channels, layout.output_ring));
     ConfigurationAnalysis result;
     for (const auto& stage : layout.stages) {
@@ -468,14 +469,8 @@ struct Engine::Impl {
             if (!taps)
                 continue;
             const auto& mix = mixes[path.mix];
-            // y[t] = sum over k of h[k] x[t - k], a tap at a time over the chunk.
-            std::fill_n(direct.data(), frames, 0.f);
-            for (std::size_t j = 0; j < taps; ++j) {
-                const float h = path.head[j];
-                const float* x = mix.head_history.data() + mix.head - 1 - j;
-                for (std::size_t t = 0; t < frames; ++t)
-                    direct[t] += h * x[t];
-            }
+            k.direct(direct.data(), mix.head_history.data() + mix.head - 1, path.head.data(), taps,
+                     frames);
             // Tap k plays at output time k + planned (planned < first here).
             const auto at = static_cast<std::size_t>(time + planned) & ring_mask;
             const auto before_wrap = std::min(frames, ring - at);

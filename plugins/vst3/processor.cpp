@@ -306,7 +306,7 @@ tresult Processor::activate(TBool state) {
             }
         } else {
             host_.reset();
-            active_latency_.store(0);
+            active_latency_.store(inactive);
         }
         active_ = state != 0;
         return AudioEffect::setActive(state);
