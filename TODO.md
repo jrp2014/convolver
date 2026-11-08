@@ -245,12 +245,11 @@ is superseded.
   Gain −6 dB, Mix 70% and Latency 1024; the VST3-16 latency renders lined
   up again. Listening and REAPER's display of the Status parameter were not
   checked. PLUG-31 changes the candidate; jrp decided these results stand
-  for the final one. On 8 November jrp loaded packaged presets in REAPER
-  with the candidate from `f11a3dd` (PLUG-31 merged), and save and reopen
-  kept the filter's name
-  ([record](docs/archive/reviews/2026-11-08-plug31-reaper.md)), so part C
-  needs only listening and the Status display, with the rest of the REAPER
-  and Audacity steps.
+  for the final one, where part C needs only a packaged preset, save and
+  reopen, listening and the Status display, with the rest of the REAPER
+  and Audacity steps. A packaged preset, and save and reopen, already passed
+  with the candidate from `f11a3dd` (PLUG-31 merged) on 8 November
+  ([record](docs/archive/reviews/2026-11-08-plug31-reaper.md)).
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
   now requested (progress below). Write adapters against the

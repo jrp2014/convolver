@@ -342,7 +342,7 @@ From the top, the window has:
   controller state), so it is still there after reopening the project, but
   not the file's folder: see [loading a filter](#loading-a-filter). A
   VST3 preset made with [`convolver-preset`](presets.md) keeps the name of
-  the file it was made from in the same way (checked in REAPER). A project saved by an earlier
+  the file it was made from in the same way. A project saved by an earlier
   Convolver, or a preset that holds no name (such as a VST3 preset made by
   an earlier `convolver-preset`), shows "Restored filter". With no filter it reads
   "None". Under the name, the filter's own facts as labelled columns:
