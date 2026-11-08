@@ -10,8 +10,8 @@
 > [REAPER smoke test](../../develop/host-testing.md#reaper-vst3) (step 11)
 > on the window PLUG-22 redesigned. The files it names are on jrp's Mac and
 > are not in this repository. Listening was not checked. PLUG-31
-> ([PR #148](https://github.com/jrp2014/convolver/pull/148)), merging before
-> the preview, changes the candidate after this run; see
+> ([PR #148](https://github.com/jrp2014/convolver/pull/148)), which jrp
+> chose to merge before the preview, changes the candidate after this run; see
 > [status](../../project/status.md#what-still-blocks-the-first-preview).
 
 ---

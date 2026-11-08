@@ -4,15 +4,15 @@
 > **Dated record.** jrp's GarageBand 10.4.14 checks of the Audio Unit with
 > the 0.12.5 candidate from `main`
 > ([run 42437291088](https://github.com/jrp2014/convolver/actions/runs/42437291088),
-> source `4117a6d`, the commit tagged `v0.12.5`), installed from the
-> package, posted in the project on 8 November 2026 at 13:19 UTC and copied
+> source `4117a6d`, the commit tagged `v0.12.5`), installed user-local
+> (the record gives no package SHA-256), posted in the project on 8 November 2026 at 13:19 UTC and copied
 > here verbatim below the line (two `->` and `>` signs restored from the
 > copy's HTML escapes). It covers most of the
 > [GarageBand smoke test](../../develop/host-testing.md#garageband-audio-unit)
 > on the current window; it is partial AU-4 evidence, not a gate pass. The
 > files it names are on jrp's Mac and are not in this repository. PLUG-31
-> ([PR #148](https://github.com/jrp2014/convolver/pull/148)), merging before
-> the preview, changes the candidate after this run; see
+> ([PR #148](https://github.com/jrp2014/convolver/pull/148)), which jrp
+> chose to merge before the preview, changes the candidate after this run; see
 > [status](../../project/status.md#what-still-blocks-the-first-preview).
 
 ---
