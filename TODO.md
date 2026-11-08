@@ -1548,6 +1548,10 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **AU-17 — Audio Unit listeners told on the main thread.** 8
+  November 2026, PR #158, from a ThreadSanitizer report on `main`
+  ([run 42512164144](https://github.com/jrp2014/convolver/actions/runs/42512164144));
+  [status and log](docs/develop/plugin-contract.md#status-and-log).
 - [x] **REL-8 — Rehearse publishing before the preview.** 8 November
   2026, PR #152; jrp's rehearsal from `main` on the v0.12.5 candidate
   ([run 42505146594](https://github.com/jrp2014/convolver/actions/runs/42505146594))
