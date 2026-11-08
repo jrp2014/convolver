@@ -214,7 +214,7 @@ struct Engine::Impl {
         // 8 per bin. They spread a block's work evenly over its slack.
         double transform_cost = 0, partition_cost = 0;
         // The block being computed, and how far the work has gone.
-        bool active = false;
+        bool whole = false, active = false;
         std::size_t job = 0, boundaries = 0, boundary = 0;
         std::size_t next_mix = 0, next_path = 0, next_partition = 0;
         double total = 0, done = 0;
@@ -256,6 +256,7 @@ struct Engine::Impl {
             stage.block = s.block;
             stage.bins = s.block + 1;
             stage.offset = s.offset;
+            stage.whole = s.whole;
             stage.transform_cost = 5.0 * n * std::log2(2.0 * n);
             stage.partition_cost = 8.0 * static_cast<double>(stage.bins);
             stage.re.assign(stage.bins, 0.f);
@@ -361,7 +362,8 @@ struct Engine::Impl {
             }
         }
     }
-    // A block of the first size: all of it at once, when it completes.
+    // A block computed whole (the first size, or one no larger than the
+    // latency without slack to spread it): all of it when it completes.
     void run(Stage& stage, std::size_t s, std::size_t job) noexcept {
         for (auto& mix : mixes)
             if (mix.stages[s].partitions)
@@ -441,7 +443,7 @@ struct Engine::Impl {
             if (time % stage.block)
                 continue;
             const auto job = static_cast<std::size_t>(time / stage.block - 1);
-            if (stage.block == first)
+            if (stage.whole)
                 run(stage, s, job);
             else
                 begin(stage, s, job);

@@ -49,7 +49,9 @@ struct Plan {
 // processing.
 class Planner {
   public:
-    Planner(const PartitionLayout& layout, std::size_t end) : layout_(layout), end_(end) {}
+    // Blocks up to `whole` frames may be computed whole when they complete.
+    Planner(const PartitionLayout& layout, std::size_t end, std::size_t whole)
+        : layout_(layout), end_(end), whole_(std::max(whole, layout.first)) {}
     Plan best(std::size_t time, std::size_t smallest) {
         const auto key = std::pair{time, smallest};
         if (const auto found = memo_.find(key); found != memo_.end())
@@ -57,19 +59,23 @@ class Planner {
         Plan result;
         result.cost = std::numeric_limits<double>::infinity();
         for (std::size_t n = smallest;; n = grow(n)) {
-            // Blocks of the first size are computed whole when they complete;
-            // larger ones need a block period of slack to spread their work.
-            if (time < (n == layout_.first ? n : 2 * n))
+            // Larger blocks than the first spread their work over a block
+            // period of slack when they have it; blocks of the first size,
+            // and others no larger than the latency, are computed whole when
+            // they complete, which needs no slack.
+            const bool spread = n != layout_.first && time >= 2 * n;
+            if (!spread && time < whole_start(n))
                 break;
             // This size for all the rest.
-            consider(result, {}, n, time, end_);
+            consider(result, {}, n, time, end_, !spread);
             // This size until the next one is possible, then the best rest.
             if (n < layout_.largest) {
                 const auto next = grow(n);
-                const auto partitions = (std::max(time + n, 2 * next) - time + n - 1) / n;
+                const auto partitions =
+                    (std::max(time + n, std::min(2 * next, whole_start(next))) - time + n - 1) / n;
                 if (time + partitions * n < end_)
                     consider(result, best(time + partitions * n, next), n, time,
-                             time + partitions * n);
+                             time + partitions * n, !spread);
             }
             if (n == layout_.largest)
                 break;
@@ -82,18 +88,23 @@ class Planner {
     std::size_t grow(std::size_t n) const {
         return std::min(n * layout_.growth, layout_.largest);
     }
+    // The earliest output time at which a block of n can be computed whole:
+    // its offset must be at least the block. Never, above the limit.
+    std::size_t whole_start(std::size_t n) const {
+        return n <= whole_ ? n : std::numeric_limits<std::size_t>::max();
+    }
     static void consider(Plan& result, const Plan& rest, std::size_t n, std::size_t time,
-                         std::size_t stop) {
+                         std::size_t stop, bool whole) {
         const auto partitions = (stop - time + n - 1) / n;
         const auto cost = stage_cost(n, partitions) + rest.cost;
         if (cost >= result.cost)
             return;
         result.cost = cost;
-        result.stages.assign(1, Stage{n, time, partitions});
+        result.stages.assign(1, Stage{n, time, partitions, whole});
         result.stages.insert(result.stages.end(), rest.stages.begin(), rest.stages.end());
     }
     const PartitionLayout& layout_;
-    std::size_t end_;
+    std::size_t end_, whole_;
     std::map<std::pair<std::size_t, std::size_t>, Plan> memo_;
 };
 } // namespace
@@ -107,7 +118,8 @@ Partitioning partition(std::size_t taps, std::size_t latency, const PartitionLay
     result.head = result.head_taps(taps);
     const auto end = taps + result.planned;
     if (result.start < end)
-        result.stages = Planner(layout, end).best(result.start, layout.first).stages;
+        result.stages =
+            Planner(layout, end, result.planned).best(result.start, layout.first).stages;
     // The direct sum's results land up to planned + first frames ahead; a
     // block's results at most offset + n frames beyond the frame being
     // produced when they are added.

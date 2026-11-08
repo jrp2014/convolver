@@ -9,10 +9,14 @@ namespace convolver::detail {
 // rest is covered by stages of uniform blocks that grow by `growth` from
 // `first` to `largest` frames; each stage is a uniformly partitioned
 // overlap-add convolution whose output starts at `offset` frames after its
-// input block. Blocks of `first` frames are computed when they complete;
-// larger blocks' work is spread over the callbacks of the following block
-// period, which the layout leaves as slack (an offset of at least twice the
-// block). Measured on 7 November 2026: docs/develop/fft-measurements.md.
+// input block. Blocks of `first` frames are computed whole when they
+// complete; larger blocks' work is spread over the callbacks of the following
+// block period, which the layout leaves as slack (an offset of at least twice
+// the block). With a latency of `first` or more, a block no larger than the
+// latency may also be computed whole, as the uniform engine did before PERF-2,
+// where its offset leaves too little slack to spread it (an offset from one to
+// two blocks): otherwise those taps would need more, smaller blocks. Measured
+// on 7 and 8 November 2026: docs/develop/fft-measurements.md.
 struct PartitionLayout {
     std::size_t first = 64, largest = 8192, growth = 4;
 };
@@ -24,6 +28,7 @@ void force_partition_layout(const PartitionLayout* layout) noexcept;
 
 struct Stage {
     std::size_t block = 0, offset = 0, partitions = 0;
+    bool whole = false; // Computed when a block completes, not spread.
 };
 struct Partitioning {
     // The latency the stages use, at most twice the largest block; any more

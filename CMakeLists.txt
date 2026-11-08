@@ -346,6 +346,10 @@ if(CONVOLVER_BUILD_NATIVE)
             SOURCES tests/native/fft_tests.cpp LIBRARIES convolver_core)
         convolver_native_test(native.engine convolver_engine_tests
             SOURCES tests/native/engine_tests.cpp LIBRARIES convolver_core)
+        # PERF-2: the production partition layout with long sparse filters
+        # against a direct reference; --soak runs it for hours (testing.md).
+        convolver_native_test(native.engine_stress convolver_engine_stress
+            SOURCES tests/native/engine_stress.cpp LIBRARIES convolver_core)
         convolver_native_test(native.kernel_divergence convolver_kernel_divergence_tests
             SOURCES tests/native/kernel_divergence_tests.cpp LIBRARIES convolver_core)
         # PERF-15: subnormals flushed while processing, the caller's mode restored.

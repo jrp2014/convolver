@@ -927,9 +927,10 @@ so the preset file path is not needed).
   a fifth more than today's engine at Latency 256, against several times
   less for long ones ([measurements](docs/develop/fft-measurements.md#the-non-uniform-engine),
   `compare_engines.py`, which builds the two revisions separately). Still
-  open: computing a first block of the Latency whole at Latency 64 and
-  above (the planner now covers those taps with 64-frame blocks, most of
-  the short-filter difference), the CPU indication beside the Latency menu, block sizes tuned on
+  open: the CPU indication beside the Latency menu, the cost at latency 0
+  varying by up to about 30% between nearby filter lengths on the Linux VM
+  (both revisions alike, most likely buffer placement; measure several
+  lengths on the Mac before tuning it), block sizes tuned on
   Apple silicon, PERF-3's measurements on jrp's Mac with both engines, and
   an independent review. Merging needs a minor version step (the C++
   defaults change).

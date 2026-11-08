@@ -787,9 +787,10 @@ At 512-frame callbacks the order is the same (all rows in the raw data).
   taps 20 to 25% more at Latency 256 and 50 to 70% more at Latency 0, all
   under 0.8% of a core. At Latency 256 the planner covers the first 256
   taps with 64-frame blocks, because a larger block is only allowed where it
-  has a block period of slack to spread its work; computing a first block of
-  the Latency whole when it completes, as `main` does, would remove most of
-  that difference (open, in PERF-2).
+  has a block period of slack to spread its work. The engine now computes a
+  block no larger than the latency whole when it completes, as `main` does,
+  where it has too little slack to spread it (after these measurements; see
+  [the short-filter fix](#the-short-filter-fix) below).
 - **Zero latency is not free in the production engine**, unlike the
   prototype above: the direct sum of the first 64 taps and three more
   64-frame partitions add 13 to 40% for filters up to 16,384 taps; for long
@@ -798,6 +799,10 @@ At 512-frame callbacks the order is the same (all rows in the raw data).
 - **Worst callbacks** (the `max_us` column) vary by tens of milliseconds
   between rounds on this shared VM for both builds; judge them on a quiet
   machine, not here.
+
+### The short-filter fix
+
+PENDING_FIX_TABLE
 
 These are one cloud VM's figures. jrp asked (8 November 2026) that speed
 claims be measured on his Mac before they are quoted: PERF-3 and this

@@ -189,7 +189,7 @@ configuration before reporting success. [Testing](testing.md) gives commands.
 
 | If changing… | Inspect together | Focused verification |
 | --- | --- | --- |
-| Convolution, routes or delays | `engine.cpp`, `partitions.cpp` (the stage layout), `kernels.inc` (the direct sum), analysis/tail functions, host assumptions | `native.engine`, `native.host`, `native.cli`; report worst oracle error |
+| Convolution, routes or delays | `engine.cpp`, `partitions.cpp` (the stage layout), `kernels.inc` (the direct sum), analysis/tail functions, host assumptions | `native.engine`, `native.engine_stress`, `native.host`, `native.cli`; report worst oracle error |
 | FFT backend | `fft.hpp`, all three adapters, CMake discovery/exports | `native.fft`, `native.engine`, `native.fft_planning`, external consumer, cross-backend comparison |
 | Configuration syntax or selection | Parser, resolver, inspection, CLI and preset selectors | `native.config_parse`, `native.inspection`, `native.inspection_cli`, corpus, config fuzz replays |
 | Decoder or quantizer | I/O API, CLI validation, direct-audio decoding, IR fuzz caller | `native.io`, `native.cli`, `native.limits`, `fuzz.replay.ir_file` |
