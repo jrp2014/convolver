@@ -221,6 +221,15 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- CI (CI-34, first step, approved by jrp on 8 November 2026): a pull request
+  builds the plug-in distribution candidates, whose macOS builds are the
+  slowest jobs, only when it changes release files, packaged pages, the
+  macOS window, the build configuration or a shipped dependency; for
+  anything else, start the workflow by hand on the branch. A change only to
+  `scripts/release/`, `tests/release/` or `packaging/` now runs only the
+  candidates, and a change to a guide in `docs/use/` builds them only when
+  the page has a command they run or shows an image. Pushes to `main`, the weekly run and
+  manual runs still build them every time, and no test was removed.
 - Plug-in presets (PLUG-31, from jrp's REAPER check of VST3-16, 8 November
   2026): a `.vstpreset` made by `convolver-preset` also holds the name of
   the file it was made from, with its extension and without its folder, and
