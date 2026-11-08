@@ -10,6 +10,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / 'scripts' / 'ci_scope.py'
@@ -33,6 +34,14 @@ def jobs(text):
 
 
 class Classification(unittest.TestCase):
+    def setUp(self):
+        # What a changed guide holds, before and after the change; None
+        # stands for a page that cannot be read.
+        self.guides = {}
+        patcher = mock.patch.object(ci_scope, 'versions', self.guides.get)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_kinds(self):
         cases = {
             'docs/develop/testing.md': 'documentation',
@@ -91,6 +100,7 @@ class Classification(unittest.TestCase):
 
     def test_decisions(self):
         self.assertEqual(ci_scope.decide(['TODO.md', 'docs/develop/build.md']), {'build': False, 'package': False})
+        self.guides['docs/use/presets.md'] = ['<!-- executable-example -->\n']
         self.assertEqual(ci_scope.decide(['TODO.md', 'docs/use/presets.md']), {'build': False, 'package': True})
         # Ordinary code builds the candidates only on main or by hand (CI-34).
         self.assertEqual(ci_scope.decide(['TODO.md', 'portable/engine.cpp']), {'build': True, 'package': False})
@@ -132,6 +142,8 @@ class Classification(unittest.TestCase):
         self.assertEqual(runs(['plugins/editor/mac/setting_rows.mm', 'plugins/identities.json']), everything)
         self.assertEqual(runs(['plugins/editor/mac/setting_rows.mm', 'portable/host.cpp']), everything)
         self.assertEqual(runs(['plugins/au/effect.hpp', 'docs/use/plugins.md']), {'au', 'release'})
+        self.guides['docs/use/plugins.md'] = ['Prose only.\n', 'Changed prose.\n']
+        self.assertEqual(runs(['plugins/au/effect.hpp', 'docs/use/plugins.md']), {'au'})
         self.assertEqual(runs(['.github/workflows/fuzz.yml']), {'fuzz'})
         self.assertEqual(runs(['.github/workflows/release.yml']), {'release'})
         self.assertEqual(runs(['.github/workflows/lint.yml']), set())
@@ -178,7 +190,8 @@ class Classification(unittest.TestCase):
             'packaging/release-policy.json',
             'packaging/trademarks/vst.json',
             '.github/workflows/release.yml',
-            'docs/use/install.md',
+            'docs/use/images/host.png',
+            'examples/plugin-presets/README.md',
         )
         skip = (
             'portable/engine.cpp',
@@ -206,6 +219,36 @@ class Classification(unittest.TestCase):
         for path in skip:
             with self.subTest(path=path):
                 self.assertFalse(ci_scope.candidates([path]))
+
+    def test_guides(self):
+        """A guide in docs/use/ builds the candidates only when it has a
+        command they run, before or after the change (CI-34)."""
+        page = 'docs/use/install.md'
+        cases = [
+            (['Prose.\n', 'Changed prose.\n'], False),
+            (['Prose.\n'], False),  # Added or deleted.
+            (['<!-- executable-example -->\n```sh\nconvolver\n```\n', 'Prose.\n'], True),  # Removed.
+            (['Prose.\n', '<!-- refused-example -->\n'], True),  # Added.
+            (None, True),  # Cannot be read: build them.
+        ]
+        for texts, build in cases:
+            with self.subTest(texts=texts):
+                self.guides[page] = texts
+                self.assertEqual(ci_scope.candidates([page]), build)
+                self.assertEqual(ci_scope.decide([page, 'TODO.md'], 'release')['package'], build)
+        # Pages outside docs/use/ and images build them whatever they hold.
+        self.guides['examples/plugin-presets/README.md'] = ['Prose.\n']
+        self.assertTrue(ci_scope.candidates(['examples/plugin-presets/README.md']))
+        self.assertTrue(ci_scope.candidates(['docs/use/images/host.png']))
+
+    def test_example_markers_match_the_packaged_check(self):
+        """The markers are the ones the candidates' documentation check runs."""
+        check = (ROOT / 'tests/release/documentation_examples.py').read_text(encoding='utf-8')
+        self.assertIn("r'<!-- (executable|refused)-example -->", check)
+        marked = [
+            page for page in sorted((ROOT / 'docs/use').glob('*.md')) if ci_scope.EXAMPLE.search(page.read_text())
+        ]
+        self.assertTrue(marked)
 
     def test_packaged_sources_build_the_candidates(self):
         """Every source file that only packaging builds or reads, and every
@@ -516,6 +559,53 @@ class Command(unittest.TestCase):
             written, printed = self.run_script(cwd=repository)
             self.assertEqual(written, 'build=true\npackage=true\n')
             self.assertIn('cannot list the changed files', printed)
+
+    def test_guide_examples_read_from_both_sides_of_the_merge(self):
+        """A guide's runnable commands are looked for in the base and in the
+        merged page, so removing the last one still builds the candidates."""
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+
+            def git(*args):
+                subprocess.run(
+                    [
+                        'git',
+                        '-c',
+                        'user.name=t',
+                        '-c',
+                        'user.email=t@example.com',
+                        '-c',
+                        'commit.gpgsign=false',
+                        '-c',
+                        'core.hooksPath=/dev/null',
+                        *args,
+                    ],
+                    cwd=repository,
+                    env=CLEAN,
+                    check=True,
+                    capture_output=True,
+                )
+
+            def merged(page, text):
+                git('checkout', '-q', '-B', 'topic', 'main')
+                (repository / page).write_text(text)
+                git('commit', '-q', '-am', 'edit')
+                git('checkout', '-q', '--detach', 'main')
+                git('merge', '-q', '--no-ff', '-m', 'merge', 'topic')
+                return self.run_script('--workflow', 'release', cwd=repository)[0]
+
+            git('init', '-q', '-b', 'main')
+            (repository / 'docs/use').mkdir(parents=True)
+            (repository / 'docs/use/prose.md').write_text('Prose.\n')
+            (repository / 'docs/use/marked.md').write_text('<!-- executable-example -->\n```sh\nconvolver\n```\n')
+            git('add', '.')
+            git('commit', '-q', '-m', 'base')
+            self.assertEqual(merged('docs/use/prose.md', 'Changed prose.\n'), 'build=false\npackage=false\n')
+            self.assertEqual(merged('docs/use/marked.md', 'No commands now.\n'), 'build=true\npackage=true\n')
+            self.assertEqual(
+                merged('docs/use/prose.md', '<!-- refused-example -->\n```sh\nconvolver\n```\n'),
+                'build=true\npackage=true\n',
+            )
 
 
 if __name__ == '__main__':

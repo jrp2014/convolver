@@ -1430,7 +1430,12 @@ except:
   two records in `docs/review-2026-10/` (`documentation`);
 - pages copied into the preview packages, which also run the
   [candidate workflow](#plug-in-candidate-checks): everything under `docs/use/`,
-  `examples/plugin-presets/README.md` and the Ooura `README.md`.
+  `examples/plugin-presets/README.md` and the Ooura `README.md`. A page in
+  `docs/use/` runs it only when it has a command marked
+  `<!-- executable-example -->` or `<!-- refused-example -->`, before or after
+  the change, because the candidates run those commands from a package; a
+  prose change elsewhere in the guides is left to Lint
+  ([below](#when-pull-requests-build-the-candidates)).
 
 When a test starts reading another page, or the packages gain one, add it to
 the lists in `ci_scope.py`. `tests/ci_scope_tests.py` (in pre-commit) checks the
@@ -1491,8 +1496,9 @@ what they are built from or hold (CI-34, approved by jrp on 8 November 2026):
 
 - release files: `scripts/release/`, `tests/release/`, `packaging/` and the
   candidate workflow itself;
-- packaged pages ([above](#documentation-only-pull-requests)) and the rest of
-  the package: `examples/`, `COPYING`, the bundles' `Info.plist.in` and
+- packaged pages ([above](#documentation-only-pull-requests); a guide in
+  `docs/use/` only when it has a marked command, before or after the change,
+  as jrp chose on 8 November 2026) and the rest of the package: `examples/`, `COPYING`, the bundles' `Info.plist.in` and
   notices, `plugins/identities.json`, `tests/plugins/fixtures.py` (it writes
   the packaged examples' audio) and `.gitattributes` (the source archive is
   written with `git archive`);
@@ -1510,6 +1516,11 @@ from the packaged pages. The list is `CANDIDATES` and `RELEASE` in
 `tests/ci_scope_tests.py` checks that it covers every source file that only a
 `CONVOLVER_PACKAGE_PLUGINS` build reads and every repository file the release
 scripts name.
+
+The scope job reads both sides of the merge for a guide's markers: the page
+as merged and as it was on the base branch (`git show HEAD^1:PAGE`), so
+removing a page's last marked command still builds the candidates, and a page
+it cannot read counts as marked.
 
 Any other change, ordinary code included, can still break a package, so the
 candidates keep building for every push to `main`, each Monday and when

@@ -36,9 +36,9 @@ approved by jrp to stop spending a candidate run on each code tweak.
   Identify required-check and artifact-consumer dependencies before gating.
   Done 8 November 2026: no status check is required on `main`; host testing
   and publishing use runs on `main` or a tag, or a run started by hand on a
-  branch. Packaged pages still build the candidates, and most code pull
-  requests change one, so whether prose-only changes to `docs/use/` should
-  is the next question for jrp.
+  branch. Most code pull requests also change a page in `docs/use/`, so jrp
+  chose the same day that such a change builds the candidates only when the
+  page has a command they run, before or after the change.
 - [ ] Evaluate narrower fuzz-campaign triggers covering configuration/list
   parsing, audio readers, saved-state decoding and all shared code, headers,
   limits, dependencies, harnesses and build options those targets depend on.

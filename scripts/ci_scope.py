@@ -12,7 +12,9 @@ changed file is one of these kinds:
   So nothing under docs/ may be built: benchmark programs live in
   tests/native/benchmarks/ and only their dated results in docs/benchmarks/.
 - packaged documentation: pages copied into the preview packages. These also
-  need the candidate workflow, which runs the packaged guide's examples.
+  need the candidate workflow, which runs the packaged guide's examples;
+  a guide in docs/use/ needs it only if it has such an example before or
+  after the change.
 - one plug-in format's own files (CI-13): its adapter and its tests. These
   need that format's workflow. The macOS window that VST3 and the Audio Unit
   share (plugins/editor/mac/) counts as a format of its own here, needing
@@ -36,7 +38,9 @@ docs/develop/testing.md#ci-triggers.
 """
 
 import argparse
+import contextlib
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path, PurePosixPath
@@ -58,6 +62,13 @@ PACKAGED = (
     'examples/plugin-presets/README.md',
     'portable/third_party/ooura/README.md',
 )
+# Guides whose marked commands the candidates run from a package
+# (tests/release/documentation_examples.py). A change to one of these pages
+# builds the candidates only when the page has such a command before or after
+# the change (CI-34, jrp's choice of 8 November 2026); other prose changes
+# there are left to Lint, and main still packages every page.
+GUIDES = 'docs/use/'
+EXAMPLE = re.compile(r'<!-- (?:executable|refused)-example -->')
 
 # Files that only one plug-in format builds or tests (CI-13). Nothing outside
 # these folders and the format's workflow may refer to them; the shared
@@ -154,11 +165,35 @@ def classify(path):
     return 'code'
 
 
+def versions(path):
+    """The texts of a changed file before and after the change: the base
+    commit's (HEAD^1, the merge commit's first parent) and the checked-out
+    one's, each when it exists. None when neither can be read."""
+    texts = []
+    with contextlib.suppress(OSError, UnicodeDecodeError):
+        texts.append(Path(path).read_text(encoding='utf-8'))
+    with contextlib.suppress(OSError, UnicodeDecodeError, subprocess.CalledProcessError):
+        base = ['git', 'show', f'HEAD^1:{path}']
+        texts.append(subprocess.run(base, check=True, capture_output=True, encoding='utf-8').stdout)
+    return texts or None
+
+
+def runnable(path):
+    """Whether a guide has a command the candidates run, before or after the
+    change. A page that cannot be read counts as having one."""
+    texts = versions(path)
+    return texts is None or any(EXAMPLE.search(text) for text in texts)
+
+
 def candidates(paths):
     """Whether a pull request changing these paths builds the candidates."""
     for path in paths:
         kind = classify(path)
         if kind == 'documentation':
+            continue
+        if kind == 'packaged' and path.startswith(GUIDES) and path.endswith('.md'):
+            if runnable(path):
+                return True
             continue
         if kind in ('packaged', 'format:editor', 'workflow:release') or matches(path, RELEASE + CANDIDATES):
             return True

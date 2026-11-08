@@ -1366,8 +1366,8 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   trigger, and matched runs demonstrate waiting-time savings. No workflow
   changes are part of REL-7.
   Progress (8 November 2026): jrp approved the first step, now done: a pull
-  request builds the candidates only for release files, packaged pages, the
-  macOS window, the build configuration and shipped dependencies, or when
+  request builds the candidates only for release files, packaged pages (a
+  `docs/use/` guide only with runnable commands), the macOS window, the build configuration and shipped dependencies, or when
   started by hand; `main`, the weekly run and manual runs build them every
   time ([CI triggers](docs/develop/testing.md#when-pull-requests-build-the-candidates)).
   Remaining: the fuzz triggers, the coverage table and matched runs.
