@@ -95,6 +95,11 @@ inline const detail::SoundFiles* test_file_reader = nullptr;
 // VST3-16, for tests: called before the processor for a new Latency is
 // built while active; throwing from it makes that preparation fail.
 inline void (*latency_preparation_for_tests)() = nullptr;
+// VST3-16, for tests: process() calls the first once it holds its processor;
+// the control side calls the second each time it waits for process() to
+// leave a replaced processor (release_processor()).
+inline void (*holding_for_tests)() = nullptr;
+inline void (*releasing_for_tests)() = nullptr;
 // DIAG-1: the controller asks the processor to collect processing faults
 // when the host shows it the Fault value the audio thread wrote (an output
 // parameter change), so the log explains and the status text follows.
@@ -228,8 +233,9 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // install_processor() makes `next` the one played and returns the
     // previous one; release_processor() then waits until process() or
     // setProcessing() is no longer using it, which takes at most one block,
-    // before it is freed. Audio thread: hold() marks the processor it uses
-    // for as long as the returned guard lives.
+    // before it is freed. process() and setProcessing() each mark the
+    // processor they use in their own marker (hold()) for as long as the
+    // returned guard lives, so one ending never clears the other's mark.
     std::unique_ptr<HostProcessor> install_processor(std::unique_ptr<HostProcessor> next) noexcept;
     void release_processor(std::unique_ptr<HostProcessor> previous) noexcept;
     struct Held {
@@ -243,7 +249,7 @@ class Processor final : public Steinberg::Vst::AudioEffect {
             mark.store(nullptr);
         }
     };
-    Held hold() noexcept;
+    Held hold(std::atomic<HostProcessor*>& marker) noexcept;
     // Where a load comes from: a file chosen in the window, state the host
     // restores (setState), or state the host says (IStreamAttributes) is a
     // project being restored.
@@ -274,8 +280,9 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     HostFilter filter_{max_bus_channels}; // The shared adapter contract's control side.
     std::unique_ptr<HostProcessor> host_; // Under control_; played_host_ is the same.
     // VST3-16: host_ as the audio thread reads it, and the processor
-    // process() or setProcessing() is using (hold()).
-    std::atomic<HostProcessor*> played_host_{nullptr}, held_host_{nullptr};
+    // process() and setProcessing() are using (hold()).
+    std::atomic<HostProcessor*> played_host_{nullptr}, processing_host_{nullptr},
+        starting_host_{nullptr};
     std::atomic<bool> bypass_{false};
     // PLUG-22: Bypass as the Status and the report show it: the audio
     // thread's value, or the controller's when it told the processor first

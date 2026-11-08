@@ -623,7 +623,9 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   the new processor at its next block, and the control side frees the old
   one only once `process()` has left it. If the new processor cannot be
   built, the old Latency keeps playing, the log says why, the window says the
-  choice is not in use yet, and the next activation builds it. A restored state sets all three
+  choice is not in use yet, and the next activation builds it. A host that
+  does restart the component builds the processor a second time, at the
+  same Latency. A restored state sets all three
   (a version 1 or 2 state resets them to their defaults), and the
   controller's `setComponentState` mirrors them, asking for a restart when the
   Latency differs.

@@ -2037,9 +2037,11 @@ void settings_parameters() {
 // VST3-16: Latency choices and filter replacements while the audio thread
 // plays. Each choice replaces the processor at once, so the control side
 // must wait until process() has left the previous one before freeing it
-// (the sanitizer build would report a use after free). The control side
-// waits for the audio thread to play a block between changes, so they
-// overlap with processing on every run; no timing is assumed.
+// (the sanitizer build reports a use after free if it does not). Between
+// changes the control side waits until the audio thread has finished
+// another block, so every change is made while the audio thread is running;
+// whether it lands inside a process() call is up to the scheduler, so this
+// is a stress test of the handover, not a deterministic interleaving.
 void latency_while_playing() {
     HostApplication context;
     Handler handler;
@@ -2100,8 +2102,8 @@ void latency_while_playing() {
         while (blocks.load() == seen && !failed.load())
             std::this_thread::yield();
     };
-    std::size_t chosen = 256;
-    float gain = .5f; // The filter that plays.
+    std::size_t chosen = 256, playing = 256; // The controller's and the processor's.
+    float gain = .5f;                        // The filter that plays.
     std::vector<uint32> expected;
     for (int i = 0; i < 24; ++i) {
         after_a_block();
@@ -2110,14 +2112,16 @@ void latency_while_playing() {
             gain = i % 2 ? .25f : .5f;
             next->seek(0, IBStream::kIBSeekSet, nullptr);
             require(p.setState(next.get()) == kResultOk, "playing latency filter");
+            playing = 256;
             after_a_block();
         }
-        // The controller's choice, never the one it already holds.
-        auto frames = convolver::host_latencies[static_cast<std::size_t>(i) %
-                                                convolver::host_latencies.size()];
-        if (frames == chosen)
-            frames = frames == 4096 ? 64 : frames * 2;
-        chosen = frames;
+        // A choice the controller does not hold and the processor does not
+        // play, so every one replaces the processor.
+        auto at = static_cast<std::size_t>(i);
+        auto frames = convolver::host_latencies[at % convolver::host_latencies.size()];
+        while (frames == chosen || frames == playing)
+            frames = convolver::host_latencies[++at % convolver::host_latencies.size()];
+        chosen = playing = frames;
         expected.push_back(static_cast<uint32>(frames));
         require(c.setParamNormalized(latency_id, normalized_latency(frames)) == kResultOk &&
                     p.getLatencySamples() == frames,
@@ -2147,6 +2151,85 @@ void latency_while_playing() {
     require(at == static_cast<int>(chosen) && std::abs(value - gain) < 1e-6,
             "the last filter at the last Latency did not play");
     handler.on_restart = nullptr;
+    p.setProcessing(false);
+    p.setActive(false);
+    p.disconnect(&c);
+    c.disconnect(&p);
+    c.terminate();
+    p.terminate();
+}
+// VST3-16: the same handover, step by step. process() is held inside a
+// block (holding_for_tests) while another thread chooses a new Latency: the
+// new processor is reported at once, the choice does not return while
+// process() still holds the old processor (the control side waits:
+// releasing_for_tests), and it returns once that block ends.
+namespace handover {
+std::atomic<bool> inside{false}, leave{false}, waited{false};
+void hold_block() {
+    inside.store(true);
+    while (!leave.load())
+        std::this_thread::yield();
+}
+void note_wait() {
+    waited.store(true);
+}
+} // namespace handover
+void latency_handover_waits() {
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk && p.connect(&c) == kResultOk &&
+                c.connect(&p) == kResultOk,
+            "handover initialize");
+    SpeakerArrangement mono = SpeakerArr::kMono;
+    require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "handover buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk &&
+                p.setProcessing(true) == kResultOk,
+            "handover activate");
+    std::array<float, 512> in{}, out{};
+    float* ins[] = {in.data()};
+    float* outs[] = {out.data()};
+    AudioBusBuffers input{}, output{};
+    input.numChannels = output.numChannels = 1;
+    input.channelBuffers32 = ins;
+    output.channelBuffers32 = outs;
+    ProcessData d{};
+    d.symbolicSampleSize = kSample32;
+    d.numInputs = d.numOutputs = 1;
+    d.inputs = &input;
+    d.outputs = &output;
+    d.numSamples = 512;
+    holding_for_tests = handover::hold_block;
+    releasing_for_tests = handover::note_wait;
+    std::atomic<tresult> played{kResultFalse};
+    std::thread audio([&] { played.store(p.process(d)); });
+    while (!handover::inside.load())
+        std::this_thread::yield();
+    holding_for_tests = nullptr; // process() is held inside its block.
+    std::atomic<bool> chosen{false};
+    std::thread control([&] {
+        c.setParamNormalized(latency_id, normalized_latency(1024));
+        chosen.store(true);
+    });
+    // The control side waits for the held block, or (broken) returns.
+    while (!handover::waited.load() && !chosen.load())
+        std::this_thread::yield();
+    const bool waited = handover::waited.load() && !chosen.load();
+    const auto reported = p.getLatencySamples();
+    handover::leave.store(true);
+    control.join();
+    audio.join();
+    releasing_for_tests = nullptr;
+    require(waited, "a replaced processor was freed while process() held it");
+    require(reported == 1024, "the new Latency was not reported while the old block finished");
+    require(played.load() == kResultOk && chosen.load(), "the held block or the choice failed");
+    require(p.process(d) == kResultOk && p.getLatencySamples() == 1024,
+            "the new processor does not play");
     p.setProcessing(false);
     p.setActive(false);
     p.disconnect(&c);
@@ -2684,6 +2767,7 @@ int run(const std::filesystem::path& preset_path) {
         controller_conversions();
         settings_parameters();
         latency_while_playing();
+        latency_handover_waits();
         report_and_files();
         saved_filter_name();
         messages_through_proxies();

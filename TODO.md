@@ -651,6 +651,17 @@ means a patched FFmpeg build with `--enable-gpl`.
 - [ ] **ROBUST-1 — Longer fuzz and transition stress.** Keep discovered inputs as
   regressions. Measure worst callback times and exercise repeated filter changes;
   allocation guards and average throughput are not a deadline guarantee.
+- [ ] **ROBUST-8 — Fault record after a failed Latency change.** From the
+  independent review of VST3-16 (PR #134, 8 November 2026). When a new
+  Latency's processor cannot be built (out of memory), the Audio Unit and
+  VST3 keep the running processor, but `HostFilter::activate()` has already
+  cleared the fault counts, the activation failure and the notice. Status
+  can then show Fault again for faults a later filter load had cleared, and
+  if `activate()` itself throws, a filter that plays silence for not suiting
+  the host may read Active. Split `activate()` into a step that may throw
+  and a commit that cannot, called only once the new processor plays, in
+  both adapters, with a test of each case. Only reachable when memory runs
+  out; waits for the freeze.
 
 ## VST3 SDK features not yet used
 
@@ -716,17 +727,21 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   the project was reopened: the plug-in asks for a restart
   (`restartComponent(kLatencyChanged)`), which the SDK says the host answers
   by deactivating and activating the component, and REAPER did not do so
-  then. jrp's trace (7 November,
-  [record](docs/archive/reviews/2026-11-07-vst3-16-reaper-trace.md)) showed
-  why: REAPER reads `getLatencySamples()` inside the request and does not
-  restart the plug-in. PR #134 applies the new processor at once, as the
-  Audio Unit does, before the request. Done when
+  then. Why is not yet known. First trace, in REAPER, whether the request
+  arrives, what it returns, when `getLatencySamples()` is read and which
+  activation calls follow; only then choose a fix (a documented host step,
+  or applying the new processor at once as the Audio Unit does). Done when
   an impulse lines up with a reference track after a change in both
   directions (256 to 1024 and back), with REAPER's delay compensation
   measured rather than its display or the reported value, and any change is
   tested for rapid successive choices, a filter replacement at the same
   time, deactivation and a failed preparation, with deterministic
   synchronisation. Its own pull request, after PLUG-23.
+  Progress (8 November 2026, PR #134): jrp's trace
+  ([record](docs/archive/reviews/2026-11-07-vst3-16-reaper-trace.md))
+  showed REAPER reads `getLatencySamples()` inside the request and does not
+  restart the plug-in; the new processor now plays at once, before the
+  request, with the tests above. jrp's REAPER impulse check remains.
 Not relevant to a convolver unless the product changes: MIDI and note
 interfaces (`IMidiMapping2`, `IMidiLearn2`, note expression, MIDI 2.0
 articulations), `ITransportControl`, `IPrefetchableSupport`,

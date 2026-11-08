@@ -554,12 +554,14 @@ void Processor::choose_latency(std::size_t frames) noexcept {
                                                     settings(), activated_->inputs);
         next->set_bypass(bypass_.load());
         next->reset();
+        // Before it plays, so its first block cannot show Fault over a load
+        // failure that is showing.
+        next->hold_fault_signal(filter_.failure_shown());
         // Nothing below can fail: what plays and what the host reads change
         // together.
         tail_.store(static_cast<uint32>(next->tail_frames()));
         active_latency_.store(next->latency_frames());
         previous = install_processor(std::move(next));
-        hold_fault_signal();
     } catch (const std::exception& e) {
         try {
             why = e.what();
@@ -596,24 +598,30 @@ Processor::install_processor(std::unique_ptr<HostProcessor> next) noexcept {
     return next; // The previous processor.
 }
 void Processor::release_processor(std::unique_ptr<HostProcessor> previous) noexcept {
-    // hold() marks its processor in held_host_ and then checks that it is
-    // still played_host_ (sequentially consistent), so once the previous one
-    // is no longer marked, the audio thread is not using it and never will.
-    while (previous && held_host_.load() == previous.get())
+    // hold() marks its processor and then checks that it is still
+    // played_host_ (sequentially consistent), so once the previous one is
+    // marked by neither, process() and setProcessing() are not using it and
+    // never will.
+    while (previous &&
+           (processing_host_.load() == previous.get() || starting_host_.load() == previous.get())) {
+        if (releasing_for_tests)
+            releasing_for_tests();
         std::this_thread::yield();
+    }
 }
-Processor::Held Processor::hold() noexcept {
+Processor::Held Processor::hold(std::atomic<HostProcessor*>& marker) noexcept {
     HostProcessor* host = nullptr;
     do {
         host = played_host_.load();
-        held_host_.store(host);
+        marker.store(host);
     } while (host != played_host_.load());
-    return {held_host_, host};
+    return {marker, host};
 }
 tresult PLUGIN_API Processor::setProcessing(TBool state) {
     // Not a place to explain faults: hosts may call this on the audio
     // thread, where nothing may lock, allocate or write the log.
-    const auto held = hold(); // VST3-16: a new Latency may replace it meanwhile.
+    // VST3-16: a new Latency may replace it meanwhile.
+    const auto held = hold(starting_host_);
     if (state && held.host) {
         held.host->set_bypass(bypass_.load());
         held.host->reset();
@@ -890,8 +898,10 @@ tresult PLUGIN_API Processor::process(ProcessData& d) {
         return kInvalidArgument;
     // VST3-16: the processor this call plays, which a new Latency may
     // replace on another thread meanwhile (choose_latency()).
-    const auto held = hold();
+    const auto held = hold(processing_host_);
     auto* host = held.host;
+    if (holding_for_tests)
+        holding_for_tests();
     if (d.numSamples && (!host || canProcessSampleSize(d.symbolicSampleSize) != kResultOk))
         return kInvalidArgument;
     if (d.numSamples) // Restored state is now checked against the host (install()).

@@ -172,8 +172,7 @@ Editor::Editor(Controller& controller) : EditorView(&controller), link_(std::mak
     if (NSDictionary<NSString*, id>* latency =
             choice(link_, latency_id, @"Latency",
                    @"The delay Convolver adds, in frames. Smaller is less delay and more processor "
-                   @"load. A new choice plays once the host restarts the plug-in, which it is "
-                   @"asked to do at once, after a gap in the sound."))
+                   @"load. A new choice plays at once, after a gap in the sound."))
         [settings addObject:latency];
     // Bypass: the plug-in's bypass parameter, edited as the settings are, so
     // the host's own bypass button, automation and undo follow it.

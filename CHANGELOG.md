@@ -632,8 +632,8 @@ Until 1.0 the C++ API may change between minor versions.
   Latency now plays at once, as in the Audio Unit: a processor with the new
   block size is built off the audio thread and replaces the running one
   before the host is asked, so the latency the host reads is always the one
-  that plays. A change during playback leaves a gap of the new latency, as
-  before, and the delay the host compensates never differs from the audio.
+  that plays. A change during playback leaves a gap in the sound, as
+  before ([latency and tail](docs/use/plugins.md#latency-and-tail)).
   If the new processor cannot be built, the old Latency keeps playing and
   the log and window say so.
 - VST3 (PLUG-23, from jrp's REAPER crossover retest at `5d188a7`): a project
