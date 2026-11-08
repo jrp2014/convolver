@@ -126,7 +126,9 @@ the one list of what each way reads:
 `convolver-preset`, which reads an IR file, a `.cfg`, a configuration list
 or a Convolver `.vstpreset`, and lists the folders where hosts look for
 presets. A preset is needed where the plug-in has no window (the VST3
-plug-in on Windows and Linux) or in an LV2 host with no file chooser.
+plug-in on Windows and Linux), in an LV2 host with no file chooser, and in
+Audacity 4.0.2, which does not store a filter chosen in the window: it plays
+while you listen, but exports and saved projects have no filter.
 
 The filter is prepared away from the audio, then installed. A filter loaded
 before any audio plays starts at once; one loaded during playback fades in

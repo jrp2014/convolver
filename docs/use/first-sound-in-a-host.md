@@ -22,6 +22,11 @@ On Windows and Linux the VST3 plug-in has no window yet: use a
 filter an ordinary music player or everything the computer plays; for that
 on Windows, see the [Equalizer APO export](equalizer-apo.md).
 
+**Audacity 4.0.2:** load the filter as a [preset](#optional-load-a-preset)
+from Audacity's own preset menu, not with **Choose…**. A filter chosen with
+Choose… plays while you listen, but Audacity does not store it, so exports
+and the saved project have no filter.
+
 ## 1. Choose a filter
 
 The package's `presets/` folder holds 18 examples: `identity`, `echo` and
@@ -32,7 +37,7 @@ as `filter.cfg` and `impulse.wav`, and the same filter as a preset.
 1. Set the host to 44100, 48000 or 96000 Hz, and select a mono or stereo
    track. Audacity plays effects at *Audio setup › Audio settings ›
    Default sample rate*, which can differ from the project's rate: set both
-   to the filter's rate before you choose it. Audacity also runs the
+   to the filter's rate before you load it. Audacity also runs the
    plug-in in stereo even on a mono track, so use a stereo filter there.
 2. Add Convolver to the track as an effect. Its window opens from the
    plug-in's slot: in GarageBand, from the plug-in's button in the track's
@@ -108,7 +113,7 @@ host's preset menu ("Load Preset…" or its preset browser; in REAPER, the
 **+** button beside the preset menu, then the item that imports a VST preset
 file). Audacity 4's preset menu does not open these files: copy the preset
 to the VST3 folder for all users in [preset folders](presets.md#preset-folders)
-and restart Audacity (on macOS, **Choose…** is simpler). Audio Unit hosts
+and restart Audacity, and it lists the preset by its file name. Audio Unit hosts
 such as GarageBand and Logic take `.aupreset` files instead; make one as
 below if GarageBand's sandbox refuses a chosen file. Without the window,
 carry on with steps 2 to 4 above, loading the matching `echo` and `repeat`
