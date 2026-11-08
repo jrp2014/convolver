@@ -13,7 +13,9 @@ does not fit. Installing is in [install](install.md); making presets is in
   below lists the differences.
 - One input and one output of 1 to 8 channels each; the counts may differ,
   for example 2 in and 6 out for a crossover.
-- You choose a filter by loading a preset (in LV2 also by choosing a file),
+- You choose a filter with **Choose…** in Convolver's window (the Audio
+  Unit and the VST3 plug-in on macOS), with the host's file chooser (LV2,
+  in hosts that show it), or as a preset from the host's preset menu,
   and the host saves the filter inside your project. A read-only Status
   parameter says what is playing, and the
   [Convolver log](#status-and-the-convolver-log) says why a filter failed.

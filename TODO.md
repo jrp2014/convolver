@@ -118,6 +118,23 @@ is superseded.
   preview, and the SourceForge project summary now points here (24 October
   2026); the old SourceForge website stays as it is. Remaining, at each
   preview: the steps after publishing.
+- [ ] **DOC-10 — One short route to load a filter.** From jrp's
+  [file-loading review](docs/archive/reviews/2026-11-07-file-loading-review.md)
+  (written 7 November 2026, posted 8 November): the guides lead readers into making and
+  installing presets, and host preset folders appear on several pages.
+  The ordinary instructions should be: choose a filter, check its rate and
+  channels, play, save the project; host preset libraries go in a separate
+  optional section, with one page owning the inputs each plug-in reads and
+  one table of preset folders, linked rather than repeated. Done when
+  [plug-in presets](docs/use/presets.md), the plug-ins guide and the
+  journeys lead with choosing a filter, one page lists the inputs each
+  plug-in reads, and one table gives the preset folders. Progress
+  (8 November 2026, PR #140): [plug-in presets](docs/use/presets.md) no longer says
+  the plug-ins have no window or that LV2 has no file chooser, the
+  plug-ins guide's summary names Choose… beside presets, and the
+  Audacity cleanup in [host testing](docs/develop/host-testing.md#prepare-the-mac)
+  removes only the files it copied. Follows PLUG-26 for the wording of
+  choosing a preset.
 - [ ] **HOST-1 — Named host matrix.** Record versions and results for Windows/macOS
   hosts: scan, load, preset/state restore, silence/tails, seek, variable callbacks,
   bypass, filter changes, multiple instances and unequal channel counts. SDK
@@ -380,16 +397,74 @@ LV2 (Linux first; also PipeWire system audio):
   effects at 44100 Hz, its Default sample rate, while the export of the same
   project ran at 48000 Hz, so a 48 kHz `.cfg` was refused during playback
   and the exports passed. Refusing the filter is correct; what was hard was
-  telling the rate the playing copy runs at from the export's rate, and
-  from a rate a host uses only briefly for a copy that
-  does not play (the copy in Audacity's effect window). The guides now say
-  so ([plug-ins](docs/use/plugins.md#status-and-the-convolver-log),
-  [Audacity steps](docs/develop/host-testing.md#audacity-vst3)). Still to
-  decide with jrp: whether a refusal for the rate should add, in its Fix,
-  that a host's playback rate can differ from its export rate, and whether the window should mark a host rate from a copy that
-  has not processed audio as not yet confirmed. Builds on the Status
-  wording of DOC-9. Diagnostic text only, no sound change; waits for the
+  telling the rate the playing copy runs at from the export's rate. The
+  guides now say so ([plug-ins](docs/use/plugins.md#status-and-the-convolver-log),
+  [Audacity steps](docs/develop/host-testing.md#audacity-vst3)). A refusal
+  for the rate adds one line to its Fix, that the host may play at a
+  different rate from the one it exports at
+  ([decided](docs/project/decisions.md#diagnostics)). Still
+  to decide with jrp: whether the window should mark a host rate as not
+  yet confirmed when it comes from a copy that has not processed audio
+  (the copy in Audacity's effect window, which a host may start briefly at
+  another rate); PLUG-27 overlaps it. Done when every format's rate
+  refusal carries the agreed line, in the window, Status details and the
+  log, and the message tests cover it. Diagnostic text only, no sound
+  change; waits for the freeze unless jrp brings it forward.
+- [ ] **PLUG-26 — Choose a `.vstpreset` in the window.** From jrp's
+  [file-loading review](docs/archive/reviews/2026-11-07-file-loading-review.md)
+  (posted 8 November 2026, with the Audacity session): the
+  window's **Choose…** and drop read IR files, `.cfg` files and
+  configuration lists (`read_filter_file()`), but not the self-contained
+  `.vstpreset` files the package ships, which only the host's preset menu
+  and `convolver-preset` (`presets::read_vst3_preset()`) read. So a user
+  has to learn each host's preset importer and folders, and Audacity 4's
+  importer does not read `.vstpreset` at all. Let Choose… and drop in the
+  macOS window (VST3 and the Audio Unit) also read Convolver's
+  `.vstpreset`, through one input reader shared with `convolver-preset`,
+  reusing its decoder and identity and size checks; `.cfg` files, nested
+  lists and their relative paths work as today. No `.aupreset` or LV2
+  reader only for symmetry. Choosing a preset loads its Gain, Mix and
+  Latency too, as the host's own preset menu does; a preset made by
+  `convolver-preset`, which holds only a filter, leaves the current
+  settings as they are ([decided](docs/project/decisions.md#plug-in-behaviour)).
+  Done
+  when the same file loads from any user folder in VST3 and the Audio Unit
+  with no installation, conversion or administrator step, saving and
+  reopening reproduces the CLI's output, and another plug-in's preset or a
+  damaged file is refused with a message saying what to do. Waits for the
   freeze unless jrp brings it forward.
+- [ ] **PLUG-27 — Read a chosen filter before the host's audio settings
+  are known.** From the same review: before the host has started audio,
+  the VST3 plug-in reads a chosen file for the rate and channels the host
+  has only proposed (`known_layout().value_or(layout())` in
+  `Processor::load_file`), so a single IR file or `.cfg` can be refused
+  against a rate the host never plays at, while a preset or restored
+  project arriving at the same moment is kept and checked when audio
+  starts. Read a single IR file or `.cfg` without assuming a rate and check
+  it at the same point as a preset; a configuration list still needs the
+  rate and channels to choose its entry, so say plainly that the choice
+  waits for the host's audio settings rather than pick an entry for a
+  proposed rate. Keep the protection for an unsuitable replacement during
+  playback; no resampling. The Audio Unit reads a chosen file the same way
+  (`effect_state.cpp`), so it is in scope too. Done when tests cover
+  choosing before activation, a refusal during playback, a changed host
+  rate and list selection, through the existing acceptance code rather
+  than a second state machine, and the
+  [plug-in contract](docs/develop/plugin-contract.md#loading-and-failure)
+  and [plug-ins guide](docs/use/plugins.md#loading-a-filter) say when a
+  chosen file is checked. Waits for the freeze unless jrp
+  brings it forward.
+- [ ] **PLUG-29 — Keep the Recent list out of the log folder.** From the
+  same review: the window's Recent list is saved beside the log
+  (`recent-filters.txt` in `~/Library/Logs/Convolver/`,
+  `portable/recent_files.cpp`), which mixes lasting settings with
+  diagnostics a user may delete. Save it under
+  `~/Library/Application Support/Convolver/` (each platform's equivalent,
+  and the sandboxed path for GarageBand), reading the old file once if the
+  new one is missing. Done when the Recent-list tests cover the new path
+  and the one-time read of the old file, and the plug-ins guide says where
+  the list is kept. Lower priority than PLUG-26 and PLUG-27; waits for
+  the freeze.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
@@ -1460,6 +1535,8 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **PERF-12 — Load-timing verdicts from records, tested without timing.** 5
   November 2026; [load timing](docs/develop/testing.md#load-timing-perf-9).
 - [x] **PERF-14 — Load timing from a full history.** 5 November 2026.
+- [x] **PLUG-28 — Name the packaged presets after their filter.** 8
+  November 2026, PR #141; [first sound in a host](docs/use/first-sound-in-a-host.md#load-the-examples).
 - [x] **PLUG-23 — A filter reads the first inputs of a wider input bus.** 6
   November 2026; [channels](docs/use/plugins.md#channels).
 - [x] **PLUG-22 — Name the filter in the window, and say each fact once.** 7

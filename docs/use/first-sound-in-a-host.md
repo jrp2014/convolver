@@ -24,8 +24,9 @@ everything the computer plays. For that on Windows, see the
 
 The package's `presets/` folder has 18 examples: `identity`, `echo` and
 `repeat`, in mono and stereo, at 44100, 48000 and 96000 Hz. Each folder is named
-`KIND-RATE-LAYOUT` and holds `filter.vstpreset`, the `filter.cfg` it was made
-from, and `impulse.wav`.
+`KIND-RATE-LAYOUT` and holds a preset of the same name
+(`KIND-RATE-LAYOUT.vstpreset`), the `filter.cfg` it was made from, and
+`impulse.wav`.
 
 1. Set the host to 44100, 48000 or 96000 Hz, and select a mono or stereo track.
 2. Add Convolver to the track as an audio effect. On macOS the host shows
@@ -33,7 +34,7 @@ from, and `impulse.wav`.
    it shows a generic panel with a bypass switch. In Audacity, turn on
    *Preset options › Use vendor UI* if you see only Audacity's own controls.
 3. From the host's preset menu ("Load Preset…" or its preset browser), load
-   `presets/identity-RATE-LAYOUT/filter.vstpreset` for your rate and layout.
+   `presets/identity-RATE-LAYOUT/identity-RATE-LAYOUT.vstpreset` for your rate and layout.
    Audacity's preset menu cannot open a `.vstpreset` file, and Audacity runs
    the plug-in in stereo even on a mono track;
    [plug-in presets](presets.md#load-it-in-a-host) says where to put the file,

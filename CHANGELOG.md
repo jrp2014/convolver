@@ -197,6 +197,29 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Packages (PLUG-28, from jrp's file-loading review; jrp chose to do it
+  before the first preview): the 18 example presets in `presets/` are named
+  after their folder, such as `presets/repeat-48000-stereo/repeat-48000-stereo.vstpreset`,
+  instead of each being `filter.vstpreset`, so hosts that list presets by
+  file name, such as Audacity, show what each one is and copying them into
+  a preset folder needs no renaming. The presets' contents are unchanged;
+  the first-use examples in `examples/first-use/` keep `filter.vstpreset`
+  beside their filter (`filter.cfg`, or `impulse.wav` for mono),
+  `input.wav` and `expected.wav`.
+- Documentation (DOC-10, from jrp's file-loading review of 7 November 2026,
+  [recorded](docs/archive/reviews/2026-11-07-file-loading-review.md)):
+  [plug-in presets](docs/use/presets.md) no longer says the plug-ins have no
+  window or that the LV2 plug-in has no file chooser; it now starts from
+  choosing the filter file itself, with presets as the other way, and the
+  [plug-ins guide](docs/use/plugins.md)'s summary names **Choose…** beside
+  presets. The
+  Audacity preparation in [host testing](docs/develop/host-testing.md#prepare-the-mac)
+  removes only the presets it copied into the system folder, not the whole
+  folder. The review's other points are TODO items PLUG-26 (choose a
+  `.vstpreset` in the window), PLUG-27 (read a chosen filter before the
+  host's audio settings are known), PLUG-28 (packaged presets named after
+  their filter) and PLUG-29 (the Recent list out of the log folder), and
+  PLUG-25 records jrp's agreed wording for a rate refusal.
 - Engine (PERF-2, draft for after the first release): non-uniformly
   partitioned convolution with zero latency. A filter's first taps are
   summed directly and the rest by stages of blocks growing from 64 to 8192
