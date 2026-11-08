@@ -133,6 +133,9 @@ struct Effect::MainNotices {
             throw std::bad_alloc();
         }
         dispatch_set_context(shared->source, shared);
+        // Listeners are called with `lock` held, so a listener that closes
+        // the unit from its callback cannot proceed; doing so was already
+        // undefined, as AUBase would go on reading the closed unit's list.
         dispatch_source_set_event_handler_f(shared->source, [](void* context) {
             auto& s = *static_cast<Shared*>(context);
             const auto notices = dispatch_source_get_data(s.source);
@@ -142,6 +145,11 @@ struct Effect::MainNotices {
         });
         dispatch_source_set_cancel_handler_f(shared->source, [](void* context) {
             auto* s = static_cast<Shared*>(context);
+            // Orders the delete after ~MainNotices on another thread for
+            // ThreadSanitizer, which does not model cancel handlers.
+            {
+                std::lock_guard guard(s->lock);
+            }
             dispatch_release(s->source);
             delete s;
         });
@@ -482,7 +490,7 @@ void Effect::timing_changed() {
 void Effect::tell_listeners(std::uintptr_t notices) noexcept {
     if (pthread_main_np())
         deliver_notices(notices);
-    else
+    else if (main_notices_) // Absent only before the constructor's end.
         main_notices_->post(notices);
 }
 

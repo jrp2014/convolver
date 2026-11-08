@@ -315,6 +315,12 @@ class Effect final : public ausdk::AUBase {
     std::mutex logging_;
     std::string logged_;    // The last line log() wrote, under logging_.
     const std::string tag_; // "Audio Unit #n": this instance in the Convolver log.
+    // AU-17: hands tell_listeners() calls to the main queue through a
+    // DISPATCH_SOURCE_TYPE_DATA_OR source; defined in effect.cpp. Declared,
+    // made before latency_queue_ and closed after it, so the Latency work can
+    // always post; a notice still pending when the unit closes is dropped.
+    struct MainNotices;
+    std::unique_ptr<MainNotices> main_notices_;
     // AU-12: the Latency work (request_latency()), on a serial dispatch
     // queue woken by a DISPATCH_SOURCE_TYPE_DATA_OR source; defined in
     // effect.cpp, so that no Objective-C file sees a dispatch object. Made at
@@ -322,12 +328,6 @@ class Effect final : public ausdk::AUBase {
     // the destructor, which waits for work already running.
     struct LatencyQueue;
     std::unique_ptr<LatencyQueue> latency_queue_;
-    // AU-17: hands tell_listeners() calls to the main queue through a
-    // DISPATCH_SOURCE_TYPE_DATA_OR source; defined in effect.cpp. Made
-    // before latency_queue_ and closed after it, so the Latency work can
-    // always post; a notice still pending when the unit closes is dropped.
-    struct MainNotices;
-    std::unique_ptr<MainNotices> main_notices_;
     std::atomic<std::uint64_t> latency_requests_{0}; // Numbers the requests (AU-14).
 };
 } // namespace convolver::au

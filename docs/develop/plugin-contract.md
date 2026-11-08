@@ -270,18 +270,24 @@ format.
   properties 64000 (the fields as a `CFDictionary` of `CFString`s) and 64001
   (the diagnostics text as a `CFString`), read-only, values released by the
   caller, with a property-change notification for 64000 wherever the Status
-  parameter's event is sent. The unit's own property notifications (the
-  latency, the tail and 64000) reach listeners on the main thread (AU-17):
-  AUBase keeps its listeners in a vector without a lock, which hosts change
-  on their main thread, so a notice from any other thread, such as the
-  Latency queue, is handed to the main queue through a
-  `DISPATCH_SOURCE_TYPE_DATA_OR` source, as the JUCE Audio Unit wrapper
-  does; notices posted before the main thread runs coalesce, and one still
-  pending when the unit closes is dropped. A host whose main thread never
-  runs its run loop is not told of changes the Latency queue makes, and
-  reads the latency and tail when it asks for them. Notifications the Audio
-  Unit SDK sends for a host's own calls stay on the host's thread. They are internal between the unit and its own
+  parameter's event is sent. They are internal between the unit and its own
   window, which ship together, so they are not permanent identities.
+  Audio Unit listeners (AU-17): the unit's own notifications of the
+  latency, the tail and 64000 reach the host's property listeners on the
+  main thread. AUBase keeps its listeners in a vector without a lock, which
+  hosts change on their main thread, so a notice raised on any other thread
+  (the Latency queue, or a host call such as a restore, `Initialize` or a
+  format change made off the main thread) is handed to the main queue
+  through a `DISPATCH_SOURCE_TYPE_DATA_OR` source, as the JUCE Audio Unit
+  wrapper does, instead of reaching listeners during that call. Notices
+  posted before the main thread runs coalesce, and one still pending when
+  the unit closes is dropped. A host whose main thread never runs its run
+  loop is not told of those changes and reads the latency and tail when it
+  asks for them; each instance it opens then keeps a small record and a
+  dispatch source until the process ends. The `ClassInfo` and
+  `PresentPreset` notices for a file chosen in the window, and the Audio
+  Unit SDK's own notices for a host's property calls, are sent on the
+  calling thread as before; the window chooses files on the main thread.
   `kAudioUnitProperty_CocoaUI` names the window's factory class in this
   image's own component bundle; the factory and view class names carry the
   version. Unlike the archived editor plan's rule that the window copies reports
