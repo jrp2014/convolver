@@ -17,6 +17,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -38,6 +39,11 @@ inline constexpr AudioUnitParameterID mix_parameter = identity::au_mix_parameter
 inline constexpr AudioUnitParameterID latency_parameter = identity::au_latency_parameter_id;
 inline constexpr AudioUnitParameterValue default_latency_index = 0;
 static_assert(host_latencies[0] == default_host_latency);
+// PERF-2: SaveState also writes the Latency in frames under this ClassInfo
+// key, so that a later change to the menu cannot change a saved Latency.
+// State without it was saved before 0 frames led the menu; RestoreState
+// reads its Latency position in the earlier menu (64 to 4096 frames).
+inline constexpr std::string_view latency_frames_key = "convolver-latency-frames";
 // The global parameters in the order GetParameterList gives them, which
 // RestoreState also notifies.
 inline constexpr std::array<AudioUnitParameterID, 4> parameter_order{

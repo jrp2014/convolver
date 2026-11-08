@@ -550,11 +550,15 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   (the CLI's `--block-size`): one of `host_latencies`, 0 or 64 to 4096 frames
   in powers of two (jrp, 25 October 2026), with 0 first and the default (jrp,
   8 November 2026, PERF-2). A larger value can use somewhat less processor
-  time. The settings constructor refuses any other value. Since the state
-  stores frames, not the menu position, adding 0 first left saved projects'
-  latencies unchanged (a VST3 test restores one saved at each earlier
-  choice); a project saved at the old default, 256, has no settings saved
-  and opens at the new default. At zero latency the first frames after a
+  time. The settings constructor refuses any other value. Adding 0 first
+  left saved projects' latencies unchanged, except at the old default, 256,
+  which opens at the new default. The VST3 state stores frames, and a
+  project saved at the default has no settings saved. The Audio Unit
+  saves its Latency parameter, which is the menu position, so it now also
+  saves the frames under `convolver-latency-frames`; state without them
+  is read through the earlier menu, whose 256 opens at 0 too (jrp,
+  8 November 2026), even when chosen on purpose. A VST3 test and an AU
+  test restore state saved at each earlier choice. At zero latency the first frames after a
   reset are heard, so a bypass, gain or mix change made before them applies
   at once, without the ramp a latency used to hide. It
   cannot change while a processor runs, so a new choice needs a new
@@ -757,7 +761,9 @@ an IEEE double as two little-endian words, then Latency in frames) and is
 written only when a setting differs from its default, with a filter or a
 failed-load marker as before; decoding checks each setting's range and
 refuses the state otherwise. The Audio Unit and LV2 read a version 3 state's
-filter and ignore its settings, which they save their own way.
+filter and ignore its settings, which they save their own way: the Audio
+Unit as parameter values under `data`, plus its Latency in frames under
+`convolver-latency-frames` since PERF-2 (see [settings](#settings)).
 Decoders read all three; encoders write version 1 whenever nothing new is recorded,
 so older builds still read those presets. How each format stores it (the
 `.vstpreset` chunk, the AU `convolver-state` key, the LV2 state property) is in

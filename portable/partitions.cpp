@@ -63,16 +63,18 @@ class Planner {
             // period of slack when they have it; blocks of the first size,
             // and others no larger than the latency, are computed whole when
             // they complete, which needs no slack.
+            // A whole block needs an offset of at least n, which every time
+            // here has: time >= whole_ >= n.
             const bool spread = n != layout_.first && time >= 2 * n;
-            if (!spread && time < whole_start(n))
+            if (!spread && !may_be_whole(n))
                 break;
             // This size for all the rest.
             consider(result, {}, n, time, end_, !spread);
             // This size until the next one is possible, then the best rest.
             if (n < layout_.largest) {
                 const auto next = grow(n);
-                const auto partitions =
-                    (std::max(time + n, std::min(2 * next, whole_start(next))) - time + n - 1) / n;
+                const auto ready = may_be_whole(next) ? time + n : std::max(time + n, 2 * next);
+                const auto partitions = (ready - time + n - 1) / n;
                 if (time + partitions * n < end_)
                     consider(result, best(time + partitions * n, next), n, time,
                              time + partitions * n, !spread);
@@ -88,10 +90,12 @@ class Planner {
     std::size_t grow(std::size_t n) const {
         return std::min(n * layout_.growth, layout_.largest);
     }
-    // The earliest output time at which a block of n can be computed whole:
-    // its offset must be at least the block. Never, above the limit.
-    std::size_t whole_start(std::size_t n) const {
-        return n <= whole_ ? n : std::numeric_limits<std::size_t>::max();
+    // Whether a block of n may be computed whole. Every output time the
+    // planner tries is at least whole_ (partition() starts at it), so such a
+    // block always has the offset of a block it needs; the next size, when it
+    // may be whole, can start after one block of this size.
+    bool may_be_whole(std::size_t n) const {
+        return n <= whole_;
     }
     static void consider(Plan& result, const Plan& rest, std::size_t n, std::size_t time,
                          std::size_t stop, bool whole) {

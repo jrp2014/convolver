@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <bit>
 #include <chrono>
 #include <cmath>
 #include <condition_variable>
@@ -1124,10 +1125,71 @@ void latency_parameter() {
     check(late.initialize(), "late initialization at the default zero latency");
     require(late.seconds(kAudioUnitProperty_Latency) == 0, "late default latency");
     check(late.restore(saved), "restore after initialization");
-    CFRelease(saved);
     require(reports(late, 64), "a Latency restored after initialization is not reported");
     require(impulse_delay(late) == 64, "a Latency restored after initialization does not play");
     late.uninitialize();
+
+    // PERF-2: state from before 0 frames led the menu holds a position in the
+    // earlier menu (64 to 4096 frames) and no frames entry. Each position
+    // reopens at the frames it meant, except the earlier default, 256, which
+    // reopens at the new default, 0, as in VST3 (jrp, 8 November 2026). State with the frames entry
+    // follows the frames, whatever the position says; frames not in the menu leave Latency as it
+    // was.
+    const auto latency_key = CFStringCreateWithBytes(
+        nullptr, reinterpret_cast<const UInt8*>(au::latency_frames_key.data()),
+        static_cast<CFIndex>(au::latency_frames_key.size()), kCFStringEncodingUTF8, false);
+    require(CFDictionaryContainsKey(static_cast<CFDictionaryRef>(saved), latency_key),
+            "saved state has no Latency in frames");
+    // ClassInfo whose "data" holds Latency `position` alone, with `frames`
+    // under the frames key, or no frames entry when negative.
+    const auto state_with = [&](float position, long long frames) {
+        const auto d =
+            CFDictionaryCreateMutableCopy(nullptr, 0, static_cast<CFDictionaryRef>(saved));
+        std::vector<UInt8> blob;
+        const auto word = [&](UInt32 w) {
+            for (int shift = 24; shift >= 0; shift -= 8)
+                blob.push_back(static_cast<UInt8>(w >> shift));
+        };
+        word(kAudioUnitScope_Global);
+        word(0);
+        word(1);
+        word(au::latency_parameter);
+        word(std::bit_cast<UInt32>(position));
+        const auto data = CFDataCreate(nullptr, blob.data(), static_cast<CFIndex>(blob.size()));
+        CFDictionarySetValue(d, CFSTR(kAUPresetDataKey), data);
+        CFRelease(data);
+        CFDictionaryRemoveValue(d, latency_key);
+        if (frames >= 0) {
+            const auto n = CFNumberCreate(nullptr, kCFNumberLongLongType, &frames);
+            CFDictionarySetValue(d, latency_key, n);
+            CFRelease(n);
+        }
+        return d;
+    };
+    const auto restored = [&](CFDictionaryRef state, std::size_t frames, const std::string& what) {
+        Unit older;
+        check(older.configure(48000, 2, 2, 512), what + " formats");
+        set_parameter(older, au::latency_parameter, 5); // 1024, to see what changes.
+        check(older.restore(state), what);
+        CFRelease(state);
+        require(reports(older, static_cast<double>(frames)),
+                what + " does not reopen at " + std::to_string(frames) + " frames");
+        require(host_latencies[static_cast<std::size_t>(parameter(older, au::latency_parameter))] ==
+                    frames,
+                what + ": the Latency parameter is not " + std::to_string(frames) + " frames");
+        check(older.initialize(), what + " initialization");
+        require(impulse_delay(older) == static_cast<long>(frames), what + " does not play it");
+        older.uninitialize();
+    };
+    constexpr std::array<std::size_t, 7> earlier{64, 128, 0, 512, 1024, 2048, 4096};
+    for (std::size_t i = 0; i < earlier.size(); ++i)
+        restored(state_with(static_cast<float>(i), -1), earlier[i],
+                 "older state at position " + std::to_string(i));
+    restored(state_with(1, 2048), 2048, "state with 2048 frames at position 1");
+    restored(state_with(1, 0), 0, "state with 0 frames at position 1");
+    restored(state_with(1, 100), 1024, "state with 100 frames");
+    CFRelease(latency_key);
+    CFRelease(saved);
     unit.uninitialize();
 }
 

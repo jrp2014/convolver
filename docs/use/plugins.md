@@ -545,6 +545,12 @@ defaults play exactly as Convolver did before the settings existed.
   time the plug-in starts, and again when it restores saved settings (some
   hosts, GarageBand among them, start the plug-in before restoring the
   project).
+- **Projects from earlier versions.** Earlier versions had no 0 in the
+  Latency menu and used 256 frames by default. A project or preset saved
+  with one of them opens at the Latency it was saved with, except 256,
+  which opens at the new default, 0 frames, even if you chose 256 on
+  purpose. Choose 256 again if you want its delay back, then save. With
+  delay compensation on, the host lines the audio up either way.
 - **Settings and other formats.** Each format saves its settings its own
   way, so a filter moved between them (a VST3 preset opened as an Audio
   Unit, say) keeps the filter but not the settings: it plays at 0 dB, fully

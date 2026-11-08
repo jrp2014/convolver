@@ -112,7 +112,7 @@ show routing; they are not a crossover ready for real speakers.
    It prints `Match`. If it prints `Different`, the line after it says why:
    another channel count means the render did not keep all six channels;
    output that is late means the host did not make up for the plug-in's
-   256-frame delay; output that ends too soon needs a longer tail; another
+   latency (none at the default, 0 frames); output that ends too soon needs a longer tail; another
    level means a volume, pan or gain setting changed it.
 
 ## 4. Save and reopen

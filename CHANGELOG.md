@@ -254,14 +254,15 @@ Until 1.0 the C++ API may change between minor versions.
   [measurements](docs/develop/fft-measurements.md#the-non-uniform-engine))
   and the worst callback falls with them. At the same latency short filters
   cost no more than before; zero latency costs more for them (about 60 to
-  85% more than the old default for 4096 taps, under 1% of a core). The Latency setting gains 0 frames, first in the list and the
-  default, and the command line's `--block-size` and inspection default to
+  85% more than the old default for 4096 taps, under 1% of a core). The
+  Latency setting gains 0 frames, first in the list and the default, and the command line's `--block-size` and inspection default to
   0 to match, so default renders still equal the plug-ins' output.
   `--block-size 0` is accepted everywhere, and `--tune-fft` plans every
   transform size the engine uses, whatever the latency. Output differs
   from before by rounding only (worst oracle error 5.2e-7 of the peak).
   Projects keep the latency they were saved with; one saved at the old
-  default (256) opens at zero. The C++ `Engine`, `analyze_configuration`,
+  default (256) opens at zero, in the Audio Unit even if 256 was chosen
+  on purpose. The C++ `Engine`, `analyze_configuration`,
   `validate_configuration` and `configuration_tail_frames` default to
   latency 0.
 - Host checks (HOST-1): jrp's Audacity 4.0.2 session with the VST3

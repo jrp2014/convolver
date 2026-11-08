@@ -9,7 +9,9 @@
 #include "presets.hpp"
 #include <AudioToolbox/AudioUnitUtilities.h>
 #include <algorithm>
+#include <array>
 #include <bit>
+#include <cmath>
 #include <exception>
 #include <filesystem>
 #include <span>
@@ -49,6 +51,54 @@ saved_parameters(CFDataRef data) {
         }
     }
     return found;
+}
+
+// The Latency menu before PERF-2 put 0 frames first: state saved by those
+// versions holds a position in this list (see latency_frames_key). Its
+// default, 256 frames, reopens at the new default, 0, as VST3 projects saved
+// at the default do (jrp, 8 November 2026): the AU saves its Latency even at
+// the default, so a deliberate 256 reopens at 0 too.
+constexpr std::array<std::size_t, 7> earlier_latencies{64, 128, 256, 512, 1024, 2048, 4096};
+constexpr std::size_t earlier_default = 256;
+
+CFStringRef latency_key() {
+    static const CFStringRef key = CFStringCreateWithBytes(
+        nullptr, reinterpret_cast<const UInt8*>(latency_frames_key.data()),
+        static_cast<CFIndex>(latency_frames_key.size()), kCFStringEncodingUTF8, false);
+    return key;
+}
+
+// PERF-2: the saved Latency as a position in this version's menu. State
+// saved since 0 frames led the menu says the frames under latency_key();
+// older state says only its position in earlier_latencies, which is mapped
+// to the same frames, except the earlier default. A Latency that is not in the menu is left out, so
+// the unit keeps its Latency.
+void current_latency_position(
+    CFDictionaryRef dict,
+    std::vector<std::pair<AudioUnitParameterID, AudioUnitParameterValue>>& saved) {
+    const auto at =
+        std::ranges::find_if(saved, [](const auto& p) { return p.first == latency_parameter; });
+    if (at == saved.end())
+        return;
+    std::optional<std::size_t> frames;
+    if (const auto value = CFDictionaryGetValue(dict, latency_key())) {
+        SInt64 n = -1;
+        if (CFGetTypeID(value) == CFNumberGetTypeID() &&
+            CFNumberGetValue(static_cast<CFNumberRef>(value), kCFNumberSInt64Type, &n) && n >= 0)
+            frames = static_cast<std::size_t>(n);
+    } else if (!std::isnan(at->second)) {
+        const auto last = static_cast<AudioUnitParameterValue>(earlier_latencies.size() - 1);
+        frames = earlier_latencies[static_cast<std::size_t>(
+            std::clamp<AudioUnitParameterValue>(std::round(at->second), 0, last))];
+        if (*frames == earlier_default)
+            frames = default_host_latency;
+    }
+    const auto found = frames ? std::ranges::find(host_latencies, *frames) : host_latencies.end();
+    if (found == host_latencies.end()) {
+        saved.erase(at);
+        return;
+    }
+    at->second = static_cast<AudioUnitParameterValue>(found - host_latencies.begin());
 }
 
 CFStringRef state_key() {
@@ -156,6 +206,15 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
         return failed(kAudioUnitErr_InvalidPropertyValue);
     }
     CFDictionarySetValue(dict, state_key(), data.get());
+    // PERF-2: the Latency in frames too (latency_frames_key).
+    const auto frames = static_cast<SInt64>(settings().latency);
+    const cf_owned<CFNumberRef> latency(CFNumberCreate(nullptr, kCFNumberSInt64Type, &frames));
+    if (!latency) {
+        CFRelease(*out);
+        *out = nullptr;
+        return failed(kAudioUnitErr_InvalidPropertyValue);
+    }
+    CFDictionarySetValue(dict, latency_key(), latency.get());
     return noErr;
 }
 
@@ -431,6 +490,8 @@ bool Effect::read_state(CFPropertyListRef plist, HostState& next,
         data && CFGetTypeID(data) == CFDataGetTypeID()) {
         try {
             saved = saved_parameters(static_cast<CFDataRef>(data));
+            if (saved)
+                current_latency_position(dict, *saved);
         } catch (...) { // Out of memory: the settings are left as they are.
         }
         settings_unreadable = !saved;

@@ -985,9 +985,16 @@ so the preset file path is not needed).
   varying by up to about 30% between nearby filter lengths on the Linux VM
   (both revisions alike, most likely buffer placement; measure several
   lengths on the Mac before tuning it), block sizes tuned on
-  Apple silicon, PERF-3's measurements on jrp's Mac with both engines, and
-  an independent review. Merging needs a minor version step (the C++
-  defaults change).
+  Apple silicon, and PERF-3's measurements on jrp's Mac with both engines.
+  When tuning: every spread stage's last unit (the last path's inverse
+  transform) waits for that stage's last boundary, and all stages' last
+  boundaries fall together, at frames 8064 mod 8192, where the review saw
+  the worst ordinary callbacks (about 100 µs against a 13 µs mean on the
+  Linux VM). The independent review of `6056ef3` found two blocking
+  problems, both fixed on the PR: Audio Unit projects reopened at a shifted
+  Latency (the AU now also saves frames, and older state is read through
+  the earlier menu), and no test checked spreading (`native.engine_stress`
+  now does). Merging needs a minor version step (the C++ defaults change).
 - [ ] **PERF-3 — Resource budgets and supported workloads.** Measure, on
   named machines, the distribution of callback durations (median, 99th
   percentile, 99.9th percentile and maximum, not only the average), memory in

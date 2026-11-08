@@ -11,11 +11,14 @@
 // every output frame of long filters, and a tap placed in the wrong partition,
 // stage or time shows at once.
 //
-//   convolver_engine_stress                     the CTest run (fixed seed)
+//   convolver_engine_stress                     the CTest run (fixed seed):
+//                                               spreading, then stress trials
 //   convolver_engine_stress --trials 500 --seed 7 --longest 1500000
 //   convolver_engine_stress --soak 3600         an hour of audio, one engine
 //
-// Stress trials check, against the reference: every output frame (within
+// The spreading check (see spreading()) counts each callback's share of the
+// large blocks' work through the engine's test probe. Stress trials check,
+// against the reference: every output frame (within
 // 1e-5 of the output peak), that two host callback patterns give identical
 // samples, that a reset part-way through gives the same samples as a fresh
 // engine, and that a reset engine is silent. The soak runs one engine for the
@@ -32,6 +35,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
+#include <map>
 #include <random>
 #include <span>
 #include <stdexcept>
@@ -74,13 +78,16 @@ std::vector<std::size_t> boundaries(std::size_t length, std::size_t latency) {
     return result;
 }
 
-std::vector<float> filter(std::mt19937& random, std::size_t length, std::size_t latency,
-                          std::size_t dense) {
+// A filter of `length` taps with taps at and beside the block boundaries the
+// engine uses: those planned for the longest path, `planned_for` taps, since
+// the engine plans every path by the longest.
+std::vector<float> filter(std::mt19937& random, std::size_t length, std::size_t planned_for,
+                          std::size_t latency, std::size_t dense) {
     std::uniform_real_distribution<float> sample(-.5f, .5f);
     std::vector<float> h(length, 0.f);
     for (std::size_t k = 0; k < std::min(dense, length); ++k)
         h[k] = sample(random);
-    for (const auto b : boundaries(length, latency))
+    for (const auto b : boundaries(planned_for, latency))
         for (const auto k : {b - 1, b, b + 1})
             if (k < length) // b - 1 wraps to a huge value when b is 0.
                 h[k] = sample(random);
@@ -187,7 +194,7 @@ void stress(std::uint32_t seed, std::size_t trials, std::size_t longest) {
                 d = random() % 3 ? random() % 50 : random() % 5000;
         }
         const auto paths = 1 + random() % 4;
-        std::size_t length_of_longest = 0;
+        std::vector<std::size_t> lengths;
         for (std::size_t p = 0; p < paths; ++p) {
             // Lengths at, just before and just after a stage or block boundary
             // of a plan, as well as random ones from 1 tap up.
@@ -200,9 +207,12 @@ void stress(std::uint32_t seed, std::size_t trials, std::size_t longest) {
             } else if (random() % 4 == 0) {
                 length = 1 + random() % 300;
             }
-            length_of_longest = std::max(length_of_longest, length);
+            lengths.push_back(length);
+        }
+        const auto length_of_longest = *std::max_element(lengths.begin(), lengths.end());
+        for (const auto length : lengths) {
             FilterPath path;
-            path.impulse = filter(random, length, latency, 64 + random() % 600);
+            path.impulse = filter(random, length, length_of_longest, latency, 64 + random() % 600);
             path.inputs = {{random() % inputs, 1}};
             if (random() % 3 == 0)
                 path.inputs.push_back({random() % inputs, sample(random)});
@@ -277,6 +287,120 @@ void stress(std::uint32_t seed, std::size_t trials, std::size_t longest) {
               << worst.where << '\n';
 }
 
+// The PERF-2 independent review: spreading a large block's work over the
+// following callbacks is what keeps the worst callback short, and nothing
+// else would notice if it stopped (the output stays right). Through the
+// engine's test probe, each boundary's work per stage, in its cost weights,
+// must stay within the block's even share plus one unit of work (the unit
+// that may lag behind), and each block's shares must add up to its total.
+// Only blocks no larger than the latency (or the first size) may be computed
+// whole. Deterministic: no timing.
+struct Spread {
+    std::size_t first = 0, latency = 0, reports = 0, spread_jobs = 0;
+    double worst = 0; // Largest cost / (share + unit) seen.
+    std::string failure;
+    std::map<std::pair<std::size_t, std::size_t>, double> sums; // (stage, job) -> cost so far.
+};
+Spread* spread_now = nullptr;
+
+void observe(const detail::StageWork& w) noexcept {
+    auto& s = *spread_now;
+    if (!s.failure.empty())
+        return;
+    try {
+        ++s.reports;
+        const auto where = "stage " + std::to_string(w.stage) + " (" + std::to_string(w.block) +
+                           " frames) block " + std::to_string(w.job) + " boundary " +
+                           std::to_string(w.boundary) + " of " + std::to_string(w.boundaries);
+        if (w.whole) {
+            if (w.block > std::max(s.first, s.latency))
+                s.failure = where + ": computed whole, though larger than the latency";
+            return;
+        }
+        const auto bound = w.total / static_cast<double>(w.boundaries) + w.unit;
+        s.worst = std::max(s.worst, w.cost / bound);
+        if (w.cost > bound * (1 + 1e-9))
+            s.failure = where + ": did " + std::to_string(w.cost) + " of " +
+                        std::to_string(w.total) + ", more than its share plus one unit (" +
+                        std::to_string(bound) + ")";
+        auto& sum = s.sums[{w.stage, w.job}];
+        sum += w.cost;
+        if (w.boundary == w.boundaries) {
+            if (std::abs(sum - w.total) > 1e-9 * w.total)
+                s.failure = where + ": the block's shares add up to " + std::to_string(sum) +
+                            ", not its total " + std::to_string(w.total);
+            if (w.total > 2 * bound)
+                ++s.spread_jobs;
+            s.sums.erase({w.stage, w.job});
+        }
+    } catch (...) {
+        s.failure = "out of memory in the spreading check";
+    }
+}
+
+void spreading(std::uint32_t seed) {
+    std::mt19937 random(seed);
+    std::uniform_real_distribution<float> sample(-.5f, .5f);
+    struct Case {
+        detail::PartitionLayout layout;
+        std::size_t latency, length, inputs, outputs;
+        bool true_stereo;
+    };
+    const detail::PartitionLayout production = detail::partition_layout();
+    const Case cases[] = {
+        {production, 0, 300000, 2, 2, false},  {production, 256, 300000, 2, 2, false},
+        {production, 0, 200000, 2, 2, true},   {production, 4096, 200000, 2, 2, false},
+        {{16, 512, 2}, 0, 6000, 2, 2, false},  {{16, 512, 2}, 32, 6000, 2, 2, true},
+        {{16, 1024, 4}, 0, 9000, 1, 2, false},
+    };
+    double worst = 0;
+    for (const auto& c : cases) {
+        detail::force_partition_layout(&c.layout);
+        Configuration config{48000, c.inputs, c.outputs, 0, {}, {}, {}};
+        for (std::size_t i = 0; i < c.inputs; ++i)
+            for (std::size_t o = 0; o < c.outputs; ++o) {
+                if (!c.true_stereo && i != o)
+                    continue;
+                FilterPath path;
+                path.impulse.assign(c.length, 0.f);
+                for (std::size_t k = 0; k < c.length; k += 97)
+                    path.impulse[k] = sample(random);
+                path.impulse.back() = sample(random);
+                path.inputs = {{i, 1}};
+                path.outputs = {{o, 1}};
+                config.paths.push_back(std::move(path));
+            }
+        Spread s;
+        s.first = c.layout.first;
+        s.latency = c.latency;
+        spread_now = &s;
+        detail::probe_stage_work(&observe);
+        {
+            Engine engine(config, c.latency);
+            std::vector<float> in((2 * c.length + 4 * c.layout.largest) * c.inputs);
+            for (auto& x : in)
+                x = sample(random);
+            run(engine, in, in.size() / c.inputs, chunk_pattern(random));
+        }
+        detail::probe_stage_work(nullptr);
+        detail::force_partition_layout(nullptr);
+        spread_now = nullptr;
+        const auto context = "spreading at latency " + std::to_string(c.latency) + ", blocks " +
+                             std::to_string(c.layout.first) + " to " +
+                             std::to_string(c.layout.largest) + ", " + std::to_string(c.length) +
+                             " taps: ";
+        if (!s.failure.empty())
+            throw std::runtime_error(context + s.failure);
+        if (s.spread_jobs < 4)
+            throw std::runtime_error(context + "too few blocks large enough to show spreading (" +
+                                     std::to_string(s.spread_jobs) + ")");
+        worst = std::max(worst, s.worst);
+    }
+    std::cout << "engine spreading: " << std::size(cases)
+              << " cases passed; the largest boundary did " << worst
+              << " of its share plus one unit\n";
+}
+
 void soak(double seconds, std::uint32_t seed) {
     constexpr std::size_t rate = 48000, length = 480000, dense = 16384;
     std::mt19937 random(seed);
@@ -287,7 +411,7 @@ void soak(double seconds, std::uint32_t seed) {
         // 1e-40, into subnormal coefficients.
         for (std::size_t p = 0; p < 4; ++p) {
             FilterPath path;
-            path.impulse = filter(random, length, latency, 0);
+            path.impulse = filter(random, length, length, latency, 0);
             for (std::size_t k = 0; k < dense; ++k)
                 path.impulse[k] =
                     .5f * sample(random) * std::exp(-static_cast<float>(k) * 92.f / dense);
@@ -446,8 +570,10 @@ int main(int argc, char** argv) {
         }
         if (soak_seconds > 0)
             soak(soak_seconds, seed);
-        else
+        else {
+            spreading(seed);
             stress(seed, trials, std::max<std::size_t>(longest, 2));
+        }
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';
         return 1;

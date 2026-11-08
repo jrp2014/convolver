@@ -88,8 +88,17 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   and the largest absolute error 1.5e-6, at peak 7.6.
 - `native.engine_stress` (PERF-2): the production partition layout with real
   filter lengths, which `native.engine`'s small forced layouts stand in for.
+  It first checks that the large blocks' work is spread, which keeps the
+  worst callback short but leaves the output unchanged when it breaks (the
+  independent review found nothing else would notice): through a test-only
+  probe of the engine, in its cost weights, each boundary does no more of a
+  block than its even share plus one unit of work, each block's shares add
+  up to its total, and only blocks no larger than the latency are computed
+  whole. Seven cases at latencies 0, 32, 256 and 4096, with the production
+  layout and forced small ones; no timing. Doing all of a block at its first
+  or last boundary, or computing it whole, fails. Then the stress trials.
   Each filter is sparse apart from a dense start, with a tap at and beside
-  every block boundary the engine plans for it, so a direct double-precision
+  every block boundary the engine plans for its longest path, so a direct double-precision
   sum over the nonzero taps checks every output frame of filters up to
   hundreds of thousands of taps. Random latencies (0 to 20000, including
   every Latency choice and both sides of the planned limit), routing, delays,

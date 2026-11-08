@@ -118,7 +118,7 @@ To see what the crossover does without filtering anything:
 
 It lists six paths, each taking input 0 or 1 to one output, with `x0.5` on
 outputs 2 and 5 (the high bands), the output delays (`0.5 ms=24` frames on
-those two), then `latency 256 frames, tail 153 frames`, and last `Valid`.
+those two), then `latency 0 frames, tail 153 frames`, and last `Valid`.
 
 ## 4. Try a filter that does not fit
 

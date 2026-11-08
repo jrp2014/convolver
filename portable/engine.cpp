@@ -149,7 +149,13 @@ ConfigurationAnalysis validate(const Configuration& c, std::size_t latency) {
     result.accounted_buffer_bytes = checked_mul(storage, sizeof(float));
     return result;
 }
+detail::StageWorkProbe stage_work_probe = nullptr;
 } // namespace
+
+void detail::probe_stage_work(StageWorkProbe p) noexcept {
+    stage_work_probe = p;
+}
+
 ConfigurationAnalysis analyze_configuration(const Configuration& c, std::size_t latency) {
     return validate(c, latency);
 }
@@ -229,6 +235,7 @@ struct Engine::Impl {
     std::vector<Path> paths;
     std::vector<Stage> stages;
     const detail::Kernels& k = detail::kernels();
+    const detail::StageWorkProbe probe = stage_work_probe; // Tests only.
     Impl(const Configuration& c, std::size_t l, const ConfigurationAnalysis& v, FftOptions options)
         : inputs(c.input_channels), outputs(c.output_channels), latency(l), tail(v.tail_frames),
           first(detail::partition_layout().first) {
@@ -437,20 +444,45 @@ struct Engine::Impl {
         }
         stage.active = false;
     }
+    // Tests only: the cost of the block run() has just computed.
+    double whole_cost(const Stage& stage, std::size_t s) const noexcept {
+        double cost = 0;
+        for (const auto& mix : mixes)
+            if (mix.stages[s].partitions)
+                cost += stage.transform_cost;
+        for (const auto& path : paths)
+            if (const auto count = used(s, path))
+                cost += static_cast<double>(count) * stage.partition_cost + stage.transform_cost;
+        return cost;
+    }
     void boundary() noexcept {
         for (std::size_t s = 0; s < stages.size(); ++s) {
             auto& stage = stages[s];
             if (time % stage.block)
                 continue;
             const auto job = static_cast<std::size_t>(time / stage.block - 1);
-            if (stage.whole)
+            if (stage.whole) {
                 run(stage, s, job);
-            else
+                if (probe) {
+                    const auto cost = whole_cost(stage, s);
+                    probe({s, stage.block, job, 1, 1, true, cost, cost,
+                           std::max(stage.transform_cost, stage.partition_cost)});
+                }
+            } else {
                 begin(stage, s, job);
+            }
         }
-        for (std::size_t s = 0; s < stages.size(); ++s)
-            if (stages[s].active)
-                advance(stages[s], s);
+        for (std::size_t s = 0; s < stages.size(); ++s) {
+            auto& stage = stages[s];
+            if (!stage.active)
+                continue;
+            const auto before = stage.done;
+            advance(stage, s);
+            if (probe)
+                probe({s, stage.block, stage.job, stage.boundary, stage.boundaries, false,
+                       stage.done - before, stage.total,
+                       std::max(stage.transform_cost, stage.partition_cost)});
+        }
     }
     // Frames up to the next boundary of the first block size.
     void chunk(std::span<const float> input, std::span<float> output, std::size_t at,

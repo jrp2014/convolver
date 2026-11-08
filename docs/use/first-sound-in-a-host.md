@@ -42,8 +42,8 @@ The package's `presets/` folder has 18 examples: `identity`, `echo` and
    Convolver's window instead. Audacity plays real-time effects at the rate
    in *Audio setup › Audio settings › Default sample rate*: set it, and the
    project's rate, to the preset's rate.
-4. Play quiet audio and watch the meters. Identity leaves the sound unchanged,
-   apart from a delay of 256 samples that most hosts make up for.
+4. Play quiet audio and watch the meters. Identity leaves the sound
+   unchanged, with no delay at the default Latency of 0 frames.
 5. Load the matching `echo` preset. Its filter is half the input at once plus a
    quarter of it 257 samples (about 5 ms) later: too soon to hear as a
    separate repeat, so it sounds about 5 dB quieter and hollow, like a comb

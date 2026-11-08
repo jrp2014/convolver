@@ -46,4 +46,20 @@ struct Partitioning {
 };
 Partitioning partition(std::size_t longest_taps, std::size_t latency,
                        const PartitionLayout& = partition_layout());
+
+// Tests only (the PERF-2 independent review): the work one stage does at one
+// boundary of the first block size, in the engine's cost weights. A whole
+// block reports all of it at the boundary where it completes; a spread
+// block reports each boundary's share while it is active. `unit` is the
+// stage's largest unit of work (a transform or one partition's multiply-add)
+// and `boundaries` the boundaries a spread block's work may use.
+struct StageWork {
+    std::size_t stage = 0, block = 0, job = 0, boundary = 0, boundaries = 0;
+    bool whole = false;
+    double cost = 0, total = 0, unit = 0;
+};
+using StageWorkProbe = void (*)(const StageWork&) noexcept;
+// Every engine calls `probe` with each stage's work; nullptr stops it. Not
+// thread-safe: set it before constructing engines.
+void probe_stage_work(StageWorkProbe probe) noexcept;
 } // namespace convolver::detail
