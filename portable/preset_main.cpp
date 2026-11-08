@@ -164,7 +164,9 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
             state = convolver::filter_file_state(input, selection,
                                                  convolver::detail::libsndfile_files(),
                                                  &raw_filters, false, !alias);
-            filter_file_name = utf8(input.filename());
+            // The alias keeps its original output bytes, so it writes no name.
+            if (!alias)
+                filter_file_name = utf8(input.filename());
             // Presets embed the decoded taps, so say what a raw filter was taken to be.
             for (const auto& raw_filter : raw_filters)
                 std::cerr << program << "raw filter '" << utf8(raw_filter.filename())

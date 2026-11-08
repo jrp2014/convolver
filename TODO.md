@@ -482,16 +482,28 @@ LV2 (Linux first; also PipeWire system audio):
   and the one-time read of the old file, and the plug-ins guide says where
   the list is kept. Lower priority than PLUG-26 and PLUG-27; waits for
   the freeze.
-- [ ] **PLUG-31 — Wording for a restored filter without a name.** From
+- [ ] **PLUG-31 — Generated VST3 presets carry the filter's name.** From
   jrp's [VST3-16 acceptance](docs/archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md#filter-name-observation)
-  (8 November 2026). Generated VST3 presets now carry the filter's name
-  (see the CHANGELOG); what remains is the heading for a state with no
-  name, which says "From the saved project or preset"
-  (`portable/host_report.cpp`). jrp suggests "Restored filter", and origin
-  wording that uses only what the host says, since a name does not show
-  whether the host restored a project or a preset; both are user-facing and
-  his to confirm. Done when the heading, the plug-ins guide and the adapter
-  contract use the confirmed wording.
+  (8 November 2026): after a packaged `.vstpreset` loads, the window's
+  Filter row says "From the saved project or preset". VST3 already saves
+  and restores a file's name for a file chosen in the window (the
+  controller state holds the name and the filter's identity, PLUG-22), but
+  `convolver-preset` writes no controller state for VST3
+  (`portable/preset_main.cpp`), so generated presets have only the
+  component chunk. Write the same name and identity there, the file name
+  with its extension and without its folder. jrp suggests "Restored filter"
+  for a state with no name, and origin wording that uses only what the
+  host says; both are user-facing and his to confirm. No change to the
+  processor's audio state. Done when a generated preset loaded in a host
+  shows its file name, a name whose identity does not match is not shown,
+  and the plug-ins guide says so. Waits for the freeze unless jrp brings
+  it forward.
+  Progress (8 November 2026, PR #148): `convolver-preset` writes the name
+  and identity as the `Cont` chunk; the SDK's `PresetFile::loadPreset`
+  shows the name in the adapter test (`vst3.preset`), and a converted
+  preset keeps it only while the identity matches. Remaining: a host check
+  (REAPER with a packaged preset, showing `impulse.wav`), and jrp's choice
+  of the no-name wording.
 - [ ] **PLUG-30 — One rule for state a busy lock makes a call skip.**
   From AU-16 (8 November 2026; jrp asked for fixes like it to be recorded,
   as stepping back may give a more general fix). The pattern: a call that

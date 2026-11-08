@@ -811,8 +811,8 @@ Compatibility rules for presets:
   keep writing version 1 for filters that do not need it, so older plug-in
   builds can still read those presets.
 - `convolver-vst3-preset` is the same tool under its old name, limited to its
-  old behaviour: the same arguments, messages and output bytes, and only
-  `.vstpreset` output.
+  old behaviour: the same arguments, messages and output bytes (so no `Cont`
+  chunk), and only `.vstpreset` output.
 
 ## Format notes
 
