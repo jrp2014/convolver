@@ -24,9 +24,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Pull requests that change only unpackaged documentation, or only the Audio
-  # Unit's, LV2's or another workflow's own files (CI-13), skip the candidates
-  # (scripts/ci_scope.py, docs/develop/testing.md#documentation-only-pull-requests).
+  # A pull request builds the candidates only when it changes what they are
+  # built from or hold: release files, packaged pages, the macOS window, the
+  # build configuration or shipped dependencies (CI-34). For anything else,
+  # start this workflow by hand on the branch. Pushes to main, the weekly and
+  # manual runs always build them (scripts/ci_scope.py,
+  # docs/develop/testing.md#when-pull-requests-build-the-candidates).
   scope:
     runs-on: ubuntu-latest
     outputs:
@@ -59,6 +62,7 @@ jobs:
           python tests/release/docs_tests.py
           python tests/release/symbols_tests.py
           python tests/release/jobs_tests.py
+          python tests/release/prepare_release_tests.py
       # CI-6: each dependency's newest release; source-manifest.json and the
       # job summary record exactly which (version, tag, commit, checksum).
       - name: Assemble corresponding source

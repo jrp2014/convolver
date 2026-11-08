@@ -7,6 +7,7 @@
 #include "public.sdk/source/vst/vstaudioeffect.h"
 #include "public.sdk/source/vst/vsteditcontroller.h"
 #include "sound_files.hpp"
+#include "vst3_controller_state.hpp"
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -77,15 +78,9 @@ struct StatusAnswer {
 inline constexpr const char* load_message = "ConvolverLoad";
 // The report's name and value pairs as the messages carry them, and back.
 std::string encode_report(const std::vector<std::pair<std::string, std::string>>&);
-// PLUG-22: the controller state (Controller::setState): the filter file's
-// name and its filter's identity, and back. Decoding anything else (empty,
-// short, another version, a name longer than max_filter_name_bytes) gives
-// two empty strings, as does an empty name or identity.
-struct ControllerState {
-    std::string name, identity;
-};
-std::string encode_controller_state(const ControllerState&);
-ControllerState decode_controller_state(std::string_view);
+// PLUG-22: the controller state (ControllerState, encode_controller_state
+// and decode_controller_state) is in vst3_controller_state.hpp, which
+// convolver-preset shares (PLUG-31).
 std::vector<std::pair<std::string, std::string>> decode_report(std::string_view);
 // How the plug-in reads the sound files a chosen filter file names: macOS's
 // AudioToolbox on macOS, as the Audio Unit does; none elsewhere until the
@@ -292,7 +287,11 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // PLUG-22, under control_: the name the report gives saved state whose
     // filter identity is saved_identity_: from the controller state
     // (name_message), or the file last accepted, as the controller records it.
-    std::string saved_name_, saved_identity_;
+    // kept_name_ and kept_identity_ are the pair that named the playing
+    // filter before the last name_message, so a refused preset, whose
+    // controller state names a filter that never played, leaves the playing
+    // filter's name (the report uses whichever pair matches).
+    std::string saved_name_, saved_identity_, kept_name_, kept_identity_;
     // VST3-4: Gain and Mix as process() last received them (or a state
     // restored), and the chosen Latency in frames.
     std::atomic<double> gain_db_{0}, mix_{1};
@@ -344,13 +343,13 @@ class Controller final : public Steinberg::Vst::EditController,
     // chosen in the window, with its extension, and that filter's identity
     // (HostReport::filter_identity), so the window names the filter after
     // the project is reopened, but only while that filter plays (a preset
-    // or an undo may bring another). Never the file's folder. The format:
-    // "CVCS", a version (1), then the name and the identity, each as a
-    // little-endian 32-bit length and UTF-8 bytes. setState sends both to the
-    // processor (name_message), which names its report and the report's text
-    // with them. Before PLUG-22 hosts
-    // saved an empty controller state, so an empty stream, a shorter one or
-    // another version reads as no name, never as a failure (VST3-8).
+    // or an undo may bring another). Never the file's folder. A preset made
+    // by convolver-preset holds the same for the file it was made from
+    // (PLUG-31). The format is in vst3_controller_state.hpp. setState sends
+    // both to the processor (name_message), which names its report and the
+    // report's text with them. Before PLUG-22 hosts saved an empty
+    // controller state, so an empty stream, a shorter one or another
+    // version reads as no name, never as a failure (VST3-8).
     Steinberg::tresult PLUGIN_API setState(Steinberg::IBStream*) override;
     Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream*) override;
 
@@ -416,7 +415,10 @@ class Controller final : public Steinberg::Vst::EditController,
     Steinberg::int64 latency_requests_ = 0;
     bool latency_waiting_ = false;
     // PLUG-22, under status_lock_: the filter file's name and the identity
-    // of the filter read from it, saved in the controller state.
-    std::string name_, identity_;
+    // of the filter read from it, saved in the controller state. kept_name_
+    // and kept_identity_: the pair that named the playing filter before the
+    // last setState, as in the processor; getState saves whichever pair
+    // names the filter the last report says plays.
+    std::string name_, identity_, kept_name_, kept_identity_;
 };
 } // namespace convolver::vst3

@@ -3,10 +3,12 @@
 #include "advice.hpp"
 #include "bytes.hpp"
 #include "file.hpp"
+#include "host_report.hpp"
 #include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <stdexcept>
 #include <system_error>
 
@@ -173,25 +175,71 @@ std::vector<std::byte> vst3_component_state(const HostState& state) {
     return out;
 }
 
-std::vector<std::byte> vst3_preset(const HostState& state) {
+vst3::ControllerState vst3_filter_name(const HostState& state, std::string_view file_name) {
+    if (!state.configuration || file_name.empty() || file_name.size() > max_filter_name_bytes ||
+        !valid_utf8(file_name))
+        return {};
+    return {std::string(file_name),
+            filter_identity_text(configuration_identity(*state.configuration))};
+}
+
+std::vector<std::byte> vst3_preset(const HostState& state, const vst3::ControllerState& name) {
     // Steinberg's documented layout (public.sdk/source/vst/vstpresetfile.h): a
-    // header, the chunk data, then the chunk list. savePreset with only a
-    // component stream writes exactly these bytes.
+    // header, the chunk data, then the chunk list. savePreset with a component
+    // stream, and a controller stream when there is a name, writes exactly
+    // these bytes.
     const auto component = vst3_component_state(state);
+    const auto controller = name.name.empty() || name.identity.empty()
+                                ? std::string()
+                                : vst3::encode_controller_state(name);
+    const auto list = vst3_header_bytes + component.size() + controller.size();
     std::vector<std::byte> out;
-    out.reserve(vst3_header_bytes + component.size() + 28);
+    out.reserve(list + 48);
     append(out, "VST3");
     append_le32(out, 1);
     append(out, vst3_class_id());
-    append_le64(out, vst3_header_bytes + component.size());
+    append_le64(out, list);
     out.insert(out.end(), component.begin(), component.end());
+    append(out, controller);
     append(out, "List");
-    append_le32(out, 1);
+    append_le32(out, controller.empty() ? 1 : 2);
     append(out, "Comp");
     append_le64(out, vst3_header_bytes);
     append_le64(out, component.size());
+    if (!controller.empty()) {
+        append(out, "Cont");
+        append_le64(out, vst3_header_bytes + component.size());
+        append_le64(out, controller.size());
+    }
     return out;
 }
+
+namespace {
+// The first chunk `id` ("Comp" or "Cont") in a .vstpreset's chunk list, or
+// none. A missing list, or a chunk outside the file, is refused.
+std::optional<std::span<const std::byte>> vst3_chunk(std::span<const std::byte> bytes,
+                                                     std::string_view id) {
+    const auto list = read_le64(bytes.subspan(40));
+    if (list == 0 || list > bytes.size() - 8 || !equal_text(bytes.subspan(list), "List"))
+        throw std::invalid_argument("damaged VST3 preset: no chunk list");
+    auto entries = bytes.subspan(list + 4);
+    const auto count = detail::read_le32(entries);
+    entries = entries.subspan(4);
+    for (std::uint32_t i = 0; i < count && entries.size() >= 20;
+         ++i, entries = entries.subspan(20)) {
+        if (!equal_text(entries, id))
+            continue;
+        const auto offset = read_le64(entries.subspan(4));
+        const auto size = read_le64(entries.subspan(12));
+        if (offset > bytes.size() || size > bytes.size() - offset)
+            throw std::invalid_argument(std::string("damaged VST3 preset: ") +
+                                        (id == "Comp" ? "component" : "controller") +
+                                        " chunk out of range");
+        return bytes.subspan(offset, size);
+    }
+    return std::nullopt;
+}
+} // namespace
 
 HostState read_vst3_preset(std::span<const std::byte> bytes) {
     if (bytes.size() < vst3_header_bytes || !equal_text(bytes, "VST3"))
@@ -210,29 +258,31 @@ HostState read_vst3_preset(std::span<const std::byte> bytes) {
     if (class_id != vst3_class_id())
         throw std::invalid_argument("this VST3 preset belongs to another plug-in (class ID " +
                                     class_id + "), not Convolver (" + vst3_class_id() + ")");
-    const auto list = read_le64(bytes.subspan(40));
-    if (list == 0 || list > bytes.size() - 8 || !equal_text(bytes.subspan(list), "List"))
-        throw std::invalid_argument("damaged VST3 preset: no chunk list");
-    auto entries = bytes.subspan(list + 4);
-    const auto count = detail::read_le32(entries);
-    entries = entries.subspan(4);
-    for (std::uint32_t i = 0; i < count && entries.size() >= 20;
-         ++i, entries = entries.subspan(20)) {
-        if (!equal_text(entries, "Comp"))
-            continue;
-        const auto offset = read_le64(entries.subspan(4));
-        const auto size = read_le64(entries.subspan(12));
-        if (offset > bytes.size() || size > bytes.size() - offset || size < 4)
-            throw std::invalid_argument("damaged VST3 preset: component chunk out of range");
-        const auto chunk = bytes.subspan(offset, size);
-        // As the plug-in reads it (vst3::read_state): a length, then the state;
-        // anything after the state in the chunk is ignored.
-        const auto length = detail::read_le32(chunk);
-        if (length < 12 || length > max_host_state_bytes || length > chunk.size() - 4)
-            throw std::invalid_argument("damaged VST3 preset: invalid state length");
-        return decode_host_state(chunk.subspan(4, length));
+    const auto chunk = vst3_chunk(bytes, "Comp");
+    if (!chunk)
+        throw std::invalid_argument("VST3 preset holds no component state ('Comp' chunk)");
+    if (chunk->size() < 4)
+        throw std::invalid_argument("damaged VST3 preset: component chunk out of range");
+    // As the plug-in reads it (vst3::read_state): a length, then the state;
+    // anything after the state in the chunk is ignored.
+    const auto length = detail::read_le32(*chunk);
+    if (length < 12 || length > max_host_state_bytes || length > chunk->size() - 4)
+        throw std::invalid_argument("damaged VST3 preset: invalid state length");
+    return decode_host_state(chunk->subspan(4, length));
+}
+
+vst3::ControllerState read_vst3_filter_name(std::span<const std::byte> bytes) {
+    if (bytes.size() < vst3_header_bytes)
+        return {};
+    try {
+        const auto chunk = vst3_chunk(bytes, "Cont");
+        if (!chunk)
+            return {};
+        return vst3::decode_controller_state(
+            std::string_view(reinterpret_cast<const char*>(chunk->data()), chunk->size()));
+    } catch (const std::invalid_argument&) {
+        return {}; // A damaged list or chunk: no name, as the plug-in reads it.
     }
-    throw std::invalid_argument("VST3 preset holds no component state ('Comp' chunk)");
 }
 
 std::string base64(std::span<const std::byte> data) {
@@ -355,8 +405,9 @@ Lv2Preset lv2_preset(const HostState& state, std::string_view name) {
 
 void check_writable(Format format, const HostState& state, std::string_view name) {
     const auto label = std::string(format_name(format));
-    // A .vstpreset stores no name (hosts show its file name), so only AU and
-    // LV2 presets need one that XML and Turtle can hold.
+    // A .vstpreset stores no preset name (hosts show its file name), so only
+    // AU and LV2 presets need one that XML and Turtle can hold. Its filter's
+    // name (PLUG-31) is left out, never refused, when it cannot be stored.
     if (format != Format::vst3) {
         if (name.empty())
             throw std::invalid_argument(
@@ -422,14 +473,14 @@ void check_writable(Format format, const HostState& state, std::string_view name
 }
 
 void write_preset(Format format, const HostState& state, const std::filesystem::path& path,
-                  std::string_view name) {
+                  std::string_view name, std::string_view filter_file_name) {
     check_writable(format, state, name);
     auto bytes = [](std::string_view text) {
         return std::as_bytes(std::span(text.data(), text.size()));
     };
     switch (format) {
     case Format::vst3: {
-        const auto data = vst3_preset(state);
+        const auto data = vst3_preset(state, vst3_filter_name(state, filter_file_name));
         detail::write_new_file(path, data);
         return;
     }

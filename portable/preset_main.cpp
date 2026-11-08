@@ -41,7 +41,8 @@ constexpr const char* usage =
     "Usage: convolver-preset [--sample-rate HZ] [--input-channels N] [--output-channels N]\n"
     "                        [--name NAME] INPUT NEW_PRESET [NEW_PRESET...]\n"
     "Writes a self-contained plug-in preset: the filter is embedded, so the preset\n"
-    "keeps working if the original files move or are deleted.\n"
+    "keeps working if the original files move or are deleted. A .vstpreset also\n"
+    "keeps the filter file's name, not its folder, for the VST3 window to show.\n"
     "  INPUT        an IR file (an impulse response in a WAV or other sound file),\n"
     "               a .cfg, a configuration list, or a .vstpreset to convert\n"
     "  NEW_PRESET   the format follows the name; each must be a new path:\n"
@@ -127,6 +128,9 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
             formats.push_back(*format);
         }
         convolver::HostState state;
+        // PLUG-31: the name a .vstpreset keeps for the window, as a file chosen
+        // there gives it (PLUG-22): the file's name with its extension.
+        std::string filter_file_name;
         if (!alias && convolver::presets::format_for(input) == Format::vst3) {
             if (selected)
                 throw std::invalid_argument(advice_text(
@@ -137,7 +141,15 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
                      "Leave out those options, or make the preset from the configuration list.",
                      {}}));
             try {
-                state = convolver::presets::read_vst3_preset(read_file(input));
+                const auto bytes = read_file(input);
+                state = convolver::presets::read_vst3_preset(bytes);
+                // The converted preset keeps the name only while it still
+                // names this filter, as the plug-in shows it.
+                const auto kept = convolver::presets::read_vst3_filter_name(bytes);
+                if (!kept.identity.empty() &&
+                    convolver::presets::vst3_filter_name(state, kept.name).identity ==
+                        kept.identity)
+                    filter_file_name = kept.name;
             } catch (const std::invalid_argument& e) {
                 throw std::invalid_argument(advice_text(
                     {utf8(input) + ": " + advice_problem(e.what()),
@@ -152,6 +164,9 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
             state = convolver::filter_file_state(input, selection,
                                                  convolver::detail::libsndfile_files(),
                                                  &raw_filters, false, !alias);
+            // The alias keeps its original output bytes, so it writes no name.
+            if (!alias)
+                filter_file_name = utf8(input.filename());
             // Presets embed the decoded taps, so say what a raw filter was taken to be.
             for (const auto& raw_filter : raw_filters)
                 std::cerr << program << "raw filter '" << utf8(raw_filter.filename())
@@ -167,8 +182,9 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
                 throw std::invalid_argument(
                     "VST3 presets support 1 to 8 input and output channels");
         }
-        // The name hosts show for AU and LV2 presets (a .vstpreset stores none):
-        // by default the first of those outputs' file names.
+        // The name hosts show for AU and LV2 presets (a .vstpreset stores none;
+        // hosts show its file name): by default the first of those outputs'
+        // file names.
         for (std::size_t i = 0; name.empty() && i < outputs.size(); ++i)
             if (formats[i] != Format::vst3)
                 name = default_name(outputs[i]);
@@ -197,7 +213,8 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
         }
         for (std::size_t i = 0; i < outputs.size(); ++i) {
             try {
-                convolver::presets::write_preset(formats[i], state, outputs[i], name);
+                convolver::presets::write_preset(formats[i], state, outputs[i], name,
+                                                 filter_file_name);
             } catch (const std::exception& e) {
                 if (alias)
                     throw;

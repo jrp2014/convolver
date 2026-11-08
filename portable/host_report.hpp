@@ -3,13 +3,14 @@
 #include "convolver/host.hpp"
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <utility>
 #include <vector>
 
 // PLUG-9: what a plug-in window and its Copy diagnostics button show about one
-// instance (docs/project/plans/2026-10-24-plugin-editor.md#how-the-window-connects).
+// instance (docs/archive/plans/2026-10-24-plugin-editor.md#how-the-window-connects).
 // It is built on the control side from the same functions as the Status
 // parameter (host_status) and the Convolver log (host_log.hpp), so the
 // window, a copied report and the log never disagree. Internal to the
@@ -68,8 +69,8 @@ struct HostReport {
     // and "Note: " lines (advice.hpp), for the text report.
     std::string explanation;
     // The window's heading: the accepted filter's file name, with its
-    // extension (for saved state, the name saved beside it, PLUG-22; "From
-    // the saved project or preset" when none was; "None"), and a note about
+    // extension (for saved state, the name saved beside it, PLUG-22;
+    // "Restored filter" when none was, PLUG-31; "None"), and a note about
     // the newest request when it was refused.
     std::string filter_name, filter_note;
     // Under the name, the accepted filter's own values (jrp, 7 November
@@ -115,6 +116,11 @@ struct HostReport {
 };
 
 HostReport host_report(const HostFilter&, const HostReportFacts&);
+// PLUG-22: HostReport::filter_identity's text for a filter identity
+// (HostFilter::filter_identity(), configuration_identity()): 16 lowercase
+// hex digits. convolver-preset writes the same text into VST3 presets
+// (PLUG-31), so the two must stay one function.
+std::string filter_identity_text(std::uint64_t identity);
 
 // The report as named text values, for a format's transport (an Audio Unit
 // property dictionary): status (the HostStatus number), status name,

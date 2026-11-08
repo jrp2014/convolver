@@ -335,7 +335,10 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   version-1 states with any channel mask, every truncation and damaged chunk
   list, another plug-in's preset, AU keys and XML escaping, one LV2 plug-in URI
   per fixed layout, Turtle escaping, and the explained refusals (channel limits,
-  layouts without an LV2 plug-in, unusable preset names).
+  layouts without an LV2 plug-in, unusable preset names), and the filter's
+  name in a `.vstpreset` (PLUG-31): the `Cont` chunk's place, its identity
+  after the state is decoded, names left out rather than stored badly, and
+  damaged or truncated name chunks read as no name.
 - `plugins.presets`: `convolver-preset` writes the 2→6 crossover fixture as all
   three formats in one run and reads each back without Convolver's code: the
   `.vstpreset` by its documented layout, the `.aupreset` with Python's
@@ -343,7 +346,9 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   when installed). All three must hold the same encoded state, which a separate
   version-1 decoder checks against the fixture's WAV samples, routes, gains and
   delays. It also converts a `.vstpreset` after its source files are deleted,
-  and checks that refused requests write nothing.
+  and checks that refused requests write nothing. Each `.vstpreset` names its
+  source file (not `--name`), a conversion keeps the name and the bytes, and
+  a name whose identity does not match the filter is dropped.
 
 - `export.equalizer_apo`: `convolver-equalizer-apo` exports the first-use
   examples and a configuration list, and a model of Equalizer APO 1.4.2 (written
@@ -374,10 +379,12 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
 The optional [VST3 build](build.md#vst3) adds these tests: actual SDK-interface lifecycle
 and audio tests, embedded preset generation/loading after deleting the source IR
 (`vst3.preset`, which also checks that `convolver-preset` and
-`convolver-vst3-preset` write the same bytes), `vst3.preset_format` (our
+`convolver-vst3-preset` write the same audio state, and that the plug-in's
+window names the file of a preset from `convolver-preset` after
+`PresetFile::loadPreset`, PLUG-31), `vst3.preset_format` (our
 `.vstpreset` writer is byte-identical to Steinberg's `PresetFile::savePreset`,
-the SDK reads our presets, and we read the SDK's, including controller and
-metadata chunks),
+with and without the filter's name, the SDK reads our presets, and we read
+the SDK's, including controller and metadata chunks),
 plus the SDK validator loading the built plug-in in its default and extensive
 modes (the preset test requires I/O). `vst3.fft_symbols` inspects the plug-in
 binary with `nm`/`readelf`, `otool` or `dumpbin` (on Windows found on PATH or,
@@ -423,7 +430,8 @@ LV2 tests under ASan and UBSan, `lv2.adapter` under ThreadSanitizer, and
 `lv2lint` on every plug-in ([LV2 tests](#lv2-tests)). The
 [Audio Unit](../../.github/workflows/au.yml) workflow builds the AU component
 against the newest AudioUnitSDK, runs its CTest tests and `auval -strict` on
-it, and runs the AU tests again in a Debug build with ASan and UBSan
+it, and runs the AU tests again in a Debug build with ASan and UBSan and
+`au.adapter` under ThreadSanitizer
 ([Audio Unit tests](#audio-unit-tests)). Not every job runs every CTest
 entry: see [which configurations run which tests](#which-configurations-run-which-tests). These
 workflows and the candidate workflow also run every Monday, so a new upstream
@@ -820,7 +828,18 @@ Five CTest tests run when the adapter is built (label `au`):
   host switches bypass on and then off: the setter must return without
   waiting, and only a later run, which the setter must ask for, can show
   the change, so the check needs both halves of the fix (AU-16, the
-  intermittent "bypass not shown" failure made deterministic).
+  intermittent "bypass not shown" failure made deterministic). The test
+  sets these hooks once, before any unit exists, and publishes each hold
+  through an atomic pointer only once the hold is complete (AU-3); leaving
+  a test, even on a failed check, releases a held run, so that closing the
+  unit then cannot wait for it for ever.
+  ThreadSanitizer does not treat the dispatch source's wake-up
+  (`dispatch_source_merge_data`) as ordering the waker's writes before the
+  run, so a hook or hold set just before a wake was reported as a race
+  (four reports at `3c57325`, all in the test). The component does not rely
+  on that ordering: the Latency work reads what the host thread wrote under
+  the control lock or from atomics. A new test that hands data to the
+  Latency work must do the same.
 - `au.log_evidence`: the adapter test's Convolver log, the file CTest
   names in the build folder (`convolver-adapter-tests.log`), reaches the
   [CI evidence](#evidence-from-failed-ci-runs) after the test aborts, as a
@@ -890,9 +909,15 @@ The tests register the unit inside the test process with
 `AudioComponentRegister`, so they need no installation. The
 [Audio Unit workflow](../../.github/workflows/au.yml) runs them on macOS, then
 installs the component for the runner's user and runs `auval -strict` and
-[pluginval](#pluginval); its `au-sanitizers` job runs them again with ASan and UBSan, built with the
-fallbacks (`CONVOLVER_AU_FILE_READER=LIBSNDFILE`, `CONVOLVER_FFT_BACKEND=FFTW`)
-so that they keep working. Named
+[pluginval](#pluginval). Its `au-sanitizers` job runs two Debug builds side
+by side: the AU tests again with ASan and UBSan, built with the fallbacks
+(`CONVOLVER_AU_FILE_READER=LIBSNDFILE`, `CONVOLVER_FFT_BACKEND=FFTW`) so that
+they keep working, and `au.adapter` alone under ThreadSanitizer (AU-3), built
+with the defaults the packages use. There it switches bypass from another
+thread while rendering, sets the Latency from audio threads and holds the
+Latency work's lock while bypass changes. Every report is printed and any
+report fails the test; a step first checks that the test program links the
+ThreadSanitizer runtime, so an uninstrumented build cannot pass. Named
 host results (Logic, GarageBand, SoundSource, Live, REAPER, FL Studio) are
 AU-4.
 
@@ -1182,26 +1207,9 @@ universal host compatibility or hard real-time deadlines. The historical
 extraction tests also leave old full-width PCM32, nonzero noise shaping, CMD
 tail handling and full host negotiation outside their coverage. Preserve these
 limits when quoting a result. [TODO](../../TODO.md#documented-limitations) gathers
-open validation gaps and intentional constraints.
-
-### Record: local dependency versions, October 2026
-
-The native tests link actual production translation units and actual
-libraries. The earlier October 2026 local test setup used these sources; they
-are not the versions current builds use (those take the newest releases; see
-[build from source](build.md#supporting-libraries)):
-
-- FFTW 3.3.11, archive SHA256
-  `5630c24cdeb33b131612f7eb4b1a9934234754f9f388ff8617458d0be6f239a1`.
-- libsndfile 1.2.2, archive SHA256
-  `3799ca9924d3125038880367bf1468e53a1b7e3686a934f098b7e1d286cdb80e`;
-  optional external codecs disabled for that local installation.
-
-FFTW's 3.3.11 CMake sources still set their reported version to 3.3.10. That
-local verification used the official configure/make build of that source
-archive, which reports 3.3.11. Convolver itself is built with CMake in both
-cases. Current LLVM, SDK and library results must be tied to the revision
-actually tested.
+open validation gaps and intentional constraints. Tie LLVM, SDK and library
+results to the revision actually tested; the October 2026 local dependency
+versions are [archived](../archive/reviews/2026-11-08-testing-guide-evidence.md#local-dependency-versions-october-2026).
 
 ## Documentation checks
 
@@ -1219,11 +1227,10 @@ replay. CI runs each libFuzzer target for 60 seconds on pull requests and
 at most one per physical core, so each keeps a core to itself for its whole
 budget; each log ends with the campaign's `Done N runs` count. The Linux
 runner's 4 CPUs are 2 cores with 2 hardware threads each, so two campaigns
-run at a time and the step takes about 2 minutes instead of 4. On 27 October
-2026 four at once gave each campaign about half its executions on `main`
-(`config_text` 194k against 447k); two at once gave 426k, and
-`config_list` 86k against 56k, `host_state` 1751k against 1640k and
-`ir_file` 121k against 161k. A manual workflow run defaults to
+run at a time and the step takes about 2 minutes instead of 4 (four at once
+gave each campaign about half its executions; the
+[27 October 2026 counts](../archive/reviews/2026-11-08-testing-guide-evidence.md#fuzz-campaigns-side-by-side-27-october-2026)
+are archived). A manual workflow run defaults to
 600 seconds per target; set its `seconds` input to `60` to reproduce the
 smoke-test budget. Keep crashes
 as committed regression inputs after investigating them.
@@ -1262,17 +1269,13 @@ runs `auval -strict` on the installed component and uninstalls it
 ([what a package holds](releasing.md#what-a-package-holds)). Windows also compiles a fixture installer and exercises
 changed-directory upgrades and locked-file uninstall recovery. The Linux
 candidate is built with networking disabled, from the archive alone, with
-CMake's default generator (Unix Makefiles). Until 27 October 2026 the
-candidate was built with networking, and a second, offline build of the same
-archive with `tests/release/source_build.py` checked that it builds offline;
-the script remains for [local checks](build.md#preview-recipe). The macOS
-candidates use Ninja and Windows Visual Studio (CI-10). Both macOS candidates
-build on macOS 15 runners (`macos-15` for arm64, `macos-15-intel` for x86-64) with a macOS 14
-deployment target, the [proposed minimum system](releasing.md#candidates).
-GitHub retires its macOS 14 image on 2 November 2026 and cancelled the arm64
-candidate during its scheduled brownouts on 30 October
-([runner-images#13518](https://github.com/actions/runner-images/issues/13518),
-CI-19). So no CI job runs a candidate on macOS 14: `verify_artifact.py` fails
+CMake's default generator (Unix Makefiles); the
+[earlier build](../archive/reviews/2026-11-08-testing-guide-evidence.md#how-the-candidates-were-built-before-november-2026)
+is archived. The macOS candidates use Ninja and Windows Visual Studio
+(CI-10). Both macOS candidates build on macOS 15 runners (`macos-15` for
+arm64, `macos-15-intel` for x86-64) with a macOS 14 deployment target, the
+[proposed minimum system](releasing.md#candidates). No CI job runs a
+candidate on macOS 14 (GitHub retired that image; CI-19): `verify_artifact.py` fails
 any binary whose `minos` is newer than 14.0, but it cannot see a newer macOS
 API used without an availability check. See the
 [qualification record](releasing.md) for external gates.
@@ -1281,6 +1284,19 @@ Local macOS builds may use `CONVOLVER_VST3_RUNTIME_VALIDATION=OFF` when system
 policy rejects ad-hoc code. These runs retain signature-integrity and standalone
 adapter checks but omit all dynamic SDK bundle loading; they are not release
 qualification. Never bypass system security to turn those checks green.
+
+### Draft release rehearsal
+
+The "Draft preview release" workflow ([`publish.yml`](../../.github/workflows/publish.yml),
+REL-8) runs for pull requests that change it, `prepare_release.py`,
+`promotion_gate.py` or `contract.py`. It takes the newest passed candidate
+run started by hand on a `vX.Y.Z` tag, downloads its
+`complete-preview-candidate`, checks it against the tag
+(`prepare_release.py`) and shows the release notes in the run's summary; it
+creates no draft. `tests/release/prepare_release_tests.py`, in the candidate
+workflow's contract checks, covers the refusals on a made-up candidate. Only
+jrp's manual run from `main` creates a draft
+([publishing](releasing.md#publishing-an-unsigned-preview)).
 
 ## Evidence from failed CI runs
 
@@ -1325,46 +1341,21 @@ checks the adapter test's log after an abort and a kill, and
 A test that fails on one run and passes on the next has a cause, usually a
 race or a time limit that a busy runner exceeds; find and fix it rather than
 re-running until green. CI does not repeat failed tests automatically, as
-that would hide real races like the Audio Unit's lost stop. Causes found so
-far, starting with CI-22's survey (1 November 2026, the 1,000 most recent
-workflow runs, 25 October to 1 November, with their re-run attempts):
+that would hide real races like the Audio Unit's lost stop. The causes found
+so far, from CI-22's survey of 1 November 2026 onwards, each with its fix, are
+[archived](../archive/reviews/2026-11-08-testing-guide-evidence.md#causes-of-intermittent-failures-found-to-6-november-2026).
+Two still apply to new work:
 
-- Windows builds, "The process cannot access the file because it is being
-  used by another process", exit 32, in the app-local DLL step
-  (`vcpkg.exe z-applocal`) after a link, both in the main build (PR #88) and
-  in `packaging.consumer.source-no-ctest` (PR #102). The message is the
-  system's, not one of vcpkg's own errors, and 32 is Windows'
-  sharing-violation code: the command could not start `vcpkg.exe`. In #88
-  it came 8 ms after another target's `z-applocal` had copied its DLL and
-  was exiting. An exiting vcpkg sends its metrics by first copying
-  `vcpkg.exe` to a temporary folder, and vcpkg opened the source of that
-  copy without sharing
-  ([microsoft/vcpkg-tool#2163](https://github.com/microsoft/vcpkg-tool/issues/2163),
-  reported with vcpkg-tool 2026-09-26; fixed by #2165, merged 28 October
-  2026). The Windows jobs set
-  `VCPKG_DISABLE_METRICS=1`, which removes that copy; do the same for local
-  parallel builds with an older vcpkg. No handle trace was taken, so this
-  is the cause the evidence points to; if the error comes back with metrics
-  off, it is another one.
-- `au.editor` (PR #103): the read after a held load could get the last
-  report while the Latency worker held the lock a moment; the test now reads
-  until the result shows, as the window's next timed read would.
-- `au.adapter` under ASan (`au-sanitizers`, PR #104, d7a9795):
-  heap-use-after-free in `host_log_path()`, which read `CONVOLVER_LOG`
-  with `getenv` on a unit's Latency worker while the test's private-log
-  helper changed the variable with `setenv` for the next case. The test
-  now sets the variable once, before any unit exists, and each case reads
-  what the log gained while it ran. The log is the file CTest names in the
-  build folder, its own since CI-27 (it was a private file copied at exit,
-  which an abort lost; `au.editor`'s was a private file deleted at exit).
-- `native.cli` (PR #123, `ec631a8`, Ooura build): the no-clip case for
-  float output compared two renders byte for byte, and libsndfile writes
-  the second a float WAV file was made into its `PEAK` chunk, so renders
-  either side of a second differed. The test now compares the sample data
-  as stored and the format fields (CI-33).
-- The Audio Unit's former Latency worker (`native.request_worker`, CI-24,
-  and its watchdog check, CI-25) was removed by AU-12; its tests and the
-  evidence from its failures are [archived](../archive/reviews/2026-11-05-request-worker.md).
+- A Windows build that fails now and then with "The process cannot access
+  the file because it is being used by another process" (exit 32) in
+  vcpkg's app-local DLL step: an older vcpkg's metrics upload
+  ([microsoft/vcpkg-tool#2163](https://github.com/microsoft/vcpkg-tool/issues/2163)).
+  The Windows jobs set `VCPKG_DISABLE_METRICS=1`; do the same for local
+  parallel builds. If the error comes back with metrics off, it has another
+  cause.
+- A test that changes an environment variable (`setenv`) while a plug-in's
+  worker may read it (`getenv`) races: set such variables once, before any
+  unit exists, as the Audio Unit tests do with `CONVOLVER_LOG`.
 
 To check that two renders hold the same audio, compare the sample data
 exactly as stored and check the format, sample rate, channel count and frame count one
@@ -1399,7 +1390,10 @@ is not a failure. `vst3.pluginval.acceptance` skips itself with pluginval 1
 
 The test workflows run for every pull request, for every push to `main` and
 when started by hand; a pull request that changes only documentation skips
-their builds and tests ([below](#documentation-only-pull-requests)). A commit pushed to a branch that has a pull request runs
+their builds and tests ([below](#documentation-only-pull-requests)). The
+candidate workflow runs for a pull request only when it changes what the
+packages are built from or hold
+([below](#when-pull-requests-build-the-candidates)). A commit pushed to a branch that has a pull request runs
 once, as part of that pull request; a branch without one gets no automatic
 run, so open the draft pull request early ([workflow](workflow.md#before-you-start))
 or use Actions, then "Run workflow" on the branch. A new commit on a pull request
@@ -1427,7 +1421,8 @@ the files the pull request changes; their other jobs then show as skipped.
 Pushes to `main` and manual runs always run everything, as a backstop.
 The `scope` jobs add six short Linux jobs to every commit (a full run was 18
 jobs before them); a documentation-only commit starts 7, none on macOS, and one
-that changes a packaged page starts 13, two of them on macOS.
+that changes a packaged page that builds the candidates starts 13, two of them
+on macOS.
 
 Documentation here means Markdown files anywhere and everything under `docs/`,
 except:
@@ -1438,7 +1433,13 @@ except:
   two records in `docs/review-2026-10/` (`documentation`);
 - pages copied into the preview packages, which also run the
   [candidate workflow](#plug-in-candidate-checks): everything under `docs/use/`,
-  `examples/plugin-presets/README.md` and the Ooura `README.md`.
+  `examples/plugin-presets/README.md` and the Ooura `README.md`. A page in
+  `docs/use/` runs it only when it has a command marked
+  `<!-- executable-example -->` or `<!-- refused-example -->`, or shows an
+  image, before or after the change: the candidates run those commands from a
+  package and check where its images come from. A change to a guide with
+  neither is left to Lint
+  ([below](#when-pull-requests-build-the-candidates)).
 
 When a test starts reading another page, or the packages gain one, add it to
 the lists in `ci_scope.py`. `tests/ci_scope_tests.py` (in pre-commit) checks the
@@ -1461,10 +1462,11 @@ workflow. Anything else in the same pull request runs everything.
 
 | Files changed | Workflows that build and test |
 | --- | --- |
-| `plugins/vst3/`, `tests/vst3/` | VST3 and the [candidates](#plug-in-candidate-checks), which build and package the VST3 plug-in |
-| `plugins/au/`, `tests/au/` | Audio Unit and the [candidates](#plug-in-candidate-checks), which package the Audio Unit on macOS |
+| `plugins/vst3/`, `tests/vst3/` | VST3, and the candidates for the files listed [below](#when-pull-requests-build-the-candidates) |
+| `plugins/au/`, `tests/au/` | Audio Unit, and the candidates for the files listed [below](#when-pull-requests-build-the-candidates) |
 | `plugins/lv2/`, `tests/lv2/` | LV2 |
 | `plugins/editor/mac/` (the macOS window, CI-26) | VST3, Audio Unit and the candidates: only those builds compile it, and their `editor_tests.mm` test it |
+| `scripts/release/`, `tests/release/`, `packaging/`, apart from the files other workflows use (CI-34) | the [candidates](#plug-in-candidate-checks) |
 | `.github/workflows/NAME.yml` | that workflow |
 
 The shared parts are not a format's files: the PLUG-2 harness in
@@ -1476,6 +1478,66 @@ name that format's files or its `CONVOLVER_BUILD_` option, and CI may use no
 CMake preset but `core-only`. When another build starts using a format's file,
 add the file to `SHARED` in `ci_scope.py` or the workflow to
 `FORMAT_WORKFLOWS`.
+
+The candidates build and package the VST3 plug-in and the Audio Unit, but a
+pull request that changes only their code does not build them unless one of
+the files [below](#when-pull-requests-build-the-candidates) changes too.
+Release files that other workflows use count as code: `resolve.py`,
+`sources.py`, `upstream.py` and `contract.py` in `scripts/release/`, with
+which the format workflows fetch their SDKs and tools, `release-policy.json`
+and the VST trademark wording that the VST3 build reads. Only the files
+`tests/ci_scope_tests.py` lists, each with its reason, may name another
+release file, so a new use outside the candidates fails pre-commit; add that
+file to `RELEASE_SHARED` in `ci_scope.py`.
+
+### When pull requests build the candidates
+
+The candidate workflow is the longest: the 13 pull-request runs that built it
+on 8 November 2026 took 8 to 24 minutes (median 13; the tag run 42437291088
+took 24), with 12 more cancelled by a newer commit, and its two macOS builds hold two of the account's five
+macOS runners. So a pull request builds the candidates only when it changes
+what they are built from or hold (CI-34, approved by jrp on 8 November 2026):
+
+- release files: `scripts/release/`, `tests/release/`, `packaging/` and the
+  candidate workflow itself;
+- packaged pages ([above](#documentation-only-pull-requests); a guide in
+  `docs/use/` only when it has a marked command or shows an image, before or
+  after the change, as jrp chose on 8 November 2026) and the rest of the
+  package: `examples/`, `COPYING`, the bundles' `Info.plist.in` and
+  notices, `plugins/identities.json`, `tests/plugins/fixtures.py` (it writes
+  the packaged examples' audio) and `.gitattributes` (the source archive is
+  written with `git archive`);
+- files only the candidates' checks run or compile: `scripts/trademarks.py`,
+  `tests/au/bundle_tests.py` and `tests/vst3/package_probe.cpp`;
+- the macOS window, `plugins/editor/`;
+- the build configuration: the top-level `CMakeLists.txt`, `cmake/`, the VST3
+  and Audio Unit `CMakeLists.txt` and `VERSION`;
+- shipped dependencies: `portable/third_party/`, and `release-policy.json`,
+  which names every other one.
+
+Markdown in these folders is still documentation and builds nothing, apart
+from the packaged pages. The list is `CANDIDATES` and `RELEASE` in
+`ci_scope.py`, and the scope job prints which kind each changed file is.
+`tests/ci_scope_tests.py` checks that it covers every source file that only a
+`CONVOLVER_PACKAGE_PLUGINS` build reads and every repository file the release
+scripts name.
+
+The scope job reads both sides of the merge for a guide: the page as merged
+and as it was on the base branch (`git show HEAD^1:PAGE`), so removing a
+page's last marked command, or deleting a marked page, still builds the
+candidates. A page that exists but cannot be read as UTF-8 on either side
+counts as marked. Only `docs/use/*.md` are guides; Markdown in a subfolder
+builds the candidates whatever it holds.
+
+Any other change, ordinary code included, can still break a package, so the
+candidates keep building for every push to `main`, each Monday and when
+started by hand. When a pull request needs them anyway (before jrp tests it
+in a host, or when a change might affect what is packaged in a way the list
+misses), start "Plug-in distribution candidates" by hand on its branch:
+Actions, then "Run workflow", or
+`gh workflow run release.yml --ref BRANCH`. That run is not shown among the
+pull request's checks; link it in the pull request. A pull request whose
+changed files cannot be listed still builds everything.
 
 ### Which configurations run which tests
 
@@ -1509,8 +1571,8 @@ format's whole test label, with the CLI for the `examples.first_use` fixture:
 | `convolver_au_suite` | Audio Unit with sanitizers | `ctest -L au` |
 | `convolver_lv2_tests` | LV2 with ASan and UBSan, and the upstream lilv check | `examples.first_use` and `lv2.*` |
 
-The LV2 ThreadSanitizer job, the lv2lint bundle and the fuzz workflow name
-their few targets directly in the workflow; the other jobs build everything.
+The LV2 and Audio Unit ThreadSanitizer jobs, the lv2lint bundle and the fuzz
+workflow name their few targets directly in the workflow; the other jobs build everything.
 A test whose program the target does not build fails (CTest reports "Could
 not find executable", a Python-driven test its own error), so a new plug-in
 test's target goes into its format's target (`au_test_targets` for the Audio
@@ -1534,9 +1596,7 @@ fixture's setup), then the ready tests in decreasing `COST`. The long tests
 carry a `COST` of about their longest CI time in seconds, so they start at
 once instead of last. Plug-in tests set it where they are defined; the core's
 are one list in the top-level `CMakeLists.txt`, before the `check` target,
-which skips a name no longer defined, so rename a test there too. On `main` at
-b9381e4 (25 October 2026, VST3 run 40236000059), Windows `vst3.lifecycle`
-took 100 s and began 21 s into its step, which then took 122 s. Static
+which skips a name no longer defined, so rename a test there too. Static
 analysis runs LLVM's `run-clang-tidy.py`, which analyses the same file list
 one file per CPU and fails if any file did
 ([lint checks](../../CONTRIBUTING.md#formatting-and-analysis)).

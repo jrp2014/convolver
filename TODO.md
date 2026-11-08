@@ -63,17 +63,18 @@ boundary and C++20 in the core.
 
 | Order | Work | Exit criterion / dependency |
 | --- | --- | --- |
-| 1. Finish the open fixes | **DIAG-1** fault state after reloads and Load failed before Fault ([PR #73](https://github.com/jrp2014/convolver/pull/73)); from jrp's review of `6920a45` (31 October 2026), **PLUG-12** (a filter that loads but cannot be saved) and **ROBUST-3** (silence after a failed first load that cannot run out of memory); from his review of `276c7dc` (1 November 2026), **PLUG-13** (room for the settings in saved state, [PR #105](https://github.com/jrp2014/convolver/pull/105)); from jrp's HOST-1 REAPER run (6 November 2026), **VST3-16** (a new VST3 Latency comes into use in REAPER) | DIAG-1 done: merged on 25 October 2026 (`7ed7e38`), and the "Plug-in distribution candidates" run on that commit passed ([run](https://github.com/jrp2014/convolver/actions/runs/40145929436)). PLUG-12 and ROBUST-3 done: merged on 31 October 2026 ([PR #91](https://github.com/jrp2014/convolver/pull/91), `7542576`), each with a test of the sequence that failed. VST3-16 open: its fix is in draft [PR #134](https://github.com/jrp2014/convolver/pull/134). |
-| 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, the Audio Unit from the same candidate, which holds it since PR #115) at the same sitting | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 and AU-4 both gate the first preview, which holds the Audio Unit too. Needs no CLI in the package, so it can start now that step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
+| 1. Finish the open fixes (done) | **DIAG-1** fault state after reloads and Load failed before Fault ([PR #73](https://github.com/jrp2014/convolver/pull/73)); from jrp's review of `6920a45` (31 October 2026), **PLUG-12** (a filter that loads but cannot be saved) and **ROBUST-3** (silence after a failed first load that cannot run out of memory); from his review of `276c7dc` (1 November 2026), **PLUG-13** (room for the settings in saved state, [PR #105](https://github.com/jrp2014/convolver/pull/105)); from jrp's HOST-1 REAPER run (6 November 2026), **VST3-16** (a new VST3 Latency comes into use in REAPER) | DIAG-1 done: merged on 25 October 2026 (`7ed7e38`), and the "Plug-in distribution candidates" run on that commit passed ([run](https://github.com/jrp2014/convolver/actions/runs/40145929436)). PLUG-12 and ROBUST-3 done: merged on 31 October 2026 ([PR #91](https://github.com/jrp2014/convolver/pull/91), `7542576`), each with a test of the sequence that failed. VST3-16 done: merged on 8 November 2026 ([PR #134](https://github.com/jrp2014/convolver/pull/134)), and jrp's REAPER check of its candidate passed ([record](docs/archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md)). |
+| 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, the Audio Unit from the same candidate, which holds it since PR #115) at the same sitting | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 and AU-4 both gate the first preview, which holds the Audio Unit too. In progress: what each host has passed, and what remains on the final candidate, is in [status](docs/project/status.md#what-still-blocks-the-first-preview) (gates 2 and 3). |
 | 3. Alongside step 2 | **PLUG-5** first-preview contents: in the candidates since PR #115 (the Audio Unit on macOS, the VST trademark notice; the `convolver` CLI and the first-use presets since PR #101); what remains is qualifying one exact candidate (HOST-1, AU-4, REL-3) and jrp's publication. **REL-2** (done): the stereo, 2→6 crossover and CLI journeys are written in `docs/use/`. **PLUG-28** (done, PR #141): the packaged presets named after their folder, before the first preview | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
 | Early walkthrough (macOS) (done) | **REL-5**: an explicitly limited walkthrough of an exact candidate on macOS, the stereo journey only | Done on 1 November 2026 as a package and command-line check only, by jrp's choice ([done](#done)); its host steps moved to HOST-1's REAPER smoke test and REL-3. It did not change the first preview's contents and does not replace REL-3. |
-| 4. Settings, windows and the Audio Unit | The **HOST-2** editor as the macOS-only first preview has it: **PLUG-9** (the report and loading from a file) and **PLUG-10** (Gain, Mix and Latency), **VST3-3**, **VST3-4**, **AU-7**, and the window **VST3-11** shared with the Audio Unit in **AU-6**; and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview, in the macOS candidates since PR #115). For later previews: **VST3-12** (Windows), **VST3-13** (Linux), and PLUG-9, PLUG-10 and AU-7's remaining gain modes and meters | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items) the first preview needs, each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the [preview workloads](#loading-responsiveness), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). |
+| 4. Settings, windows and the Audio Unit (first-preview parts built) | The **HOST-2** editor as the macOS-only first preview has it: **PLUG-9** (the report and loading from a file) and **PLUG-10** (Gain, Mix and Latency), **VST3-3**, **VST3-4**, **AU-7**, and the window **VST3-11** shared with the Audio Unit in **AU-6**; and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview, in the macOS candidates since PR #115). For later previews: **VST3-12** (Windows), **VST3-13** (Linux), and PLUG-9, PLUG-10 and AU-7's remaining gain modes and meters | The [editor plan's phases](docs/archive/plans/2026-10-24-plugin-editor.md#phases-and-todo-items) the first preview needs, each merged with its tests (what remains of each item for the first preview is its host steps, under HOST-1 and AU-4); the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the [preview workloads](#loading-responsiveness), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). |
 | 5. The milestone | A candidate from a 0.12.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
 | 6. Later previews | Windows and Linux (**VST3-12**, **VST3-13**), the remaining gain modes and meters (**PLUG-9**, **PLUG-10**, **AU-7**), PERF-3's supported workloads; **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need. Not a first-preview gate: the loading-responsiveness gate uses the finite preview workloads instead. |
 | Supporting, cheap | **PERF-1**, **HOST-4** | HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
 | After the milestone: edges over other convolvers | First the limitations users cite: **EDGE-1** with **IO-2**, **PERF-3**'s long-reverb workloads with **EDGE-11**, then **PERF-2** with **EDGE-10**, **EDGE-3** and **EDGE-13**; then **EDGE-12**, **EDGE-9**, **EDGE-2**, **EDGE-4** and **EDGE-5**; then **EDGE-6** to **EDGE-8**, in the ranked order of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) | jrp's goal (6 November 2026): be better than the most popular reverb plug-ins. Waits for REL-3 unless jrp lifts the freeze; each item starts with the owner's decision its plan row names, and keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#non-negotiables). PERF-2 still waits for PERF-3's budgets. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. |
+| Parked until after REL-3 | Edge-case and robustness items **ROBUST-1**, **ROBUST-8**, **PLUG-25**, **PLUG-27**, **PLUG-29**, **PLUG-30**, **HOST-6**, **CFG-3**, **DIAG-5**, **CI-32**; performance items **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19** | jrp, 8 November 2026: "park any non-essential corner or edge case robustness tests" and smoke test the packaging and release path instead (REL-8). They stay listed and no existing test is removed; a reproduced crash, lost state, unsafe output or wrong audio still reopens one at once ([preview acceptance](docs/project/plans/2026-11-08-preview-acceptance.md#3-decide-whether-a-finding-blocks-the-preview)). |
 | Optional editor work | **PLUG-11** (FFT planning in FFTW-built plug-ins), **LV2-6** (an LV2 window, only if Linux users ask) | Not needed for any preview. |
 | On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
 
@@ -93,6 +94,17 @@ is superseded.
   and deferred limitations are linked from the gate summary; jrp publishes.
   The plan is written; qualification is not claimed complete. CI-34 is
   separate and does not gate the walkthrough.
+  Progress (8 November 2026): from jrp's release-readiness review of
+  v0.12.8, the checks still to run are one list,
+  [checks left before publication](docs/project/status.md#checks-left-before-publication),
+  which keeps the results jrp accepted and names what could be narrowed.
+  REL-6 qualified the 0.12.5 source on his MacBook Pro
+  ([record](docs/archive/reviews/2026-11-08-rel6-qualification.md)).
+  jrp chose the final candidate: the first tag after DOC-10 merges, with
+  most host checks run first on a v0.12.8 candidate and REL-6's 0.12.5
+  result standing while no engine, loading or plug-in code changes
+  ([decisions](docs/project/decisions.md#releases)). Remaining: the
+  checks in that list, then his publication.
 
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The candidate workflow
   builds unsigned packages with pinned dependencies, corresponding source,
@@ -119,6 +131,9 @@ is superseded.
   [next milestone](#execution-priorities). jrp chooses the tester. Record
   the evidence HOST-1 lists (package hash, host and OS versions, expected
   outputs, recovery from a refused filter) for each journey.
+  jrp's review of 8 November 2026 adds the first thing to try: "The
+  independent tester should try installing, loading their own filter,
+  saving and reopening with only the supplied instructions."
 - [ ] **REL-4 — Make the preview findable.** Room-correction users and the
   `.cfg` format's existing users should find Convolver from search, the old
   SourceForge site, KVR and their forums. Done on the repository side: a README
@@ -129,23 +144,6 @@ is superseded.
   preview, and the SourceForge project summary now points here (24 October
   2026); the old SourceForge website stays as it is. Remaining, at each
   preview: the steps after publishing.
-- [ ] **DOC-10 — One short route to load a filter.** From jrp's
-  [file-loading review](docs/archive/reviews/2026-11-07-file-loading-review.md)
-  (written 7 November 2026, posted 8 November): the guides lead readers into making and
-  installing presets, and host preset folders appear on several pages.
-  The ordinary instructions should be: choose a filter, check its rate and
-  channels, play, save the project; host preset libraries go in a separate
-  optional section, with one page owning the inputs each plug-in reads and
-  one table of preset folders, linked rather than repeated. Done when
-  [plug-in presets](docs/use/presets.md), the plug-ins guide and the
-  journeys lead with choosing a filter, one page lists the inputs each
-  plug-in reads, and one table gives the preset folders. Progress
-  (8 November 2026, PR #140): [plug-in presets](docs/use/presets.md) no longer says
-  the plug-ins have no window or that LV2 has no file chooser, the
-  plug-ins guide's summary names Choose… beside presets, and the
-  Audacity cleanup in [host testing](docs/develop/host-testing.md#prepare-the-mac)
-  removes only the files it copied. Follows PLUG-26 for the wording of
-  choosing a preset.
 - [ ] **HOST-1 — Named host matrix.** Record versions and results for Windows/macOS
   hosts: scan, load, preset/state restore, silence/tails, seek, variable callbacks,
   bypass, filter changes, multiple instances and unequal channel counts. SDK
@@ -236,14 +234,43 @@ is superseded.
   those that passed on earlier candidates, is run again on the preview
   candidate, so the earlier results are shown to hold for the current
   window and code: in REAPER that repeats the window and settings steps
-  (part C) on the window PLUG-22 redesigned.
+  (part C) on the window PLUG-22 redesigned. Since jrp's choice of final
+  candidate (8 November 2026), that means the v0.12.8 candidate, except
+  REAPER steps 10 and 12, which run on the final candidate
+  ([checks left](docs/project/status.md#checks-left-before-publication)).
+  Progress (8 November 2026): jrp ran REAPER part C with the 0.12.5
+  candidate from `main` (run 42437291088, `4117a6d`, tagged `v0.12.5`;
+  [record](docs/archive/reviews/2026-11-08-host1-reaper-window.md)): on the
+  redesigned window **Choose…**, Gain, Mix, undo, reset, the details and
+  **Copy Diagnostics** worked, and save, quit and reopen kept the filter,
+  Gain −6 dB, Mix 70% and Latency 1024; the VST3-16 latency renders lined
+  up again. Listening and REAPER's display of the Status parameter were not
+  checked. PLUG-31 changes the candidate; jrp decided these results stand
+  for the final one. A packaged preset, and save and reopen, passed with
+  the candidate from `f11a3dd` (PLUG-31 merged) on 8 November
+  ([record](docs/archive/reviews/2026-11-08-plug31-reaper.md)), and jrp
+  decided those stand too, so part C needs only listening and the Status
+  display, with the rest of the REAPER and Audacity steps
+  ([checks left](docs/project/status.md#checks-left-before-publication)).
+  Progress (8 November 2026): jrp's checks of the v0.12.8 candidate (run
+  42506723627; [record](docs/archive/reviews/2026-11-08-v0128-host-checks.md)).
+  REAPER: a render, save, quit and reopen, a refused wrong-rate preset and
+  the host at 44.1 kHz then 48 kHz passed, each export compared with the
+  CLI; REAPER's generic view lists Status after Bypass and it changed to
+  Load failed with nothing else changing. After the refusal the window's
+  heading changed from `impulse.wav` to "Restored filter" although the
+  old filter kept playing; fixed on PR #156 at jrp's request, with a
+  test of both orders of the two states. Audacity: a filter chosen with
+  **Choose…** was not in the export (VST3-17); the window is shown and not
+  clipped. Listening and VoiceOver were not checked in any host, and the
+  rest of the Audacity steps remain.
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
   now requested (progress below). Write adapters against the
   formats' own headers, not a framework.
   Progress (24 October 2026): jrp asked for an editor window, "not least for
   debugging", and that it configure the plug-in as the old Convolver did,
-  as inspiration rather than a copy; the [editor plan](docs/project/plans/2026-10-24-plugin-editor.md) proposes native
+  as inspiration rather than a copy; the [editor plan](docs/archive/plans/2026-10-24-plugin-editor.md) proposes native
   views (decided) over shared report code, with gain, latency and mix as host
   parameters, in phases PLUG-9, PLUG-10, PLUG-11, VST3-3, VST3-4, VST3-11 to
   VST3-13, AU-6, AU-7, LV2-6 and LV2-7, with decisions for jrp.
@@ -254,6 +281,14 @@ is superseded.
   divergence documented. Since narrowed: the first preview is macOS-only,
   and the Windows and Linux windows come in later previews
   ([decided](docs/project/decisions.md#plug-in-behaviour)).
+  Open risks carried from the archived editor plan's
+  [risks](docs/archive/plans/2026-10-24-plugin-editor.md#risks-and-open-questions)
+  (8 November 2026), none of them a first-preview gate: Gain's Estimate mode may add a
+  noticeable part of a second to loading a long multichannel filter (PERF-3
+  measures it; if too slow, compute it on a worker after the load and ramp
+  to the result); LV2's notify port needs the report's size declared up
+  front (LV2-6); and typing in the window must not trigger the host's
+  shortcuts, nor the host's keys reach the window.
 - [ ] **HOST-3 — Windows Media Foundation transform (parked).** Needs more
   thought before any work starts. Wrap the engine as a
   synchronous dual-mode audio effect (MFT plus DMO) for Windows Media Player
@@ -288,7 +323,7 @@ is superseded.
 ## Plug-ins: VST3, LV2 and AU
 
 VST3, LV2 and AU are developed in parallel. Design, host evidence and framework choice:
-[plug-in formats plan](docs/project/plans/2026-10-21-plugin-formats.md). Each
+[plug-in formats plan](docs/archive/plans/2026-10-21-plugin-formats.md). Each
 adapter is written against its format's own headers over `HostProcessor` and
 follows the [shared adapter contract](docs/develop/plugin-contract.md). VST3
 work continues under HOST-1, PLUG-5 and the VST3 items
@@ -334,7 +369,7 @@ Shared work, done once for all three formats:
   a later preview (LV2-5), and Developer ID signing, notarization and
   Authenticode at the production gate (REL-1).
 - [ ] **PLUG-9 — Editor report and loading from a file.** Phase 1 of the
-  [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), needing no window: a
+  [editor plan](docs/archive/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), needing no window: a
   report value in `Convolver::host` built on the control side (status, full
   failure, notice and fault messages with request numbers, host and filter
   details, latency and tail, FFT backend and kernels, log path and state),
@@ -355,7 +390,7 @@ Shared work, done once for all three formats:
   state the tool writes. Remaining: the settings' computed gains and meters
   as PLUG-10 adds them.
 - [ ] **PLUG-10 — Gain, mix and latency settings.** Phase 1 of the
-  [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings): in `HostProcessor`, an output gain
+  [editor plan](docs/archive/plans/2026-10-24-plugin-editor.md#settings): in `HostProcessor`, an output gain
   with three modes (a set value, the noise estimate and the no-clip bound of
   `estimate_attenuation()`, computed during preparation), a
   latency-aligned wet/dry mix, and a chosen block size (64 to 4096 frames,
@@ -365,7 +400,7 @@ Shared work, done once for all three formats:
   where they can diverge (presets from `convolver-preset` carry the filter
   only; states moved between formats keep the filter, not the settings) is
   documented in `docs/use/plugins.md` and listed here as a limitation
-  ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings)). Defaults leave the sound unchanged.
+  ([editor plan](docs/archive/plans/2026-10-24-plugin-editor.md#settings)). Defaults leave the sound unchanged.
   Gain, Mix and Latency are in the first preview; the other gain modes and
   the meters are for a later preview. Oracle tests with the worst
   error relative to the peak; the contract change in its own pull request.
@@ -384,7 +419,7 @@ Shared work, done once for all three formats:
   in the sound ([settings](docs/develop/plugin-contract.md#settings)). Remaining: the
   Estimate and No clipping gain modes and the meters.
 - [ ] **PLUG-11 — FFT planning in FFTW-built plug-ins (optional).** From the
-  [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings), as jrp asked:
+  [editor plan](docs/archive/plans/2026-10-24-plugin-editor.md#settings), as jrp asked:
   only when a plug-in is built with `-DCONVOLVER_FFT_BACKEND=FFTW` (released
   plug-ins use Ooura or Accelerate, which have no planner), a Quick or
   Measured planning choice, Quick by default, passed through `HostProcessor`
@@ -482,22 +517,6 @@ LV2 (Linux first; also PipeWire system audio):
   and the one-time read of the old file, and the plug-ins guide says where
   the list is kept. Lower priority than PLUG-26 and PLUG-27; waits for
   the freeze.
-- [ ] **PLUG-31 — Generated VST3 presets carry the filter's name.** From
-  jrp's [VST3-16 acceptance](docs/archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md#filter-name-observation)
-  (8 November 2026): after a packaged `.vstpreset` loads, the window's
-  Filter row says "From the saved project or preset". VST3 already saves
-  and restores a file's name for a file chosen in the window (the
-  controller state holds the name and the filter's identity, PLUG-22), but
-  `convolver-preset` writes no controller state for VST3
-  (`portable/preset_main.cpp`), so generated presets have only the
-  component chunk. Write the same name and identity there, the file name
-  with its extension and without its folder. jrp suggests "Restored filter"
-  for a state with no name, and origin wording that uses only what the
-  host says; both are user-facing and his to confirm. No change to the
-  processor's audio state. Done when a generated preset loaded in a host
-  shows its file name, a name whose identity does not match is not shown,
-  and the plug-ins guide says so. Waits for the freeze unless jrp brings
-  it forward.
 - [ ] **PLUG-30 — One rule for state a busy lock makes a call skip.**
   From AU-16 (8 November 2026; jrp asked for fixes like it to be recorded,
   as stepping back may give a more general fix). The pattern: a call that
@@ -522,6 +541,29 @@ LV2 (Linux first; also PipeWire system audio):
   queue. Done when each adapter's skip paths either follow that rule or
   are listed with why they are safe, with a held-lock test for each, as
   AU-16's. Waits for the freeze.
+- [ ] **PLUG-33 — A chosen file follows the same rules as a preset.**
+  Found in DOC-10's independent review (8 November 2026), now that the
+  guides lead with **Choose…**. Two places still treat a chosen file as the
+  second route. (1) `read_filter_file()` (`portable/filter_file.cpp`)
+  selects with the host's exact input count (`detail::matches()` in
+  `portable/config.cpp`), so a file chosen in the window needs exactly
+  the inputs the host gives, while a preset or
+  saved project needs only at least them (PLUG-23). On REAPER's
+  six-channel track, which gives the VST3 plug-in 6 inputs, choosing the
+  2→6 crossover's `filter.cfg` is refused, with a Fix that asks for 2
+  inputs; the preset of the same filter plays. The
+  [crossover check](docs/use/check-a-crossover-in-a-host.md#3-render-the-example-in-the-host)
+  and [channels](docs/use/plugins.md#channels) say to load the preset
+  there. A configuration list still needs a rule for which entry a wider
+  input bus selects. (2) With no filter, the Status text ends "Load a
+  Convolver preset." (`host_status()` in `portable/host.cpp`), where the
+  window's own Fix already names Choose…. Done when a chosen single filter
+  is accepted on a wider input bus by the PLUG-23 rule in VST3 and the
+  Audio Unit (adapter tests), list selection with a wider bus is decided
+  and tested, the No-filter Status names choosing a filter where the
+  plug-in has a window, and the guides' preset fallback for the crossover
+  is removed. No sound change for filters that load today. Waits for the
+  freeze unless jrp brings it forward.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
@@ -531,6 +573,11 @@ LV2 (Linux first; also PipeWire system audio):
   ([pluginval](docs/develop/testing.md#pluginval)); named layouts remain.
 - [ ] **LV2-4 — User guide and host matrix.** LV2 in `docs/use/plugins.md` and
   `docs/use/install.md` (written in DOC-4), plus a PipeWire configuration; Ardour, REAPER, Carla, Qtractor and PipeWire results.
+  The guide should also say plainly what Convolver adds over PipeWire's
+  built-in `convolver` node (`.cfg` files, routing matrices, delays, and
+  choosing from a list by rate and channels), and can start from the full
+  `filter-chain` example in the archived formats plan's
+  [PipeWire section](docs/archive/plans/2026-10-21-plugin-formats.md#system-wide-use-with-pipewire).
 - [ ] **LV2-5 — Release bundles.** Linux tarball, then distro packages; macOS and
   Windows bundles under PLUG-5.
   Before the first release, jrp decides how `VERSION` maps to
@@ -544,12 +591,16 @@ LV2 (Linux first; also PipeWire system audio):
   is a micro version LV2 reads as a development version (0.11.x was minor
   11, which LV2 reads as a development version too; LV2 is not in the first
   preview).
+  Whether to publish LV2 bundles for macOS and Windows at all is also
+  jrp's to decide; the archived
+  [formats plan](docs/archive/plans/2026-10-21-plugin-formats.md#decisions-for-the-owner)
+  recommended building them in CI and publishing once Linux has users.
 - [ ] **LV2-6 — Editor report and UI (optional).** Only if Linux users show a
   need: generic UIs already offer the `filter` file chooser and the status
   port. The report as `patch:Set` atoms on the notify port, prepared in
   `work()` and written allocation-free by `run()` (new property URIs for jrp
   to name), then an LV2 UI reusing the macOS and Windows views
-  ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#per-format)).
+  ([editor plan](docs/archive/plans/2026-10-24-plugin-editor.md#per-format)).
 - [ ] **LV2-7 — Settings as control ports.** PLUG-10's gain, gain mode, mix
   and latency as control input ports after the existing ones, the latency
   port following the chosen block size; port symbols for jrp to approve;
@@ -558,15 +609,6 @@ LV2 (Linux first; also PipeWire system audio):
 
 AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 
-- [ ] **AU-3 — Validation.** `auval` and pluginval in macOS CI. `auval -strict`
-  runs since PR #44; still to add: pluginval on the component, and a
-  ThreadSanitizer build of `au.adapter` (bypass switched while rendering).
-  Needed for the first preview, the ThreadSanitizer build included
-  ([decisions](docs/project/decisions.md#plug-in-behaviour)).
-  Progress (6 November 2026): pluginval validates the installed component
-  at strictness 10, editor tests included, in the Audio Unit workflow
-  ([pluginval](docs/develop/testing.md#pluginval)); the ThreadSanitizer build
-  remains.
 - [ ] **AU-4 — User guide and host matrix.** The Audio Unit in
   `docs/use/plugins.md` and `docs/use/install.md` (written in DOC-4); Logic, GarageBand,
   SoundSource, Live, REAPER and FL Studio results, including loading an
@@ -585,6 +627,25 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   remain. GarageBand's smoke test, with the checks that passed on earlier
   builds, runs on the preview candidate.
   Needed for the first preview.
+  Progress (8 November 2026): jrp ran GarageBand 10.4.14 with the Audio
+  Unit from the 0.12.5 candidate (run 42437291088, `4117a6d`;
+  [record](docs/archive/reviews/2026-11-08-au4-garageband.md)): the presets,
+  **Choose…** of a packaged `filter.cfg`, a refused 48 kHz preset that kept
+  the filter, Gain, Mix and Latency kept after save and reopen, and two
+  echo exports matching the CLI (worst error −112.99 dB; GarageBand's
+  *Export projects at full volume* must be off for a comparison). Not
+  checked: listening to the presets and to Gain and Mix, a click when
+  bypassing, whether the track stays in time after a Latency change,
+  VoiceOver and the Recent list. jrp decided these results stand after
+  PLUG-31; a packaged preset, save and reopen and the unchecked steps
+  remain, on the v0.12.8 candidate
+  ([checks left](docs/project/status.md#checks-left-before-publication)).
+  Progress (8 November 2026, v0.12.8 candidate run 42506723627;
+  [record](docs/archive/reviews/2026-11-08-v0128-host-checks.md)): a
+  packaged preset from GarageBand's menu, then save, quit and reopen,
+  restored it and the export matched the CLI; **Reload** and **Recent**
+  loaded the file again with its path kept. Listening, the bypass click,
+  the in-time check after a Latency change and VoiceOver remain.
 - [ ] **AU-5 — Release.** In the first preview. Unsigned preview component under PLUG-5 (ad-hoc
   signed, documented quarantine removal). Developer ID signing and
   notarization follow at the production gate.
@@ -602,7 +663,7 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   `ClassInfo` change after a load; then a Cocoa view factory
   (`kAudioUnitProperty_CocoaUI`) over the VST3-11 view, with class names that
   carry the version; `auval` lists the view; GarageBand smoke steps, including
-  a `.cfg` chosen inside its sandbox ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#per-format)).
+  a `.cfg` chosen inside its sandbox ([editor plan](docs/archive/plans/2026-10-24-plugin-editor.md#per-format)).
   Needed for the first preview.
   From jrp's first GarageBand run (25 October 2026): Apple's generic window
   shows the Status row with no value, so a stereo preset on a mono track
@@ -629,7 +690,7 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   `native.audio_toolbox` compares the two readers.
   The window still reads the report itself rather than copying reports
   pushed to it (the editor plan's
-  [rule 2](docs/project/plans/2026-10-24-plugin-editor.md#threads)), but a
+  [rule 2](docs/archive/plans/2026-10-24-plugin-editor.md#threads)), but a
   read no longer waits for a load: while a load holds the control lock it
   returns the last report (the window's next timed read shows the
   result), and `au.editor` checks that with a restore held open on another
@@ -672,7 +733,11 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   investigation's logging, Option-click switch, activation and window-level
   changes are gone.
   Not checked: VoiceOver; the sheet in a host that runs the plug-in in its
-  own process (REAPER, for example), where it attaches to the host's window.
+  own process (REAPER, for example), where it attaches to the host's window;
+  and, from the archived editor plan's
+  [risks](docs/archive/plans/2026-10-24-plugin-editor.md#risks-and-open-questions),
+  that the window's custom properties still arrive when a host runs the
+  Audio Unit in another process (under Rosetta, for example).
   - [x] Choose Filter in GarageBand: a sound file, and a `.cfg` inside its
     sandbox whose WAV files it read (allowed in that session); a dropped
     `.cfg`.
@@ -744,7 +809,7 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 - [ ] **AU-7 — Settings as Audio Unit parameters.** PLUG-10's gain, gain
   mode, mix and latency as global parameters (IDs beside Status 1001 in
   `plugins/identities.json`), latency indexed and not automatable, with
-  latency and tail change notifications ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#per-format)).
+  latency and tail change notifications ([editor plan](docs/archive/plans/2026-10-24-plugin-editor.md#per-format)).
   Gain, Mix and Latency are in the first preview; Gain mode is for a later
   preview.
   Progress (25 October 2026, PR #80): Gain (0) and Mix (1003), saved in
@@ -796,6 +861,21 @@ means a patched FFmpeg build with `--enable-gpl`.
   documentation or sources, states what it cannot represent (per-channel EQ,
   mixers with gains above unity, resampling) and fails rather than guess.
   Optional; after CFG-1 shows which readers matter.
+- [ ] **CFG-3 — Say when a configuration is not UTF-8.** From the BruteFIR
+  comparison (8 November 2026; BruteFIR fixed non-ASCII configuration text
+  in 0.99g). The historical Convolver read `.cfg` text in the Windows ANSI
+  code page (`channelpaths.cpp` reads it through `basic_ifstream<TCHAR>`
+  and `wavefile.h` opens `CT2CA(path)`); the portable parser reads UTF-8
+  only. A `.cfg` saved in Windows-1252 that names `ir_ü.wav` stops with "IR
+  file not found" and a garbled name, and nothing mentions the encoding
+  (tried on Linux at `8ba79fb`; not checked on Windows). Done when a filename
+  line that is not valid UTF-8 is reported as such, with the line, the
+  likely cause (saved in a Windows code page) and how to save it as UTF-8,
+  and a test covers it. Whether Convolver should also read Windows-1252
+  names is a `.cfg` compatibility decision for jrp, recorded in the
+  decisions log either way. Which encoding Roon, JRiver and Audiolense write
+  is unknown (CFG-1). A compatibility failure, so jrp decides whether it
+  waits for the freeze.
 - [ ] **COMPAT-1 — Files from released builds.** Round-trip tests with
   today's writer and reader can agree with each other while both break
   yesterday's files. When jrp publishes a preview, keep a small collection
@@ -817,6 +897,20 @@ means a patched FFmpeg build with `--enable-gpl`.
   [publication steps](docs/develop/releasing.md#publishing-an-unsigned-preview)
   when this is implemented. The four guarantees it protects are listed in
   [status](docs/project/status.md#compatibility-guarantees).
+- [ ] **DIAG-5 — Report clipping after a command-line render.** From the
+  BruteFIR comparison (8 November 2026): BruteFIR has printed each output's
+  count of overflowed samples and its peak by default since 0.99
+  (`overflow_warnings`). The `convolver` CLI clips integer output silently,
+  as [file rendering](docs/use/command-line.md#file-rendering) states,
+  and stops only for samples that are not finite: at `8ba79fb`, `--gain-db 20`
+  with `wav-pcm24` clipped 4,800 of 4,863 samples, printed nothing and
+  exited 0. Done when, after a render to integer output in which any sample
+  clipped, stderr gives the clipped-sample count and the peak in dBFS for
+  each affected output and suggests `--gain-db no-clip`; float output whose
+  peak exceeds full scale gets a note, since a later integer conversion
+  will clip it; nothing is printed when nothing clipped; the exit status is
+  unchanged; and CLI tests cover each case. The plug-ins' clip counts stay
+  with PLUG-10's meters.
 - [ ] **IO-1 — Large files.** Specify and test boundary sizes and pipe behavior
   for output beyond 4 GiB. Input decoder support is not a promise of strict
   validation for every container.
@@ -869,6 +963,10 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   defined (see limitations), declare the VST2 ID `'Conv'` in `moduleinfo.json`'s
   `Compatibility` section or `IPluginCompatibility`, and map old parameters with
   `IRemapParamID`. Old VST2 chunk state would still need a converter.
+  Gain uses the old attenuation's parameter ID 0 but not its mapping, so a
+  declared compatibility must convert that value in the state converter or
+  leave parameter values out of the migration (from the archived editor
+  plan's [risks](docs/archive/plans/2026-10-24-plugin-editor.md#risks-and-open-questions)).
 - [ ] **VST3-11 — Editor window on macOS.** An AppKit view behind `IPlugView`
   (`kPlatformTypeNSView`), shared with AU-6: status and full messages,
   active configuration, choose and reload a filter (with drag and drop,
@@ -876,7 +974,7 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   mode, mix, latency) with the output peak, clip count and load, copy
   diagnostics, show the log, bypass. Needed for the first preview. Opened in CI by `editorhost` and pluginval's GUI tests, with an
   accessibility test of names, roles and text; smoke steps in REAPER and
-  Audacity, with VoiceOver ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md)).
+  Audacity, with VoiceOver ([editor plan](docs/archive/plans/2026-10-24-plugin-editor.md)).
   Progress (1 November 2026, PR #103): the Audio Unit's window, moved to
   `plugins/editor/mac/`, shown through the SDK's `EditorView` for
   `kPlatformTypeNSView`, with settings edited as `beginEdit`, `performEdit`
@@ -891,6 +989,46 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   the steps in REAPER and Audacity ([host testing](docs/develop/host-testing.md#reaper-vst3))
   and VoiceOver for the first preview; the meters (with PLUG-10) for a later
   preview.
+- [ ] **VST3-17 — Audacity keeps a filter chosen in the window.** Found
+  in jrp's v0.12.8 checks (8 November 2026,
+  [record](docs/archive/reviews/2026-11-08-v0128-host-checks.md)): in
+  Audacity 4.0.2 a `.cfg` chosen with **Choose…** played in the window's
+  copy, but the export and the saved project had no filter (the export
+  matched the dry input). Audacity 4 stores a VST3 plug-in's state only at
+  the end of a parameter edit (`endEdit` then `flushAndStoreSettings` in
+  its `au3/libraries/au3-vst3`); its component handler offers no
+  `IComponentHandler2`, so `setDirty`, which Convolver calls after an
+  accepted load, does not reach it, and its `restartComponent` does
+  nothing. Presets from Audacity's own menu worked (7 November), since
+  Audacity loads that state itself. Wrong audio in a required journey, so
+  a preview blocker under the
+  [acceptance plan](docs/project/plans/2026-11-08-preview-acceptance.md#3-decide-whether-a-finding-blocks-the-preview)
+  unless jrp narrows it. The workaround proposed: after an accepted load,
+  the controller makes a gesture that changes no value (`beginEdit`,
+  `performEdit` with the current value, `endEdit`) so such hosts store the
+  state; check its side effects in REAPER (an undo step) and its effect in
+  Audacity (export and reopen). jrp chose (8 November 2026, decision card)
+  to fix it before the final tag, then set the terms: "hearing one result
+  and exporting another is a significant correctness problem"; confirm the
+  mechanism once (Choose, a genuine Gain edit, then export and save and
+  reopen); pursue the host fix with Audacity; keep any Convolver workaround
+  narrow, without manufactured Gain or Mix edits that could affect
+  automation or undo; correct the documentation now (DOC-10); and make the
+  regression check Choose, export, save and reopen with no parameter
+  touched. Audacity's vendor-window path may store only a parameter's
+  change at `endEdit`, not the whole component state, so the workaround
+  waits for jrp's test. Draft upstream issue for jrp to post: project
+  files `audacity-upstream/`.
+  **Recent**, **Reload** and reloading when the file changes go through
+  the same `Controller::load_file` as **Choose…**, so they share the
+  problem; what the export keeps is whatever Audacity stored last, which
+  may be an older filter rather than none. jrp, later on 8 November: fix
+  and retest it, or explicitly narrow the preview's supported Audacity
+  workflow and verify that alternative; defer implementation changes that
+  do not prevent the walkthrough. jrp then chose (decision card) to narrow
+  Audacity to presets for the first preview
+  ([decisions](docs/project/decisions.md#plug-in-behaviour)): the item
+  stays open for after the preview, or for Audacity's own fix.
 - [ ] **VST3-12 — Editor window on Windows.** The same window as a Win32 view
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.
@@ -901,7 +1039,7 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   to the package checks and licence notices; opened by `editorhost` under
   `xvfb-run`. Not reachable by screen readers, which the guide says. A native
   X11 view can replace it later if Linux users need one
-  ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#framework-choice)).
+  ([editor plan](docs/archive/plans/2026-10-24-plugin-editor.md#framework-choice)).
   For a later preview: the first preview is macOS-only ([decided](docs/project/decisions.md#plug-in-behaviour)).
 Not relevant to a convolver unless the product changes: MIDI and note
 interfaces (`IMidiMapping2`, `IMidiLearn2`, note expression, MIDI 2.0
@@ -1159,12 +1297,15 @@ callbacks, loaded into an empty instance, replaced by another as long and
 reset, through each adapter's load and restore entry points. PERF-3's wider
 measurements (6- and 8-channel routing, 96 kHz, other block sizes, memory)
 become stated supported workloads after the first preview; they are not a
-preview gate. What remains for the gate: the release qualification run on
-the intended machine ([REL-6](docs/develop/releasing.md#responsiveness-qualification),
-a first-preview gate) and, if the 30 s case
-exceeds 250 ms on a supported platform, jrp's choice between background
-preparation in VST3 and the Audio Unit (VST3-5) and a higher limit with the
-pause documented.
+preview gate. The release qualification on the intended machine
+([REL-6](docs/develop/releasing.md#responsiveness-qualification), a
+first-preview gate) passed for the 0.12.5 source on jrp's MacBook Pro
+(8 November 2026, longest hold 43.2 ms;
+[record](docs/archive/reviews/2026-11-08-rel6-qualification.md)), so
+background preparation (VST3-5) is not needed for the preview. jrp
+decided the result stands for the final candidate while no engine,
+loading or plug-in code changes
+([decisions](docs/project/decisions.md#releases)).
 First optimised-build figures (Linux cloud VM, 4 cores, clang Release with
 Ooura, 5 November 2026; stereo 48 kHz, 512-frame callbacks): VST3 `setState`
 held the host's thread for 4 ms with a 1 s filter, 43 to 61 ms with 10 s,
@@ -1245,7 +1386,8 @@ waits for the walkthroughs (jrp, 7 November 2026). Order: first the
 limitations users cite (EDGE-1 with IO-2, PERF-3 with EDGE-11, PERF-2 with
 EDGE-10, EDGE-3, EDGE-13), then edges nobody was found citing (EDGE-12,
 then the easy room-correction wins EDGE-9, EDGE-2, EDGE-4, EDGE-5), then
-the reverb features (EDGE-6 to EDGE-8). An item starts only after the
+the reverb features (EDGE-6 to EDGE-8). EDGE-15, from the BruteFIR
+comparison, is not ranked yet. An item starts only after the
 plan's [gate](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#before-an-item-starts): a reproducible Convolver
 limitation, an affected intended workflow and a measurable acceptance
 criterion. Optimisations are experiments with a stated gain and permission
@@ -1263,7 +1405,7 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   and the library report each path's magnitude, phase, group delay and
   energy decay, checked against an independent computation, and the macOS
   window plots them (layout approved by jrp as an addition to the
-  [editor plan](docs/project/plans/2026-10-24-plugin-editor.md)). Effort M.
+  [editor plan](docs/archive/plans/2026-10-24-plugin-editor.md)). Effort M.
 - [ ] **EDGE-3 — Reverb file layouts without a configuration.** Done when a
   mono response on a stereo instance and true stereo (one four-channel file
   or two stereo files) load without a `.cfg`, giving the same routes and
@@ -1358,6 +1500,21 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   Still needs jrp's decision on its parameter ID, how it is saved, and the
   proposed Status warning when a filter plays more than 12 dB louder than
   its input at 100% Mix. Effort S to M.
+- [ ] **EDGE-15 — Optional output safety ceiling.** From the BruteFIR
+  comparison (8 November 2026): BruteFIR's `safety_limit` (1.0m, 2013)
+  checks every output sample and stops before one above the set level
+  reaches the device, "to protect your ears and expensive speakers", and
+  [protect-bflogic](https://github.com/MRinus/protect-bflogic) (2026) adds
+  per-channel limits because BruteFIR has none. Convolver has no output
+  ceiling, so a wrong filter or route gain reaches an amplifier or a
+  crossover's tweeter at full level. Done when an opt-in ceiling, off by
+  default, acts on any output sample above it as jrp decides (for example,
+  mute that output with Fault and the sample's position in the plug-ins,
+  stop the render in the CLI), and tests show that no sample above the
+  ceiling leaves, that output below it is bit-identical, and that the check
+  allocates and locks nothing on the audio thread. Needs jrp's decisions on
+  the action (mute, limit or stop), per output or global, and whether it is
+  saved in state. Waits for REL-3. Effort S to M.
 
 ## Developer tooling
 
@@ -1369,6 +1526,13 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   when scope tests and affected CI pass, every configuration has a retained
   trigger, and matched runs demonstrate waiting-time savings. No workflow
   changes are part of REL-7.
+  Progress (8 November 2026): jrp approved the first step, now done: a pull
+  request builds the candidates only for release files, packaged pages (a
+  `docs/use/` guide only with runnable commands or images), the macOS
+  window, the build configuration and shipped dependencies, or when started
+  by hand; `main`, the weekly run and manual runs build them every
+  time ([CI triggers](docs/develop/testing.md#when-pull-requests-build-the-candidates)).
+  Remaining: the fuzz triggers, the coverage table and matched runs.
 
 - [ ] **CI-32 — Run the most extreme numerical cases less often, once they
   cost.** From jrp's simplification review of 5 November 2026: keep
@@ -1422,280 +1586,35 @@ with compatibility tests; linked IDs point to open work above.
 
 ## Done
 
-Finished items, one line each so their IDs stay defined. What each delivered is
-described on the linked page and in the [CHANGELOG](CHANGELOG.md). The longer
-entries written before 7 November 2026, with their evidence, are
-[archived](docs/archive/todo/2026-11-06-done-entries.md).
+Finished items move out of this file so that it holds open work only. Each
+keeps one line, with its ID, title, date, pull request and the page that now
+describes it, in the [archive of finished items](docs/archive/todo/README.md):
+everything finished up to 8 November 2026 is in
+[that day's list](docs/archive/todo/2026-11-08-done-items.md). The
+[repository checks](docs/develop/workflow.md#automated-checks) treat an ID
+listed there as defined and done. What each item delivered is described on
+its linked page and in the [CHANGELOG](CHANGELOG.md).
 
-- [x] **AU-1 — Adapter and test.** 23 October 2026, PR #44, with the bypass
-  follow-up in PR #49; [plug-in guide](docs/use/plugins.md).
-- [x] **AU-2 — Loading filters.** 23 October 2026, PR #44;
-  [presets](docs/use/presets.md).
-- [x] **AU-8 — Split the adapter's source by responsibility.** 31 October 2026,
-  PR #92; [implementation map](docs/develop/architecture.md).
-- [x] **AU-12 — Wake the Latency work with a dispatch source.** 5 November
-  2026, PR #109; [Audio Unit settings](docs/develop/plugin-contract.md).
-- [x] **AU-14 — A completion witness for the Latency work.** 5 November 2026.
-- [x] **AU-15 — Render through AVAudioEngine.** 6 November 2026; [AVAudioEngine
-  render](docs/develop/testing.md#avaudioengine-render).
-- [x] **AU-13 — Safe partial construction of the Latency work.** 5 November
-  2026, PR #111.
-- [x] **AU-16 — Show a bypass switched while the control lock is held.**
-  8 November 2026, PR #143; [Status and log](docs/develop/plugin-contract.md#status-and-log).
-- [x] **AU-11 — Separate file watching from the window.** 5 November 2026;
-  [shared macOS window](docs/develop/architecture.md#the-shared-macos-window).
-- [x] **AU-10 — Separate the window's setting editing from its layout.** 1
-  November 2026, PR #100; [implementation map](docs/develop/architecture.md).
-- [x] **AU-9 — Simplify the macOS plug-in code.** 31 October 2026, PR #93.
-- [x] **CI-1 — Skip builds and tests for documentation-only pull requests.** 24
-  October 2026, PR #63; [documentation-only pull
-  requests](docs/develop/testing.md#documentation-only-pull-requests).
-- [x] **CI-2 — Shorten CI without losing coverage.** 24 October 2026, PR #65;
-  [which configurations run which
-  tests](docs/develop/testing.md#which-configurations-run-which-tests).
-- [x] **CI-3 — Latest stable Clang tools.** 24 October 2026, PR #69;
-  [formatting and analysis](CONTRIBUTING.md#formatting-and-analysis).
-- [x] **CI-4 — Report the oracle error relative to the signal.** 24 October
-  2026, PR #74; [native
-  tests](docs/develop/testing.md#native-production-tests).
-- [x] **CI-5 — No actions on a deprecated Node.js.** 24 October 2026, PR #76;
-  [lint checks](CONTRIBUTING.md#lint-checks).
-- [x] **CI-6 — Keep supporting libraries on their newest releases.** 24 October
-  2026, PR #77; [supporting
-  libraries](docs/develop/build.md#supporting-libraries).
-- [x] **CI-7 — Resolve shared SDKs once per workflow.** 5 November 2026;
-  [supporting libraries](docs/develop/build.md#supporting-libraries).
-- [x] **CI-8 — Keep evidence from advisory failures.** 5 November 2026;
-  [evidence from CI
-  runs](docs/develop/testing.md#evidence-from-failed-ci-runs).
-- [x] **CI-9 — Shorter CI jobs, no test dropped.** 25 October 2026, PR #85;
-  [build targets and test
-  order](docs/develop/testing.md#build-targets-and-test-order).
-- [x] **CI-10 — One Linux source build for candidates.** 27 October 2026, PR
-  #86; [candidate checks](docs/develop/testing.md#plug-in-candidate-checks).
-- [x] **CI-11 — FFT backend configurations as parallel jobs.** 27 October 2026,
-  closed without the split, PR #86; [CI
-  triggers](docs/develop/testing.md#ci-triggers).
-- [x] **CI-12 — Fuzz campaigns side by side.** 27 October 2026, PR #86; [fuzz
-  smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
-- [x] **CI-13 — Run only the affected format's workflows.** 27 October 2026, PR
-  #86; [pull requests for one plug-in
-  format](docs/develop/testing.md#pull-requests-for-one-plug-in-format).
-- [x] **CI-14 — Use every runner CPU.** 27 October 2026, PR #86; [build targets
-  and test order](docs/develop/testing.md#build-targets-and-test-order).
-- [x] **CI-15 — Test the fuzz scheduler's failure paths.** 28 October 2026, PR
-  #87; [fuzz smoke
-  tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
-- [x] **CI-16 — A `--jobs` limit for release builds.** 28 October 2026, PR #87;
-  [preview recipe](docs/develop/build.md#preview-recipe).
-- [x] **CI-17 — Remove unused Python imports.** 29 October 2026, PR #88;
-  [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).
-- [x] **CI-18 — Format and lint the Python with ruff.** 29 October 2026, PR
-  #88; [Python formatting and
-  lint](CONTRIBUTING.md#python-formatting-and-lint).
-- [x] **CI-22 — Make intermittent CI failures fixable.** 1 November 2026;
-  [intermittent failures](docs/develop/testing.md#intermittent-failures).
-- [x] **CI-30 — Complete the tests' replaced allocation functions.** 5 November
-  2026, PR #111.
-- [x] **CI-31 — Keep `native.host_settings` within its time limit under
-  sanitizers.** 5 November 2026, PR #111.
-- [x] **CI-33 — Compare audio, not file bytes, in the no-clip test.** 6
-  November 2026, PR #124; [intermittent
-  failures](docs/develop/testing.md#intermittent-failures).
-- [x] **CI-29 — Use LLVM's parallel clang-tidy runner.** 5 November 2026, PR
-  #108; [formatting and analysis](CONTRIBUTING.md#formatting-and-analysis).
-- [x] **CI-24 — Find why `native.request_worker` timed out on Windows.** 5
-  November 2026, closed without a cause, PR #109;
-  [evidence](docs/archive/reviews/2026-11-05-request-worker.md).
-- [x] **CI-25 — Find why the watchdog check hung on the macOS arm64
-  candidate.** 5 November 2026, closed without a cause, PR #109;
-  [evidence](docs/archive/reviews/2026-11-05-request-worker.md).
-- [x] **CI-28 — Keep `vst3.adapter`'s Status and log case's log as evidence.**
-  5 November 2026; [evidence from failed CI
-  runs](docs/develop/testing.md#evidence-from-failed-ci-runs).
-- [x] **CI-27 — Keep the Audio Unit adapter test's log after a crash.** 2
-  November 2026; [evidence from failed CI
-  runs](docs/develop/testing.md#evidence-from-failed-ci-runs).
-- [x] **CI-26 — Run only VST3, Audio Unit and the candidates for window
-  changes.** 2 November 2026; [one plug-in
-  format](docs/develop/testing.md#pull-requests-for-one-plug-in-format).
-- [x] **CI-23 — Run `vst3.fft_symbols` on Windows.** 1 November 2026; [VST3
-  tests](docs/develop/testing.md#plug-in-format-tests).
-- [x] **CI-19 — Build the Apple silicon candidate on `macos-15`.** 31 October
-  2026; [candidate checks](docs/develop/testing.md#plug-in-candidate-checks).
-- [x] **CI-20 — Keep unpacked ZIP files inside their destination.** 1 November
-  2026, PR #102; [candidates](docs/develop/releasing.md#candidates).
-- [x] **CI-21 — Pin third-party actions to a commit SHA.** 1 November 2026, PR
-  #102; [lint checks](CONTRIBUTING.md#lint-checks).
-- [x] **DIAG-1 — Review how diagnostics reach the user.** 23 to 31 October
-  2026, PRs #57, #68, #72, #73, #96; [status and
-  log](docs/develop/plugin-contract.md#status-and-log).
-- [x] **DIAG-2 — Actionable diagnostics.** 5 November 2026, PR #110;
-  [troubleshooting](docs/use/troubleshooting.md).
-- [x] **DIAG-3 — Report faults around a filter change together.** 5 November
-  2026; [contract](docs/develop/plugin-contract.md#status-and-log).
-- [x] **DIAG-4 — Keep messages in their parts inside the library.** 5 November
-  2026; [failure reasons](docs/develop/plugin-contract.md#failure-reasons).
-- [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026.
-- [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;
-  [first-use examples](examples/first-use/README.md).
-- [x] **DOC-3 — Resolve adapter-plan review findings.** 21 October 2026.
-- [x] **DOC-4 — Organise the documentation by reader.** 23 October 2026, PRs
-  #47, #51, #52, #53; [documentation guide](docs/develop/documentation.md).
-- [x] **DOC-5 — Refresh the status page's evidence.** 1 November 2026, PR #99;
-  [status](docs/project/status.md).
-- [x] **DOC-6 — One home for progress.** 1 November 2026, PR #105; [recording
-  progress](docs/develop/workflow.md#recording-progress-in-todo).
-- [x] **DOC-7 — Archive finished entries and remove cruft.** 6 November 2026,
-  PR #123, on jrp's request; [recording
-  progress](docs/develop/workflow.md#recording-progress-in-todo).
-- [x] **DOC-8 — Tune the agent guidance and workflow.** 6 November 2026,
-  PR #129, from jrp's review; [workflow](docs/develop/workflow.md#kinds-of-task).
-- [x] **DOC-9 — Consistent words for filters, presets and projects.** 7
-  November 2026, PR #136, from jrp's review, with clearer Waiting status wording;
-  [words Convolver uses](docs/use/concepts.md#words-convolver-uses).
-- [x] **DOC-11 — Reconcile the release status page.** 8 November 2026,
-  PR #142, from jrp's review of `bf6a207`; [what still blocks the first
-  preview](docs/project/status.md#what-still-blocks-the-first-preview).
-- [x] **FFMPEG-1 — Test the pipe workflow.** 5 November 2026;
-  [tests](docs/develop/testing.md#native-production-tests).
-- [x] **FFT-1 — Check that we have the latest Ooura version.** 21 October 2026;
-  [upstream
-  comparison](portable/third_party/ooura/README.md#upstream-comparison-21-october-2026).
-- [x] **FFT-3 — Accelerate by default on macOS.** 30 October 2026, PR #89;
-  [which libraries each build
-  uses](docs/develop/build.md#which-libraries-each-build-uses).
-- [x] **FFT-4 — Remove the finished vDSP experiment.** 5 November 2026, PR
-  #108.
-- [x] **IO-3 — More output containers.** 23 October 2026, PR #60; [output
-  formats](docs/use/command-line.md#output-formats).
-- [x] **IO-4 — Raw filters and raw sample types.** 24 October 2026, PR #60;
-  [RAW streams](docs/use/command-line.md#raw-streams).
-- [x] **IO-7 — Dither defaults by output resolution.** 25 October 2026, PR #79;
-  [integer
-  output](docs/use/command-line.md#integer-formats-dither-and-noise-shaping).
-- [x] **IO-9 — Shortest float text from the standard library.** 5 November
-  2026, PR #109; [building for macOS before
-  14](docs/develop/build.md#building-for-macos-before-14).
-- [x] **IO-6 — FLAC in the preview packages.** 24 October 2026, PR #60; [FLAC
-  and Ogg](docs/use/command-line.md#flac-and-ogg).
-- [x] **HOST-5 — A headless Ardour session in CI.** 6 November 2026; [Ardour,
-  headless](docs/develop/testing.md#ardour-headless).
-- [x] **LV2-1 — Adapter and headless test.** 22 October 2026, PR #43; [LV2
-  tests](docs/develop/testing.md#lv2-tests).
-- [x] **LV2-2 — Loading filters.** 23 October 2026, PR #48; [LV2
-  tests](docs/develop/testing.md#lv2-tests).
-- [x] **LV2-8 — Status after a request the host drops.** 6 November 2026,
-  closed without a change, PR #122; [worker
-  lifecycle](docs/project/plans/2026-10-21-plugin-formats.md#lv2-adapter-design).
-- [x] **PERF-4 — Compiler flags and CPU-specific kernels.** 24 October 2026, PR
-  #61; [compiler flags and AVX2
-  kernels](docs/develop/fft-backends.md#compiler-flags-and-avx2-kernels).
-- [x] **PERF-5 — Track valid input history.** 24 October 2026, PR #70;
-  [startup, reset and
-  loading](docs/develop/fft-backends.md#startup-reset-and-filter-loading).
-- [x] **PERF-6 — Decode each filter file once per load.** 24 October 2026, PR
-  #70; [startup, reset and
-  loading](docs/develop/fft-backends.md#startup-reset-and-filter-loading).
-- [x] **PERF-9 — Load timing test.** 5 November 2026, PR #111; [load
-  timing](docs/develop/testing.md#load-timing-perf-9).
-- [x] **PERF-10 — The load-timing gate cannot pass unqualified.** 5 November
-  2026; [load timing](docs/develop/testing.md#load-timing-perf-9).
-- [x] **PERF-11 — Quiet noise as the load-timing input.** 5 November 2026.
-- [x] **DOC-2 — Maintain documentation automatically.** 6 November 2026, PR
-  #118; [automated checks](docs/develop/documentation.md#automated-checks).
-- [x] **GAIN-1 — Define no-clip headroom precisely.** 6 November 2026, PR #118;
-  [gain](docs/use/command-line.md#gain-and-attenuation).
-- [x] **GAIN-3 — `no-clip` reserves the integer headroom.** 6 November 2026;
-  [gain](docs/use/command-line.md#gain-and-attenuation).
-- [x] **PERF-12 — Load-timing verdicts from records, tested without timing.** 5
-  November 2026; [load timing](docs/develop/testing.md#load-timing-perf-9).
-- [x] **PERF-14 — Load timing from a full history.** 5 November 2026.
-- [x] **VST3-16 — A new Latency in REAPER.** 8 November 2026, PR #134;
-  [settings](docs/use/plugins.md#settings),
-  [acceptance](docs/archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md).
-- [x] **PLUG-28 — Name the packaged presets after their filter.** 8
-  November 2026, PR #141 and, for the first-use presets, PR #144; [first sound in a host](docs/use/first-sound-in-a-host.md#load-the-examples).
-- [x] **PLUG-23 — A filter reads the first inputs of a wider input bus.** 6
-  November 2026; [channels](docs/use/plugins.md#channels).
-- [x] **PLUG-22 — Name the filter in the window, and say each fact once.** 7
-  November 2026, PR #128; [Convolver's
-  window](docs/use/plugins.md#convolvers-window).
-- [x] **PLUG-21 — Teardown tested at chosen stages.** 5 November 2026.
-- [x] **PERF-13 — Load-timing records as JSON.** 5 November 2026; [load
-  timing](docs/develop/testing.md#load-timing-perf-9).
-- [x] **PERF-15 — Subnormal numbers flushed while processing.** 5 November
-  2026, PR #117; [subnormal
-  numbers](docs/develop/architecture.md#subnormal-numbers).
-- [x] **GAIN-2 — No noise simulation for `--gain-db no-clip`.** 5 November
-  2026, PR #111.
-- [x] **PLUG-1 — FFT backend for plug-ins.** 21 October 2026; [plug-in
-  builds](docs/develop/fft-backends.md#plug-in-builds).
-- [x] **PLUG-2 — Shared adapter test harness.** 22 October 2026, PR #28;
-  [plug-in comparisons](docs/develop/testing.md#plug-in-comparisons-plug-2).
-- [x] **PLUG-3 — One preset tool.** 22 October 2026, PR #32; [preset
-  files](docs/develop/plugin-contract.md#preset-files).
-- [x] **PLUG-4 — Layouts and identities.** 22 October 2026, PR #27; [plug-in
-  identities](docs/develop/plugin-identities.md).
-- [x] **PLUG-6 — Pin format dependencies.** 22 October 2026, PR #31;
-  [supporting libraries](docs/develop/build.md#supporting-libraries).
-- [x] **PLUG-7 — Lifecycle sequence tests.** 23 October 2026, PR #58;
-  [lifecycle sequences](docs/develop/testing.md#lifecycle-sequences-plug-7).
-- [x] **PLUG-8 — Keep a structured failure reason.** 23 October 2026, PR #46;
-  [failure reasons](docs/develop/plugin-contract.md#failure-reasons).
-- [x] **PLUG-12 — Accept only filters that can be saved.** 31 October 2026;
-  [host state](docs/develop/plugin-contract.md#host-state).
-- [x] **PLUG-13 — Keep room for the settings in saved state.** 1 November 2026,
-  PR #105; [host state](docs/develop/plugin-contract.md#host-state).
-- [x] **PLUG-15 — One macOS deployment target.** 5 November 2026, PR #108;
-  [build options](docs/develop/build.md#build-options).
-- [x] **PLUG-17 — Ramps measured in time rather than frames.** 5 November 2026,
-  PR #109; [contract](docs/develop/plugin-contract.md#settings).
-- [x] **PLUG-19 — One frame's allowance at a ramp's end.** 5 November 2026;
-  [settings](docs/develop/plugin-contract.md#settings).
-- [x] **PLUG-18 — Exact bypass and mute ramp endpoints.** 5 November 2026, PR
-  #111; [settings](docs/develop/plugin-contract.md#settings).
-- [x] **PLUG-16 — Name the transition lengths.** 5 November 2026, PR #108;
-  [contract](docs/develop/plugin-contract.md).
-- [x] **REL-2 — Define the first release by user journeys.** 6 November 2026,
-  PR #118; [check a stereo filter](docs/use/check-a-stereo-filter.md), [a
-  crossover](docs/use/check-a-crossover-in-a-host.md), [file
-  rendering](docs/use/check-files-with-the-command-line.md).
-- [x] **REL-6 — Responsiveness qualification before a release.** 5 November
-  2026; [procedure](docs/develop/releasing.md#responsiveness-qualification).
-- [x] **REL-5 — Early limited walkthrough on macOS.** 1 November 2026, PR #101;
-  [check a stereo filter in a host](docs/use/check-a-stereo-filter.md).
-- [x] **ROBUST-3 — Silence when memory runs out after a recorded failure.** 31
-  October 2026; [replacement and
-  threads](docs/develop/plugin-contract.md#replacement-and-threads).
-- [x] **ROBUST-7 — A failed first load fails however early memory runs out.** 5
-  November 2026, PR #111; [status and
-  log](docs/develop/plugin-contract.md#status-and-log).
-- [x] **ROBUST-4 — Low-memory quantizer and non-finite gain estimates.** 24
-  October 2026, PR #72; [gain](docs/use/command-line.md#gain-and-attenuation).
-- [x] **IO-5 — Speaker labels beyond WAV.** 6 November 2026, PR #118; [speaker
-  labels](docs/use/command-line.md#speaker-labels).
-- [x] **ROBUST-2 — Bound report output.** 6 November 2026, PR #118; [resource
-  limits](docs/develop/library.md#resource-limits).
-- [x] **ROBUST-6 — State the shared limits once.** 5 November 2026, PR #108;
-  [resource limits](docs/develop/library.md#resource-limits).
-- [x] **VST3-15 — Test the messages through a host's proxy.** 5 November 2026;
-  [messages](docs/develop/plugin-contract.md#status-and-log).
-- [x] **VST3-14 — Separate the controller from the processor's file.** 5
-  November 2026; [implementation map](docs/develop/architecture.md).
-- [x] **VST3-1 — Speaker arrangements, not only channel counts.** 23 October
-  2026, PR #42; [channel
-  layouts](docs/develop/plugin-identities.md#channel-layouts).
-- [x] **VST3-3 — Editor messaging between controller and processor.** 1
-  November 2026, PR #103;
-  [messages](docs/develop/plugin-contract.md#status-and-log).
-- [x] **VST3-4 — Gain, mix and latency parameters.** 1 November 2026, PR #103;
-  [settings](docs/develop/plugin-contract.md#settings).
-- [x] **VST3-7 — Follow the shared adapter contract.** 22 October 2026, PR #35;
-  [adapter contract](docs/develop/plugin-contract.md).
-- [x] **VST3-8 — Follow the SDK documentation where the audit found gaps.** 23
-  October 2026, PR #59; [adapter contract](docs/develop/plugin-contract.md).
-- [x] **VST3-9 — Non-integer host rates.** 5 November 2026; [when a filter does
-  not fit](docs/use/plugins.md#when-a-filter-does-not-fit).
-- [x] **VST3-10 — Mark silent output.** 24 October 2026, PR #70; [format
-  notes](docs/develop/plugin-contract.md#format-notes).
+Items finished since then are listed here, one line each, until the next
+move to the archive.
+
+- [x] **AU-17 — Audio Unit listeners told on the main thread.** 8
+  November 2026, PR #158, from a ThreadSanitizer report on `main`
+  ([run 42512164144](https://github.com/jrp2014/convolver/actions/runs/42512164144));
+  [status and log](docs/develop/plugin-contract.md#status-and-log).
+- [x] **REL-8 — Rehearse publishing before the preview.** 8 November
+  2026, PR #152; jrp's rehearsal from `main` on the v0.12.5 candidate
+  ([run 42505146594](https://github.com/jrp2014/convolver/actions/runs/42505146594))
+  made the draft, which he read ("That looked fine to me") and deleted;
+  [publishing](docs/develop/releasing.md#publishing-an-unsigned-preview).
+- [x] **DOC-13 — Shorter backlog, superseded plans and evidence archived.** 8
+  November 2026; [archived TODO entries](docs/archive/todo/README.md),
+  [archived plans](docs/archive/plans/README.md).
+- [x] **DOC-10 — One short route to load a filter.** 8 November 2026,
+  PR #157, from jrp's file-loading review; [your first sound in a
+  host](docs/use/first-sound-in-a-host.md), [inputs](docs/use/plugins.md#loading-a-filter),
+  [preset folders](docs/use/presets.md#preset-folders).
+- [x] **PLUG-31 — Generated VST3 presets carry the filter's name.** 8
+  November 2026, PR #148, checked in REAPER;
+  [presets](docs/use/presets.md),
+  [record](docs/archive/reviews/2026-11-08-plug31-reaper.md).

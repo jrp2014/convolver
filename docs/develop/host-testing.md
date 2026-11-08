@@ -29,8 +29,8 @@ compatibility claim is inferred.
 
 There are two levels of testing. An **unsigned preview** needs the smoke test
 below. A **signed production release** needs the full qualification procedure.
-Both gates are set out in the
-[plug-in formats plan](../project/plans/2026-10-21-plugin-formats.md#unsigned-previews-and-production).
+What the production gate adds is set out in
+[releasing](releasing.md#production-gates).
 
 ## First hosts
 
@@ -111,8 +111,8 @@ macOS 14 or later. Checked on 23 October 2026:
   macOS 26, repeat the step with another VST3 plug-in before blaming
   Convolver.
 - **GarageBand:** the version from the App Store for your macOS is native on
-  both architectures. Build the Audio Unit on the Mac that runs GarageBand, so
-  it matches.
+  both architectures. Install the Audio Unit from the package for that Mac's
+  processor (`macos-arm64` or `macos-x86_64`).
 
 ## Hosts in CI
 
@@ -173,9 +173,13 @@ Keep private audio out of reports. Use the supplied synthetic examples.
 ## Smoke test for an unsigned preview
 
 1. Download the preview the way a user would and check its SHA-256 against the
-   release notes. Install it as the [install guide](../use/install.md) says, including
-   its quarantine removal on macOS for this bundle only. Never disable security
-   system-wide.
+   release notes. Install it as the [install guide](../use/install.md) says:
+   from the macOS installer, through **Open Anyway**, or from the ZIP archive,
+   with its quarantine removal for this bundle only. Never disable security
+   system-wide. Record the macOS version, the exact text of each warning, and
+   whether the installed bundles still carry a quarantine flag
+   (`xattr -l /Library/Audio/Plug-Ins/VST3/Convolver.vst3` lists
+   `com.apple.quarantine` if they do).
 2. Scan, insert Convolver, and load one example preset at 48 kHz in mono and
    stereo, where the host offers both ([first hosts](#first-hosts)). Check
    that the identity, echo and repeat examples sound as expected.
@@ -194,20 +198,24 @@ what you actually chose. Play quiet audio and keep the volume low.
 
 ### Prepare the Mac
 
-Do this once. Run the commands in the extracted preview package folder,
-except the Audio Unit build, which runs in a source checkout.
+Do this once. Run the commands in the extracted preview package folder.
 
 1. Get the package for your Mac's processor (`macos-arm64` on Apple silicon,
    `macos-x86_64` on Intel). Until a preview is published, download the
    `candidate-macos-arm64` (or `candidate-macos-x86_64`) artifact from the
    latest successful "Plug-in distribution candidates" run on `main`, and
-   unzip the package inside it. Check its SHA-256, install `Convolver.vst3` as
+   unzip the package inside it. To test a pull request before it merges, use
+   a run on its branch; most pull requests do not start one, so start it by
+   hand ([when pull requests build the candidates](testing.md#when-pull-requests-build-the-candidates)). Check its SHA-256, install `Convolver.vst3` as
    the [install guide](../use/install.md) says, and clear the quarantine for
    the bundle and for `bin/` only
    ([unsigned previews](../use/install.md#unsigned-previews)).
-2. For GarageBand, build the Audio Unit ([Audio Unit build](build.md#audio-unit)),
-   copy `build-au/plugins/au/Convolver.component` to
-   `~/Library/Audio/Plug-Ins/Components/` and check it:
+2. For GarageBand, install the package's Audio Unit,
+   `Components/Convolver.component`, as the [install guide](../use/install.md)
+   says, and clear its quarantine
+   ([unsigned previews](../use/install.md#unsigned-previews)). The smoke test checks the candidate's own
+   component (AU-5), so first move aside any copy built from source, in
+   either Components folder. Then check it:
 
    ```sh
    killall -9 AudioComponentRegistrar 2>/dev/null || true
@@ -251,9 +259,10 @@ except the Audio Unit build, which runs in a source checkout.
    In jrp's Audacity 4.0.2 session (7 November 2026) the administrator
    prompt was cancelled, so this folder is not yet confirmed in a test;
    copies in the user's `~/Library/Audio/Presets` folder were not how
-   Audacity found presets. Without it, load each filter in steps 3, 6 and
-   7 with Convolver's **Choose…** instead (the example folders hold each preset's
-   `filter.cfg`).
+   Audacity found presets. The first preview supports only this route in
+   Audacity ([decision](../project/decisions.md#plug-in-behaviour)): a
+   filter loaded with Convolver's **Choose…** plays but is not exported or
+   saved (VST3-17 in [TODO](../../TODO.md)), so it is no substitute.
 4. Have a stereo test file at 44.1 kHz and one at 48 kHz, with clear
    transients (a click track or spoken word). For the 48 kHz checks, the
    repository includes a [quiet stereo listening clip](../../examples/host-audio/README.md)
@@ -300,8 +309,8 @@ except the Audio Unit build, which runs in a source checkout.
 5. Toggle the plug-in's bypass (the checkbox beside its name) while playing.
    The sound switches between filtered and unfiltered; note any click.
 6. Render the project (*File › Render*, offline) to a WAV and check that it
-   holds the echo, starting in time with the source rather than 256 samples
-   late.
+   holds the echo, starting in time with the source (at a Latency above 0,
+   rather than that many samples late).
 7. Save the project, quit REAPER, reopen the project and play: the echo is
    still there.
 8. While the echo plays, import `presets/identity-44100-stereo/identity-44100-stereo.vstpreset`.
@@ -394,7 +403,7 @@ preparation and steps 2, 3 and 9 below include what it found.
 6. Remove the real-time effect. Select a few seconds, choose Convolver from the
    **Effect** menu with the `echo-48000-stereo` preset, and apply it. Zoom in on
    a transient: the result starts where the original did (Audacity removes the
-   reported 256-sample delay by default). Undo.
+   reported delay by default; at the default Latency of 0 there is none). Undo.
 7. Add the effect again with the echo preset, play, and choose
    `identity-44100-stereo`. The echo keeps playing. Stop and start playback:
    the echo must still play, not silence or unfiltered sound. Record what
@@ -420,6 +429,24 @@ preparation and steps 2, 3 and 9 below include what it found.
    Choose 1024 frames for Latency and record whether Audacity restarts the
    effect at once or at the next playback, and whether the track stays in
    time. Record anything the window does differently from REAPER.
+   In Audacity 4.0.2 the filter chosen here is not kept for an export or a
+   saved project (VST3-17); step 10 checks the supported route instead.
+10. Your own filter through the preset menu, the route the first preview
+    supports in Audacity. Make a preset from the stereo example and put it
+    in the system folder, then restart Audacity:
+
+    ```sh
+    ./bin/convolver-preset examples/first-use/stereo/filter.cfg own-filter.vstpreset
+    sudo cp own-filter.vstpreset /Library/Audio/Presets/Convolver/Convolver/
+    ```
+
+    Import `examples/first-use/stereo/input.wav` into a new 48000 Hz
+    project, add Convolver as a real-time effect and choose `own-filter`
+    from Audacity's preset menu without touching Gain, Mix or Latency.
+    Export the whole project (stereo, 48000 Hz, 32-bit float WAV) and run `./bin/convolver --compare
+    export.wav examples/first-use/stereo/expected.wav`. Save the project,
+    quit, reopen it, export again and compare again. Both comparisons must
+    pass. Remove `own-filter.vstpreset` from the folder afterwards.
 
 ### GarageBand (Audio Unit)
 
@@ -495,7 +522,7 @@ seen in, what was observed, what is not yet known, and the evidence.
    `convolver-preset` operation too.
 2. Check identity, echo and repeat output at 44.1/48/96 kHz, mono/stereo, variable blocks,
    long-tail silence, stop/start/seek and offline/bounce rendering. Align numerical
-   comparison by 256 samples; use an independent time-domain convolution reference.
+   comparison by the reported latency (0 frames by default); use an independent time-domain convolution reference.
 3. Exercise bypass automation, multiple instances and filter replacements. Check
    levels and nonfinite output. The filter transition starts with fresh history.
 4. Save a project, remove its original IRs, close/reopen, and transfer the project

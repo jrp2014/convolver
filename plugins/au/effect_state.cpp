@@ -331,8 +331,9 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
         }
         update_status();
     }
-    // Listeners may call back into the unit, so notify outside the lock.
-    PropertyChanged(kAudioUnitProperty_TailTime, kAudioUnitScope_Global, 0);
+    // Listeners may call back into the unit, so notify outside the lock; on
+    // the main thread, as a restore may run on another (AU-17).
+    tell_listeners(notice_tail);
     log_faults(faults);
     log(message, problem); // A restored failed load says why it plays silence.
     if (accepted && settings_unreadable)

@@ -4,7 +4,8 @@
 # release (CI-6; its version, commit and checksum are in the job summary),
 # tested through the Audio Unit API and the shared PLUG-2 harness, then
 # installed for the user, checked by auval and pluginval (AU-3), and played
-# through AVAudioEngine (AU-15).
+# through AVAudioEngine (AU-15). Debug builds run the AU tests under ASan and
+# UBSan, and the adapter test under ThreadSanitizer (AU-3).
 name: Audio Unit
 
 'on':
@@ -231,19 +232,57 @@ jobs:
         if: success() && github.run_attempt != '1'
         uses: ./.github/actions/note-retry
 
+  # Two Debug builds of the AU tests, side by side. auval cannot load an
+  # instrumented bundle, so only the in-process tests run here, and the
+  # core's own sanitizer runs are in the native workflow.
+  #
   # CONVOLVER_SANITIZERS=ON compiles the adapter, AudioUnitSDK and the AU
   # tests with ASan and UBSan (jrp's review of 0.5.5: they were only linked
-  # with the runtimes). Only the AU tests run here: the core's sanitizer runs
-  # are in the native workflow, and auval cannot load an instrumented bundle.
-  # This job also builds the fallbacks, libsndfile for the window's filter
-  # files and FFTW for the FFT, so they keep working; the Release job above
-  # builds the defaults (AudioToolbox and Accelerate) that packages use.
+  # with the runtimes). That build also uses the fallbacks, libsndfile for
+  # the window's filter files and FFTW for the FFT, so they keep working; the
+  # Release job above builds the defaults (AudioToolbox and Accelerate) that
+  # packages use.
+  #
+  # AU-3: au.adapter again under ThreadSanitizer, with the defaults the
+  # packages use. It switches bypass from another thread while rendering,
+  # sets the Latency from audio threads and holds the Latency work's lock
+  # while the host changes bypass. ThreadSanitizer cannot be combined with
+  # ASan, so it is a build of its own, of that one test.
   au-sanitizers:
     # Skipped with the sdk job when the scope job finds nothing to build.
     needs: sdk
+    name: ${{ matrix.name }}
     runs-on: macos-15
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: AU tests (Debug, ASan and UBSan, fallbacks)
+            packages: libsndfile fftw
+            configure: >-
+              -DCONVOLVER_SANITIZERS=ON -DCONVOLVER_AU_FILE_READER=LIBSNDFILE
+              -DCONVOLVER_FFT_BACKEND=FFTW
+            # Only what the au.* tests run (CI-9).
+            targets: convolver_au_suite
+            tests: -L au
+            cache: au-sanitizers-macos-15
+            tsan: false
+          - name: AU adapter tests (Debug, ThreadSanitizer)
+            packages: libsndfile
+            configure: >-
+              -DCMAKE_CXX_FLAGS=-fsanitize=thread
+              -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread
+              -DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=thread
+              -DCMAKE_MODULE_LINKER_FLAGS=-fsanitize=thread
+            targets: convolver_au_tests
+            tests: -R '^au\.adapter$'
+            cache: au-tsan-macos-15
+            tsan: true
     env:
+      # Every race is reported, with both threads' stacks, and any report
+      # fails the test at exit (on macOS by aborting).
+      TSAN_OPTIONS: halt_on_error=0 second_deadlock_stack=1
       CMAKE_C_COMPILER_LAUNCHER: ccache
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
     steps:
@@ -263,24 +302,34 @@ jobs:
           python scripts/release/sources.py --lock "$RUNNER_TEMP/lock/audiounitsdk-lock.json" --fetch
           --cache "$RUNNER_TEMP/downloads" --destination "$RUNNER_TEMP/sources" audiounitsdk
       - name: Tools and libraries
-        run: brew install libsndfile fftw
+        run: |
+          xcodebuild -version
+          brew install ${{ matrix.packages }}
       - name: Compiler cache
         uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d  # v1.2.24
         with:
-          key: au-sanitizers-macos-15
+          key: ${{ matrix.cache }}
           max-size: 1G
           save: ${{ github.event_name != 'pull_request' }}
       - name: Configure
         run: >-
-          cmake -S . -B build-au -DCMAKE_BUILD_TYPE=Debug -DCONVOLVER_SANITIZERS=ON
+          cmake -S . -B build-au -DCMAKE_BUILD_TYPE=Debug
           -DCONVOLVER_BUILD_AU=ON "-DCONVOLVER_AU_SDK=$RUNNER_TEMP/sources/AudioUnitSDK"
-          -DCONVOLVER_LEGACY_TESTS=OFF -DCONVOLVER_AU_FILE_READER=LIBSNDFILE
-          -DCONVOLVER_FFT_BACKEND=FFTW
-      # Only what the au.* tests run (CI-9).
+          -DCONVOLVER_LEGACY_TESTS=OFF ${{ matrix.configure }}
       - name: Build
-        run: cmake --build build-au --target convolver_au_suite
-      - name: AU adapter, harness and lifecycle under ASan and UBSan
-        run: ctest --test-dir build-au --output-on-failure --output-junit junit.xml -L au
+        run: cmake --build build-au --target ${{ matrix.targets }}
+      # A run without the runtime would pass without checking anything.
+      - name: Check that the test links ThreadSanitizer
+        if: matrix.tsan
+        run: |
+          test_program=$(find build-au -type f -perm -u+x -name convolver_au_tests | head -n 1)
+          otool -L "$test_program" | tee linked.txt
+          grep -q 'libclang_rt.tsan' linked.txt
+      # A test renamed away from the selection fails rather than passing unrun.
+      - name: Test
+        run: >-
+          ctest --test-dir build-au --output-on-failure --output-junit junit.xml
+          --no-tests=error ${{ matrix.tests }}
       - name: Collect test evidence
         if: failure()
         run: python scripts/ci_evidence.py test-evidence build-au

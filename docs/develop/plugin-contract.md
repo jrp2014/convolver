@@ -7,8 +7,8 @@
 For anyone writing, changing or reviewing a plug-in adapter (VST3, Audio Unit,
 LV2), and for host integrators. This page is the reference for what every
 adapter must do; [how the plug-ins behave](../use/plugins.md) says how that
-looks to a user. The rules were designed in the
-[plug-in formats plan](../project/plans/2026-10-21-plugin-formats.md#shared-adapter-contract)
+looks to a user. The rules were designed in the archived
+[plug-in formats plan](../archive/plans/2026-10-21-plugin-formats.md#shared-adapter-contract)
 and are maintained here.
 
 **In short:**
@@ -243,10 +243,16 @@ format.
   and `Note:` lines ([`advice.hpp`](../../portable/advice.hpp)); then
   the filter's name for the heading (the file's name with its extension;
   after a restore the name saved with the project, `HostRequest::name` in
-  the Audio Unit, or VST3's controller state while the filter's identity
+  the Audio Unit, or VST3's controller state (which a `.vstpreset` made by
+  `convolver-preset` also holds, PLUG-31) while the filter's identity
   (`HostFilter::filter_identity()`, a hash of every stored value, found once
   when the filter is accepted) matches the one saved beside it, or
-  "From the saved project or preset" without one; PLUG-22) and a note when
+  "Restored filter" without one, which claims no origin the host did not
+  give; PLUG-22, PLUG-31. VST3 keeps the pair that named the playing filter
+  before the newest controller state and uses whichever pair matches, in
+  the report and in `Controller::getState`, since a host sends a refused
+  preset's controller state as well, in either order with the component
+  state) and a note when
   the newest request was
   refused, the filter's own values for under its name (rate, channels,
   length and taps, speakers; PLUG-22), the Audio facts as short labelled
@@ -270,10 +276,26 @@ format.
   caller, with a property-change notification for 64000 wherever the Status
   parameter's event is sent. They are internal between the unit and its own
   window, which ship together, so they are not permanent identities.
+  Audio Unit listeners (AU-17): the unit's own notifications of the
+  latency, the tail and 64000 reach the host's property listeners on the
+  main thread. AUBase keeps its listeners in a vector without a lock, which
+  hosts change on their main thread, so a notice raised on any other thread
+  (the Latency queue, or a host call such as a restore, `Initialize` or a
+  format change made off the main thread) is handed to the main queue
+  through a `DISPATCH_SOURCE_TYPE_DATA_OR` source, as the JUCE Audio Unit
+  wrapper does, instead of reaching listeners during that call. Notices
+  posted before the main thread runs coalesce, and one still pending when
+  the unit closes is dropped. A host whose main thread never runs its run
+  loop is not told of those changes and reads the latency and tail when it
+  asks for them; each instance it opens then keeps a small record and a
+  dispatch source until the process ends. The `ClassInfo` and
+  `PresentPreset` notices for a file chosen in the window, and the Audio
+  Unit SDK's own notices for a host's property calls, are sent on the
+  calling thread as before; the window chooses files on the main thread.
   `kAudioUnitProperty_CocoaUI` names the window's factory class in this
   image's own component bundle; the factory and view class names carry the
-  version. Unlike the editor plan's rule that the window copies reports
-  pushed to it ([threads](../project/plans/2026-10-24-plugin-editor.md#threads),
+  version. Unlike the archived editor plan's rule that the window copies reports
+  pushed to it ([threads](../archive/plans/2026-10-24-plugin-editor.md#threads),
   rule 2), the AU window reads 64000 itself, as Audio Unit views do: twice a
   second while its window is on screen, on the main thread. A read builds
   the report under the unit's control lock when the lock is free, and keeps
@@ -497,8 +519,8 @@ around the plug-in, and no adapter can stop that.
 
 `HostProcessor` implements this, so every adapter that drives it through
 `set_bypass` follows the rule; the PLUG-2 `bypass` case checks it. An adapter
-must not use its format's own pass-through bypass (see the AU design in the
-[plug-in formats plan](../project/plans/2026-10-21-plugin-formats.md#au-adapter-design)).
+must not use its format's own pass-through bypass (see the AU design in the archived
+[plug-in formats plan](../archive/plans/2026-10-21-plugin-formats.md#au-adapter-design)).
 
 Whether saved state records bypass follows each format's convention. VST3 saves its bypass parameter with the
 component state, as the SDK's examples do. In LV2 (the `enabled` port) and
@@ -508,7 +530,7 @@ state from another format.
 
 ## Settings
 
-PLUG-10, from the [editor plan](../project/plans/2026-10-24-plugin-editor.md#settings),
+PLUG-10, from the archived [editor plan](../archive/plans/2026-10-24-plugin-editor.md#settings),
 whose choices jrp made on 24 and 25 October 2026
 ([decisions](../project/decisions.md#identities-and-file-formats)). Every
 adapter offers the same settings as host parameters, so they work in generic
@@ -569,8 +591,9 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   position: long for a linear-phase filter), and the audio still inside the
   old processor, including a sounding tail, is dropped.
   The host is told the new latency when the new processor is handed over.
-  Not automatable. The [editor plan](../project/plans/2026-10-24-plugin-editor.md#settings)
-  keeps the load measurement beside it for later.
+  Not automatable. The load meter the archived
+  [editor plan](../archive/plans/2026-10-24-plugin-editor.md#settings) puts
+  beside it is for a later preview (PLUG-10).
 - **Saved form:** each format's own way. The Audio Unit's parameters are
   saved by `AUBase::SaveState` in `ClassInfo` ("data"); VST3 saves them in
   host state version 3, written only when a setting differs from its
@@ -605,7 +628,7 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   Render no longer marks it, waiting at most for the rest of one render
   call. Destroying the unit cancels the source and waits for work already
   running. Uninitialized, `kAudioUnitProperty_Latency` simply follows the
-  choice. The host is told of the new latency and tail from the queue, and the
+  choice. The host is told of the new latency and tail, and the
   log says what changed; the log line is best effort, so running out of
   memory while writing it does not undo or misreport a change. The new
   processor starts the fault count again, so the window's fault totals
@@ -784,8 +807,16 @@ loading. These names are permanent, like the
 - **VST3 (`.vstpreset`):** Steinberg's documented preset file: the header
   `VST3`, format version 1, the processor class ID, then one component-state
   chunk (`Comp`) holding a 32-bit little-endian length and the encoded state.
-  The tool's writer needs no SDK; `vst3.preset_format` checks that its output is
-  byte-identical to the SDK's `PresetFile::savePreset`.
+  After it, a controller-state chunk (`Cont`) names the filter for the window
+  as a file chosen there does (PLUG-31): the controller state `CVCS` version
+  1 ([PLUG-22](#status-and-log), `portable/vst3_controller_state.hpp`) with the
+  name of the file the preset was made from, with its extension and without
+  its folder, and the filter's identity. Converting a `.vstpreset` keeps its
+  name only while that identity still matches the filter; a name that is
+  empty, not UTF-8 or longer than the plug-in reads is left out, never
+  refused. The tool's writer needs no SDK; `vst3.preset_format` checks that
+  its output, with and without the name, is byte-identical to the SDK's
+  `PresetFile::savePreset`.
 - **AU (`.aupreset`):** an XML property list, the dictionary that Audio Units
   save as `ClassInfo`. It has Apple's standard keys (`version` 0, `type`,
   `subtype` and `manufacturer` as the numbers of `aufx`, `Conv` and `CONV`,
@@ -817,8 +848,8 @@ Compatibility rules for presets:
   keep writing version 1 for filters that do not need it, so older plug-in
   builds can still read those presets.
 - `convolver-vst3-preset` is the same tool under its old name, limited to its
-  old behaviour: the same arguments, messages and output bytes, and only
-  `.vstpreset` output.
+  old behaviour: the same arguments, messages and output bytes (so no `Cont`
+  chunk), and only `.vstpreset` output.
 
 ## Format notes
 
@@ -912,9 +943,9 @@ How each adapter meets the contract where its format differs:
   plugin state with an empty map"): no filter, no failure, no path, and loads
   still outstanding are superseded. The status port
   follows the newest request (3, Loading, while it is outstanding); the path
-  it reports and saves follows the installed filter. The full rules are in
-  the plan's
-  [worker and state lifecycle](../project/plans/2026-10-21-plugin-formats.md#lv2-adapter-design).
+  it reports and saves follows the installed filter. The design, with the full
+  lifecycle, is in the archived formats plan's
+  [worker and state lifecycle](../archive/plans/2026-10-21-plugin-formats.md#lv2-adapter-design).
   It needs `urid:map`, uses `work:schedule` to load files, logs through
   `log:log` (otherwise standard error), and reads `bufsz:maxBlockLength` from
   `options` when given; without it, or for longer `run()` calls, it processes in

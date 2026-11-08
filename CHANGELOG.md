@@ -12,6 +12,57 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Release evidence (REL-6, REL-7): jrp's responsiveness qualification of
+  the 0.12.5 source on his MacBook Pro is recorded: all 24 combinations
+  passed on the first run, with the longest hold of the host's thread
+  43.2 ms and the longest judged callback 2.95 ms
+  ([record](docs/archive/reviews/2026-11-08-rel6-qualification.md)). The
+  status page now lists, once, the checks left before the first preview
+  is published, keeping the host results jrp accepted
+  ([checks left](docs/project/status.md#checks-left-before-publication)).
+- Host checks (HOST-1, AU-4): jrp's 8 November 2026 checks of the v0.12.8
+  candidate are recorded
+  ([record](docs/archive/reviews/2026-11-08-v0128-host-checks.md)). In
+  REAPER a render, save and reopen, a refused preset and a change of host
+  rate passed against the CLI; in GarageBand a packaged preset with save
+  and reopen, Recent and Reload passed. In Audacity 4 a filter chosen with
+  Choose… was missing from the export, because Audacity stores a plug-in's
+  state only after a parameter edit (VST3-17, open).
+  For the first preview, Audacity is supported through its own preset
+  menu only, and the release notes say so.
+- Releases (REL-8): a "Draft preview release" workflow turns a passed
+  candidate run on a `vX.Y.Z` tag into a draft GitHub pre-release. It refuses
+  a run that was not started by hand on the tag or did not pass, or whose
+  tag holds another commit or version, checks every file against
+  `SHA256SUMS` and the candidate record, attaches only the macOS packages
+  and the corresponding source, writes the release notes (each file's
+  SHA-256, the run, the install guide, known limitations and the
+  responsiveness result) and downloads the attached files again to compare
+  them. Nothing is public until jrp publishes the draft. Pull requests that
+  change it run a dry run on the newest tag candidate. jrp rehearsed it on
+  8 November 2026 with the v0.12.5 candidate: the draft was right and was
+  deleted. REL-8 is done.
+- Tests (AU-3): the Audio Unit workflow runs `au.adapter` under
+  ThreadSanitizer, in a Debug build with the defaults the packages use, on
+  the runs where that workflow already runs. It switches bypass from another
+  thread while rendering, sets the Latency from audio threads and holds the
+  Latency work while bypass changes; a step checks that the test is
+  instrumented. Its first runs reported four races, all in the test's own
+  setup, which relied on a dispatch source's wake-up that ThreadSanitizer
+  does not see as ordering; the test now sets its hooks before any unit
+  exists and publishes each hold atomically. No plug-in code changed. AU-3
+  is done, and with it first-preview gate 4.
+- Host checks (HOST-1, AU-4): jrp's 8 November 2026 checks with the 0.12.5
+  candidate are recorded. In REAPER, part C on the redesigned window
+  passed its controls and state, including save, quit and reopen, and the
+  latency renders lined up again
+  ([record](docs/archive/reviews/2026-11-08-host1-reaper-window.md)). In
+  GarageBand, the Audio Unit's presets, **Choose…**, a refused preset,
+  settings kept after reopening and two exports matching the CLI passed
+  ([record](docs/archive/reviews/2026-11-08-au4-garageband.md)). Listening
+  was not checked in either. jrp decided these results stand for the final
+  candidate after PLUG-31, where only what it touches and the unchecked
+  steps are run.
 - Preview qualification (REL-7): an acceptance plan with a fixed-candidate
   stop rule, required gates, blocker classification and deferred work.
   CI-34 proposes scheduling improvements separately; workflows and useful
@@ -202,6 +253,70 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Documentation (DOC-10, from jrp's file-loading review of 7 November 2026
+  and his release-direction review of 8 November): [your first sound in a
+  host](docs/use/first-sound-in-a-host.md) now runs choose a filter, check
+  its rate and channels, play, save the project, with **Choose…** in
+  Convolver's window and the package's `filter.cfg` files; host presets and
+  `convolver-preset` are an optional section for plug-ins without a window
+  and for preset libraries. It says that Choose… reads IR files, `.cfg`
+  files and lists from any folder but not preset files. One table in [how
+  the plug-ins behave](docs/use/plugins.md#loading-a-filter) lists what each
+  way of loading a filter reads, and one table in [plug-in
+  presets](docs/use/presets.md#preset-folders) gives the host preset
+  folders. The stereo and crossover checks choose `filter.cfg` in the
+  window, with the `.vstpreset` as the route without one. A file chosen in
+  the window must have exactly as many inputs as the host gives, unlike a
+  preset (TODO PLUG-33), so the crossover check loads the preset where the
+  host gives more inputs, as REAPER does. A new [In
+  Audacity](docs/use/first-sound-in-a-host.md#in-audacity) section gives the
+  route the first preview supports there, Audacity's own preset menu, since
+  Audacity 4.0.2 does not keep a filter loaded from the window for exports
+  or saved projects. The first-use guide gains a short "Before you start"
+  list, and [report a problem](docs/use/troubleshooting.md#report-a-problem)
+  and the GitHub problem form ask for Copy Diagnostics, the loading method
+  and whether playback, an export or reopening is affected. No behaviour
+  change.
+- CI (CI-34, first step, approved by jrp on 8 November 2026): a pull request
+  builds the plug-in distribution candidates, whose macOS builds are the
+  slowest jobs, only when it changes release files, packaged pages, the
+  macOS window, the build configuration or a shipped dependency; for
+  anything else, start the workflow by hand on the branch. A change only to
+  `scripts/release/`, `tests/release/` or `packaging/` now runs only the
+  candidates, and a change to a guide in `docs/use/` builds them only when
+  the page has a command they run or shows an image. Pushes to `main`, the weekly run and
+  manual runs still build them every time, and no test was removed.
+- Plug-in presets (PLUG-31, from jrp's REAPER check of VST3-16, 8 November
+  2026): a `.vstpreset` made by `convolver-preset` also holds the name of
+  the file it was made from, with its extension and without its folder, and
+  that filter's identity, as the VST3 controller state that a file chosen
+  in the window saves (PLUG-22). Loaded through Steinberg's preset code, as
+  the tests do, the VST3 window's heading then names the file
+  (`impulse.wav`, `filter.cfg` for the packaged presets) while that filter
+  plays. jrp checked this in REAPER 7.85 on 8 November 2026
+  ([record](docs/archive/reviews/2026-11-08-plug31-reaper.md)). A restored filter with no name (an
+  older project or preset, or another filter than the name's) is headed
+  "Restored filter" in every format, in place of "From the saved project
+  or preset", which named an origin the plug-in cannot know (jrp's choice). Converting a `.vstpreset` keeps its name only while it still
+  matches the filter. The audio state is unchanged, so presets sound the
+  same; VST3 builds from 0.5.0 on load them as before.
+  `convolver-vst3-preset` still writes its original bytes, without the
+  name. The controller state's reader and writer moved to
+  `portable/vst3_controller_state.hpp` so the tool, which needs no SDK,
+  shares them.
+- Documentation (DOC-13, from jrp's review of `main` at `21711c5`, 8
+  November 2026): [TODO](TODO.md) holds open work only. The 122 finished
+  items' one-line entries moved, with their IDs and links, to
+  [`docs/archive/todo/`](docs/archive/todo/2026-11-08-done-items.md), whose
+  IDs the repository checks (`scripts/check_repository.py`) now count as
+  defined and done; the execution priorities no longer describe VST3-16 as an
+  open draft. The plug-in formats and editor plans, whose state paragraphs
+  dated from October, are [archived as superseded](docs/archive/plans/README.md);
+  the risks, the PipeWire comparison and one owner's question they still
+  held moved to HOST-2, VST3-6, AU-6, LV2-4 and LV2-5. Dated dependency versions, fixed intermittent failures and old
+  timings moved from the [testing guide](docs/develop/testing.md) to an
+  [evidence record](docs/archive/reviews/2026-11-08-testing-guide-evidence.md),
+  leaving the two failure causes that still apply to new work.
 - Documentation (DOC-11, from jrp's review of `main` at `bf6a207`, 8
   November 2026): the [status page](docs/project/status.md) agrees with the
   dated host records. It is dated 8 November 2026 against 0.12.1, no longer
@@ -720,6 +835,32 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Audio Unit (AU-17, a ThreadSanitizer report on `main` at `8af5efd`): the
+  unit told the host's property listeners about a new latency, tail or
+  window report from its own Latency queue, while hosts add and remove
+  listeners on their main thread; the Audio Unit SDK keeps them in a list
+  without a lock, so the two could collide and, at worst, crash the host
+  just after a Latency change or a restored project. No host showed it.
+  These notifications now reach listeners on the main thread, as the JUCE
+  Audio Unit wrapper sends them; one still pending when the unit closes is
+  dropped. No change to the audio. A test adds and removes listeners while
+  Latency changes are applied, under ThreadSanitizer in CI.
+- Releases (REL-7, from jrp's review of 8 November 2026): the draft
+  pre-release notes say how to report a problem: Copy Diagnostics, the
+  host and its version, how the filter was loaded, and whether playback,
+  export or reopening is affected.
+- VST3 (HOST-1, from jrp's v0.12.8 REAPER check): after a refused preset,
+  the window's heading changed from the playing filter's name to
+  "Restored filter", and a project saved then kept the refused preset's
+  name, because the host sends that preset's controller state too. The
+  processor and the controller now keep the pair that named the playing
+  filter and use whichever pair matches it, in either order of the two
+  states; audio was not affected.
+- Guides (REL-8): the install guide now says how to open the unsigned macOS
+  installer (**Open Anyway** in Privacy & Security); it described only
+  clearing the quarantine of bundles copied from the ZIP archive. The limits
+  page no longer says the plug-ins have no window: the VST3 plug-in and the
+  Audio Unit have one on macOS.
 - VST3 (VST3-16, from jrp's HOST-1 REAPER run and his trace with PR #134's
   trace build): in REAPER 7.85 a new Latency stayed unused until a render,
   FX Offline then Online, or reopening the project. Convolver asked REAPER

@@ -396,7 +396,7 @@ void cases() {
     require(fact(host_report(f, facts(stereo, {24, 0})), "Loudest peak").note ==
                 "(cannot clip at this Gain and Mix)",
             "loudest peak at mix 0");
-    require(r.filter_name == "From the saved project or preset" && r.filter_note.empty(),
+    require(r.filter_name == "Restored filter" && r.filter_note.empty(),
             "filter row: " + r.filter_name + " / " + r.filter_note);
     require(reference(r, "Filter file") == "a saved project or preset, request 1",
             "filter file: " + reference(r, "Filter file"));
@@ -476,7 +476,7 @@ void cases() {
             "saved name: " + host_report(named, facts(stereo)).filter_name);
     HostFilter unnamed(8);
     unnamed.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {});
-    require(host_report(unnamed, facts(stereo)).filter_name == "From the saved project or preset",
+    require(host_report(unnamed, facts(stereo)).filter_name == "Restored filter",
             "no saved name: " + host_report(unnamed, facts(stereo)).filter_name);
     std::string files;
     for (const auto& [key, value] : report_fields(rc))

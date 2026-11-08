@@ -10,18 +10,19 @@ window or for a host's preset library. You will make a preset from an IR or
 
 **In short:**
 
-- The simplest way to give a plug-in a filter is to choose the IR file,
-  `.cfg` or configuration list itself: with **Choose…** in
-  [Convolver's window](plugins.md#convolvers-window) (the VST® 3 plug-in on
-  macOS and the Audio Unit) or the host's file chooser (LV2, in hosts that
-  show its file parameter, such as Ardour). A **preset**
-  is the other way, through the host's preset menu, and
-  `convolver-preset` makes one from an impulse response (IR), a
-  [`.cfg`](configuration.md) or a configuration list. You need one where the
-  plug-in has no window (the VST3 plug-in on Windows and Linux), in an LV2
-  host with no file chooser, or to keep filters in the host's preset
-  library.
-- The name you give the new file picks the format: `room.vstpreset` (VST® 3),
+- You do not need a preset to use a filter. The ordinary way is to choose
+  the IR file, `.cfg` or configuration list itself, from any folder, with
+  **Choose…** in [Convolver's window](plugins.md#convolvers-window) (the
+  Audio Unit and the VST® 3 plug-in on macOS) or the host's file chooser
+  (LV2, in hosts that show it), then save the project
+  ([your first sound in a host](first-sound-in-a-host.md)).
+- A **preset** is the same filter in the host's preset format, loaded from
+  the host's preset menu. You need one where the plug-in has no window (the
+  VST3 plug-in on Windows and Linux), in an LV2 host with no file chooser,
+  or to keep filters in the host's preset library. `convolver-preset` makes
+  one from an impulse response (IR), a [`.cfg`](configuration.md) or a
+  configuration list.
+- The name you give the new file picks the format: `room.vstpreset` (VST3),
   `room.aupreset` (Audio Unit) or `room.preset.lv2` (an LV2 preset folder).
   Name several to make them all at once:
   `convolver-preset room.cfg room.vstpreset room.aupreset room.preset.lv2`.
@@ -38,7 +39,8 @@ window or for a host's preset library. You will make a preset from an IR or
   builds for existing scripts. Preview packages contain only `convolver-preset`.
 
 Contents: [make a preset](#make-a-preset) · [convert a VST3 preset](#convert-a-vst3-preset) ·
-[load it in a host](#load-it-in-a-host) · [when a preset does not fit](#when-a-preset-does-not-fit) ·
+[load it in a host](#load-it-in-a-host) · [preset folders](#preset-folders) ·
+[when a preset does not fit](#when-a-preset-does-not-fit) ·
 [messages](#messages) · [old and new versions](#old-and-new-versions)
 
 ## Make a preset
@@ -63,7 +65,14 @@ convolver-preset --name "Living room" impulse.wav living.aupreset
   host's sample rate and channel counts.
 - **Name:** `--name` sets the name hosts show for AU and LV2 presets. Without it,
   the file name of the first AU or LV2 output is used (`room.preset.lv2` gives `room`). A
-  `.vstpreset` stores no name; hosts show its file name.
+  `.vstpreset` stores no preset name; hosts show its file name.
+- **Filter name:** a `.vstpreset` also keeps the name of the file you made it
+  from, with its extension but not its folder (`Living room 48k.cfg`), as
+  the plug-in's own saved state does for a file chosen in the window. A host
+  that gives the plug-in this part of the preset, as Steinberg's own preset
+  code does, then shows the name in the VST3 window after the preset is
+  loaded and after the project is reopened, as REAPER does. Converting a `.vstpreset` keeps its name while the name still
+  belongs to that filter. `--name` does not change it.
 - **Help:** `convolver-preset --help` lists these options and the preset
   formats.
 - **New files only:** every output must be a new path. If any output cannot be
@@ -103,33 +112,34 @@ already holds one filter.
 
 ## Load it in a host
 
-- **VST3:** use the host's preset menu ("Load Preset…", or the preset browser)
-  on the plug-in. Hosts that
-  keep a preset library also find presets in their VST3 preset folder, for
-  example `~/Library/Audio/Presets/Convolver/Convolver/` on macOS.
-  **Audacity 4** imports only its own preset files, not `.vstpreset`. It lists
-  the files in the system-wide folder instead:
-  `/Library/Audio/Presets/Convolver/Convolver/` on macOS,
-  `C:\ProgramData\VST3 Presets\Convolver\Convolver\` on Windows and
-  `/usr/local/share/vst3/presets/Convolver/Convolver/` on Linux (copying there
-  needs an administrator), then restart Audacity. They appear in the
-  effect's preset menu under their file names, so give each preset its own
-  name, such as `room-48000.vstpreset`. On macOS you can also choose the preset's `.cfg` or IR file with **Choose…** in
-  Convolver's window (turn on *Preset options › Use vendor UI* if Audacity
-  shows only its own controls). Audacity always runs Convolver with
-  two channels, even on a mono track, so use a stereo (2-in, 2-out) preset,
-  and set its playback rate to the preset's
+- **VST3:** load the `.vstpreset` from the host's preset menu ("Load
+  Preset…", or the preset browser; in REAPER, the **+** button beside the
+  preset menu, then the item that imports a VST preset file). Hosts that
+  keep a preset library also list presets saved in their
+  [preset folder](#preset-folders).
+  **Audacity 4** imports only its own preset files, not `.vstpreset`.
+  Instead, copy the presets to the VST3 folder for all users in
+  [preset folders](#preset-folders) (this needs an administrator) and
+  restart Audacity. They appear in the effect's preset menu under their
+  file names, so give each preset its own name,
+  such as `room-48000.vstpreset`. This preset menu is the route the first
+  preview supports in Audacity: a filter loaded from Convolver's window
+  (Choose…, Recent, Reload, or reloading when the file changes) plays while
+  you listen, but Audacity 4.0.2 does not keep it for exports or saved
+  projects, which keep whatever Audacity stored last, possibly no filter or
+  an older one ([in Audacity](first-sound-in-a-host.md#in-audacity)). Audacity always runs Convolver with two channels, even on a
+  mono track, so use a stereo (2-in, 2-out) filter, and set its playback
+  rate to the filter's
   ([the rate a host plays at](plugins.md#status-and-the-convolver-log)).
 - **AU:** load the `.aupreset` from the host's preset menu. Logic and
-  GarageBand list user presets saved under
-  `~/Library/Audio/Presets/Convolver/Convolver/`.
-- **LV2:** copy the whole `room.preset.lv2` folder into a folder
-  LV2 hosts scan, such as `~/.lv2/` on Linux, then choose the preset by its name
-  in the host's preset list for that plug-in. The folder's name only has to end
-  in `.lv2`. LV2 plug-ins have fixed channel counts, so the preset belongs to the
-  plug-in whose counts match the filter; the tool prints that plug-in's URI.
-  Hosts that show LV2 file parameters, such as Ardour and Jalv, can also
-  choose the IR file or `.cfg` directly
+  GarageBand list the user presets in their [preset folder](#preset-folders).
+- **LV2:** copy the whole `room.preset.lv2` folder into a
+  [folder LV2 hosts scan](#preset-folders), then choose the preset by its
+  name in the host's preset list for that plug-in. The folder's name only
+  has to end in `.lv2`. LV2 plug-ins have fixed channel counts, so the
+  preset belongs to the plug-in whose counts match the filter; the tool
+  prints that plug-in's URI. Hosts that show LV2 file parameters, such as
+  Ardour and Jalv, can also choose the IR file or `.cfg` directly
   ([LV2 filter files](plugins.md#lv2-filter-files)).
 
 The preset holds the whole filter, and the host saves the same data in your
@@ -139,6 +149,25 @@ are moved or deleted.
 **Check it worked:** the tool prints `Created self-contained … preset` and the
 path of each file it wrote, and the host plays the filtered sound once the preset is loaded. If the
 plug-in plays silence, see [when a preset does not fit](#when-a-preset-does-not-fit).
+
+## Preset folders
+
+A preset loads from any folder through the host's preset menu. These are
+the folders where hosts look for presets on their own, to list them in a
+preset library. None of them is needed for **Choose…**.
+
+| Format | System | Your user account | All users (needs an administrator) |
+| --- | --- | --- | --- |
+| VST3 | macOS | `~/Library/Audio/Presets/Convolver/Convolver/` | `/Library/Audio/Presets/Convolver/Convolver/` |
+| VST3 | Windows | `%USERPROFILE%\Documents\VST3 Presets\Convolver\Convolver\` | `C:\ProgramData\VST3 Presets\Convolver\Convolver\` |
+| VST3 | Linux | `~/.vst3/presets/Convolver/Convolver/` | `/usr/local/share/vst3/presets/Convolver/Convolver/` or `/usr/share/vst3/presets/Convolver/Convolver/` |
+| AU | macOS | `~/Library/Audio/Presets/Convolver/Convolver/` | `/Library/Audio/Presets/Convolver/Convolver/` |
+| LV2 | Linux | `~/.lv2/` | `/usr/lib/lv2/` |
+
+The VST3 folders follow Steinberg's
+[preset locations](https://steinbergmedia.github.io/vst3_dev_portal/pages/Technical+Documentation/Locations+Format/Preset+Locations.html);
+hosts differ in which of them they read (Audacity 4 reads only the folder
+for all users).
 
 ## When a preset does not fit
 
@@ -185,7 +214,8 @@ give the same explanations as `convolver`; see
   cannot read is refused by that older plug-in: a filter already playing keeps
   playing, and otherwise the plug-in plays silence.
 - `convolver-vst3-preset`, the older name, takes the same arguments and writes
-  the same bytes as before, and makes only `.vstpreset` files.
+  the same bytes as before, and makes only `.vstpreset` files. Its presets
+  do not keep the filter's name.
 
 What a preset file contains is described for developers in the
 [plug-in adapter contract](../develop/plugin-contract.md#preset-files).
