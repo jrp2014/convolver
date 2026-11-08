@@ -30,6 +30,10 @@ Until 1.0 the C++ API may change between minor versions.
   state only after a parameter edit (VST3-17, open).
   For the first preview, Audacity is supported through its own preset
   menu only, and the release notes say so.
+- Releases (REL-7): jrp decided to publish the first preview without the
+  remaining host checks and the independent walkthrough; they stay open
+  as follow-up, and the release notes list what was not checked
+  ([decision](docs/project/decisions.md#releases)).
 - Releases (REL-8): a "Draft preview release" workflow turns a passed
   candidate run on a `vX.Y.Z` tag into a draft GitHub pre-release. It refuses
   a run that was not started by hand on the tag or did not pass, or whose

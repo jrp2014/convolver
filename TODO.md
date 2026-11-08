@@ -103,8 +103,13 @@ is superseded.
   jrp chose the final candidate: the first tag after DOC-10 merges, with
   most host checks run first on a v0.12.8 candidate and REL-6's 0.12.5
   result standing while no engine, loading or plug-in code changes
-  ([decisions](docs/project/decisions.md#releases)). Remaining: the
-  checks in that list, then his publication.
+  ([decisions](docs/project/decisions.md#releases)). Then (21:02) jrp
+  decided to publish the first preview from the next tag without further
+  testing; the checks in that list stay open as follow-up, not gates, and
+  the release notes say what was not checked
+  ([decisions](docs/project/decisions.md#releases)). Remaining: the next
+  tag's candidate run, the draft pre-release and his publication; the
+  checks move to HOST-1, AU-4 and REL-3 when this item closes.
 
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The candidate workflow
   builds unsigned packages with pinned dependencies, corresponding source,
@@ -128,7 +133,10 @@ is superseded.
   it worked, where they hesitated and what they could not do without help.
   Fix the guides or the product for each finding and repeat the affected
   steps. This is the exit criterion of the
-  [next milestone](#execution-priorities). jrp chooses the tester. Record
+  [next milestone](#execution-priorities). jrp chooses the tester.
+  jrp decided (8 November 2026) to publish the first preview before this
+  walkthrough, so it uses the published files and gates the next preview
+  ([decisions](docs/project/decisions.md#releases)). Record
   the evidence HOST-1 lists (package hash, host and OS versions, expected
   outputs, recovery from a refused filter) for each journey.
   jrp's review of 8 November 2026 adds the first thing to try: "The

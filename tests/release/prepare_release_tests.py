@@ -137,6 +137,8 @@ class PrepareReleaseTests(unittest.TestCase):
         self.assertIn(self.commit, text)
         self.assertIn('https://github.com/owner/convolver/actions/runs/42', text)
         self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/install.md#unsigned-previews', text)
+        # What was not checked before publication (jrp's decision of 8 November 2026).
+        self.assertIn('Not yet checked: listening in any host', text)
         # The Audacity limitation (VST3-17), which jrp chose to state rather than fix.
         self.assertIn("load filters from Audacity's own preset menu", text)
         # How to report a problem, with what makes a report useful.
