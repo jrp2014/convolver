@@ -476,6 +476,30 @@ LV2 (Linux first; also PipeWire system audio):
   and the one-time read of the old file, and the plug-ins guide says where
   the list is kept. Lower priority than PLUG-26 and PLUG-27; waits for
   the freeze.
+- [ ] **PLUG-30 — One rule for state a busy lock makes a call skip.**
+  From AU-16 (8 November 2026; jrp asked for fixes like it to be recorded,
+  as stepping back may give a more general fix). The pattern: a call that
+  must not wait changes shared state, finds the control lock taken, skips
+  the update that lock guards and relies on the holder to make it; but the
+  holder may already have made it, or may never make it, so what the host
+  sees stays stale with no later update. Fixed where it was seen: the Audio
+  Unit's bypass setter (`SetProperty`, `effect_properties.cpp`) left Status
+  at Active while the Latency work held the lock with the Latency
+  unchanged (au.adapter, CI run 42418181089 on `2f3cb80`). The narrow fix
+  hands the update to the Latency work's serial queue, which may wait for
+  the lock and updates the Status when the bypass it shows differs
+  (`status_bypassed_`). Other places that skip or work around a busy lock,
+  each correct today for its own reason: the Audio Unit's report read
+  (`Effect::report()`) returns its last copy, safe only because every
+  change goes through `update_status()`, which forgets the copy, and then
+  notifies the window; LV2's `deactivate()` tries the lock first but then
+  waits. VST3 takes its locks without trying. A general fix would make
+  "changed while the lock was held" a rule rather than a per-call
+  decision: for example, a pending-update flag that whoever releases the
+  control lock acts on, or all Audio Unit control work on the one serial
+  queue. Done when each adapter's skip paths either follow that rule or
+  are listed with why they are safe, with a held-lock test for each, as
+  AU-16's. Waits for the freeze.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
@@ -1338,6 +1362,9 @@ entries written before 7 November 2026, with their evidence, are
   render](docs/develop/testing.md#avaudioengine-render).
 - [x] **AU-13 — Safe partial construction of the Latency work.** 5 November
   2026, PR #111.
+- [x] **AU-16 — Show a bypass switched while the control lock is held.**
+  8 November 2026; [Status and log](docs/develop/plugin-contract.md#status-and-log),
+  and PLUG-30 for the pattern.
 - [x] **AU-11 — Separate file watching from the window.** 5 November 2026;
   [shared macOS window](docs/develop/architecture.md#the-shared-macos-window).
 - [x] **AU-10 — Separate the window's setting editing from its layout.** 1

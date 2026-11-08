@@ -87,6 +87,11 @@ inline void (*latency_progress_for_tests)(AudioComponentInstance unit, std::uint
 // change them only while no unit's Latency work is running.
 inline void (*latency_started_for_tests)(AudioComponentInstance unit) noexcept = nullptr;
 inline void (*latency_closing_for_tests)(AudioComponentInstance unit) noexcept = nullptr;
+// For the tests only (AU-16): when set, each run of a unit's Latency work
+// calls it once it holds the control lock, on the work's queue, so that
+// au.adapter can switch bypass while the lock is taken. Null in the
+// component; change it only while no unit's Latency work is running.
+inline void (*latency_locked_for_tests)(AudioComponentInstance unit) noexcept = nullptr;
 
 // One input bus and one output bus, 1 to 8 channels each (counts may differ),
 // following the shared adapter contract
@@ -242,7 +247,9 @@ class Effect final : public ausdk::AUBase {
     // new one starts with no history, so the sound has a gap (the new latency
     // plus the filter's own delay). The host is told of the new latency and
     // tail, from the queue, and the log says what happened. A Latency
-    // that cannot be built is tried again only when chosen again.
+    // that cannot be built is tried again only when chosen again. A bypass
+    // switched while another call held `control_` wakes the work too, which
+    // then shows it in the Status (AU-16).
     void request_latency() noexcept;
     void apply_latency() noexcept;
     // Under `control_`: makes `next` (null when uninitializing) the processor
@@ -276,6 +283,7 @@ class Effect final : public ausdk::AUBase {
     std::optional<HostLayout> committed_;
     HostStatusLine status_;          // Under control_.
     bool status_log_written_ = true; // host_log_written() when status_ was set; under control_.
+    bool status_bypassed_ = false;   // bypass_ when status_ was set; under control_ (AU-16).
     std::chrono::steady_clock::time_point
         report_faults_at_{}; // Last report_locked() look; under control_.
     // AU-6: the last report read, for a read while another call holds

@@ -1370,11 +1370,15 @@ void status_parameter() {
           "Status write");
     require(value() == HostStatus::active, "a host write changed the status");
     // PLUG-22: the host's bypass shows as Bypassed, and switching it off
-    // brings Active back.
+    // brings Active back. The load just woke the Latency work: while its run
+    // holds the lock, the Latency work shows the bypass instead of
+    // SetProperty, so the check waits for it (AU-16, the CI failure of 2f3cb80).
     unit.set_bypass(true);
+    require(latency_settled(unit), "the Latency work did not finish after bypass");
     require(value() == HostStatus::bypassed && shown() == "Bypassed: the input plays unfiltered.",
             "bypass not shown: " + shown());
     unit.set_bypass(false);
+    require(latency_settled(unit), "the Latency work did not finish after bypass off");
     require(value() == HostStatus::active && shown() == "Filter loaded: 48000 Hz, 2 in, 2 out.",
             "bypass off not shown: " + shown());
     // A wrong preset while a filter plays: it keeps playing, and both say so.
@@ -1601,6 +1605,53 @@ void latency_staged_closing() {
     }
 }
 
+// AU-16: the CI failure of 2f3cb80 (au.adapter at "bypass not shown"), made
+// deterministic. A load wakes the Latency work; its run, with the Latency
+// unchanged, is held while it holds the control lock, and the host switches
+// bypass meanwhile. SetProperty cannot take the lock and must not wait for
+// it; the Status must still follow once the run lets the lock go, though
+// that run sets no status of its own.
+void bypass_while_latency_work_holds_lock() {
+    auto unit = latency_unit();
+    const auto status = [&] {
+        AudioUnitParameterValue v = -1;
+        check(
+            AudioUnitGetParameter(unit->get(), au::status_parameter, kAudioUnitScope_Global, 0, &v),
+            "Status value");
+        AudioUnitParameterStringFromValue request{au::status_parameter, nullptr, nullptr};
+        UInt32 bytes = sizeof request;
+        check(AudioUnitGetProperty(unit->get(), kAudioUnitProperty_ParameterStringFromValue,
+                                   kAudioUnitScope_Global, 0, &request, &bytes),
+              "Status text");
+        require(request.outString != nullptr, "Status text missing");
+        char text[256] = {};
+        CFStringGetCString(request.outString, text, sizeof text, kCFStringEncodingUTF8);
+        CFRelease(request.outString);
+        return std::pair(static_cast<HostStatus>(std::lround(v)), std::string(text));
+    };
+    for (const bool on : {true, false}) {
+        const std::string label = std::string("bypass switched ") + (on ? "on" : "off") +
+                                  " while the Latency work held the lock: ";
+        LatencyHold hold;
+        hold.unit = unit->get();
+        latency_hold = &hold;
+        au::latency_locked_for_tests = hold_latency;
+        check(unit->load(state_of(stereo(48000))), "filter");
+        wait_for_hold(hold, [&] { return hold.runs > 0; }, label + "the Latency run starting");
+        finish_within(std::async(std::launch::async, [&] { unit->set_bypass(on); }),
+                      label + "switching bypass");
+        release(hold);
+        require(latency_settled(*unit), label + "the Latency work did not finish");
+        au::latency_locked_for_tests = nullptr;
+        latency_hold = nullptr;
+        const auto [value, text] = status();
+        require(on ? value == HostStatus::bypassed &&
+                         text == "Bypassed: the input plays unfiltered."
+                   : value == HostStatus::active && text == "Filter loaded: 48000 Hz, 2 in, 2 out.",
+                label + "the Status says \"" + text + "\"");
+    }
+}
+
 int main(int argc, char** argv) {
     process_log = au_test::use_test_log("convolver-adapter-tests.log");
     au::latency_progress_for_tests = record_progress;
@@ -1623,6 +1674,7 @@ int main(int argc, char** argv) {
         latency_queue_lifetime();
         latency_witness_per_unit();
         latency_staged_closing();
+        bypass_while_latency_work_holds_lock();
         settings_in_diagnostics();
         wider_inputs();
         std::cout << "Audio Unit adapter checks passed\n";

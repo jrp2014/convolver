@@ -157,8 +157,9 @@ void Effect::update_status() noexcept {
         }
         status_log_written_ = host_log_written();
         // Gain and Mix change what plays without a filter (PLUG-10).
-        status_ =
-            host_status(filter_, known_layout(), status_log_written_, settings(), bypass_.load());
+        const bool bypassed = bypass_.load();
+        status_ = host_status(filter_, known_layout(), status_log_written_, settings(), bypassed);
+        status_bypassed_ = bypassed;
         if (host_) // Render must not show Fault over a load failure.
             host_->hold_fault_signal(filter_.failure_shown());
         Globals()->SetParameter(status_parameter,
@@ -567,9 +568,12 @@ OSStatus Effect::SetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         std::memcpy(&value, data, sizeof value);
         bypass_.store(value != 0);
         // PLUG-22: the Status says Bypassed. Faults Render met are explained
-        // first, so the new status does not hide them. While a load holds
-        // the lock this waits for nothing: the load's own update reads the
-        // bypass.
+        // first, so the new status does not hide them. While another call
+        // holds the lock (a load preparing a filter can take a while) this
+        // waits for nothing. That call may already have set the status, or
+        // may never set it (the Latency work with an unchanged Latency, the
+        // CI failure of 2f3cb80), so the Latency work's serial queue, which
+        // may wait, shows the bypass once the lock is free (AU-16).
         std::string faults;
         bool updated = false;
         try {
@@ -581,6 +585,8 @@ OSStatus Effect::SetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
             }
         } catch (...) { // Out of memory: the status follows at the next update.
         }
+        if (!updated)
+            request_latency();
         if (!faults.empty())
             log_faults(faults);
         if (updated)

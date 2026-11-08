@@ -320,10 +320,12 @@ void Effect::apply_latency() noexcept {
     // Before the settings are read: the requests this run is sure to see.
     const auto seen = latency_requests_.load();
     std::string message, faults;
-    bool changed = false, problem = false;
+    bool changed = false, problem = false, bypass_shown = false;
     std::unique_ptr<HostProcessor> previous;
     {
         std::lock_guard lock(control_);
+        if (const auto hook = latency_locked_for_tests)
+            hook(GetComponentInstance());
         // The settings are read once: what is built and what is reported
         // both come from this one reading, even if the host changes the
         // parameter meanwhile (that wakes the queue again).
@@ -381,6 +383,14 @@ void Effect::apply_latency() noexcept {
             }
             update_status();
         }
+        // AU-16: a bypass switched while another call held the lock
+        // (SetProperty) is shown here, with Render's faults explained first
+        // as SetProperty does. Not needed when the update above read it.
+        if (status_bypassed_ != bypass_.load()) {
+            faults = observe_faults();
+            update_status();
+            bypass_shown = true;
+        }
     }
     release_processor(std::move(previous));
     log_faults(faults);
@@ -391,7 +401,7 @@ void Effect::apply_latency() noexcept {
         } catch (...) {
         }
     }
-    if (!message.empty() || problem)
+    if (!message.empty() || problem || bypass_shown)
         notify_status();
     // Finished: the tests' witness (AU-14).
     if (const auto hook = latency_progress_for_tests)
