@@ -233,9 +233,10 @@ Commands are checked in two ways (DOC-2). The
 option and every Convolver tool option the pages show with the build and the
 tools' sources, so a renamed or removed option fails in pre-commit. The
 examples marked `<!-- executable-example -->` or `<!-- refused-example -->`
-(above) run from the staged package in the candidates workflow, on every
-pull request that changes code or the packaged pages
-([CI scope](testing.md#documentation-only-pull-requests)). Other examples
+(above) run from the staged package in the candidates workflow: on every push
+to `main`, and on a pull request that changes a page with such an example or
+anything else the packages are built from
+([when pull requests build the candidates](testing.md#when-pull-requests-build-the-candidates)). Other examples
 name files a reader has, so they are not run.
 
 The [repository checks](workflow.md#automated-checks) add the structural rules:

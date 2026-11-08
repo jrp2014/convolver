@@ -28,8 +28,8 @@ on Windows, see the [Equalizer APO export](equalizer-apo.md).
   resample. Audacity plays effects at its Default sample rate, which can
   differ from the rate it exports at.
 - **Audacity 4.0.2:** load the filter as a [preset](#optional-load-a-preset)
-  from Audacity's own preset menu, not with **Choose…**, **Recent** or
-  **Reload** in Convolver's window. A filter loaded in the window plays
+  from Audacity's own preset menu, not with **Choose…**, **Recent**,
+  **Reload** or automatic reload in Convolver's window. A filter loaded in the window plays
   while you listen, but Audacity does not store it: exports and the saved
   project keep whatever Audacity stored last, which may be no filter or an
   older one, so a wrong export can still sound plausible.

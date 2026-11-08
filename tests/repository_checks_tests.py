@@ -70,6 +70,33 @@ class RepositoryChecks(unittest.TestCase):
             self.run_check({'TODO.md': TODO + '- [ ] **PLUG-2 — Again.**\n'}), 'PLUG-2 is defined more than once'
         )
 
+    def test_archived_todo_ids_count_as_done(self):
+        archive = SPDX_MD + '# Done\n\n- [x] **PLUG-3 — Presets.** Done.\n'
+        result = self.run_check(
+            {
+                'docs/archive/todo/2026-11-08-done-items.md': archive,
+                'docs/archive/todo/2026-11-06-done-entries.md': archive,
+                'docs/use/guide.md': SPDX_MD + 'PLUG-3 is done; LV2-1 is next.\n',
+            }
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertBroken(
+            self.run_check(
+                {
+                    'docs/README.md': BASE['docs/README.md'] + '[Old](project/plans/2026-10-18-old.md)\n',
+                    'docs/archive/todo/2026-11-08-done-items.md': archive,
+                    'docs/project/plans/2026-10-18-old.md': SPDX_MD + 'Delivered PLUG-3.\n',
+                }
+            ),
+            'docs/project/plans/2026-10-18-old.md: every TODO item it names is done',
+        )
+        self.assertBroken(
+            self.run_check(
+                {'docs/archive/todo/2026-11-08-done-items.md': SPDX_MD + '- [x] **PLUG-2 — Harness.** Done.\n'}
+            ),
+            'PLUG-2 is also listed as done in docs/archive/todo/',
+        )
+
     def test_unindexed_page(self):
         self.assertBroken(
             self.run_check({'docs/new.md': SPDX_MD + '# New\n'}), 'docs/new.md: not listed in docs/README.md'

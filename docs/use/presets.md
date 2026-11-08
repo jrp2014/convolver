@@ -123,7 +123,8 @@ already holds one filter.
   restart Audacity. They appear in the effect's preset menu under their
   file names, so give each preset its own name,
   such as `room-48000.vstpreset`. Use a preset in Audacity rather than
-  **Choose…**, **Recent** or **Reload** in Convolver's window: Audacity
+  **Choose…**, **Recent**, **Reload** or automatic reload in Convolver's
+  window: Audacity
   4.0.2 does not store a filter loaded there, so it plays while you listen,
   but exports and saved projects keep whatever Audacity stored last, which
   may be no filter or an older one. Audacity always runs Convolver with two channels, even on a
