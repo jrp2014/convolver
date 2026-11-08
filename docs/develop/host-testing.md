@@ -29,8 +29,8 @@ compatibility claim is inferred.
 
 There are two levels of testing. An **unsigned preview** needs the smoke test
 below. A **signed production release** needs the full qualification procedure.
-Both gates are set out in the
-[plug-in formats plan](../project/plans/2026-10-21-plugin-formats.md#unsigned-previews-and-production).
+What the production gate adds is set out in
+[releasing](releasing.md#production-gates).
 
 ## First hosts
 
@@ -204,7 +204,9 @@ Do this once. Run the commands in the extracted preview package folder.
    `macos-x86_64` on Intel). Until a preview is published, download the
    `candidate-macos-arm64` (or `candidate-macos-x86_64`) artifact from the
    latest successful "Plug-in distribution candidates" run on `main`, and
-   unzip the package inside it. Check its SHA-256, install `Convolver.vst3` as
+   unzip the package inside it. To test a pull request before it merges, use
+   a run on its branch; most pull requests do not start one, so start it by
+   hand ([when pull requests build the candidates](testing.md#when-pull-requests-build-the-candidates)). Check its SHA-256, install `Convolver.vst3` as
    the [install guide](../use/install.md) says, and clear the quarantine for
    the bundle and for `bin/` only
    ([unsigned previews](../use/install.md#unsigned-previews)).

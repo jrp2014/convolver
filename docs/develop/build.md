@@ -557,7 +557,7 @@ until that pull request is merged. AudioUnitSDK is the likeliest: 1.4.0 needed
 C++23 (for `std::expected`), so the AU target builds as C++23 while the core
 and the other formats stay C++20. Its licence is Apache-2.0, which is why the
 AU component is distributed under GPL-3.0-or-later
-([AU licence](../project/plans/2026-10-21-plugin-formats.md#au-licence)).
+([Audio Unit licence](../use/plugins.md#audio-unit-licence)).
 
 If an upstream host does not answer, the job fails and names the host; run it
 again later. `lv2lint`'s small host has a fallback (FreeBSD's ports list and

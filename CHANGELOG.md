@@ -39,7 +39,9 @@ Until 1.0 the C++ API may change between minor versions.
   SHA-256, the run, the install guide, known limitations and the
   responsiveness result) and downloads the attached files again to compare
   them. Nothing is public until jrp publishes the draft. Pull requests that
-  change it run a dry run on the newest tag candidate.
+  change it run a dry run on the newest tag candidate. jrp rehearsed it on
+  8 November 2026 with the v0.12.5 candidate: the draft was right and was
+  deleted. REL-8 is done.
 - Tests (AU-3): the Audio Unit workflow runs `au.adapter` under
   ThreadSanitizer, in a Debug build with the defaults the packages use, on
   the runs where that workflow already runs. It switches bypass from another
@@ -239,6 +241,15 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- CI (CI-34, first step, approved by jrp on 8 November 2026): a pull request
+  builds the plug-in distribution candidates, whose macOS builds are the
+  slowest jobs, only when it changes release files, packaged pages, the
+  macOS window, the build configuration or a shipped dependency; for
+  anything else, start the workflow by hand on the branch. A change only to
+  `scripts/release/`, `tests/release/` or `packaging/` now runs only the
+  candidates, and a change to a guide in `docs/use/` builds them only when
+  the page has a command they run or shows an image. Pushes to `main`, the weekly run and
+  manual runs still build them every time, and no test was removed.
 - Plug-in presets (PLUG-31, from jrp's REAPER check of VST3-16, 8 November
   2026): a `.vstpreset` made by `convolver-preset` also holds the name of
   the file it was made from, with its extension and without its folder, and
@@ -257,6 +268,19 @@ Until 1.0 the C++ API may change between minor versions.
   name. The controller state's reader and writer moved to
   `portable/vst3_controller_state.hpp` so the tool, which needs no SDK,
   shares them.
+- Documentation (DOC-13, from jrp's review of `main` at `21711c5`, 8
+  November 2026): [TODO](TODO.md) holds open work only. The 122 finished
+  items' one-line entries moved, with their IDs and links, to
+  [`docs/archive/todo/`](docs/archive/todo/2026-11-08-done-items.md), whose
+  IDs the repository checks (`scripts/check_repository.py`) now count as
+  defined and done; the execution priorities no longer describe VST3-16 as an
+  open draft. The plug-in formats and editor plans, whose state paragraphs
+  dated from October, are [archived as superseded](docs/archive/plans/README.md);
+  the risks, the PipeWire comparison and one owner's question they still
+  held moved to HOST-2, VST3-6, AU-6, LV2-4 and LV2-5. Dated dependency versions, fixed intermittent failures and old
+  timings moved from the [testing guide](docs/develop/testing.md) to an
+  [evidence record](docs/archive/reviews/2026-11-08-testing-guide-evidence.md),
+  leaving the two failure causes that still apply to new work.
 - Documentation (DOC-11, from jrp's review of `main` at `bf6a207`, 8
   November 2026): the [status page](docs/project/status.md) agrees with the
   dated host records. It is dated 8 November 2026 against 0.12.1, no longer

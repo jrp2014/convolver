@@ -373,8 +373,9 @@ behaviour ([other programs](../use/other-programs.md)).
    with its open questions
    for jrp. Precision beyond what can be heard is not a goal.
 
-The plug-in direction is the [plug-in formats plan](plans/2026-10-21-plugin-formats.md):
-VST3, LV2 and AU in parallel, CLAP on request. The dependency choices behind
+The plug-in direction is in the [decisions log](decisions.md#direction):
+VST3, LV2 and AU in parallel, CLAP on request (designed in the archived
+[plug-in formats plan](../archive/plans/2026-10-21-plugin-formats.md)). The dependency choices behind
 the build (FFTW, Accelerate and Ooura, libsndfile) are explained in the
 [implementation map](../develop/architecture.md#dependency-choices). Recorded
 owner's decisions are in the [decisions log](decisions.md); where the code came

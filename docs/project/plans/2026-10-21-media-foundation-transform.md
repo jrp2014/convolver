@@ -11,7 +11,7 @@ APO coverage. These are proposed contracts, not implemented adapter behavior.
 
 **Parked:** a Windows-native adapter needs more thought
 before any work starts. VST3, LV2 and AU come first; see the
-[plug-in formats plan](2026-10-21-plugin-formats.md).
+[plug-in formats plan](../../archive/plans/2026-10-21-plugin-formats.md).
 
 **Update:** asked to choose this plan's target users, jrp
 chose system-wide filtering through Equalizer APO. That route is now the

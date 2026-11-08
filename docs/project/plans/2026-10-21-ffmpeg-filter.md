@@ -13,7 +13,7 @@ host FFT-option prerequisites. The measurements below retain their original scop
 
 **Priority revised later:** the built-in filter (FFMPEG-2 to
 FFMPEG-5) is parked while VST3, LV2 and AU are developed in parallel; see the
-[plug-in formats plan](2026-10-21-plugin-formats.md). The owner does not want to
+[plug-in formats plan](../../archive/plans/2026-10-21-plugin-formats.md). The owner does not want to
 maintain a patched FFmpeg source tree (option C below), because of the coupling
 it creates. The pipe workflow and FFMPEG-1 are unaffected.
 

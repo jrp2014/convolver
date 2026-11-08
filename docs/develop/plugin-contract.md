@@ -7,8 +7,8 @@
 For anyone writing, changing or reviewing a plug-in adapter (VST3, Audio Unit,
 LV2), and for host integrators. This page is the reference for what every
 adapter must do; [how the plug-ins behave](../use/plugins.md) says how that
-looks to a user. The rules were designed in the
-[plug-in formats plan](../project/plans/2026-10-21-plugin-formats.md#shared-adapter-contract)
+looks to a user. The rules were designed in the archived
+[plug-in formats plan](../archive/plans/2026-10-21-plugin-formats.md#shared-adapter-contract)
 and are maintained here.
 
 **In short:**
@@ -278,8 +278,8 @@ format.
   window, which ship together, so they are not permanent identities.
   `kAudioUnitProperty_CocoaUI` names the window's factory class in this
   image's own component bundle; the factory and view class names carry the
-  version. Unlike the editor plan's rule that the window copies reports
-  pushed to it ([threads](../project/plans/2026-10-24-plugin-editor.md#threads),
+  version. Unlike the archived editor plan's rule that the window copies reports
+  pushed to it ([threads](../archive/plans/2026-10-24-plugin-editor.md#threads),
   rule 2), the AU window reads 64000 itself, as Audio Unit views do: twice a
   second while its window is on screen, on the main thread. A read builds
   the report under the unit's control lock when the lock is free, and keeps
@@ -503,8 +503,8 @@ around the plug-in, and no adapter can stop that.
 
 `HostProcessor` implements this, so every adapter that drives it through
 `set_bypass` follows the rule; the PLUG-2 `bypass` case checks it. An adapter
-must not use its format's own pass-through bypass (see the AU design in the
-[plug-in formats plan](../project/plans/2026-10-21-plugin-formats.md#au-adapter-design)).
+must not use its format's own pass-through bypass (see the AU design in the archived
+[plug-in formats plan](../archive/plans/2026-10-21-plugin-formats.md#au-adapter-design)).
 
 Whether saved state records bypass follows each format's convention. VST3 saves its bypass parameter with the
 component state, as the SDK's examples do. In LV2 (the `enabled` port) and
@@ -514,7 +514,7 @@ state from another format.
 
 ## Settings
 
-PLUG-10, from the [editor plan](../project/plans/2026-10-24-plugin-editor.md#settings),
+PLUG-10, from the archived [editor plan](../archive/plans/2026-10-24-plugin-editor.md#settings),
 whose choices jrp made on 24 and 25 October 2026
 ([decisions](../project/decisions.md#identities-and-file-formats)). Every
 adapter offers the same settings as host parameters, so they work in generic
@@ -562,8 +562,9 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   position: long for a linear-phase filter), and the audio still inside the
   old processor, including a sounding tail, is dropped.
   The host is told the new latency when the new processor is handed over.
-  Not automatable. The [editor plan](../project/plans/2026-10-24-plugin-editor.md#settings)
-  keeps the load measurement beside it for later.
+  Not automatable. The load meter the archived
+  [editor plan](../archive/plans/2026-10-24-plugin-editor.md#settings) puts
+  beside it is for a later preview (PLUG-10).
 - **Saved form:** each format's own way. The Audio Unit's parameters are
   saved by `AUBase::SaveState` in `ClassInfo` ("data"); VST3 saves them in
   host state version 3, written only when a setting differs from its
@@ -911,9 +912,9 @@ How each adapter meets the contract where its format differs:
   plugin state with an empty map"): no filter, no failure, no path, and loads
   still outstanding are superseded. The status port
   follows the newest request (3, Loading, while it is outstanding); the path
-  it reports and saves follows the installed filter. The full rules are in
-  the plan's
-  [worker and state lifecycle](../project/plans/2026-10-21-plugin-formats.md#lv2-adapter-design).
+  it reports and saves follows the installed filter. The design, with the full
+  lifecycle, is in the archived formats plan's
+  [worker and state lifecycle](../archive/plans/2026-10-21-plugin-formats.md#lv2-adapter-design).
   It needs `urid:map`, uses `work:schedule` to load files, logs through
   `log:log` (otherwise standard error), and reads `bufsz:maxBlockLength` from
   `options` when given; without it, or for longer `run()` calls, it processes in

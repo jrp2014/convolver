@@ -32,7 +32,7 @@ preview artifacts for VST3. The FFT choice is settled (PLUG-1): plug-in builds
 use Ooura on Windows and Linux and Accelerate on macOS, so the FFTW lines below
 are superseded. First releases are unsigned previews; signing (Task 4) and
 production acceptance are a later gate. LV2 and AU now share this pipeline
-(PLUG-5). The [plug-in formats plan](../../project/plans/2026-10-21-plugin-formats.md) and
+(PLUG-5). The [plug-in formats plan](2026-10-21-plugin-formats.md) and
 [TODO](../../../TODO.md#plug-ins-vst3-lv2-and-au) own the current plan; the
 dated notes and tasks below are kept as the record.
 
@@ -43,7 +43,7 @@ can proceed independently; its future APIs are not prerequisites here.
 
 **Priority revised:** AU and LV2 are no longer follow-ons.
 They are developed in parallel with VST3, sharing one release pipeline (PLUG-5);
-see the [plug-in formats plan](../../project/plans/2026-10-21-plugin-formats.md).
+see the [plug-in formats plan](2026-10-21-plugin-formats.md).
 **Signing decided:** first releases are unsigned previews on
 macOS (ad-hoc signed, with documented quarantine removal) and Windows (SmartScreen
 warning). Task 4's signing steps and the production acceptance below stay the
