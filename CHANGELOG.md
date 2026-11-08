@@ -674,7 +674,12 @@ Until 1.0 the C++ API may change between minor versions.
   that plays. A change during playback leaves a gap in the sound, as
   before ([latency and tail](docs/use/plugins.md#latency-and-tail)).
   If the new processor cannot be built, the old Latency keeps playing and
-  the log and window say so.
+  the log and window say so. jrp's check in REAPER 7.85 with the candidate
+  at `7d6a8b4` passed: stopped and while playing, 256 to 1024 frames and
+  back, the window and REAPER's delay compensation showed the new latency
+  at once, and every impulse in the later renders lined up with the
+  reference track
+  ([record](docs/archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md)).
 - VST3 (PLUG-23, from jrp's REAPER crossover retest at `5d188a7`): a project
   saved with the 2→6 crossover on a six-channel track played silence after
   reopening, and after FX Offline then Online. REAPER starts the plug-in on

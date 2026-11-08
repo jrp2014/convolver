@@ -341,8 +341,9 @@ except the Audio Unit build, which runs in a source checkout.
     in a new project, from the same candidate package as the steps above:
     a six-channel track, the crossover preset, a six-channel render
     compared with `convolver --compare`, save and reopen, and the presets
-    that do not fit. No REAPER routing that gives the VST3 plug-in 2 inputs
-    and 6 outputs is known yet ([unresolved](#unresolved-host-findings)):
+    that do not fit. REAPER gives the VST3 plug-in as many inputs as
+    outputs, six here; since PLUG-23 the filter reads the first two
+    ([retest](../archive/reviews/2026-11-07-reaper-crossover-retest.md)):
     record the layout REAPER offered (the track's channels, the plug-in's
     routing, and what Status and the log said). If the preset is refused,
     stop there and record it; otherwise record the render settings, each
@@ -480,9 +481,12 @@ explained or fixed. Each names the host and build it was seen in; it is not a
 claim about other hosts or versions. Do not add host steps to work around one
 until its cause is known: record what was observed, as below.
 
-| Finding | Seen in | What was observed | Not yet known | Evidence |
-| --- | --- | --- | --- | --- |
-| A new Latency is not used until the project is reopened (VST3) | REAPER 7.85, macOS 27.2 arm64, candidate 0.10.9 (`83aa64d`), 6 November 2026; traced with PR #134's trace build (`d7d16d2`), 7 November 2026 | The log said `Latency set to 1024 frames`; the window said the new latency was not in use yet, with 256 frames still active; REAPER's delay-compensation display stayed at 256 samples, also after playback stopped. After save, quit and reopen both read 1024. The trace showed why: REAPER reads `getLatencySamples()` inside `restartComponent(kLatencyChanged)` and does not restart the plug-in; a render or FX Offline then Online applied the choice, and every render lined up. VST3-16 now plays the new Latency before the request | Whether the VST3-16 change plays the new Latency at once in REAPER and the impulses still line up in both directions | [Record](../archive/reviews/2026-11-06-host1-reaper.md#part-c-window-and-settings) (step C5), [trace](../archive/reviews/2026-11-07-vst3-16-reaper-trace.md) |
+None at present. The last one, a new VST3 Latency that REAPER used only
+after a render, FX Offline then Online, or reopening the project, was fixed
+by VST3-16 and checked in REAPER on 8 November 2026
+([acceptance](../archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md)).
+Record the next with these columns: the finding, the host and build it was
+seen in, what was observed, what is not yet known, and the evidence.
 
 ## Production qualification
 
