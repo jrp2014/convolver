@@ -399,9 +399,10 @@ LV2 (Linux first; also PipeWire system audio):
   and the exports passed. Refusing the filter is correct; what was hard was
   telling the rate the playing copy runs at from the export's rate. The
   guides now say so ([plug-ins](docs/use/plugins.md#status-and-the-convolver-log),
-  [Audacity steps](docs/develop/host-testing.md#audacity-vst3)). jrp agreed
-  (8 November 2026): a refusal for the rate adds one line to its Fix, that
-  the host may play at a different rate from the one it exports at. Still
+  [Audacity steps](docs/develop/host-testing.md#audacity-vst3)). A refusal
+  for the rate adds one line to its Fix, that the host may play at a
+  different rate from the one it exports at
+  ([decided](docs/project/decisions.md#diagnostics)). Still
   to decide with jrp: whether the window should mark a host rate as not
   yet confirmed when it comes from a copy that has not processed audio
   (the copy in Audacity's effect window, which a host may start briefly at
@@ -422,10 +423,11 @@ LV2 (Linux first; also PipeWire system audio):
   `.vstpreset`, through one input reader shared with `convolver-preset`,
   reusing its decoder and identity and size checks; `.cfg` files, nested
   lists and their relative paths work as today. No `.aupreset` or LV2
-  reader only for symmetry. jrp decided (8 November 2026): choosing a
-  preset loads its Gain, Mix and Latency too, as the host's own preset
-  menu does; a preset made by `convolver-preset`, which holds only a
-  filter, leaves the current settings as they are. Done
+  reader only for symmetry. Choosing a preset loads its Gain, Mix and
+  Latency too, as the host's own preset menu does; a preset made by
+  `convolver-preset`, which holds only a filter, leaves the current
+  settings as they are ([decided](docs/project/decisions.md#plug-in-behaviour)).
+  Done
   when the same file loads from any user folder in VST3 and the Audio Unit
   with no installation, conversion or administrator step, saving and
   reopening reproduces the CLI's output, and another plug-in's preset or a
