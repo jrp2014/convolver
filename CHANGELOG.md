@@ -228,8 +228,9 @@ Until 1.0 the C++ API may change between minor versions.
   stereo filter about 11 times less, a 30 s crossover 38 times less, on
   the Linux cloud VM; see the
   [measurements](docs/develop/fft-measurements.md#the-non-uniform-engine))
-  and the worst callback falls with them; short filters cost slightly
-  more. The Latency setting gains 0 frames, first in the list and the
+  and the worst callback falls with them. At the same latency short filters
+  cost no more than before; zero latency costs more for them (about 60 to
+  85% more than the old default for 4096 taps, under 1% of a core). The Latency setting gains 0 frames, first in the list and the
   default, and the command line's `--block-size` and inspection default to
   0 to match, so default renders still equal the plug-ins' output.
   `--block-size 0` is accepted everywhere, and `--tune-fft` plans every

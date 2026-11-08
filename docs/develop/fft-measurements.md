@@ -802,7 +802,28 @@ At 512-frame callbacks the order is the same (all rows in the raw data).
 
 ### The short-filter fix
 
-PENDING_FIX_TABLE
+The same comparison, rerun with the candidate at `662c0b7`, which may
+compute a block no larger than the latency whole when it completes (same
+machine and build, filters up to 480,000 taps, three rounds;
+[raw data](../benchmarks/2026-11-08-x86-engine-compare-whole-blocks.csv)).
+Mean ns per output frame at 64-frame callbacks:
+
+| Filter | Stereo: main 256 | PERF-2 0 | PERF-2 256 | True stereo: main 256 | PERF-2 0 | PERF-2 256 | Crossover: main 256 | PERF-2 0 | PERF-2 256 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 4,096 taps | 43 | 79 | 41 | 56 | 101 | 55 | 88 | 141 | 83 |
+| 16,384 | 71 | 76 | 53 | 110 | 121 | 74 | 171 | 189 | 117 |
+| 65,536 | 257 | 108 | 85 | 587 | 165 | 122 | 926 | 259 | 181 |
+| 480,000 (10 s) | 2,628 | 182 | 174 | 5,535 | 311 | 277 | 7,687 | 478 | 384 |
+
+- **At the same latency the new engine is never slower** in these runs: at
+  Latency 256 a 4,096-tap filter costs the same as `main` (one 256-frame
+  stage, as `main` has), and from 16,384 taps it costs less.
+- **Zero latency costs most on short filters**: at 4,096 taps 60 to 85% more
+  than `main` at 256 (61 against 40 ns for stereo at 512-frame callbacks),
+  under 0.7% of a core; from 65,536 taps it is cheaper than `main`. On this
+  VM the cost at latency 0 also varies by up to about 30% between nearby
+  filter lengths, in both revisions alike (most likely where buffers land in
+  memory); measure several lengths before tuning it.
 
 These are one cloud VM's figures. jrp asked (8 November 2026) that speed
 claims be measured on his Mac before they are quoted: PERF-3 and this
