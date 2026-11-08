@@ -185,6 +185,22 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Host checks (HOST-1): jrp's Audacity 4.0.2 session with the VST3
+  plug-in (7 November 2026, candidate 0.10.13) is
+  [recorded](docs/archive/reviews/2026-11-07-host1-audacity.md): the seven
+  48 kHz stereo exports with a filter or bypass matched the CLI with
+  `convolver --compare`, including after a refused preset and after
+  restarting Audacity, and the export with no filter matched the original
+  file. The guides now say
+  what it found: Audacity plays real-time effects at its Default sample
+  rate, which can differ from the rate an export uses, so set it, and the
+  project's rate, to the filter's rate; Convolver's window shows with *Preset options ›
+  Use vendor UI*; and, as Audacity's preset menu does not import
+  `.vstpreset`, a filter can be chosen with **Choose…** in the window on
+  macOS. [Your first sound in a host](docs/use/first-sound-in-a-host.md) no
+  longer says the plug-in has no window or that preview packages lack the
+  Audio Unit. PLUG-25 records the clearer playback-rate wording still to
+  decide. No code or sound changes.
 - Wording (DOC-9, from jrp's review of 7 November 2026): one set of words for
   filters, IR files, configurations, presets and projects, listed in
   [words Convolver uses](docs/use/concepts.md#words-convolver-uses) and used

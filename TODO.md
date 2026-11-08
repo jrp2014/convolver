@@ -170,6 +170,39 @@ is superseded.
   quitting and reopening, and FX Offline then Online
   ([record](docs/archive/reviews/2026-11-07-reaper-crossover-retest.md)).
   The Latency finding stays open (VST3-16).
+  Progress (7 November 2026, PR #137): jrp ran the Audacity steps
+  (Audacity 4.0.2 arm64, macOS 27.2) with the VST3 plug-in from PR #131's
+  candidate (0.10.13, run 42404299284: PR head `c3dbf0d`, built as merge
+  `1b0d873`, so with the window from before PLUG-22; the record gives the
+  plug-in executable's SHA-256, not the package's;
+  [record](docs/archive/reviews/2026-11-07-host1-audacity.md)). Audacity
+  validated the plug-in; the export with no filter matched the original
+  file, and the seven 48 kHz stereo exports with a filter or bypass matched
+  the CLI's output with `convolver --compare` (worst error −123.67 dB
+  relative to the output peak): identity, echo, repeat, echo applied from
+  the Effect menu, host bypass, echo kept after a refused 44.1 kHz preset and a
+  stop and start, and echo after saving, quitting, restarting Audacity and
+  reopening. Three findings, now in the guides
+  ([Audacity steps](docs/develop/host-testing.md#audacity-vst3)):
+  *Preset options › Import* does not read `.vstpreset` (as documented; the
+  run loaded presets through prepared Audacity user presets, a test
+  fixture; copies in the user's `~/Library/Audio/Presets` folder were not
+  how Audacity found them);
+  real-time playback ran at Audacity's Default sample rate (44100 Hz)
+  while the export ran at 48000 Hz, so a 48 kHz `.cfg` was refused until
+  the playback rate was changed (PLUG-25); and Convolver's window shows
+  only with *Preset options › Use vendor UI* on. The Status wording it
+  found unclear ("checked when the host starts it") is reworded by
+  DOC-9, with jrp's proposed "waiting for audio settings from the host". Still to run in Audacity, from a candidate with the current window:
+  listening (clicks, preset changes, whether a preset chosen during
+  playback is heard at once); a successful **Choose…** of a `.cfg` with
+  playback at the filter's rate; the system preset folder route in
+  [preparation](docs/develop/host-testing.md#prepare-the-mac) and saving
+  an Audacity preset after **Choose…**; a mono track; a Latency change;
+  a filter tail longer than the clip's silent ending (every export here
+  ended in silence, so tails past the end of a clip are not qualified);
+  VoiceOver and the window's layout (screen capture failed). REAPER's
+  display of the Status parameter also remains.
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
   now requested (progress below). Write adapters against the
@@ -342,6 +375,21 @@ LV2 (Linux first; also PipeWire system audio):
   it as follow-up work after the preview. Done when the macOS window (shared
   by VST3 and the Audio Unit) shows the logo and notice somewhere a user can
   find them, without crowding the settings, and its tests cover it.
+- [ ] **PLUG-25 — Say which rate the host plays at.** From jrp's Audacity
+  session (HOST-1, 7 November 2026): Audacity 4.0.2 played real-time
+  effects at 44100 Hz, its Default sample rate, while the export of the same
+  project ran at 48000 Hz, so a 48 kHz `.cfg` was refused during playback
+  and the exports passed. Refusing the filter is correct; what was hard was
+  telling the rate the playing copy runs at from the export's rate, and
+  from a rate a host uses only briefly for a copy that
+  does not play (the copy in Audacity's effect window). The guides now say
+  so ([plug-ins](docs/use/plugins.md#status-and-the-convolver-log),
+  [Audacity steps](docs/develop/host-testing.md#audacity-vst3)). Still to
+  decide with jrp: whether a refusal for the rate should add, in its Fix,
+  that a host's playback rate can differ from its export rate, and whether the window should mark a host rate from a copy that
+  has not processed audio as not yet confirmed. Builds on the Status
+  wording of DOC-9. Diagnostic text only, no sound change; waits for the
+  freeze unless jrp brings it forward.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
