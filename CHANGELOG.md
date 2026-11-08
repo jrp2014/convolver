@@ -12,6 +12,16 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Host checks (HOST-1, AU-4): jrp's 8 November 2026 checks with the 0.12.5
+  candidate are recorded. In REAPER, part C on the redesigned window
+  passed its controls and state, including save, quit and reopen, and the
+  latency renders lined up again
+  ([record](docs/archive/reviews/2026-11-08-host1-reaper-window.md)). In
+  GarageBand, the Audio Unit's presets, **Choose…**, a refused preset,
+  settings kept after reopening and two exports matching the CLI passed
+  ([record](docs/archive/reviews/2026-11-08-au4-garageband.md)). Listening
+  was not checked in either, and both gates run again on the final
+  candidate.
 - Preview qualification (REL-7): an acceptance plan with a fixed-candidate
   stop rule, required gates, blocker classification and deferred work.
   CI-34 proposes scheduling improvements separately; workflows and useful
