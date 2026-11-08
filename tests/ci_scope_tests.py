@@ -96,6 +96,7 @@ class Classification(unittest.TestCase):
         self.assertEqual(ci_scope.decide(['TODO.md', 'portable/engine.cpp']), {'build': True, 'package': False})
         self.assertEqual(ci_scope.decide(['portable/engine.cpp', 'cmake/X.cmake']), {'build': True, 'package': True})
         self.assertEqual(ci_scope.decide(['scripts/release/candidate.py']), {'build': False, 'package': True})
+        self.assertEqual(ci_scope.decide(['packaging/trademarks/README.md']), {'build': False, 'package': False})
         # An empty list is unusual (a merge that changes nothing); test everything.
         self.assertEqual(ci_scope.decide([]), {'build': True, 'package': True})
         self.assertEqual(ci_scope.decide([], 'release'), {'build': True, 'package': True})
@@ -168,6 +169,9 @@ class Classification(unittest.TestCase):
             'plugins/au/GPL-3.0.txt',
             'tests/plugins/fixtures.py',
             'scripts/trademarks.py',
+            'tests/au/bundle_tests.py',
+            'tests/vst3/package_probe.cpp',
+            '.gitattributes',
             'scripts/release/candidate.py',
             'scripts/release/resolve.py',
             'tests/release/macos_installer.py',
@@ -192,6 +196,9 @@ class Classification(unittest.TestCase):
             'CMakePresets.json',
             'TODO.md',
             'docs/develop/testing.md',
+            # Markdown that nothing packages is documentation, wherever it is.
+            'packaging/trademarks/README.md',
+            'examples/host-audio/README.md',
         )
         for path in build:
             with self.subTest(path=path):
@@ -201,11 +208,29 @@ class Classification(unittest.TestCase):
                 self.assertFalse(ci_scope.candidates([path]))
 
     def test_packaged_sources_build_the_candidates(self):
-        """Every source file the packaging names builds the candidates."""
-        packaging = (ROOT / 'cmake/ConvolverPluginPackaging.cmake').read_text(encoding='utf-8')
-        named = set(re.findall(r'\$\{PROJECT_SOURCE_DIR\}/([^"\s)]+)', packaging)) - {'SOURCE_COMMIT'}
+        """Every source file that only packaging builds or reads, and every
+        file the release scripts read outside their folders, builds the
+        candidates."""
+        named = set()
+        texts = [(ROOT / 'cmake/ConvolverPluginPackaging.cmake').read_text(encoding='utf-8')]
+        # Blocks that only a CONVOLVER_PACKAGE_PLUGINS build configures.
+        for cmake in sorted(ROOT.glob('plugins/*/CMakeLists.txt')):
+            texts += re.findall(
+                r'^if\([^\n]*CONVOLVER_PACKAGE_PLUGINS[^\n]*$(.*?)^endif\(\)',
+                cmake.read_text(encoding='utf-8'),
+                re.MULTILINE | re.DOTALL,
+            )
+        for text in texts:
+            named |= set(re.findall(r'\$\{PROJECT_SOURCE_DIR\}/([^"\s)]+)', text))
         self.assertIn('COPYING', named)
-        for pattern in sorted(named):
+        self.assertIn('tests/vst3/package_probe.cpp', named)
+        for script in sorted([*ROOT.glob('scripts/release/*.py'), *ROOT.glob('tests/release/*.py')]):
+            named |= set(re.findall(r"\bROOT / '([^']+)'", script.read_text(encoding='utf-8')))
+        self.assertIn('tests/au/bundle_tests.py', named)
+        # SOURCE_COMMIT is written into the source archive. The include
+        # directory and the import path are not read whole; the files they
+        # are used for are named one by one.
+        for pattern in sorted(named - {'SOURCE_COMMIT', 'portable', 'scripts'}):
             path = pattern.replace('*', 'guide').replace('${release_test}', 'manifest')
             if (ROOT / path).is_dir():
                 path = path.rstrip('/') + '/file'
@@ -381,7 +406,7 @@ class FormatIsolation(unittest.TestCase):
 RELEASE_REFERENCES = {
     '.pre-commit-config.yaml': 'Lint runs the trademark check for every pull request',
     'scripts/trademarks.py': 'Lint runs it; also a candidate trigger, as the package checks import it',
-    'tests/identities_tests.py': 'Lint runs it for every pull request',
+    'tests/identities_tests.py': 'Lint runs it for every pull request (also CTest identities)',
     'cmake/ConvolverDebugSymbols.cmake': 'a comment',
     'cmake/ConvolverPluginPackaging.cmake': 'used only with CONVOLVER_PACKAGE_PLUGINS, in the candidates',
     'tests/vst3/package_probe.cpp': 'a comment',
@@ -403,6 +428,19 @@ class ReleaseIsolation(unittest.TestCase):
             if names - set(ci_scope.RELEASE_SHARED):
                 found.add(path)
         self.assertEqual(found, set(RELEASE_REFERENCES))
+
+    def test_shared_release_scripts_import_only_shared_ones(self):
+        """A release module that a shared one imports is used by other
+        workflows too, so it must be shared."""
+        modules = {path.stem for path in (ROOT / 'scripts/release').glob('*.py')}
+        for shared in ci_scope.RELEASE_SHARED:
+            if not shared.endswith('.py'):
+                continue
+            text = (ROOT / shared).read_text(encoding='utf-8')
+            imported = set(re.findall(r'^(?:import|from) (\w+)', text, re.MULTILINE)) & modules
+            with self.subTest(module=shared):
+                for name in imported:
+                    self.assertIn(f'scripts/release/{name}.py', ci_scope.RELEASE_SHARED)
 
 
 class Command(unittest.TestCase):

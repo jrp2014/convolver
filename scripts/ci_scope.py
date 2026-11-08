@@ -24,7 +24,7 @@ changed file is one of these kinds:
 - everything else, including documentation that a build test reads or runs.
   Every workflow but the candidates runs.
 
-The candidate workflow, whose macOS builds take about 25 minutes, runs for a
+The candidate workflow, the slowest (up to about 25 minutes), runs for a
 pull request only when it changes what the packages are built from or hold
 (CI-34): release files, packaged documentation, the macOS window, the build
 configuration, the shipped dependencies and the other files in CANDIDATES.
@@ -117,7 +117,11 @@ CANDIDATES = (
     'plugins/au/NOTICE.txt',
     'plugins/au/GPL-3.0.txt',
     'tests/plugins/fixtures.py',  # Writes the packaged examples' WAV files.
-    'scripts/trademarks.py',  # tests/release/package_smoke.py checks the packages with it.
+    # The candidates' own checks run or compile these.
+    'scripts/trademarks.py',  # tests/release/package_smoke.py
+    'tests/au/bundle_tests.py',  # package_smoke.py and macos_installer.py
+    'tests/vst3/package_probe.cpp',  # Built only with CONVOLVER_PACKAGE_PLUGINS.
+    '.gitattributes',  # git archive writes the source archive with it.
     'portable/third_party/',  # Shipped dependency (Ooura), with its licence.
 )
 # Workflows gated by this script, named by their file in .github/workflows/.
@@ -152,10 +156,13 @@ def classify(path):
 
 def candidates(paths):
     """Whether a pull request changing these paths builds the candidates."""
-    return any(
-        classify(path) in ('packaged', 'format:editor', 'workflow:release') or matches(path, RELEASE + CANDIDATES)
-        for path in paths
-    )
+    for path in paths:
+        kind = classify(path)
+        if kind == 'documentation':
+            continue
+        if kind in ('packaged', 'format:editor', 'workflow:release') or matches(path, RELEASE + CANDIDATES):
+            return True
+    return False
 
 
 def needed(paths):
