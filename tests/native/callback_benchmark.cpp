@@ -78,9 +78,8 @@ Options parse(int argc, char** argv) {
         else
             throw std::invalid_argument(usage);
     }
-    if (!o.taps || !o.inputs || !o.outputs || !o.block || !o.callback ||
-        !std::isfinite(o.seconds) || o.seconds <= 0 || o.seconds > 600 ||
-        (o.filter != "noise" && o.filter != "decaying") ||
+    if (!o.taps || !o.inputs || !o.outputs || !o.callback || !std::isfinite(o.seconds) ||
+        o.seconds <= 0 || o.seconds > 600 || (o.filter != "noise" && o.filter != "decaying") ||
         (o.thread_denormals != "gradual" && o.thread_denormals != "flush"))
         throw std::invalid_argument(usage);
     return o;

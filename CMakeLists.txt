@@ -141,7 +141,7 @@ if(CONVOLVER_BUILD_NATIVE)
     endif()
     message(STATUS "Convolver FFT backend: ${fft_backend} (CONVOLVER_FFT_BACKEND=${CONVOLVER_FFT_BACKEND})")
     find_package(Threads REQUIRED)
-    add_library(convolver_core STATIC portable/engine.cpp portable/kernels.cpp portable/attenuation.cpp
+    add_library(convolver_core STATIC portable/engine.cpp portable/partitions.cpp portable/kernels.cpp portable/attenuation.cpp
         ${fft_source})
     add_library(Convolver::core ALIAS convolver_core)
     set_target_properties(convolver_core PROPERTIES EXPORT_NAME core POSITION_INDEPENDENT_CODE ON)
