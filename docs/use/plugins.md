@@ -127,10 +127,11 @@ the one list of what each way reads:
 or a Convolver `.vstpreset`, and lists the folders where hosts look for
 presets. A preset is needed where the plug-in has no window (the VST3
 plug-in on Windows and Linux), in an LV2 host with no file chooser, and in
-Audacity 4.0.2, which does not store a filter loaded in the window (with
-Choose…, Recent, Reload or automatic reload): it plays while you listen, but exports and saved
-projects keep whatever Audacity stored last, which may be no filter or an
-older one.
+Audacity, where the first preview supports only Audacity's own preset menu:
+Audacity 4.0.2 does not keep a filter loaded in the window (with Choose…,
+Recent, Reload or reloading when the file changes) for exports or saved
+projects, which keep whatever Audacity stored last, possibly no filter or an
+older one ([in Audacity](first-sound-in-a-host.md#in-audacity)).
 
 The filter is prepared away from the audio, then installed. A filter loaded
 before any audio plays starts at once; one loaded during playback fades in

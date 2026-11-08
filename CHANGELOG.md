@@ -236,10 +236,15 @@ Until 1.0 the C++ API may change between minor versions.
   window, with the `.vstpreset` as the route without one. A file chosen in
   the window must have exactly as many inputs as the host gives, unlike a
   preset (TODO PLUG-33), so the crossover check loads the preset where the
-  host gives more inputs, as REAPER does. In Audacity 4.0.2 the guides say
-  to load a preset from Audacity's own preset menu, not to use Choose…:
-  Audacity does not store a chosen filter, so it plays but is not exported
-  or saved. No behaviour change.
+  host gives more inputs, as REAPER does. A new [In
+  Audacity](docs/use/first-sound-in-a-host.md#in-audacity) section gives the
+  route the first preview supports there, Audacity's own preset menu, since
+  Audacity 4.0.2 does not keep a filter loaded from the window for exports
+  or saved projects. The first-use guide gains a short "Before you start"
+  list, and [report a problem](docs/use/troubleshooting.md#report-a-problem)
+  and the GitHub problem form ask for Copy Diagnostics, the loading method
+  and whether playback, an export or reopening is affected. No behaviour
+  change.
 - CI (CI-34, first step, approved by jrp on 8 November 2026): a pull request
   builds the plug-in distribution candidates, whose macOS builds are the
   slowest jobs, only when it changes release files, packaged pages, the

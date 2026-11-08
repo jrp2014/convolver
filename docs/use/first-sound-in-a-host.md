@@ -12,7 +12,8 @@ you hear no change. Choose `echo-48000-stereo/filter.cfg` (quieter and
 hollow) and `repeat-48000-stereo/filter.cfg` (each sound again a quarter of a
 second later), then save, close and reopen the project: the filter is still
 there. Your own IR file, `.cfg` or configuration list loads the same way,
-from any folder. Presets are an [optional route](#optional-load-a-preset).
+from any folder. Presets are an [optional route](#optional-load-a-preset),
+and the supported one [in Audacity](#in-audacity).
 
 You need a plug-in host that loads VST® 3, such as REAPER or Audacity
 (version 4 or later), or one that loads Audio Units, such as GarageBand or
@@ -27,12 +28,8 @@ on Windows, see the [Equalizer APO export](equalizer-apo.md).
 - The filter's sample rate must match the host's: Convolver does not
   resample. Audacity plays effects at its Default sample rate, which can
   differ from the rate it exports at.
-- **Audacity 4.0.2:** load the filter as a [preset](#optional-load-a-preset)
-  from Audacity's own preset menu, not with **Choose…**, **Recent**,
-  **Reload** or automatic reload in Convolver's window. A filter loaded in the window plays
-  while you listen, but Audacity does not store it: exports and the saved
-  project keep whatever Audacity stored last, which may be no filter or an
-  older one, so a wrong export can still sound plausible.
+- **In Audacity**, load filters from Audacity's own preset menu, as
+  [In Audacity](#in-audacity) says, not from Convolver's window.
 - A file chosen in the window must have exactly as many inputs as the host
   gives the plug-in; a preset of the same filter only needs at least that
   many. Where a host gives more inputs, as REAPER does on a six-channel
@@ -54,14 +51,10 @@ named `KIND-RATE-LAYOUT` (such as `echo-48000-stereo`) and holds the filter
 as `filter.cfg` and `impulse.wav`, and the same filter as a preset.
 
 1. Set the host to 44100, 48000 or 96000 Hz, and select a mono or stereo
-   track. Audacity plays effects at *Audio setup › Audio settings ›
-   Default sample rate*, which can differ from the project's rate: set both
-   to the filter's rate before you load it. Audacity also runs the
-   plug-in in stereo even on a mono track, so use a stereo filter there.
+   track.
 2. Add Convolver to the track as an effect. Its window opens from the
    plug-in's slot: in GarageBand, from the plug-in's button in the track's
-   Plug-ins area; in Audacity, turn on *Preset options › Use vendor UI* if
-   you see only Audacity's own controls.
+   Plug-ins area.
 3. Click **Choose…** under the filter's name, or drop the file on the window,
    and pick `presets/identity-RATE-LAYOUT/filter.cfg` for your track's rate
    and layout.
@@ -132,9 +125,7 @@ Each example folder holds a VST3 preset named after it
 (`presets/echo-48000-stereo/echo-48000-stereo.vstpreset`). Load it from the
 host's preset menu ("Load Preset…" or its preset browser; in REAPER, the
 **+** button beside the preset menu, then the item that imports a VST preset
-file). Audacity 4's preset menu does not open these files: copy the preset
-to the VST3 folder for all users in [preset folders](presets.md#preset-folders)
-and restart Audacity, and it lists the preset by its file name. Audio Unit hosts
+file). In Audacity, see [In Audacity](#in-audacity). Audio Unit hosts
 such as GarageBand and Logic take `.aupreset` files instead; make one as
 below if GarageBand's sandbox refuses a chosen file. Without the window,
 carry on with steps 2 to 4 above, loading the matching `echo` and `repeat`
@@ -152,6 +143,39 @@ To make a preset from your own filter, run from the extracted package folder
 In PowerShell use `./bin/convolver-preset.exe` with the same two arguments.
 [Plug-in presets](presets.md) explains the Audio Unit and LV2 formats,
 choosing an entry from a list, and the folders where hosts look for presets.
+
+## In Audacity
+
+The first preview supports Audacity 4 through Audacity's own preset menu
+only. A filter loaded from Convolver's window (**Choose…**, **Recent**,
+**Reload**, or reloading when the file changes) plays while you listen, but
+Audacity 4.0.2 does not keep it for an export or a saved project: they keep
+whatever Audacity stored last, which may be no filter or an older one, so a
+wrong export can still sound plausible.
+
+1. Set *Audio setup › Audio settings › Default sample rate*, and the
+   project's rate, to the filter's rate. Audacity plays effects at the
+   Default sample rate, which can differ from the rate it exports at. Use
+   stereo filters: Audacity runs the plug-in in stereo even on a mono track.
+2. Audacity's preset menu does not import `.vstpreset` files; it lists the
+   ones in the VST3 folder for all users,
+   `/Library/Audio/Presets/Convolver/Convolver/` on macOS
+   ([preset folders](presets.md#preset-folders)). Copy the presets there
+   (this needs an administrator), then restart Audacity, which reads the
+   folder once per session. For your own filter, make a preset first, as
+   in [optional: load a preset](#optional-load-a-preset), named after its
+   rate (`room-48000.vstpreset`):
+
+   ```sh
+   sudo mkdir -p /Library/Audio/Presets/Convolver/Convolver
+   sudo cp presets/*-stereo/*-stereo.vstpreset /Library/Audio/Presets/Convolver/Convolver/
+   ```
+
+3. Add Convolver as a real-time effect and choose the preset by its file
+   name from Audacity's preset menu. To see Convolver's window and status,
+   turn on *Preset options › Use vendor UI*.
+4. Play, export a few seconds and listen to the export; save the project,
+   reopen it and play again.
 
 ## What to expect
 
