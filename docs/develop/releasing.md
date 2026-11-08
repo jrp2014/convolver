@@ -14,7 +14,8 @@ run that workflow on a tag, then the "Draft preview release" workflow, which
 checks the files against their checksums and attaches them unchanged to a
 draft GitHub pre-release that jrp reads and publishes. Production releases stay disabled
 (`production_enabled` is false) until signing, clean installation and
-named-host qualification are done. Nothing has been published yet. After
+named-host qualification are done. The first preview, [0.12.12](https://github.com/jrp2014/convolver/releases/tag/v0.12.12),
+was published on 8 November 2026. After
 publishing, jrp tells the people who already use the `.cfg` format where to
 find it.
 
@@ -196,7 +197,7 @@ whoever he names) qualifies it on a named machine (REL-6 in
 ## Publishing an unsigned preview
 
 Signing is not needed for a preview. Publication is a manual step owned by
-jrp, and has not been done yet. The "Draft preview release" workflow
+jrp; he first did it on 8 November 2026 (0.12.12). The "Draft preview release" workflow
 ([`publish.yml`](../../.github/workflows/publish.yml), REL-8) does the
 mechanical part, but only as a draft: nothing is public until jrp presses
 **Publish**.

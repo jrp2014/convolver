@@ -86,31 +86,6 @@ is superseded.
 
 ## User experience and distribution
 
-- [ ] **REL-7 — Apply bounded preview acceptance.** Follow the
-  [qualification plan](docs/project/plans/2026-11-08-preview-acceptance.md):
-  hold one candidate still, complete the existing required host and release
-  gates, classify blockers by consequence, and record lower-risk work for
-  later. Done when the final candidate meets the stop rule and its evidence
-  and deferred limitations are linked from the gate summary; jrp publishes.
-  The plan is written; qualification is not claimed complete. CI-34 is
-  separate and does not gate the walkthrough.
-  Progress (8 November 2026): from jrp's release-readiness review of
-  v0.12.8, the checks still to run are one list,
-  [checks left before publication](docs/project/status.md#checks-left-before-publication),
-  which keeps the results jrp accepted and names what could be narrowed.
-  REL-6 qualified the 0.12.5 source on his MacBook Pro
-  ([record](docs/archive/reviews/2026-11-08-rel6-qualification.md)).
-  jrp chose the final candidate: the first tag after DOC-10 merges, with
-  most host checks run first on a v0.12.8 candidate and REL-6's 0.12.5
-  result standing while no engine, loading or plug-in code changes
-  ([decisions](docs/project/decisions.md#releases)). Then (21:02) jrp
-  decided to publish the first preview from the next tag without further
-  testing; the checks in that list stay open as follow-up, not gates, and
-  the release notes say what was not checked
-  ([decisions](docs/project/decisions.md#releases)). Remaining: the next
-  tag's candidate run, the draft pre-release and his publication; the
-  checks move to HOST-1, AU-4 and REL-3 when this item closes.
-
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The candidate workflow
   builds unsigned packages with pinned dependencies, corresponding source,
   staging, installers, artifact verification and promotion gates
@@ -1556,6 +1531,10 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **REL-7 — Apply bounded preview acceptance.** 8 November 2026,
+  PRs #156 and #159; jrp published [0.12.12](https://github.com/jrp2014/convolver/releases/tag/v0.12.12) without the remaining
+  host checks and REL-3, which stay open under HOST-1, AU-4 and REL-3
+  ([checks left](docs/project/status.md#checks-left-before-publication)).
 - [x] **AU-17 — Audio Unit listeners told on the main thread.** 8
   November 2026, PR #158, from a ThreadSanitizer report on `main`
   ([run 42512164144](https://github.com/jrp2014/convolver/actions/runs/42512164144));

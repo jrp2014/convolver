@@ -17,9 +17,11 @@ Unit's ThreadSanitizer run
 ([PR #150](https://github.com/jrp2014/convolver/pull/150)) and REL-8 the
 draft-release workflow
 ([PR #152](https://github.com/jrp2014/convolver/pull/152)), which jrp
-rehearsed on 8 November and whose draft he deleted. Nothing has been
-published: there are no GitHub releases, and preview packages exist only as
-CI artifacts. The command-line renderer, the preset tool, the Equalizer APO
+rehearsed on 8 November and whose draft he deleted. On 8 November
+2026 jrp published the first preview, [Convolver 0.12.12](https://github.com/jrp2014/convolver/releases/tag/v0.12.12) for macOS,
+as an unsigned GitHub pre-release, without the remaining host checks and
+the independent walkthrough, which stay open
+([checks left](#checks-left-before-publication)). The command-line renderer, the preset tool, the Equalizer APO
 export and the VST3, Audio Unit and LV2 plug-ins are implemented and tested
 automatically; VST3 and the Audio Unit have Gain, Mix and Latency and share
 one macOS window. jrp has run the VST3 plug-in in REAPER (6 to 8 November)

@@ -12,6 +12,21 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Releases (REL-7): jrp decided to publish the first preview without the
+  remaining host checks and the independent walkthrough; they stay open
+  as follow-up, and the release notes list what was not checked
+  ([decision](docs/project/decisions.md#releases)).
+- Releases (REL-7): jrp published Convolver 0.12.12 as the first unsigned
+  developer preview for macOS on 8 November 2026
+  ([release](https://github.com/jrp2014/convolver/releases/tag/v0.12.12)).
+
+## [0.12.12] - 2026-11-08
+
+The first published preview: macOS only, unsigned, published before its
+last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0.12.12)).
+
+### Added
+
 - Release evidence (REL-6, REL-7): jrp's responsiveness qualification of
   the 0.12.5 source on his MacBook Pro is recorded: all 24 combinations
   passed on the first run, with the longest hold of the host's thread
@@ -30,10 +45,6 @@ Until 1.0 the C++ API may change between minor versions.
   state only after a parameter edit (VST3-17, open).
   For the first preview, Audacity is supported through its own preset
   menu only, and the release notes say so.
-- Releases (REL-7): jrp decided to publish the first preview without the
-  remaining host checks and the independent walkthrough; they stay open
-  as follow-up, and the release notes list what was not checked
-  ([decision](docs/project/decisions.md#releases)).
 - Releases (REL-8): a "Draft preview release" workflow turns a passed
   candidate run on a `vX.Y.Z` tag into a draft GitHub pre-release. It refuses
   a run that was not started by hand on the tag or did not pass, or whose
@@ -1940,7 +1951,8 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.12.12...HEAD
+[0.12.12]: https://github.com/jrp2014/convolver/releases/tag/v0.12.12
 [0.7.1]: https://github.com/jrp2014/convolver/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/jrp2014/convolver/compare/v0.6.10...v0.7.0
 [0.6.10]: https://github.com/jrp2014/convolver/compare/v0.5.6...v0.6.10
