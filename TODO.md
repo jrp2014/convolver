@@ -1363,8 +1363,7 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **AU-13 — Safe partial construction of the Latency work.** 5 November
   2026, PR #111.
 - [x] **AU-16 — Show a bypass switched while the control lock is held.**
-  8 November 2026; [Status and log](docs/develop/plugin-contract.md#status-and-log),
-  and PLUG-30 for the pattern.
+  8 November 2026, PR #143; [Status and log](docs/develop/plugin-contract.md#status-and-log).
 - [x] **AU-11 — Separate file watching from the window.** 5 November 2026;
   [shared macOS window](docs/develop/architecture.md#the-shared-macos-window).
 - [x] **AU-10 — Separate the window's setting editing from its layout.** 1

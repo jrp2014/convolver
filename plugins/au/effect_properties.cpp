@@ -573,7 +573,8 @@ OSStatus Effect::SetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         // waits for nothing. That call may already have set the status, or
         // may never set it (the Latency work with an unchanged Latency, the
         // CI failure of 2f3cb80), so the Latency work's serial queue, which
-        // may wait, shows the bypass once the lock is free (AU-16).
+        // may wait, shows the bypass once the lock is free (AU-16; the
+        // pattern is TODO PLUG-30).
         std::string faults;
         bool updated = false;
         try {
@@ -586,7 +587,7 @@ OSStatus Effect::SetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         } catch (...) { // Out of memory: the status follows at the next update.
         }
         if (!updated)
-            request_latency();
+            request_status();
         if (!faults.empty())
             log_faults(faults);
         if (updated)

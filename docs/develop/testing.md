@@ -764,11 +764,12 @@ Five CTest tests run when the adapter is built (label `au`):
   once closing has cancelled the work and is about to wait for it
   (`latency_closing_for_tests`), so closing must wait and the queued run
   never starts. A 60 s watchdog names a step that does not finish. A run
-  is also held once it has taken the control lock
-  (`latency_locked_for_tests`) while the host switches bypass on and then
-  off: the setter must return without waiting, and Status must follow once
-  the run lets the lock go (AU-16, the intermittent "bypass not shown"
-  failure made deterministic).
+  is also held at the end of the part that holds the control lock, after
+  it has looked for a bypass change (`latency_locked_for_tests`), while the
+  host switches bypass on and then off: the setter must return without
+  waiting, and only a later run, which the setter must ask for, can show
+  the change, so the check needs both halves of the fix (AU-16, the
+  intermittent "bypass not shown" failure made deterministic).
 - `au.log_evidence`: the adapter test's Convolver log, the file CTest
   names in the build folder (`convolver-adapter-tests.log`), reaches the
   [CI evidence](#evidence-from-failed-ci-runs) after the test aborts, as a

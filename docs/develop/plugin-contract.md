@@ -225,8 +225,11 @@ format.
   lock is free. The setter never waits for the lock: when another call
   holds it, the Latency work's serial queue updates the Status once the
   lock is free, so a host that reads it straight after setting bypass may
-  see the old value until the parameter-change event (AU-16; the pattern
-  is TODO PLUG-30). Host writes to it
+  see the old value until the call holding the lock or the Latency work
+  updates it. The setter wakes that work with its own bit of the dispatch
+  source's data, and such a run only updates the Status: it does not
+  retry a Latency that could not be built (AU-16; the pattern is TODO
+  PLUG-30). Host writes to it
   are ignored, and the value `AUBase::SaveState` writes with the other
   parameters is ignored on restore. When the log file cannot be written
   (`host_log_written()` is false), the text says so instead of pointing to it.

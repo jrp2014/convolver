@@ -1636,14 +1636,19 @@ void bypass_while_latency_work_holds_lock() {
         hold.unit = unit->get();
         latency_hold = &hold;
         au::latency_locked_for_tests = hold_latency;
+        // Unhooked before `hold` goes, even when a check below fails.
+        const std::unique_ptr<void, void (*)(void*)> unhook(&hold, [](void*) {
+            au::latency_locked_for_tests = nullptr;
+            latency_hold = nullptr;
+        });
+        // The held run has already looked for a bypass change, so only a
+        // later run, which the setter must ask for, can show this one.
         check(unit->load(state_of(stereo(48000))), "filter");
         wait_for_hold(hold, [&] { return hold.runs > 0; }, label + "the Latency run starting");
         finish_within(std::async(std::launch::async, [&] { unit->set_bypass(on); }),
                       label + "switching bypass");
         release(hold);
         require(latency_settled(*unit), label + "the Latency work did not finish");
-        au::latency_locked_for_tests = nullptr;
-        latency_hold = nullptr;
         const auto [value, text] = status();
         require(on ? value == HostStatus::bypassed &&
                          text == "Bypassed: the input plays unfiltered."
