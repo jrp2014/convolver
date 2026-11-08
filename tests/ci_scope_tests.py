@@ -73,6 +73,17 @@ class Classification(unittest.TestCase):
             'plugins/audio_guard.hpp': 'code',
             'tests/plugins/fixtures.py': 'code',
             'tests/auxiliary.py': 'code',
+            # Release files only the candidates use (CI-34), and the few others use too.
+            'scripts/release/candidate.py': 'release',
+            'tests/release/package_smoke.py': 'release',
+            'packaging/macos/Distribution.xml': 'release',
+            'packaging/windows/installer.nsi': 'release',
+            'packaging/trademarks/README.md': 'documentation',
+            'scripts/release/resolve.py': 'code',
+            'scripts/release/contract.py': 'code',
+            'packaging/release-policy.json': 'code',
+            'packaging/trademarks/vst.json': 'code',
+            '.github/workflows/release.yml': 'workflow:release',
         }
         for path, kind in cases.items():
             with self.subTest(path=path):
@@ -81,9 +92,13 @@ class Classification(unittest.TestCase):
     def test_decisions(self):
         self.assertEqual(ci_scope.decide(['TODO.md', 'docs/develop/build.md']), {'build': False, 'package': False})
         self.assertEqual(ci_scope.decide(['TODO.md', 'docs/use/presets.md']), {'build': False, 'package': True})
-        self.assertEqual(ci_scope.decide(['TODO.md', 'portable/engine.cpp']), {'build': True, 'package': True})
+        # Ordinary code builds the candidates only on main or by hand (CI-34).
+        self.assertEqual(ci_scope.decide(['TODO.md', 'portable/engine.cpp']), {'build': True, 'package': False})
+        self.assertEqual(ci_scope.decide(['portable/engine.cpp', 'cmake/X.cmake']), {'build': True, 'package': True})
+        self.assertEqual(ci_scope.decide(['scripts/release/candidate.py']), {'build': False, 'package': True})
         # An empty list is unusual (a merge that changes nothing); test everything.
         self.assertEqual(ci_scope.decide([]), {'build': True, 'package': True})
+        self.assertEqual(ci_scope.decide([], 'release'), {'build': True, 'package': True})
 
     def test_format_decisions(self):
         def runs(paths):
@@ -95,13 +110,20 @@ class Classification(unittest.TestCase):
             }
 
         everything = set(ci_scope.WORKFLOWS)
-        # The candidates package the Audio Unit on macOS (PLUG-5).
-        self.assertEqual(runs(['plugins/au/effect.hpp', 'tests/au/harness_test.cpp', 'TODO.md']), {'au', 'release'})
+        builds = everything - {'release'}
+        # A format's own code runs its workflows; the candidates, which package
+        # the VST3 plug-in and the Audio Unit, build for it only on main or by
+        # hand (CI-34).
+        self.assertEqual(runs(['plugins/au/effect.hpp', 'tests/au/harness_test.cpp', 'TODO.md']), {'au'})
         self.assertEqual(runs(['plugins/lv2/plugin.cpp']), {'lv2'})
-        # The candidates build and package the VST3 plug-in.
-        self.assertEqual(runs(['plugins/vst3/processor.cpp']), {'vst3', 'release'})
-        self.assertEqual(runs(['plugins/au/effect.hpp', 'plugins/lv2/plugin.cpp']), {'au', 'lv2', 'release'})
-        # The macOS window, which both the VST3 plug-in and the Audio Unit show (CI-26).
+        self.assertEqual(runs(['plugins/vst3/processor.cpp']), {'vst3'})
+        self.assertEqual(runs(['plugins/au/effect.hpp', 'plugins/lv2/plugin.cpp']), {'au', 'lv2'})
+        # What a format puts into its bundle builds the candidates too.
+        self.assertEqual(runs(['plugins/au/Info.plist.in']), {'au', 'release'})
+        self.assertEqual(runs(['plugins/vst3/CMakeLists.txt']), {'vst3', 'release'})
+        self.assertEqual(runs(['plugins/lv2/CMakeLists.txt']), {'lv2'})
+        # The macOS window, which both the VST3 plug-in and the Audio Unit show
+        # (CI-26), and which the candidates package.
         self.assertEqual(runs(['plugins/editor/mac/setting_rows.mm']), {'vst3', 'au', 'release'})
         self.assertEqual(
             runs(['plugins/editor/mac/setting_rows.mm', 'tests/au/editor_tests.mm']), {'vst3', 'au', 'release'}
@@ -110,16 +132,85 @@ class Classification(unittest.TestCase):
         self.assertEqual(runs(['plugins/editor/mac/setting_rows.mm', 'portable/host.cpp']), everything)
         self.assertEqual(runs(['plugins/au/effect.hpp', 'docs/use/plugins.md']), {'au', 'release'})
         self.assertEqual(runs(['.github/workflows/fuzz.yml']), {'fuzz'})
+        self.assertEqual(runs(['.github/workflows/release.yml']), {'release'})
         self.assertEqual(runs(['.github/workflows/lint.yml']), set())
-        self.assertEqual(runs(['plugins/au/effect.hpp', 'portable/engine.cpp']), everything)
-        self.assertEqual(runs(['plugins/au/effect.hpp', 'tests/plugins/harness.hpp']), everything)
-        self.assertEqual(runs(['tests/vst3/fft_symbols.py']), everything)
-        self.assertEqual(ci_scope.decide(['plugins/au/effect.hpp'], 'release'), {'build': True, 'package': True})
+        self.assertEqual(runs(['plugins/au/effect.hpp', 'portable/engine.cpp']), builds)
+        self.assertEqual(runs(['plugins/au/effect.hpp', 'tests/plugins/harness.hpp']), builds)
+        self.assertEqual(runs(['tests/vst3/fft_symbols.py']), builds)
+        # Release files: only the candidates, unless other workflows use them too.
+        self.assertEqual(runs(['scripts/release/candidate.py', 'tests/release/package_smoke.py']), {'release'})
+        self.assertEqual(runs(['packaging/macos/Distribution.xml', 'TODO.md']), {'release'})
+        self.assertEqual(runs(['scripts/release/resolve.py']), everything)
+        self.assertEqual(runs(['packaging/release-policy.json']), everything)
+        self.assertEqual(runs(['scripts/release/candidate.py', 'plugins/au/effect.hpp']), {'au', 'release'})
+        self.assertEqual(ci_scope.decide(['plugins/au/effect.hpp'], 'release'), {'build': False, 'package': False})
         self.assertEqual(ci_scope.decide(['plugins/lv2/plugin.cpp'], 'release'), {'build': False, 'package': False})
-        self.assertEqual(ci_scope.decide(['plugins/vst3/processor.cpp'], 'release'), {'build': True, 'package': True})
-        # Without a workflow name the answer is whether any workflow builds.
-        self.assertEqual(ci_scope.decide(['plugins/au/effect.hpp']), {'build': True, 'package': True})
+        self.assertEqual(ci_scope.decide(['cmake/X.cmake'], 'release'), {'build': True, 'package': True})
+        # Without a workflow name, build says whether any workflow but the candidates builds.
+        self.assertEqual(ci_scope.decide(['plugins/au/effect.hpp']), {'build': True, 'package': False})
         self.assertEqual(ci_scope.decide(['.github/workflows/lint.yml']), {'build': False, 'package': False})
+
+    def test_candidates(self):
+        """What the packages are built from or hold builds the candidates on a
+        pull request; other code does not (CI-34)."""
+        build = (
+            'CMakeLists.txt',
+            'cmake/ConvolverPluginPackaging.cmake',
+            'cmake/FindConvolverFFTW.cmake',
+            'VERSION',
+            'COPYING',
+            'examples/first-use/stereo/filter.wav',
+            'examples/plugin-presets/stereo.vstpreset',
+            'portable/third_party/ooura/fftsg.c',
+            'plugins/identities.json',
+            'plugins/editor/mac/view_layout.h',
+            'plugins/vst3/NOTICE.txt.in',
+            'plugins/au/GPL-3.0.txt',
+            'tests/plugins/fixtures.py',
+            'scripts/trademarks.py',
+            'scripts/release/candidate.py',
+            'scripts/release/resolve.py',
+            'tests/release/macos_installer.py',
+            'packaging/release-policy.json',
+            'packaging/trademarks/vst.json',
+            '.github/workflows/release.yml',
+            'docs/use/install.md',
+        )
+        skip = (
+            'portable/engine.cpp',
+            'portable/host.cpp',
+            'include/convolver/engine.hpp',
+            'plugins/vst3/processor.cpp',
+            'plugins/vst3/editor.mm',
+            'plugins/au/effect.cpp',
+            'plugins/lv2/CMakeLists.txt',
+            'tests/consumer/CMakeLists.txt',
+            'tests/native/engine_tests.cpp',
+            'tests/plugins/harness.hpp',
+            '.github/workflows/vst3.yml',
+            '.github/actions/use-every-cpu/action.yml',
+            'CMakePresets.json',
+            'TODO.md',
+            'docs/develop/testing.md',
+        )
+        for path in build:
+            with self.subTest(path=path):
+                self.assertTrue(ci_scope.candidates([path]))
+        for path in skip:
+            with self.subTest(path=path):
+                self.assertFalse(ci_scope.candidates([path]))
+
+    def test_packaged_sources_build_the_candidates(self):
+        """Every source file the packaging names builds the candidates."""
+        packaging = (ROOT / 'cmake/ConvolverPluginPackaging.cmake').read_text(encoding='utf-8')
+        named = set(re.findall(r'\$\{PROJECT_SOURCE_DIR\}/([^"\s)]+)', packaging)) - {'SOURCE_COMMIT'}
+        self.assertIn('COPYING', named)
+        for pattern in sorted(named):
+            path = pattern.replace('*', 'guide').replace('${release_test}', 'manifest')
+            if (ROOT / path).is_dir():
+                path = path.rstrip('/') + '/file'
+            with self.subTest(path=path):
+                self.assertTrue(ci_scope.candidates([path]))
 
     def test_documentation_the_build_tests_reads(self):
         """Pages that CTest entries read must never count as documentation only."""
@@ -186,23 +277,26 @@ class Workflows(unittest.TestCase):
 # Files outside a format's folders that name its files (as plugins/NAME/,
 # tests/NAME/ or a relative NAME/ path) or its CMake option, and why that does
 # not make them depend on the format (CI-13). Documentation, historical code
-# and the format's own workflow are not checked.
+# and the format's own workflow are not checked. The candidates build and
+# package the VST3 plug-in and the Audio Unit, but since CI-34 a pull request
+# changing only their code builds them only when started by hand; main,
+# the weekly run and manual runs still do.
 FORMAT_REFERENCES = {
     'vst3': {
         'CMakeLists.txt': 'adds plugins/vst3 only with CONVOLVER_BUILD_VST3',
         'CMakePresets.json': 'local presets; CI uses only core-only (checked below)',
         'cmake/ConvolverDebugSymbols.cmake': 'a comment',
-        'cmake/ConvolverPluginPackaging.cmake': 'packages the VST3 build, in the candidates',
-        'scripts/release/candidate.py': 'the candidates, which VST3 changes run',
+        'cmake/ConvolverPluginPackaging.cmake': 'packages the VST3 build, in the candidates (CI-34)',
+        'scripts/release/candidate.py': 'the candidates (CI-34: main, weekly, by hand)',
         'tests/release/source_build.py': 'a local check of the source archive; CI does not run it',
         'tests/identities_tests.py': 'Lint runs it for every pull request',
         'tests/native/preset_tests.cpp': 'a comment',
-        'tests/release/package_smoke.py': 'runs the VST3 validator in the candidates, which VST3 changes run',
+        'tests/release/package_smoke.py': 'runs the VST3 validator in the candidates (CI-34: main, weekly, by hand)',
     },
     'au': {
         'CMakeLists.txt': 'adds plugins/au only with CONVOLVER_BUILD_AU',
-        'cmake/ConvolverPluginPackaging.cmake': 'packages the Audio Unit on macOS, in the candidates',
-        'scripts/release/candidate.py': 'the candidates, which Audio Unit changes run',
+        'cmake/ConvolverPluginPackaging.cmake': 'packages the Audio Unit on macOS, in the candidates (CI-34)',
+        'scripts/release/candidate.py': 'the candidates (CI-34: main, weekly, by hand)',
         'tests/release/package_smoke.py': "runs au.bundle's checks on the package, in the candidates",
         'tests/release/macos_installer.py': "runs au.bundle's checks on the installed component, in the candidates",
         'tests/release/source_build.py': 'a local check of the source archive; CI does not run it',
@@ -227,26 +321,28 @@ FORMAT_REFERENCES = {
 }
 
 
+def tracked():
+    """Tracked files that a build or workflow may read, with their text."""
+    listed = (
+        subprocess.run(['git', 'ls-files', '-z'], cwd=ROOT, env=CLEAN, check=True, capture_output=True)
+        .stdout.decode()
+        .split('\0')
+    )
+    for path in filter(None, listed):
+        if path.startswith(('docs/', 'historical/')) or path.endswith('.md') or not (ROOT / path).is_file():
+            continue
+        try:
+            yield path, (ROOT / path).read_text(encoding='utf-8')
+        except UnicodeDecodeError:
+            continue
+
+
 class FormatIsolation(unittest.TestCase):
     """A pull request that changes only one format's files runs only that
     format's workflows, so nothing else may build or read those files."""
 
-    def tracked(self):
-        listed = (
-            subprocess.run(['git', 'ls-files', '-z'], cwd=ROOT, env=CLEAN, check=True, capture_output=True)
-            .stdout.decode()
-            .split('\0')
-        )
-        for path in filter(None, listed):
-            if path.startswith(('docs/', 'historical/')) or path.endswith('.md') or not (ROOT / path).is_file():
-                continue
-            try:
-                yield path, (ROOT / path).read_text(encoding='utf-8')
-            except UnicodeDecodeError:
-                continue
-
     def test_only_listed_files_name_a_format(self):
-        files = list(self.tracked())
+        files = list(tracked())
         for name, folders in ci_scope.FORMATS.items():
             # A relative path such as parents[1] / 'vst3/x.py' counts too; a
             # URL path such as github.com/lv2/lv2 does not.
@@ -279,6 +375,36 @@ class FormatIsolation(unittest.TestCase):
                 self.assertLessEqual(presets, {'core-only'})
 
 
+# Files outside the release folders that name a release file other than those
+# in RELEASE_SHARED, and why that does not make them use it (CI-34).
+# Documentation, historical code and the candidate workflow are not checked.
+RELEASE_REFERENCES = {
+    '.pre-commit-config.yaml': 'Lint runs the trademark check for every pull request',
+    'scripts/trademarks.py': 'Lint runs it; also a candidate trigger, as the package checks import it',
+    'tests/identities_tests.py': 'Lint runs it for every pull request',
+    'cmake/ConvolverDebugSymbols.cmake': 'a comment',
+    'cmake/ConvolverPluginPackaging.cmake': 'used only with CONVOLVER_PACKAGE_PLUGINS, in the candidates',
+    'tests/vst3/package_probe.cpp': 'a comment',
+}
+
+
+class ReleaseIsolation(unittest.TestCase):
+    """A pull request that changes only release files runs only the
+    candidate workflow, so no other workflow may use them."""
+
+    def test_only_listed_files_name_a_release_file(self):
+        pattern = re.compile(r'(?:scripts/release|tests/release|packaging)/[\w./-]*')
+        own = (*ci_scope.RELEASE, '.github/workflows/release.yml', 'scripts/ci_scope.py', 'tests/ci_scope_tests.py')
+        found = set()
+        for path, contents in tracked():
+            if path.startswith(own):
+                continue
+            names = {name.rstrip('.') for name in pattern.findall(contents)}
+            if names - set(ci_scope.RELEASE_SHARED):
+                found.add(path)
+        self.assertEqual(found, set(RELEASE_REFERENCES))
+
+
 class Command(unittest.TestCase):
     def run_script(self, *args, cwd=ROOT, event='pull_request'):
         with tempfile.TemporaryDirectory() as temporary:
@@ -300,7 +426,7 @@ class Command(unittest.TestCase):
         self.assertIn('Only documentation changed', printed)
 
     def test_push_and_manual_runs_test_everything(self):
-        for event in ('push', 'workflow_dispatch'):
+        for event in ('push', 'workflow_dispatch', 'schedule'):
             with self.subTest(event=event):
                 self.assertEqual(self.run_script(event=event)[0], 'build=true\npackage=true\n')
 

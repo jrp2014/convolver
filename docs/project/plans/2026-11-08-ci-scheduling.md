@@ -7,6 +7,10 @@ builds and queueing while preserving the tests that protect Convolver.
 **In short:** implement scheduling changes only in a dedicated PR. The
 [preview acceptance plan](2026-11-08-preview-acceptance.md) proceeds independently.
 This page changes no workflow and authorises no test removal or weaker threshold.
+The first step is done: since 8 November 2026 a pull request builds the
+candidates only when it changes what they are built from or hold
+([CI triggers](../../develop/testing.md#when-pull-requests-build-the-candidates)),
+approved by jrp to stop spending a candidate run on each code tweak.
 
 ## Baseline and constraints
 
@@ -24,12 +28,17 @@ This page changes no workflow and authorises no test removal or weaker threshold
 
 ## Proposed scheduling changes to evaluate
 
-- [ ] Evaluate candidate builds on demand during development and before a
+- [x] Evaluate candidate builds on demand during development and before a
   host-testing PR is ready, retaining automatic runs for packaging, release,
   installation, dependencies, relevant CMake/build changes and packaged
   executable guides. Ordinary code can affect packaging too: retain a full
   candidate qualification before release and a regular integration run.
   Identify required-check and artifact-consumer dependencies before gating.
+  Done 8 November 2026: no status check is required on `main`; host testing
+  and publishing use runs on `main` or a tag, or a run started by hand on a
+  branch. Packaged pages still build the candidates, and most code pull
+  requests change one, so whether prose-only changes to `docs/use/` should
+  is the next question for jrp.
 - [ ] Evaluate narrower fuzz-campaign triggers covering configuration/list
   parsing, audio readers, saved-state decoding and all shared code, headers,
   limits, dependencies, harnesses and build options those targets depend on.

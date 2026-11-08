@@ -1388,7 +1388,10 @@ is not a failure. `vst3.pluginval.acceptance` skips itself with pluginval 1
 
 The test workflows run for every pull request, for every push to `main` and
 when started by hand; a pull request that changes only documentation skips
-their builds and tests ([below](#documentation-only-pull-requests)). A commit pushed to a branch that has a pull request runs
+their builds and tests ([below](#documentation-only-pull-requests)). The
+candidate workflow runs for a pull request only when it changes what the
+packages are built from or hold
+([below](#when-pull-requests-build-the-candidates)). A commit pushed to a branch that has a pull request runs
 once, as part of that pull request; a branch without one gets no automatic
 run, so open the draft pull request early ([workflow](workflow.md#before-you-start))
 or use Actions, then "Run workflow" on the branch. A new commit on a pull request
@@ -1450,10 +1453,11 @@ workflow. Anything else in the same pull request runs everything.
 
 | Files changed | Workflows that build and test |
 | --- | --- |
-| `plugins/vst3/`, `tests/vst3/` | VST3 and the [candidates](#plug-in-candidate-checks), which build and package the VST3 plug-in |
-| `plugins/au/`, `tests/au/` | Audio Unit and the [candidates](#plug-in-candidate-checks), which package the Audio Unit on macOS |
+| `plugins/vst3/`, `tests/vst3/` | VST3 |
+| `plugins/au/`, `tests/au/` | Audio Unit |
 | `plugins/lv2/`, `tests/lv2/` | LV2 |
 | `plugins/editor/mac/` (the macOS window, CI-26) | VST3, Audio Unit and the candidates: only those builds compile it, and their `editor_tests.mm` test it |
+| `scripts/release/`, `tests/release/`, `packaging/`, apart from the files other workflows use (CI-34) | the [candidates](#plug-in-candidate-checks) |
 | `.github/workflows/NAME.yml` | that workflow |
 
 The shared parts are not a format's files: the PLUG-2 harness in
@@ -1465,6 +1469,51 @@ name that format's files or its `CONVOLVER_BUILD_` option, and CI may use no
 CMake preset but `core-only`. When another build starts using a format's file,
 add the file to `SHARED` in `ci_scope.py` or the workflow to
 `FORMAT_WORKFLOWS`.
+
+The candidates build and package the VST3 plug-in and the Audio Unit, but a
+pull request that changes only their code does not build them unless one of
+the files [below](#when-pull-requests-build-the-candidates) changes too.
+Release files that other workflows use count as code: `resolve.py`,
+`sources.py`, `upstream.py` and `contract.py` in `scripts/release/`, with
+which the format workflows fetch their SDKs and tools, `release-policy.json`
+and the VST trademark wording that the VST3 build reads. Only the files
+`tests/ci_scope_tests.py` lists, each with its reason, may name another
+release file, so a new use outside the candidates fails pre-commit; add that
+file to `RELEASE_SHARED` in `ci_scope.py`.
+
+### When pull requests build the candidates
+
+The candidate workflow is the longest: the 13 pull-request runs that built it
+on 8 November 2026 took 8 to 24 minutes (median 13), with 12 more cancelled
+by a newer commit, and its two macOS builds hold two of the account's five
+macOS runners. So a pull request builds the candidates only when it changes
+what they are built from or hold (CI-34, approved by jrp on 8 November 2026):
+
+- release files: `scripts/release/`, `tests/release/`, `packaging/` and the
+  candidate workflow itself;
+- packaged pages ([above](#documentation-only-pull-requests)) and the rest of
+  the package: `examples/`, `COPYING`, the bundles' `Info.plist.in` and
+  notices, `plugins/identities.json`, `tests/plugins/fixtures.py` (it writes
+  the packaged examples' audio) and `scripts/trademarks.py`;
+- the macOS window, `plugins/editor/`;
+- the build configuration: the top-level `CMakeLists.txt`, `cmake/`, the VST3
+  and Audio Unit `CMakeLists.txt` and `VERSION`;
+- shipped dependencies: `portable/third_party/`, and `release-policy.json`,
+  which names every other one.
+
+The list is `CANDIDATES` and `RELEASE` in `ci_scope.py`, and the scope job
+prints which kind each changed file is. `tests/ci_scope_tests.py` checks that
+every source file `cmake/ConvolverPluginPackaging.cmake` names is on it.
+
+Any other change, ordinary code included, can still break a package, so the
+candidates keep building for every push to `main`, each Monday and when
+started by hand. When a pull request needs them anyway (before jrp tests it
+in a host, or when a change might affect what is packaged in a way the list
+misses), start "Plug-in distribution candidates" by hand on its branch:
+Actions, then "Run workflow", or
+`gh workflow run release.yml --ref BRANCH`. That run is not shown among the
+pull request's checks; link it in the pull request. A pull request whose
+changed files cannot be listed still builds everything.
 
 ### Which configurations run which tests
 
