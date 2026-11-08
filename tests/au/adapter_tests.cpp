@@ -241,7 +241,9 @@ void drain_main() {
 // Waits up to five seconds for `done`, as a host waits for a notification,
 // running the main queue meanwhile.
 template <class Done> bool eventually(Done done) {
-    for (int i = 0; i < 5000; ++i) {
+    // By the clock: a run of the main loop can return at once.
+    const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (std::chrono::steady_clock::now() < until) {
         if (done())
             return true;
         run_main(0.001);
@@ -296,7 +298,7 @@ void record_progress(AudioComponentInstance unit, std::uint64_t requested,
     p->done = std::max(p->done, done);
 }
 // Waits until a run of `unit`'s Latency work that saw every request made to
-// it so far has finished, logged and told the host: a completion witness
+// it so far has finished, logged and posted its notices: a completion witness
 // rather than a sleep. The default deadline only catches a deadlock.
 bool latency_finished(const Unit& unit,
                       std::chrono::milliseconds deadline = std::chrono::seconds(10)) {
