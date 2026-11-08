@@ -119,7 +119,7 @@ Until 1.0 the C++ API may change between minor versions.
 - Preview packages (PLUG-5, REL-2) ship the `convolver` command-line tool in
   `bin/`, and the first-use examples in `examples/first-use/` (mono, stereo
   and the 2→6 crossover: filter, `input.wav`, `expected.wav`) with a
-  `filter.vstpreset` made from each filter. The release tests render each
+  preset made from each filter. The release tests render each
   example with the packaged tool and compare it with `expected.wav`.
 - User guide: [check a stereo filter in a host](docs/use/check-a-stereo-filter.md),
   the stereo journey from download and checksum to a host render checked

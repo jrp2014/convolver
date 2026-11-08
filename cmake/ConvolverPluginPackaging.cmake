@@ -93,7 +93,8 @@ add_custom_command(OUTPUT "${first_use_presets}/stamp"
     COMMAND convolver_preset_tool "${first_use_source}/crossover/filter.cfg"
         "${first_use_presets}/crossover/first-use-crossover.vstpreset"
     COMMAND "${CMAKE_COMMAND}" -E touch "${first_use_presets}/stamp"
-    DEPENDS convolver_preset_tool "${first_use_source}/mono/impulse.wav" "${first_use_source}/stereo/filter.cfg"
+    # This file too, so a renamed preset reaches an existing build folder.
+    DEPENDS convolver_preset_tool "${CMAKE_CURRENT_LIST_FILE}" "${first_use_source}/mono/impulse.wav" "${first_use_source}/stereo/filter.cfg"
         "${first_use_source}/stereo/room.wav" "${first_use_source}/crossover/filter.cfg"
         "${first_use_source}/crossover/crossover.wav"
     VERBATIM)

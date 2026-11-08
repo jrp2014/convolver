@@ -22,7 +22,7 @@ class InstallerTests(unittest.TestCase):
         owned = self.installers.destinations(
             [
                 'VST3/Convolver.vst3/Contents/x86_64-win/Convolver.vst3',
-                'presets/identity/identity.vstpreset',
+                'presets/identity-48000-stereo/identity-48000-stereo.vstpreset',
                 'bin/convolver-preset.exe',
             ],
             'Windows',
