@@ -124,7 +124,7 @@ Until 1.0 the C++ API may change between minor versions.
 - Preview packages (PLUG-5, REL-2) ship the `convolver` command-line tool in
   `bin/`, and the first-use examples in `examples/first-use/` (mono, stereo
   and the 2→6 crossover: filter, `input.wav`, `expected.wav`) with a
-  `filter.vstpreset` made from each filter. The release tests render each
+  preset made from each filter. The release tests render each
   example with the packaged tool and compare it with `expected.wav`.
 - User guide: [check a stereo filter in a host](docs/use/check-a-stereo-filter.md),
   the stereo journey from download and checksum to a host render checked
@@ -213,10 +213,11 @@ Until 1.0 the C++ API may change between minor versions.
   after their folder, such as `presets/repeat-48000-stereo/repeat-48000-stereo.vstpreset`,
   instead of each being `filter.vstpreset`, so hosts that list presets by
   file name, such as Audacity, show what each one is and copying them into
-  a preset folder needs no renaming. The presets' contents are unchanged;
-  the first-use examples in `examples/first-use/` keep `filter.vstpreset`
-  beside their filter (`filter.cfg`, or `impulse.wav` for mono),
-  `input.wav` and `expected.wav`.
+  a preset folder needs no renaming. The three first-use presets in
+  `examples/first-use/` are likewise `first-use-mono.vstpreset`,
+  `first-use-stereo.vstpreset` and `first-use-crossover.vstpreset`, and the
+  stereo and crossover guides load them by those names. The presets'
+  contents are unchanged.
 - Documentation (DOC-10, from jrp's file-loading review of 7 November 2026,
   [recorded](docs/archive/reviews/2026-11-07-file-loading-review.md)):
   [plug-in presets](docs/use/presets.md) no longer says the plug-ins have no
@@ -685,6 +686,24 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- VST3 (VST3-16, from jrp's HOST-1 REAPER run and his trace with PR #134's
+  trace build): in REAPER 7.85 a new Latency stayed unused until a render,
+  FX Offline then Online, or reopening the project. Convolver asked REAPER
+  to restart the plug-in (`restartComponent(kLatencyChanged)`), as the VST3
+  SDK describes, but REAPER only reads the latency then and does not
+  restart it, so it read the old one. While the host runs the plug-in, a new
+  Latency now plays at once, as in the Audio Unit: a processor with the new
+  block size is built off the audio thread and replaces the running one
+  before the host is asked, so the latency the host reads is always the one
+  that plays. A change during playback leaves a gap in the sound, as
+  before ([latency and tail](docs/use/plugins.md#latency-and-tail)).
+  If the new processor cannot be built, the old Latency keeps playing and
+  the log and window say so. jrp's check in REAPER 7.85 with the candidate
+  at `7d6a8b4` passed: stopped and while playing, 256 to 1024 frames and
+  back, the window and REAPER's delay compensation showed the new latency
+  at once, and every impulse in the later renders lined up with the
+  reference track
+  ([record](docs/archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md)).
 - Audio Unit (AU-16, an intermittent au.adapter failure in CI on `2f3cb80`):
   switching the host's bypass could leave Status at Active while the audio
   was bypassed, and the reverse. The bypass setter does not wait for the

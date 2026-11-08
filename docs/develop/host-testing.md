@@ -330,9 +330,9 @@ except the Audio Unit build, which runs in a source checkout.
     sliders to reset them. Choose 1024 frames in the Latency menu while
     playing, and record what the window's Latency row and the log say,
     what REAPER shows as the plug-in's latency (its delay compensation),
-    and when, if ever, the new latency comes into use. In REAPER 7.85 it
-    stayed unused until the project was reopened
-    ([unresolved](#unresolved-host-findings)). Open the
+    and when the new latency comes into use: since VST3-16 at once (the log
+    says `Latency changed from 256 to 1024 frames`), with REAPER's delay
+    compensation following. Open the
     disclosure triangle: REAPER's FX window grows to fit.
     Click **Copy Diagnostics** and paste into the report. Save, quit and
     reopen: Gain, Mix and Latency come back.
@@ -341,8 +341,9 @@ except the Audio Unit build, which runs in a source checkout.
     in a new project, from the same candidate package as the steps above:
     a six-channel track, the crossover preset, a six-channel render
     compared with `convolver --compare`, save and reopen, and the presets
-    that do not fit. No REAPER routing that gives the VST3 plug-in 2 inputs
-    and 6 outputs is known yet ([unresolved](#unresolved-host-findings)):
+    that do not fit. REAPER gives the VST3 plug-in as many inputs as
+    outputs, six here; since PLUG-23 the filter reads the first two
+    ([retest](../archive/reviews/2026-11-07-reaper-crossover-retest.md)):
     record the layout REAPER offered (the track's channels, the plug-in's
     routing, and what Status and the log said). If the preset is refused,
     stop there and record it; otherwise record the render settings, each
@@ -480,9 +481,12 @@ explained or fixed. Each names the host and build it was seen in; it is not a
 claim about other hosts or versions. Do not add host steps to work around one
 until its cause is known: record what was observed, as below.
 
-| Finding | Seen in | What was observed | Not yet known | Evidence |
-| --- | --- | --- | --- | --- |
-| A new Latency is not used until the project is reopened (VST3) | REAPER 7.85, macOS 27.2 arm64, candidate 0.10.9 (`83aa64d`), 6 November 2026 | The log said `Latency set to 1024 frames`; the window said the new latency was not in use yet, with 256 frames still active; REAPER's delay-compensation display stayed at 256 samples, also after playback stopped. After save, quit and reopen both read 1024. The gap and the alignment at 1024 were not checked | Whether REAPER received Convolver's restart request, and what it did with it; whether the audio lines up after the change | [Record](../archive/reviews/2026-11-06-host1-reaper.md#part-c-window-and-settings) (step C5) |
+None at present. The last one, a new VST3 Latency that REAPER used only
+after a render, FX Offline then Online, or reopening the project, was fixed
+by VST3-16 and checked in REAPER on 8 November 2026
+([acceptance](../archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md)).
+Record the next with these columns: the finding, the host and build it was
+seen in, what was observed, what is not yet known, and the evidence.
 
 ## Production qualification
 

@@ -18,8 +18,11 @@ REL-7 tracks applying this plan, not another implementation milestone.
 
 ## 1. Fix the candidate and the test boundary
 
-- [ ] Finish the fixes that block the agreed journeys, including VST3-16's
-  host acceptance. Keep performance experiments and optional window changes
+- [ ] Check the gate summary for outstanding fixes before selecting the final
+  candidate. VST3-16's fix and its
+  [REAPER acceptance](../../archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md)
+  are already recorded; do not reopen that fix-specific gate merely to
+  apply this plan. Keep performance experiments and optional window changes
   on their own branches; do not include them to fill time while testing.
 - [ ] Build one candidate after those fixes merge. Record its version, source
   commit, CI run, package SHA-256, host versions, OS and architecture in the
