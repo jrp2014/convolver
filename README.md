@@ -19,9 +19,9 @@ a configuration list naming several of them. Roon, JRiver and Audiolense use
 variants of the `.cfg` format ([other programs](docs/use/other-programs.md)).
 Coming from the old Windows Convolver? Your `.cfg` files may need a few
 edits ([how](docs/use/other-programs.md#configurations-from-the-old-windows-convolver)).
-Convolver is a developer preview: packages are unsigned and nothing has been
-published yet. The Audio Unit has been tried in GarageBand; the full host
-tests and an independent user's walkthrough are still to come
+Convolver is a developer preview: the first, [0.12.12](https://github.com/jrp2014/convolver/releases/tag/v0.12.12), is an
+unsigned macOS pre-release. It was published before its last host checks
+and before an independent user's walkthrough, which are still to come
 ([status](docs/project/status.md)).
 
 ## Start here
