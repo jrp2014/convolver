@@ -53,6 +53,8 @@ windows, the other gain modes and the meters, and PERF-3's wider workloads
 come in later previews; LV2 joins a later preview once its own journeys are
 demonstrated. What still blocks it, with the evidence, is in
 [status](docs/project/status.md#what-still-blocks-the-first-preview).
+The [bounded qualification plan](docs/project/plans/2026-11-08-preview-acceptance.md)
+defines acceptance, retesting and deferred work (REL-7).
 Finishing a dependable product matters more than another substantial
 refactor: move code into shared layers only when two formats need the same
 behaviour (as with `HostFilter`), do not generalise host lifecycle or release
@@ -82,6 +84,15 @@ needs them. This table owns the current ordering; the dated
 is superseded.
 
 ## User experience and distribution
+
+- [ ] **REL-7 — Apply bounded preview acceptance.** Follow the
+  [qualification plan](docs/project/plans/2026-11-08-preview-acceptance.md):
+  hold one candidate still, complete the existing required host and release
+  gates, classify blockers by consequence, and record lower-risk work for
+  later. Done when the final candidate meets the stop rule and its evidence
+  and deferred limitations are linked from the gate summary; jrp publishes.
+  The plan is written; qualification is not claimed complete. CI-34 is
+  separate and does not gate the walkthrough.
 
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The candidate workflow
   builds unsigned packages with pinned dependencies, corresponding source,
@@ -1286,6 +1297,15 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   fixed for a processor's life. Effort S to M.
 
 ## Developer tooling
+
+- [ ] **CI-34 — Reduce duplicate CI scheduling, preserving coverage.** A
+  separate proposed PR, following the
+  [CI plan](docs/project/plans/2026-11-08-ci-scheduling.md). Inventory unique
+  coverage before narrowing candidate and fuzz triggers; retain oracle,
+  regression, validator, platform and release qualification checks. Done
+  when scope tests and affected CI pass, every configuration has a retained
+  trigger, and matched runs demonstrate waiting-time savings. No workflow
+  changes are part of REL-7.
 
 - [ ] **CI-32 — Run the most extreme numerical cases less often, once they
   cost.** From jrp's simplification review of 5 November 2026: keep

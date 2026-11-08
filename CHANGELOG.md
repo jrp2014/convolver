@@ -12,6 +12,11 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Preview qualification (REL-7): an acceptance plan with a fixed-candidate
+  stop rule, required gates, blocker classification and deferred work.
+  CI-34 proposes scheduling improvements separately; workflows and useful
+  test coverage are unchanged.
+
 - Host checks (HOST-1): a reusable 20-second, 48 kHz stereo listening WAV
   with quiet clicks and sustained tones, a standard-library Python generator,
   and [usage notes](examples/host-audio/README.md). The REAPER smoke-test

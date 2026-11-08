@@ -152,6 +152,12 @@ current direction; the Media Foundation and FFmpeg plans are parked.
 including the 18 October plug-in distribution plan, whose open work is now in
 [releasing](develop/releasing.md) and TODO.
 
+- [Finish and qualify the first preview](project/plans/2026-11-08-preview-acceptance.md)
+  (REL-7, Reference): acceptance criteria, blocking defects, retest boundaries
+  and deferred work for the fixed macOS candidate.
+- [Reduce CI waiting without losing useful coverage](project/plans/2026-11-08-ci-scheduling.md)
+  (CI-34, Reference): separate proposed scheduling work with coverage and
+  measurement requirements; no workflow changes yet.
 - [Plug-in formats: VST3, LV2 and AU](project/plans/2026-10-21-plugin-formats.md)
   (PLUG, LV2 and AU items): which hosts load VST3, AU, LV2 and CLAP, framework
   choice, and the plan to develop VST3, LV2 and AU in parallel, including LV2

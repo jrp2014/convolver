@@ -59,6 +59,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
 
 | Date | Decision | Explained in |
 | --- | --- | --- |
+| 8 November 2026 | Use a bounded preview qualification plan: clear acceptance and deferred work, one fixed candidate, consequence-based blockers and preserved useful test coverage. CI changes stay in a separate workstream. Existing required gates, including AU ThreadSanitizer, named-Mac responsiveness and independent use, remain in force. | [Preview acceptance](plans/2026-11-08-preview-acceptance.md), [CI proposal](plans/2026-11-08-ci-scheduling.md) |
 | 21 October 2026 | The first releases are unsigned previews on macOS (ad-hoc signature, quarantine removed by the user) and Windows (SmartScreen warning). Signing stays a production gate | [Releasing](../develop/releasing.md#publishing-an-unsigned-preview) |
 | 21 October 2026 | Publishing is a manual step owned by jrp, from one candidate run | [Releasing](../develop/releasing.md#publishing-an-unsigned-preview) |
 | 21 October 2026 | Plug-in builds use Ooura on Linux and Windows and Accelerate on macOS (PLUG-1) | [FFT guide](../develop/fft-backends.md#plug-in-builds) |

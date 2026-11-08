@@ -303,8 +303,14 @@ add one line under it per merged pull request:
 These lines are the one home for an item's progress. The
 [status page](../project/status.md) gives only each feature's level and
 each milestone condition's status in a sentence, names what remains and
-links the item; when an item changes, update both in the same pull request
-rather than retelling the progress there (DOC-6).
+links the item. Update status in the same pull request when a gate, feature
+readiness or scope changes; internal progress alone belongs in TODO rather
+than another retelling in status (DOC-6). During preview qualification use the
+[acceptance plan](../project/plans/2026-11-08-preview-acceptance.md#3-decide-whether-a-finding-blocks-the-preview)
+to distinguish blocking findings from deferred suggestions. Report audio,
+safety, state retention, host behaviour and required-gate failures first;
+group non-blocking prose suggestions without hiding consequential errors in
+installation, routing or recovery instructions.
 
 When the item is complete, move lasting behaviour into the owning guide and
 any owner's decision into the [decisions log](../project/decisions.md). Then

@@ -171,6 +171,10 @@ preview workloads), other `.cfg` readers
 
 ## What still blocks the first preview
 
+The [acceptance plan](plans/2026-11-08-preview-acceptance.md) defines the stop
+rule, blocker classification and retest boundaries. The gate results below
+remain authoritative; writing the plan does not pass or waive any gate.
+
 These are the remaining gates on 8 November 2026, each listed once, in the
 order of [TODO's priorities](../../TODO.md#execution-priorities), except that
 the exact candidate (gate 6) comes just before the walkthrough that uses it.
