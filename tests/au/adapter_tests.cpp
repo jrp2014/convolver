@@ -1573,9 +1573,11 @@ void listeners_on_main_thread() {
                                            &Notifications::listener, &kept),
               "kept listener");
         // Uninitialized, each new choice changes the reported latency, so
-        // each Latency run notifies.
+        // each Latency run notifies. The choices skip the default, 0 frames
+        // (position 0), and the last differs from it: runs may coalesce, and
+        // one that ends where the unit started has nothing to tell.
         for (int i = 0; i < 50; ++i) {
-            set_parameter(unit, au::latency_parameter, static_cast<float>(i % 7));
+            set_parameter(unit, au::latency_parameter, static_cast<float>(1 + i % 7));
             check(AudioUnitAddPropertyListener(unit.get(), kAudioUnitProperty_Latency,
                                                &Notifications::listener, &churn),
                   "added listener");
