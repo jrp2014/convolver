@@ -22,10 +22,29 @@ On Windows and Linux the VST3 plug-in has no window yet: use a
 filter an ordinary music player or everything the computer plays; for that
 on Windows, see the [Equalizer APO export](equalizer-apo.md).
 
-**Audacity 4.0.2:** load the filter as a [preset](#optional-load-a-preset)
-from Audacity's own preset menu, not with **Choose…**. A filter chosen with
-Choose… plays while you listen, but Audacity does not store it, so exports
-and the saved project have no filter.
+**Before you start:**
+
+- The filter's sample rate must match the host's: Convolver does not
+  resample. Audacity plays effects at its Default sample rate, which can
+  differ from the rate it exports at.
+- **Audacity 4.0.2:** load the filter as a [preset](#optional-load-a-preset)
+  from Audacity's own preset menu, not with **Choose…**, **Recent** or
+  **Reload** in Convolver's window. A filter loaded in the window plays
+  while you listen, but Audacity does not store it: exports and the saved
+  project keep whatever Audacity stored last, which may be no filter or an
+  older one, so a wrong export can still sound plausible.
+- A file chosen in the window must have exactly as many inputs as the host
+  gives the plug-in; a preset of the same filter only needs at least that
+  many. Where a host gives more inputs, as REAPER does on a six-channel
+  track, load the filter as a preset.
+- Changing **Latency** during playback leaves a short gap and cuts off a
+  tail that is still sounding; hosts differ in when they line the audio up
+  again ([latency and tail](plugins.md#latency-and-tail)).
+- A host's own switch that turns an effect off or offline can route audio
+  around Convolver unfiltered, unlike Convolver's bypass. With a crossover
+  that can send full-range audio to a tweeter ([bypass](plugins.md#bypass)).
+- The project saves a copy of the filter, not a link to its file: after
+  reopening, **Reload** stays dimmed until you choose the file again.
 
 ## 1. Choose a filter
 
@@ -97,8 +116,10 @@ keeps working after the WAV and `.cfg` files move or are deleted. It keeps
 the file's name but not its folder.
 
 **Check it worked:** the status reads Active and you hear the filter after
-reopening. If the plug-in plays silence or the host does not list it, see
-[troubleshooting](troubleshooting.md#a-plug-in-plays-silence).
+reopening, and an export or render of a few seconds sounds as the track did
+while playing. If the plug-in plays silence or the host does not list it,
+see [troubleshooting](troubleshooting.md#a-plug-in-plays-silence); to
+report a problem, see [report a problem](troubleshooting.md#report-a-problem).
 
 ## Optional: load a preset
 

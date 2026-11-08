@@ -60,11 +60,33 @@ body:
     attributes:
       label: Audio settings
       description: Sample rate, input and output channel counts, and buffer size.
+  - type: dropdown
+    id: loading
+    attributes:
+      label: How the filter was loaded (plug-ins)
+      multiple: true
+      options:
+        - Choose… or dropped on Convolver's window
+        - Recent or Reload in Convolver's window
+        - A preset from the host's preset menu
+        - A reopened project
+        - The host's file chooser (LV2)
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where the problem shows (plug-ins)
+      multiple: true
+      options:
+        - What you hear while playing
+        - An export or render
+        - After reopening the project
   - type: textarea
     id: messages
     attributes:
       label: Messages
-      description: Any error message or log, pasted as text.
+      description: >-
+        Copy Diagnostics from Convolver's window (macOS), or any error message
+        or log, pasted as text.
       render: text
   - type: textarea
     id: filter

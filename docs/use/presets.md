@@ -123,9 +123,10 @@ already holds one filter.
   restart Audacity. They appear in the effect's preset menu under their
   file names, so give each preset its own name,
   such as `room-48000.vstpreset`. Use a preset in Audacity rather than
-  **Choose…** in Convolver's window: Audacity 4.0.2 does not store a filter
-  chosen there, so it plays while you listen but exports and saved projects
-  have no filter. Audacity always runs Convolver with two channels, even on a
+  **Choose…**, **Recent** or **Reload** in Convolver's window: Audacity
+  4.0.2 does not store a filter loaded there, so it plays while you listen,
+  but exports and saved projects keep whatever Audacity stored last, which
+  may be no filter or an older one. Audacity always runs Convolver with two channels, even on a
   mono track, so use a stereo (2-in, 2-out) filter, and set its playback
   rate to the filter's
   ([the rate a host plays at](plugins.md#status-and-the-convolver-log)).

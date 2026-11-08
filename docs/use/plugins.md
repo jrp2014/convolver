@@ -127,8 +127,10 @@ the one list of what each way reads:
 or a Convolver `.vstpreset`, and lists the folders where hosts look for
 presets. A preset is needed where the plug-in has no window (the VST3
 plug-in on Windows and Linux), in an LV2 host with no file chooser, and in
-Audacity 4.0.2, which does not store a filter chosen in the window: it plays
-while you listen, but exports and saved projects have no filter.
+Audacity 4.0.2, which does not store a filter loaded in the window (with
+Choose…, Recent or Reload): it plays while you listen, but exports and saved
+projects keep whatever Audacity stored last, which may be no filter or an
+older one.
 
 The filter is prepared away from the audio, then installed. A filter loaded
 before any audio plays starts at once; one loaded during playback fades in
@@ -144,7 +146,7 @@ host:
 | --- | --- |
 | No filter loaded yet, equal input and output counts | The input, unchanged (after the latency) |
 | No filter loaded yet, different counts | Silence |
-| The host gives more inputs than the filter needs, and the outputs match | The filter, reading the first inputs; the rest are ignored ([channels](#channels)) |
+| The host gives more inputs than the filter needs, and the outputs match | A preset or saved project: the filter, reading the first inputs; the rest are ignored ([channels](#channels)). A file chosen in the window is refused: it needs exactly the host's inputs |
 | The first filter does not fit, or its preset is damaged | Silence |
 | A new filter does not fit while another is playing | The working filter, unchanged; the project keeps saving it |
 | The filter is too large to save with the project | As for a filter that does not fit: silence for a first filter, otherwise the working filter |
@@ -418,7 +420,9 @@ From the top, the window has:
   silent, as for a first preset that does not fit. Either way the project
   then saves the outcome: the filter that plays, with the failure noted.
   An accepted file also becomes the plug-in's current preset, named after the
-  file, so the host can tell the project has changed and asks to save it.
+  file, and Convolver tells the host the project has changed. What the
+  host does with that differs: most mark the project unsaved, and Audacity
+  4.0.2 does not store the change at all ([loading a filter](#loading-a-filter)).
   The
   file is read and the filter prepared before the window responds again,
   so a very long filter can make the window (and the host) pause for a
@@ -429,7 +433,9 @@ From the top, the window has:
   the dialog too, and nothing is loaded. GarageBand runs plug-ins in a
   sandbox; in jrp's test (October 2026) it let a `.cfg` read the WAV files
   beside it. Where a sandbox refuses, the explanation says permission was
-  denied. A preset always works.
+  denied. A preset carries the filter inside it, so it does not depend on
+  the sandbox letting Convolver read the original files; its rate and
+  channels must still fit.
 
   Beside Choose…:
 
@@ -457,8 +463,8 @@ From the top, the window has:
     is not reloaded; the filter that plays stays, as it does when a reload
     is refused (say, a `.cfg` that names a file not written yet): press
     Reload once the file is ready. A filter the host has restored since
-    (a preset, an undo) is not replaced by a reload. Each reload marks the
-    project changed, as choosing the file does.
+    (a preset, an undo) is not replaced by a reload. Each reload tells the
+    host the project has changed, as choosing the file does.
 - **Gain** and **Mix**: a slider, the value in a box beside it and its unit.
   Type a value in the box and press Return (or move to another control) to
   set it exactly; a value beyond the range stops at its end. Option-click a
@@ -523,7 +529,8 @@ except:
 - The title line names the instance as the log does (`VST3 #2`).
 - Dragging a Gain or Mix slider is one change for the host's undo and
   automation, from mouse down to mouse up, as the VST3 SDK asks.
-- An accepted file marks the project changed, so the host asks to save it.
+- An accepted file is reported to the host as a change to the project;
+  hosts differ in what they do with it (see above).
 - A **Bypass** checkbox at the end of the title line is the plug-in's bypass: ticking
   it is the same as the host's own bypass button, which it follows, and the
   host's undo and automation record it. The Audio Unit's window has none,
