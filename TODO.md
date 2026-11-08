@@ -1007,7 +1007,10 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   may be an older filter rather than none. jrp, later on 8 November: fix
   and retest it, or explicitly narrow the preview's supported Audacity
   workflow and verify that alternative; defer implementation changes that
-  do not prevent the walkthrough.
+  do not prevent the walkthrough. jrp then chose (decision card) to narrow
+  Audacity to presets for the first preview
+  ([decisions](docs/project/decisions.md#plug-in-behaviour)): the item
+  stays open for after the preview, or for Audacity's own fix.
 - [ ] **VST3-12 — Editor window on Windows.** The same window as a Win32 view
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.

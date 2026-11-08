@@ -28,6 +28,8 @@ Until 1.0 the C++ API may change between minor versions.
   and reopen, Recent and Reload passed. In Audacity 4 a filter chosen with
   Choose… was missing from the export, because Audacity stores a plug-in's
   state only after a parameter edit (VST3-17, open).
+  For the first preview, Audacity is supported through its own preset
+  menu only, and the release notes say so.
 - Releases (REL-8): a "Draft preview release" workflow turns a passed
   candidate run on a `vX.Y.Z` tag into a draft GitHub pre-release. It refuses
   a run that was not started by hand on the tag or did not pass, or whose

@@ -124,7 +124,9 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'source.\n'
             '- Unsigned: macOS asks you to confirm that you want to open it.\n'
             '- Checked by hand on one Mac in REAPER and Audacity (VST3) and GarageBand (Audio Unit); '
-            f'[status]({base}/blob/{tag}/docs/project/status.md) says which steps. Other hosts are untested.'
+            f'[status]({base}/blob/{tag}/docs/project/status.md) says which steps. Other hosts are untested.\n'
+            "- In Audacity, load filters from Audacity's own preset menu. A filter loaded from Convolver's window "
+            '(Choose…, Recent or Reload) plays there, but Audacity 4 does not keep it for exports or saved projects.'
         ),
         '## Report a problem',
         (

@@ -225,7 +225,7 @@ If a fix changes plug-in code after a check, that check runs again.
 | 1 | REAPER, by ear: scan, the identity, echo and repeat presets, a click on bypass, Gain and Mix; where REAPER shows the Status parameter, and that it follows a change without side effects (HOST-1) | [REAPER](../develop/host-testing.md#reaper-vst3) steps 1 to 5 and the listening in 11 | 10 min | Status display passed on v0.12.8 (REAPER's generic view lists it after Bypass; it changed to Load failed and nothing else changed). Listening open |
 | 2 | REAPER: a render, save, quit and reopen with the echo still playing, a refused preset, the wrong host rate | REAPER steps 6 to 9 | 10 min | **Passed** on v0.12.8, each export compared with the CLI; listening during the refusal not checked |
 | 3 | REAPER, on the final candidate: the stereo journey (three `convolver --compare` results) and the 2→6 crossover (render, Mix 0% still filtered, bypass silent, save and reopen, refused presets), each following its guide as DOC-10 leaves it | REAPER steps 10 and 12 | 25 min | Waits for the final candidate |
-| 4 | Audacity, on the current window: the system preset folder, listening, save and reopen, a refused preset, a mono track, **Choose…** at 48 kHz, saving an Audacity preset after **Choose…**, a Latency change, and the window's layout; HOST-1 also lists VoiceOver and a tail longer than the clip (see the narrowing below) | [Prepare the Mac](../develop/host-testing.md#prepare-the-mac) step 3; [Audacity](../develop/host-testing.md#audacity-vst3) steps 1 to 9 | 30 min | **Failed:** a filter chosen with **Choose…** was missing from the export (VST3-17, a known defect below: fixed and retested, or Audacity narrowed to presets and that route checked). The window shows, not clipped. The rest open |
+| 4 | Audacity, through its preset menu only (jrp narrowed it, [decision](decisions.md#plug-in-behaviour)): packaged presets from the all-users folder and one made from your own filter with `convolver-preset`; listening; an export compared with the CLI; save, quit, reopen and export again; a refused preset with a stop and start; a mono track; a Latency change; the window's layout. HOST-1 also lists VoiceOver and a tail longer than the clip (see the narrowing below) | [Prepare the Mac](../develop/host-testing.md#prepare-the-mac) step 3; [Audacity](../develop/host-testing.md#audacity-vst3) steps 1 to 8 and 10; step 9 only for the window's layout, Gain, Mix and Latency | 30 min | **Failed:** a filter chosen with **Choose…** was missing from the export (VST3-17, a known defect below; jrp narrowed Audacity to its preset menu, so this check now runs that route). The window shows, not clipped. The rest open |
 | 5 | GarageBand: a packaged preset and save and reopen (what PLUG-31 touches); listening to the presets, Gain and Mix; a click on bypass; whether the track stays in time after a Latency change; **Recent** and **Reload**; VoiceOver on the window | [GarageBand](../develop/host-testing.md#garageband-audio-unit) steps 4 to 6, 9 and 10; AU-6 | 20 min | Packaged preset with save and reopen, **Recent** and **Reload** passed on v0.12.8. Listening, the bypass click, the in-time check and VoiceOver open |
 | 6 | The final candidate: the candidates workflow hand-run on the first tag after DOC-10 merges passes; its package SHA-256 and the code comparison with v0.12.8 recorded | [Releasing](../develop/releasing.md#candidates); gate 6 | CI | Not started |
 | 7 | The independent walkthrough of the final candidate: install, load their own filter, save and reopen, with only the supplied instructions; then the REL-2 journeys (stereo, 2→6 crossover, file rendering) from the package | REL-3 | the tester | Not started |
@@ -250,10 +250,10 @@ than checked.
 - VST3-17: in Audacity 4.0.2 a filter loaded from Convolver's window
   (**Choose…**, **Recent**, **Reload** or reloading when the file changes,
   which share one path) plays, but the export and the saved project keep
-  whatever Audacity stored last: no filter, or an older one. Under the
-  acceptance plan this blocks claiming that workflow in Audacity until it
-  is fixed and retested, or jrp narrows Audacity's supported workflow and
-  the alternative is checked.
+  whatever Audacity stored last: no filter, or an older one. jrp narrowed
+  the preview's Audacity support to Audacity's own preset menu
+  ([decision](decisions.md#plug-in-behaviour)); the guides and the release
+  notes say so, and check 4 verifies that route.
 - **Choose…** needs the filter's input count to match the host's exactly,
   while a preset needs only at least that many inputs, so in REAPER on a
   six-channel track the crossover's `filter.cfg` is refused through
