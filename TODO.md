@@ -94,6 +94,17 @@ is superseded.
   and deferred limitations are linked from the gate summary; jrp publishes.
   The plan is written; qualification is not claimed complete. CI-34 is
   separate and does not gate the walkthrough.
+  Progress (8 November 2026): from jrp's release-readiness review of
+  v0.12.8, the checks still to run are one list,
+  [checks left before publication](docs/project/status.md#checks-left-before-publication),
+  which keeps the results jrp accepted and names what could be narrowed.
+  REL-6 qualified the 0.12.5 source on his MacBook Pro
+  ([record](docs/archive/reviews/2026-11-08-rel6-qualification.md)).
+  jrp chose the final candidate: the first tag after DOC-10 merges, with
+  most host checks run first on a v0.12.8 candidate and REL-6's 0.12.5
+  result standing while no engine, loading or plug-in code changes
+  ([decisions](docs/project/decisions.md#releases)). Remaining: the
+  checks in that list, then his publication.
 
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The candidate workflow
   builds unsigned packages with pinned dependencies, corresponding source,
@@ -120,6 +131,9 @@ is superseded.
   [next milestone](#execution-priorities). jrp chooses the tester. Record
   the evidence HOST-1 lists (package hash, host and OS versions, expected
   outputs, recovery from a refused filter) for each journey.
+  jrp's review of 8 November 2026 adds the first thing to try: "The
+  independent tester should try installing, loading their own filter,
+  saving and reopening with only the supplied instructions."
 - [ ] **REL-4 — Make the preview findable.** Room-correction users and the
   `.cfg` format's existing users should find Convolver from search, the old
   SourceForge site, KVR and their forums. Done on the repository side: a README
@@ -237,7 +251,10 @@ is superseded.
   those that passed on earlier candidates, is run again on the preview
   candidate, so the earlier results are shown to hold for the current
   window and code: in REAPER that repeats the window and settings steps
-  (part C) on the window PLUG-22 redesigned.
+  (part C) on the window PLUG-22 redesigned. Since jrp's choice of final
+  candidate (8 November 2026), that means the v0.12.8 candidate, except
+  REAPER steps 10 and 12, which run on the final candidate
+  ([checks left](docs/project/status.md#checks-left-before-publication)).
   Progress (8 November 2026): jrp ran REAPER part C with the 0.12.5
   candidate from `main` (run 42437291088, `4117a6d`, tagged `v0.12.5`;
   [record](docs/archive/reviews/2026-11-08-host1-reaper-window.md)): on the
@@ -249,9 +266,21 @@ is superseded.
   for the final one. A packaged preset, and save and reopen, passed with
   the candidate from `f11a3dd` (PLUG-31 merged) on 8 November
   ([record](docs/archive/reviews/2026-11-08-plug31-reaper.md)), and jrp
-  decided those stand too, so on the final candidate part C needs only
-  listening and the Status display, with the rest of the REAPER and
-  Audacity steps.
+  decided those stand too, so part C needs only listening and the Status
+  display, with the rest of the REAPER and Audacity steps
+  ([checks left](docs/project/status.md#checks-left-before-publication)).
+  Progress (8 November 2026): jrp's checks of the v0.12.8 candidate (run
+  42506723627; [record](docs/archive/reviews/2026-11-08-v0128-host-checks.md)).
+  REAPER: a render, save, quit and reopen, a refused wrong-rate preset and
+  the host at 44.1 kHz then 48 kHz passed, each export compared with the
+  CLI; REAPER's generic view lists Status after Bypass and it changed to
+  Load failed with nothing else changing. After the refusal the window's
+  heading changed from `impulse.wav` to "Restored filter" although the
+  old filter kept playing; fixed on PR #156 at jrp's request, with a
+  test of both orders of the two states. Audacity: a filter chosen with
+  **Choose…** was not in the export (VST3-17); the window is shown and not
+  clipped. Listening and VoiceOver were not checked in any host, and the
+  rest of the Audacity steps remain.
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
   now requested (progress below). Write adapters against the
@@ -601,9 +630,16 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   *Export projects at full volume* must be off for a comparison). Not
   checked: listening to the presets and to Gain and Mix, a click when
   bypassing, whether the track stays in time after a Latency change,
-  VoiceOver and the Recent list. jrp decided these results stand for the
-  final candidate after PLUG-31, where a packaged preset, save and reopen
-  and the unchecked steps remain.
+  VoiceOver and the Recent list. jrp decided these results stand after
+  PLUG-31; a packaged preset, save and reopen and the unchecked steps
+  remain, on the v0.12.8 candidate
+  ([checks left](docs/project/status.md#checks-left-before-publication)).
+  Progress (8 November 2026, v0.12.8 candidate run 42506723627;
+  [record](docs/archive/reviews/2026-11-08-v0128-host-checks.md)): a
+  packaged preset from GarageBand's menu, then save, quit and reopen,
+  restored it and the export matched the CLI; **Reload** and **Recent**
+  loaded the file again with its path kept. Listening, the bypass click,
+  the in-time check after a Latency change and VoiceOver remain.
 - [ ] **AU-5 — Release.** In the first preview. Unsigned preview component under PLUG-5 (ad-hoc
   signed, documented quarantine removal). Developer ID signing and
   notarization follow at the production gate.
@@ -947,6 +983,46 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   the steps in REAPER and Audacity ([host testing](docs/develop/host-testing.md#reaper-vst3))
   and VoiceOver for the first preview; the meters (with PLUG-10) for a later
   preview.
+- [ ] **VST3-17 — Audacity keeps a filter chosen in the window.** Found
+  in jrp's v0.12.8 checks (8 November 2026,
+  [record](docs/archive/reviews/2026-11-08-v0128-host-checks.md)): in
+  Audacity 4.0.2 a `.cfg` chosen with **Choose…** played in the window's
+  copy, but the export and the saved project had no filter (the export
+  matched the dry input). Audacity 4 stores a VST3 plug-in's state only at
+  the end of a parameter edit (`endEdit` then `flushAndStoreSettings` in
+  its `au3/libraries/au3-vst3`); its component handler offers no
+  `IComponentHandler2`, so `setDirty`, which Convolver calls after an
+  accepted load, does not reach it, and its `restartComponent` does
+  nothing. Presets from Audacity's own menu worked (7 November), since
+  Audacity loads that state itself. Wrong audio in a required journey, so
+  a preview blocker under the
+  [acceptance plan](docs/project/plans/2026-11-08-preview-acceptance.md#3-decide-whether-a-finding-blocks-the-preview)
+  unless jrp narrows it. The workaround proposed: after an accepted load,
+  the controller makes a gesture that changes no value (`beginEdit`,
+  `performEdit` with the current value, `endEdit`) so such hosts store the
+  state; check its side effects in REAPER (an undo step) and its effect in
+  Audacity (export and reopen). jrp chose (8 November 2026, decision card)
+  to fix it before the final tag, then set the terms: "hearing one result
+  and exporting another is a significant correctness problem"; confirm the
+  mechanism once (Choose, a genuine Gain edit, then export and save and
+  reopen); pursue the host fix with Audacity; keep any Convolver workaround
+  narrow, without manufactured Gain or Mix edits that could affect
+  automation or undo; correct the documentation now (DOC-10); and make the
+  regression check Choose, export, save and reopen with no parameter
+  touched. Audacity's vendor-window path may store only a parameter's
+  change at `endEdit`, not the whole component state, so the workaround
+  waits for jrp's test. Draft upstream issue for jrp to post: project
+  files `audacity-upstream/`.
+  **Recent**, **Reload** and reloading when the file changes go through
+  the same `Controller::load_file` as **Choose…**, so they share the
+  problem; what the export keeps is whatever Audacity stored last, which
+  may be an older filter rather than none. jrp, later on 8 November: fix
+  and retest it, or explicitly narrow the preview's supported Audacity
+  workflow and verify that alternative; defer implementation changes that
+  do not prevent the walkthrough. jrp then chose (decision card) to narrow
+  Audacity to presets for the first preview
+  ([decisions](docs/project/decisions.md#plug-in-behaviour)): the item
+  stays open for after the preview, or for Audacity's own fix.
 - [ ] **VST3-12 — Editor window on Windows.** The same window as a Win32 view
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.
@@ -1176,12 +1252,15 @@ callbacks, loaded into an empty instance, replaced by another as long and
 reset, through each adapter's load and restore entry points. PERF-3's wider
 measurements (6- and 8-channel routing, 96 kHz, other block sizes, memory)
 become stated supported workloads after the first preview; they are not a
-preview gate. What remains for the gate: the release qualification run on
-the intended machine ([REL-6](docs/develop/releasing.md#responsiveness-qualification),
-a first-preview gate) and, if the 30 s case
-exceeds 250 ms on a supported platform, jrp's choice between background
-preparation in VST3 and the Audio Unit (VST3-5) and a higher limit with the
-pause documented.
+preview gate. The release qualification on the intended machine
+([REL-6](docs/develop/releasing.md#responsiveness-qualification), a
+first-preview gate) passed for the 0.12.5 source on jrp's MacBook Pro
+(8 November 2026, longest hold 43.2 ms;
+[record](docs/archive/reviews/2026-11-08-rel6-qualification.md)), so
+background preparation (VST3-5) is not needed for the preview. jrp
+decided the result stands for the final candidate while no engine,
+loading or plug-in code changes
+([decisions](docs/project/decisions.md#releases)).
 First optimised-build figures (Linux cloud VM, 4 cores, clang Release with
 Ooura, 5 November 2026; stereo 48 kHz, 512-frame callbacks): VST3 `setState`
 held the host's thread for 4 ms with a 1 s filter, 43 to 61 ms with 10 s,

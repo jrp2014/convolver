@@ -248,7 +248,11 @@ format.
   (`HostFilter::filter_identity()`, a hash of every stored value, found once
   when the filter is accepted) matches the one saved beside it, or
   "Restored filter" without one, which claims no origin the host did not
-  give; PLUG-22, PLUG-31) and a note when
+  give; PLUG-22, PLUG-31. VST3 keeps the pair that named the playing filter
+  before the newest controller state and uses whichever pair matches, in
+  the report and in `Controller::getState`, since a host sends a refused
+  preset's controller state as well, in either order with the component
+  state) and a note when
   the newest request was
   refused, the filter's own values for under its name (rate, channels,
   length and taps, speakers; PLUG-22), the Audio facts as short labelled

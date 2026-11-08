@@ -51,6 +51,12 @@ tresult PLUGIN_API Controller::setState(IBStream* stream) {
         bytes.size() > max_controller_state ? ControllerState{} : decode_controller_state(bytes);
     {
         std::lock_guard lock(status_lock_);
+        // Keep the pair that names the playing filter (the last report's):
+        // a refused preset's controller state names one that does not play.
+        if (!identity_.empty() && identity_ == field(report_, "filter identity")) {
+            kept_name_ = name_;
+            kept_identity_ = identity_;
+        }
         name_ = state.name;
         identity_ = state.identity;
     }
@@ -76,9 +82,15 @@ tresult PLUGIN_API Controller::getState(IBStream* stream) {
     std::string bytes;
     {
         std::lock_guard lock(status_lock_);
-        if (name_.empty() || identity_.empty())
+        // The pair that names the filter that plays, if one does.
+        const auto playing = field(report_, "filter identity");
+        const bool kept =
+            identity_ != playing && !kept_identity_.empty() && kept_identity_ == playing;
+        const auto& name = kept ? kept_name_ : name_;
+        const auto& identity = kept ? kept_identity_ : identity_;
+        if (name.empty() || identity.empty())
             return kResultOk; // Nothing to keep: the empty state of earlier versions.
-        bytes = encode_controller_state({name_, identity_});
+        bytes = encode_controller_state({name, identity});
     }
     if (!stream)
         return kResultFalse;
@@ -190,6 +202,8 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
                 !field(report, "filter identity").empty()) {
                 name_ = field(report, "filter name");
                 identity_ = field(report, "filter identity");
+                kept_name_.clear();
+                kept_identity_.clear();
             }
             report_.swap(report);
             report_text_.swap(report_text);

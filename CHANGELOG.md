@@ -12,6 +12,24 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Release evidence (REL-6, REL-7): jrp's responsiveness qualification of
+  the 0.12.5 source on his MacBook Pro is recorded: all 24 combinations
+  passed on the first run, with the longest hold of the host's thread
+  43.2 ms and the longest judged callback 2.95 ms
+  ([record](docs/archive/reviews/2026-11-08-rel6-qualification.md)). The
+  status page now lists, once, the checks left before the first preview
+  is published, keeping the host results jrp accepted
+  ([checks left](docs/project/status.md#checks-left-before-publication)).
+- Host checks (HOST-1, AU-4): jrp's 8 November 2026 checks of the v0.12.8
+  candidate are recorded
+  ([record](docs/archive/reviews/2026-11-08-v0128-host-checks.md)). In
+  REAPER a render, save and reopen, a refused preset and a change of host
+  rate passed against the CLI; in GarageBand a packaged preset with save
+  and reopen, Recent and Reload passed. In Audacity 4 a filter chosen with
+  Choose… was missing from the export, because Audacity stores a plug-in's
+  state only after a parameter edit (VST3-17, open).
+  For the first preview, Audacity is supported through its own preset
+  menu only, and the release notes say so.
 - Releases (REL-8): a "Draft preview release" workflow turns a passed
   candidate run on a `vX.Y.Z` tag into a draft GitHub pre-release. It refuses
   a run that was not started by hand on the tag or did not pass, or whose
@@ -769,6 +787,17 @@ Until 1.0 the C++ API may change between minor versions.
   Audio Unit wrapper sends them; one still pending when the unit closes is
   dropped. No change to the audio. A test adds and removes listeners while
   Latency changes are applied, under ThreadSanitizer in CI.
+- Releases (REL-7, from jrp's review of 8 November 2026): the draft
+  pre-release notes say how to report a problem: Copy Diagnostics, the
+  host and its version, how the filter was loaded, and whether playback,
+  export or reopening is affected.
+- VST3 (HOST-1, from jrp's v0.12.8 REAPER check): after a refused preset,
+  the window's heading changed from the playing filter's name to
+  "Restored filter", and a project saved then kept the refused preset's
+  name, because the host sends that preset's controller state too. The
+  processor and the controller now keep the pair that named the playing
+  filter and use whichever pair matches it, in either order of the two
+  states; audio was not affected.
 - Guides (REL-8): the install guide now says how to open the unsigned macOS
   installer (**Open Anyway** in Privacy & Security); it described only
   clearing the quarantine of bundles copied from the ZIP archive. The limits

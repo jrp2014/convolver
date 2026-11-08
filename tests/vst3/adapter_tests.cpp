@@ -2406,13 +2406,13 @@ void saved_filter_name() {
         Handler handler;
         Processor p;
         Controller c;
-        Instance() {
+        explicit Instance(double rate = 48000) {
             require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
                         c.setComponentHandler(&handler) == kResultOk &&
                         p.connect(&c) == kResultOk && c.connect(&p) == kResultOk,
                     "name instance");
             SpeakerArrangement mono = SpeakerArr::kMono;
-            ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+            ProcessSetup setup{kRealtime, kSample32, 512, rate};
             require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk &&
                         p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
                     "name activate");
@@ -2501,6 +2501,77 @@ void saved_filter_name() {
         report = reopened.c.report();
         require(field(report, "filter name") == "Restored filter",
                 "a saved name shown for another filter");
+    }
+    // A refused preset (jrp's v0.12.8 REAPER check): the host sends its
+    // controller state too, which names a filter that never played. The
+    // playing filter keeps its name in the window and in the saved state,
+    // whichever order the host sends the two states in.
+    const auto slow = folder / "slow.wav";
+    write_wav(slow, 44100, 1, 8);
+    MemoryStream slow_component, slow_controller, hall_controller;
+    {
+        Instance at44(44100);
+        require(at44.c.load_file(slow.string()) && at44.p.getState(&slow_component) == kResultOk &&
+                    at44.c.getState(&slow_controller) == kResultOk,
+                "44.1 kHz preset");
+        require(at44.c.load_file(other.string()) == false, "a 48 kHz file loaded at 44.1 kHz");
+    }
+    {
+        Instance hall48;
+        require(hall48.c.load_file(other.string()) &&
+                    hall48.c.getState(&hall_controller) == kResultOk,
+                "hall preset's controller state");
+    }
+    const auto saved_name = [](Controller& c) {
+        MemoryStream out;
+        require(c.getState(&out) == kResultOk, "save the controller state");
+        out.seek(0, IBStream::kIBSeekSet, nullptr);
+        std::string bytes(static_cast<std::size_t>(out.getSize()), '\0');
+        int32 read = 0;
+        out.read(bytes.data(), static_cast<int32>(bytes.size()), &read);
+        return decode_controller_state(bytes).name;
+    };
+    for (const bool controller_first : {false, true}) {
+        Instance playing;
+        component.seek(0, IBStream::kIBSeekSet, nullptr);
+        controller.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(playing.p.setState(&component) == kResultOk &&
+                    playing.c.setState(&controller) == kResultOk,
+                "restore room.wav");
+        require(field(playing.c.report(), "filter name") == "room.wav", "room.wav not restored");
+        play_block(playing.p, 1, 1, 512); // Playing, so a preset for 44.1 kHz is refused.
+        slow_component.seek(0, IBStream::kIBSeekSet, nullptr);
+        slow_controller.seek(0, IBStream::kIBSeekSet, nullptr);
+        if (controller_first) {
+            playing.c.setState(&slow_controller);
+            playing.p.setState(&slow_component);
+        } else {
+            playing.p.setState(&slow_component);
+            playing.c.setState(&slow_controller);
+        }
+        auto report = playing.c.report();
+        require(field(report, "filter identity") == identity,
+                "the refused preset replaced the playing filter");
+        require(field(report, "filter name") == "room.wav",
+                "a refused preset renamed the playing filter");
+        require(saved_name(playing.c) == "room.wav",
+                "a refused preset's name saved for the playing filter");
+        // A preset that loads afterwards still takes its own name, in
+        // either order.
+        hall.seek(0, IBStream::kIBSeekSet, nullptr);
+        hall_controller.seek(0, IBStream::kIBSeekSet, nullptr);
+        if (controller_first) {
+            require(playing.c.setState(&hall_controller) == kResultOk &&
+                        playing.p.setState(&hall) == kResultOk,
+                    "hall after the refusal");
+        } else {
+            require(playing.p.setState(&hall) == kResultOk &&
+                        playing.c.setState(&hall_controller) == kResultOk,
+                    "hall after the refusal");
+        }
+        require(field(playing.c.report(), "filter name") == "hall.wav" &&
+                    saved_name(playing.c) == "hall.wav",
+                "a preset after a refusal lost its name");
     }
     convolver::vst3::test_file_reader = reader;
     std::filesystem::remove_all(folder);
