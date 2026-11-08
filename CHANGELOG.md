@@ -20,6 +20,14 @@ Until 1.0 the C++ API may change between minor versions.
   status page now lists, once, the checks left before the first preview
   is published, keeping the host results jrp accepted
   ([checks left](docs/project/status.md#checks-left-before-publication)).
+- Host checks (HOST-1, AU-4): jrp's 8 November 2026 checks of the v0.12.8
+  candidate are recorded
+  ([record](docs/archive/reviews/2026-11-08-v0128-host-checks.md)). In
+  REAPER a render, save and reopen, a refused preset and a change of host
+  rate passed against the CLI; in GarageBand a packaged preset with save
+  and reopen, Recent and Reload passed. In Audacity 4 a filter chosen with
+  Choose… was missing from the export, because Audacity stores a plug-in's
+  state only after a parameter edit (VST3-17, open).
 - Releases (REL-8): a "Draft preview release" workflow turns a passed
   candidate run on a `vX.Y.Z` tag into a draft GitHub pre-release. It refuses
   a run that was not started by hand on the tag or did not pass, or whose

@@ -282,6 +282,17 @@ is superseded.
   decided those stand too, so part C needs only listening and the Status
   display, with the rest of the REAPER and Audacity steps
   ([checks left](docs/project/status.md#checks-left-before-publication)).
+  Progress (8 November 2026): jrp's checks of the v0.12.8 candidate (run
+  42506723627; [record](docs/archive/reviews/2026-11-08-v0128-host-checks.md)).
+  REAPER: a render, save, quit and reopen, a refused wrong-rate preset and
+  the host at 44.1 kHz then 48 kHz passed, each export compared with the
+  CLI; REAPER's generic view lists Status after Bypass and it changed to
+  Load failed with nothing else changing. After the refusal the window's
+  heading changed from `impulse.wav` to "Restored filter" although the
+  old filter kept playing (follow-up). Audacity: a filter chosen with
+  **Choose…** was not in the export (VST3-17); the window is shown and not
+  clipped. Listening and VoiceOver were not checked in any host, and the
+  rest of the Audacity steps remain.
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
   now requested (progress below). Write adapters against the
@@ -618,6 +629,12 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   PLUG-31; a packaged preset, save and reopen and the unchecked steps
   remain, on the v0.12.8 candidate
   ([checks left](docs/project/status.md#checks-left-before-publication)).
+  Progress (8 November 2026, v0.12.8 candidate run 42506723627;
+  [record](docs/archive/reviews/2026-11-08-v0128-host-checks.md)): a
+  packaged preset from GarageBand's menu, then save, quit and reopen,
+  restored it and the export matched the CLI; **Reload** and **Recent**
+  loaded the file again with its path kept. Listening, the bypass click,
+  the in-time check after a Latency change and VoiceOver remain.
 - [ ] **AU-5 — Release.** In the first preview. Unsigned preview component under PLUG-5 (ad-hoc
   signed, documented quarantine removal). Developer ID signing and
   notarization follow at the production gate.
@@ -953,6 +970,26 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   the steps in REAPER and Audacity ([host testing](docs/develop/host-testing.md#reaper-vst3))
   and VoiceOver for the first preview; the meters (with PLUG-10) for a later
   preview.
+- [ ] **VST3-17 — Audacity keeps a filter chosen in the window.** Found
+  in jrp's v0.12.8 checks (8 November 2026,
+  [record](docs/archive/reviews/2026-11-08-v0128-host-checks.md)): in
+  Audacity 4.0.2 a `.cfg` chosen with **Choose…** played in the window's
+  copy, but the export and the saved project had no filter (the export
+  matched the dry input). Audacity 4 stores a VST3 plug-in's state only at
+  the end of a parameter edit (`endEdit` then `flushAndStoreSettings` in
+  its `au3/libraries/au3-vst3`); its component handler offers no
+  `IComponentHandler2`, so `setDirty`, which Convolver calls after an
+  accepted load, does not reach it, and its `restartComponent` does
+  nothing. Presets from Audacity's own menu worked (7 November), since
+  Audacity loads that state itself. Wrong audio in a required journey, so
+  a preview blocker under the
+  [acceptance plan](docs/project/plans/2026-11-08-preview-acceptance.md#3-decide-whether-a-finding-blocks-the-preview)
+  unless jrp narrows it. The workaround proposed: after an accepted load,
+  the controller makes a gesture that changes no value (`beginEdit`,
+  `performEdit` with the current value, `endEdit`) so such hosts store the
+  state; check its side effects in REAPER (an undo step) and its effect in
+  Audacity (export and reopen). jrp chose (8 November 2026, decision card)
+  to fix it before the final tag.
 - [ ] **VST3-12 — Editor window on Windows.** The same window as a Win32 view
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.
