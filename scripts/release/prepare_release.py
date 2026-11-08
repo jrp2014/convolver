@@ -123,8 +123,12 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             '- macOS only. Windows, Linux and the LV2 plug-in come with later previews; until then, build from '
             'source.\n'
             '- Unsigned: macOS asks you to confirm that you want to open it.\n'
-            '- Checked by hand on one Mac in REAPER and Audacity (VST3) and GarageBand (Audio Unit); '
-            f'[status]({base}/blob/{tag}/docs/project/status.md) says which steps. Other hosts are untested.\n'
+            '- An early preview, published before its last checks. On one Mac, renders and exports from REAPER and '
+            'Audacity (VST3) and GarageBand (Audio Unit) matched the command-line tool, and saved projects reopened '
+            'with their filter. Not yet checked: listening in any host, VoiceOver, the latest Audio Unit change in '
+            'GarageBand, and anyone outside the project following the guides. '
+            f'[Status]({base}/blob/{tag}/docs/project/status.md#checks-left-before-publication) lists what is open. '
+            'Other hosts are untested.\n'
             "- In Audacity, load filters from Audacity's own preset menu. A filter loaded from Convolver's window "
             '(Choose…, Recent or Reload) plays there, but Audacity 4 does not keep it for exports or saved projects.'
         ),
