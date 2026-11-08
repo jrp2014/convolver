@@ -92,6 +92,14 @@ std::vector<std::pair<std::string, std::string>> decode_report(std::string_view)
 // For the tests only: a reader to use where the build has none. Set it only
 // while no processor is loading.
 inline const detail::SoundFiles* test_file_reader = nullptr;
+// VST3-16, for tests: called before the processor for a new Latency is
+// built while active; throwing from it makes that preparation fail.
+inline void (*latency_preparation_for_tests)() = nullptr;
+// VST3-16, for tests: process() calls the first once it holds its processor;
+// the control side calls the second each time it waits for process() to
+// leave a replaced processor (release_processor()).
+inline void (*holding_for_tests)() = nullptr;
+inline void (*releasing_for_tests)() = nullptr;
 // DIAG-1: the controller asks the processor to collect processing faults
 // when the host shows it the Fault value the audio thread wrote (an output
 // parameter change), so the log explains and the status text follows.
@@ -104,8 +112,10 @@ inline constexpr const char* faults_message = "ConvolverFaults";
 // passes a new choice to the processor in a latency_message ("frames", an
 // integer; "request", a number) and, once the processor's answer says it
 // has it (StatusAnswer), asks the host to restart the component
-// (kLatencyChanged); the processor reports it from getLatencySamples() and
-// builds its processor with it at the next activation. All three are saved
+// (kLatencyChanged). While active, the processor builds a processor with the
+// new Latency and plays it before it answers (VST3-16: REAPER reads
+// getLatencySamples() inside restartComponent and does not restart the
+// component), so the latency the host reads is the one that plays. All three are saved
 // in the component state (host state version 3 when not at the defaults).
 // IDs from plugins/identities.json; never change them.
 inline constexpr Steinberg::Vst::ParamID gain_id = identity::vst3_gain_parameter_id;
@@ -154,8 +164,9 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     Steinberg::tresult PLUGIN_API setProcessing(Steinberg::TBool) override;
     Steinberg::tresult PLUGIN_API process(Steinberg::Vst::ProcessData&) override;
     // The latency the processor runs at while active, otherwise the chosen
-    // Latency (VST3-4). After a new choice the host restarts the component
-    // (kLatencyChanged) and reads it after setActive(true), as the SDK says.
+    // Latency (VST3-4). A new choice plays at once (VST3-16), so a host that
+    // reads this when asked to restart (kLatencyChanged) gets the new value,
+    // as does one that restarts the component first, as the SDK describes.
     Steinberg::uint32 PLUGIN_API getLatencySamples() override {
         const auto running = active_latency_.load();
         return static_cast<Steinberg::uint32>(running ? running : latency_.load());
@@ -198,7 +209,7 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // thread must not show Fault over a load failure (failure_shown()).
     void hold_fault_signal() const noexcept;
     // Audio thread: writes Fault to the Status parameter for new faults.
-    void signal_faults(Steinberg::Vst::ProcessData&) noexcept;
+    void signal_faults(HostProcessor*, Steinberg::Vst::ProcessData&) noexcept;
     Steinberg::tresult arrange(Steinberg::Vst::SpeakerArrangement*, Steinberg::int32,
                                Steinberg::Vst::SpeakerArrangement*, Steinberg::int32);
     // Sends status() to the controller, with the answer to its request if
@@ -210,10 +221,35 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     HostLayout layout() const;
     std::optional<HostLayout> known_layout() const;
     template <class T>
-    bool segment(Steinberg::Vst::ProcessData&, Steinberg::int32, Steinberg::int32) noexcept;
+    bool segment(HostProcessor&, Steinberg::Vst::ProcessData&, Steinberg::int32,
+                 Steinberg::int32) noexcept;
     void mark_silence(Steinberg::Vst::ProcessData&) noexcept;
-    // VST3-4, under control_: a Latency chosen in the controller.
-    void choose_latency(std::size_t frames);
+    // VST3-4, under control_: a Latency chosen in the controller or restored.
+    // While active, a processor with it replaces the running one at once
+    // (VST3-16); if it cannot be built, the running one keeps playing and the
+    // log says why. Never throws.
+    void choose_latency(std::size_t frames) noexcept;
+    // VST3-16: the processor the audio thread plays. Under control_,
+    // install_processor() makes `next` the one played and returns the
+    // previous one; release_processor() then waits until process() or
+    // setProcessing() is no longer using it, which takes at most one block,
+    // before it is freed. process() and setProcessing() each mark the
+    // processor they use in their own marker (hold()) for as long as the
+    // returned guard lives, so one ending never clears the other's mark.
+    std::unique_ptr<HostProcessor> install_processor(std::unique_ptr<HostProcessor> next) noexcept;
+    void release_processor(std::unique_ptr<HostProcessor> previous) noexcept;
+    struct Held {
+        Held(std::atomic<HostProcessor*>& marked, HostProcessor* held) noexcept
+            : mark(marked), host(held) {}
+        std::atomic<HostProcessor*>& mark;
+        HostProcessor* host;
+        Held(const Held&) = delete;
+        Held& operator=(const Held&) = delete;
+        ~Held() {
+            mark.store(nullptr);
+        }
+    };
+    Held hold(std::atomic<HostProcessor*>& marker) noexcept;
     // Where a load comes from: a file chosen in the window, state the host
     // restores (setState), or state the host says (IStreamAttributes) is a
     // project being restored.
@@ -242,7 +278,11 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     const detail::SoundFiles* files_ = nullptr; // The reader, or none.
     std::mutex control_;
     HostFilter filter_{max_bus_channels}; // The shared adapter contract's control side.
-    std::unique_ptr<HostProcessor> host_;
+    std::unique_ptr<HostProcessor> host_; // Under control_; played_host_ is the same.
+    // VST3-16: host_ as the audio thread reads it, and the processor
+    // process() and setProcessing() are using (hold()).
+    std::atomic<HostProcessor*> played_host_{nullptr}, processing_host_{nullptr},
+        starting_host_{nullptr};
     std::atomic<bool> bypass_{false};
     // PLUG-22: Bypass as the Status and the report show it: the audio
     // thread's value, or the controller's when it told the processor first

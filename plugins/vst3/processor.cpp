@@ -16,6 +16,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <type_traits>
 #include <utility>
 
@@ -290,7 +291,8 @@ tresult Processor::activate(TBool state) {
             // only a new configuration needs the host to play again.
             if (!activated_ || !same_configuration(*activated_, host))
                 played_.store(false);
-            host_ = std::move(next);
+            // Not playing: the host does not process while it activates.
+            release_processor(install_processor(std::move(next)));
             active_latency_.store(host_->latency_frames());
             hold_fault_signal();
             activated_ = layout();
@@ -305,7 +307,7 @@ tresult Processor::activate(TBool state) {
             } catch (...) { // Out of memory for the line: it is dropped.
             }
         } else {
-            host_.reset();
+            release_processor(install_processor(nullptr));
             active_latency_.store(0);
         }
         active_ = state != 0;
@@ -523,29 +525,106 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
     send_status();
     return kResultOk;
 }
-// The host is asked to restart the component (the controller's
-// kLatencyChanged), which deactivates and activates it: the new processor is
-// built then, off the audio thread, as for any activation. Until a host
-// does, the running processor keeps its block size.
-void Processor::choose_latency(std::size_t frames) {
+// VST3-16: while active, the new Latency plays at once, before the
+// controller asks the host to restart (kLatencyChanged): REAPER 7.85 reads
+// getLatencySamples() inside that request and does not restart the
+// component, so the latency must already be the one that plays. Built off
+// the audio thread, as an activation builds it; process() switches to it at
+// its next block, which starts empty, so the sound pauses briefly, as in the
+// Audio Unit (apply_latency()).
+void Processor::choose_latency(std::size_t frames) noexcept {
     if (latency_.exchange(frames) == frames)
         return;
-    try {
-        log("Latency set to " + std::to_string(frames) + " frames" +
-                (host_ && host_->latency_frames() != frames
-                     ? "; it is used when the host next starts the plug-in, which it is asked "
-                       "to do now."
-                     : "."),
-            false);
-    } catch (...) { // Out of memory for the line: the choice stands.
+    const auto before = host_ ? host_->latency_frames() : frames;
+    if (!host_ || !activated_ || before == frames) {
+        try {
+            log("Latency set to " + std::to_string(frames) + " frames.", false);
+        } catch (...) { // Out of memory for the line: the choice stands.
+        }
+        return;
     }
+    observe_faults(); // Before the processor that counted them goes.
+    std::unique_ptr<HostProcessor> previous;
+    std::string why;
+    try {
+        const auto playback = filter_.activate(*activated_);
+        if (latency_preparation_for_tests)
+            latency_preparation_for_tests();
+        auto next = std::make_unique<HostProcessor>(playback, processSetup.maxSamplesPerBlock,
+                                                    settings(), activated_->inputs);
+        next->set_bypass(bypass_.load());
+        next->reset();
+        // Before it plays, so its first block cannot show Fault over a load
+        // failure that is showing.
+        next->hold_fault_signal(filter_.failure_shown());
+        // Nothing below can fail: what plays and what the host reads change
+        // together.
+        tail_.store(static_cast<uint32>(next->tail_frames()));
+        active_latency_.store(next->latency_frames());
+        previous = install_processor(std::move(next));
+    } catch (const std::exception& e) {
+        try {
+            why = e.what();
+        } catch (...) {
+        }
+    } catch (...) {
+    }
+    const bool changed = previous != nullptr;
+    // The previous processor plays until process() has switched.
+    release_processor(std::move(previous));
+    if (!changed) {
+        // The running processor keeps playing at its latency, and the
+        // window's report says the chosen one is not in use. activate()
+        // started the fault count again for a new processor, so count from
+        // the running one's totals (logged above) rather than log them again.
+        (void)filter_.observe(host_->faults());
+    }
+    try { // Best effort: out of memory for the line changes nothing else.
+        log(changed ? "Latency changed from " + std::to_string(before) + " to " +
+                          std::to_string(frames) +
+                          " frames; the sound paused briefly while the new processor started."
+                    : "Latency " + std::to_string(frames) +
+                          " frames could not be applied, so the plug-in keeps " +
+                          std::to_string(before) + " frames" +
+                          (why.empty() ? std::string(".") : ": " + why),
+            !changed);
+    } catch (...) {
+    }
+}
+std::unique_ptr<HostProcessor>
+Processor::install_processor(std::unique_ptr<HostProcessor> next) noexcept {
+    played_host_.store(next.get());
+    std::swap(host_, next);
+    return next; // The previous processor.
+}
+void Processor::release_processor(std::unique_ptr<HostProcessor> previous) noexcept {
+    // hold() marks its processor and then checks that it is still
+    // played_host_ (sequentially consistent), so once the previous one is
+    // marked by neither, process() and setProcessing() are not using it and
+    // never will.
+    while (previous &&
+           (processing_host_.load() == previous.get() || starting_host_.load() == previous.get())) {
+        if (releasing_for_tests)
+            releasing_for_tests();
+        std::this_thread::yield();
+    }
+}
+Processor::Held Processor::hold(std::atomic<HostProcessor*>& marker) noexcept {
+    HostProcessor* host = nullptr;
+    do {
+        host = played_host_.load();
+        marker.store(host);
+    } while (host != played_host_.load());
+    return {marker, host};
 }
 tresult PLUGIN_API Processor::setProcessing(TBool state) {
     // Not a place to explain faults: hosts may call this on the audio
     // thread, where nothing may lock, allocate or write the log.
-    if (state && host_) {
-        host_->set_bypass(bypass_.load());
-        host_->reset();
+    // VST3-16: a new Latency may replace it meanwhile.
+    const auto held = hold(starting_host_);
+    if (state && held.host) {
+        held.host->set_bypass(bypass_.load());
+        held.host->reset();
     }
     return kResultOk;
 }
@@ -773,7 +852,8 @@ tresult PLUGIN_API Processor::getState(IBStream* stream) {
         send_status();
     return result;
 }
-template <class T> bool Processor::segment(ProcessData& d, int32 start, int32 count) noexcept {
+template <class T>
+bool Processor::segment(HostProcessor& host, ProcessData& d, int32 start, int32 count) noexcept {
     std::array<const T*, max_bus_channels> in{};
     std::array<T*, max_bus_channels> out{};
     if (d.numInputs && d.inputs && getAudioInput(0)->isActive()) {
@@ -807,16 +887,22 @@ template <class T> bool Processor::segment(ProcessData& d, int32 start, int32 co
             }
         }
     }
-    host_->set_bypass(bypass_.load());
-    host_->set_gain_db(gain_db_.load());
-    host_->set_mix(mix_.load());
-    return host_->process(std::span(in).first(inputs_), std::span(out).first(outputs_), count);
+    host.set_bypass(bypass_.load());
+    host.set_gain_db(gain_db_.load());
+    host.set_mix(mix_.load());
+    return host.process(std::span(in).first(inputs_), std::span(out).first(outputs_), count);
 }
 tresult PLUGIN_API Processor::process(ProcessData& d) {
     if (d.numSamples < 0 || d.numSamples > processSetup.maxSamplesPerBlock || d.numInputs < 0 ||
         d.numInputs > 1 || d.numOutputs < 0 || d.numOutputs > 1)
         return kInvalidArgument;
-    if (d.numSamples && (!host_ || canProcessSampleSize(d.symbolicSampleSize) != kResultOk))
+    // VST3-16: the processor this call plays, which a new Latency may
+    // replace on another thread meanwhile (choose_latency()).
+    const auto held = hold(processing_host_);
+    auto* host = held.host;
+    if (holding_for_tests)
+        holding_for_tests();
+    if (d.numSamples && (!host || canProcessSampleSize(d.symbolicSampleSize) != kResultOk))
         return kInvalidArgument;
     if (d.numSamples) // Restored state is now checked against the host (install()).
         played_.store(true, std::memory_order_relaxed);
@@ -825,8 +911,8 @@ tresult PLUGIN_API Processor::process(ProcessData& d) {
     auto render = [&](int32 first, int32 count) {
         if (!count)
             return true;
-        return d.symbolicSampleSize == kSample32 ? segment<float>(d, first, count)
-                                                 : segment<double>(d, first, count);
+        return d.symbolicSampleSize == kSample32 ? segment<float>(*host, d, first, count)
+                                                 : segment<double>(*host, d, first, count);
     };
     int32 position = 0;
     if (d.inputParameterChanges) {
@@ -859,7 +945,7 @@ tresult PLUGIN_API Processor::process(ProcessData& d) {
                     continue;
                 offset = std::clamp(offset, position, d.numSamples);
                 if (!render(position, offset - position))
-                    return signal_faults(d), kInvalidArgument;
+                    return signal_faults(host, d), kInvalidArgument;
                 position = offset;
                 bypass_.store(value >= .5);
                 shown_bypass_.store(value >= .5);
@@ -869,7 +955,7 @@ tresult PLUGIN_API Processor::process(ProcessData& d) {
     const bool rendered = render(position, d.numSamples - position);
     if (rendered)
         mark_silence(d);
-    signal_faults(d);
+    signal_faults(host, d);
     return rendered ? kResultOk : kInvalidArgument;
 }
 // VST3-10: flag each output channel that this call left all zero, so a host
@@ -898,12 +984,12 @@ void Processor::mark_silence(ProcessData& d) noexcept {
 // DIAG-1: a new processing fault shows at once in hosts that pass output
 // parameter changes on, without logging or allocating here: Status becomes
 // Fault, and the controller asks the control side to explain.
-void Processor::signal_faults(ProcessData& d) noexcept {
-    if (!host_ || !d.outputParameterChanges || !host_->fault_to_signal())
+void Processor::signal_faults(HostProcessor* host, ProcessData& d) noexcept {
+    if (!host || !d.outputParameterChanges || !host->fault_to_signal())
         return;
     int32 index = 0, point = 0;
     if (auto* queue = d.outputParameterChanges->addParameterData(status_id, index);
         queue && queue->addPoint(0, normalized_status(HostStatus::fault), point) == kResultOk)
-        host_->fault_signalled();
+        host->fault_signalled();
 }
 } // namespace convolver::vst3
