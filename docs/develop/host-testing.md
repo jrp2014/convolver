@@ -319,9 +319,9 @@ except the Audio Unit build, which runs in a source checkout.
     sliders to reset them. Choose 1024 frames in the Latency menu while
     playing, and record what the window's Latency row and the log say,
     what REAPER shows as the plug-in's latency (its delay compensation),
-    and when, if ever, the new latency comes into use. In REAPER 7.85 it
-    stayed unused until the project was reopened
-    ([unresolved](#unresolved-host-findings)). Open the
+    and when the new latency comes into use: since VST3-16 at once (the log
+    says `Latency changed from 256 to 1024 frames`), with REAPER's delay
+    compensation following. Open the
     disclosure triangle: REAPER's FX window grows to fit.
     Click **Copy Diagnostics** and paste into the report. Save, quit and
     reopen: Gain, Mix and Latency come back.
@@ -451,7 +451,7 @@ until its cause is known: record what was observed, as below.
 
 | Finding | Seen in | What was observed | Not yet known | Evidence |
 | --- | --- | --- | --- | --- |
-| A new Latency is not used until the project is reopened (VST3) | REAPER 7.85, macOS 27.2 arm64, candidate 0.10.9 (`83aa64d`), 6 November 2026 | The log said `Latency set to 1024 frames`; the window said the new latency was not in use yet, with 256 frames still active; REAPER's delay-compensation display stayed at 256 samples, also after playback stopped. After save, quit and reopen both read 1024. The gap and the alignment at 1024 were not checked | Whether REAPER received Convolver's restart request, and what it did with it; whether the audio lines up after the change | [Record](../archive/reviews/2026-11-06-host1-reaper.md#part-c-window-and-settings) (step C5) |
+| A new Latency is not used until the project is reopened (VST3) | REAPER 7.85, macOS 27.2 arm64, candidate 0.10.9 (`83aa64d`), 6 November 2026; traced with PR #134's trace build (`d7d16d2`), 7 November 2026 | The log said `Latency set to 1024 frames`; the window said the new latency was not in use yet, with 256 frames still active; REAPER's delay-compensation display stayed at 256 samples, also after playback stopped. After save, quit and reopen both read 1024. The trace showed why: REAPER reads `getLatencySamples()` inside `restartComponent(kLatencyChanged)` and does not restart the plug-in; a render or FX Offline then Online applied the choice, and every render lined up. VST3-16 now plays the new Latency before the request | Whether the VST3-16 change plays the new Latency at once in REAPER and the impulses still line up in both directions | [Record](../archive/reviews/2026-11-06-host1-reaper.md#part-c-window-and-settings) (step C5), [trace](../archive/reviews/2026-11-07-vst3-16-reaper-trace.md) |
 
 ## Production qualification
 

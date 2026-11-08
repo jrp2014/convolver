@@ -716,10 +716,11 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   the project was reopened: the plug-in asks for a restart
   (`restartComponent(kLatencyChanged)`), which the SDK says the host answers
   by deactivating and activating the component, and REAPER did not do so
-  then. Why is not yet known. First trace, in REAPER, whether the request
-  arrives, what it returns, when `getLatencySamples()` is read and which
-  activation calls follow; only then choose a fix (a documented host step,
-  or applying the new processor at once as the Audio Unit does). Done when
+  then. jrp's trace (7 November,
+  [record](docs/archive/reviews/2026-11-07-vst3-16-reaper-trace.md)) showed
+  why: REAPER reads `getLatencySamples()` inside the request and does not
+  restart the plug-in. PR #134 applies the new processor at once, as the
+  Audio Unit does, before the request. Done when
   an impulse lines up with a reference track after a change in both
   directions (256 to 1024 and back), with REAPER's delay compensation
   measured rather than its display or the reported value, and any change is

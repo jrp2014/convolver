@@ -623,6 +623,19 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- VST3 (VST3-16, from jrp's HOST-1 REAPER run and his trace with PR #134's
+  trace build): in REAPER 7.85 a new Latency stayed unused until a render,
+  FX Offline then Online, or reopening the project. Convolver asked REAPER
+  to restart the plug-in (`restartComponent(kLatencyChanged)`), as the VST3
+  SDK describes, but REAPER only reads the latency then and does not
+  restart it, so it read the old one. While the host runs the plug-in, a new
+  Latency now plays at once, as in the Audio Unit: a processor with the new
+  block size is built off the audio thread and replaces the running one
+  before the host is asked, so the latency the host reads is always the one
+  that plays. A change during playback leaves a gap of the new latency, as
+  before, and the delay the host compensates never differs from the audio.
+  If the new processor cannot be built, the old Latency keeps playing and
+  the log and window say so.
 - VST3 (PLUG-23, from jrp's REAPER crossover retest at `5d188a7`): a project
   saved with the 2→6 crossover on a six-channel track played silence after
   reopening, and after FX Offline then Online. REAPER starts the plug-in on

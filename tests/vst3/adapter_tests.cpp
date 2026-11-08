@@ -12,6 +12,7 @@
 #include "sound_files.hpp"
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -28,6 +29,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 using namespace Steinberg;
 using namespace Steinberg::Vst;
@@ -1923,35 +1925,92 @@ void settings_parameters() {
         plain.read(head.data(), 12, &got);
         require(got == 12 && head[8] == 1, "default settings not saved as state version 1");
     }
-    // Latency: the controller tells the processor and asks the host to
-    // restart; the next activation plays at the new delay.
+    // Latency (VST3-16): while active the new choice plays at once, before
+    // the controller asks the host to restart, so a host that only reads
+    // getLatencySamples() when asked (as REAPER 7.85 does) reads the latency
+    // that plays, and one that restarts the component gets the same.
+    const auto impulse_delay = [&] {
+        in.fill(0);
+        for (int b = 0; b < 10; ++b) // Longer than the longest Latency.
+            require(p.process(d) == kResultOk, "latency flush");
+        in[0] = 1;
+        int at = -1;
+        for (int b = 0; b < 10 && at < 0; ++b) {
+            require(p.process(d) == kResultOk, "latency process");
+            in[0] = 0;
+            for (int i = 0; i < 512; ++i)
+                if (at < 0 && std::abs(out[i]) > 1e-6)
+                    at = b * 512 + i;
+        }
+        return at;
+    };
+    std::vector<uint32> read_at_restart;
+    handler.on_restart = [&](int32 flags) {
+        if (flags & kLatencyChanged)
+            read_at_restart.push_back(p.getLatencySamples());
+    };
     handler.restarts.clear();
-    // Until the host restarts it, the processor reports the latency it runs at.
-    require(c.setParamNormalized(latency_id, normalized_latency(1024)) == kResultOk &&
-                p.settings().latency == 1024 && p.getLatencySamples() == 256 &&
-                handler.latency_restarts() == 1,
-            "Latency not passed on with kLatencyChanged");
+    require(impulse_delay() == 256, "output not delayed by the default Latency");
+    {
+        const convolver::test_log::LogSince log(process_log);
+        require(c.setParamNormalized(latency_id, normalized_latency(1024)) == kResultOk &&
+                    p.settings().latency == 1024 && p.getLatencySamples() == 1024 &&
+                    p.getTailSamples() == 1024 && handler.latency_restarts() == 1 &&
+                    read_at_restart == std::vector<uint32>{1024},
+                "the new Latency was not in use when the host was asked to restart");
+        require(log.text().find("Latency changed from 256 to 1024 frames; the sound paused "
+                                "briefly") != std::string::npos,
+                "the Latency change not logged");
+    }
+    require(impulse_delay() == 1024, "output not delayed by the new Latency at once");
     require(c.setParamNormalized(latency_id, normalized_latency(1024)) == kResultOk &&
                 handler.latency_restarts() == 1,
             "an unchanged Latency restarted the component");
+    // A host that restarts the component, as the SDK describes, keeps it.
     require(p.setProcessing(false) == kResultOk && p.setActive(false) == kResultOk &&
-                p.setActive(true) == kResultOk && p.setProcessing(true) == kResultOk,
+                p.getLatencySamples() == 1024 && p.setActive(true) == kResultOk &&
+                p.setProcessing(true) == kResultOk && p.getLatencySamples() == 1024,
             "restart after Latency");
-    require(p.getLatencySamples() == 1024 && p.getTailSamples() == 1024,
-            "latency and tail after the restart");
-    in.fill(0);
-    in[0] = 1;
-    int at = -1;
-    for (int b = 0; b < 4 && at < 0; ++b) {
-        require(p.process(d) == kResultOk, "latency process");
-        in[0] = 0;
-        for (int i = 0; i < 512; ++i)
-            if (at < 0 && std::abs(out[i]) > 1e-6)
-                at = b * 512 + i;
+    require(impulse_delay() == 1024, "output not delayed by the Latency after the restart");
+    // Back down, and quick successive choices: each plays when it is read.
+    read_at_restart.clear();
+    for (const std::size_t frames : {256, 512, 2048, 64, 512})
+        require(c.setParamNormalized(latency_id, normalized_latency(frames)) == kResultOk &&
+                    p.getLatencySamples() == frames && read_at_restart.back() == frames,
+                "a successive Latency was not in use when read");
+    require(read_at_restart == std::vector<uint32>{256, 512, 2048, 64, 512},
+            "successive Latency choices");
+    require(impulse_delay() == 512, "output not delayed by the last of several choices");
+    // A processor that cannot be built: the running one keeps playing, the
+    // host reads the latency that plays, and the log and report say why.
+    latency_preparation_for_tests = [] { throw std::runtime_error("no memory for the test"); };
+    {
+        const convolver::test_log::LogSince log(process_log);
+        read_at_restart.clear();
+        const auto chosen = c.setParamNormalized(latency_id, normalized_latency(2048));
+        latency_preparation_for_tests = nullptr;
+        require(chosen == kResultOk && p.settings().latency == 2048 &&
+                    p.getLatencySamples() == 512 && read_at_restart == std::vector<uint32>{512},
+                "a failed Latency preparation changed the latency the host reads");
+        require(log.text().find("Latency 2048 frames could not be applied, so the plug-in keeps "
+                                "512 frames: no memory for the test") != std::string::npos,
+                "a failed Latency preparation not logged");
     }
-    require(at == 1024, "output not delayed by the new Latency");
-    // A state with another Latency changes the processor's and asks the
-    // controller's host to restart.
+    require(impulse_delay() == 512, "a failed Latency preparation changed the output");
+    // The next activation builds the chosen one.
+    require(p.setProcessing(false) == kResultOk && p.setActive(false) == kResultOk &&
+                p.setActive(true) == kResultOk && p.setProcessing(true) == kResultOk &&
+                p.getLatencySamples() == 2048 && impulse_delay() == 2048,
+            "the activation after a failed Latency did not use it");
+    // Inactive, a choice waits for the activation.
+    require(p.setProcessing(false) == kResultOk && p.setActive(false) == kResultOk &&
+                c.setParamNormalized(latency_id, normalized_latency(1024)) == kResultOk &&
+                p.getLatencySamples() == 1024 && p.setActive(true) == kResultOk &&
+                p.setProcessing(true) == kResultOk && p.getLatencySamples() == 1024 &&
+                impulse_delay() == 1024,
+            "a Latency chosen while inactive");
+    // A state with another Latency plays it at once too, and the
+    // controller's host is asked to restart.
     MemoryStream with_latency;
     require(p.getState(&with_latency) == kResultOk, "save latency");
     with_latency.seek(0, IBStream::kIBSeekSet, nullptr);
@@ -1959,13 +2018,135 @@ void settings_parameters() {
     handler.restarts.clear();
     state.seek(0, IBStream::kIBSeekSet, nullptr);
     require(p.setState(&state) == kResultOk && p.settings().latency == 256 &&
-                p.getLatencySamples() == 1024,
-            "an older state kept the Latency, or it played before a restart");
+                p.getLatencySamples() == 256 && impulse_delay() == 256,
+            "an older state kept the Latency, or it did not play at once");
     state.seek(0, IBStream::kIBSeekSet, nullptr);
+    read_at_restart.clear();
     require(c.setComponentState(&state) == kResultOk &&
                 latency_frames(c.getParamNormalized(latency_id)) == 256 &&
-                handler.latency_restarts() == 1,
+                handler.latency_restarts() == 1 && read_at_restart == std::vector<uint32>{256},
             "controller did not ask to restart for the restored Latency");
+    handler.on_restart = nullptr;
+    p.setProcessing(false);
+    p.setActive(false);
+    p.disconnect(&c);
+    c.disconnect(&p);
+    c.terminate();
+    p.terminate();
+}
+// VST3-16: Latency choices and filter replacements while the audio thread
+// plays. Each choice replaces the processor at once, so the control side
+// must wait until process() has left the previous one before freeing it
+// (the sanitizer build would report a use after free). The control side
+// waits for the audio thread to play a block between changes, so they
+// overlap with processing on every run; no timing is assumed.
+void latency_while_playing() {
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk && p.connect(&c) == kResultOk &&
+                c.connect(&p) == kResultOk,
+            "playing latency initialize");
+    SpeakerArrangement mono = SpeakerArr::kMono;
+    require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "playing latency buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    const auto one_tap = [](float gain) {
+        convolver::HostState state;
+        state.configuration =
+            convolver::Configuration{48000, 1, 1, 0, {}, {}, {{{gain}, {{0, 1}}, {{0, 1}}}}};
+        auto stream = std::make_unique<MemoryStream>();
+        require(write_state(stream.get(), state), "encode playing latency state");
+        return stream;
+    };
+    const auto half = one_tap(.5f), quarter = one_tap(.25f);
+    half->seek(0, IBStream::kIBSeekSet, nullptr);
+    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+    require(p.setState(half.get()) == kResultOk && p.setupProcessing(setup) == kResultOk &&
+                p.setActive(true) == kResultOk && p.setProcessing(true) == kResultOk,
+            "playing latency activate");
+    std::vector<uint32> read_at_restart;
+    handler.on_restart = [&](int32 flags) {
+        if (flags & kLatencyChanged)
+            read_at_restart.push_back(p.getLatencySamples());
+    };
+    std::array<float, 512> in{}, out{};
+    float* ins[] = {in.data()};
+    float* outs[] = {out.data()};
+    AudioBusBuffers input{}, output{};
+    input.numChannels = output.numChannels = 1;
+    input.channelBuffers32 = ins;
+    output.channelBuffers32 = outs;
+    ProcessData d{};
+    d.symbolicSampleSize = kSample32;
+    d.numInputs = d.numOutputs = 1;
+    d.inputs = &input;
+    d.outputs = &output;
+    d.numSamples = 512;
+    in.fill(1);
+    std::atomic<bool> stop{false}, failed{false};
+    std::atomic<int> blocks{0};
+    std::thread audio([&] {
+        while (!stop.load()) {
+            if (p.process(d) != kResultOk)
+                failed.store(true);
+            blocks.fetch_add(1);
+        }
+    });
+    const auto after_a_block = [&] {
+        const auto seen = blocks.load();
+        while (blocks.load() == seen && !failed.load())
+            std::this_thread::yield();
+    };
+    std::size_t chosen = 256;
+    float gain = .5f; // The filter that plays.
+    std::vector<uint32> expected;
+    for (int i = 0; i < 24; ++i) {
+        after_a_block();
+        if (i % 3 == 2) { // A replacement filter, whose state resets the Latency to 256.
+            auto& next = i % 2 ? quarter : half;
+            gain = i % 2 ? .25f : .5f;
+            next->seek(0, IBStream::kIBSeekSet, nullptr);
+            require(p.setState(next.get()) == kResultOk, "playing latency filter");
+            after_a_block();
+        }
+        // The controller's choice, never the one it already holds.
+        auto frames = convolver::host_latencies[static_cast<std::size_t>(i) %
+                                                convolver::host_latencies.size()];
+        if (frames == chosen)
+            frames = frames == 4096 ? 64 : frames * 2;
+        chosen = frames;
+        expected.push_back(static_cast<uint32>(frames));
+        require(c.setParamNormalized(latency_id, normalized_latency(frames)) == kResultOk &&
+                    p.getLatencySamples() == frames,
+                "a Latency chosen while playing is not the one in use");
+    }
+    after_a_block();
+    stop.store(true);
+    audio.join();
+    require(!failed.load(), "process() failed while the Latency changed");
+    require(read_at_restart == expected, "a Latency read while playing was not the one chosen");
+    // The last filter at the last Latency.
+    in.fill(0);
+    for (int b = 0; b < 10; ++b)
+        require(p.process(d) == kResultOk, "playing latency flush");
+    in[0] = 1;
+    int at = -1;
+    float value = 0;
+    for (int b = 0; b < 10 && at < 0; ++b) {
+        require(p.process(d) == kResultOk, "playing latency impulse");
+        in[0] = 0;
+        for (int i = 0; i < 512; ++i)
+            if (at < 0 && std::abs(out[i]) > 1e-6) {
+                at = b * 512 + i;
+                value = out[i];
+            }
+    }
+    require(at == static_cast<int>(chosen) && std::abs(value - gain) < 1e-6,
+            "the last filter at the last Latency did not play");
+    handler.on_restart = nullptr;
     p.setProcessing(false);
     p.setActive(false);
     p.disconnect(&c);
@@ -2502,6 +2683,7 @@ int run(const std::filesystem::path& preset_path) {
         fractional_rates();
         controller_conversions();
         settings_parameters();
+        latency_while_playing();
         report_and_files();
         saved_filter_name();
         messages_through_proxies();
