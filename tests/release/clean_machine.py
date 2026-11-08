@@ -12,17 +12,22 @@ platform named:
   then runs package_smoke.py there: the tools render the first-use examples
   to their expected output, remake every shipped preset and export to
   Equalizer APO, and the guides' examples run;
-- loads the VST3 plug-in's binary and asks its factory for its classes, which
-  must be the processor and controller with the class IDs in
-  plugins/identities.json;
-- on Windows, with --install, runs the installer silently, checks that every
-  file lands where the installer owns it with the ZIP's bytes, renders a
-  first-use example with the installed CLI, loads the installed plug-in, and
-  runs the uninstaller silently, which must remove every file it installed.
+- loads the VST3 plug-in's library as a host does and asks its factory for
+  its classes, which must be the processor and controller with the class IDs
+  in plugins/identities.json (no instance is created and no audio runs);
+- on Windows, with --install, runs the installer silently, checks that it
+  installs exactly the ZIP's files, with their bytes, where it owns them,
+  plus its uninstaller; renders a first-use example with the installed CLI,
+  loads the installed plug-in's library, and runs the uninstaller silently,
+  which must remove every file it installed and its registry keys.
 
 The build runners already check the packages (release.yml); this shows the
-same files run where no compiler, SDK or library from the build is present.
-It is not a host test: nothing here plays audio through a DAW.
+same files run on an image other than the build's, without the libraries,
+SDKs and build tree the build used. The Linux images are stock distribution
+images. GitHub's Windows images do include Visual Studio and the Visual C++
+runtime, so a computer without that runtime is not tried here (the installer
+refuses to run without it). It is not a host test: nothing here plays audio
+through a DAW.
 """
 
 import argparse
@@ -124,7 +129,7 @@ def load_plugin(bundle, system):
     }
     classes = factory_classes(binary, system)
     assert set(classes) == expected and len(classes) == 2, f'{binary}: unexpected classes {classes}'
-    print(f'Loaded {binary}: processor and controller classes as in plugins/identities.json')
+    print(f'Loaded {binary}: processor and controller classes as in plugins/identities.json', flush=True)
 
 
 def check_sums(candidate_dir, names):
@@ -135,7 +140,7 @@ def check_sums(candidate_dir, names):
     for name in names:
         assert name in sums, f'SHA256SUMS does not list {name}'
         assert sha256(candidate_dir / name) == sums[name], f'{name} does not match its SHA256SUMS line'
-        print(f'{name}: SHA-256 matches')
+        print(f'{name}: SHA-256 matches', flush=True)
 
 
 def render_first_use(cli, examples):
@@ -178,7 +183,9 @@ def check_windows_installer(setup, unpacked):
 
     from installers import destinations
 
-    key = r'Software\Convolver'
+    identities = json.loads((ROOT / 'plugins/identities.json').read_text(encoding='utf-8'))['windows_installer']
+    key = identities['registry_key']
+    uninstall_key = 'Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\' + identities['uninstall_key']
     if registry_key_exists(winreg, key):
         raise RuntimeError('refusing to install over an existing Convolver installation')
     files = sorted(p.relative_to(unpacked).as_posix() for p in unpacked.rglob('*') if p.is_file())
@@ -197,7 +204,12 @@ def check_windows_installer(setup, unpacked):
     for name, path in installed.items():
         assert path.is_file(), f'installer did not install {name} at {path}'
         assert path.read_bytes() == (unpacked / name).read_bytes(), f'{path} differs from the ZIP'
-    print(f'Installer put {len(installed)} files in place with the ZIP bytes')
+    uninstaller = install_dir / 'Uninstall.exe'
+    bundle = common / 'VST3/Convolver.vst3'
+    present = {p for folder in (install_dir, bundle) for p in folder.rglob('*') if p.is_file()}
+    extra = sorted(str(p) for p in present - set(installed.values()) - {uninstaller})
+    assert uninstaller.is_file() and not extra, f'installer added files the ZIP does not hold: {extra}'
+    print(f'Installer put {len(installed)} files in place with the ZIP bytes', flush=True)
     render_first_use(install_dir / 'bin/convolver.exe', install_dir / 'examples/first-use')
     check_plugin(common / 'VST3/Convolver.vst3', 'Windows')
     # _?= keeps the uninstaller in the foreground, so its status is the result;
@@ -210,9 +222,12 @@ def check_windows_installer(setup, unpacked):
     assert result.returncode == 0, f'uninstaller exited with {result.returncode}'
     left = [str(path) for path in installed.values() if path.exists()]
     assert not left, f'uninstaller left installed files: {left}'
-    for registered in (key, r'Software\Microsoft\Windows\CurrentVersion\Uninstall\Convolver'):
+    # Run with _?=, the uninstaller cannot delete itself; nothing else may stay.
+    remaining = sorted(str(p) for p in install_dir.rglob('*') if p != uninstaller) if install_dir.exists() else []
+    assert not remaining, f'uninstaller left files or folders: {remaining}'
+    for registered in (key, uninstall_key):
         assert not registry_key_exists(winreg, registered), f'uninstaller left HKLM\\{registered}'
-    assert not (common / 'VST3/Convolver.vst3').exists(), 'uninstaller left the plug-in bundle'
+    assert not bundle.exists(), 'uninstaller left the plug-in bundle'
     print('Uninstaller removed every installed file and registry key')
 
 

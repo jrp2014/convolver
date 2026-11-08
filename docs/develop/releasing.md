@@ -232,12 +232,15 @@ mechanical part, but only as a draft: nothing is public until jrp presses
    added, and a Windows Server 2025 runner (the package is built on 2022).
    Each checks the files' sums, unpacks the ZIP into a folder whose name has
    spaces and `ü`, runs `package_smoke.py` there without the build's SDK tools,
-   and loads the VST3 binary to list its factory's classes against
-   [`identities.json`](../../plugins/identities.json); on Windows the
-   installer is also run silently, every file it installs is compared with
-   the ZIP, the installed CLI renders a first-use example and the installed
-   plug-in loads, and the uninstaller must remove every file and registry
-   key. Nothing is drafted unless all pass. These are not host tests. It
+   and loads the VST3 library as a host does to list its factory's classes
+   against [`identities.json`](../../plugins/identities.json) (no instance,
+   no audio); on Windows the installer is also run silently and must install
+   exactly the ZIP's files, byte for byte, plus its uninstaller, the
+   installed CLI renders a first-use example and the installed library
+   loads, and the uninstaller must remove every file and registry key.
+   GitHub's Windows images include the Visual C++ runtime, so a computer
+   without it is not tried. Nothing is drafted unless all pass. These are
+   not host tests; the scripts come from the tag, as the files do. It
    then creates a draft pre-release on the tag, titled "Convolver X.Y.Z
    (unsigned developer preview)", with every platform's files: the ZIP
    archive for each, the `-unsigned.pkg` installers for macOS arm64 and

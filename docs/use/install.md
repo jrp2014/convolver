@@ -10,9 +10,8 @@ package or from your own build. Afterwards, follow
 - Copy the whole plug-in bundle (a folder, not just the file inside it) into a
   folder your host scans, then ask the host to rescan.
 - Preview packages contain the VST® 3 plug-in on macOS, Windows and Linux,
-  and the Audio Unit on macOS. The first preview was for macOS only; Windows
-  and Linux packages come from the second. For the LV2 plug-in (Linux),
-  build from source.
+  and the Audio Unit on macOS. For the LV2 plug-in (Linux), build from
+  source.
 - Previews are not signed. On macOS, allow the installer once in
   **Privacy & Security**, or, from the ZIP archive, clear the download
   quarantine for the Convolver bundles only; on Windows, an installer shows a
@@ -102,9 +101,7 @@ code-signing certificate.
 ## Installers
 
 Preview installers are also made for macOS and Windows; Linux has the ZIP
-archive only. Before each preview, the Windows installer is installed and
-removed automatically on a fresh Windows machine; neither installer has yet
-been tried by a person on a clean computer. The Windows installer puts the plug-in in the
+archive only. They have not yet been tried by a person on a clean computer. The Windows installer puts the plug-in in the
 all-users VST3 folder and the tools in the Convolver folder you choose;
 upgrading removes the previous version's files first. The macOS package
 installs into `/Library/Audio/Plug-Ins/VST3`,

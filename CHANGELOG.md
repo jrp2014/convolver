@@ -20,8 +20,8 @@ Until 1.0 the C++ API may change between minor versions.
   to report a problem without the window. Before the draft is made, the
   exact files run on machines that never built Convolver: stock Ubuntu
   22.04, Ubuntu 24.04, Debian 12 and Fedora images and a fresh Windows
-  runner, where the tools render the examples, the plug-in loads and the
-  installer installs and removes itself
+  runner, where the tools render the examples, the plug-in's library loads
+  and lists its classes, and the installer installs and removes itself
   ([publishing](docs/develop/releasing.md#publishing-an-unsigned-preview)).
 - Releases (REL-7): jrp decided to publish the first preview without the
   remaining host checks and the independent walkthrough; they stay open

@@ -31,6 +31,12 @@ name: Draft preview release
       - scripts/release/promotion_gate.py
       - scripts/release/contract.py
       - tests/release/clean_machine.py
+      - tests/release/package_smoke.py
+      - tests/release/documentation_examples.py
+      - scripts/release/candidate.py
+      - scripts/release/installers.py
+      - scripts/trademarks.py
+      - plugins/identities.json
 
 permissions:
   contents: read
@@ -131,8 +137,9 @@ jobs:
   # REL-9: the exact Windows and Linux files on machines that never built
   # Convolver: stock distribution images with only Python added, and a
   # Windows image other than the one that built the package, where the
-  # installer is installed and removed silently. The scripts come from this
-  # commit, the files from the candidate run (tests/release/clean_machine.py).
+  # installer is installed and removed silently (tests/release/clean_machine.py).
+  # A real run takes the scripts from the tag, as the files are; the dry run
+  # for a pull request takes them from the pull request.
   clean-machines:
     needs: prepare
     name: Clean machine (${{ matrix.name }})
@@ -172,6 +179,8 @@ jobs:
       - name: Add Python, and nothing else, to the image
         if: matrix.container != ''
         shell: sh
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
           if command -v apt-get >/dev/null; then
             apt-get update -qq && apt-get install -y -qq --no-install-recommends python3
@@ -183,6 +192,10 @@ jobs:
         with:
           python-version: '3.12'
       - uses: actions/checkout@v7
+        with:
+          ref: >-
+            ${{ github.event_name == 'workflow_dispatch'
+            && format('refs/tags/{0}', needs.prepare.outputs.tag) || '' }}
       - uses: actions/download-artifact@v8
         with:
           name: complete-preview-candidate
@@ -190,6 +203,8 @@ jobs:
           run-id: ${{ needs.prepare.outputs.run_id }}
           github-token: ${{ github.token }}
       - name: Run the published files
+        env:
+          PYTHONUNBUFFERED: '1'
         run: >-
           ${{ matrix.python || 'python3' }} tests/release/clean_machine.py --candidate build/candidate
           --platform ${{ matrix.platform }} ${{ matrix.install }}

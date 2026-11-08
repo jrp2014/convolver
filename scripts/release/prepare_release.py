@@ -109,7 +109,8 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
         (
             'Choose the file for your system: on macOS and Windows the installer (`.pkg`, `-setup.exe`) or the ZIP '
             'archive, on Linux the ZIP archive. Check its SHA-256 before opening it: `shasum -a 256 <file>` in '
-            "macOS's Terminal, `Get-FileHash <file>` in Windows PowerShell, `sha256sum <file>` on Linux."
+            "macOS's Terminal, `Get-FileHash <file>` in Windows PowerShell (which prints it in capitals), "
+            '`sha256sum <file>` on Linux.'
         ),
         '| File | For | Kind | SHA-256 |\n| --- | --- | --- | --- |\n' + rows.rstrip('\n'),
         '## Install and first use',
@@ -136,8 +137,8 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'with their filter. Not yet checked: listening in any host, VoiceOver, the latest Audio Unit change in '
             'GarageBand, and anyone outside the project following the guides. The Windows and Linux packages were '
             'checked only automatically, on CI machines that had never built Convolver: the tools and examples ran '
-            'from them, the plug-in loaded, and the Windows installer installed and removed itself. Nobody has '
-            'used them in a host yet. '
+            "from them, the plug-in's library loaded and listed its classes, and the Windows installer installed "
+            'and removed itself. Nobody has used them in a host yet. '
             f'[Status]({base}/blob/{tag}/docs/project/status.md#checks-left-before-publication) lists what is open. '
             'Other hosts are untested.\n'
             "- In Audacity, load filters from Audacity's own preset menu. A filter loaded from Convolver's window "
@@ -147,7 +148,8 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
         (
             "Copy Diagnostics from Convolver's window on macOS, or attach the Convolver log on Windows and Linux "
             f'([where it is]({docs}/plugins.md#status-and-the-convolver-log)). Say which system, host and version '
-            'you used, how you loaded the filter (Choose…, Recent, Reload, a preset or a saved project), and whether '
+            'you used, how you loaded the filter (on macOS Choose…, Recent or Reload; anywhere a preset or a saved '
+            'project), and whether '
             'the problem is in playback, export or reopening '
             f'([how to report]({docs}/troubleshooting.md#report-a-problem)).'
         ),
