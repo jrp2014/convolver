@@ -173,9 +173,13 @@ Keep private audio out of reports. Use the supplied synthetic examples.
 ## Smoke test for an unsigned preview
 
 1. Download the preview the way a user would and check its SHA-256 against the
-   release notes. Install it as the [install guide](../use/install.md) says, including
-   its quarantine removal on macOS for this bundle only. Never disable security
-   system-wide.
+   release notes. Install it as the [install guide](../use/install.md) says:
+   from the macOS installer, through **Open Anyway**, or from the ZIP archive,
+   with its quarantine removal for this bundle only. Never disable security
+   system-wide. Record the macOS version, the exact text of each warning, and
+   whether the installed bundles still carry a quarantine flag
+   (`xattr -l /Library/Audio/Plug-Ins/VST3/Convolver.vst3` lists
+   `com.apple.quarantine` if they do).
 2. Scan, insert Convolver, and load one example preset at 48 kHz in mono and
    stereo, where the host offers both ([first hosts](#first-hosts)). Check
    that the identity, echo and repeat examples sound as expected.

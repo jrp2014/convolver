@@ -12,6 +12,16 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Releases (REL-8): a "Draft preview release" workflow turns a passed
+  candidate run on a `vX.Y.Z` tag into a draft GitHub pre-release. It refuses
+  a run that was not started by hand on the tag or did not pass, or whose
+  tag holds another commit or version, checks every file against
+  `SHA256SUMS` and the candidate record, attaches only the macOS packages
+  and the corresponding source, writes the release notes (each file's
+  SHA-256, the run, the install guide, known limitations and the
+  responsiveness result) and downloads the attached files again to compare
+  them. Nothing is public until jrp publishes the draft. Pull requests that
+  change it run a dry run on the newest tag candidate.
 - Tests (AU-3): the Audio Unit workflow runs `au.adapter` under
   ThreadSanitizer, in a Debug build with the defaults the packages use, on
   the runs where that workflow already runs. It switches bypass from another
@@ -734,6 +744,11 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Guides (REL-8): the install guide now says how to open the unsigned macOS
+  installer (**Open Anyway** in Privacy & Security); it described only
+  clearing the quarantine of bundles copied from the ZIP archive. The limits
+  page no longer says the plug-ins have no window: the VST3 plug-in and the
+  Audio Unit have one on macOS.
 - VST3 (VST3-16, from jrp's HOST-1 REAPER run and his trace with PR #134's
   trace build): in REAPER 7.85 a new Latency stayed unused until a render,
   FX Offline then Online, or reopening the project. Convolver asked REAPER

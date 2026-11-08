@@ -10,8 +10,9 @@ unsigned preview is published, and what a production release still needs.
 **In short:** the "Plug-in distribution candidates" workflow builds and tests
 unsigned packages for four platforms with their corresponding source, and
 cannot publish anything. Publishing a preview is a manual step owned by jrp:
-run the workflow on a tag, check the files against their checksums and attach
-them unchanged to a GitHub pre-release. Production releases stay disabled
+run that workflow on a tag, then the "Draft preview release" workflow, which
+checks the files against their checksums and attaches them unchanged to a
+draft GitHub pre-release that jrp reads and publishes. Production releases stay disabled
 (`production_enabled` is false) until signing, clean installation and
 named-host qualification are done. Nothing has been published yet. After
 publishing, jrp tells the people who already use the `.cfg` format where to
@@ -195,38 +196,65 @@ whoever he names) qualifies it on a named machine (REL-6 in
 ## Publishing an unsigned preview
 
 Signing is not needed for a preview. Publication is a manual step owned by
-jrp, and has not been done yet:
+jrp, and has not been done yet. The "Draft preview release" workflow
+([`publish.yml`](../../.github/workflows/publish.yml), REL-8) does the
+mechanical part, but only as a draft: nothing is public until jrp presses
+**Publish**.
 
 1. Run the "Plug-in distribution candidates" workflow by hand on the chosen tag
    (`vX.Y.Z`; the first preview comes from a 0.12.x tag): Actions, then
    "Run workflow", choosing the tag, or
    `gh workflow run release.yml --ref vX.Y.Z`. The version bot's tag push does
    not start it, because pushes made with the workflow token do not trigger
-   other workflows. Wait for the whole run to pass.
-2. Download that run's `complete-preview-candidate` artifact (made by its
-   `collect` job) and check every file against the `SHA256SUMS` file it
-   contains. These are the files you will attach, unchanged. The first
-   preview is macOS-only ([decisions](../project/decisions.md#plug-in-behaviour)),
-   so attach only the macOS files: for arm64 and for x86-64, the ZIP archive
-   and the `-unsigned.pkg` installer, with the
-   [corresponding source](#licences-and-corresponding-source)
-   (`Convolver-source.tar.gz`). `SHA256SUMS` and the candidate record also
-   list the Windows and Linux files; the release notes give only the sums of
-   the files attached. For
-   the first preview, the independent walkthrough (REL-3 in
-   [TODO](../../TODO.md)) uses these same files before they are uploaded.
+   other workflows. Wait for the whole run to pass (about 25 minutes, most of
+   it waiting for macOS runners).
+2. For the first preview, the independent walkthrough (REL-3 in
+   [TODO](../../TODO.md)) uses that run's files before anything is uploaded:
+   the `candidate-macos-arm64` or `candidate-macos-x86_64` artifact, or
+   `complete-preview-candidate` (made by the `collect` job), whose
+   `SHA256SUMS` lists every file.
 3. Run the [smoke test](host-testing.md#smoke-test-for-an-unsigned-preview) in
    at least one host, and the
    [responsiveness qualification](#responsiveness-qualification) on a named
    machine; the release notes give its result either way.
-4. Create a GitHub pre-release on that tag titled "Convolver X.Y.Z (unsigned
-   developer preview)". Put the SHA-256 sums, the run link and download and
-   installation instructions (pointing to
-   [unsigned previews](../use/install.md#unsigned-previews)) in the release
-   notes.
-5. Check it worked: download each asset from the published pre-release and
-   compare it with its line in `SHA256SUMS`, and read the release page as a user would.
-   Never replace or edit an asset after publication; a fix gets a new version.
+4. Run "Draft preview release" from `main` (Actions, then "Run workflow"),
+   giving the candidate run's ID (the number in its address) and the
+   responsiveness result in one sentence, or
+   `gh workflow run publish.yml -f run_id=<ID> -f qualification="<result>"`.
+   It refuses a run that was not started by hand on a `vX.Y.Z` tag, did not
+   pass, or whose tag holds another commit or `VERSION`; it checks every file
+   against `SHA256SUMS` and the candidate record, and refuses if a release or
+   draft for the tag already exists. It then creates a draft pre-release on
+   the tag, titled "Convolver X.Y.Z (unsigned developer preview)", with only
+   the macOS files: for arm64 and for x86-64, the ZIP archive and the
+   `-unsigned.pkg` installer, with the
+   [corresponding source](#licences-and-corresponding-source)
+   (`Convolver-source.tar.gz`), as the first preview is macOS-only
+   ([decisions](../project/decisions.md#plug-in-behaviour)). Its notes give
+   the SHA-256 of each attached file, the run link, the source commit, links
+   to the [install guide](../use/install.md#unsigned-previews) at the tag,
+   the known limitations and the responsiveness result. Finally it downloads
+   every attached file again and compares it with its sum. The run's summary
+   shows the notes and links to the draft. A pull request that changes the
+   workflow or its scripts runs a dry run on the newest candidate run on a
+   tag: every check and the notes, but no draft.
+5. Read the draft as a user would, edit its notes if needed (a draft's notes
+   can change; its files must not), then press **Publish release**. To start
+   again, delete the draft and run step 4 again. Never replace or edit an
+   asset after publication; a fix gets a new version.
+6. Download one asset from the published page and compare it with its line
+   in the notes, and download the candidate run's `symbols-macos-arm64` and
+   `symbols-macos-x86_64` artifacts and keep them
+   ([debugging symbols](#debugging-symbols)): artifacts expire after 90 days.
+   Then record the published version in the
+   [changelog](../../CHANGELOG.md): a heading for the tag above the entries it
+   contains. That pull request's merge bumps `VERSION` again, which is
+   expected: the tag, not `main`, is what was published.
+
+Without the workflow (for example while it is being fixed), the same steps by
+hand: download `complete-preview-candidate`, run `sha256sum -c SHA256SUMS`,
+and create the pre-release on the tag with the five files above and notes
+giving their sums, the run link and the install guide.
 
 `production_enabled` stays false for a preview. Previews are unsigned on macOS
 (ad-hoc signature, because Apple silicon will not load code with no signature
