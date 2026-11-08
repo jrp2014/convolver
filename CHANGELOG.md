@@ -759,6 +759,16 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Audio Unit (AU-17, a ThreadSanitizer report on `main` at `8af5efd`): the
+  unit told the host's property listeners about a new latency, tail or
+  window report from its own Latency queue, while hosts add and remove
+  listeners on their main thread; the Audio Unit SDK keeps them in a list
+  without a lock, so the two could collide and, at worst, crash the host
+  just after a Latency change or a restored project. No host showed it.
+  These notifications now reach listeners on the main thread, as the JUCE
+  Audio Unit wrapper sends them; one still pending when the unit closes is
+  dropped. No change to the audio. A test adds and removes listeners while
+  Latency changes are applied, under ThreadSanitizer in CI.
 - Guides (REL-8): the install guide now says how to open the unsigned macOS
   installer (**Open Anyway** in Privacy & Security); it described only
   clearing the quarantine of bundles copied from the ZIP archive. The limits

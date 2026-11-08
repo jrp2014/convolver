@@ -195,8 +195,8 @@ void Effect::notify_status() noexcept {
     event.mArgument.mParameter = {GetComponentInstance(), status_parameter, kAudioUnitScope_Global,
                                   0};
     AUEventListenerNotify(nullptr, nullptr, &event);
-    // AU-6: Convolver's window rereads the report.
-    PropertyChanged(report_property, kAudioUnitScope_Global, 0);
+    // AU-6: Convolver's window rereads the report. On the main thread (AU-17).
+    tell_listeners(notice_report);
 }
 
 HostReport Effect::report_locked(std::string& faults) {

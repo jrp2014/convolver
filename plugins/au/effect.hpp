@@ -210,6 +210,14 @@ class Effect final : public ausdk::AUBase {
     // returns the message to log. Called under `control_`.
     std::string activation_failed(const char* why) noexcept;
     void timing_changed();
+    // AU-17: tells the host's property listeners about the unit's own
+    // changes (the `notice_*` bits), on the main thread. AUBase keeps its
+    // listeners in a plain vector that hosts change on their main thread
+    // without a lock, so a call from any other thread (the Latency queue)
+    // is handed to the main queue, as the JUCE Audio Unit wrapper does.
+    static constexpr std::uintptr_t notice_latency = 1, notice_tail = 2, notice_report = 4;
+    void tell_listeners(std::uintptr_t notices) noexcept;
+    void deliver_notices(std::uintptr_t notices) noexcept;
     // Writes to the Convolver log (host_log), skipping a repeat of the line
     // this instance wrote last, as hosts restart plug-ins often.
     void log(const std::string&, bool problem = true) noexcept;
@@ -314,6 +322,12 @@ class Effect final : public ausdk::AUBase {
     // the destructor, which waits for work already running.
     struct LatencyQueue;
     std::unique_ptr<LatencyQueue> latency_queue_;
+    // AU-17: hands tell_listeners() calls to the main queue through a
+    // DISPATCH_SOURCE_TYPE_DATA_OR source; defined in effect.cpp. Made
+    // before latency_queue_ and closed after it, so the Latency work can
+    // always post; a notice still pending when the unit closes is dropped.
+    struct MainNotices;
+    std::unique_ptr<MainNotices> main_notices_;
     std::atomic<std::uint64_t> latency_requests_{0}; // Numbers the requests (AU-14).
 };
 } // namespace convolver::au

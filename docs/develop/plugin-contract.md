@@ -270,7 +270,17 @@ format.
   properties 64000 (the fields as a `CFDictionary` of `CFString`s) and 64001
   (the diagnostics text as a `CFString`), read-only, values released by the
   caller, with a property-change notification for 64000 wherever the Status
-  parameter's event is sent. They are internal between the unit and its own
+  parameter's event is sent. The unit's own property notifications (the
+  latency, the tail and 64000) reach listeners on the main thread (AU-17):
+  AUBase keeps its listeners in a vector without a lock, which hosts change
+  on their main thread, so a notice from any other thread, such as the
+  Latency queue, is handed to the main queue through a
+  `DISPATCH_SOURCE_TYPE_DATA_OR` source, as the JUCE Audio Unit wrapper
+  does; notices posted before the main thread runs coalesce, and one still
+  pending when the unit closes is dropped. A host whose main thread never
+  runs its run loop is not told of changes the Latency queue makes, and
+  reads the latency and tail when it asks for them. Notifications the Audio
+  Unit SDK sends for a host's own calls stay on the host's thread. They are internal between the unit and its own
   window, which ship together, so they are not permanent identities.
   `kAudioUnitProperty_CocoaUI` names the window's factory class in this
   image's own component bundle; the factory and view class names carry the
@@ -595,7 +605,7 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   Render no longer marks it, waiting at most for the rest of one render
   call. Destroying the unit cancels the source and waits for work already
   running. Uninitialized, `kAudioUnitProperty_Latency` simply follows the
-  choice. The host is told of the new latency and tail from the queue, and the
+  choice. The host is told of the new latency and tail, and the
   log says what changed; the log line is best effort, so running out of
   memory while writing it does not undo or misreport a change. The new
   processor starts the fault count again, so the window's fault totals

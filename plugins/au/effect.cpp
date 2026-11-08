@@ -11,7 +11,9 @@
 #include <cmath>
 #include <dispatch/dispatch.h>
 #include <exception>
+#include <mutex>
 #include <new>
+#include <pthread.h>
 #include <span>
 #include <thread>
 #include <vector>
@@ -108,6 +110,61 @@ struct Effect::LatencyQueue {
     dispatch_source_t source = nullptr;
 };
 
+// AU-17: the main-queue end of tell_listeners(). The source's handler runs on
+// the main thread with the ORed notices posted since its last run; `shared`
+// lives until the source's cancel handler, which runs on the main queue
+// after any handler already running, so a late handler finds `effect`
+// cleared rather than a closed unit. If the main queue never runs (a host
+// with no main run loop), the pending notices and this small record are
+// never freed: nothing is told, which is what such a host can hear anyway.
+struct Effect::MainNotices {
+    struct Shared {
+        std::mutex lock;
+        Effect* effect = nullptr; // Cleared, under `lock`, when the unit closes.
+        dispatch_source_t source = nullptr;
+    };
+
+    explicit MainNotices(Effect& e) : shared(new Shared) {
+        shared->effect = &e;
+        shared->source =
+            dispatch_source_create(DISPATCH_SOURCE_TYPE_DATA_OR, 0, 0, dispatch_get_main_queue());
+        if (!shared->source) {
+            delete shared;
+            throw std::bad_alloc();
+        }
+        dispatch_set_context(shared->source, shared);
+        dispatch_source_set_event_handler_f(shared->source, [](void* context) {
+            auto& s = *static_cast<Shared*>(context);
+            const auto notices = dispatch_source_get_data(s.source);
+            std::lock_guard guard(s.lock);
+            if (s.effect)
+                s.effect->deliver_notices(notices);
+        });
+        dispatch_source_set_cancel_handler_f(shared->source, [](void* context) {
+            auto* s = static_cast<Shared*>(context);
+            dispatch_release(s->source);
+            delete s;
+        });
+        dispatch_activate(shared->source);
+    }
+    MainNotices(const MainNotices&) = delete;
+    MainNotices& operator=(const MainNotices&) = delete;
+    ~MainNotices() {
+        {
+            // Waits for a handler running on the main thread when the unit
+            // closes on another thread.
+            std::lock_guard guard(shared->lock);
+            shared->effect = nullptr;
+        }
+        dispatch_source_cancel(shared->source); // The cancel handler frees `shared`.
+    }
+    void post(std::uintptr_t notices) noexcept {
+        dispatch_source_merge_data(shared->source, notices);
+    }
+
+    Shared* shared;
+};
+
 Effect::Effect(AudioComponentInstance instance)
     : AUBase(instance, 1, 1), status_(host_status(filter_, std::nullopt)), tag_(next_tag()) {
     set_host_log_sdk(CONVOLVER_SDK_DESCRIPTION); // The Convolver log names the SDK (CI-6).
@@ -120,11 +177,13 @@ Effect::Effect(AudioComponentInstance instance)
     Globals()->SetParameter(mix_parameter,
                             static_cast<AudioUnitParameterValue>(100 * defaults.mix));
     Globals()->SetParameter(latency_parameter, default_latency_index);
+    main_notices_ = std::make_unique<MainNotices>(*this);
     latency_queue_ = std::make_unique<LatencyQueue>(*this);
 }
 
 Effect::~Effect() {
     latency_queue_.reset(); // Waits for Latency work already running.
+    main_notices_.reset();  // After it: that work may have posted notices.
 }
 
 HostLayout Effect::layout() {
@@ -417,8 +476,24 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
 }
 
 void Effect::timing_changed() {
-    PropertyChanged(kAudioUnitProperty_Latency, kAudioUnitScope_Global, 0);
-    PropertyChanged(kAudioUnitProperty_TailTime, kAudioUnitScope_Global, 0);
+    tell_listeners(notice_latency | notice_tail);
+}
+
+void Effect::tell_listeners(std::uintptr_t notices) noexcept {
+    if (pthread_main_np())
+        deliver_notices(notices);
+    else
+        main_notices_->post(notices);
+}
+
+void Effect::deliver_notices(std::uintptr_t notices) noexcept {
+    // AUBase's listeners, as PropertyChanged calls them, on the main thread.
+    if (notices & notice_latency)
+        PropertyChanged(kAudioUnitProperty_Latency, kAudioUnitScope_Global, 0);
+    if (notices & notice_tail)
+        PropertyChanged(kAudioUnitProperty_TailTime, kAudioUnitScope_Global, 0);
+    if (notices & notice_report)
+        PropertyChanged(report_property, kAudioUnitScope_Global, 0);
 }
 
 OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp& time,

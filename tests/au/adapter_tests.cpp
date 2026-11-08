@@ -22,6 +22,7 @@
 #include <mutex>
 #include <new>
 #include <optional>
+#include <pthread.h>
 #include <string>
 #include <thread>
 #include <vector>
@@ -196,20 +197,28 @@ void channel_capabilities() {
     require(b.output_silent(), "an empty 2 to 6 instance is not silent");
 }
 
-// Counts property notifications, which may arrive on the unit's Latency
-// queue (a Latency change).
+// Counts property notifications, and those that arrived off the main thread
+// (AU-17: the unit sends its own on the main thread, which the test's main
+// run loop serves; see run_main()).
 struct Notifications {
     std::mutex lock;
     std::map<AudioUnitPropertyID, int> counts;
+    int off_main = 0;
     static void listener(void* self, AudioUnit, AudioUnitPropertyID id, AudioUnitScope,
                          AudioUnitElement) {
         auto& n = *static_cast<Notifications*>(self);
         std::lock_guard guard(n.lock);
         ++n.counts[id];
+        if (!pthread_main_np())
+            ++n.off_main;
     }
     int of(AudioUnitPropertyID id) {
         std::lock_guard guard(lock);
         return counts[id];
+    }
+    int called_off_main() {
+        std::lock_guard guard(lock);
+        return off_main;
     }
     void clear() {
         std::lock_guard guard(lock);
@@ -217,12 +226,25 @@ struct Notifications {
     }
 };
 
-// Waits up to five seconds for `done`, as a host waits for a notification.
+// Runs the main run loop for up to `seconds`, as a host's main thread does,
+// which serves the main queue; returns whether it ran anything.
+bool run_main(CFTimeInterval seconds) {
+    return CFRunLoopRunInMode(kCFRunLoopDefaultMode, seconds, true) == kCFRunLoopRunHandledSource;
+}
+
+// Runs what the main queue holds now: the notices a unit has posted (AU-17).
+void drain_main() {
+    while (run_main(0.01)) {
+    }
+}
+
+// Waits up to five seconds for `done`, as a host waits for a notification,
+// running the main queue meanwhile.
 template <class Done> bool eventually(Done done) {
     for (int i = 0; i < 5000; ++i) {
         if (done())
             return true;
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        run_main(0.001);
     }
     return done();
 }
@@ -276,8 +298,8 @@ void record_progress(AudioComponentInstance unit, std::uint64_t requested,
 // Waits until a run of `unit`'s Latency work that saw every request made to
 // it so far has finished, logged and told the host: a completion witness
 // rather than a sleep. The default deadline only catches a deadlock.
-bool latency_settled(const Unit& unit,
-                     std::chrono::milliseconds deadline = std::chrono::seconds(10)) {
+bool latency_finished(const Unit& unit,
+                      std::chrono::milliseconds deadline = std::chrono::seconds(10)) {
     const auto done = [&] {
         std::lock_guard lock(progress_mutex);
         require(!progress_lost, "more units had Latency work outstanding than there are "
@@ -291,6 +313,16 @@ bool latency_settled(const Unit& unit,
             return false;
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
+    return true;
+}
+
+// As latency_finished, then runs the main queue, where the runs posted their
+// notices (AU-17): once settled, the notification counts are final.
+bool latency_settled(const Unit& unit,
+                     std::chrono::milliseconds deadline = std::chrono::seconds(10)) {
+    if (!latency_finished(unit, deadline))
+        return false;
+    drain_main();
     return true;
 }
 
@@ -899,13 +931,6 @@ void latency_parameter() {
     set_parameter(unit, au::latency_parameter, 2.4f);
     require(parameter(unit, au::latency_parameter) == 2, "Latency not rounded");
 
-    // The choices above woke the unit's Latency queue, whose runs tell the
-    // listeners from that queue's thread. The Audio Unit SDK's listener list
-    // is a plain vector, so adding a listener while a run reads it is a data
-    // race: ThreadSanitizer reported it on main (CI run 42512164144 on
-    // 8af5efd). Let those runs finish before adding the listener. A host that
-    // adds a listener while a Latency run notifies meets the same race (AU-17).
-    require(latency_settled(unit), "the Latency work for the clamped choices did not finish");
     Notifications seen;
     check(AudioUnitAddPropertyListener(unit.get(), kAudioUnitProperty_Latency,
                                        &Notifications::listener, &seen),
@@ -919,11 +944,13 @@ void latency_parameter() {
         return eventually([&] { return u.seconds(kAudioUnitProperty_Latency) == frames / 48000; });
     };
     // The unit's Latency queue applies a choice: uninitialized, the reported latency
-    // follows it, and the host is told once. Loading the filter woke the queue
-    // too (a restored Latency applies at once), and its run may notify: wait
-    // for it first, so that the count is this choice's alone (on 7 November
-    // 2026 a slow macOS Intel runner never saw exactly one). A run notifies
-    // before it reports itself finished, so once settled the count is final.
+    // follows it, and the host is told once. The choices above woke the queue
+    // too, and its runs for them may notify after the listener is added: wait
+    // for them first, so that the count is this choice's alone (on 7 November
+    // 2026 a slow macOS Intel runner never saw exactly one). A run posts its
+    // notices before it reports itself finished, and latency_settled() then
+    // runs the main queue that delivers them, so once settled the count is
+    // final.
     require(latency_settled(unit), "the Latency work for the earlier choices did not finish");
     seen.clear();
     set_parameter(unit, au::latency_parameter, 3);
@@ -1462,6 +1489,46 @@ void status_parameter() {
     unit.uninitialize();
 }
 
+// AU-17: a host adds and removes property listeners on its main thread while
+// the unit's Latency queue applies choices. The unit tells listeners of its
+// own changes on the main thread, so AUBase's unlocked listener list is only
+// read where the host changes it (ThreadSanitizer saw the race on main, CI
+// run 42512164144 on 8af5efd, when the queue notified itself), and no
+// listener is called on another thread. A notice still pending when the unit
+// closes is dropped, not delivered to a closed unit.
+void listeners_on_main_thread() {
+    Notifications kept, churn;
+    {
+        Unit unit;
+        check(AudioUnitAddPropertyListener(unit.get(), kAudioUnitProperty_Latency,
+                                           &Notifications::listener, &kept),
+              "kept listener");
+        // Uninitialized, each new choice changes the reported latency, so
+        // each Latency run notifies.
+        for (int i = 0; i < 50; ++i) {
+            set_parameter(unit, au::latency_parameter, static_cast<float>(i % 7));
+            check(AudioUnitAddPropertyListener(unit.get(), kAudioUnitProperty_Latency,
+                                               &Notifications::listener, &churn),
+                  "added listener");
+            check(AudioUnitRemovePropertyListenerWithUserData(
+                      unit.get(), kAudioUnitProperty_Latency, &Notifications::listener, &churn),
+                  "removed listener");
+        }
+        require(latency_settled(unit), "the Latency work for the choices did not finish");
+        require(kept.of(kAudioUnitProperty_Latency) > 0, "no Latency notification arrived");
+        require(kept.called_off_main() == 0 && churn.called_off_main() == 0,
+                "a listener was called off the main thread");
+
+        // A run that finishes but whose notice is not yet delivered when the
+        // unit closes.
+        kept.clear();
+        set_parameter(unit, au::latency_parameter, 5);
+        require(latency_finished(unit), "the last Latency run did not finish");
+    }
+    drain_main();
+    require(kept.of(kAudioUnitProperty_Latency) == 0, "a notice reached a closed unit's listener");
+}
+
 // AU-13: when the Latency work's semaphore, queue or dispatch source cannot be
 // created, opening the unit fails cleanly (no crash, hang or inactive source
 // released). Closing a unit while Latency work is queued or running finishes.
@@ -1714,6 +1781,7 @@ int main(int argc, char** argv) {
         status_parameter();
         settings_parameters();
         latency_parameter();
+        listeners_on_main_thread();
         latency_queue_lifetime();
         latency_witness_per_unit();
         latency_staged_closing();
