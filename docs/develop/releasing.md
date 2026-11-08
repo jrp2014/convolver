@@ -233,7 +233,11 @@ mechanical part, but only as a draft: nothing is public until jrp presses
    ([decisions](../project/decisions.md#plug-in-behaviour)). Its notes give
    the SHA-256 of each attached file, the run link, the source commit, links
    to the [install guide](../use/install.md#unsigned-previews) at the tag,
-   the known limitations and the responsiveness result. Finally it downloads
+   the known limitations, how to
+   [report a problem](../use/troubleshooting.md#report-a-problem) (Copy
+   Diagnostics, the host and its version, how the filter was loaded, and
+   whether playback, export or reopening is affected) and the
+   responsiveness result. Finally it downloads
    every attached file again and compares it with its sum. The run's summary
    shows the notes and links to the draft. A pull request that changes the
    workflow or its scripts runs a dry run on the newest candidate run on a

@@ -137,6 +137,15 @@ class PrepareReleaseTests(unittest.TestCase):
         self.assertIn(self.commit, text)
         self.assertIn('https://github.com/owner/convolver/actions/runs/42', text)
         self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/install.md#unsigned-previews', text)
+        # The Audacity limitation (VST3-17), which jrp chose to state rather than fix.
+        self.assertIn("load filters from Audacity's own preset menu", text)
+        # How to report a problem, with what makes a report useful.
+        self.assertIn('## Report a problem', text)
+        self.assertIn(
+            f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/troubleshooting.md#report-a-problem', text
+        )
+        for words in ('Copy Diagnostics', 'host and version', 'playback', 'export or reopening'):
+            self.assertIn(words, text)
 
     def test_refuses_a_run_that_is_not_a_manual_successful_candidate_run_on_the_tag(self):
         for key, value, words in [

@@ -259,9 +259,10 @@ Do this once. Run the commands in the extracted preview package folder.
    In jrp's Audacity 4.0.2 session (7 November 2026) the administrator
    prompt was cancelled, so this folder is not yet confirmed in a test;
    copies in the user's `~/Library/Audio/Presets` folder were not how
-   Audacity found presets. Without it, load each filter in steps 3, 6 and
-   7 with Convolver's **Choose…** instead (the example folders hold each preset's
-   `filter.cfg`).
+   Audacity found presets. The first preview supports only this route in
+   Audacity ([decision](../project/decisions.md#plug-in-behaviour)): a
+   filter loaded with Convolver's **Choose…** plays but is not exported or
+   saved (VST3-17 in [TODO](../../TODO.md)), so it is no substitute.
 4. Have a stereo test file at 44.1 kHz and one at 48 kHz, with clear
    transients (a click track or spoken word). For the 48 kHz checks, the
    repository includes a [quiet stereo listening clip](../../examples/host-audio/README.md)
@@ -428,6 +429,24 @@ preparation and steps 2, 3 and 9 below include what it found.
    Choose 1024 frames for Latency and record whether Audacity restarts the
    effect at once or at the next playback, and whether the track stays in
    time. Record anything the window does differently from REAPER.
+   In Audacity 4.0.2 the filter chosen here is not kept for an export or a
+   saved project (VST3-17); step 10 checks the supported route instead.
+10. Your own filter through the preset menu, the route the first preview
+    supports in Audacity. Make a preset from the stereo example and put it
+    in the system folder, then restart Audacity:
+
+    ```sh
+    ./bin/convolver-preset examples/first-use/stereo/filter.cfg own-filter.vstpreset
+    sudo cp own-filter.vstpreset /Library/Audio/Presets/Convolver/Convolver/
+    ```
+
+    Import `examples/first-use/stereo/input.wav` into a new 48000 Hz
+    project, add Convolver as a real-time effect and choose `own-filter`
+    from Audacity's preset menu without touching Gain, Mix or Latency.
+    Export the whole project (stereo, 48000 Hz, 32-bit float WAV) and run `./bin/convolver --compare
+    export.wav examples/first-use/stereo/expected.wav`. Save the project,
+    quit, reopen it, export again and compare again. Both comparisons must
+    pass. Remove `own-filter.vstpreset` from the folder afterwards.
 
 ### GarageBand (Audio Unit)
 
