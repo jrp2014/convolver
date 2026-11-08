@@ -1140,8 +1140,9 @@ so the preset file path is not needed).
   ([measurements](docs/develop/fft-measurements.md#on-apple-silicon)):
   3 to 17 times faster than `v0.12.12` at the same Latency from 65,536
   taps, and Latency 0 costing 16 to 96% more than 256, most for short
-  filters. The REAPER and GarageBand session is still open. jrp also asked
-  for a clear way to turn zero added latency on and off, on by default.
+  filters. The REAPER and GarageBand session is still open. jrp decided no
+  separate zero-latency switch is needed: the Latency menu is the choice,
+  with 0 the default, and the user guide explains the trade-off.
 - [ ] **PERF-3 — Resource budgets and supported workloads.** Measure, on
   named machines, the distribution of callback durations (median, 99th
   percentile, 99.9th percentile and maximum, not only the average), memory in

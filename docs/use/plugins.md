@@ -564,7 +564,7 @@ defaults play exactly as Convolver did before the settings existed.
 | --- | --- | --- | --- |
 | **Gain** | −100 to +24 dB | 0 dB | Scales the filtered signal, as the command line's `--gain-db` does. Negative values make room for a filter that boosts some frequencies; positive values make up level. |
 | **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. Whenever bypass plays silence there is no dry signal, so the mix stays at 100%: when the filter's input and output counts differ, and in the cases [bypass](#bypass) lists when no filter plays. Where bypass passes the input, the input share of Mix still plays while a kept filter is silent. |
-| **Latency** | 0, 64, 128, 256, 512, 1024, 2048 or 4096 frames | 0 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. At 0 Convolver adds no processing delay; any delay in the filter itself still plays. A larger value can use somewhat less processor time, most of it gained by 64 frames. It is the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
+| **Latency** | 0, 64, 128, 256, 512, 1024, 2048 or 4096 frames | 0 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. At 0 Convolver adds no processing delay; any delay in the filter itself still plays. A larger value uses less processor time, most of all for short filters. It is the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
 
 - Gain and Mix changes fade over 1.3 ms (64 samples at 48 kHz, 128 at
   96 kHz), so automating them does not click. Latency cannot be automated.
@@ -611,6 +611,17 @@ its impulse response, the phase delay of a crossover or a room
 correction) still plays, as it would in any convolver. In the VST3 plug-in and the Audio Unit the [Latency setting](#settings)
 can add one, from 64 to 4096 samples, and the plug-in reports it so the host
 can line the audio up; LV2 always uses none.
+
+Zero added delay costs some processor time. On one Apple silicon Mac
+(November 2026), Latency 0 used about 16% more processor time than 256 for
+a 30-second reverb, and nearly twice as much for a short filter of 4,096
+taps. A short filter costs little either way, so the difference matters
+only when the processor is busy. Other machines and filters give other
+figures. Keep 0 when you play, sing or monitor through the plug-in, where
+any delay is heard. When you only play back recorded tracks and need the
+processor time, a larger Latency can save some. The host's delay
+compensation then keeps the tracks lined up, but it cannot remove the delay
+you hear when you monitor live input through the plug-in.
 
 A new Latency plays at once, and the host is told the new delay. Changing it during playback leaves a gap in the
 sound, because Convolver starts again with the new size: the gap lasts the
