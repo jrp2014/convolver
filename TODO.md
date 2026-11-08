@@ -422,10 +422,10 @@ LV2 (Linux first; also PipeWire system audio):
   `.vstpreset`, through one input reader shared with `convolver-preset`,
   reusing its decoder and identity and size checks; `.cfg` files, nested
   lists and their relative paths work as today. No `.aupreset` or LV2
-  reader only for symmetry. **Decision for jrp first:** does choosing a
-  preset load only its filter, keeping the current Gain, Mix and Latency,
-  or also the settings a host-saved preset holds? Name and describe it
-  accordingly; never drop settings while calling it a preset import. Done
+  reader only for symmetry. jrp decided (8 November 2026): choosing a
+  preset loads its Gain, Mix and Latency too, as the host's own preset
+  menu does; a preset made by `convolver-preset`, which holds only a
+  filter, leaves the current settings as they are. Done
   when the same file loads from any user folder in VST3 and the Audio Unit
   with no installation, conversion or administrator step, saving and
   reopening reproduces the CLI's output, and another plug-in's preset or a
