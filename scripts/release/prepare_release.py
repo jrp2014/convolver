@@ -39,7 +39,7 @@ DESCRIPTIONS = {
 def check_run(run, tag):
     """The run must be a successful manual run of the candidate workflow on `tag`."""
     problems = []
-    if not run.get('path', '').startswith(CANDIDATE_WORKFLOW):
+    if run.get('path', '').split('@')[0] != CANDIDATE_WORKFLOW:
         problems.append(f'run {run.get("id")} is {run.get("path")!r}, not the candidate workflow {CANDIDATE_WORKFLOW}')
     if run.get('event') != 'workflow_dispatch':
         problems.append(f'run {run.get("id")} was started by {run.get("event")!r}, not by hand (workflow_dispatch)')
@@ -123,8 +123,8 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             '- macOS only. Windows, Linux and the LV2 plug-in come with later previews; until then, build from '
             'source.\n'
             '- Unsigned: macOS asks you to confirm that you want to open it.\n'
-            '- Tested by hand in REAPER, Audacity (VST3) and GarageBand (Audio Unit) on one Mac; other hosts are '
-            'untested.'
+            '- Checked by hand on one Mac in REAPER and Audacity (VST3) and GarageBand (Audio Unit); '
+            f'[status]({base}/blob/{tag}/docs/project/status.md) says which steps. Other hosts are untested.'
         ),
         '## Loading responsiveness',
         qualification,
@@ -133,7 +133,7 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             f'Built and tested by [run {run["id"]}]({run["html_url"]}) from commit `{commit}` (tag `{tag}`). The same '
             'run built Windows and Linux packages, which are not part of this preview. `Convolver-source.tar.gz` is '
             'the corresponding source: Convolver with the exact SDK and library sources the packages were built from. '
-            'The debugging symbols are kept with the run.'
+            'The maintainer keeps the matching debugging symbols.'
         ),
     ]
     return '\n\n'.join(paragraphs) + '\n'

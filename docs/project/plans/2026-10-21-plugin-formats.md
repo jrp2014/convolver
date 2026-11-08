@@ -298,14 +298,10 @@ It happens with the chosen candidate run's files before they are uploaded
 (see REL-3).
 
 The candidate workflow builds and checks artifacts but cannot publish (its
-permissions are read-only). Publishing a preview is a manual step owned by jrp:
-run the candidate workflow on the chosen tag by hand (the version bot pushes
-tags with the workflow token, which does not trigger other workflows), take
-exactly the files from that run's `complete-preview-candidate` artifact (made
-by its `collect` job), check them against the recorded SHA-256 sums, and
-upload them unchanged to a GitHub pre-release on that tag, with the sums and
-download instructions in the release notes. Assets are never replaced after
-publication; a fix gets a new version.
+permissions are read-only). Publishing a preview is a manual step owned by
+jrp, from a draft that the "Draft preview release" workflow prepares from that
+run's files; the steps are in
+[releasing](../../develop/releasing.md#publishing-an-unsigned-preview).
 
 ## LV2 adapter design
 

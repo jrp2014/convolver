@@ -243,7 +243,10 @@ mechanical part, but only as a draft: nothing is public until jrp presses
    again, delete the draft and run step 4 again. Never replace or edit an
    asset after publication; a fix gets a new version.
 6. Download one asset from the published page and compare it with its line
-   in the notes. Then record the published version in the
+   in the notes, and download the candidate run's `symbols-macos-arm64` and
+   `symbols-macos-x86_64` artifacts and keep them
+   ([debugging symbols](#debugging-symbols)): artifacts expire after 90 days.
+   Then record the published version in the
    [changelog](../../CHANGELOG.md): a heading for the tag above the entries it
    contains. That pull request's merge bumps `VERSION` again, which is
    expected: the tag, not `main`, is what was published.

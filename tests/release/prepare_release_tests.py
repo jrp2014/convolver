@@ -171,6 +171,12 @@ class PrepareReleaseTests(unittest.TestCase):
         (self.root / 'extra.txt').write_bytes(b'')
         with self.assertRaisesRegex(ValueError, 'does not match its SHA256SUMS line'):
             self.prepare()
+        # A correct sum for a file that the candidate record does not list.
+        lines = (self.root / 'SHA256SUMS').read_text().splitlines()[:-1]
+        lines.append(f'{sha256(self.root / "extra.txt")}  extra.txt')
+        (self.root / 'SHA256SUMS').write_text('\n'.join(lines) + '\n')
+        with self.assertRaisesRegex(ValueError, 'list different files'):
+            self.prepare()
 
     def test_needs_the_qualification_result(self):
         with self.assertRaisesRegex(ValueError, 'REL-6'):

@@ -72,12 +72,14 @@ layout ([LV2 layouts](plugins.md#lv2-channel-layouts)).
 Previews are not yet signed with an Apple Developer ID or a Windows
 code-signing certificate.
 
-- **macOS installer (`.pkg`):** opening it the first time shows "Apple could
-  not verify … is free of malware". Choose **Done**, open **System Settings**,
-  then **Privacy & Security**, scroll down to the message that the installer
-  was blocked and choose **Open Anyway**, confirm with your password, and the
-  installer starts. macOS offers **Open Anyway** for about an hour after the
-  first attempt. Check the file's SHA-256 against the release notes first.
+- **macOS installer (`.pkg`):** check the file's SHA-256 against the release
+  notes first. The first time you open it, macOS says it cannot verify the
+  installer or its developer; close that message (**Done** or **OK**). Open
+  **System Settings**, then **Privacy & Security**, scroll down to the message
+  that the installer was blocked and choose **Open Anyway**. macOS asks once
+  more (**Open** or **Open Anyway**) and then for your password or Touch ID,
+  and the installer starts. **Open Anyway** is offered for about an hour after
+  the first attempt.
 - **macOS ZIP archive:** the bundle carries only an ad-hoc signature. Files
   downloaded with a browser are quarantined, and hosts may refuse to load a
   quarantined unsigned bundle. After copying, clear the quarantine for this

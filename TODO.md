@@ -104,8 +104,9 @@ is superseded.
   pre-release with the macOS files, the source and generated notes
   ([publishing](docs/develop/releasing.md#publishing-an-unsigned-preview));
   pull requests that change it run a dry run. Done when jrp has run it once
-  from `main` on a tag candidate, read the draft and deleted it (or
-  published it as the preview).
+  from `main` on a tag candidate, read the draft and deleted it. A rehearsal
+  may use the v0.12.5 run; the preview itself is published only from the
+  final candidate, on a tag that holds this workflow and the guides it links.
 
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The candidate workflow
   builds unsigned packages with pinned dependencies, corresponding source,
