@@ -1632,7 +1632,7 @@ entries written before 7 November 2026, with their evidence, are
   [presets](docs/use/presets.md),
   [record](docs/archive/reviews/2026-11-08-plug31-reaper.md).
 - [x] **PLUG-28 — Name the packaged presets after their filter.** 8
-  November 2026, PR #141 and, for the first-use presets, PR #144; [first sound in a host](docs/use/first-sound-in-a-host.md#load-the-examples).
+  November 2026, PR #141 and, for the first-use presets, PR #144; [first sound in a host](docs/use/first-sound-in-a-host.md#1-choose-a-filter).
 - [x] **PLUG-23 — A filter reads the first inputs of a wider input bus.** 6
   November 2026; [channels](docs/use/plugins.md#channels).
 - [x] **PLUG-22 — Name the filter in the window, and say each fact once.** 7

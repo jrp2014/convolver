@@ -13,10 +13,12 @@ does not fit. Installing is in [install](install.md); making presets is in
   below lists the differences.
 - One input and one output of 1 to 8 channels each; the counts may differ,
   for example 2 in and 6 out for a crossover.
-- You choose a filter with **Choose…** in Convolver's window (the Audio
-  Unit and the VST3 plug-in on macOS), with the host's file chooser (LV2,
-  in hosts that show it), or as a preset from the host's preset menu,
-  and the host saves the filter inside your project. A read-only Status
+- You choose the filter file itself (an IR file, a `.cfg` or a
+  configuration list) with **Choose…** in Convolver's window (the Audio
+  Unit and the VST3 plug-in on macOS) or with the host's file chooser
+  (LV2, in hosts that show it); a preset from the host's preset menu is
+  the other way ([loading a filter](#loading-a-filter)). The host saves
+  the filter inside your project. A read-only Status
   parameter says what is playing, and the
   [Convolver log](#status-and-the-convolver-log) says why a filter failed.
   The Audio Unit and the VST3 plug-in on macOS also have a
@@ -98,28 +100,35 @@ side speakers count as the back pair.
 
 ## Loading a filter
 
-Load a preset from the host's preset menu ("Load Preset…" or its preset
-browser). [Plug-in presets](presets.md) shows how to make one from an IR, a
-`.cfg` or a configuration list. The preset holds the whole filter, and the host
-saves the same data in the project, so the project keeps working after the
-original WAV and `.cfg` files are moved or deleted.
+Choose the filter file itself: an IR file, a `.cfg` or a configuration list,
+from any folder. The plug-in reads it as the
+[command-line tool](command-line.md) does, for the rate and channels the
+host has set, so a list chooses its entry the same way. The project then
+holds a copy of the whole filter: moving or deleting the file afterwards
+changes nothing. In the Audio Unit and VST3 the project also keeps the
+file's name, with its extension, so the window names the filter after
+reopening; it does not keep the file's folder, so a project passed to
+someone else does not carry your folder names.
 
-The filter is prepared away from the audio, then installed. A preset loaded
+A preset, loaded from the host's preset menu, is the other way in. This is
+the one list of what each way reads:
+
+| Way in | Plug-ins | Reads |
+| --- | --- | --- |
+| **Choose…**, or dropping the file, in [Convolver's window](#convolvers-window) | The Audio Unit, and the VST3 plug-in on macOS | An IR file, a `.cfg` or a configuration list; not a preset file |
+| The host's file chooser for the **Filter** parameter | LV2, in hosts that show it ([LV2 filter files](#lv2-filter-files)) | An IR file, a `.cfg` or a configuration list |
+| The host's preset menu ("Load Preset…" or its preset browser) | Every format | Convolver's preset in that format: `.vstpreset` (VST3), `.aupreset` (Audio Unit) or a `NAME.preset.lv2` folder (LV2) |
+| A saved project | Every format | The filter and settings saved in it |
+
+[Plug-in presets](presets.md) shows how to make a preset with
+`convolver-preset`, which reads an IR file, a `.cfg`, a configuration list
+or a Convolver `.vstpreset`, and lists the folders where hosts look for
+presets. A preset is needed where the plug-in has no window (the VST3
+plug-in on Windows and Linux) or in an LV2 host with no file chooser.
+
+The filter is prepared away from the audio, then installed. A filter loaded
 before any audio plays starts at once; one loaded during playback fades in
 ([replacing a filter](#replacing-a-filter)).
-
-In the Audio Unit, and in the VST3 plug-in on macOS, you can also choose the
-IR file, `.cfg` or configuration list itself, in Convolver's window:
-**Choose…** under the filter's name, or drop the file on the window
-([Convolver's window](#convolvers-window)). In LV2
-you choose it with the host's file chooser
-([LV2 filter files](#lv2-filter-files)). Either way the plug-in reads the
-file as `convolver-preset` does, for the rate and channels the host has
-set, and the project then holds the filter itself, as with a preset: moving
-or deleting the file afterwards changes nothing. In the Audio Unit and VST3
-the project also keeps the file's name, with its extension, so the window
-names the filter after reopening; it does not keep the file's folder, so a
-project passed to someone else does not carry your folder names.
 
 ## When a filter does not fit
 

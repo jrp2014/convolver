@@ -5,16 +5,16 @@ For anyone who has downloaded a preview package and wants to see, from start to
 finish, that the Convolver plug-in can split stereo into six outputs in their
 host, as a three-way crossover does. You will render the 2→6 crossover example
 through the plug-in, check the result with a command, save and reopen the
-project, and see what happens when a preset does not fit.
+project, and see what happens when a filter does not fit.
 
 **In short:** install the VST® 3 plug-in as for the
 [stereo check](check-a-stereo-filter.md), put Convolver on a six-channel track
-at 48000 Hz with 2 inputs and 6 outputs, load
-`examples/first-use/crossover/first-use-crossover.vstpreset`, render
+at 48000 Hz with 2 inputs and 6 outputs, choose
+`examples/first-use/crossover/filter.cfg` in its window, render
 `input.wav` through it as a six-channel file, and run
 `./bin/convolver --compare host-crossover.wav examples/first-use/crossover/expected.wav`.
 It should print `Match`. The filter must survive saving and reopening, and a
-preset for another rate or channel count must leave it playing.
+filter for another rate or channel count must leave it playing.
 
 **Status:** Convolver is a developer preview, and these steps have not yet
 been followed in a host from start to finish. How a host gives an effect more
@@ -80,9 +80,11 @@ show routing; they are not a crossover ready for real speakers.
 3. Add Convolver to the track as an effect. On macOS its window opens and
    shows the status; on Windows and Linux the host shows its generic controls,
    with a read-only **Status**.
-4. Load `examples/first-use/crossover/first-use-crossover.vstpreset` from
-   the host's preset menu (REAPER: the **+** button beside the preset menu,
-   then the item that imports a VST preset file). Status reads
+4. Click **Choose…** in Convolver's window and pick
+   `examples/first-use/crossover/filter.cfg`. Without the window (Windows
+   and Linux), load `examples/first-use/crossover/first-use-crossover.vstpreset`
+   from the host's preset menu instead (REAPER: the **+** button beside the
+   preset menu, then the item that imports a VST preset file). Status reads
    `Filter loaded: 48000 Hz, 2 in, 6 out.`, or on a track that gives the
    plug-in six inputs, `Filter loaded: 48000 Hz, 2 in, 6 out; plug-in inputs
    3-6 ignored.` Convolver then reads inputs 1 and 2, so put the stereo
@@ -121,28 +123,32 @@ Save the project, quit the host, open the project again and render a second
 time to `host-crossover-reopened.wav`. Comparing it with `expected.wav` again
 prints `Match`: the project kept the filter and its six outputs.
 
-## 5. Load a preset that does not fit
+## 5. Choose a filter that does not fit
 
-1. Load `examples/first-use/stereo/first-use-stereo.vstpreset`, a filter
-   with 2 inputs and 2 outputs. The crossover keeps playing, and Status
-   reads `Load failed, previous filter kept: the filter has 2 in, 2 out, the
-   host 2 in, 6 out. Details in the Convolver log.`
-2. Load `presets/echo-44100-stereo/echo-44100-stereo.vstpreset`, made for 44100 Hz. The
-   crossover keeps playing, and Status reads `Load failed, previous filter
-   kept: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in the
+Choose each of these in turn (without the window, load the `.vstpreset` in
+the same folder):
+
+1. `examples/first-use/stereo/filter.cfg`, a filter with 2 inputs and 2
+   outputs. The crossover keeps playing, and Status reads `Load failed,
+   previous filter kept: the filter has 2 in, 2 out, the host 2 in, 6 out.
+   Details in the Convolver log.`
+2. `presets/echo-44100-stereo/filter.cfg`, made for 44100 Hz. The crossover
+   keeps playing, and Status reads `Load failed, previous filter kept: the
+   filter is for 44100 Hz, the host runs at 48000 Hz. Details in the
    Convolver log.`
-3. Render again and compare: still `Match`. To recover from a preset that
-   does not fit, load the crossover preset from step 4 of section 3 again, or
-   a preset made for your host's rate and the host's 2 inputs and 6 outputs.
+3. Render again and compare: still `Match`. To recover from a filter that
+   does not fit, choose the crossover's `filter.cfg` from step 4 of section 3
+   again, or a filter made for your host's rate and the host's 2 inputs and
+   6 outputs.
 
 ## With the Audio Unit (macOS)
 
 REAPER also loads Audio Units. Install `Components/Convolver.component` as
-[install](install.md) says, insert Convolver's Audio Unit in step 3 in place
-of the VST3 plug-in, and load the filter in its window: **Choose…** under
-the filter's name, then `examples/first-use/crossover/filter.cfg`. The window reads
-`filter.cfg`, Active, and its Audio section 48000 Hz, 2 in, 6 out, and the render and comparison are as
-above. Its preset menu takes `.aupreset` files rather than `.vstpreset`
+[install](install.md) says and insert Convolver's Audio Unit in step 3 in
+place of the VST3 plug-in. It has the same window, so the steps are the
+same: after **Choose…** the window reads `filter.cfg`, Active, and its Audio
+section 48000 Hz, 2 in, 6 out, and the render and comparison are as above.
+Its preset menu takes `.aupreset` files rather than `.vstpreset`
 ([plug-in presets](presets.md)).
 
 ## If something went wrong

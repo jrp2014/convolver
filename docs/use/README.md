@@ -38,12 +38,12 @@ and the plug-ins have not yet been tested in named DAWs. The
 | --- | --- | --- |
 | [Concepts](concepts.md) | Background | Audio terms, the words Convolver uses for filters, presets and projects, latency, tails, files versus streams |
 | [Your first filter](first-filter.md) | Tutorial | The bundled example filters with the command-line tool |
-| [Your first sound in a host](first-sound-in-a-host.md) | Tutorial | The example presets in a plug-in host |
+| [Your first sound in a host](first-sound-in-a-host.md) | Tutorial | Choosing an example filter in a plug-in host, playing it and saving the project |
 | [Check a stereo filter in a host](check-a-stereo-filter.md) | Tutorial | From download to a host render checked against the expected output |
 | [Check a crossover in a host](check-a-crossover-in-a-host.md) | Tutorial | The same for a filter with 2 inputs and 6 outputs |
 | [Check file rendering with the command line](check-files-with-the-command-line.md) | Tutorial | From download to rendered files checked against the expected output, and a filter that does not fit |
 | [Install](install.md) | How-to | A preview package or your own build, for every plug-in format and system |
-| [Plug-in presets](presets.md) | How-to | Turning a filter into a preset for a plug-in |
+| [Plug-in presets](presets.md) | How-to | Optional: turning a filter into a preset, and where hosts look for presets |
 | [Equalizer APO export](equalizer-apo.md) | How-to | System-wide filtering on Windows |
 | [Other programs](other-programs.md) | How-to | Configurations shared with Roon, JRiver, Audiolense and the old Windows Convolver |
 | [Troubleshooting](troubleshooting.md) | How-to | Symptoms, causes and fixes |

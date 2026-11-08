@@ -2,65 +2,114 @@
 # Your first sound in a host
 
 For anyone who has [installed](install.md) the Convolver plug-in and wants to
-hear it work. You will load the example presets from a preview package, check
-what you hear, then make a preset from your own filter.
+hear it work. You will choose an example filter in Convolver's window, check
+that it fits the track, play, and save the project.
 
-**In short:** load Convolver on a mono or stereo track, load the matching
-`identity` preset (you should hear no change), then the `echo` preset (you
-should hear it quieter, with a hollow tone), then the `repeat` preset (you
-should hear each sound again a quarter of a second later). Save and reopen the
-project to check that the filter is kept.
+**In short:** on a stereo track at 48000 Hz, add Convolver, click
+**Choose…** in its window and pick `presets/identity-48000-stereo/filter.cfg`
+from the extracted package. The window shows 48000 Hz and `2 in → 2 out`, and
+you hear no change. Choose `echo-48000-stereo/filter.cfg` (quieter and
+hollow) and `repeat-48000-stereo/filter.cfg` (each sound again a quarter of a
+second later), then save, close and reopen the project: the filter is still
+there. Your own IR file, `.cfg` or configuration list loads the same way,
+from any folder. Presets are an [optional route](#optional-load-a-preset).
 
-You need a plug-in host that loads VST® 3: a DAW such as REAPER, an audio
-editor such as Audacity (version 4 or later), or a plug-in rack such as Carla.
-GarageBand and Logic load only Audio Units; the macOS preview package holds
-the Audio Unit too ([install](install.md)), and its presets are `.aupreset`
-files ([plug-in presets](presets.md#load-it-in-a-host)).
-Installing a plug-in does not add filtering to an ordinary music player or to
-everything the computer plays. For that on Windows, see the
-[Equalizer APO export](equalizer-apo.md).
+You need a plug-in host that loads VST® 3, such as REAPER or Audacity
+(version 4 or later), or one that loads Audio Units, such as GarageBand or
+Logic. On macOS both formats have the same window, so the steps are the same.
+On Windows and Linux the VST3 plug-in has no window yet: use a
+[preset](#optional-load-a-preset) instead. Installing a plug-in does not
+filter an ordinary music player or everything the computer plays; for that
+on Windows, see the [Equalizer APO export](equalizer-apo.md).
 
-## Load the examples
+## 1. Choose a filter
 
-The package's `presets/` folder has 18 examples: `identity`, `echo` and
-`repeat`, in mono and stereo, at 44100, 48000 and 96000 Hz. Each folder is named
-`KIND-RATE-LAYOUT` and holds a preset of the same name
-(`KIND-RATE-LAYOUT.vstpreset`), the `filter.cfg` it was made from, and
-`impulse.wav`.
+The package's `presets/` folder holds 18 examples: `identity`, `echo` and
+`repeat`, in mono and stereo, at 44100, 48000 and 96000 Hz. Each folder is
+named `KIND-RATE-LAYOUT` (such as `echo-48000-stereo`) and holds the filter
+as `filter.cfg` and `impulse.wav`, and the same filter as a preset.
 
-1. Set the host to 44100, 48000 or 96000 Hz, and select a mono or stereo track.
-2. Add Convolver to the track as an audio effect. On macOS the host shows
-   [Convolver's window](plugins.md#convolvers-window); on Windows and Linux
-   it shows a generic panel with a bypass switch. In Audacity, turn on
-   *Preset options › Use vendor UI* if you see only Audacity's own controls.
-3. From the host's preset menu ("Load Preset…" or its preset browser), load
-   `presets/identity-RATE-LAYOUT/identity-RATE-LAYOUT.vstpreset` for your rate and layout.
-   Audacity's preset menu cannot open a `.vstpreset` file, and Audacity runs
-   the plug-in in stereo even on a mono track;
-   [plug-in presets](presets.md#load-it-in-a-host) says where to put the file,
-   or, on macOS, choose the folder's `filter.cfg` with **Choose…** in
-   Convolver's window instead. Audacity plays real-time effects at the rate
-   in *Audio setup › Audio settings › Default sample rate*: set it, and the
-   project's rate, to the preset's rate.
-4. Play quiet audio and watch the meters. Identity leaves the sound unchanged,
-   apart from a delay of 256 samples that most hosts make up for.
-5. Load the matching `echo` preset. Its filter is half the input at once plus a
-   quarter of it 257 samples (about 5 ms) later: too soon to hear as a
-   separate repeat, so it sounds about 5 dB quieter and hollow, like a comb
-   filter. Convolver does not lower the level for you,
-   so leave headroom with your own filters.
-6. Load the matching `repeat` preset: the same two taps, but the second comes
-   a quarter of a second later, so you hear each sound again, quieter.
-7. Switch the host's bypass on and off. Save the project, close it and reopen
-   it: the filter is back. Presets carry the filter inside them, so the
-   original WAV and `.cfg` files are not needed.
+1. Set the host to 44100, 48000 or 96000 Hz, and select a mono or stereo
+   track.
+2. Add Convolver to the track as an effect. Its window opens from the
+   plug-in's slot: in GarageBand, from the plug-in's button in the track's
+   Plug-ins area; in Audacity, turn on *Preset options › Use vendor UI* if
+   you see only Audacity's own controls.
+3. Click **Choose…** under the filter's name, or drop the file on the window,
+   and pick `presets/identity-RATE-LAYOUT/filter.cfg` for your track's rate
+   and layout.
 
-If the plug-in plays silence, the preset does not match the track's sample
-rate or channel counts; see [troubleshooting](troubleshooting.md#a-plug-in-plays-silence).
+**Choose…** reads an IR file (a WAV, AIFF, FLAC or other sound file), a
+`.cfg` or a configuration list, from any folder: nothing needs installing or
+converting first. It does not read preset files; those go through the
+host's preset menu ([optional route](#optional-load-a-preset)).
+[Loading a filter](plugins.md#loading-a-filter) lists what each plug-in
+reads.
 
-## Make a preset from your own filter
+## 2. Check the rate and channels
 
-From the extracted package folder (the output must not exist yet):
+A filter plays only at its own sample rate, and only with its own output
+channels and at least its inputs. Convolver never resamples or remixes.
+
+Under the filter's name the window shows **Sample rate** and **Channels**
+(`2 in → 2 out`), and beside it the status: **Active**, in green, when the
+filter fits and plays. The host's Status parameter reads
+`Filter loaded: 48000 Hz, 2 in, 2 out.`
+
+If the status reads **Load failed**, the message under the name says which
+value differs and what to change: set the host to the filter's rate, use a
+track with the filter's channels, or choose a filter made for the track. A
+first filter that does not fit plays silence, never unfiltered audio.
+**Waiting** means the host has not started audio yet; the filter is checked
+when it does. Audacity plays effects at *Audio setup › Audio settings ›
+Default sample rate*, which can differ from the project's rate: set both to
+the filter's rate. Audacity also runs the plug-in in stereo even on a mono
+track, so use a stereo filter there.
+
+## 3. Play
+
+1. Play quiet audio and watch the meters. Identity leaves the sound
+   unchanged, apart from a delay of 256 samples that most hosts make up for.
+2. Choose the matching `echo` folder's `filter.cfg`. Its filter is half the
+   input at once plus a quarter of it 257 samples (about 5 ms) later: too
+   soon to hear as a separate repeat, so it sounds about 5 dB quieter and
+   hollow, like a comb filter. The change fades over while audio plays.
+3. Choose the matching `repeat` folder's `filter.cfg`: the same two taps, but
+   the second comes a quarter of a second later, so you hear each sound
+   again, quieter.
+4. Switch the host's bypass on and off to compare.
+
+Convolver does not lower the level for you, so leave headroom with your own
+filters, or turn down **Gain** in the window ([settings](plugins.md#settings)).
+
+## 4. Save the project
+
+Save the project, close it and reopen it. The filter is back, and the window
+names it (`filter.cfg`). The project holds a copy of the whole filter, so it
+keeps working after the WAV and `.cfg` files move or are deleted. It keeps
+the file's name but not its folder.
+
+**Check it worked:** the status reads Active and you hear the filter after
+reopening. If the plug-in plays silence or the host does not list it, see
+[troubleshooting](troubleshooting.md#a-plug-in-plays-silence).
+
+## Optional: load a preset
+
+A preset is the filter saved in the host's preset format, loaded from the
+host's preset menu instead of the window. You need one where the plug-in has
+no window (the VST3 plug-in on Windows and Linux), to keep filters in the
+host's preset library, or to pass one self-contained file to someone else.
+
+Each example folder holds a VST3 preset named after it
+(`presets/echo-48000-stereo/echo-48000-stereo.vstpreset`). Load it from the
+host's preset menu ("Load Preset…" or its preset browser; in REAPER, the
+**+** button beside the preset menu, then the item that imports a VST preset
+file). Audacity 4's preset menu does not open these files, and Audio Unit
+hosts such as GarageBand and Logic take `.aupreset` files instead: use
+**Choose…** there.
+
+To make a preset from your own filter, run from the extracted package folder
+(the output must not exist yet):
 
 <!-- executable-example -->
 
@@ -69,18 +118,17 @@ From the extracted package folder (the output must not exist yet):
 ```
 
 In PowerShell use `./bin/convolver-preset.exe` with the same two arguments.
-Use your own IR, `.cfg` or configuration list in place of the example WAV, at
-the sample rate your host runs at. [Plug-in presets](presets.md) explains
-choosing an entry from a list, and the Audio Unit and LV2 preset formats.
+[Plug-in presets](presets.md) explains the Audio Unit and LV2 formats,
+choosing an entry from a list, and the folders where hosts look for presets.
 
 ## What to expect
 
-- The filter's sample rate must match the host's, and its input and output
-  channel counts must match the track's. Each side can have 1 to 8 channels.
+- Each side of a filter can have 1 to 8 channels.
 - Processing is single precision, including in hosts that use 64-bit buffers.
 - After the input stops, the filter's tail still plays out.
-- Loading another preset while audio plays fades over to it. The new filter
-  starts fresh: it cannot filter audio that played before it was loaded.
+- A new filter chosen while audio plays fades over from the old one, and
+  starts fresh: it cannot filter audio that played before it was loaded. A
+  new filter that does not fit is refused, and the old one keeps playing.
 
 [How the plug-ins behave](plugins.md) has the details. To check a real
 filter's output exactly, render it in the host and compare the result by
