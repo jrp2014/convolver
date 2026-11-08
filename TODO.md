@@ -989,7 +989,17 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   `performEdit` with the current value, `endEdit`) so such hosts store the
   state; check its side effects in REAPER (an undo step) and its effect in
   Audacity (export and reopen). jrp chose (8 November 2026, decision card)
-  to fix it before the final tag.
+  to fix it before the final tag, then set the terms: "hearing one result
+  and exporting another is a significant correctness problem"; confirm the
+  mechanism once (Choose, a genuine Gain edit, then export and save and
+  reopen); pursue the host fix with Audacity; keep any Convolver workaround
+  narrow, without manufactured Gain or Mix edits that could affect
+  automation or undo; correct the documentation now (DOC-10); and make the
+  regression check Choose, export, save and reopen with no parameter
+  touched. Audacity's vendor-window path may store only a parameter's
+  change at `endEdit`, not the whole component state, so the workaround
+  waits for jrp's test. Draft upstream issue for jrp to post: project
+  files `audacity-upstream/`.
 - [ ] **VST3-12 — Editor window on Windows.** The same window as a Win32 view
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.
