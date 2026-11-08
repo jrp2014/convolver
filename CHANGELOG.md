@@ -185,6 +185,20 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Documentation (DOC-10, from jrp's file-loading review of 7 November 2026,
+  [recorded](docs/archive/reviews/2026-11-07-file-loading-review.md)):
+  [plug-in presets](docs/use/presets.md) no longer says the plug-ins have no
+  window or that the LV2 plug-in has no file chooser; it now starts from
+  choosing the filter file itself, with presets as the other way, and the
+  [plug-ins guide](docs/use/plugins.md)'s summary names **Choose…** beside
+  presets. The
+  Audacity preparation in [host testing](docs/develop/host-testing.md#prepare-the-mac)
+  removes only the presets it copied into the system folder, not the whole
+  folder. The review's other points are TODO items PLUG-26 (choose a
+  `.vstpreset` in the window), PLUG-27 (read a chosen filter before the
+  host's audio settings are known), PLUG-28 (packaged presets named after
+  their filter) and PLUG-29 (the Recent list out of the log folder), and
+  PLUG-25 records jrp's agreed wording for a rate refusal.
 - Host checks (HOST-1): jrp's Audacity 4.0.2 session with the VST3
   plug-in (7 November 2026, candidate 0.10.13) is
   [recorded](docs/archive/reviews/2026-11-07-host1-audacity.md): the seven
