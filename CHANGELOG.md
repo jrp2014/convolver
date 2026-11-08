@@ -359,6 +359,9 @@ Until 1.0 the C++ API may change between minor versions.
   host's audio settings are known), PLUG-28 (packaged presets named after
   their filter) and PLUG-29 (the Recent list out of the log folder), and
   PLUG-25 records jrp's agreed wording for a rate refusal.
+- Version 0.13.0 for PERF-2 (jrp, 8 November 2026): the next minor-version
+  pre-release after the published `v0.12.12`. C++ consumers request
+  `find_package(Convolver 0.13)`.
 - Engine (PERF-2, draft for after the first release): non-uniformly
   partitioned convolution that adds no processing delay at Latency 0. A filter's first taps are
   summed directly and the rest by stages of blocks growing from 64 to 8192

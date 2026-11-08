@@ -1132,7 +1132,10 @@ so the preset file path is not needed).
   problems, both fixed on the PR: Audio Unit projects reopened at a shifted
   Latency (the AU now also saves frames, and older state is read through
   the earlier menu), and no test checked spreading (`native.engine_stress`
-  now does). Merging needs a minor version step (the C++ defaults change).
+  now does). The branch carries the minor version step, 0.13.0 (the C++
+  defaults change). jrp (8 November): it merges for the 0.13.0 pre-release
+  after the Mac benchmarks, stress and soak, a focused REAPER and
+  GarageBand session, and CI, compared against the published `v0.12.12`.
 - [ ] **PERF-3 — Resource budgets and supported workloads.** Measure, on
   named machines, the distribution of callback durations (median, 99th
   percentile, 99.9th percentile and maximum, not only the average), memory in
