@@ -185,6 +185,24 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Documentation (DOC-11, from jrp's review of `main` at `bf6a207`, 8
+  November 2026): the [status page](docs/project/status.md) agrees with the
+  dated host records. It is dated 8 November 2026 against 0.12.1, no longer
+  says there are no open fixes while the VST3 Latency finding in REAPER
+  (VST3-16) is open, says which window each host run used (none yet the
+  0.12 window), and gives the crossover's passing REAPER retest without the
+  older refusal as a current result. [What still blocks the first
+  preview](docs/project/status.md#what-still-blocks-the-first-preview) is now
+  one table listing each remaining gate once, with its status and evidence:
+  VST3-16, the VST3 smoke tests on the current window (HOST-1), the Audio
+  Unit in GarageBand (AU-4), the Audio Unit's ThreadSanitizer build (AU-3),
+  responsiveness qualified on a named machine (REL-6), one exact candidate
+  (PLUG-5) and the independent walkthrough (REL-3). Every host
+  step, those that passed on earlier candidates included, is run again on
+  the preview candidate, as jrp decided on 8 November 2026. TODO's
+  execution priorities now list VST3-16 as an open fix and PLUG-28 before
+  the first preview. The dated records are unchanged. No code or sound
+  changes.
 - Packages (PLUG-28, from jrp's file-loading review; jrp chose to do it
   before the first preview): the 18 example presets in `presets/` are named
   after their folder, such as `presets/repeat-48000-stereo/repeat-48000-stereo.vstpreset`,
