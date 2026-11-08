@@ -341,8 +341,10 @@ From the top, the window has:
   with the filter (the Audio Unit as its preset name, VST3 in its
   controller state), so it is still there after reopening the project, but
   not the file's folder: see [loading a filter](#loading-a-filter). A
-  project saved by an earlier Convolver, or a preset that holds no name,
-  shows "From the saved project or preset". With no filter it reads
+  VST3 preset made with [`convolver-preset`](presets.md) keeps the name of
+  the file it was made from in the same way (not yet checked in a host). A project saved by an earlier
+  Convolver, or a preset that holds no name (such as a VST3 preset made by
+  an earlier `convolver-preset`), shows "Restored filter". With no filter it reads
   "None". Under the name, the filter's own facts as labelled columns:
   **Sample rate**, **Channels** (`2 in → 2 out`), **Length** and, when the
   filter names them, **Speakers** (cut short with "…" if they do not fit;
@@ -514,7 +516,9 @@ except:
   since Audio Unit hosts show their own bypass button.
 - The filter's name after reopening comes from the controller state, and
   is shown only while the filter saved with it plays: a preset or an undo
-  that brings another filter shows "From the saved project or preset".
+  that brings another filter shows "Restored filter". A
+  preset made by `convolver-preset` holds a controller state too, naming
+  the file it was made from.
 - Bypass changed in the window or by the host shows as Bypassed at once,
   before audio next runs.
 - The window grows when the file, software and log lines are shown, and

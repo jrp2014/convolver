@@ -1,17 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // The edit controller (VST3-14: moved from processor.cpp, unchanged).
-#include "bytes.hpp"
 #include "editor.hpp"
 #include "host_report.hpp"
 #include "pluginterfaces/base/ibstream.h"
 #include "processor.hpp"
 #include <algorithm>
-#include <array>
 #include <cstddef>
-#include <cstdint>
 #include <mutex>
 #include <optional>
-#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -21,31 +17,8 @@ namespace convolver::vst3 {
 using namespace Steinberg;
 using namespace Steinberg::Vst;
 namespace {
-constexpr std::string_view controller_magic = "CVCS";
-constexpr std::uint32_t controller_version = 1;
 constexpr std::size_t max_controller_state = 4096; // Name, identity and headers fit easily.
 
-void append_le32(std::string& out, std::uint32_t value) {
-    std::array<std::byte, 4> bytes{};
-    detail::write_le32(bytes, value);
-    for (const auto byte : bytes)
-        out.push_back(static_cast<char>(byte));
-}
-std::optional<std::uint32_t> take_le32(std::string_view& in) {
-    if (in.size() < 4)
-        return std::nullopt;
-    const auto value = detail::read_le32(std::as_bytes(std::span(in.data(), 4)));
-    in.remove_prefix(4);
-    return value;
-}
-std::optional<std::string> take_text(std::string_view& in, std::size_t most) {
-    const auto size = take_le32(in);
-    if (!size || *size > most || *size > in.size())
-        return std::nullopt;
-    std::string text(in.substr(0, *size));
-    in.remove_prefix(*size);
-    return text;
-}
 // A report field's value, or empty.
 std::string field(const std::vector<std::pair<std::string, std::string>>& report,
                   std::string_view name) {
@@ -61,27 +34,6 @@ void copy(const std::string& text, String128 out) {
     out[i] = 0;
 }
 } // namespace
-std::string encode_controller_state(const ControllerState& state) {
-    std::string out(controller_magic);
-    append_le32(out, controller_version);
-    append_le32(out, static_cast<std::uint32_t>(state.name.size()));
-    out += state.name;
-    append_le32(out, static_cast<std::uint32_t>(state.identity.size()));
-    out += state.identity;
-    return out;
-}
-ControllerState decode_controller_state(std::string_view in) {
-    if (!in.starts_with(controller_magic))
-        return {};
-    in.remove_prefix(controller_magic.size());
-    if (take_le32(in) != controller_version)
-        return {};
-    auto name = take_text(in, max_filter_name_bytes);
-    auto identity = take_text(in, 64);
-    if (!name || !identity || name->empty() || identity->empty())
-        return {};
-    return {std::move(*name), std::move(*identity)};
-}
 tresult PLUGIN_API Controller::setState(IBStream* stream) {
     if (!stream)
         return kResultOk;

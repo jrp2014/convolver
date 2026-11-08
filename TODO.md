@@ -509,6 +509,13 @@ LV2 (Linux first; also PipeWire system audio):
   shows its file name, a name whose identity does not match is not shown,
   and the plug-ins guide says so. Waits for the freeze unless jrp brings
   it forward.
+  Progress (8 November 2026, PR #148): `convolver-preset` writes the name
+  and identity as the `Cont` chunk; the SDK's `PresetFile::loadPreset`
+  shows the name in the adapter test (`vst3.preset`), and a converted
+  preset keeps it only while the identity matches. jrp chose "Restored
+  filter" for a state with no name (8 November 2026), now the heading.
+  Remaining: a host check (REAPER with a packaged preset, showing
+  `impulse.wav`). jrp wants this in before the preview (8 November 2026).
 - [ ] **PLUG-30 — One rule for state a busy lock makes a call skip.**
   From AU-16 (8 November 2026; jrp asked for fixes like it to be recorded,
   as stepping back may give a more general fix). The pattern: a call that
