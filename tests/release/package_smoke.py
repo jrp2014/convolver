@@ -7,6 +7,7 @@ import json
 import platform
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -17,6 +18,20 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 import trademarks  # noqa: E402
 
 COMPONENT = 'Components/Convolver.component'
+
+
+def vstpreset_parts(path):
+    """A .vstpreset's chunks by ID ('Comp' holds the audio state; 'Cont', the
+    filter file's name and identity, PLUG-31)."""
+    data = path.read_bytes()
+    (list_offset,) = struct.unpack_from('<q', data, 40)
+    assert data[list_offset : list_offset + 4] == b'List', f'{path.name}: no chunk list'
+    (count,) = struct.unpack_from('<i', data, list_offset + 4)
+    parts = {}
+    for i in range(count):
+        chunk, offset, size = struct.unpack_from('<4sqq', data, list_offset + 8 + 20 * i)
+        parts[chunk] = data[offset : offset + size]
+    return parts
 
 
 def staged_tool(root, name):
@@ -155,7 +170,12 @@ def check(root, validator=None, probe=None):
             assert result.returncode and output.read_bytes() == original, 'converter overwrote existing preset'
             config_output = folder / 'from config.vstpreset'
             subprocess.run([str(tool), str(folder / 'filter.cfg'), str(config_output)], check=True)
-            assert original == config_output.read_bytes(), 'WAV and config conversion disagree'
+            # The same filter from either file; each preset names its own file.
+            from_wav, from_config = vstpreset_parts(output), vstpreset_parts(config_output)
+            assert from_wav[b'Comp'] == from_config[b'Comp'], 'WAV and config conversion disagree'
+            assert b'impulse.wav' in from_wav[b'Cont'] and b'filter.cfg' in from_config[b'Cont'], (
+                'a converted preset does not name its file'
+            )
             shipped = folder / f'{example["name"]}.vstpreset'
             assert original == shipped.read_bytes(), 'shipped example differs from converter'
             assert not (folder / 'filter.vstpreset').exists(), 'example preset still has the old name'
