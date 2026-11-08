@@ -196,9 +196,11 @@ Until 1.0 the C++ API may change between minor versions.
   that filter's identity, as the VST3 controller state that a file chosen
   in the window saves (PLUG-22). Loaded through Steinberg's preset code, as
   the tests do, the VST3 window's heading then names the file
-  (`impulse.wav`, `filter.cfg` for the packaged presets) instead of "From
-  the saved project or preset", while that filter plays; no host has been
-  checked yet. Converting a `.vstpreset` keeps its name only while it still
+  (`impulse.wav`, `filter.cfg` for the packaged presets) while that filter
+  plays; no host has been checked yet. A restored filter with no name (an
+  older project or preset, or another filter than the name's) is headed
+  "Restored filter" in every format, in place of "From the saved project
+  or preset", which named an origin the plug-in cannot know (jrp's choice). Converting a `.vstpreset` keeps its name only while it still
   matches the filter. The audio state is unchanged, so presets sound the
   same; VST3 builds from 0.5.0 on load them as before.
   `convolver-vst3-preset` still writes its original bytes, without the

@@ -2499,7 +2499,7 @@ void saved_filter_name() {
         hall.seek(0, IBStream::kIBSeekSet, nullptr);
         require(reopened.p.setState(&hall) == kResultOk, "other preset");
         report = reopened.c.report();
-        require(field(report, "filter name") == "From the saved project or preset",
+        require(field(report, "filter name") == "Restored filter",
                 "a saved name shown for another filter");
     }
     convolver::vst3::test_file_reader = reader;

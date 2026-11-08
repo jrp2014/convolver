@@ -69,8 +69,8 @@ struct HostReport {
     // and "Note: " lines (advice.hpp), for the text report.
     std::string explanation;
     // The window's heading: the accepted filter's file name, with its
-    // extension (for saved state, the name saved beside it, PLUG-22; "From
-    // the saved project or preset" when none was; "None"), and a note about
+    // extension (for saved state, the name saved beside it, PLUG-22;
+    // "Restored filter" when none was, PLUG-31; "None"), and a note about
     // the newest request when it was refused.
     std::string filter_name, filter_note;
     // Under the name, the accepted filter's own values (jrp, 7 November

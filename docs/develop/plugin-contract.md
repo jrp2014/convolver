@@ -247,7 +247,8 @@ format.
   `convolver-preset` also holds, PLUG-31) while the filter's identity
   (`HostFilter::filter_identity()`, a hash of every stored value, found once
   when the filter is accepted) matches the one saved beside it, or
-  "From the saved project or preset" without one; PLUG-22) and a note when
+  "Restored filter" without one, which claims no origin the host did not
+  give; PLUG-22, PLUG-31) and a note when
   the newest request was
   refused, the filter's own values for under its name (rate, channels,
   length and taps, speakers; PLUG-22), the Audio facts as short labelled

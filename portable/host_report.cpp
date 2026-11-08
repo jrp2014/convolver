@@ -374,7 +374,7 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
         r.filter_name = accepted.source == HostFilterSource::file && !accepted.path.empty()
                             ? file_name(accepted.path)
                         : !accepted.name.empty() ? accepted.name
-                                                 : "From the saved project or preset";
+                                                 : "Restored filter";
     else
         r.filter_name = "None";
     if (c) {

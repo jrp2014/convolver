@@ -501,9 +501,10 @@ LV2 (Linux first; also PipeWire system audio):
   Progress (8 November 2026, PR #148): `convolver-preset` writes the name
   and identity as the `Cont` chunk; the SDK's `PresetFile::loadPreset`
   shows the name in the adapter test (`vst3.preset`), and a converted
-  preset keeps it only while the identity matches. Remaining: a host check
-  (REAPER with a packaged preset, showing `impulse.wav`), and jrp's choice
-  of the no-name wording.
+  preset keeps it only while the identity matches. jrp chose "Restored
+  filter" for a state with no name (8 November 2026), now the heading.
+  Remaining: a host check (REAPER with a packaged preset, showing
+  `impulse.wav`). jrp wants this in before the preview (8 November 2026).
 - [ ] **PLUG-30 — One rule for state a busy lock makes a call skip.**
   From AU-16 (8 November 2026; jrp asked for fixes like it to be recorded,
   as stepping back may give a more general fix). The pattern: a call that
