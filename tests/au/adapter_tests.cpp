@@ -1496,8 +1496,9 @@ void status_parameter() {
 // own changes on the main thread, so AUBase's unlocked listener list is only
 // read where the host changes it (ThreadSanitizer saw the race on main, CI
 // run 42512164144 on 8af5efd, when the queue notified itself), and no
-// listener is called on another thread. A notice still pending when the unit
-// closes is dropped, not delivered to a closed unit.
+// listener is called on another thread, also for a restore made on a worker
+// thread. A notice still pending when the unit closes is dropped, not
+// delivered to a closed unit.
 void listeners_on_main_thread() {
     Notifications kept, churn;
     {
@@ -1520,6 +1521,39 @@ void listeners_on_main_thread() {
         require(kept.of(kAudioUnitProperty_Latency) > 0, "no Latency notification arrived");
         require(kept.called_off_main() == 0 && churn.called_off_main() == 0,
                 "a listener was called off the main thread");
+
+        // A host restores the state on a worker thread, as GarageBand may and
+        // the editor tests' responsive() does: the tail and report notices the
+        // restore raises reach the listeners afterwards, on the main thread,
+        // not on the worker during the call (they did before eb2b4cb). The
+        // host changes no listener meanwhile: the Audio Unit SDK's own
+        // PresentPreset notice for the restore still runs on the worker.
+        Notifications restored;
+        const std::array<AudioUnitPropertyID, 2> restore_ids{kAudioUnitProperty_TailTime,
+                                                             au::report_property};
+        for (const auto id : restore_ids)
+            check(AudioUnitAddPropertyListener(unit.get(), id, &Notifications::listener, &restored),
+                  "restore listener");
+        check(unit.configure(48000, 2, 2, 512), "restore formats");
+        drain_main();
+        restored.clear();
+        OSStatus loaded = noErr;
+        std::thread worker([&] { loaded = unit.load(state_of(stereo(48000))); });
+        worker.join();
+        check(loaded, "restore on a worker thread");
+        require(restored.of(kAudioUnitProperty_TailTime) == 0 &&
+                    restored.of(au::report_property) == 0,
+                "a restore on a worker thread told listeners during the call");
+        require(latency_settled(unit), "the restore's Latency run did not finish");
+        require(restored.of(kAudioUnitProperty_TailTime) > 0 &&
+                    restored.of(au::report_property) > 0,
+                "a restore on a worker thread sent no tail or report notification");
+        require(restored.called_off_main() == 0,
+                "a restore on a worker thread told a listener off the main thread");
+        for (const auto id : restore_ids)
+            check(AudioUnitRemovePropertyListenerWithUserData(unit.get(), id,
+                                                              &Notifications::listener, &restored),
+                  "restore listener removed");
 
         // A run that finishes but whose notice is not yet delivered when the
         // unit closes.
