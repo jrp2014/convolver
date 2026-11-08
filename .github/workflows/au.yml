@@ -281,8 +281,8 @@ jobs:
             tsan: true
     env:
       # Every race is reported, with both threads' stacks, and any report
-      # makes the test exit with 66, so it fails.
-      TSAN_OPTIONS: halt_on_error=0 exitcode=66 second_deadlock_stack=1
+      # fails the test at exit (on macOS by aborting).
+      TSAN_OPTIONS: halt_on_error=0 second_deadlock_stack=1
       CMAKE_C_COMPILER_LAUNCHER: ccache
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
     steps:
@@ -325,10 +325,11 @@ jobs:
           test_program=$(find build-au -type f -perm -u+x -name convolver_au_tests | head -n 1)
           otool -L "$test_program" | tee linked.txt
           grep -q 'libclang_rt.tsan' linked.txt
+      # A test renamed away from the selection fails rather than passing unrun.
       - name: Test
         run: >-
           ctest --test-dir build-au --output-on-failure --output-junit junit.xml
-          ${{ matrix.tests }}
+          --no-tests=error ${{ matrix.tests }}
       - name: Collect test evidence
         if: failure()
         run: python scripts/ci_evidence.py test-evidence build-au

@@ -1500,7 +1500,7 @@ struct LatencyHold {
     int runs = 0; // Of that unit.
 };
 // AU-3: the hooks below are set once in main(), before any unit exists, and
-// a test publishes its hold here only once the hold is complete. A test that
+// a test publishes the hold here (HoldScope) only once it is set up. A test that
 // set a hook or a plain pointer just before waking the Latency work relied
 // on the dispatch source's wake-up to order it before the run, an ordering
 // ThreadSanitizer does not see (four reports at 3c57325). The component never
@@ -1527,6 +1527,38 @@ void closing_latency(AudioComponentInstance unit) noexcept {
         h->closing = true;
     h->changed.notify_all();
 }
+void release(LatencyHold& hold) {
+    {
+        std::lock_guard lock(hold.mutex);
+        hold.released = true;
+    }
+    hold.changed.notify_all();
+}
+// One hold with static storage, so that no run of the Latency work can
+// outlive it, published for one test's scope. Leaving the scope, also when a
+// check fails, releases a held run before withdrawing the hold, so that
+// closing the unit afterwards does not wait for that run for ever.
+LatencyHold the_hold;
+class HoldScope {
+  public:
+    HoldScope(AudioComponentInstance unit, LatencyHold::At at) {
+        {
+            std::lock_guard lock(hold.mutex);
+            hold.unit = unit;
+            hold.at = at;
+            hold.released = hold.closing = false;
+            hold.runs = 0;
+        }
+        latency_hold = &hold;
+    }
+    ~HoldScope() {
+        release(hold);
+        latency_hold = nullptr;
+    }
+    HoldScope(const HoldScope&) = delete;
+    HoldScope& operator=(const HoldScope&) = delete;
+    LatencyHold& hold = the_hold;
+};
 void finish_within(std::future<void>&& step, const std::string& what) {
     if (step.wait_for(std::chrono::seconds(60)) != std::future_status::ready) {
         std::cerr << what << " did not finish within 60 s (deadlock)" << std::endl;
@@ -1544,13 +1576,6 @@ void wait_for_hold(LatencyHold& hold, Condition condition, const std::string& wh
                              }),
                   what);
 }
-void release(LatencyHold& hold) {
-    {
-        std::lock_guard lock(hold.mutex);
-        hold.released = true;
-    }
-    hold.changed.notify_all();
-}
 std::unique_ptr<Unit> latency_unit() {
     auto unit = std::make_unique<Unit>();
     check(unit->configure(48000, 2, 2, 512), "formats");
@@ -1567,9 +1592,8 @@ std::unique_ptr<Unit> latency_unit() {
 // until its run is released.
 void latency_witness_per_unit() {
     auto a = latency_unit(), b = latency_unit();
-    LatencyHold hold;
-    hold.unit = a->get();
-    latency_hold = &hold;
+    const HoldScope scope(a->get(), LatencyHold::At::start);
+    auto& hold = scope.hold;
     set_parameter(*a, au::latency_parameter, 3.f);
     wait_for_hold(hold, [&] { return hold.runs > 0; }, "A's Latency run starting");
     set_parameter(*b, au::latency_parameter, 3.f);
@@ -1579,7 +1603,6 @@ void latency_witness_per_unit() {
             "A's held Latency work counted as finished (by B's)");
     release(hold);
     require(latency_settled(*a), "A's Latency work did not finish once released");
-    latency_hold = nullptr;
 }
 
 // Closing a unit at each stage of its Latency work: a run in progress, and a
@@ -1593,9 +1616,8 @@ void latency_staged_closing() {
         const std::string label = std::string("closing with a Latency run held") +
                                   (queued ? " and one queued" : "") + ": ";
         auto unit = latency_unit();
-        LatencyHold hold;
-        hold.unit = unit->get();
-        latency_hold = &hold;
+        const HoldScope scope(unit->get(), LatencyHold::At::start);
+        auto& hold = scope.hold;
         set_parameter(*unit, au::latency_parameter, 3.f);
         wait_for_hold(hold, [&] { return hold.runs > 0; }, label + "the Latency run starting");
         if (queued)
@@ -1606,7 +1628,6 @@ void latency_staged_closing() {
                 label + "closing finished while a Latency run was held");
         release(hold);
         finish_within(std::move(closed), label + "closing");
-        latency_hold = nullptr;
         require(hold.runs == 1, label + std::to_string(hold.runs) +
                                     " runs of the Latency work (a queued run started after "
                                     "the work was cancelled)");
@@ -1640,13 +1661,8 @@ void bypass_while_latency_work_holds_lock() {
     for (const bool on : {true, false}) {
         const std::string label = std::string("bypass switched ") + (on ? "on" : "off") +
                                   " while the Latency work held the lock: ";
-        LatencyHold hold;
-        hold.unit = unit->get();
-        hold.at = LatencyHold::At::locked;
-        latency_hold = &hold;
-        // Unpublished before `hold` goes, even when a check below fails.
-        const std::unique_ptr<void, void (*)(void*)> unhook(&hold,
-                                                            [](void*) { latency_hold = nullptr; });
+        const HoldScope scope(unit->get(), LatencyHold::At::locked);
+        auto& hold = scope.hold;
         // The held run has already looked for a bypass change, so only a
         // later run, which the setter must ask for, can show this one.
         check(unit->load(state_of(stereo(48000))), "filter");

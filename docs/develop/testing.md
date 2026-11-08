@@ -794,7 +794,9 @@ Five CTest tests run when the adapter is built (label `au`):
   the change, so the check needs both halves of the fix (AU-16, the
   intermittent "bypass not shown" failure made deterministic). The test
   sets these hooks once, before any unit exists, and publishes each hold
-  through an atomic pointer only once the hold is complete (AU-3).
+  through an atomic pointer only once the hold is complete (AU-3); leaving
+  a test, even on a failed check, releases a held run, so that closing the
+  unit then cannot wait for it for ever.
   ThreadSanitizer does not treat the dispatch source's wake-up
   (`dispatch_source_merge_data`) as ordering the waker's writes before the
   run, so a hook or hold set just before a wake was reported as a race
@@ -877,8 +879,8 @@ by side: the AU tests again with ASan and UBSan, built with the fallbacks
 they keep working, and `au.adapter` alone under ThreadSanitizer (AU-3), built
 with the defaults the packages use. There it switches bypass from another
 thread while rendering, sets the Latency from audio threads and holds the
-Latency work's lock while bypass changes; any report fails the test
-(`halt_on_error=1`), and a step first checks that the test program links the
+Latency work's lock while bypass changes. Every report is printed and any
+report fails the test; a step first checks that the test program links the
 ThreadSanitizer runtime, so an uninstrumented build cannot pass. Named
 host results (Logic, GarageBand, SoundSource, Live, REAPER, FL Studio) are
 AU-4.
