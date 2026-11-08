@@ -71,7 +71,9 @@ the [command-line tool](command-line.md) for wider filters.
 
 **More inputs than the filter needs.** A filter plays on its own number of
 outputs, exactly, and on at least its number of inputs: it reads the first
-ones and ignores the rest. Some hosts give a plug-in as many inputs as
+ones and ignores the rest. (A file chosen in the window is the exception:
+it must have exactly as many inputs as the host gives, so on such a track
+load the filter as a preset.) Some hosts give a plug-in as many inputs as
 outputs: REAPER gives the VST3 plug-in six inputs on a six-channel track, so a
 2→6 crossover reads inputs 1 and 2 and ignores 3 to 6. Status then ends with
 "plug-in inputs 3-6 ignored.", and the [Convolver log](#status-and-the-convolver-log)
@@ -115,9 +117,9 @@ the one list of what each way reads:
 
 | Way in | Plug-ins | Reads |
 | --- | --- | --- |
-| **Choose…**, or dropping the file, in [Convolver's window](#convolvers-window) | The Audio Unit, and the VST3 plug-in on macOS | An IR file, a `.cfg` or a configuration list; not a preset file |
-| The host's file chooser for the **Filter** parameter | LV2, in hosts that show it ([LV2 filter files](#lv2-filter-files)) | An IR file, a `.cfg` or a configuration list |
-| The host's preset menu ("Load Preset…" or its preset browser) | Every format | Convolver's preset in that format: `.vstpreset` (VST3), `.aupreset` (Audio Unit) or a `NAME.preset.lv2` folder (LV2) |
+| **Choose…**, or dropping the file, in [Convolver's window](#convolvers-window) | The Audio Unit, and the VST3 plug-in on macOS | An IR file, a `.cfg` or a configuration list, with exactly as many inputs as the host gives; not a preset file |
+| The host's file chooser for the **Filter** parameter | LV2, in hosts that show it ([LV2 filter files](#lv2-filter-files)) | An IR file, a `.cfg` or a configuration list, with the plug-in's own channel counts |
+| The host's preset menu ("Load Preset…" or its preset browser) | Every format | Convolver's preset in that format: `.vstpreset` (VST3), `.aupreset` (Audio Unit) or a `NAME.preset.lv2` folder (LV2), with at least its inputs ([channels](#channels)) |
 | A saved project | Every format | The filter and settings saved in it |
 
 [Plug-in presets](presets.md) shows how to make a preset with
@@ -132,8 +134,9 @@ before any audio plays starts at once; one loaded during playback fades in
 
 ## When a filter does not fit
 
-A preset holds one filter at one sample rate, with fixed input and output
-channel counts. Each plug-in checks it against the host:
+A filter, chosen as a file or loaded as a preset, has one sample rate and
+fixed input and output channel counts. Each plug-in checks it against the
+host:
 
 | Situation | What plays |
 | --- | --- |
@@ -183,11 +186,11 @@ happens next depends on the format:
 - **LV2** refuses the filter as soon as the session opens, and `status` shows
   Load failed. **Do not save the session**: saving records the failure and
   drops the filter. Close it without saving and reopen it at the filter's rate,
-  or load the preset again.
+  or load the filter again.
 
 **Saving after a first filter failed** saves the failure, so reopening the
-project plays silence again rather than unfiltered audio. Load a matching
-preset to replace it.
+project plays silence again rather than unfiltered audio. Choose or load a
+matching filter to replace it.
 
 How each format reports a refusal:
 

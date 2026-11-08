@@ -5,7 +5,7 @@ For anyone who has [installed](install.md) the Convolver plug-in and wants to
 hear it work. You will choose an example filter in Convolver's window, check
 that it fits the track, play, and save the project.
 
-**In short:** on a stereo track at 48000 Hz, add Convolver, click
+**In short:** on macOS, on a stereo track at 48000 Hz, add Convolver, click
 **Choose…** in its window and pick `presets/identity-48000-stereo/filter.cfg`
 from the extracted package. The window shows 48000 Hz and `2 in → 2 out`, and
 you hear no change. Choose `echo-48000-stereo/filter.cfg` (quieter and
@@ -30,7 +30,10 @@ named `KIND-RATE-LAYOUT` (such as `echo-48000-stereo`) and holds the filter
 as `filter.cfg` and `impulse.wav`, and the same filter as a preset.
 
 1. Set the host to 44100, 48000 or 96000 Hz, and select a mono or stereo
-   track.
+   track. Audacity plays effects at *Audio setup › Audio settings ›
+   Default sample rate*, which can differ from the project's rate: set both
+   to the filter's rate before you choose it. Audacity also runs the
+   plug-in in stereo even on a mono track, so use a stereo filter there.
 2. Add Convolver to the track as an effect. Its window opens from the
    plug-in's slot: in GarageBand, from the plug-in's button in the track's
    Plug-ins area; in Audacity, turn on *Preset options › Use vendor UI* if
@@ -42,29 +45,28 @@ as `filter.cfg` and `impulse.wav`, and the same filter as a preset.
 **Choose…** reads an IR file (a WAV, AIFF, FLAC or other sound file), a
 `.cfg` or a configuration list, from any folder: nothing needs installing or
 converting first. It does not read preset files; those go through the
-host's preset menu ([optional route](#optional-load-a-preset)).
-[Loading a filter](plugins.md#loading-a-filter) lists what each plug-in
-reads.
+host's preset menu ([optional route](#optional-load-a-preset)). Your own
+filter loads the same way; it must be made for the rate and channels your
+host runs at. [Loading a filter](plugins.md#loading-a-filter) lists what
+each plug-in reads.
 
 ## 2. Check the rate and channels
 
-A filter plays only at its own sample rate, and only with its own output
-channels and at least its inputs. Convolver never resamples or remixes.
+A filter plays only at its own sample rate and with its own channels.
+Convolver never resamples or remixes.
 
 Under the filter's name the window shows **Sample rate** and **Channels**
 (`2 in → 2 out`), and beside it the status: **Active**, in green, when the
 filter fits and plays. The host's Status parameter reads
-`Filter loaded: 48000 Hz, 2 in, 2 out.`
+`Filter loaded: 48000 Hz, 2 in, 2 out.` **Waiting** means the host has not
+started audio yet: press play.
 
 If the status reads **Load failed**, the message under the name says which
 value differs and what to change: set the host to the filter's rate, use a
 track with the filter's channels, or choose a filter made for the track. A
-first filter that does not fit plays silence, never unfiltered audio.
-**Waiting** means the host has not started audio yet; the filter is checked
-when it does. Audacity plays effects at *Audio setup › Audio settings ›
-Default sample rate*, which can differ from the project's rate: set both to
-the filter's rate. Audacity also runs the plug-in in stereo even on a mono
-track, so use a stereo filter there.
+first filter that does not fit plays silence, never unfiltered audio. If
+the message names a rate your host is not set to, the host had not started
+audio when you chose the file: start playback, then choose it again.
 
 ## 3. Play
 
@@ -104,9 +106,13 @@ Each example folder holds a VST3 preset named after it
 (`presets/echo-48000-stereo/echo-48000-stereo.vstpreset`). Load it from the
 host's preset menu ("Load Preset…" or its preset browser; in REAPER, the
 **+** button beside the preset menu, then the item that imports a VST preset
-file). Audacity 4's preset menu does not open these files, and Audio Unit
-hosts such as GarageBand and Logic take `.aupreset` files instead: use
-**Choose…** there.
+file). Audacity 4's preset menu does not open these files: copy the preset
+to the VST3 folder for all users in [preset folders](presets.md#preset-folders)
+and restart Audacity (on macOS, **Choose…** is simpler). Audio Unit hosts
+such as GarageBand and Logic take `.aupreset` files instead; make one as
+below if GarageBand's sandbox refuses a chosen file. Without the window,
+carry on with steps 2 to 4 above, loading the matching `echo` and `repeat`
+presets in place of choosing their `filter.cfg`.
 
 To make a preset from your own filter, run from the extracted package folder
 (the output must not exist yet):

@@ -517,6 +517,29 @@ LV2 (Linux first; also PipeWire system audio):
   queue. Done when each adapter's skip paths either follow that rule or
   are listed with why they are safe, with a held-lock test for each, as
   AU-16's. Waits for the freeze.
+- [ ] **PLUG-33 — A chosen file follows the same rules as a preset.**
+  Found in DOC-10's independent review (8 November 2026), now that the
+  guides lead with **Choose…**. Two places still treat a chosen file as the
+  second route. (1) `read_filter_file()` (`portable/filter_file.cpp`)
+  selects with the host's exact input count (`detail::matches()` in
+  `portable/config.cpp`), so a file chosen in the window needs exactly
+  the inputs the host gives, while a preset or
+  saved project needs only at least them (PLUG-23). On REAPER's
+  six-channel track, which gives the VST3 plug-in 6 inputs, choosing the
+  2→6 crossover's `filter.cfg` is refused, with a Fix that asks for 2
+  inputs; the preset of the same filter plays. The
+  [crossover check](docs/use/check-a-crossover-in-a-host.md#3-render-the-example-in-the-host)
+  and [channels](docs/use/plugins.md#channels) say to load the preset
+  there. A configuration list still needs a rule for which entry a wider
+  input bus selects. (2) With no filter, the Status text ends "Load a
+  Convolver preset." (`host_status()` in `portable/host.cpp`), where the
+  window's own Fix already names Choose…. Done when a chosen single filter
+  is accepted on a wider input bus by the PLUG-23 rule in VST3 and the
+  Audio Unit (adapter tests), list selection with a wider bus is decided
+  and tested, the No-filter Status names choosing a filter where the
+  plug-in has a window, and the guides' preset fallback for the crossover
+  is removed. No sound change for filters that load today. Waits for the
+  freeze unless jrp brings it forward.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
@@ -1619,7 +1642,7 @@ entries written before 7 November 2026, with their evidence, are
   [presets](docs/use/presets.md),
   [record](docs/archive/reviews/2026-11-08-plug31-reaper.md).
 - [x] **PLUG-28 — Name the packaged presets after their filter.** 8
-  November 2026, PR #141 and, for the first-use presets, PR #144; [first sound in a host](docs/use/first-sound-in-a-host.md#1-choose-a-filter).
+  November 2026, PR #141 and, for the first-use presets, PR #144; [first sound in a host](docs/use/first-sound-in-a-host.md#optional-load-a-preset).
 - [x] **PLUG-23 — A filter reads the first inputs of a wider input bus.** 6
   November 2026; [channels](docs/use/plugins.md#channels).
 - [x] **PLUG-22 — Name the filter in the window, and say each fact once.** 7

@@ -134,8 +134,8 @@ loaded.
 
 ## 6. Choose a filter that does not fit
 
-Choose each of these in turn (without the window, load the `.vstpreset` of
-the same name from the same folder):
+Choose each of these in turn (without the window, load the `.vstpreset`
+named after its folder instead):
 
 1. `presets/echo-44100-stereo/filter.cfg`, made for 44100 Hz. The stereo
    filter keeps playing, and Status reads `Load failed, previous filter
@@ -143,7 +143,7 @@ the same name from the same folder):
    Convolver log.` Some hosts also report the failure themselves.
 2. `presets/echo-48000-mono/filter.cfg`, made for one channel. The stereo
    filter keeps playing, and Status says the filter has `1 in, 1 out`, the
-   plug-in `2 in, 2 out`.
+   host `2 in, 2 out`.
 3. Render again and compare: still `Match`. To recover, choose the stereo
    filter from step 4 again, or a filter made for your host's rate and the
    track's channels.

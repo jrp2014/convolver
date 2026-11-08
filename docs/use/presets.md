@@ -117,10 +117,11 @@ already holds one filter.
   preset menu, then the item that imports a VST preset file). Hosts that
   keep a preset library also list presets saved in their
   [preset folder](#preset-folders).
-  **Audacity 4** imports only its own preset files, not `.vstpreset`. It
-  lists the files in the folder for all users instead (copying there needs
-  an administrator), then restart Audacity. They appear in the effect's
-  preset menu under their file names, so give each preset its own name,
+  **Audacity 4** imports only its own preset files, not `.vstpreset`.
+  Instead, copy the presets to the VST3 folder for all users in
+  [preset folders](#preset-folders) (this needs an administrator) and
+  restart Audacity. They appear in the effect's preset menu under their
+  file names, so give each preset its own name,
   such as `room-48000.vstpreset`. On macOS it is simpler to choose the
   preset's `.cfg` or IR file with **Choose…** in Convolver's window (turn
   on *Preset options › Use vendor UI* if Audacity shows only its own
@@ -135,7 +136,9 @@ already holds one filter.
   name in the host's preset list for that plug-in. The folder's name only
   has to end in `.lv2`. LV2 plug-ins have fixed channel counts, so the
   preset belongs to the plug-in whose counts match the filter; the tool
-  prints that plug-in's URI.
+  prints that plug-in's URI. Hosts that show LV2 file parameters, such as
+  Ardour and Jalv, can also choose the IR file or `.cfg` directly
+  ([LV2 filter files](plugins.md#lv2-filter-files)).
 
 The preset holds the whole filter, and the host saves the same data in your
 project, so the project keeps working after the original WAV and `.cfg` files
@@ -155,16 +158,14 @@ preset library. None of them is needed for **Choose…**.
 | --- | --- | --- | --- |
 | VST3 | macOS | `~/Library/Audio/Presets/Convolver/Convolver/` | `/Library/Audio/Presets/Convolver/Convolver/` |
 | VST3 | Windows | `%USERPROFILE%\Documents\VST3 Presets\Convolver\Convolver\` | `C:\ProgramData\VST3 Presets\Convolver\Convolver\` |
-| VST3 | Linux | `~/.vst3/presets/Convolver/Convolver/` | `/usr/local/share/vst3/presets/Convolver/Convolver/` |
-| AU | macOS | `~/Library/Audio/Presets/Convolver/Convolver/` | |
+| VST3 | Linux | `~/.vst3/presets/Convolver/Convolver/` | `/usr/local/share/vst3/presets/Convolver/Convolver/` or `/usr/share/vst3/presets/Convolver/Convolver/` |
+| AU | macOS | `~/Library/Audio/Presets/Convolver/Convolver/` | `/Library/Audio/Presets/Convolver/Convolver/` |
 | LV2 | Linux | `~/.lv2/` | `/usr/lib/lv2/` |
 
 The VST3 folders follow Steinberg's
 [preset locations](https://steinbergmedia.github.io/vst3_dev_portal/pages/Technical+Documentation/Locations+Format/Preset+Locations.html);
 hosts differ in which of them they read (Audacity 4 reads only the folder
-for all users). Hosts that show LV2 file parameters, such as Ardour and
-Jalv, can also choose the IR file or `.cfg` directly
-([LV2 filter files](plugins.md#lv2-filter-files)).
+for all users).
 
 ## When a preset does not fit
 

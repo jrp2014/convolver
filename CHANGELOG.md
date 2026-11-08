@@ -233,8 +233,10 @@ Until 1.0 the C++ API may change between minor versions.
   way of loading a filter reads, and one table in [plug-in
   presets](docs/use/presets.md#preset-folders) gives the host preset
   folders. The stereo and crossover checks choose `filter.cfg` in the
-  window, with the `.vstpreset` as the route without one. No behaviour
-  change.
+  window, with the `.vstpreset` as the route without one. A file chosen in
+  the window must have exactly as many inputs as the host gives, unlike a
+  preset (TODO PLUG-33), so the crossover check loads the preset where the
+  host gives more inputs, as REAPER does. No behaviour change.
 - Plug-in presets (PLUG-31, from jrp's REAPER check of VST3-16, 8 November
   2026): a `.vstpreset` made by `convolver-preset` also holds the name of
   the file it was made from, with its extension and without its folder, and

@@ -21,7 +21,7 @@ package or from your own build. Afterwards, follow
 
 `VST3/Convolver.vst3`, on macOS the Audio Unit `Components/Convolver.component`,
 the tools in `bin/` (`convolver`, `convolver-preset`
-and `convolver-equalizer-apo`), example presets in `presets/`, the first-use
+and `convolver-equalizer-apo`), example filters and their presets in `presets/`, the first-use
 examples with presets made from them in `examples/first-use/`, these pages in
 `docs/use/` (start with `docs/use/README.md`) and licence notices in `licenses/`. Check the package's
 SHA-256 checksum against the one published with it before going further.
