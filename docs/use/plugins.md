@@ -26,10 +26,12 @@ does not fit. Installing is in [install](install.md); making presets is in
   what to change, the filter and settings, what plays in plain words, with
   Copy Diagnostics and Show Log; the VST3 plug-in on Windows and Linux and
   the LV2 plug-in have no window yet.
-- There is no latency by default: the filtered sound comes out with the
-  input. The VST3 plug-in and the Audio Unit have [settings](#settings) for
+- Convolver adds no processing delay by default: the filtered sound comes
+  out as the filter shapes it, with no wait for blocks of audio. (A filter
+  can still delay the sound itself, with a delay in its impulse response or
+  the phase delay of its filtering.) The VST3 plug-in and the Audio Unit have [settings](#settings) for
   the gain, the wet/dry mix and the latency; the LV2 plug-in does not have
-  them yet (it always has zero latency).
+  them yet (it never adds processing delay).
 - A filter that does not fit the host's sample rate or channel counts never
   plays unfiltered audio in its place: a first filter that fails to load
   plays silence, even bypassed, and one that replaces a working filter is
@@ -562,7 +564,7 @@ defaults play exactly as Convolver did before the settings existed.
 | --- | --- | --- | --- |
 | **Gain** | −100 to +24 dB | 0 dB | Scales the filtered signal, as the command line's `--gain-db` does. Negative values make room for a filter that boosts some frequencies; positive values make up level. |
 | **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. Whenever bypass plays silence there is no dry signal, so the mix stays at 100%: when the filter's input and output counts differ, and in the cases [bypass](#bypass) lists when no filter plays. Where bypass passes the input, the input share of Mix still plays while a kept filter is silent. |
-| **Latency** | 0, 64, 128, 256, 512, 1024, 2048 or 4096 frames | 0 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. At 0 the filtered sound is not delayed at all. A larger value can use somewhat less processor time, most of it gained by 64 frames. It is the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
+| **Latency** | 0, 64, 128, 256, 512, 1024, 2048 or 4096 frames | 0 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. At 0 Convolver adds no processing delay; any delay in the filter itself still plays. A larger value can use somewhat less processor time, most of it gained by 64 frames. It is the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
 
 - Gain and Mix changes fade over 1.3 ms (64 samples at 48 kHz, 128 at
   96 kHz), so automating them does not click. Latency cannot be automated.
@@ -602,9 +604,11 @@ defaults play exactly as Convolver did before the settings existed.
 
 ## Latency and tail
 
-There is no latency by default, whatever the host's buffer size: the
-engine sums a filter's first taps directly, so its output starts with the
-input. In the VST3 plug-in and the Audio Unit the [Latency setting](#settings)
+Convolver adds no processing delay by default, whatever the host's
+buffer size: the engine sums a filter's first taps directly, so its output
+starts with the input. Delay that the filter itself contains (a delay in
+its impulse response, the phase delay of a crossover or a room
+correction) still plays, as it would in any convolver. In the VST3 plug-in and the Audio Unit the [Latency setting](#settings)
 can add one, from 64 to 4096 samples, and the plug-in reports it so the host
 can line the audio up; LV2 always uses none.
 

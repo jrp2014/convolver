@@ -360,7 +360,7 @@ Until 1.0 the C++ API may change between minor versions.
   their filter) and PLUG-29 (the Recent list out of the log folder), and
   PLUG-25 records jrp's agreed wording for a rate refusal.
 - Engine (PERF-2, draft for after the first release): non-uniformly
-  partitioned convolution with zero latency. A filter's first taps are
+  partitioned convolution that adds no processing delay at Latency 0. A filter's first taps are
   summed directly and the rest by stages of blocks growing from 64 to 8192
   frames, whose larger blocks spread their work over the following
   callbacks. Long filters need far less processor time (a 480,000-tap

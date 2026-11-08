@@ -16,8 +16,9 @@ routing in one engine:
   crossover  2 in, 6 out, six paths
 
 Each row records the revision, its commit, the build type, the FFT backend and
-kernels the benchmark reports, and the CPU. The builds alternate in each round,
-so drift on the machine affects both alike.
+kernels the benchmark reports, and the CPU. The builds take turns case by case,
+and every other round reverses their order, so drift on the machine (heat,
+background load) affects both alike.
 
   python3 tests/native/benchmarks/compare_engines.py --baseline bf6a207 \\
       --candidate HEAD --work ../engine-compare > engines.csv
@@ -225,7 +226,10 @@ def main():
         for layout in o.layouts.split(','):
             for taps in numbers(o.taps):
                 for callback in numbers(o.callbacks):
-                    for build in builds:
+                    # Odd rounds run the baseline first and even rounds the
+                    # candidate, so neither always meets a cooler or quieter
+                    # machine.
+                    for build in builds if r % 2 else reversed(builds):
                         latencies = [o.baseline_latency] if build.label == 'baseline' else numbers(o.latency)
                         for latency in latencies:
                             row = build.measure(layout, taps, callback, latency, o.seconds)

@@ -746,7 +746,9 @@ default before PERF-2). Candidate: `b29f0d2` at Latency 0 (its default) and
 Clang 18.1, Release, Ubuntu FFTW 3.3.10, AVX2+FMA kernels. Workload:
 `convolver_callback_benchmark --scenario warm` (a prepared engine, warmed,
 production routing in one engine), 1 s per run, three rounds with the two
-builds alternating; the tables give the median of the three. Before timing,
+builds taking turns case by case, the baseline first in every round (the
+script has reversed the order in every other round since jrp's review of
+`f983dfa`); the tables give the median of the three. Before timing,
 both builds rendered the stereo and 2-to-6 crossover first-use examples
 within the oracle tolerance of their direct double-precision references
 (worst error 1.2e-7 for the baseline and 7.5e-8 for the candidate).
