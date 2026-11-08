@@ -244,8 +244,10 @@ is superseded.
   **Copy Diagnostics** worked, and save, quit and reopen kept the filter,
   Gain −6 dB, Mix 70% and Latency 1024; the VST3-16 latency renders lined
   up again. Listening and REAPER's display of the Status parameter were not
-  checked. PLUG-31 changes the candidate, so these steps run again on the
-  final one with the rest of the REAPER and Audacity steps.
+  checked. PLUG-31 changes the candidate; jrp decided these results stand
+  for the final one, where part C needs only a packaged preset, save and
+  reopen, listening and the Status display, with the rest of the REAPER
+  and Audacity steps.
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
   now requested (progress below). Write adapters against the
@@ -603,8 +605,9 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   *Export projects at full volume* must be off for a comparison). Not
   checked: listening to the presets and to Gain and Mix, a click when
   bypassing, whether the track stays in time after a Latency change,
-  VoiceOver and the Recent list. Partial evidence on that candidate; the
-  smoke test runs on the final candidate after PLUG-31.
+  VoiceOver and the Recent list. jrp decided these results stand for the
+  final candidate after PLUG-31, where a packaged preset, save and reopen
+  and the unchecked steps remain.
 - [ ] **AU-5 — Release.** In the first preview. Unsigned preview component under PLUG-5 (ad-hoc
   signed, documented quarantine removal). Developer ID signing and
   notarization follow at the production gate.
