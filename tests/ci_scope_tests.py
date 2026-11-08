@@ -138,7 +138,9 @@ class Classification(unittest.TestCase):
         block = re.search(r'^DOCUMENTED = \((.*?)\)$', fixtures, re.MULTILINE | re.DOTALL).group(1)
         self.assertEqual(tuple(re.findall(r"REPOSITORY / '([^']+)'", block)), ci_scope.COMMANDED)
         marker = re.search(r"^MARKER = '([^']+)'$", fixtures, re.MULTILINE).group(1)
-        self.assertEqual(ci_scope.FIRST_USE.pattern, marker + r'\s*```sh\n(.*?)\n```')
+        # The block pattern documented_commands() puts after re.escape(MARKER).
+        block = re.search(r"re\.escape\(MARKER\) \+ r'([^']+)'", fixtures).group(1)
+        self.assertEqual(ci_scope.FIRST_USE.pattern, marker + block)
         for page in ci_scope.COMMANDED:
             with self.subTest(page=page):
                 self.assertTrue(ci_scope.FIRST_USE.findall((ROOT / page).read_text(encoding='utf-8')))

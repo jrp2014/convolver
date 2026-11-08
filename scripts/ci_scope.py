@@ -71,7 +71,7 @@ PACKAGED = (
 # The pages of TESTED whose marked commands examples.first_use runs
 # (tests/plugins/fixtures.py DOCUMENTED and MARKER). Only a change to those
 # commands builds and tests everything; other edits to these pages count as
-# what the page otherwise is (CI-35, jrp, 8 November 2026).
+# what the page otherwise is (CI-35).
 COMMANDED = ('README.md', 'examples/first-use/README.md', 'docs/use/first-filter.md')
 FIRST_USE = re.compile(r'<!-- first-use-example -->\s*```sh\n(.*?)\n```', re.DOTALL)
 GUIDES = 'docs/use/'
