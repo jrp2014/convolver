@@ -241,8 +241,15 @@ except the Audio Unit build, which runs in a source checkout.
    ```
 
    Audacity reads this folder once per session, so restart it if it was
-   open. Remove the folder after testing
-   (`sudo rm -r /Library/Audio/Presets/Convolver`).
+   open. After testing, remove only the files copied there (the folder may
+   hold other presets):
+
+   ```sh
+   for d in presets/*-stereo; do
+     sudo rm -f "/Library/Audio/Presets/Convolver/Convolver/$(basename "$d").vstpreset"
+   done
+   ```
+
    In jrp's Audacity 4.0.2 session (7 November 2026) the administrator
    prompt was cancelled, so this folder is not yet confirmed in a test;
    copies in the user's `~/Library/Audio/Presets` folder were not how

@@ -9,9 +9,15 @@ preset from an IR or `.cfg` with `convolver-preset` and load it in your host.
 
 **In short:**
 
-- The plug-ins have no editor. You choose a filter by loading a **preset**, and
+- The simplest way to give a plug-in a filter is to choose the IR file,
+  `.cfg` or configuration list itself: with **Choose…** in
+  [Convolver's window](plugins.md#convolvers-window) (the VST® 3 plug-in on
+  macOS and the Audio Unit) or the host's file chooser (LV2). A **preset**
+  is the other way, through the host's preset menu, and
   `convolver-preset` makes one from an impulse response (IR), a
-  [`.cfg`](configuration.md) or a configuration list.
+  [`.cfg`](configuration.md) or a configuration list. You need one where the
+  plug-in has no window (the VST3 plug-in on Windows and Linux) or to keep
+  filters in the host's preset library.
 - The name you give the new file picks the format: `room.vstpreset` (VST® 3),
   `room.aupreset` (Audio Unit) or `room.preset.lv2` (an LV2 preset folder).
   Name several to make them all at once:
@@ -119,8 +125,9 @@ already holds one filter.
   in the host's preset list for that plug-in. The folder's name only has to end
   in `.lv2`. LV2 plug-ins have fixed channel counts, so the preset belongs to the
   plug-in whose counts match the filter; the tool prints that plug-in's URI.
-  The LV2 plug-in has no file chooser yet, so a preset (or a saved session) is
-  the only way to give it a filter.
+  Hosts that show LV2 file parameters, such as Ardour and Jalv, can also
+  choose the IR file or `.cfg` directly
+  ([LV2 filter files](plugins.md#lv2-filter-files)).
 
 The preset holds the whole filter, and the host saves the same data in your
 project, so the project keeps working after the original WAV and `.cfg` files
