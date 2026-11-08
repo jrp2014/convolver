@@ -498,11 +498,18 @@ timing::Result run(Mock& mock, int attempts, Ms limit = 100ms, bool warm = false
 }
 
 // A little with real threads: the renderer's records reach the verdict.
-// The delays are far beyond the limit, so the verdicts hold on any machine.
+// Runs that should pass the hold get a limit of two seconds, far above any
+// runner's scheduling delays: on 8 November 2026 a starved macOS runner
+// (run 42522591379 on 59a093f, sanitizer build, every callback waking about
+// 60 ms late) held an instant load 130 ms, over the 100 ms these runs used,
+// and overslept the slow loader's 60 ms by 150 ms. The slow loader can only
+// get slower, so its 20 ms limit still fails it on any machine.
+constexpr Ms passing_limit = 2000ms;
+
 void integration() {
     {
         Mock mock;
-        const auto r = run(mock, 1);
+        const auto r = run(mock, 1, passing_limit);
         const auto every_phase_heard = [&] {
             for (const auto& rec : r.records)
                 for (const auto& p : rec.phases)
@@ -548,7 +555,7 @@ void integration() {
         // not judged. The verdict itself depends on the runner's scheduling
         // (macOS CI's thread woke late), so only the hold is checked.
         Mock mock;
-        const auto r = run(mock, 1, 100ms, true);
+        const auto r = run(mock, 1, passing_limit, true);
         std::string names;
         bool reported_only_warm = true;
         for (const auto& p : r.records.at(0).phases) {
