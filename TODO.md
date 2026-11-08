@@ -466,7 +466,7 @@ LV2 (Linux first; also PipeWire system audio):
   and the one-time read of the old file, and the plug-ins guide says where
   the list is kept. Lower priority than PLUG-26 and PLUG-27; waits for
   the freeze.
-- [ ] **PLUG-30 — Generated VST3 presets carry the filter's name.** From
+- [ ] **PLUG-31 — Generated VST3 presets carry the filter's name.** From
   jrp's [VST3-16 acceptance](docs/archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md#filter-name-observation)
   (8 November 2026): after a packaged `.vstpreset` loads, the window's
   Filter row says "From the saved project or preset". VST3 already saves

@@ -6,7 +6,7 @@
 > for it, posted in the project thread on 8 November 2026 at 01:28 UTC and
 > copied here verbatim below the line. The files listed under Evidence are
 > on jrp's Mac and are not in this repository. The filter-name observation
-> became PLUG-30 in [TODO](../../../TODO.md).
+> became PLUG-31 in [TODO](../../../TODO.md).
 
 ---
 
