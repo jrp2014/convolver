@@ -68,6 +68,12 @@ PACKAGED = (
 # builds them too, as only the packaging checks where its images come from
 # (scripts/release/package_docs.py). Other prose changes are left to Lint,
 # and main still packages every page.
+# The pages of TESTED whose marked commands examples.first_use runs
+# (tests/plugins/fixtures.py DOCUMENTED and MARKER). Only a change to those
+# commands builds and tests everything; other edits to these pages count as
+# what the page otherwise is (CI-35, jrp, 8 November 2026).
+COMMANDED = ('README.md', 'examples/first-use/README.md', 'docs/use/first-filter.md')
+FIRST_USE = re.compile(r'<!-- first-use-example -->\s*```sh\n(.*?)\n```', re.DOTALL)
 GUIDES = 'docs/use/'
 EXAMPLE = re.compile(r'<!-- (?:executable|refused)-example -->')
 IMAGE = re.compile(r'!\[|<img\s')
@@ -193,6 +199,24 @@ def versions(path):
     return texts or None
 
 
+def commands_changed(path):
+    """Whether a page's marked first-use commands differ before and after
+    the change. A page that is new, removed or cannot be read counts as
+    changed."""
+    texts = versions(path)
+    if texts is None or len(texts) != 2:
+        return True
+    return FIRST_USE.findall(texts[0]) != FIRST_USE.findall(texts[1])
+
+
+def page_kind(path):
+    """classify(), except that a page in COMMANDED counts as code only when
+    its marked commands change (CI-35)."""
+    if path in COMMANDED and not commands_changed(path):
+        return 'packaged' if matches(path, PACKAGED) else 'documentation'
+    return classify(path)
+
+
 def guide(path):
     """Whether a path is one of the guides, docs/use/*.md."""
     name = path[len(GUIDES) :]
@@ -209,14 +233,14 @@ def guide_needs_candidates(path):
 def candidates(paths):
     """Whether a pull request changing these paths builds the candidates."""
     for path in paths:
-        kind = classify(path)
-        if kind == 'documentation':
+        what = page_kind(path)
+        if what == 'documentation':
             continue
-        if kind == 'packaged' and guide(path):
+        if what == 'packaged' and guide(path):
             if guide_needs_candidates(path):
                 return True
             continue
-        if kind in ('packaged', 'format:editor', 'workflow:release') or matches(path, RELEASE + CANDIDATES):
+        if what in ('packaged', 'format:editor', 'workflow:release') or matches(path, RELEASE + CANDIDATES):
             return True
     return False
 
@@ -226,7 +250,7 @@ def needed(paths):
     empty list (a merge that changes nothing) runs everything."""
     if not paths:
         return set(WORKFLOWS)
-    kinds = {classify(path) for path in paths}
+    kinds = {page_kind(path) for path in paths}
     if 'code' in kinds:
         workflows = set(WORKFLOWS)
     else:
@@ -299,7 +323,7 @@ def main(argv=None):
         reason = 'cannot list the changed files' if paths is None else f'{len(paths)} changed file(s)'
     answer = decide(paths, args.workflow) if paths is not None else {'build': True, 'package': True}
 
-    lines = [f'CI scope: {reason}.', *(f'  {classify(path):13} {path}' for path in paths or [])]
+    lines = [f'CI scope: {reason}.', *(f'  {page_kind(path):13} {path}' for path in paths or [])]
     if paths is not None:
         workflows = needed(paths)
         if not workflows:

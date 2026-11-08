@@ -10,6 +10,15 @@ Until 1.0 the C++ API may change between minor versions.
 
 ## [Unreleased]
 
+### Changed
+
+- CI (CI-35): a pull request that edits the README, the first-use
+  examples' README or `docs/use/first-filter.md` without changing a
+  command marked `<!-- first-use-example -->` now runs Lint (and, for the
+  packaged guide, only what a guide edit runs) instead of every workflow;
+  a change to those commands still runs everything
+  ([CI triggers](docs/develop/testing.md#documentation-only-pull-requests)).
+
 ### Added
 
 - Releases (REL-7): jrp decided to publish the first preview without the

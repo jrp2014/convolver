@@ -1531,6 +1531,9 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **CI-35 — Prose edits to the first-use pages run Lint only.** 8
+  November 2026, from jrp's question why a README link ran every workflow;
+  [CI triggers](docs/develop/testing.md#documentation-only-pull-requests).
 - [x] **REL-7 — Apply bounded preview acceptance.** 8 November 2026,
   PRs #156 and #159; jrp published [0.12.12](https://github.com/jrp2014/convolver/releases/tag/v0.12.12) without the remaining
   host checks and REL-3, which stay open under HOST-1, AU-4 and REL-3

@@ -111,6 +111,38 @@ class Classification(unittest.TestCase):
         self.assertEqual(ci_scope.decide([]), {'build': True, 'package': True})
         self.assertEqual(ci_scope.decide([], 'release'), {'build': True, 'package': True})
 
+    def test_first_use_pages(self):
+        """A page whose marked commands examples.first_use runs builds
+        everything only when those commands change (CI-35)."""
+        block = '<!-- first-use-example -->\n```sh\n./build/convolver --filter {} --output out.wav\n```\n'
+        before = '# Convolver\n\n' + block.format('a.cfg')
+        self.guides['README.md'] = [before.replace('# Convolver', '# Convolver\n\nDownload it.'), before]
+        self.assertEqual(ci_scope.decide(['README.md']), {'build': False, 'package': False})
+        self.guides['README.md'] = [before.replace('a.cfg', 'b.cfg'), before]
+        self.assertEqual(ci_scope.decide(['README.md']), {'build': True, 'package': False})
+        # A new or removed page, or one that cannot be read, counts as changed.
+        self.guides['README.md'] = [before]
+        self.assertEqual(ci_scope.decide(['README.md']), {'build': True, 'package': False})
+        self.guides['README.md'] = None
+        self.assertEqual(ci_scope.decide(['README.md']), {'build': True, 'package': False})
+        # The packaged first-filter guide stays a packaged page when only its prose changes.
+        self.guides['docs/use/first-filter.md'] = [before + 'More.\n', before]
+        self.assertEqual(ci_scope.page_kind('docs/use/first-filter.md'), 'packaged')
+        self.assertEqual(ci_scope.decide(['docs/use/first-filter.md']), {'build': False, 'package': False})
+        # The other pages tests read still always run everything.
+        self.assertEqual(ci_scope.page_kind('docs/review-2026-10/archive-documentation.json'), 'code')
+
+    def test_first_use_marker_matches_the_test(self):
+        """COMMANDED and the marker are the ones examples.first_use reads."""
+        fixtures = (ROOT / 'tests/plugins/fixtures.py').read_text(encoding='utf-8')
+        block = re.search(r'^DOCUMENTED = \((.*?)\)$', fixtures, re.MULTILINE | re.DOTALL).group(1)
+        self.assertEqual(tuple(re.findall(r"REPOSITORY / '([^']+)'", block)), ci_scope.COMMANDED)
+        marker = re.search(r"^MARKER = '([^']+)'$", fixtures, re.MULTILINE).group(1)
+        self.assertEqual(ci_scope.FIRST_USE.pattern, marker + r'\s*```sh\n(.*?)\n```')
+        for page in ci_scope.COMMANDED:
+            with self.subTest(page=page):
+                self.assertTrue(ci_scope.FIRST_USE.findall((ROOT / page).read_text(encoding='utf-8')))
+
     def test_format_decisions(self):
         def runs(paths):
             # The candidate workflow reads package; the others read build.
