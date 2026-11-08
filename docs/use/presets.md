@@ -69,8 +69,7 @@ convolver-preset --name "Living room" impulse.wav living.aupreset
   the plug-in's own saved state does for a file chosen in the window. A host
   that gives the plug-in this part of the preset, as Steinberg's own preset
   code does, then shows the name in the VST3 window after the preset is
-  loaded and after the project is reopened; this has not yet been checked
-  in a host. Converting a `.vstpreset` keeps its name while the name still
+  loaded and after the project is reopened, as REAPER does. Converting a `.vstpreset` keeps its name while the name still
   belongs to that filter. `--name` does not change it.
 - **Help:** `convolver-preset --help` lists these options and the preset
   formats.

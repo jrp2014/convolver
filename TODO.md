@@ -245,9 +245,12 @@ is superseded.
   Gain −6 dB, Mix 70% and Latency 1024; the VST3-16 latency renders lined
   up again. Listening and REAPER's display of the Status parameter were not
   checked. PLUG-31 changes the candidate; jrp decided these results stand
-  for the final one, where part C needs only a packaged preset, save and
-  reopen, listening and the Status display, with the rest of the REAPER
-  and Audacity steps.
+  for the final one. A packaged preset, and save and reopen, passed with
+  the candidate from `f11a3dd` (PLUG-31 merged) on 8 November
+  ([record](docs/archive/reviews/2026-11-08-plug31-reaper.md)), and jrp
+  decided those stand too, so on the final candidate part C needs only
+  listening and the Status display, with the rest of the REAPER and
+  Audacity steps.
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
   now requested (progress below). Write adapters against the
@@ -493,29 +496,6 @@ LV2 (Linux first; also PipeWire system audio):
   and the one-time read of the old file, and the plug-ins guide says where
   the list is kept. Lower priority than PLUG-26 and PLUG-27; waits for
   the freeze.
-- [ ] **PLUG-31 — Generated VST3 presets carry the filter's name.** From
-  jrp's [VST3-16 acceptance](docs/archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md#filter-name-observation)
-  (8 November 2026): after a packaged `.vstpreset` loads, the window's
-  Filter row says "From the saved project or preset". VST3 already saves
-  and restores a file's name for a file chosen in the window (the
-  controller state holds the name and the filter's identity, PLUG-22), but
-  `convolver-preset` writes no controller state for VST3
-  (`portable/preset_main.cpp`), so generated presets have only the
-  component chunk. Write the same name and identity there, the file name
-  with its extension and without its folder. jrp suggests "Restored filter"
-  for a state with no name, and origin wording that uses only what the
-  host says; both are user-facing and his to confirm. No change to the
-  processor's audio state. Done when a generated preset loaded in a host
-  shows its file name, a name whose identity does not match is not shown,
-  and the plug-ins guide says so. Waits for the freeze unless jrp brings
-  it forward.
-  Progress (8 November 2026, PR #148): `convolver-preset` writes the name
-  and identity as the `Cont` chunk; the SDK's `PresetFile::loadPreset`
-  shows the name in the adapter test (`vst3.preset`), and a converted
-  preset keeps it only while the identity matches. jrp chose "Restored
-  filter" for a state with no name (8 November 2026), now the heading.
-  Remaining: a host check (REAPER with a packaged preset, showing
-  `impulse.wav`). jrp wants this in before the preview (8 November 2026).
 - [ ] **PLUG-30 — One rule for state a busy lock makes a call skip.**
   From AU-16 (8 November 2026; jrp asked for fixes like it to be recorded,
   as stepping back may give a more general fix). The pattern: a call that
@@ -1633,6 +1613,10 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **VST3-16 — A new Latency in REAPER.** 8 November 2026, PR #134;
   [settings](docs/use/plugins.md#settings),
   [acceptance](docs/archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md).
+- [x] **PLUG-31 — Generated VST3 presets carry the filter's name.** 8
+  November 2026, PR #148, checked in REAPER;
+  [presets](docs/use/presets.md),
+  [record](docs/archive/reviews/2026-11-08-plug31-reaper.md).
 - [x] **PLUG-28 — Name the packaged presets after their filter.** 8
   November 2026, PR #141 and, for the first-use presets, PR #144; [first sound in a host](docs/use/first-sound-in-a-host.md#load-the-examples).
 - [x] **PLUG-23 — A filter reads the first inputs of a wider input bus.** 6

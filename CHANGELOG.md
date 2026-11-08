@@ -218,7 +218,8 @@ Until 1.0 the C++ API may change between minor versions.
   in the window saves (PLUG-22). Loaded through Steinberg's preset code, as
   the tests do, the VST3 window's heading then names the file
   (`impulse.wav`, `filter.cfg` for the packaged presets) while that filter
-  plays; no host has been checked yet. A restored filter with no name (an
+  plays. jrp checked this in REAPER 7.85 on 8 November 2026
+  ([record](docs/archive/reviews/2026-11-08-plug31-reaper.md)). A restored filter with no name (an
   older project or preset, or another filter than the name's) is headed
   "Restored filter" in every format, in place of "From the saved project
   or preset", which named an origin the plug-in cannot know (jrp's choice). Converting a `.vstpreset` keeps its name only while it still
