@@ -460,6 +460,7 @@ class FormatIsolation(unittest.TestCase):
 # Documentation, historical code and the candidate workflow are not checked.
 RELEASE_REFERENCES = {
     '.pre-commit-config.yaml': 'Lint runs the trademark check for every pull request',
+    '.github/workflows/publish.yml': 'runs only on its own paths and by hand from main',
     'scripts/trademarks.py': 'Lint runs it; also a candidate trigger, as the package checks import it',
     'tests/identities_tests.py': 'Lint runs it for every pull request (also CTest identities)',
     'cmake/ConvolverDebugSymbols.cmake': 'a comment',
