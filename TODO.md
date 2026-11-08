@@ -576,15 +576,6 @@ LV2 (Linux first; also PipeWire system audio):
 
 AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 
-- [ ] **AU-3 — Validation.** `auval` and pluginval in macOS CI. `auval -strict`
-  runs since PR #44; still to add: pluginval on the component, and a
-  ThreadSanitizer build of `au.adapter` (bypass switched while rendering).
-  Needed for the first preview, the ThreadSanitizer build included
-  ([decisions](docs/project/decisions.md#plug-in-behaviour)).
-  Progress (6 November 2026): pluginval validates the installed component
-  at strictness 10, editor tests included, in the Audio Unit workflow
-  ([pluginval](docs/develop/testing.md#pluginval)); the ThreadSanitizer build
-  remains.
 - [ ] **AU-4 — User guide and host matrix.** The Audio Unit in
   `docs/use/plugins.md` and `docs/use/install.md` (written in DOC-4); Logic, GarageBand,
   SoundSource, Live, REAPER and FL Studio results, including loading an
@@ -1456,6 +1447,9 @@ entries written before 7 November 2026, with their evidence, are
   follow-up in PR #49; [plug-in guide](docs/use/plugins.md).
 - [x] **AU-2 — Loading filters.** 23 October 2026, PR #44;
   [presets](docs/use/presets.md).
+- [x] **AU-3 — Validation.** 8 November 2026: `auval -strict` since PR #44,
+  pluginval on 6 November, and `au.adapter` under ThreadSanitizer in PR #150;
+  [Audio Unit tests](docs/develop/testing.md#audio-unit-tests).
 - [x] **AU-8 — Split the adapter's source by responsibility.** 31 October 2026,
   PR #92; [implementation map](docs/develop/architecture.md).
 - [x] **AU-12 — Wake the Latency work with a dispatch source.** 5 November

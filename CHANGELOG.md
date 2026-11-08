@@ -12,6 +12,16 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Tests (AU-3): the Audio Unit workflow runs `au.adapter` under
+  ThreadSanitizer, in a Debug build with the defaults the packages use, on
+  the runs where that workflow already runs. It switches bypass from another
+  thread while rendering, sets the Latency from audio threads and holds the
+  Latency work while bypass changes; a step checks that the test is
+  instrumented. Its first runs reported four races, all in the test's own
+  setup, which relied on a dispatch source's wake-up that ThreadSanitizer
+  does not see as ordering; the test now sets its hooks before any unit
+  exists and publishes each hold atomically. No plug-in code changed. AU-3
+  is done, and with it first-preview gate 4.
 - Host checks (HOST-1, AU-4): jrp's 8 November 2026 checks with the 0.12.5
   candidate are recorded. In REAPER, part C on the redesigned window
   passed its controls and state, including save, quit and reopen, and the
