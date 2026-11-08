@@ -126,6 +126,12 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             '- Checked by hand on one Mac in REAPER and Audacity (VST3) and GarageBand (Audio Unit); '
             f'[status]({base}/blob/{tag}/docs/project/status.md) says which steps. Other hosts are untested.'
         ),
+        '## Report a problem',
+        (
+            "Copy Diagnostics from Convolver's window, and say which host and version you used, how you loaded the "
+            'filter (Choose…, Recent, Reload, a preset or a saved project), and whether the problem is in playback, '
+            f'export or reopening ([how to report]({docs}/troubleshooting.md#report-a-problem)).'
+        ),
         '## Loading responsiveness',
         qualification,
         '## How it was built',

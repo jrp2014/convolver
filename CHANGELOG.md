@@ -751,6 +751,10 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Releases (REL-7, from jrp's review of 8 November 2026): the draft
+  pre-release notes say how to report a problem: Copy Diagnostics, the
+  host and its version, how the filter was loaded, and whether playback,
+  export or reopening is affected.
 - VST3 (HOST-1, from jrp's v0.12.8 REAPER check): after a refused preset,
   the window's heading changed from the playing filter's name to
   "Restored filter", and a project saved then kept the refused preset's
