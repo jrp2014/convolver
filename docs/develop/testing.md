@@ -1253,12 +1253,16 @@ qualification. Never bypass system security to turn those checks green.
 
 The "Draft preview release" workflow ([`publish.yml`](../../.github/workflows/publish.yml),
 REL-8) runs for pull requests that change it, `prepare_release.py`,
-`promotion_gate.py` or `contract.py`. It takes the newest passed candidate
-run started by hand on a `vX.Y.Z` tag, downloads its
+`promotion_gate.py`, `contract.py` or `clean_machine.py`. It takes the newest
+passed candidate run started by hand on a `vX.Y.Z` tag, downloads its
 `complete-preview-candidate`, checks it against the tag
-(`prepare_release.py`) and shows the release notes in the run's summary; it
-creates no draft. `tests/release/prepare_release_tests.py`, in the candidate
-workflow's contract checks, covers the refusals on a made-up candidate. Only
+(`prepare_release.py`), runs the Windows and Linux files on clean machines
+(REL-9, [publishing](releasing.md#publishing-an-unsigned-preview)) and shows
+the release notes in the run's summary; it creates no draft.
+`tests/release/prepare_release_tests.py` and `clean_machine_tests.py`, in the
+candidate workflow's contract checks, cover the refusals on a made-up
+candidate. The clean-machine jobs use this commit's scripts on the tag's
+files, so a script change is tried on files an earlier tag built. Only
 jrp's manual run from `main` creates a draft
 ([publishing](releasing.md#publishing-an-unsigned-preview)).
 

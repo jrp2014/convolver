@@ -12,6 +12,17 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Windows and Linux previews (REL-9): from the second preview, the draft
+  release attaches the Windows and Linux packages with the macOS ones: the
+  VST3 plug-in (no window yet on those systems; filters load from the
+  host's preset menu) and the tools, with a Windows installer. Its notes
+  give each system's checksum command, what Windows and Linux lack and how
+  to report a problem without the window. Before the draft is made, the
+  exact files run on machines that never built Convolver: stock Ubuntu
+  22.04, Ubuntu 24.04, Debian 12 and Fedora images and a fresh Windows
+  runner, where the tools render the examples, the plug-in loads and the
+  installer installs and removes itself
+  ([publishing](docs/develop/releasing.md#publishing-an-unsigned-preview)).
 - Release evidence (REL-6, REL-7): jrp's responsiveness qualification of
   the 0.12.5 source on his MacBook Pro is recorded: all 24 combinations
   passed on the first run, with the longest hold of the host's thread

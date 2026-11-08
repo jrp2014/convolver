@@ -3,9 +3,11 @@
 name: Draft preview release
 
 # REL-8: turns a passed candidate run on a vX.Y.Z tag into a DRAFT GitHub
-# pre-release, with the macOS files, the corresponding source and generated
-# notes. A draft is visible only to people with write access; nothing is
-# public until jrp reads it and presses Publish
+# pre-release, with every platform's files (macOS, Windows and Linux since
+# REL-9), the corresponding source and generated notes. First the Windows and
+# Linux files run on machines that never built Convolver (clean-machines).
+# A draft is visible only to people with write access; nothing is public
+# until jrp reads it and presses Publish
 # (docs/develop/releasing.md#publishing-an-unsigned-preview).
 'on':
   workflow_dispatch:
@@ -28,6 +30,7 @@ name: Draft preview release
       - scripts/release/prepare_release.py
       - scripts/release/promotion_gate.py
       - scripts/release/contract.py
+      - tests/release/clean_machine.py
 
 permissions:
   contents: read
@@ -125,8 +128,74 @@ jobs:
           path: build/release/*
           if-no-files-found: error
 
-  draft:
+  # REL-9: the exact Windows and Linux files on machines that never built
+  # Convolver: stock distribution images with only Python added, and a
+  # Windows image other than the one that built the package, where the
+  # installer is installed and removed silently. The scripts come from this
+  # commit, the files from the candidate run (tests/release/clean_machine.py).
+  clean-machines:
     needs: prepare
+    name: Clean machine (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Ubuntu 22.04
+            os: ubuntu-latest
+            container: ubuntu:22.04
+            platform: linux-x86_64
+          - name: Ubuntu 24.04
+            os: ubuntu-latest
+            container: ubuntu:24.04
+            platform: linux-x86_64
+          - name: Debian 12
+            os: ubuntu-latest
+            container: debian:12
+            platform: linux-x86_64
+          - name: Fedora
+            os: ubuntu-latest
+            container: fedora:latest
+            platform: linux-x86_64
+          - name: Windows Server 2025
+            os: windows-2025
+            container: ''
+            platform: windows-x86_64
+            install: --install
+            python: python
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Add Python, and nothing else, to the image
+        if: matrix.container != ''
+        shell: sh
+        run: |
+          if command -v apt-get >/dev/null; then
+            apt-get update -qq && apt-get install -y -qq --no-install-recommends python3
+          else
+            dnf install -y -q python3
+          fi
+      - uses: actions/setup-python@v7
+        if: matrix.container == ''
+        with:
+          python-version: '3.12'
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: complete-preview-candidate
+          path: build/candidate
+          run-id: ${{ needs.prepare.outputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Run the published files
+        run: >-
+          ${{ matrix.python || 'python3' }} tests/release/clean_machine.py --candidate build/candidate
+          --platform ${{ matrix.platform }} ${{ matrix.install }}
+
+  draft:
+    needs: [prepare, clean-machines]
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
