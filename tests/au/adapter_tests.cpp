@@ -899,6 +899,13 @@ void latency_parameter() {
     set_parameter(unit, au::latency_parameter, 2.4f);
     require(parameter(unit, au::latency_parameter) == 2, "Latency not rounded");
 
+    // The choices above woke the unit's Latency queue, whose runs tell the
+    // listeners from that queue's thread. The Audio Unit SDK's listener list
+    // is a plain vector, so adding a listener while a run reads it is a data
+    // race: ThreadSanitizer reported it on main (CI run 42512164144 on
+    // 8af5efd). Let those runs finish before adding the listener. A host that
+    // adds a listener while a Latency run notifies meets the same race (AU-17).
+    require(latency_settled(unit), "the Latency work for the clamped choices did not finish");
     Notifications seen;
     check(AudioUnitAddPropertyListener(unit.get(), kAudioUnitProperty_Latency,
                                        &Notifications::listener, &seen),
@@ -912,9 +919,9 @@ void latency_parameter() {
         return eventually([&] { return u.seconds(kAudioUnitProperty_Latency) == frames / 48000; });
     };
     // The unit's Latency queue applies a choice: uninitialized, the reported latency
-    // follows it, and the host is told once. The choices above woke the queue
-    // too, and its runs for them may notify after the listener is added: wait
-    // for them first, so that the count is this choice's alone (on 7 November
+    // follows it, and the host is told once. Loading the filter woke the queue
+    // too (a restored Latency applies at once), and its run may notify: wait
+    // for it first, so that the count is this choice's alone (on 7 November
     // 2026 a slow macOS Intel runner never saw exactly one). A run notifies
     // before it reports itself finished, so once settled the count is final.
     require(latency_settled(unit), "the Latency work for the earlier choices did not finish");

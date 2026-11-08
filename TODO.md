@@ -529,6 +529,26 @@ LV2 (Linux first; also PipeWire system audio):
   queue. Done when each adapter's skip paths either follow that rule or
   are listed with why they are safe, with a held-lock test for each, as
   AU-16's. Waits for the freeze.
+- [ ] **AU-17 — Tell Audio Unit listeners without racing the host.**
+  From a ThreadSanitizer report on `main` (CI run 42512164144 on `8af5efd`,
+  8 November 2026). The Audio Unit's Latency queue calls
+  `AUBase::PropertyChanged` (Latency and TailTime from
+  `Effect::timing_changed()`, and the report property from
+  `notify_status()`) on its own thread. The Audio Unit SDK keeps the
+  listeners in a plain `std::vector` (`AUBase::mPropertyListeners`) with no
+  lock, so a host that adds or removes a listener while a Latency run
+  notifies changes the vector while it is being read; when the first add
+  reallocates it, the notifying thread may read freed memory. A run follows
+  a Latency choice or a restored state, so the window is a host adding
+  listeners just after restoring a project. No host has shown it. Fixed
+  narrowly in `latency_parameter()` (`tests/au/adapter_tests.cpp`), which
+  now lets its own Latency runs finish before it adds its listener; the
+  plug-in is unchanged. A general fix would deliver these notifications on
+  the main thread, as the JUCE Audio Unit wrapper does, or guard our
+  notifying calls and the listener overrides (`AddPropertyListener` and
+  `RemovePropertyListener` are virtual) with one lock. Done when a test
+  adds and removes listeners while Latency runs notify, clean under
+  ThreadSanitizer. Before or after the preview is jrp's call.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
