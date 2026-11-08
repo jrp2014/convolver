@@ -796,6 +796,21 @@ means a patched FFmpeg build with `--enable-gpl`.
   documentation or sources, states what it cannot represent (per-channel EQ,
   mixers with gains above unity, resampling) and fails rather than guess.
   Optional; after CFG-1 shows which readers matter.
+- [ ] **CFG-3 — Say when a configuration is not UTF-8.** From the BruteFIR
+  comparison (8 November 2026; BruteFIR fixed non-ASCII configuration text
+  in 0.99g). The historical Convolver read `.cfg` text in the Windows ANSI
+  code page (`channelpaths.cpp` reads it through `basic_ifstream<TCHAR>`
+  and `wavefile.h` opens `CT2CA(path)`); the portable parser reads UTF-8
+  only. A `.cfg` saved in Windows-1252 that names `ir_ü.wav` stops with "IR
+  file not found" and a garbled name, and nothing mentions the encoding
+  (tried on Linux at `8ba79fb`; not checked on Windows). Done when a filename
+  line that is not valid UTF-8 is reported as such, with the line, the
+  likely cause (saved in a Windows code page) and how to save it as UTF-8,
+  and a test covers it. Whether Convolver should also read Windows-1252
+  names is a `.cfg` compatibility decision for jrp, recorded in the
+  decisions log either way. Which encoding Roon, JRiver and Audiolense write
+  is unknown (CFG-1). A compatibility failure, so jrp decides whether it
+  waits for the freeze.
 - [ ] **COMPAT-1 — Files from released builds.** Round-trip tests with
   today's writer and reader can agree with each other while both break
   yesterday's files. When jrp publishes a preview, keep a small collection
@@ -817,6 +832,20 @@ means a patched FFmpeg build with `--enable-gpl`.
   [publication steps](docs/develop/releasing.md#publishing-an-unsigned-preview)
   when this is implemented. The four guarantees it protects are listed in
   [status](docs/project/status.md#compatibility-guarantees).
+- [ ] **DIAG-5 — Report clipping after a command-line render.** From the
+  BruteFIR comparison (8 November 2026): BruteFIR has printed each output's
+  count of overflowed samples and its peak by default since 0.99
+  (`overflow_warnings`). The `convolver` CLI clips integer output silently,
+  as [file rendering](docs/use/command-line.md#file-rendering) states,
+  and stops only for samples that are not finite: at `8ba79fb`, `--gain-db 20`
+  with `wav-pcm24` clipped 4,800 of 4,863 samples, printed nothing and
+  exited 0. Done when, after a render to integer output in which any sample
+  clipped, stderr gives the clipped-sample count and the peak in dBFS for
+  each affected output and suggests `--gain-db no-clip`; float output whose
+  peak exceeds full scale gets a note, since a later integer conversion
+  will clip it; nothing is printed when nothing clipped; the exit status is
+  unchanged; and CLI tests cover each case. The plug-ins' clip counts stay
+  with PLUG-10's meters.
 - [ ] **IO-1 — Large files.** Specify and test boundary sizes and pipe behavior
   for output beyond 4 GiB. Input decoder support is not a promise of strict
   validation for every container.
@@ -1206,7 +1235,8 @@ waits for the walkthroughs (jrp, 7 November 2026). Order: first the
 limitations users cite (EDGE-1 with IO-2, PERF-3 with EDGE-11, PERF-2 with
 EDGE-10, EDGE-3, EDGE-13), then edges nobody was found citing (EDGE-12,
 then the easy room-correction wins EDGE-9, EDGE-2, EDGE-4, EDGE-5), then
-the reverb features (EDGE-6 to EDGE-8). An item starts only after the
+the reverb features (EDGE-6 to EDGE-8). EDGE-15, from the BruteFIR
+comparison, is not ranked yet. An item starts only after the
 plan's [gate](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#before-an-item-starts): a reproducible Convolver
 limitation, an affected intended workflow and a measurable acceptance
 criterion. Optimisations are experiments with a stated gain and permission
@@ -1308,6 +1338,21 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   Needs jrp's decision on whether to offer it, how the delay is found and
   what a replacement with a different delay does, since the latency is
   fixed for a processor's life. Effort S to M.
+- [ ] **EDGE-15 — Optional output safety ceiling.** From the BruteFIR
+  comparison (8 November 2026): BruteFIR's `safety_limit` (1.0m, 2013)
+  checks every output sample and stops before one above the set level
+  reaches the device, "to protect your ears and expensive speakers", and
+  [protect-bflogic](https://github.com/MRinus/protect-bflogic) (2026) adds
+  per-channel limits because BruteFIR has none. Convolver has no output
+  ceiling, so a wrong filter or route gain reaches an amplifier or a
+  crossover's tweeter at full level. Done when an opt-in ceiling, off by
+  default, acts on any output sample above it as jrp decides (for example,
+  mute that output with Fault and the sample's position in the plug-ins,
+  stop the render in the CLI), and tests show that no sample above the
+  ceiling leaves, that output below it is bit-identical, and that the check
+  allocates and locks nothing on the audio thread. Needs jrp's decisions on
+  the action (mute, limit or stop), per output or global, and whether it is
+  saved in state. Waits for REL-3. Effort S to M.
 
 ## Developer tooling
 
