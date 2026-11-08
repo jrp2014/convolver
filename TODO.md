@@ -1494,7 +1494,7 @@ entries written before 7 November 2026, with their evidence, are
   November 2026; [load timing](docs/develop/testing.md#load-timing-perf-9).
 - [x] **PERF-14 — Load timing from a full history.** 5 November 2026.
 - [x] **PLUG-28 — Name the packaged presets after their filter.** 8
-  November 2026, PR #141; [first sound in a host](docs/use/first-sound-in-a-host.md#load-the-examples).
+  November 2026, PR #141 and, for the first-use presets, PR #NNN; [first sound in a host](docs/use/first-sound-in-a-host.md#load-the-examples).
 - [x] **PLUG-23 — A filter reads the first inputs of a wider input bus.** 6
   November 2026; [channels](docs/use/plugins.md#channels).
 - [x] **PLUG-22 — Name the filter in the window, and say each fact once.** 7

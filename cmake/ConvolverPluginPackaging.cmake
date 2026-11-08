@@ -79,7 +79,8 @@ add_custom_target(convolver_plugin_examples ALL DEPENDS "${examples_dir}/example
 install(DIRECTORY "${examples_dir}/" DESTINATION presets COMPONENT PluginDistribution)
 install(FILES "${PROJECT_SOURCE_DIR}/examples/plugin-presets/README.md" DESTINATION presets COMPONENT PluginDistribution)
 # The first-use examples (DOC-1) for the user journeys (REL-2): each folder's
-# filter, input.wav and expected.wav, plus a preset made from its filter. Their
+# filter, input.wav and expected.wav, plus a preset made from its filter and
+# named after the example, such as first-use-stereo.vstpreset. Their
 # README describes a source build, so the guides in docs/use/ take its place.
 set(first_use_source "${PROJECT_SOURCE_DIR}/examples/first-use")
 set(first_use_presets "${CMAKE_CURRENT_BINARY_DIR}/first-use-presets/$<CONFIG>")
@@ -87,10 +88,10 @@ add_custom_command(OUTPUT "${first_use_presets}/stamp"
     COMMAND "${CMAKE_COMMAND}" -E rm -rf "${first_use_presets}"
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${first_use_presets}/mono" "${first_use_presets}/stereo"
         "${first_use_presets}/crossover"
-    COMMAND convolver_preset_tool "${first_use_source}/mono/impulse.wav" "${first_use_presets}/mono/filter.vstpreset"
-    COMMAND convolver_preset_tool "${first_use_source}/stereo/filter.cfg" "${first_use_presets}/stereo/filter.vstpreset"
+    COMMAND convolver_preset_tool "${first_use_source}/mono/impulse.wav" "${first_use_presets}/mono/first-use-mono.vstpreset"
+    COMMAND convolver_preset_tool "${first_use_source}/stereo/filter.cfg" "${first_use_presets}/stereo/first-use-stereo.vstpreset"
     COMMAND convolver_preset_tool "${first_use_source}/crossover/filter.cfg"
-        "${first_use_presets}/crossover/filter.vstpreset"
+        "${first_use_presets}/crossover/first-use-crossover.vstpreset"
     COMMAND "${CMAKE_COMMAND}" -E touch "${first_use_presets}/stamp"
     DEPENDS convolver_preset_tool "${first_use_source}/mono/impulse.wav" "${first_use_source}/stereo/filter.cfg"
         "${first_use_source}/stereo/room.wav" "${first_use_source}/crossover/filter.cfg"

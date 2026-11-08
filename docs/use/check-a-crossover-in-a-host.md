@@ -10,8 +10,8 @@ project, and see what happens when a preset does not fit.
 **In short:** install the VST® 3 plug-in as for the
 [stereo check](check-a-stereo-filter.md), put Convolver on a six-channel track
 at 48000 Hz with 2 inputs and 6 outputs, load
-`examples/first-use/crossover/filter.vstpreset`, render `input.wav` through it
-as a six-channel file, and run
+`examples/first-use/crossover/first-use-crossover.vstpreset`, render
+`input.wav` through it as a six-channel file, and run
 `./bin/convolver --compare host-crossover.wav examples/first-use/crossover/expected.wav`.
 It should print `Match`. The filter must survive saving and reopening, and a
 preset for another rate or channel count must leave it playing.
@@ -66,8 +66,8 @@ mid, 3 left high, 4 right low, 5 right mid and 6 right high. The high bands
 are 6 dB lower and 0.5 ms later, so a swapped, missing or misrouted output
 would not match. `examples/first-use/crossover/` holds the filter
 (`filter.cfg` and `crossover.wav`), `input.wav`, `expected.wav` and
-`filter.vstpreset`, a preset made from the filter. Its bands show routing;
-they are not a crossover ready for real speakers.
+`first-use-crossover.vstpreset`, a preset made from the filter. Its bands
+show routing; they are not a crossover ready for real speakers.
 
 ## 3. Render the example in the host
 
@@ -80,9 +80,9 @@ they are not a crossover ready for real speakers.
 3. Add Convolver to the track as an effect. On macOS its window opens and
    shows the status; on Windows and Linux the host shows its generic controls,
    with a read-only **Status**.
-4. Load `examples/first-use/crossover/filter.vstpreset` from the host's
-   preset menu (REAPER: the **+** button beside the preset menu, then the
-   item that imports a VST preset file). Status reads
+4. Load `examples/first-use/crossover/first-use-crossover.vstpreset` from
+   the host's preset menu (REAPER: the **+** button beside the preset menu,
+   then the item that imports a VST preset file). Status reads
    `Filter loaded: 48000 Hz, 2 in, 6 out.`, or on a track that gives the
    plug-in six inputs, `Filter loaded: 48000 Hz, 2 in, 6 out; plug-in inputs
    3-6 ignored.` Convolver then reads inputs 1 and 2, so put the stereo
@@ -123,8 +123,8 @@ prints `Match`: the project kept the filter and its six outputs.
 
 ## 5. Load a preset that does not fit
 
-1. Load `examples/first-use/stereo/filter.vstpreset`, a filter with 2 inputs
-   and 2 outputs. The crossover keeps playing, and Status reads `Load failed,
+1. Load `examples/first-use/stereo/first-use-stereo.vstpreset`, a filter
+   with 2 inputs and 2 outputs. The crossover keeps playing, and Status reads `Load failed,
    previous filter kept: the filter has 2 in, 2 out, the host 2 in, 6 out.
    Details in the Convolver log.`
 2. Load `presets/echo-44100-stereo/echo-44100-stereo.vstpreset`, made for 44100 Hz. The
