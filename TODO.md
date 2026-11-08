@@ -462,8 +462,9 @@ LV2 (Linux first; also PipeWire system audio):
   it; update the package manifest, the journeys, the release tests and the
   guides that name the file together, and leave dated records alone. Done
   when the package and its release tests use the new names and the
-  journeys and host-testing steps no longer rename files. It changes the
-  preview package's contents, so jrp decides when.
+  journeys and host-testing steps no longer rename files. jrp decided
+  (8 November 2026): before the first preview, so the independent tester
+  learns the final names.
 - [ ] **PLUG-29 — Keep the Recent list out of the log folder.** From the
   same review: the window's Recent list is saved beside the log
   (`recent-filters.txt` in `~/Library/Logs/Convolver/`,
