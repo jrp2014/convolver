@@ -41,7 +41,7 @@ NSColor* status_colour(NSInteger status) {
         return [NSColor systemRedColor];
     case 4: // Fault
         return [NSColor systemOrangeColor];
-    default: // No filter, Not checked yet, Bypassed
+    default: // No filter, Waiting, Bypassed
         return [NSColor labelColor];
     }
 }
@@ -451,9 +451,9 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
                                        action:@selector(chooseFilter:)];
     _chooseButton.accessibilityLabel = @"Choose Filter";
     _chooseButton.toolTip =
-        @"Loads a Convolver configuration (.cfg) or a sound file as the filter; you can also "
-        @"drop the file on this window. The project keeps the filter itself and its file's "
-        @"name, as a preset does, so moving the file later does not change it.";
+        @"Loads an IR file, .cfg or configuration list as the filter; you can also drop the "
+        @"file on this window. The project keeps the filter itself and its file's name, as a "
+        @"preset does, so moving the file later does not change it.";
     _recentButton = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:YES];
     _recentButton.translatesAutoresizingMaskIntoConstraints = NO;
     [_recentButton addItemWithTitle:@"Recent"];
@@ -764,7 +764,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _watchButton.enabled = watch_.path().length > 0;
     if (loader_)
         note = note.length ? [note stringByAppendingString:@" Or drop a file on this window."]
-                           : @"Or drop a .cfg or sound file on this window.";
+                           : @"Or drop an IR file or .cfg on this window.";
     // Choose Filter… only where the window can choose a file.
     if ([action isEqualToString:@"choose filter"] && !loader_)
         action = @"";
@@ -1010,8 +1010,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     panel.canChooseFiles = YES;
     panel.canChooseDirectories = NO;
     panel.allowsMultipleSelection = NO;
-    panel.message =
-        @"Choose a Convolver configuration (.cfg) or a sound file to use as the filter.";
+    panel.message = @"Choose an IR file, .cfg or configuration list to use as the filter.";
     panel.prompt = @"Load";
     // Not runModal: a modal loop inside the plug-in would stall the host's
     // own window events (plan, threads rule 4). The view may go before the

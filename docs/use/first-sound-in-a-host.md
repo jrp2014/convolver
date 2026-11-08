@@ -13,8 +13,9 @@ project to check that the filter is kept.
 
 You need a plug-in host that loads VST® 3: a DAW such as REAPER, an audio
 editor such as Audacity (version 4 or later), or a plug-in rack such as Carla.
-GarageBand and Logic load only Audio Units, which preview packages do not
-contain yet ([install](install.md)).
+GarageBand and Logic load only Audio Units; the macOS preview package holds
+the Audio Unit too ([install](install.md)), and its presets are `.aupreset`
+files ([plug-in presets](presets.md#load-it-in-a-host)).
 Installing a plug-in does not add filtering to an ordinary music player or to
 everything the computer plays. For that on Windows, see the
 [Equalizer APO export](equalizer-apo.md).
@@ -27,13 +28,19 @@ The package's `presets/` folder has 18 examples: `identity`, `echo` and
 from, and `impulse.wav`.
 
 1. Set the host to 44100, 48000 or 96000 Hz, and select a mono or stereo track.
-2. Add Convolver to the track as an audio effect. It has no window of its own;
-   the host shows a generic panel with a bypass switch.
+2. Add Convolver to the track as an audio effect. On macOS the host shows
+   [Convolver's window](plugins.md#convolvers-window); on Windows and Linux
+   it shows a generic panel with a bypass switch. In Audacity, turn on
+   *Preset options › Use vendor UI* if you see only Audacity's own controls.
 3. From the host's preset menu ("Load Preset…" or its preset browser), load
    `presets/identity-RATE-LAYOUT/filter.vstpreset` for your rate and layout.
    Audacity's preset menu cannot open a `.vstpreset` file, and Audacity runs
    the plug-in in stereo even on a mono track;
-   [plug-in presets](presets.md#load-it-in-a-host) says where to put the file.
+   [plug-in presets](presets.md#load-it-in-a-host) says where to put the file,
+   or, on macOS, choose the folder's `filter.cfg` with **Choose…** in
+   Convolver's window instead. Audacity plays real-time effects at the rate
+   in *Audio setup › Audio settings › Default sample rate*: set it, and the
+   project's rate, to the preset's rate.
 4. Play quiet audio and watch the meters. Identity leaves the sound unchanged,
    apart from a delay of 256 samples that most hosts make up for.
 5. Load the matching `echo` preset. Its filter is half the input at once plus a

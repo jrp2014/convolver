@@ -232,7 +232,7 @@ void properties(const au_test::LogSince& log) {
     check(unit.load(state_of(identity(44100, 2))), "stereo preset");
     require(report_changes.load() > 0, "no report change after a load");
     r = report(unit);
-    require([r[@"status name"] isEqualToString:@"Not checked yet"],
+    require([r[@"status name"] isEqualToString:@"Waiting"],
             "before start: " + text(r[@"status name"]));
     check(unit.configure(44100, 1, 1, 512), "mono formats");
     const auto before = report_changes.load();
@@ -727,7 +727,7 @@ void files() {
     // The short summary (Status, Copy diagnostics) gives the refused file's
     // own counts (jrp's GarageBand run: it read "0 in, 0 out"), and the
     // explanation speaks of Convolver and the host, not command-line options.
-    require(contains(r[@"summary"], "the filter has 1 in, 1 out, the plug-in 2 in, 2 out") &&
+    require(contains(r[@"summary"], "the filter has 1 in, 1 out, the host 2 in, 2 out") &&
                 !contains(r[@"summary"], "0 in, 0 out"),
             "mono file summary: " + text(r[@"summary"]));
     require(!contains(r[@"explanation"], "--") &&

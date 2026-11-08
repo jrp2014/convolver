@@ -17,8 +17,8 @@
 // not a stable interface.
 namespace convolver {
 // The Status parameter's value names, in HostStatus order.
-inline constexpr std::array<const char*, 6> host_status_names{
-    "Active", "No filter", "Load failed", "Not checked yet", "Fault", "Bypassed"};
+inline constexpr std::array<const char*, 6> host_status_names{"Active",  "No filter", "Load failed",
+                                                              "Waiting", "Fault",     "Bypassed"};
 static_assert(static_cast<std::size_t>(HostStatus::bypassed) == host_status_names.size() - 1);
 
 // What the adapter knows besides its HostFilter, under its control lock.

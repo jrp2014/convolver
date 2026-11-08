@@ -15,8 +15,9 @@
 
 namespace convolver::cli {
 namespace {
-constexpr auto usage = R"(Usage: convolver --inspect CONFIG [options]
-       convolver --validate CONFIG [options]
+constexpr auto usage = R"(Usage: convolver --inspect FILTER [options]
+       convolver --validate FILTER [options]
+FILTER is an IR file, a .cfg or a configuration list.
   --sample-rate HZ         Select as rendering would for this input rate
   --input-channels N       Select as rendering would for this input channel count
   --output-channels N      Select as rendering would for this output channel count
@@ -390,7 +391,7 @@ void print_report(const InspectionReport& r, bool validate, bool warnings_as_err
         if (s.outcome != "selected" && s.outcome != "validated")
             out << "  " << s.outcome << ": " << text(s.file) << '\n';
     for (const auto& c : r.configurations) {
-        out << '\n' << text(c.file) << (c.sound_file ? " (sound file)" : "") << '\n';
+        out << '\n' << text(c.file) << (c.sound_file ? " (IR file)" : "") << '\n';
         out << "  " << c.sample_rate << " Hz, " << c.input_channels << " in, " << c.output_channels
             << " out, channel mask 0x" << std::hex << c.channel_mask << std::dec << '\n';
         auto delay_line = [&](const char* name, const std::vector<InspectedDelay>& ds) {
@@ -648,7 +649,8 @@ int run_inspection(int argc, char** argv) {
         if (options.all_configurations && options.syntax_only)
             throw Usage("--all-configurations and --syntax-only are mutually exclusive");
         if (path.empty() || path == "-")
-            throw Usage("--inspect and --validate need a configuration file path");
+            throw Usage("--inspect and --validate need a filter: an IR file, a .cfg or a "
+                        "configuration list");
     } catch (const Usage& e) {
         std::cerr << detail::cli_error("convolver", e.what()) << usage;
         return 2;

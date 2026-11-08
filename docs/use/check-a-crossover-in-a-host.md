@@ -125,7 +125,7 @@ prints `Match`: the project kept the filter and its six outputs.
 
 1. Load `examples/first-use/stereo/filter.vstpreset`, a filter with 2 inputs
    and 2 outputs. The crossover keeps playing, and Status reads `Load failed,
-   previous filter kept: the filter has 2 in, 2 out, the plug-in 2 in, 6 out.
+   previous filter kept: the filter has 2 in, 2 out, the host 2 in, 6 out.
    Details in the Convolver log.`
 2. Load `presets/echo-44100-stereo/filter.vstpreset`, made for 44100 Hz. The
    crossover keeps playing, and Status reads `Load failed, previous filter
@@ -133,7 +133,7 @@ prints `Match`: the project kept the filter and its six outputs.
    Convolver log.`
 3. Render again and compare: still `Match`. To recover from a preset that
    does not fit, load the crossover preset from step 3 again, or a preset made
-   for your host's rate and the plug-in's 2 inputs and 6 outputs.
+   for your host's rate and the host's 2 inputs and 6 outputs.
 
 ## With the Audio Unit (macOS)
 

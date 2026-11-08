@@ -110,7 +110,7 @@ void validate_wave(const std::filesystem::path& path) {
         check_wave(path);
     } catch (const std::runtime_error& e) {
         throw std::runtime_error(
-            advice_text({"cannot read audio file " + path.string() + ": " + e.what(),
+            advice_text({"cannot read sound file " + path.string() + ": " + e.what(),
                          "The file is damaged or incomplete, or is not a sound file.",
                          "Export it again from the program that made it.",
                          {}}));
@@ -128,7 +128,7 @@ std::string invalid_sample_message(const std::filesystem::path& path, std::uint6
                                    std::optional<RawEncoding> raw) {
     const bool stream = path == "-";
     Advice a{std::string(stream ? "cannot read audio from standard input"
-                                : "cannot read audio file " + path.string()) +
+                                : "cannot read sound file " + path.string()) +
                  ": invalid sample (not a number, or infinite) " +
                  sample_position(frame, channel, sample_rate),
              {},

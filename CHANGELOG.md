@@ -197,6 +197,42 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Host checks (HOST-1): jrp's Audacity 4.0.2 session with the VST3
+  plug-in (7 November 2026, candidate 0.10.13) is
+  [recorded](docs/archive/reviews/2026-11-07-host1-audacity.md): the seven
+  48 kHz stereo exports with a filter or bypass matched the CLI with
+  `convolver --compare`, including after a refused preset and after
+  restarting Audacity, and the export with no filter matched the original
+  file. The guides now say
+  what it found: Audacity plays real-time effects at its Default sample
+  rate, which can differ from the rate an export uses, so set it, and the
+  project's rate, to the filter's rate; Convolver's window shows with *Preset options ›
+  Use vendor UI*; and, as Audacity's preset menu does not import
+  `.vstpreset`, a filter can be chosen with **Choose…** in the window on
+  macOS. [Your first sound in a host](docs/use/first-sound-in-a-host.md) no
+  longer says the plug-in has no window or that preview packages lack the
+  Audio Unit. PLUG-25 records the clearer playback-rate wording still to
+  decide. No code or sound changes.
+- Wording (DOC-9, from jrp's review of 7 November 2026): one set of words for
+  filters, IR files, configurations, presets and projects, listed in
+  [words Convolver uses](docs/use/concepts.md#words-convolver-uses) and used
+  by the window, the Status text, the log, the tools' help and messages, and
+  the documentation. A filter given as a sound file is an "IR file" (the
+  window, `--inspect` and list messages said "sound file"; one reader message
+  said "audio file"); a `.cfg` is a "configuration", never a "config"; a list
+  is a "configuration list". `convolver --help` and `--inspect --help` name
+  the filter argument `FILTER` (was `IR_OR_CFG` and `CONFIG`). Messages about
+  unreadable saved data say "the saved project or preset" rather than "the
+  saved state". Channel mismatches name the host's channels, as the window's
+  "Host channels" does: "the filter has 2 in, 6 out, the host 2 in, 2 out"
+  (was "the plug-in 2 in, 2 out"). The Status value "Not checked yet" is now
+  **Waiting** ("Filter loaded: 48000 Hz, 2 in, 2 out; waiting for audio
+  settings from the host."; was "checked when the host starts it", wording
+  from jrp's Audacity walkthrough), with the same value and icon, and the
+  window says "Waiting for audio settings from the host. The filter then
+  plays if it fits the host's sample rate and channels." The LV2
+  status port's first label is Active, as in the VST3 and Audio Unit (was
+  Running); its value is unchanged. No sound changes.
 - Plug-ins (PLUG-22, from jrp's review of 6 and 7 November 2026): the macOS
   window (Audio Unit and VST3) names the filter at the top, with its
   extension, and keeps the name after the project is reopened: the Audio

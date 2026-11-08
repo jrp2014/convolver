@@ -105,8 +105,12 @@ already holds one filter.
   `/usr/local/share/vst3/presets/Convolver/Convolver/` on Linux (copying there
   needs an administrator), then restart Audacity. They appear in the
   effect's preset menu under their file names, so give each preset its own
-  name, such as `room-48000.vstpreset`. Audacity always runs Convolver with
-  two channels, even on a mono track, so use a stereo (2-in, 2-out) preset.
+  name, such as `room-48000.vstpreset`. On macOS you can also choose the preset's `.cfg` or IR file with **Choose…** in
+  Convolver's window (turn on *Preset options › Use vendor UI* if Audacity
+  shows only its own controls). Audacity always runs Convolver with
+  two channels, even on a mono track, so use a stereo (2-in, 2-out) preset,
+  and set its playback rate to the preset's
+  ([the rate a host plays at](plugins.md#status-and-the-convolver-log)).
 - **AU:** load the `.aupreset` from the host's preset menu. Logic and
   GarageBand list user presets saved under
   `~/Library/Audio/Presets/Convolver/Convolver/`.
@@ -151,7 +155,7 @@ The problems, with what lies behind them:
 | `NAME: the preset format is not known from this name` | The format follows the name's ending: `.vstpreset`, `.aupreset` or `.preset.lv2` |
 | `NAME already exists` | The tool never replaces a preset: choose a new name, or remove the old one |
 | `no LV2 plug-in takes this filter's …` | LV2 has only the [listed layouts](plugins.md#lv2-channel-layouts). Use the VST3 or AU plug-in, or ask for the layout to be added |
-| `the filter is too large to save …` | Plug-in state and presets hold at most 64 MiB, just under 16,777,216 samples counting every impulse response together ([size limit](plugins.md#when-a-filter-does-not-fit)). Shorten the impulse responses, or render with the CLI |
+| `the filter is too large to save …` | Projects and presets hold at most 64 MiB of Convolver's data, just under 16,777,216 samples counting every impulse response together ([size limit](plugins.md#when-a-filter-does-not-fit)). Shorten the impulse responses, or render with the CLI |
 | `… presets support 1 to 8 input and output channels` | The plug-ins have at most 8 channels on each side; use the CLI for wider filters |
 | `this VST3 preset belongs to another plug-in` | Only Convolver's own presets can be converted |
 | `--sample-rate, --input-channels and --output-channels cannot choose from a .vstpreset` | A `.vstpreset` already holds one filter: leave out those options |

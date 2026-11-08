@@ -1351,8 +1351,8 @@ void status_and_log() {
     damaged.write(const_cast<unsigned char*>(junk.data()), 16, nullptr);
     damaged.seek(0, IBStream::kIBSeekSet, nullptr);
     require(p.setState(&damaged) == kResultFalse &&
-                contains(shown(), "the preset or saved state could not be read") &&
-                contains(log_text(), "the saved state could not be read: "),
+                contains(shown(), "the saved project or preset could not be read") &&
+                contains(log_text(), "the saved project or preset could not be read: "),
             "damaged state not shown or logged");
     // DIAG-1, jrp's reproduction: extreme but finite input and filter values
     // overflow the output. The audio thread writes Fault to the Status
@@ -1526,8 +1526,8 @@ void status_and_log() {
     String128 text{};
     d.getParamStringByValue(status_id, d.getParamNormalized(status_id), text);
     require(text[0] == 'F' && d.status_text() ==
-                                  "Filter loaded: 44100 Hz, 2 in, 2 out; checked when the "
-                                  "host starts it.",
+                                  "Filter loaded: 44100 Hz, 2 in, 2 out; waiting for audio "
+                                  "settings from the host.",
             "unchecked state not shown");
     q.disconnect(&d);
     d.disconnect(&q);

@@ -9,7 +9,7 @@ To build it, see [build from source](../develop/build.md).
 
 **In short:**
 
-- `convolver --filter IR_OR_CFG --input IN --output OUT` renders a file. The
+- `convolver --filter FILTER --input IN --output OUT` renders a file. The
   output lines up with the input (processing latency removed) and keeps the
   whole filter tail. Rate and channel counts must match; nothing is resampled.
 - Output is 32-bit float WAV by default. `--output-format` also writes RF64,
@@ -51,13 +51,13 @@ convolver --filter room.cfg --input music.wav --output corrected.wav
 convolver --filter impulse.wav --input music.wav --output corrected.wav --block-size 128 --gain-db -6 --output-format wav-pcm24
 ```
 
-The filter may be an IR sound file, a [configuration](configuration.md), or a configuration
-list. A direct multichannel IR maps each IR channel to the corresponding input
-and output; a mono IR requires mono input. Use a config to apply one mono IR to
-several channels. Lists select the first entry matching input rate and channel
-count. `--output-channels N` adds the requirement of N output channels; a
-single configuration or sound file that has a different count is rejected (a
-sound file has as many outputs as inputs). There is no resampling or
+The filter may be an IR file, a [configuration](configuration.md) (`.cfg`), or a
+configuration list. An IR file used directly maps each IR channel to the
+corresponding input and output; a mono IR requires mono input. Use a
+configuration to apply one mono IR to several channels. Lists select the first
+entry matching input rate and channel count. `--output-channels N` adds the
+requirement of N output channels; a single configuration or IR file that has a
+different count is rejected (an IR file has as many outputs as inputs). There is no resampling or
 nearest-rate substitution.
 
 `--block-size` is the uniform partition payload B, not the historical partition
@@ -311,7 +311,7 @@ convolver --filter surround.cfg --input music.wav --output out.wav --speaker-map
 - The mask must name exactly as many speakers as there are output channels, and
   only bits 0 to 17 are accepted. Otherwise the render stops before the output is
   created.
-- A mask of 0 (and any sound-file filter, which has no mask) means unspecified:
+- A mask of 0 (and any IR file used directly, which has no mask) means unspecified:
   the CLI says so on stderr and writes the plain header, which for `rf64-`
   output is libsndfile's default (below).
 - Only `wav-` and `rf64-` formats carry the labels, both in a
@@ -330,10 +330,10 @@ convolver --filter surround.cfg --input music.wav --output out.wav --speaker-map
 
 ### Output safety
 
-Output paths must differ from input, configuration/list files and referenced IRs,
+Output paths must differ from the input, the configuration or list and the IR files it names,
 including filesystem aliases. A regular file redirected to stdin is protected
 from being opened as output by the CLI. Shell redirection itself happens before
-the program starts: never redirect stdout onto an input/configuration/IR file.
+the program starts: never redirect stdout onto an input, configuration or IR file.
 An existing output file is replaced without asking, as command-line tools on
 macOS and Linux usually do; `convolver-preset` and `convolver-equalizer-apo`
 write only to new paths. Failures return a nonzero exit code and a diagnostic
@@ -430,7 +430,7 @@ an error at their limit.
 
 ## Inspecting and validating configurations
 
-`--inspect` shows what a configuration, sound file or list resolves to without
+`--inspect` shows what a configuration, IR file or list resolves to without
 rendering; `--validate` checks it and prints a one-line result. Both use the
 loader's own parser, list selection and limits, decode the selected IRs, and run
 the engine's validation and storage accounting. Neither plans FFTs, changes FFTW

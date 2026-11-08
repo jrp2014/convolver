@@ -213,7 +213,7 @@ std::string wanted_text(const ConfigurationSelection& w) {
 }
 std::string candidate_text(const SelectionCandidate& c) {
     if (c.sound_file)
-        return "sound file, " + hertz(c.sample_rate) + ", " + channels(c.input_channels);
+        return "IR file, " + hertz(c.sample_rate) + ", " + channels(c.input_channels);
     return "configuration, " + hertz(c.sample_rate) + ", " + std::to_string(c.input_channels) +
            " in, " + std::to_string(c.output_channels) + " out";
 }
@@ -298,9 +298,9 @@ std::string explain_one(const std::filesystem::path& filter, const SelectionCand
     // The differences name both values, so the request is not repeated.
     a.problem = name + " cannot be used with " + std::string(subject) + ": " + joined(diffs, "; ");
     if (c.sound_file)
-        a.cause = name + " is a sound-file filter (" + hertz(c.sample_rate) + ", " +
-                  channels(c.input_channels) +
-                  "). A sound file used directly as the filter applies its first channel to the "
+        a.cause = name + " is an IR file used directly as the filter (" + hertz(c.sample_rate) +
+                  ", " + channels(c.input_channels) +
+                  "). An IR file used directly applies its first channel to the "
                   "first input channel, its second to the second, and so on, so it needs audio "
                   "with exactly " +
                   channels(c.input_channels) + " at " + hertz(c.sample_rate) + ".";
@@ -346,7 +346,7 @@ std::string explain_one(const std::filesystem::path& filter, const SelectionCand
         } else if (c.sound_file) {
             append(a.fix, "Use an IR file with one channel per input channel (" +
                               std::to_string(w.input_channels) +
-                              "), or a configuration (.cfg) file that says which IR channel "
+                              "), or a configuration (.cfg) that says which IR channel "
                               "filters which input and where the result goes.");
         } else if (who == Chooser::options) {
             append(a.fix, "--input-channels asked for " + channels(w.input_channels, "input ") +
@@ -369,20 +369,19 @@ std::string explain_one(const std::filesystem::path& filter, const SelectionCand
         c.sound_file) {
         append(a.cause,
                "The host gives the plug-in " + channels(w.output_channels, "output ") + ".");
-        append(a.fix, "A sound-file filter always has as many outputs as inputs: use a "
-                      "configuration (.cfg) file to produce a different number, or give the "
+        append(a.fix, "An IR file used directly always has as many outputs as inputs: use a "
+                      "configuration (.cfg) to produce a different number, or give the "
                       "plug-in as many outputs as inputs in the host's track or routing "
                       "settings.");
     } else if (w.output_channels && w.output_channels != c.output_channels && !plugin) {
         append(a.cause, "--output-channels asked for " + channels(w.output_channels, "output ") +
-                            (c.sound_file ? ", but a sound-file filter always has as many "
-                                            "outputs as inputs."
+                            (c.sound_file ? ", but an IR file used directly always has as "
+                                            "many outputs as inputs."
                                           : "."));
-        append(a.fix, c.sound_file
-                          ? "Use a configuration (.cfg) file to produce a different number of "
-                            "outputs, or omit --output-channels."
-                          : "Use a configuration with that output count (its third header "
-                            "number), or omit --output-channels.");
+        append(a.fix, c.sound_file ? "Use a configuration (.cfg) to produce a different number of "
+                                     "outputs, or omit --output-channels."
+                                   : "Use a configuration with that output count (its third header "
+                                     "number), or omit --output-channels.");
     }
     // The example goes on from the fix that introduces it, before the note.
     if (!example.empty()) {
@@ -404,12 +403,11 @@ std::string explain_no_match(const std::filesystem::path& filter, bool list,
     const bool plugin = who == Chooser::host;
     const auto name = utf8_string(filter);
     if (candidates.empty())
-        return advice_text(
-            {"the configuration list " + name + " names no sound file or configuration",
-             "Every line of a list names a configuration or sound file to choose "
-             "from, and this one names none.",
-             "Add a line for each filter, one per sample rate or channel layout.",
-             {}});
+        return advice_text({"the configuration list " + name + " names no IR file or configuration",
+                            "Every line of a list names a configuration or IR file to choose "
+                            "from, and this one names none.",
+                            "Add a line for each filter, one per sample rate or channel layout.",
+                            {}});
     std::string criteria = "sample rate and input channel count";
     if (w.output_channels)
         criteria = "sample rate, input channel count and output channel count";

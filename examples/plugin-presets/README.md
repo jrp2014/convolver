@@ -15,5 +15,5 @@ Stereo applies the same response independently to each channel; no crossfeed.
 Expected output is the convolution of input with those taps, delayed by the
 plug-in's reported 256 samples. `examples.json` records the exact coefficients.
 Each directory contains `impulse.wav`, a relative-path `filter.cfg`, and an
-embedded `filter.vstpreset`. WAV and configuration imports produce identical
-presets. Presets retain the filters after the WAV and config are removed.
+embedded `filter.vstpreset`. Presets made from the WAV and from the `.cfg` are
+identical, and keep the filter after the WAV and `.cfg` are removed.

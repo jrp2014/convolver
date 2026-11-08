@@ -63,8 +63,8 @@ std::string loaded_line(const HostFilter&, const std::optional<HostLayout>& host
 std::string rejected_line(const HostFilter&, bool started);
 // DIAG-1: logged when the host's save call fails, which hosts may not report.
 inline constexpr const char* save_failure_message =
-    "Saving failed: the plug-in's state could not be written for the host (out of memory, or "
-    "the host did not take the data), so the project or preset being saved does not hold "
+    "Saving failed: Convolver could not give its data to the host (out of memory, or the "
+    "host did not take it), so the project or preset being saved does not hold "
     "the filter. Save again, and report it if it keeps failing.";
 // PLUG-10: what Gain and Mix let through while no filter is heard, with
 // equal input and output counts (otherwise Mix does not apply and there is

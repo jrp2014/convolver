@@ -71,7 +71,7 @@ configurations in that program.
 
 | Feature | Convolver | Roon | Audiolense / JRiver | Other readers |
 | --- | --- | --- | --- | --- |
-| Sound file as the filter, diagonal channels | yes | not tested | not tested | not tested |
+| IR file used directly as the filter, diagonal channels | yes | not tested | not tested | not tested |
 | Header, delay lines, four-line paths (3.0 and later) | yes | documented | documented | not tested |
 | Format before 3.0 (no delay lines) | no, with a diagnostic | unknown | unknown | unknown |
 | `-0` inversion, fractional weights, repeated routes | yes | not tested | not tested | not tested |

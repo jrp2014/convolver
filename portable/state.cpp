@@ -128,8 +128,8 @@ Advice host_state_size_error(const HostState& state) {
     const auto n = state.configuration ? samples(*state.configuration) : 0;
     return {"the filter is too large to save: its " + std::to_string(n) + " samples would take " +
                 std::to_string(size) + " bytes",
-            "Plug-in state and presets hold at most " + std::to_string(max_host_state_bytes) +
-                " bytes (64 MiB), just under " + std::to_string(limit_samples) +
+            "Projects and presets hold at most " + std::to_string(max_host_state_bytes) +
+                " bytes (64 MiB) of Convolver's data, just under " + std::to_string(limit_samples) +
                 " samples of all the impulse responses together, with room kept for the plug-in's "
                 "settings.",
             "Shorten the impulse responses (most of a long one's end is usually silence) or use "
@@ -190,7 +190,7 @@ HostState decode_host_state(std::span<const std::byte> bytes) {
         throw std::length_error("host state exceeds limit");
     Reader r{bytes};
     if (r.word() != magic)
-        throw std::invalid_argument("it is not Convolver plug-in state");
+        throw std::invalid_argument("it was not saved by Convolver");
     const auto format = r.word();
     if (format > version)
         throw NewerHostState(detail::advice_text(
