@@ -85,11 +85,14 @@ workflow.
    fixed offset after its input block.
 3. `Engine::process` accepts interleaved float frames, applies input delays,
    and works in chunks up to the next 64-frame boundary. At each boundary the
-   64-frame stage runs whole; a larger stage's block (n frames) is started and
-   its transforms and multiply-adds are spread over the n/64 boundaries that
-   follow, by cost, so no callback carries a whole large block. The layout
-   leaves each spread stage a block period of slack (an offset of at least
-   2n).
+   64-frame stage runs whole, and so does any stage the layout marks whole: at
+   a latency of 64 or more, a block no larger than the latency whose offset
+   (one to two blocks) is too short to spread it, as the uniform engine
+   computed every block. Any other larger stage's block (n frames) is started
+   and its transforms and multiply-adds are spread over the n/64 boundaries
+   that follow, by cost, so no callback carries a whole large block. The
+   layout leaves each spread stage a block period of slack (an offset of at
+   least 2n).
 4. `same_mix` groups identical **ordered** input routes, including gain bits.
    Each `Mix` owns, per stage, one forward-transform history shared by its
    paths, plus the mixed input and the direct sum's history. Each path keeps

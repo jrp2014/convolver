@@ -583,7 +583,11 @@ void tune_fft(std::size_t b, FftOptions options) {
 Engine::Engine(const Configuration& c, std::size_t b, FftOptions options)
     : impl_([&] {
           const detail::ScopedFlushDenormals flush;
-          return std::make_unique<Impl>(c, b, validate(c, b), options);
+          const auto analysis = validate(c, b);
+          // Checked here too: a filter short enough for the direct sum alone
+          // makes no transform that would check them.
+          detail::check_fft_options(options);
+          return std::make_unique<Impl>(c, b, analysis, options);
       }()) {}
 Engine::~Engine() = default;
 Engine::Engine(Engine&&) noexcept = default;

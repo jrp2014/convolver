@@ -551,14 +551,16 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   in powers of two (jrp, 25 October 2026), with 0 first and the default (jrp,
   8 November 2026, PERF-2). A larger value can use somewhat less processor
   time. The settings constructor refuses any other value. Adding 0 first
-  left saved projects' latencies unchanged, except at the old default, 256,
-  which opens at the new default. The VST3 state stores frames, and a
-  project saved at the default has no settings saved. The Audio Unit
-  saves its Latency parameter, which is the menu position, so it now also
-  saves the frames under `convolver-latency-frames`; state without them
-  is read through the earlier menu, whose 256 opens at 0 too (jrp,
-  8 November 2026), even when chosen on purpose. A VST3 test and an AU
-  test restore state saved at each earlier choice. At zero latency the first frames after a
+  left saved projects' latencies unchanged, except some at the old
+  default, 256. The VST3 state stores frames, and only when a setting
+  differs from its default: a project saved with every setting at the
+  default has none and opens at the new default, 0, while one whose Gain
+  or Mix differed stored 256 and keeps it. The Audio Unit saves its
+  Latency parameter, which is the menu position, so it now also saves the
+  frames under `convolver-latency-frames`; state without them is read
+  through the earlier menu, whose 256 always opens at 0 (jrp, 8 November
+  2026), even when chosen on purpose. A VST3 test and an AU test restore
+  state saved at each earlier choice. At zero latency the first frames after a
   reset are heard, so a bypass, gain or mix change made before them applies
   at once, without the ramp a latency used to hide. It
   cannot change while a processor runs, so a new choice needs a new

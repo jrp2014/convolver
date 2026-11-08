@@ -413,6 +413,20 @@ void no_processing_allocation() {
 void invalid() {
     rejects([] { Engine e(mono(), max_block_frames + 1); });
     rejects([] { Engine e(mono(), std::numeric_limits<std::size_t>::max()); });
+    // FFT options every backend refuses (a negative time limit) are refused
+    // whatever the filter length, including filters short enough for the
+    // direct sum alone, which make no transform (jrp's review of f5d460e).
+    for (const std::size_t taps : {1, 64, 65, 5000})
+        for (const std::size_t latency : {0, 256})
+            rejects([&] {
+                Engine e(mono(std::vector<float>(taps, .1f)), latency,
+                         FftOptions{FftPlanning::estimate, false, -1});
+            });
+    if (!fft_supports_wisdom())
+        for (const std::size_t taps : {1, 65})
+            rejects([&] {
+                Engine e(mono(std::vector<float>(taps, .1f)), 0, FftOptions{FftPlanning::measure});
+            });
     for (auto rate : {0, -1, 768001}) {
         auto c = mono();
         c.sample_rate = rate;

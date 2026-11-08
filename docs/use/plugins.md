@@ -547,10 +547,18 @@ defaults play exactly as Convolver did before the settings existed.
   project).
 - **Projects from earlier versions.** Earlier versions had no 0 in the
   Latency menu and used 256 frames by default. A project or preset saved
-  with one of them opens at the Latency it was saved with, except 256,
-  which opens at the new default, 0 frames, even if you chose 256 on
-  purpose. Choose 256 again if you want its delay back, then save. With
-  delay compensation on, the host lines the audio up either way.
+  with one of them opens at the Latency it was saved with, except
+  sometimes at 256, the old default:
+  - **VST3:** a project saved with Gain, Mix and Latency all at their
+    defaults saved no settings, so it opens at the new default, 0 frames.
+    One where Gain or Mix had been changed saved its Latency too, and opens
+    at 256.
+  - **Audio Unit:** 256 always opens at 0 frames, even if you chose it on
+    purpose, because the Audio Unit's saved state cannot tell the two
+    apart.
+
+  Choose 256 again if you want its delay back, then save. With delay
+  compensation on, the host lines the audio up either way.
 - **Settings and other formats.** Each format saves its settings its own
   way, so a filter moved between them (a VST3 preset opened as an Audio
   Unit, say) keeps the filter but not the settings: it plays at 0 dB, fully

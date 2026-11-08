@@ -359,7 +359,7 @@ Shared work, done once for all three formats:
   with three modes (a set value, the noise estimate and the no-clip bound of
   `estimate_attenuation()`, computed during preparation), a
   latency-aligned wet/dry mix, and a chosen block size (64 to 4096 frames,
-  default 256), with 64-sample ramps; output peak, clip count and callback
+  default 256; since PERF-2, 0 or 64 to 4096, default 0), with 64-sample ramps; output peak, clip count and callback
   load as audio-thread counters; host state version 3 written only for
   non-default settings; each format saves the settings its own way, and
   where they can diverge (presets from `convolver-preset` carry the filter
@@ -1404,7 +1404,7 @@ with compatibility tests; linked IDs point to open work above.
 | One FFT backend per binary; Ooura/Accelerate have no FFTW-style measured plans or wisdom | Intentional deployment choice. Assess alternatives under FFT-2; do not imply runtime fallback. | [FFT guide](docs/develop/fft-backends.md#selection-and-contract) |
 | FFTW wisdom is CPU/build/size-sensitive and process-global | Retune when relevant inputs change; external planner users must coordinate. A successful import does not prove optimality. | [Planning](docs/use/command-line.md#fftw-plan-tuning) |
 | Core processing uses interleaved float buffers that must not overlap | Use `HostProcessor` for planar/in-place float/double host buffers; internal DSP remains float. | [Engine API](docs/develop/library.md#engine-api) |
-| Latency and filter replacement are not instantaneous | Core latency is B; the plug-ins' default is 256 frames. Replacement starts with fresh history and warms/crossfades; reset work scales with the block buffers and delay lines, not the filter length (PERF-5). | [Replacement](docs/develop/plugin-contract.md#replacement-and-threads) |
+| Latency and filter replacement are not instantaneous | Core latency is B; the plug-ins' default is 0 frames (PERF-2); a larger Latency adds its delay. Replacement starts with fresh history and warms/crossfades; reset work scales with the block buffers and delay lines, not the filter length (PERF-5). | [Replacement](docs/develop/plugin-contract.md#replacement-and-threads) |
 | Callback safety has a defined thread contract | One audio thread per instance; serialized control calls; teardown requires stopped audio. Stress/deadline evidence remains ROBUST-1. | [Implementation invariants](docs/develop/architecture.md#invariants-to-preserve) |
 | Resource limits cap channels, paths, delays, text, IRs and state | Intentional bounds; assess any increase with memory/overflow tests. | [Core limits](docs/develop/library.md#resource-limits), [tests](docs/develop/testing.md) |
 | The configuration format is not identical across consumers | No external consumer has verified this corpus yet; CFG-1. Older bundled configs may need delay lines and portable paths. | [Compatibility matrix](docs/use/other-programs.md#what-convolver-accepts) |

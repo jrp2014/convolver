@@ -8,6 +8,10 @@ namespace convolver::detail {
 // Internal callers validate 1 <= block <= 2^20 before these size calculations.
 std::size_t fft_size(std::size_t block) noexcept;
 std::size_t fft_storage(std::size_t n) noexcept; // owned float buffer elements
+// Throws std::invalid_argument for options this backend cannot honour, as
+// RealFft would. The engine checks them even when a filter needs no
+// transform (a filter short enough for the direct sum alone).
+void check_fft_options(const FftOptions&);
 
 // Canonical bins 0..N/2, interleaved real/imaginary; separate DC and Nyquist.
 // Forward is the mathematical DFT; inverse returns N times the real signal.

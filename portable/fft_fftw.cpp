@@ -96,6 +96,9 @@ struct Plan {
     }
 };
 } // namespace
+void check_fft_options(const FftOptions& options) {
+    static_cast<void>(planning_flags(options));
+}
 std::size_t fft_size(std::size_t b) noexcept {
     return 2 * b;
 }

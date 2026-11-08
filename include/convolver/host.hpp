@@ -531,7 +531,8 @@ const char* no_dry_reason(HostDrySignal) noexcept;
 // stopped audio.
 class HostProcessor {
   public:
-    HostProcessor(const Configuration&, std::size_t max_frames, std::size_t block = 256);
+    HostProcessor(const Configuration&, std::size_t max_frames,
+                  std::size_t block = default_host_latency);
     // PLUG-10: with the settings applied from the first frame: gain and mix,
     // and the latency as the block size. Throws std::invalid_argument if the
     // latency is not one of host_latencies.
