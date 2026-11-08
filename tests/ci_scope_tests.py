@@ -229,6 +229,8 @@ class Classification(unittest.TestCase):
             (['Prose.\n'], False),  # Added or deleted.
             (['<!-- executable-example -->\n```sh\nconvolver\n```\n', 'Prose.\n'], True),  # Removed.
             (['Prose.\n', '<!-- refused-example -->\n'], True),  # Added.
+            (['Prose with ![a logo](images/logo.png).\n'], True),  # Only packaging checks images.
+            (['<img src="images/logo.png" alt="">\n', 'Prose.\n'], True),
             (None, True),  # Cannot be read: build them.
         ]
         for texts, build in cases:
@@ -240,15 +242,25 @@ class Classification(unittest.TestCase):
         self.guides['examples/plugin-presets/README.md'] = ['Prose.\n']
         self.assertTrue(ci_scope.candidates(['examples/plugin-presets/README.md']))
         self.assertTrue(ci_scope.candidates(['docs/use/images/host.png']))
+        # Only docs/use/*.md are guides; Markdown in a subfolder is packaged
+        # as it is (install(DIRECTORY docs/use/images/)), so it builds them.
+        self.guides['docs/use/images/notes.md'] = ['Prose.\n']
+        self.assertTrue(ci_scope.candidates(['docs/use/images/notes.md']))
 
     def test_example_markers_match_the_packaged_check(self):
-        """The markers are the ones the candidates' documentation check runs."""
-        check = (ROOT / 'tests/release/documentation_examples.py').read_text(encoding='utf-8')
-        self.assertIn("r'<!-- (executable|refused)-example -->", check)
-        marked = [
-            page for page in sorted((ROOT / 'docs/use').glob('*.md')) if ci_scope.EXAMPLE.search(page.read_text())
-        ]
-        self.assertTrue(marked)
+        """Every guide whose commands the candidates' documentation check runs
+        is one the scope counts as marked, and some guides are."""
+        spec = importlib.util.spec_from_file_location(
+            'documentation_examples', ROOT / 'tests/release/documentation_examples.py'
+        )
+        examples = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(examples)
+        texts = {page: page.read_text(encoding='utf-8') for page in sorted((ROOT / 'docs/use').glob('*.md'))}
+        run = [page for page, text in texts.items() if examples.EXAMPLE.search(text)]
+        self.assertTrue(run)
+        for page in run:
+            with self.subTest(page=page.name):
+                self.assertRegex(texts[page], ci_scope.EXAMPLE)
 
     def test_packaged_sources_build_the_candidates(self):
         """Every source file that only packaging builds or reads, and every
@@ -588,8 +600,14 @@ class Command(unittest.TestCase):
 
             def merged(page, text):
                 git('checkout', '-q', '-B', 'topic', 'main')
-                (repository / page).write_text(text)
-                git('commit', '-q', '-am', 'edit')
+                if text is None:
+                    git('rm', '-q', page)
+                elif isinstance(text, bytes):
+                    (repository / page).write_bytes(text)
+                else:
+                    (repository / page).write_text(text)
+                git('add', '-A')
+                git('commit', '-q', '-m', 'edit')
                 git('checkout', '-q', '--detach', 'main')
                 git('merge', '-q', '--no-ff', '-m', 'merge', 'topic')
                 return self.run_script('--workflow', 'release', cwd=repository)[0]
@@ -606,6 +624,11 @@ class Command(unittest.TestCase):
                 merged('docs/use/prose.md', '<!-- refused-example -->\n```sh\nconvolver\n```\n'),
                 'build=true\npackage=true\n',
             )
+            self.assertEqual(merged('docs/use/added.md', 'New prose.\n'), 'build=false\npackage=false\n')
+            self.assertEqual(merged('docs/use/marked.md', None), 'build=true\npackage=true\n')  # Deleted.
+            self.assertEqual(merged('docs/use/prose.md', None), 'build=false\npackage=false\n')
+            # A page that cannot be read counts as marked, even when the other side is prose.
+            self.assertEqual(merged('docs/use/prose.md', b'\xff<!-- prose -->\n'), 'build=true\npackage=true\n')
 
 
 if __name__ == '__main__':

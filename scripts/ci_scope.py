@@ -13,8 +13,8 @@ changed file is one of these kinds:
   tests/native/benchmarks/ and only their dated results in docs/benchmarks/.
 - packaged documentation: pages copied into the preview packages. These also
   need the candidate workflow, which runs the packaged guide's examples;
-  a guide in docs/use/ needs it only if it has such an example before or
-  after the change.
+  a guide in docs/use/ needs it only if it has such an example or shows an
+  image, before or after the change.
 - one plug-in format's own files (CI-13): its adapter and its tests. These
   need that format's workflow. The macOS window that VST3 and the Audio Unit
   share (plugins/editor/mac/) counts as a format of its own here, needing
@@ -38,7 +38,6 @@ docs/develop/testing.md#ci-triggers.
 """
 
 import argparse
-import contextlib
 import os
 import re
 import subprocess
@@ -62,13 +61,16 @@ PACKAGED = (
     'examples/plugin-presets/README.md',
     'portable/third_party/ooura/README.md',
 )
-# Guides whose marked commands the candidates run from a package
-# (tests/release/documentation_examples.py). A change to one of these pages
-# builds the candidates only when the page has such a command before or after
-# the change (CI-34, jrp's choice of 8 November 2026); other prose changes
-# there are left to Lint, and main still packages every page.
+# The guides, docs/use/*.md. The candidates run their marked commands from a
+# package (tests/release/documentation_examples.py), so a change to a guide
+# builds them only when the page has such a command before or after the
+# change (CI-34, jrp's choice of 8 November 2026). A page that shows an image
+# builds them too, as only the packaging checks where its images come from
+# (scripts/release/package_docs.py). Other prose changes are left to Lint,
+# and main still packages every page.
 GUIDES = 'docs/use/'
 EXAMPLE = re.compile(r'<!-- (?:executable|refused)-example -->')
+IMAGE = re.compile(r'!\[|<img\s')
 
 # Files that only one plug-in format builds or tests (CI-13). Nothing outside
 # these folders and the format's workflow may refer to them; the shared
@@ -168,21 +170,40 @@ def classify(path):
 def versions(path):
     """The texts of a changed file before and after the change: the base
     commit's (HEAD^1, the merge commit's first parent) and the checked-out
-    one's, each when it exists. None when neither can be read."""
+    one's, each when it exists. None when neither exists, or when one that
+    exists cannot be read as UTF-8."""
     texts = []
-    with contextlib.suppress(OSError, UnicodeDecodeError):
+    try:
         texts.append(Path(path).read_text(encoding='utf-8'))
-    with contextlib.suppress(OSError, UnicodeDecodeError, subprocess.CalledProcessError):
-        base = ['git', 'show', f'HEAD^1:{path}']
-        texts.append(subprocess.run(base, check=True, capture_output=True, encoding='utf-8').stdout)
+    except FileNotFoundError:
+        pass
+    except (OSError, UnicodeDecodeError):
+        return None
+    try:
+        base = subprocess.run(['git', 'show', f'HEAD^1:{path}'], check=True, capture_output=True).stdout
+    except subprocess.CalledProcessError:
+        base = None  # Not in the base commit, or there is none.
+    except OSError:
+        return None
+    if base is not None:
+        try:
+            texts.append(base.decode('utf-8'))
+        except UnicodeDecodeError:
+            return None
     return texts or None
 
 
-def runnable(path):
-    """Whether a guide has a command the candidates run, before or after the
-    change. A page that cannot be read counts as having one."""
+def guide(path):
+    """Whether a path is one of the guides, docs/use/*.md."""
+    name = path[len(GUIDES) :]
+    return path.startswith(GUIDES) and '/' not in name and name.endswith('.md')
+
+
+def guide_needs_candidates(path):
+    """Whether a guide has a command the candidates run, or shows an image,
+    before or after the change. A page that cannot be read counts as one."""
     texts = versions(path)
-    return texts is None or any(EXAMPLE.search(text) for text in texts)
+    return texts is None or any(EXAMPLE.search(text) or IMAGE.search(text) for text in texts)
 
 
 def candidates(paths):
@@ -191,8 +212,8 @@ def candidates(paths):
         kind = classify(path)
         if kind == 'documentation':
             continue
-        if kind == 'packaged' and path.startswith(GUIDES) and path.endswith('.md'):
-            if runnable(path):
+        if kind == 'packaged' and guide(path):
+            if guide_needs_candidates(path):
                 return True
             continue
         if kind in ('packaged', 'format:editor', 'workflow:release') or matches(path, RELEASE + CANDIDATES):
@@ -287,7 +308,7 @@ def main(argv=None):
             lines.append('These workflows build and test: ' + ', '.join(sorted(workflows)) + '.')
         if workflows and 'release' not in workflows:
             lines.append(
-                'The candidates are not built: nothing they are built from or hold changed (CI-34). '
+                'The candidates are not built: nothing that changed needs them (CI-34). '
                 'To build them for this branch, start "Plug-in distribution candidates" by hand on it.'
             )
         if args.workflow:

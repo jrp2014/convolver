@@ -1419,7 +1419,8 @@ the files the pull request changes; their other jobs then show as skipped.
 Pushes to `main` and manual runs always run everything, as a backstop.
 The `scope` jobs add six short Linux jobs to every commit (a full run was 18
 jobs before them); a documentation-only commit starts 7, none on macOS, and one
-that changes a packaged page starts 13, two of them on macOS.
+that changes a packaged page that builds the candidates starts 13, two of them
+on macOS.
 
 Documentation here means Markdown files anywhere and everything under `docs/`,
 except:
@@ -1432,9 +1433,10 @@ except:
   [candidate workflow](#plug-in-candidate-checks): everything under `docs/use/`,
   `examples/plugin-presets/README.md` and the Ooura `README.md`. A page in
   `docs/use/` runs it only when it has a command marked
-  `<!-- executable-example -->` or `<!-- refused-example -->`, before or after
-  the change, because the candidates run those commands from a package; a
-  prose change elsewhere in the guides is left to Lint
+  `<!-- executable-example -->` or `<!-- refused-example -->`, or shows an
+  image, before or after the change: the candidates run those commands from a
+  package and check where its images come from. A change to a guide with
+  neither is left to Lint
   ([below](#when-pull-requests-build-the-candidates)).
 
 When a test starts reading another page, or the packages gain one, add it to
@@ -1497,8 +1499,9 @@ what they are built from or hold (CI-34, approved by jrp on 8 November 2026):
 - release files: `scripts/release/`, `tests/release/`, `packaging/` and the
   candidate workflow itself;
 - packaged pages ([above](#documentation-only-pull-requests); a guide in
-  `docs/use/` only when it has a marked command, before or after the change,
-  as jrp chose on 8 November 2026) and the rest of the package: `examples/`, `COPYING`, the bundles' `Info.plist.in` and
+  `docs/use/` only when it has a marked command or shows an image, before or
+  after the change, as jrp chose on 8 November 2026) and the rest of the
+  package: `examples/`, `COPYING`, the bundles' `Info.plist.in` and
   notices, `plugins/identities.json`, `tests/plugins/fixtures.py` (it writes
   the packaged examples' audio) and `.gitattributes` (the source archive is
   written with `git archive`);
@@ -1517,10 +1520,12 @@ from the packaged pages. The list is `CANDIDATES` and `RELEASE` in
 `CONVOLVER_PACKAGE_PLUGINS` build reads and every repository file the release
 scripts name.
 
-The scope job reads both sides of the merge for a guide's markers: the page
-as merged and as it was on the base branch (`git show HEAD^1:PAGE`), so
-removing a page's last marked command still builds the candidates, and a page
-it cannot read counts as marked.
+The scope job reads both sides of the merge for a guide: the page as merged
+and as it was on the base branch (`git show HEAD^1:PAGE`), so removing a
+page's last marked command, or deleting a marked page, still builds the
+candidates. A page that exists but cannot be read as UTF-8 on either side
+counts as marked. Only `docs/use/*.md` are guides; Markdown in a subfolder
+builds the candidates whatever it holds.
 
 Any other change, ordinary code included, can still break a package, so the
 candidates keep building for every push to `main`, each Monday and when
