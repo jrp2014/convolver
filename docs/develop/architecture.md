@@ -267,6 +267,33 @@ and AArch64 kernels. Each platform-specific path:
   found none);
 - adds no shipped dependency without jrp's decision.
 
+### Threads and cores
+
+Convolver does not spread one instance's work over several cores, and does
+not plan to unless a measurement shows it is needed ([decided](../project/decisions.md#direction)
+by jrp, 8 November 2026). Machines with many cores are used as follows:
+
+- **Real-time processing** runs on the host's audio thread for the track.
+  Hosts such as REAPER, Logic and GarageBand already spread separate tracks
+  and instances over their cores. With the non-uniform engine (PERF-2) one
+  instance needs little: a 30 s stereo reverb at Latency 0 takes under 2% of
+  one core on the Linux cloud VM
+  ([measurements](fft-measurements.md#the-non-uniform-engine)). In the
+  7 November experiment a worker thread used 2 to 3.5 times more processor
+  time in total and did not shorten the worst callback
+  ([long reverbs](fft-measurements.md#long-reverbs-and-zero-latency)), and
+  it would add the scheduling rules a worker needs (results ready when their
+  samples are due, in real-time, prefetch and offline modes).
+- **Loading a filter** runs on one control thread and already meets the
+  [loading limits](load-timing.md); spreading it over cores would save tens
+  of milliseconds at most.
+- **The command line** renders one file per run; several runs at once use
+  every core with no change ([file rendering](../use/command-line.md#file-rendering)).
+
+Revisit only if a measured workload on a named machine shows one instance
+needing a large share of a core (PERF-3), and then with Apple's audio
+workgroups or Windows MMCSS for any helper thread, as EDGE-10 lists.
+
 ## Where future work belongs
 
 Keep this page about implemented structure. Put open work in [TODO](../../TODO.md),

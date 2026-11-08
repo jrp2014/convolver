@@ -51,6 +51,14 @@ convolver --filter room.cfg --input music.wav --output corrected.wav
 convolver --filter impulse.wav --input music.wav --output corrected.wav --block-size 128 --gain-db -6 --output-format wav-pcm24
 ```
 
+Each run renders one file on one processor core. To render a folder of files
+on every core, run several at once, for example eight at a time:
+
+```sh
+mkdir -p out
+ls *.wav | xargs -P 8 -I{} convolver --filter room.cfg --input {} --output out/{}
+```
+
 The filter may be an IR file, a [configuration](configuration.md) (`.cfg`), or a
 configuration list. An IR file used directly maps each IR channel to the
 corresponding input and output; a mono IR requires mono input. Use a
