@@ -2,6 +2,7 @@
 // PLUG-3: preset containers built without any plug-in SDK. The VST3 writer is
 // also compared byte for byte with Steinberg's (tests/vst3/preset_format_tests.cpp),
 // and tests/plugins/preset_tests.py reads all three formats independently.
+#include "host_report.hpp"
 #include "presets.hpp"
 #include <algorithm>
 #include <cstring>
@@ -140,6 +141,53 @@ int main() {
         auto lost = file;
         put64(lost, 40, ~std::uint64_t{0});
         rejects([&] { presets::read_vst3_preset(lost); }, "list offset overflow");
+
+        // PLUG-31: the filter file's name for the VST3 window, with the
+        // filter's identity, as the 'Cont' chunk after 'Comp' (the
+        // controller state, PLUG-22).
+        const auto named = presets::vst3_filter_name(stereo, "Living room 48k.cfg");
+        require(named.name == "Living room 48k.cfg" &&
+                    named.identity ==
+                        filter_identity_text(configuration_identity(*stereo.configuration)) &&
+                    named.identity.size() == 16,
+                "filter name and identity");
+        const auto with_name = presets::vst3_preset(stereo, named);
+        const auto cont = vst3::encode_controller_state(named);
+        const auto named_list = 48 + component.size() + cont.size();
+        require(with_name.size() == named_list + 8 + 2 * 20 &&
+                    std::memcmp(with_name.data() + 48, component.data(), component.size()) == 0 &&
+                    std::memcmp(with_name.data() + 48 + component.size(), cont.data(),
+                                cont.size()) == 0 &&
+                    std::memcmp(with_name.data() + named_list, "List\2\0\0\0Comp", 12) == 0 &&
+                    std::memcmp(with_name.data() + named_list + 28, "Cont", 4) == 0,
+                "header, both chunks and their list");
+        const auto restored = presets::read_vst3_preset(with_name);
+        require(same(restored, stereo), "named VST3 round trip");
+        // The identity the plug-in finds for the filter it decodes.
+        require(filter_identity_text(configuration_identity(*restored.configuration)) ==
+                    named.identity,
+                "identity changed by the round trip");
+        const auto back = presets::read_vst3_filter_name(with_name);
+        require(back.name == named.name && back.identity == named.identity, "name read back");
+        require(presets::read_vst3_filter_name(file).name.empty() &&
+                    presets::read_vst3_filter_name(hosted).name.empty(),
+                "a name read from a preset without one");
+        require(presets::vst3_preset(stereo, {}) == file, "a preset without a name changed");
+        // No name rather than one the plug-in would not read.
+        for (const auto& bad :
+             {std::string(), std::string(max_filter_name_bytes + 1, 'a'), std::string("\xFF.wav")})
+            require(presets::vst3_filter_name(stereo, bad).name.empty(), "a bad name kept");
+        require(presets::vst3_filter_name(empty, "room.wav").name.empty(),
+                "a name without a filter");
+        // A damaged name chunk is no name, and the filter still loads.
+        auto far_name = with_name;
+        put64(far_name, named_list + 8 + 20 + 4, with_name.size());
+        require(presets::read_vst3_filter_name(far_name).name.empty() &&
+                    same(presets::read_vst3_preset(far_name), stereo),
+                "a damaged name chunk");
+        for (std::size_t n = 0; n < with_name.size(); ++n)
+            require(presets::read_vst3_filter_name(std::span(with_name).first(n)).name.empty(),
+                    "a name from a truncated preset");
 
         // AU: Apple's standard keys plus ours; the name is XML-escaped.
         const auto au = presets::au_preset(stereo, "Room <A&B>");

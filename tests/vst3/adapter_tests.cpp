@@ -2499,12 +2499,64 @@ void saved_filter_name() {
         hall.seek(0, IBStream::kIBSeekSet, nullptr);
         require(reopened.p.setState(&hall) == kResultOk, "other preset");
         report = reopened.c.report();
-        require(field(report, "filter name") == "From the saved project or preset",
+        require(field(report, "filter name") == "Restored filter",
                 "a saved name shown for another filter");
     }
     convolver::vst3::test_file_reader = reader;
     std::filesystem::remove_all(folder);
 #endif
+}
+// PLUG-31: a preset made by convolver-preset, loaded as the SDK's
+// PresetFile::loadPreset does for a host (the component state, then the
+// controller's), names its filter file in the window. An empty `expected`:
+// a preset without a name (convolver-vst3-preset's), which must not gain one.
+void preset_filter_name(const std::filesystem::path& preset_path, const std::string& expected) {
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk && p.connect(&c) == kResultOk &&
+                c.connect(&p) == kResultOk,
+            "preset name instance");
+    SpeakerArrangement mono = SpeakerArr::kMono;
+    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+    require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk &&
+                p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "preset name activate");
+    std::ifstream file(preset_path, std::ios::binary);
+    std::vector<char> bytes((std::istreambuf_iterator<char>(file)), {});
+    MemoryStream preset(bytes.data(), static_cast<TSize>(bytes.size()));
+    require(PresetFile::loadPreset(&preset, processor_id, &p, &c), "SDK preset loading");
+    std::string shown = "(missing)", identity;
+    for (const auto& [key, value] : c.report()) {
+        if (key == "filter name")
+            shown = value;
+        if (key == "filter identity")
+            identity = value;
+    }
+    require(!identity.empty(), "a generated preset loaded no filter");
+    if (!expected.empty() && shown != expected)
+        throw std::runtime_error("a generated preset shows '" + shown + "', not '" + expected +
+                                 "'");
+    // Saved again by the host: the name stays with the filter.
+    MemoryStream again;
+    require(c.getState(&again) == kResultOk, "save after a generated preset");
+    std::string saved(static_cast<std::size_t>(again.getSize()), '\0');
+    again.seek(0, IBStream::kIBSeekSet, nullptr);
+    int32 read = 0;
+    again.read(saved.data(), static_cast<int32>(saved.size()), &read);
+    const auto kept = decode_controller_state(saved);
+    if (expected.empty())
+        require(saved.empty(), "a preset without a name saved with one");
+    else
+        require(kept.name == expected && kept.identity == identity, "name lost when saved again");
+    p.setActive(false);
+    p.disconnect(&c);
+    c.disconnect(&p);
+    c.terminate();
+    p.terminate();
+    std::cout << "A generated preset shows: " << shown << '\n';
 }
 // VST3-15: what a host may put between the components
 // (IConnectionPoint): a proxy that passes each message on at once and
@@ -2760,8 +2812,10 @@ void controller_conversions() {
     require(c.setState(&state) == kResultOk, "controller setState");
     c.terminate();
 }
-int run(const std::filesystem::path& preset_path) {
+int run(const std::filesystem::path& preset_path, const std::optional<std::string>& preset_name) {
     try {
+        if (preset_name)
+            preset_filter_name(preset_path, *preset_name);
         edge_cases();
         fractional_rates();
         controller_conversions();
@@ -2872,5 +2926,12 @@ int main(int argc, char** argv) {
     // CI-28: the log CTest names in the build folder, set once before any
     // instance exists and never removed, so it is evidence after a crash.
     process_log = convolver::test_log::use_test_log("convolver-adapter-tests.log");
-    return run(argc == 2 ? std::filesystem::path(argv[1]) : std::filesystem::path{});
+    // A preset to load, and the filter name it should show (PLUG-31; empty
+    // for none).
+    std::optional<std::string> preset_name;
+    if (argc == 3) {
+        const auto name = std::filesystem::path(argv[2]).u8string();
+        preset_name.emplace(name.begin(), name.end());
+    }
+    return run(argc >= 2 ? std::filesystem::path(argv[1]) : std::filesystem::path{}, preset_name);
 }

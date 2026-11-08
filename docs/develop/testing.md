@@ -299,7 +299,10 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   version-1 states with any channel mask, every truncation and damaged chunk
   list, another plug-in's preset, AU keys and XML escaping, one LV2 plug-in URI
   per fixed layout, Turtle escaping, and the explained refusals (channel limits,
-  layouts without an LV2 plug-in, unusable preset names).
+  layouts without an LV2 plug-in, unusable preset names), and the filter's
+  name in a `.vstpreset` (PLUG-31): the `Cont` chunk's place, its identity
+  after the state is decoded, names left out rather than stored badly, and
+  damaged or truncated name chunks read as no name.
 - `plugins.presets`: `convolver-preset` writes the 2→6 crossover fixture as all
   three formats in one run and reads each back without Convolver's code: the
   `.vstpreset` by its documented layout, the `.aupreset` with Python's
@@ -307,7 +310,9 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   when installed). All three must hold the same encoded state, which a separate
   version-1 decoder checks against the fixture's WAV samples, routes, gains and
   delays. It also converts a `.vstpreset` after its source files are deleted,
-  and checks that refused requests write nothing.
+  and checks that refused requests write nothing. Each `.vstpreset` names its
+  source file (not `--name`), a conversion keeps the name and the bytes, and
+  a name whose identity does not match the filter is dropped.
 
 - `export.equalizer_apo`: `convolver-equalizer-apo` exports the first-use
   examples and a configuration list, and a model of Equalizer APO 1.4.2 (written
@@ -338,10 +343,12 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
 The optional [VST3 build](build.md#vst3) adds these tests: actual SDK-interface lifecycle
 and audio tests, embedded preset generation/loading after deleting the source IR
 (`vst3.preset`, which also checks that `convolver-preset` and
-`convolver-vst3-preset` write the same bytes), `vst3.preset_format` (our
+`convolver-vst3-preset` write the same audio state, and that the plug-in's
+window names the file of a preset from `convolver-preset` after
+`PresetFile::loadPreset`, PLUG-31), `vst3.preset_format` (our
 `.vstpreset` writer is byte-identical to Steinberg's `PresetFile::savePreset`,
-the SDK reads our presets, and we read the SDK's, including controller and
-metadata chunks),
+with and without the filter's name, the SDK reads our presets, and we read
+the SDK's, including controller and metadata chunks),
 plus the SDK validator loading the built plug-in in its default and extensive
 modes (the preset test requires I/O). `vst3.fft_symbols` inspects the plug-in
 binary with `nm`/`readelf`, `otool` or `dumpbin` (on Windows found on PATH or,

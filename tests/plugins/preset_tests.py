@@ -76,19 +76,47 @@ def decode_state(data):
     return state
 
 
-def read_vstpreset(path):
+def vstpreset_chunks(path):
+    """The chunks of a .vstpreset as convolver-preset writes it: 'Comp', then
+    'Cont' (PLUG-31) when it names the filter, back to back after the header."""
     data = path.read_bytes()
     magic, version, class_id, list_offset = struct.unpack_from('<4si32sq', data)
     assert magic == b'VST3' and version == 1
     assert class_id.decode() == REGISTRY['vst3']['processor_class_id']
     assert data[list_offset : list_offset + 4] == b'List'
     (count,) = struct.unpack_from('<i', data, list_offset + 4)
-    assert count == 1 and len(data) == list_offset + 8 + 20 * count
-    chunk, offset, size = struct.unpack_from('<4sqq', data, list_offset + 8)
-    assert chunk == b'Comp' and offset == 48 and offset + size == list_offset
-    (length,) = struct.unpack_from('<I', data, offset)
-    assert length == size - 4
-    return data[offset + 4 : offset + 4 + length]
+    assert count in (1, 2) and len(data) == list_offset + 8 + 20 * count
+    chunks = {}
+    end = 48
+    for i in range(count):
+        chunk, offset, size = struct.unpack_from('<4sqq', data, list_offset + 8 + 20 * i)
+        assert chunk == (b'Comp', b'Cont')[i] and offset == end, (chunk, offset)
+        end = offset + size
+        chunks[chunk] = data[offset:end]
+    assert end == list_offset
+    return chunks
+
+
+def read_vstpreset(path):
+    comp = vstpreset_chunks(path)[b'Comp']
+    (length,) = struct.unpack_from('<I', comp)
+    assert length == len(comp) - 4
+    return comp[4:]
+
+
+def vstpreset_filter_name(path):
+    """The filter's name in the controller state (PLUG-22's "CVCS" version 1:
+    the name, then the filter's identity, each with a 32-bit length), or None."""
+    cont = vstpreset_chunks(path).get(b'Cont')
+    if cont is None:
+        return None
+    assert cont[:4] == b'CVCS' and struct.unpack_from('<I', cont, 4) == (1,)
+    (name_size,) = struct.unpack_from('<I', cont, 8)
+    name = cont[12 : 12 + name_size].decode('utf-8')
+    (identity_size,) = struct.unpack_from('<I', cont, 12 + name_size)
+    identity = cont[16 + name_size :].decode('ascii')
+    assert len(identity) == identity_size == 16 and re.fullmatch('[0-9a-f]{16}', identity), identity
+    return name
 
 
 def read_aupreset(path, name):
@@ -201,6 +229,8 @@ def main():
         ]
         assert states[0] == states[1] == states[2], 'one encoded state in every format'
         check_crossover(decode_state(states[0]))
+        # PLUG-31: the .vstpreset names the filter file, with its extension.
+        assert vstpreset_filter_name(root / names[0]) == 'filter.cfg'
         print('Crossover (2->6) as VST3, AU and LV2 presets with identical state')
 
         # Converting a .vstpreset keeps the state byte for byte, after the
@@ -215,8 +245,21 @@ def main():
         (work / 'raw.cfg').write_text('44100 1 1 0\n0\n0\ndrc.pcm\n0\n0\n0\n')
         note = run(work / 'raw.cfg', root / 'Raw.vstpreset').stderr
         assert "raw filter 'drc.pcm' read as mono f32le at 44100 Hz" in note, note
+        assert vstpreset_filter_name(root / 'Raw.vstpreset') == 'raw.cfg'
+        # The filter file's name, not --name (the AU and LV2 preset name).
+        assert vstpreset_filter_name(root / 'Fork.vstpreset') == 'mono.cfg'
         shutil.rmtree(work)
-        run(root / 'Fork.vstpreset', root / 'Fork.aupreset', root / 'Fork.preset.lv2')
+        run(root / 'Fork.vstpreset', root / 'Fork.aupreset', root / 'Fork.preset.lv2', root / 'Fork 2.vstpreset')
+        # A converted .vstpreset keeps the name with the filter.
+        assert (root / 'Fork 2.vstpreset').read_bytes() == (root / 'Fork.vstpreset').read_bytes()
+        # A name saved for another filter is not carried over.
+        data = bytearray((root / 'Fork.vstpreset').read_bytes())
+        (list_offset,) = struct.unpack_from('<q', data, 40)
+        data[list_offset - 16 : list_offset] = b'0' * 16
+        (root / 'Other.vstpreset').write_bytes(bytes(data))
+        run(root / 'Other.vstpreset', root / 'Other 2.vstpreset')
+        assert vstpreset_filter_name(root / 'Other 2.vstpreset') is None
+        assert read_vstpreset(root / 'Other 2.vstpreset') == read_vstpreset(root / 'Fork.vstpreset')
         fork = read_vstpreset(root / 'Fork.vstpreset')
         assert read_aupreset(root / 'Fork.aupreset', 'Fork') == fork
         assert read_lv2(root / 'Fork.preset.lv2', 'Fork', 'discrete-1-2') == fork

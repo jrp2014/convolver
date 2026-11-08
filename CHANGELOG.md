@@ -12,6 +12,17 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Host checks (HOST-1, AU-4): jrp's 8 November 2026 checks with the 0.12.5
+  candidate are recorded. In REAPER, part C on the redesigned window
+  passed its controls and state, including save, quit and reopen, and the
+  latency renders lined up again
+  ([record](docs/archive/reviews/2026-11-08-host1-reaper-window.md)). In
+  GarageBand, the Audio Unit's presets, **Choose…**, a refused preset,
+  settings kept after reopening and two exports matching the CLI passed
+  ([record](docs/archive/reviews/2026-11-08-au4-garageband.md)). Listening
+  was not checked in either. jrp decided these results stand for the final
+  candidate after PLUG-31, where only what it touches and the unchecked
+  steps are run.
 - Preview qualification (REL-7): an acceptance plan with a fixed-candidate
   stop rule, required gates, blocker classification and deferred work.
   CI-34 proposes scheduling improvements separately; workflows and useful
@@ -190,6 +201,23 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Plug-in presets (PLUG-31, from jrp's REAPER check of VST3-16, 8 November
+  2026): a `.vstpreset` made by `convolver-preset` also holds the name of
+  the file it was made from, with its extension and without its folder, and
+  that filter's identity, as the VST3 controller state that a file chosen
+  in the window saves (PLUG-22). Loaded through Steinberg's preset code, as
+  the tests do, the VST3 window's heading then names the file
+  (`impulse.wav`, `filter.cfg` for the packaged presets) while that filter
+  plays; no host has been checked yet. A restored filter with no name (an
+  older project or preset, or another filter than the name's) is headed
+  "Restored filter" in every format, in place of "From the saved project
+  or preset", which named an origin the plug-in cannot know (jrp's choice). Converting a `.vstpreset` keeps its name only while it still
+  matches the filter. The audio state is unchanged, so presets sound the
+  same; VST3 builds from 0.5.0 on load them as before.
+  `convolver-vst3-preset` still writes its original bytes, without the
+  name. The controller state's reader and writer moved to
+  `portable/vst3_controller_state.hpp` so the tool, which needs no SDK,
+  shares them.
 - Documentation (DOC-11, from jrp's review of `main` at `bf6a207`, 8
   November 2026): the [status page](docs/project/status.md) agrees with the
   dated host records. It is dated 8 November 2026 against 0.12.1, no longer
