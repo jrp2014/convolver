@@ -494,7 +494,7 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
         const bool has_identity =
             attributes->getBinary("identity", identity, identity_size) == kResultOk;
         if (has_name != has_identity || (name_size && !name) || (identity_size && !identity) ||
-            name_size > max_filter_name_bytes || identity_size > 64)
+            name_size > max_filter_name_bytes || identity_size > max_controller_identity_bytes)
             return kInvalidArgument;
         try {
             std::lock_guard lock(control_);

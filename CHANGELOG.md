@@ -190,6 +190,20 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Plug-in presets (PLUG-31, from jrp's REAPER check of VST3-16, 8 November
+  2026): a `.vstpreset` made by `convolver-preset` (or
+  `convolver-vst3-preset`) also holds the name of the file it was made
+  from, with its extension and without its folder, and that filter's
+  identity, as the VST3 controller state that a file chosen in the window
+  saves (PLUG-22). After such a preset is loaded, or a project using it is
+  reopened, the VST3 window's heading names the file (`impulse.wav`,
+  `filter.cfg` for the packaged presets) instead of "From the saved project
+  or preset", while that filter plays. Converting a `.vstpreset` keeps its
+  name only while it still matches the filter. The audio state is unchanged:
+  presets sound the same, and plug-ins without the name ignore it. The
+  controller state's reader and writer moved to
+  `portable/vst3_controller_state.hpp` so the tool, which needs no SDK,
+  shares them.
 - Documentation (DOC-11, from jrp's review of `main` at `bf6a207`, 8
   November 2026): the [status page](docs/project/status.md) agrees with the
   dated host records. It is dated 8 November 2026 against 0.12.1, no longer

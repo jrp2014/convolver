@@ -22,7 +22,8 @@ with tempfile.TemporaryDirectory() as directory:
     result = subprocess.run([sys.argv[1], str(impulse), str(preset)], capture_output=True, check=False)
     assert result.returncode != 0 and preset.read_bytes() == original
     impulse.unlink()
-    subprocess.run([sys.argv[2], str(preset)], check=True)
+    # PLUG-31: the window names the IR file, with its extension.
+    subprocess.run([sys.argv[2], str(preset), impulse.name], check=True)
     result = subprocess.run([sys.argv[1], str(root / 'missing.wav'), str(preset)], capture_output=True, check=False)
     assert result.returncode != 0 and preset.read_bytes() == original
     print('Preset embeds filters and survives removal of original IR')

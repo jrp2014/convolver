@@ -243,7 +243,8 @@ format.
   and `Note:` lines ([`advice.hpp`](../../portable/advice.hpp)); then
   the filter's name for the heading (the file's name with its extension;
   after a restore the name saved with the project, `HostRequest::name` in
-  the Audio Unit, or VST3's controller state while the filter's identity
+  the Audio Unit, or VST3's controller state (which a `.vstpreset` made by
+  `convolver-preset` also holds, PLUG-31) while the filter's identity
   (`HostFilter::filter_identity()`, a hash of every stored value, found once
   when the filter is accepted) matches the one saved beside it, or
   "From the saved project or preset" without one; PLUG-22) and a note when
@@ -769,8 +770,16 @@ loading. These names are permanent, like the
 - **VST3 (`.vstpreset`):** Steinberg's documented preset file: the header
   `VST3`, format version 1, the processor class ID, then one component-state
   chunk (`Comp`) holding a 32-bit little-endian length and the encoded state.
-  The tool's writer needs no SDK; `vst3.preset_format` checks that its output is
-  byte-identical to the SDK's `PresetFile::savePreset`.
+  After it, a controller-state chunk (`Cont`) names the filter for the window
+  as a file chosen there does (PLUG-31): the controller state `CVCS` version
+  1 ([PLUG-22](#status-and-log), `portable/vst3_controller_state.hpp`) with the
+  name of the file the preset was made from, with its extension and without
+  its folder, and the filter's identity. Converting a `.vstpreset` keeps its
+  name only while that identity still matches the filter; a name that is
+  empty, not UTF-8 or longer than the plug-in reads is left out, never
+  refused. The tool's writer needs no SDK; `vst3.preset_format` checks that
+  its output, with and without the name, is byte-identical to the SDK's
+  `PresetFile::savePreset`.
 - **AU (`.aupreset`):** an XML property list, the dictionary that Audio Units
   save as `ClassInfo`. It has Apple's standard keys (`version` 0, `type`,
   `subtype` and `manufacturer` as the numbers of `aufx`, `Conv` and `CONV`,

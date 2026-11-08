@@ -332,15 +332,6 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
     return audio;
 }
 
-// PLUG-22: FNV-1a over what tells filters apart cheaply, read on every
-// report (twice a second while a window is open), so not every sample.
-// 16 hex digits of HostFilter::filter_identity().
-std::string identity_text(std::uint64_t identity) {
-    char text[17] = {};
-    std::snprintf(text, sizeof text, "%016llx", static_cast<unsigned long long>(identity));
-    return text;
-}
-
 std::string request_reference(const HostRequest& r) {
     return (r.source == HostFilterSource::file && !r.path.empty()
                 ? r.path
@@ -348,6 +339,12 @@ std::string request_reference(const HostRequest& r) {
            (r.number ? ", request " + std::to_string(r.number) : std::string());
 }
 } // namespace
+
+std::string filter_identity_text(std::uint64_t identity) {
+    char text[17] = {};
+    std::snprintf(text, sizeof text, "%016llx", static_cast<unsigned long long>(identity));
+    return text;
+}
 
 HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
     HostReport r;
@@ -388,7 +385,7 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
         const auto length = duration(taps, c->sample_rate);
         r.filter_taps = std::to_string(taps) + " taps";
         r.filter_length = length.empty() ? r.filter_taps : length;
-        r.filter_identity = identity_text(filter.filter_identity());
+        r.filter_identity = filter_identity_text(filter.filter_identity());
         // A list on its own, so it starts with a capital: "Front left, front right".
         r.filter_speakers = speaker_names(c->channel_mask, c->output_channels);
         if (!r.filter_speakers.empty())

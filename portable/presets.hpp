@@ -5,6 +5,7 @@
 // VST3, AU and LV2. Nothing here needs a plug-in SDK. Control-thread only.
 #include "convolver/host.hpp"
 #include "convolver_identities.hpp"
+#include "vst3_controller_state.hpp"
 #include <cstddef>
 #include <filesystem>
 #include <optional>
@@ -36,10 +37,22 @@ std::string lv2_state_uri();
 // byte-identical to Steinberg's PresetFile::savePreset.
 std::string vst3_class_id(); // 32 uppercase hex digits, as in .vstpreset headers
 std::vector<std::byte> vst3_component_state(const HostState&);
-std::vector<std::byte> vst3_preset(const HostState&);
+// PLUG-31: the controller state that names the filter of `state` as the
+// window does after a file is chosen (PLUG-22): `file_name` (the filter
+// file's name with its extension, never its folder) with the filter's
+// identity. None (two empty strings) without a filter, or for a name that is
+// empty, not valid UTF-8, or longer than max_filter_name_bytes.
+vst3::ControllerState vst3_filter_name(const HostState&, std::string_view file_name);
+// With a name, the preset also holds it as the 'Cont' chunk (the controller
+// state), as savePreset writes it with a controller stream.
+std::vector<std::byte> vst3_preset(const HostState&, const vst3::ControllerState& name = {});
 // Reads the 'Comp' chunk of any .vstpreset for our processor class, including
 // those hosts save with other chunks. Every version-1 state is accepted.
 HostState read_vst3_preset(std::span<const std::byte>);
+// The name in a .vstpreset's 'Cont' chunk, or none when it has no such chunk
+// or the chunk is not a Convolver controller state. Call it after
+// read_vst3_preset accepted the same bytes.
+vst3::ControllerState read_vst3_filter_name(std::span<const std::byte>);
 
 // AU: an XML property list (.aupreset) that the host gives to ClassInfo.
 std::string au_preset(const HostState&, std::string_view name);
@@ -65,6 +78,9 @@ struct ChannelLimit : std::invalid_argument {
 // names, the saved state's size).
 void check_writable(Format, const HostState&, std::string_view name);
 // Creates the file (or LV2 folder); never replaces an existing entry. A
-// partly written LV2 folder is removed again.
-void write_preset(Format, const HostState&, const std::filesystem::path&, std::string_view name);
+// partly written LV2 folder is removed again. `name` is the AU or LV2
+// preset's name; `filter_file_name` is the filter file's name, which a
+// .vstpreset keeps (vst3_filter_name).
+void write_preset(Format, const HostState&, const std::filesystem::path&, std::string_view name,
+                  std::string_view filter_file_name = {});
 } // namespace convolver::presets

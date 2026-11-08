@@ -63,7 +63,12 @@ convolver-preset --name "Living room" impulse.wav living.aupreset
   host's sample rate and channel counts.
 - **Name:** `--name` sets the name hosts show for AU and LV2 presets. Without it,
   the file name of the first AU or LV2 output is used (`room.preset.lv2` gives `room`). A
-  `.vstpreset` stores no name; hosts show its file name.
+  `.vstpreset` stores no preset name; hosts show its file name.
+- **Filter name:** a `.vstpreset` also keeps the name of the file you made it
+  from, with its extension but not its folder (`Living room 48k.cfg`), so the
+  VST3 window shows it after the preset is loaded and after the project is
+  reopened, as for a file chosen in the window. Converting a `.vstpreset`
+  keeps the name it holds. `--name` does not change it.
 - **Help:** `convolver-preset --help` lists these options and the preset
   formats.
 - **New files only:** every output must be a new path. If any output cannot be
@@ -184,8 +189,10 @@ give the same explanations as `convolver`; see
 - A preset made by a newer version that records something an older plug-in
   cannot read is refused by that older plug-in: a filter already playing keeps
   playing, and otherwise the plug-in plays silence.
-- `convolver-vst3-preset`, the older name, takes the same arguments and writes
-  the same bytes as before, and makes only `.vstpreset` files.
+- `convolver-vst3-preset`, the older name, takes the same arguments and gives
+  the same messages as before, and makes only `.vstpreset` files. Like
+  `convolver-preset`, it now also writes the filter's name into them, which
+  plug-ins without the name ignore.
 
 What a preset file contains is described for developers in the
 [plug-in adapter contract](../develop/plugin-contract.md#preset-files).

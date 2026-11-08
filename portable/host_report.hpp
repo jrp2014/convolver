@@ -3,6 +3,7 @@
 #include "convolver/host.hpp"
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <utility>
@@ -115,6 +116,11 @@ struct HostReport {
 };
 
 HostReport host_report(const HostFilter&, const HostReportFacts&);
+// PLUG-22: HostReport::filter_identity's text for a filter identity
+// (HostFilter::filter_identity(), configuration_identity()): 16 lowercase
+// hex digits. convolver-preset writes the same text into VST3 presets
+// (PLUG-31), so the two must stay one function.
+std::string filter_identity_text(std::uint64_t identity);
 
 // The report as named text values, for a format's transport (an Audio Unit
 // property dictionary): status (the HostStatus number), status name,
