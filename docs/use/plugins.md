@@ -462,8 +462,10 @@ From the top, the window has:
   automation from it may record each step separately; not yet tried in
   GarageBand.
 - **Latency**: a menu of delays in frames, from 0 (none) up, with the delay
-  a choice adds at the host's rate beside it ("adds 21.3 ms"). A new choice plays once the plug-in
-  restarts with it, and until then the row says it is "not in use yet"
+  a choice adds at the host's rate beside it ("adds 21.3 ms"). A new choice
+  plays at once; if it cannot (the computer is out of memory, say), the old
+  one keeps playing, the row says the choice is "not in use yet" and the
+  Convolver log says why
   ([settings](#settings)). The host is told the delay, so it can delay
   other tracks to keep them in time.
 - **Audio**: the host's values and what plays, each a short value. The
@@ -504,9 +506,6 @@ filter is ready.
 except:
 
 - The title line names the instance as the log does (`VST3 #2`).
-- A Latency choice plays once the host restarts the plug-in, which
-  Convolver asks it to do at once; until then the Latency row says the
-  choice is not in use yet ([settings](#settings)).
 - Dragging a Gain or Mix slider is one change for the host's undo and
   automation, from mouse down to mouse up, as the VST3 SDK asks.
 - An accepted file marks the project changed, so the host asks to save it.
@@ -552,9 +551,8 @@ defaults play exactly as Convolver did before the settings existed.
   wet, with no latency. The LV2 plug-in has no settings yet.
   The same project can therefore sound different in another format.
 - **VST3 hosts** mark Mix as the plug-in's dry/wet control where they have
-  one. A new Latency asks the host to restart the plug-in; until it does,
-  the old Latency plays. REAPER 7.85 restarts it only when the project is
-  reopened ([REAPER findings](../develop/host-testing.md#unresolved-host-findings)). A
+  one. A new Latency plays at once, and Convolver tells the host the new
+  delay. A
   project saved at the default settings is saved exactly as before the
   settings existed, so older Convolver builds still open it; one saved with
   other settings needs a Convolver with these settings, and an older build refuses
@@ -568,8 +566,7 @@ input. In the VST3 plug-in and the Audio Unit the [Latency setting](#settings)
 can add one, from 64 to 4096 samples, and the plug-in reports it so the host
 can line the audio up; LV2 always uses none.
 
-In the Audio Unit a new Latency plays at once; in VST3 it plays when the host
-restarts the plug-in, which Convolver asks it to do at once. Changing it during playback leaves a gap in the
+A new Latency plays at once, and the host is told the new delay. Changing it during playback leaves a gap in the
 sound, because Convolver starts again with the new size: the gap lasts the
 new latency plus the filter's own delay, which is short for most room
 correction filters but can be most of a second for a long linear-phase

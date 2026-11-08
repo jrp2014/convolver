@@ -82,7 +82,7 @@ def check(root, validator=None, probe=None):
     for name in (
         'VST3/Convolver.vst3',
         'presets/examples.json',
-        'examples/first-use/stereo/filter.vstpreset',
+        'examples/first-use/stereo/first-use-stereo.vstpreset',
         'docs/use/README.md',
         'docs/use/first-sound-in-a-host.md',
         'docs/use/presets.md',
@@ -141,7 +141,9 @@ def check(root, validator=None, probe=None):
             assert compared.returncode == 0 and 'Match' in compared.stdout, compared.stdout + compared.stderr
             converted = folder / 'converted ü.vstpreset'
             subprocess.run([str(tool), str(folder / source), str(converted)], check=True)
-            assert converted.read_bytes() == (folder / 'filter.vstpreset').read_bytes(), f'{name} preset differs'
+            shipped = folder / f'first-use-{name}.vstpreset'
+            assert converted.read_bytes() == shipped.read_bytes(), f'{name} preset differs'
+            assert not (folder / 'filter.vstpreset').exists(), f'{name} preset still has the old name'
         for example in examples:
             folder = relocated / 'presets' / example['name']
             output = folder / 'converted ü.vstpreset'

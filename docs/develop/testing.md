@@ -627,9 +627,23 @@ comparisons; since VST3-7 the adapter lists no known deviations.
 flags, ranges, value text and `kDryWetMix`, Gain and Mix in the audio,
 saving them as host state version 3 and restoring them in a second
 instance, an older state resetting them to their defaults, 0 dB from a host that
-keeps normalized values as float, and a Latency choice that asks the host
-to restart, is reported once the host has, and delays an impulse by exactly
-the chosen frames, also when restored; and a filter at the saved-state
+keeps normalized values as float, and the Latency (VST3-16): a choice
+while active is the one `getLatencySamples()` reports when the host is asked
+to restart (the test reads it then, as REAPER does) and delays an impulse by
+exactly the chosen frames at once, in both directions, after quick
+successive choices and after a restart; a choice whose processor cannot be
+built (a test hook) keeps the running latency, is logged and is built at
+the next activation; a choice while inactive waits for the activation; and
+a restored state with another Latency plays it at once.
+`latency_while_playing()` changes the Latency 24 times and replaces the
+filter 8 times while another thread calls `process()`, waiting for a block
+between changes, then checks the last filter at the last Latency; the
+sanitizer build reports a use after free if the control side frees a
+processor `process()` is still using. `latency_handover_waits()` does the
+same step by step: it holds `process()` inside a block through a test hook
+while another thread chooses a Latency, and checks that the new latency is
+reported at once and that the choice returns only after the held block
+ends. And a filter at the saved-state
 limit (PLUG-13) that is restored, given Gain −6 dB, saved and restored in a
 second instance, with one sample more refused. And the window's messages
 (VST3-3): the report's fields, a fresh report on request after a Gain
@@ -657,8 +671,9 @@ resizable, its size, attached to an off-screen window's content view, the
 shared view with VST3's own class name, the status and title, the two
 sliders and the Latency menu, a Gain the host set shown in the window, a
 reset that is one `beginEdit`, `performEdit`, `endEdit`, a Latency choice
-that is one edit, reaches the processor and asks the host to restart (and
-the window saying it is not in use until then), the Bypass checkbox (one
+that is one edit, plays at once and asks the host to restart (the row
+showing the time it adds), and one whose processor cannot be built (the row
+saying it is not in use yet until the next activation), the Bypass checkbox (one
 edit per click, and following the host), a chosen WAV loaded and the
 project marked changed, the file in the Recent menu, Reload, a change to
 the file reloaded on the second check (not with the box unticked, and not
@@ -790,7 +805,13 @@ Five CTest tests run when the adapter is built (label `au`):
   behind it, while another thread closes the unit; the run is released only
   once closing has cancelled the work and is about to wait for it
   (`latency_closing_for_tests`), so closing must wait and the queued run
-  never starts. A 60 s watchdog names a step that does not finish.
+  never starts. A 60 s watchdog names a step that does not finish. A run
+  is also held at the end of the part that holds the control lock, after
+  it has looked for a bypass change (`latency_locked_for_tests`), while the
+  host switches bypass on and then off: the setter must return without
+  waiting, and only a later run, which the setter must ask for, can show
+  the change, so the check needs both halves of the fix (AU-16, the
+  intermittent "bypass not shown" failure made deterministic).
 - `au.log_evidence`: the adapter test's Convolver log, the file CTest
   names in the build folder (`convolver-adapter-tests.log`), reaches the
   [CI evidence](#evidence-from-failed-ci-runs) after the test aborts, as a

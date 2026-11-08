@@ -220,7 +220,16 @@ format.
   and not writable; the line is the current value's
   `kAudioUnitProperty_ParameterStringFromValue`, recomputed after every
   restore, initialization, cleanup and stream format change, and a
-  parameter-change event is sent outside the control lock. Host writes to it
+  parameter-change event is sent outside the control lock. A bypass switch
+  (`kAudioUnitProperty_BypassEffect`) updates it at once when the control
+  lock is free. The setter never waits for the lock: when another call
+  holds it, the Latency work's serial queue updates the Status once the
+  lock is free, so a host that reads it straight after setting bypass may
+  see the old value until the call holding the lock or the Latency work
+  updates it. The setter wakes that work with its own bit of the dispatch
+  source's data, and such a run only updates the Status: it does not
+  retry a Latency that could not be built (AU-16; the pattern is TODO
+  PLUG-30). Host writes to it
   are ignored, and the value `AUBase::SaveState` writes with the other
   parameters is ignored on restore. When the log file cannot be written
   (`host_log_written()` is false), the text says so instead of pointing to it.
@@ -618,12 +627,21 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   (`ConvolverLatency` message) and, once the processor's `ConvolverStatus`
   answer says it has the new Latency, asks the host to restart the component
   (`restartComponent(kLatencyChanged)`), so a host that delivers messages
-  late still reads the new latency (VST3-15); the next `setActive(true)` builds
-  the processor with it, and `getLatencySamples()` reports the latency the
-  running processor has (the choice while inactive), as the SDK says a host
-  reads it after `setActive(true)`.
-  Until the host restarts the plug-in the old Latency keeps playing and the
-  window says the choice is not in use yet. A restored state sets all three
+  late still reads the new latency (VST3-15). While active, the processor
+  builds a processor with the new Latency and plays it before it answers
+  (VST3-16), as the Audio Unit does: REAPER 7.85 reads
+  `getLatencySamples()` inside `restartComponent` and does not deactivate and
+  activate the component, as the SDK describes
+  ([trace](../archive/reviews/2026-11-07-vst3-16-reaper-trace.md)), so the
+  latency must already be the one that plays. `getLatencySamples()` always
+  reports the latency the running processor has (the choice while
+  inactive), never a choice that does not play yet. `process()` switches to
+  the new processor at its next block, and the control side frees the old
+  one only once `process()` has left it. If the new processor cannot be
+  built, the old Latency keeps playing, the log says why, the window says the
+  choice is not in use yet, and the next activation builds it. A host that
+  does restart the component builds the processor a second time, at the
+  same Latency. A restored state sets all three
   (a version 1 or 2 state resets them to their defaults), and the
   controller's `setComponentState` mirrors them, asking for a restart when the
   Latency differs.
@@ -672,6 +690,15 @@ old engines awaiting control-thread collection after the last publication.
 Collection does not hold up pending changes. The tail is available before
 activation and includes routed delays; it can grow conservatively during a
 session, and reactivation recomputes it.
+
+A new Latency while active (the Audio Unit, and VST3 since VST3-16)
+replaces the whole `HostProcessor`, since the block size changes: the
+adapter builds it on the control side, then publishes it through an atomic
+pointer that the audio callback reads at the start of each call and marks
+as in use until the call returns; the previous processor is freed on the
+control side only once the callback no longer marks it, which takes at most
+one callback. The new processor starts with empty history, so the sound
+pauses for the new latency and a sounding tail is cut.
 
 `Convolver::host` exports `HostProcessor`, `HostFilter` and the state codec
 without SDK or file I/O dependencies ([`host.hpp`](../../include/convolver/host.hpp)).

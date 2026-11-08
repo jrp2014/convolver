@@ -259,7 +259,10 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     if (load_request && load_accepted)
         setDirty(true); // IComponentHandler2, where the host offers it.
     // The SDK's way to report a new latency: the host deactivates the
-    // component, reads getLatencySamples() and activates it again. Last,
+    // component, reads getLatencySamples() and activates it again; some
+    // (REAPER 7.85) only read it. The processor already plays the new
+    // Latency when it answers (VST3-16), so either way the host reads the
+    // latency that plays. Last,
     // after this message's Status: with a direct connection this runs inside
     // Processor::notify, and a host that restarts at once sends newer
     // status messages from setActive.

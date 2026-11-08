@@ -229,24 +229,37 @@ void window() {
                 std::abs(c.getParamNormalized(gain_id) - normalized_gain(0)) < 1e-12,
             "Gain reset edits: " + handler.kinds(gain_id));
 
-    // A Latency choice: one edit, the processor reports it, the host is
-    // asked to restart, and the window says it is not in use yet.
+    // A Latency choice: one edit, the processor plays it at once (VST3-16)
+    // and reports it, the host is asked to restart, and the window shows the
+    // time it adds.
     handler.edits.clear();
     NSPopUpButton* latency = shown.settingMenus[0];
     [latency selectItemAtIndex:5];
     [latency sendAction:latency.action to:latency.target];
     require(handler.kinds(latency_id) == "bpe" && p.settings().latency == 1024 &&
-                p.getLatencySamples() == 0 && handler.latency_restarts == 1,
+                p.getLatencySamples() == 1024 && handler.latency_restarts == 1,
             "Latency choice: " + handler.kinds(latency_id));
+    [shown refresh];
+    require([shown.settingValues[2].stringValue isEqualToString:@"adds 21.3 ms"],
+            "Latency note " + text(shown.settingValues[2].stringValue));
+    // A choice whose processor cannot be built is not in use yet; the next
+    // activation builds it.
+    latency_preparation_for_tests = [] { throw std::runtime_error("test"); };
+    [latency selectItemAtIndex:6];
+    [latency sendAction:latency.action to:latency.target];
+    latency_preparation_for_tests = nullptr;
+    require(p.settings().latency == 2048 && p.getLatencySamples() == 1024 &&
+                handler.latency_restarts == 2,
+            "failed Latency choice");
     [shown refresh];
     require([shown.settingValues[2].stringValue rangeOfString:@"not in use yet"].location !=
                 NSNotFound,
-            "Latency note " + text(shown.settingValues[2].stringValue));
+            "Latency note after a failed choice " + text(shown.settingValues[2].stringValue));
     require(p.setActive(false) == kResultOk && p.setActive(true) == kResultOk &&
-                p.getLatencySamples() == 1024,
+                p.getLatencySamples() == 2048,
             "restart");
     [shown refresh];
-    require([shown.settingValues[2].stringValue isEqualToString:@"adds 21.3 ms"],
+    require([shown.settingValues[2].stringValue isEqualToString:@"adds 42.7 ms"],
             "Latency note after the restart " + text(shown.settingValues[2].stringValue));
 
     // Bypass: a click is one edit of the bypass parameter, and the host's

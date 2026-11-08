@@ -53,6 +53,8 @@ windows, the other gain modes and the meters, and PERF-3's wider workloads
 come in later previews; LV2 joins a later preview once its own journeys are
 demonstrated. What still blocks it, with the evidence, is in
 [status](docs/project/status.md#what-still-blocks-the-first-preview).
+The [bounded qualification plan](docs/project/plans/2026-11-08-preview-acceptance.md)
+defines acceptance, retesting and deferred work (REL-7).
 Finishing a dependable product matters more than another substantial
 refactor: move code into shared layers only when two formats need the same
 behaviour (as with `HostFilter`), do not generalise host lifecycle or release
@@ -61,9 +63,9 @@ boundary and C++20 in the core.
 
 | Order | Work | Exit criterion / dependency |
 | --- | --- | --- |
-| 1. Finish the open fixes (done) | **DIAG-1** fault state after reloads and Load failed before Fault ([PR #73](https://github.com/jrp2014/convolver/pull/73)); from jrp's review of `6920a45` (31 October 2026), **PLUG-12** (a filter that loads but cannot be saved) and **ROBUST-3** (silence after a failed first load that cannot run out of memory); from his review of `276c7dc` (1 November 2026), **PLUG-13** (room for the settings in saved state, [PR #105](https://github.com/jrp2014/convolver/pull/105)) | DIAG-1 done: merged on 25 October 2026 (`7ed7e38`), and the "Plug-in distribution candidates" run on that commit passed ([run](https://github.com/jrp2014/convolver/actions/runs/40145929436)). PLUG-12 and ROBUST-3 done: merged on 31 October 2026 ([PR #91](https://github.com/jrp2014/convolver/pull/91), `7542576`), each with a test of the sequence that failed. |
+| 1. Finish the open fixes | **DIAG-1** fault state after reloads and Load failed before Fault ([PR #73](https://github.com/jrp2014/convolver/pull/73)); from jrp's review of `6920a45` (31 October 2026), **PLUG-12** (a filter that loads but cannot be saved) and **ROBUST-3** (silence after a failed first load that cannot run out of memory); from his review of `276c7dc` (1 November 2026), **PLUG-13** (room for the settings in saved state, [PR #105](https://github.com/jrp2014/convolver/pull/105)); from jrp's HOST-1 REAPER run (6 November 2026), **VST3-16** (a new VST3 Latency comes into use in REAPER) | DIAG-1 done: merged on 25 October 2026 (`7ed7e38`), and the "Plug-in distribution candidates" run on that commit passed ([run](https://github.com/jrp2014/convolver/actions/runs/40145929436)). PLUG-12 and ROBUST-3 done: merged on 31 October 2026 ([PR #91](https://github.com/jrp2014/convolver/pull/91), `7542576`), each with a test of the sequence that failed. VST3-16 open: its fix is in draft [PR #134](https://github.com/jrp2014/convolver/pull/134). |
 | 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, the Audio Unit from the same candidate, which holds it since PR #115) at the same sitting | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 and AU-4 both gate the first preview, which holds the Audio Unit too. Needs no CLI in the package, so it can start now that step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
-| 3. Alongside step 2 | **PLUG-5** first-preview contents: in the candidates since PR #115 (the Audio Unit on macOS, the VST trademark notice; the `convolver` CLI and the first-use presets since PR #101); what remains is qualifying one exact candidate (HOST-1, AU-4, REL-3) and jrp's publication. **REL-2** (done): the stereo, 2→6 crossover and CLI journeys are written in `docs/use/` | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
+| 3. Alongside step 2 | **PLUG-5** first-preview contents: in the candidates since PR #115 (the Audio Unit on macOS, the VST trademark notice; the `convolver` CLI and the first-use presets since PR #101); what remains is qualifying one exact candidate (HOST-1, AU-4, REL-3) and jrp's publication. **REL-2** (done): the stereo, 2→6 crossover and CLI journeys are written in `docs/use/`. **PLUG-28** (done, PR #141): the packaged presets named after their folder, before the first preview | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
 | Early walkthrough (macOS) (done) | **REL-5**: an explicitly limited walkthrough of an exact candidate on macOS, the stereo journey only | Done on 1 November 2026 as a package and command-line check only, by jrp's choice ([done](#done)); its host steps moved to HOST-1's REAPER smoke test and REL-3. It did not change the first preview's contents and does not replace REL-3. |
 | 4. Settings, windows and the Audio Unit | The **HOST-2** editor as the macOS-only first preview has it: **PLUG-9** (the report and loading from a file) and **PLUG-10** (Gain, Mix and Latency), **VST3-3**, **VST3-4**, **AU-7**, and the window **VST3-11** shared with the Audio Unit in **AU-6**; and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview, in the macOS candidates since PR #115). For later previews: **VST3-12** (Windows), **VST3-13** (Linux), and PLUG-9, PLUG-10 and AU-7's remaining gain modes and meters | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items) the first preview needs, each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the [preview workloads](#loading-responsiveness), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). |
 | 5. The milestone | A candidate from a 0.12.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
@@ -82,6 +84,15 @@ needs them. This table owns the current ordering; the dated
 is superseded.
 
 ## User experience and distribution
+
+- [ ] **REL-7 — Apply bounded preview acceptance.** Follow the
+  [qualification plan](docs/project/plans/2026-11-08-preview-acceptance.md):
+  hold one candidate still, complete the existing required host and release
+  gates, classify blockers by consequence, and record lower-risk work for
+  later. Done when the final candidate meets the stop rule and its evidence
+  and deferred limitations are linked from the gate summary; jrp publishes.
+  The plan is written; qualification is not claimed complete. CI-34 is
+  separate and does not gate the walkthrough.
 
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The candidate workflow
   builds unsigned packages with pinned dependencies, corresponding source,
@@ -186,7 +197,8 @@ is superseded.
   preset, the wrong rate, and (after a restore fix in the same PR) saving,
   quitting and reopening, and FX Offline then Online
   ([record](docs/archive/reviews/2026-11-07-reaper-crossover-retest.md)).
-  The Latency finding stays open (VST3-16).
+  The Latency finding was fixed by VST3-16 (PR #134,
+  [acceptance](docs/archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md)).
   Progress (7 November 2026, PR #137): jrp ran the Audacity steps
   (Audacity 4.0.2 arm64, macOS 27.2) with the VST3 plug-in from PR #131's
   candidate (0.10.13, run 42404299284: PR head `c3dbf0d`, built as merge
@@ -220,6 +232,11 @@ is superseded.
   ended in silence, so tails past the end of a clip are not qualified);
   VoiceOver and the window's layout (screen capture failed). REAPER's
   display of the Status parameter also remains.
+  Before the first preview, every REAPER and Audacity step, including
+  those that passed on earlier candidates, is run again on the preview
+  candidate, so the earlier results are shown to hold for the current
+  window and code: in REAPER that repeats the window and settings steps
+  (part C) on the window PLUG-22 redesigned.
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
   now requested (progress below). Write adapters against the
@@ -465,6 +482,46 @@ LV2 (Linux first; also PipeWire system audio):
   and the one-time read of the old file, and the plug-ins guide says where
   the list is kept. Lower priority than PLUG-26 and PLUG-27; waits for
   the freeze.
+- [ ] **PLUG-31 — Generated VST3 presets carry the filter's name.** From
+  jrp's [VST3-16 acceptance](docs/archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md#filter-name-observation)
+  (8 November 2026): after a packaged `.vstpreset` loads, the window's
+  Filter row says "From the saved project or preset". VST3 already saves
+  and restores a file's name for a file chosen in the window (the
+  controller state holds the name and the filter's identity, PLUG-22), but
+  `convolver-preset` writes no controller state for VST3
+  (`portable/preset_main.cpp`), so generated presets have only the
+  component chunk. Write the same name and identity there, the file name
+  with its extension and without its folder. jrp suggests "Restored filter"
+  for a state with no name, and origin wording that uses only what the
+  host says; both are user-facing and his to confirm. No change to the
+  processor's audio state. Done when a generated preset loaded in a host
+  shows its file name, a name whose identity does not match is not shown,
+  and the plug-ins guide says so. Waits for the freeze unless jrp brings
+  it forward.
+- [ ] **PLUG-30 — One rule for state a busy lock makes a call skip.**
+  From AU-16 (8 November 2026; jrp asked for fixes like it to be recorded,
+  as stepping back may give a more general fix). The pattern: a call that
+  must not wait changes shared state, finds the control lock taken, skips
+  the update that lock guards and relies on the holder to make it; but the
+  holder may already have made it, or may never make it, so what the host
+  sees stays stale with no later update. Fixed where it was seen: the Audio
+  Unit's bypass setter (`SetProperty`, `effect_properties.cpp`) left Status
+  at Active while the Latency work held the lock with the Latency
+  unchanged (au.adapter, CI run 42418181089 on `2f3cb80`). The narrow fix
+  hands the update to the Latency work's serial queue, which may wait for
+  the lock and updates the Status when the bypass it shows differs
+  (`status_bypassed_`). Other places that skip or work around a busy lock,
+  each correct today for its own reason: the Audio Unit's report read
+  (`Effect::report()`) returns its last copy, safe only because every
+  change goes through `update_status()`, which forgets the copy, and then
+  notifies the window; LV2's `deactivate()` tries the lock first but then
+  waits. VST3 takes its locks without trying. A general fix would make
+  "changed while the lock was held" a rule rather than a per-call
+  decision: for example, a pending-update flag that whoever releases the
+  control lock acts on, or all Audio Unit control work on the one serial
+  queue. Done when each adapter's skip paths either follow that rule or
+  are listed with why they are safe, with a held-lock test for each, as
+  AU-16's. Waits for the freeze.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
@@ -525,7 +582,8 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   Status with no value (AU-6). These are checks, not host qualification: the
   full smoke test (every step, recorded with the GarageBand and macOS
   versions), its export and preset-replacement steps, and the other hosts
-  remain.
+  remain. GarageBand's smoke test, with the checks that passed on earlier
+  builds, runs on the preview candidate.
   Needed for the first preview.
 - [ ] **AU-5 — Release.** In the first preview. Unsigned preview component under PLUG-5 (ad-hoc
   signed, documented quarantine removal). Developer ID signing and
@@ -774,6 +832,17 @@ means a patched FFmpeg build with `--enable-gpl`.
 - [ ] **ROBUST-1 — Longer fuzz and transition stress.** Keep discovered inputs as
   regressions. Measure worst callback times and exercise repeated filter changes;
   allocation guards and average throughput are not a deadline guarantee.
+- [ ] **ROBUST-8 — Fault record after a failed Latency change.** From the
+  independent review of VST3-16 (PR #134, 8 November 2026). When a new
+  Latency's processor cannot be built (out of memory), the Audio Unit and
+  VST3 keep the running processor, but `HostFilter::activate()` has already
+  cleared the fault counts, the activation failure and the notice. Status
+  can then show Fault again for faults a later filter load had cleared, and
+  if `activate()` itself throws, a filter that plays silence for not suiting
+  the host may read Active. Split `activate()` into a step that may throw
+  and a commit that cannot, called only once the new processor plays, in
+  both adapters, with a test of each case. Only reachable when memory runs
+  out; waits for the freeze.
 
 ## VST3 SDK features not yet used
 
@@ -834,21 +903,6 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   X11 view can replace it later if Linux users need one
   ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#framework-choice)).
   For a later preview: the first preview is macOS-only ([decided](docs/project/decisions.md#plug-in-behaviour)).
-- [ ] **VST3-16 — A new Latency in REAPER.** In jrp's HOST-1 REAPER run (6
-  November 2026, REAPER 7.85 on macOS) a new Latency stayed pending until
-  the project was reopened: the plug-in asks for a restart
-  (`restartComponent(kLatencyChanged)`), which the SDK says the host answers
-  by deactivating and activating the component, and REAPER did not do so
-  then. Why is not yet known. First trace, in REAPER, whether the request
-  arrives, what it returns, when `getLatencySamples()` is read and which
-  activation calls follow; only then choose a fix (a documented host step,
-  or applying the new processor at once as the Audio Unit does). Done when
-  an impulse lines up with a reference track after a change in both
-  directions (256 to 1024 and back), with REAPER's delay compensation
-  measured rather than its display or the reported value, and any change is
-  tested for rapid successive choices, a filter replacement at the same
-  time, deactivation and a failed preparation, with deterministic
-  synchronisation. Its own pull request, after PLUG-23.
 Not relevant to a convolver unless the product changes: MIDI and note
 interfaces (`IMidiMapping2`, `IMidiLearn2`, note expression, MIDI 2.0
 articulations), `ITransportControl`, `IPrefetchableSupport`,
@@ -1300,6 +1354,15 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
 
 ## Developer tooling
 
+- [ ] **CI-34 — Reduce duplicate CI scheduling, preserving coverage.** A
+  separate proposed PR, following the
+  [CI plan](docs/project/plans/2026-11-08-ci-scheduling.md). Inventory unique
+  coverage before narrowing candidate and fuzz triggers; retain oracle,
+  regression, validator, platform and release qualification checks. Done
+  when scope tests and affected CI pass, every configuration has a retained
+  trigger, and matched runs demonstrate waiting-time savings. No workflow
+  changes are part of REL-7.
+
 - [ ] **CI-32 — Run the most extreme numerical cases less often, once they
   cost.** From jrp's simplification review of 5 November 2026: keep
   representative oracle and allocation checks as everyday gates, and run
@@ -1370,6 +1433,8 @@ entries written before 7 November 2026, with their evidence, are
   render](docs/develop/testing.md#avaudioengine-render).
 - [x] **AU-13 — Safe partial construction of the Latency work.** 5 November
   2026, PR #111.
+- [x] **AU-16 — Show a bypass switched while the control lock is held.**
+  8 November 2026, PR #143; [Status and log](docs/develop/plugin-contract.md#status-and-log).
 - [x] **AU-11 — Separate file watching from the window.** 5 November 2026;
   [shared macOS window](docs/develop/architecture.md#the-shared-macos-window).
 - [x] **AU-10 — Separate the window's setting editing from its layout.** 1
@@ -1482,6 +1547,9 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **DOC-9 — Consistent words for filters, presets and projects.** 7
   November 2026, PR #136, from jrp's review, with clearer Waiting status wording;
   [words Convolver uses](docs/use/concepts.md#words-convolver-uses).
+- [x] **DOC-11 — Reconcile the release status page.** 8 November 2026,
+  PR #142, from jrp's review of `bf6a207`; [what still blocks the first
+  preview](docs/project/status.md#what-still-blocks-the-first-preview).
 - [x] **FFMPEG-1 — Test the pipe workflow.** 5 November 2026;
   [tests](docs/develop/testing.md#native-production-tests).
 - [x] **FFT-1 — Check that we have the latest Ooura version.** 21 October 2026;
@@ -1536,8 +1604,11 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **PERF-12 — Load-timing verdicts from records, tested without timing.** 5
   November 2026; [load timing](docs/develop/testing.md#load-timing-perf-9).
 - [x] **PERF-14 — Load timing from a full history.** 5 November 2026.
+- [x] **VST3-16 — A new Latency in REAPER.** 8 November 2026, PR #134;
+  [settings](docs/use/plugins.md#settings),
+  [acceptance](docs/archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md).
 - [x] **PLUG-28 — Name the packaged presets after their filter.** 8
-  November 2026, PR #141; [first sound in a host](docs/use/first-sound-in-a-host.md#load-the-examples).
+  November 2026, PR #141 and, for the first-use presets, PR #144; [first sound in a host](docs/use/first-sound-in-a-host.md#load-the-examples).
 - [x] **PLUG-23 — A filter reads the first inputs of a wider input bus.** 6
   November 2026; [channels](docs/use/plugins.md#channels).
 - [x] **PLUG-22 — Name the filter in the window, and say each fact once.** 7

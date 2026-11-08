@@ -12,6 +12,11 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Preview qualification (REL-7): an acceptance plan with a fixed-candidate
+  stop rule, required gates, blocker classification and deferred work.
+  CI-34 proposes scheduling improvements separately; workflows and useful
+  test coverage are unchanged.
+
 - Long-reverb experiment (PERF-2, in progress): `convolver_long_reverb_benchmark`
   compares today's engine with prototype non-uniform partitions (zero
   latency, large blocks' work spread over callbacks, or on a worker thread)
@@ -131,7 +136,7 @@ Until 1.0 the C++ API may change between minor versions.
 - Preview packages (PLUG-5, REL-2) ship the `convolver` command-line tool in
   `bin/`, and the first-use examples in `examples/first-use/` (mono, stereo
   and the 2→6 crossover: filter, `input.wav`, `expected.wav`) with a
-  `filter.vstpreset` made from each filter. The release tests render each
+  preset made from each filter. The release tests render each
   example with the packaged tool and compare it with `expected.wav`.
 - User guide: [check a stereo filter in a host](docs/use/check-a-stereo-filter.md),
   the stereo journey from download and checksum to a host render checked
@@ -197,15 +202,34 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Documentation (DOC-11, from jrp's review of `main` at `bf6a207`, 8
+  November 2026): the [status page](docs/project/status.md) agrees with the
+  dated host records. It is dated 8 November 2026 against 0.12.1, no longer
+  says there are no open fixes while the VST3 Latency finding in REAPER
+  (VST3-16) is open, says which window each host run used (none yet the
+  0.12 window), and gives the crossover's passing REAPER retest without the
+  older refusal as a current result. [What still blocks the first
+  preview](docs/project/status.md#what-still-blocks-the-first-preview) is now
+  one table listing each remaining gate once, with its status and evidence:
+  VST3-16, the VST3 smoke tests on the current window (HOST-1), the Audio
+  Unit in GarageBand (AU-4), the Audio Unit's ThreadSanitizer build (AU-3),
+  responsiveness qualified on a named machine (REL-6), one exact candidate
+  (PLUG-5) and the independent walkthrough (REL-3). Every host
+  step, those that passed on earlier candidates included, is run again on
+  the preview candidate, as jrp decided on 8 November 2026. TODO's
+  execution priorities now list VST3-16 as an open fix and PLUG-28 before
+  the first preview. The dated records are unchanged. No code or sound
+  changes.
 - Packages (PLUG-28, from jrp's file-loading review; jrp chose to do it
   before the first preview): the 18 example presets in `presets/` are named
   after their folder, such as `presets/repeat-48000-stereo/repeat-48000-stereo.vstpreset`,
   instead of each being `filter.vstpreset`, so hosts that list presets by
   file name, such as Audacity, show what each one is and copying them into
-  a preset folder needs no renaming. The presets' contents are unchanged;
-  the first-use examples in `examples/first-use/` keep `filter.vstpreset`
-  beside their filter (`filter.cfg`, or `impulse.wav` for mono),
-  `input.wav` and `expected.wav`.
+  a preset folder needs no renaming. The three first-use presets in
+  `examples/first-use/` are likewise `first-use-mono.vstpreset`,
+  `first-use-stereo.vstpreset` and `first-use-crossover.vstpreset`, and the
+  stereo and crossover guides load them by those names. The presets'
+  contents are unchanged.
 - Documentation (DOC-10, from jrp's file-loading review of 7 November 2026,
   [recorded](docs/archive/reviews/2026-11-07-file-loading-review.md)):
   [plug-in presets](docs/use/presets.md) no longer says the plug-ins have no
@@ -694,6 +718,33 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- VST3 (VST3-16, from jrp's HOST-1 REAPER run and his trace with PR #134's
+  trace build): in REAPER 7.85 a new Latency stayed unused until a render,
+  FX Offline then Online, or reopening the project. Convolver asked REAPER
+  to restart the plug-in (`restartComponent(kLatencyChanged)`), as the VST3
+  SDK describes, but REAPER only reads the latency then and does not
+  restart it, so it read the old one. While the host runs the plug-in, a new
+  Latency now plays at once, as in the Audio Unit: a processor with the new
+  block size is built off the audio thread and replaces the running one
+  before the host is asked, so the latency the host reads is always the one
+  that plays. A change during playback leaves a gap in the sound, as
+  before ([latency and tail](docs/use/plugins.md#latency-and-tail)).
+  If the new processor cannot be built, the old Latency keeps playing and
+  the log and window say so. jrp's check in REAPER 7.85 with the candidate
+  at `7d6a8b4` passed: stopped and while playing, 256 to 1024 frames and
+  back, the window and REAPER's delay compensation showed the new latency
+  at once, and every impulse in the later renders lined up with the
+  reference track
+  ([record](docs/archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md)).
+- Audio Unit (AU-16, an intermittent au.adapter failure in CI on `2f3cb80`):
+  switching the host's bypass could leave Status at Active while the audio
+  was bypassed, and the reverse. The bypass setter does not wait for the
+  control lock, and when a load or the Latency work held it, the setter
+  left the Status to that call, which might already have set it or never
+  set it. The Latency work's serial queue now updates the Status once the
+  lock is free. No change to the audio. A test holds the Latency work
+  while bypass is switched both ways; TODO PLUG-30 records the pattern and
+  the other places that skip a busy lock.
 - VST3 (PLUG-23, from jrp's REAPER crossover retest at `5d188a7`): a project
   saved with the 2→6 crossover on a six-channel track played silence after
   reopening, and after FX Offline then Online. REAPER starts the plug-in on
