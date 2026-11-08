@@ -102,8 +102,11 @@ is superseded.
   combinations passed on the first run; longest hold 43.2 ms, longest
   judged callback 2.95 ms;
   [record](docs/archive/reviews/2026-11-08-rel6-qualification.md)).
-  Remaining: jrp's choice of the final candidate's tag, the host checks on
-  it, REL-3, then his publication.
+  jrp chose the final candidate: the first tag after DOC-10 merges, with
+  the host checks run first on a v0.12.8 candidate and REL-6's 0.12.5
+  result standing while no engine, loading or plug-in code changes
+  ([decisions](docs/project/decisions.md#releases)). Remaining: those host
+  checks, DOC-10, the final tag's candidate, REL-3, then his publication.
 
 - [ ] **REL-8 — Rehearse publishing before the preview.** From jrp's
   8 November 2026 request to stop adding edge-case tests and smoke test the
@@ -1182,9 +1185,10 @@ preview gate. The release qualification on the intended machine
 first-preview gate) passed for the 0.12.5 source on jrp's MacBook Pro
 (8 November 2026, longest hold 43.2 ms;
 [record](docs/archive/reviews/2026-11-08-rel6-qualification.md)), so
-background preparation (VST3-5) is not needed for the preview; whether
-that result stands for the final candidate is jrp's choice
-([checks left](docs/project/status.md#checks-left-before-publication)).
+background preparation (VST3-5) is not needed for the preview. jrp
+decided the result stands for the final candidate while no engine,
+loading or plug-in code changes
+([decisions](docs/project/decisions.md#releases)).
 First optimised-build figures (Linux cloud VM, 4 cores, clang Release with
 Ooura, 5 November 2026; stereo 48 kHz, 512-frame callbacks): VST3 `setState`
 held the host's thread for 4 ms with a 1 s filter, 43 to 61 ms with 10 s,
