@@ -136,10 +136,10 @@ can act on it without a separate copy of the rules:
 | Package consumption, engine API and resource limits | [Library guide](library.md) | CMake exports, public headers, external-consumer tests, `native.limits` |
 | Building from source, every target and format, CMake presets | [Build from source](build.md) | `CMakeLists.txt`, `CMakePresets.json`, the CI workflows |
 | Installing the plug-ins | [Install](../use/install.md) | Packaging, installers, each format's bundle layout |
-| How the plug-ins behave for users | [How the plug-ins behave](../use/plugins.md) | The adapter contract, adapter and harness tests |
+| How the plug-ins behave for users, and what each way of loading a filter reads | [How the plug-ins behave](../use/plugins.md), the inputs in its [loading a filter](../use/plugins.md#loading-a-filter) table | The adapter contract, adapter and harness tests |
 | What every plug-in adapter must do | [Plug-in adapter contract](plugin-contract.md) | `host.hpp`, the PLUG-2 harness, each adapter's tests |
 | Plug-in identities and channel layouts | [Plug-in identities](plugin-identities.md) | `plugins/identities.json`, `tests/identities_tests.py`, `vst3.identities` |
-| Plug-in presets and the preset tool | [Plug-in presets](../use/presets.md); file formats in the [contract](plugin-contract.md#preset-files) | `portable/presets.*`, `portable/preset_main.cpp`, `native.presets`, `plugins.presets`, `vst3.preset_format` |
+| Plug-in presets, the preset tool and the host preset folders | [Plug-in presets](../use/presets.md), the folders in its [preset folders](../use/presets.md#preset-folders) table; file formats in the [contract](plugin-contract.md#preset-files) | `portable/presets.*`, `portable/preset_main.cpp`, `native.presets`, `plugins.presets`, `vst3.preset_format` |
 | System-wide filtering on Windows | [Equalizer APO export](../use/equalizer-apo.md) | `portable/equalizer_apo*.cpp`, `export.equalizer_apo` and its model of Equalizer APO |
 | Plug-in downloads and release gates | [Install](../use/install.md), [releasing](releasing.md), [build from source](build.md#preview-recipe), [host testing](host-testing.md) | `packaging/release-policy.json`, `scripts/release/`, `tests/release/`, candidate workflow |
 | Status, evidence levels and direction | [Status](../project/status.md) | TODO, open pull requests, GitHub releases, host records |

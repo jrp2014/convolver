@@ -203,7 +203,7 @@
   [settings](../../use/plugins.md#settings),
   [acceptance](../../archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md).
 - [x] **PLUG-28 — Name the packaged presets after their filter.** 8
-  November 2026, PR #141 and, for the first-use presets, PR #144; [first sound in a host](../../use/first-sound-in-a-host.md#load-the-examples).
+  November 2026, PR #141 and, for the first-use presets, PR #144; [first sound in a host](../../use/first-sound-in-a-host.md#optional-load-a-preset).
 - [x] **PLUG-23 — A filter reads the first inputs of a wider input bus.** 6
   November 2026; [channels](../../use/plugins.md#channels).
 - [x] **PLUG-22 — Name the filter in the window, and say each fact once.** 7

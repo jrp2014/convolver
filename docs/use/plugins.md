@@ -13,10 +13,12 @@ does not fit. Installing is in [install](install.md); making presets is in
   below lists the differences.
 - One input and one output of 1 to 8 channels each; the counts may differ,
   for example 2 in and 6 out for a crossover.
-- You choose a filter with **Choose…** in Convolver's window (the Audio
-  Unit and the VST3 plug-in on macOS), with the host's file chooser (LV2,
-  in hosts that show it), or as a preset from the host's preset menu,
-  and the host saves the filter inside your project. A read-only Status
+- You choose the filter file itself (an IR file, a `.cfg` or a
+  configuration list) with **Choose…** in Convolver's window (the Audio
+  Unit and the VST3 plug-in on macOS) or with the host's file chooser
+  (LV2, in hosts that show it); a preset from the host's preset menu is
+  the other way ([loading a filter](#loading-a-filter)). The host saves
+  the filter inside your project. A read-only Status
   parameter says what is playing, and the
   [Convolver log](#status-and-the-convolver-log) says why a filter failed.
   The Audio Unit and the VST3 plug-in on macOS also have a
@@ -69,7 +71,9 @@ the [command-line tool](command-line.md) for wider filters.
 
 **More inputs than the filter needs.** A filter plays on its own number of
 outputs, exactly, and on at least its number of inputs: it reads the first
-ones and ignores the rest. Some hosts give a plug-in as many inputs as
+ones and ignores the rest. (A file chosen in the window is the exception:
+it must have exactly as many inputs as the host gives, so on such a track
+load the filter as a preset.) Some hosts give a plug-in as many inputs as
 outputs: REAPER gives the VST3 plug-in six inputs on a six-channel track, so a
 2→6 crossover reads inputs 1 and 2 and ignores 3 to 6. Status then ends with
 "plug-in inputs 3-6 ignored.", and the [Convolver log](#status-and-the-convolver-log)
@@ -98,39 +102,52 @@ side speakers count as the back pair.
 
 ## Loading a filter
 
-Load a preset from the host's preset menu ("Load Preset…" or its preset
-browser). [Plug-in presets](presets.md) shows how to make one from an IR, a
-`.cfg` or a configuration list. The preset holds the whole filter, and the host
-saves the same data in the project, so the project keeps working after the
-original WAV and `.cfg` files are moved or deleted.
+Choose the filter file itself: an IR file, a `.cfg` or a configuration list,
+from any folder. The plug-in reads it as the
+[command-line tool](command-line.md) does, for the rate and channels the
+host has set, so a list chooses its entry the same way. The project then
+holds a copy of the whole filter: moving or deleting the file afterwards
+changes nothing. In the Audio Unit and VST3 the project also keeps the
+file's name, with its extension, so the window names the filter after
+reopening; it does not keep the file's folder, so a project passed to
+someone else does not carry your folder names.
 
-The filter is prepared away from the audio, then installed. A preset loaded
+A preset, loaded from the host's preset menu, is the other way in. This is
+the one list of what each way reads:
+
+| Way in | Plug-ins | Reads |
+| --- | --- | --- |
+| **Choose…**, or dropping the file, in [Convolver's window](#convolvers-window) | The Audio Unit, and the VST3 plug-in on macOS | An IR file, a `.cfg` or a configuration list, with exactly as many inputs as the host gives; not a preset file |
+| The host's file chooser for the **Filter** parameter | LV2, in hosts that show it ([LV2 filter files](#lv2-filter-files)) | An IR file, a `.cfg` or a configuration list, with the plug-in's own channel counts |
+| The host's preset menu ("Load Preset…" or its preset browser) | Every format | Convolver's preset in that format: `.vstpreset` (VST3), `.aupreset` (Audio Unit) or a `NAME.preset.lv2` folder (LV2), with at least its inputs ([channels](#channels)) |
+| A saved project | Every format | The filter and settings saved in it |
+
+[Plug-in presets](presets.md) shows how to make a preset with
+`convolver-preset`, which reads an IR file, a `.cfg`, a configuration list
+or a Convolver `.vstpreset`, and lists the folders where hosts look for
+presets. A preset is needed where the plug-in has no window (the VST3
+plug-in on Windows and Linux), in an LV2 host with no file chooser, and in
+Audacity, where the first preview supports only Audacity's own preset menu:
+Audacity 4.0.2 does not keep a filter loaded in the window (with Choose…,
+Recent, Reload or reloading when the file changes) for exports or saved
+projects, which keep whatever Audacity stored last, possibly no filter or an
+older one ([in Audacity](first-sound-in-a-host.md#in-audacity)).
+
+The filter is prepared away from the audio, then installed. A filter loaded
 before any audio plays starts at once; one loaded during playback fades in
 ([replacing a filter](#replacing-a-filter)).
 
-In the Audio Unit, and in the VST3 plug-in on macOS, you can also choose the
-IR file, `.cfg` or configuration list itself, in Convolver's window:
-**Choose…** under the filter's name, or drop the file on the window
-([Convolver's window](#convolvers-window)). In LV2
-you choose it with the host's file chooser
-([LV2 filter files](#lv2-filter-files)). Either way the plug-in reads the
-file as `convolver-preset` does, for the rate and channels the host has
-set, and the project then holds the filter itself, as with a preset: moving
-or deleting the file afterwards changes nothing. In the Audio Unit and VST3
-the project also keeps the file's name, with its extension, so the window
-names the filter after reopening; it does not keep the file's folder, so a
-project passed to someone else does not carry your folder names.
-
 ## When a filter does not fit
 
-A preset holds one filter at one sample rate, with fixed input and output
-channel counts. Each plug-in checks it against the host:
+A filter, chosen as a file or loaded as a preset, has one sample rate and
+fixed input and output channel counts. Each plug-in checks it against the
+host:
 
 | Situation | What plays |
 | --- | --- |
 | No filter loaded yet, equal input and output counts | The input, unchanged (after the latency) |
 | No filter loaded yet, different counts | Silence |
-| The host gives more inputs than the filter needs, and the outputs match | The filter, reading the first inputs; the rest are ignored ([channels](#channels)) |
+| The host gives more inputs than the filter needs, and the outputs match | A preset or saved project: the filter, reading the first inputs; the rest are ignored ([channels](#channels)). A file chosen in the window is refused: it needs exactly the host's inputs |
 | The first filter does not fit, or its preset is damaged | Silence |
 | A new filter does not fit while another is playing | The working filter, unchanged; the project keeps saving it |
 | The filter is too large to save with the project | As for a filter that does not fit: silence for a first filter, otherwise the working filter |
@@ -174,11 +191,11 @@ happens next depends on the format:
 - **LV2** refuses the filter as soon as the session opens, and `status` shows
   Load failed. **Do not save the session**: saving records the failure and
   drops the filter. Close it without saving and reopen it at the filter's rate,
-  or load the preset again.
+  or load the filter again.
 
 **Saving after a first filter failed** saves the failure, so reopening the
-project plays silence again rather than unfiltered audio. Load a matching
-preset to replace it.
+project plays silence again rather than unfiltered audio. Choose or load a
+matching filter to replace it.
 
 How each format reports a refusal:
 
@@ -404,7 +421,9 @@ From the top, the window has:
   silent, as for a first preset that does not fit. Either way the project
   then saves the outcome: the filter that plays, with the failure noted.
   An accepted file also becomes the plug-in's current preset, named after the
-  file, so the host can tell the project has changed and asks to save it.
+  file, and Convolver tells the host the project has changed. What the
+  host does with that differs: most mark the project unsaved, and Audacity
+  4.0.2 does not store the change at all ([loading a filter](#loading-a-filter)).
   The
   file is read and the filter prepared before the window responds again,
   so a very long filter can make the window (and the host) pause for a
@@ -415,7 +434,9 @@ From the top, the window has:
   the dialog too, and nothing is loaded. GarageBand runs plug-ins in a
   sandbox; in jrp's test (October 2026) it let a `.cfg` read the WAV files
   beside it. Where a sandbox refuses, the explanation says permission was
-  denied. A preset always works.
+  denied. A preset carries the filter inside it, so it does not depend on
+  the sandbox letting Convolver read the original files; its rate and
+  channels must still fit.
 
   Beside Choose…:
 
@@ -443,8 +464,8 @@ From the top, the window has:
     is not reloaded; the filter that plays stays, as it does when a reload
     is refused (say, a `.cfg` that names a file not written yet): press
     Reload once the file is ready. A filter the host has restored since
-    (a preset, an undo) is not replaced by a reload. Each reload marks the
-    project changed, as choosing the file does.
+    (a preset, an undo) is not replaced by a reload. Each reload tells the
+    host the project has changed, as choosing the file does.
 - **Gain** and **Mix**: a slider, the value in a box beside it and its unit.
   Type a value in the box and press Return (or move to another control) to
   set it exactly; a value beyond the range stops at its end. Option-click a
@@ -509,7 +530,8 @@ except:
 - The title line names the instance as the log does (`VST3 #2`).
 - Dragging a Gain or Mix slider is one change for the host's undo and
   automation, from mouse down to mouse up, as the VST3 SDK asks.
-- An accepted file marks the project changed, so the host asks to save it.
+- An accepted file is reported to the host as a change to the project;
+  hosts differ in what they do with it (see above).
 - A **Bypass** checkbox at the end of the title line is the plug-in's bypass: ticking
   it is the same as the host's own bypass button, which it follows, and the
   host's undo and automation record it. The Audio Unit's window has none,

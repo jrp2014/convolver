@@ -241,6 +241,30 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Documentation (DOC-10, from jrp's file-loading review of 7 November 2026
+  and his release-direction review of 8 November): [your first sound in a
+  host](docs/use/first-sound-in-a-host.md) now runs choose a filter, check
+  its rate and channels, play, save the project, with **Choose…** in
+  Convolver's window and the package's `filter.cfg` files; host presets and
+  `convolver-preset` are an optional section for plug-ins without a window
+  and for preset libraries. It says that Choose… reads IR files, `.cfg`
+  files and lists from any folder but not preset files. One table in [how
+  the plug-ins behave](docs/use/plugins.md#loading-a-filter) lists what each
+  way of loading a filter reads, and one table in [plug-in
+  presets](docs/use/presets.md#preset-folders) gives the host preset
+  folders. The stereo and crossover checks choose `filter.cfg` in the
+  window, with the `.vstpreset` as the route without one. A file chosen in
+  the window must have exactly as many inputs as the host gives, unlike a
+  preset (TODO PLUG-33), so the crossover check loads the preset where the
+  host gives more inputs, as REAPER does. A new [In
+  Audacity](docs/use/first-sound-in-a-host.md#in-audacity) section gives the
+  route the first preview supports there, Audacity's own preset menu, since
+  Audacity 4.0.2 does not keep a filter loaded from the window for exports
+  or saved projects. The first-use guide gains a short "Before you start"
+  list, and [report a problem](docs/use/troubleshooting.md#report-a-problem)
+  and the GitHub problem form ask for Copy Diagnostics, the loading method
+  and whether playback, an export or reopening is affected. No behaviour
+  change.
 - CI (CI-34, first step, approved by jrp on 8 November 2026): a pull request
   builds the plug-in distribution candidates, whose macOS builds are the
   slowest jobs, only when it changes release files, packaged pages, the

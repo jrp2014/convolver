@@ -5,18 +5,19 @@ For anyone who has downloaded a preview package and wants to see, from start to
 finish, that the Convolver plug-in filters exactly as it should in their host.
 You will install the package, render the stereo example through the plug-in,
 check the result with a command, save and reopen the project, and see what
-happens when a preset does not fit.
+happens when a filter does not fit.
 
-**In short:** check the package's checksum, install the VST® 3 plug-in, load
-`examples/first-use/stereo/first-use-stereo.vstpreset` on a stereo track at
-48000 Hz, render `input.wav` through it, and run
+**In short:** check the package's checksum, install the VST® 3 plug-in, put
+Convolver on a stereo track at 48000 Hz and choose
+`examples/first-use/stereo/filter.cfg` in its window, render `input.wav`
+through it, and run
 `./bin/convolver --compare host-render.wav examples/first-use/stereo/expected.wav`.
 It should print `Match`. The filter must survive saving and reopening, and a
-preset for another rate or channel count must leave it playing.
+filter for another rate or channel count must leave it playing.
 
 **Status:** Convolver is a developer preview. These steps have been followed
-from start to finish once, in REAPER on macOS, and gave the expected result;
-other hosts are not yet checked. Menu names and what a host
+from start to finish once, in REAPER on macOS, loading the filter as a
+preset, and gave the expected result; other hosts are not yet checked. Menu names and what a host
 shows may differ from what is written here; the
 [status page](../project/status.md) says what is ready.
 
@@ -98,10 +99,14 @@ from the filter.
 3. Add Convolver to the track as an effect. On macOS its window opens and
    shows the status; on Windows and Linux the host shows its generic controls,
    with a read-only **Status**.
-4. Load `examples/first-use/stereo/first-use-stereo.vstpreset` from the
-   host's preset menu (REAPER: the **+** button beside the preset menu, then
-   the item that imports a VST preset file). Status reads
-   `Filter loaded: 48000 Hz, 2 in, 2 out.`
+4. Click **Choose…** in Convolver's window and pick
+   `examples/first-use/stereo/filter.cfg`. The window shows 48000 Hz,
+   `2 in → 2 out` and Active, and Status reads
+   `Filter loaded: 48000 Hz, 2 in, 2 out.` Without the window (Windows and
+   Linux), load `examples/first-use/stereo/first-use-stereo.vstpreset` from
+   the host's preset menu instead (REAPER: the **+** button beside the
+   preset menu, then the item that imports a VST preset file); the Status
+   is the same.
 5. Leave the track's volume, pan and the master at their defaults, and render
    the whole project offline to `host-render.wav` in the package folder:
    48000 Hz, stereo, 32-bit float WAV, no normalising or dither, with a tail of
@@ -123,20 +128,24 @@ from the filter.
 
 Save the project, quit the host, open the project again and render a second
 time to `host-render-reopened.wav`. Comparing it with `expected.wav` again
-prints `Match`: the project kept the filter. The preset holds the whole filter,
-so the example's WAV and `.cfg` files are not needed once it is loaded.
+prints `Match`: the project kept the filter. The project holds the whole
+filter, so the example's WAV and `.cfg` files are not needed once it is
+loaded.
 
-## 6. Load a preset that does not fit
+## 6. Choose a filter that does not fit
 
-1. Load `presets/echo-44100-stereo/echo-44100-stereo.vstpreset`, made for 44100 Hz. The
-   stereo filter keeps playing, and Status reads `Load failed, previous filter
+Choose each of these in turn (without the window, load the `.vstpreset`
+named after its folder instead):
+
+1. `presets/echo-44100-stereo/filter.cfg`, made for 44100 Hz. The stereo
+   filter keeps playing, and Status reads `Load failed, previous filter
    kept: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in the
    Convolver log.` Some hosts also report the failure themselves.
-2. Load `presets/echo-48000-mono/echo-48000-mono.vstpreset`, made for one channel.
-   The stereo filter keeps playing, and Status says the filter has
-   `1 in, 1 out`, the plug-in `2 in, 2 out`.
-3. Render again and compare: still `Match`. To recover, load the stereo
-   preset from step 4 again, or a preset made for your host's rate and the
+2. `presets/echo-48000-mono/filter.cfg`, made for one channel. The stereo
+   filter keeps playing, and Status says the filter has `1 in, 1 out`, the
+   host `2 in, 2 out`.
+3. Render again and compare: still `Match`. To recover, choose the stereo
+   filter from step 4 again, or a filter made for your host's rate and the
    track's channels.
 
 ## If something went wrong
@@ -147,7 +156,7 @@ so the example's WAV and `.cfg` files are not needed once it is loaded.
   48000 Hz in stereo. Its options are in the
   [command-line reference](command-line.md#comparing-two-files).
 - To make a preset from your own filter, see
-  [your first sound in a host](first-sound-in-a-host.md#make-a-preset-from-your-own-filter).
+  [your first sound in a host](first-sound-in-a-host.md#optional-load-a-preset).
 
 <!-- VST trademark notice: written by scripts/trademarks.py from packaging/trademarks/vst.json -->
 

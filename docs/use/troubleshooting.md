@@ -62,17 +62,19 @@ cannot be used ([when a filter does not fit](plugins.md#when-a-filter-does-not-f
 
 | Cause | Fix |
 | --- | --- |
-| The preset's sample rate differs from the host's | Set the host to the preset's rate, or make a preset at the host's rate; Convolver does not resample |
-| The track has fewer inputs than the preset, or a different number of outputs | Use a track or bus with at least the preset's inputs and exactly its outputs, or a matching preset |
-| A project was opened at another rate or layout | VST® 3 and Audio Unit: set the host back to the rate and layout the filter was made for, and the filter returns. LV2: do not save; reopen the session at the filter's rate, or load the preset again ([details](plugins.md#when-a-filter-does-not-fit)) |
-| No preset is loaded, and the input and output counts differ (a crossover, for example) | Load a preset |
-| The project was saved after its first preset failed | Load a matching preset |
+| The filter's sample rate differs from the host's | Set the host to the filter's rate, or choose a filter made for the host's rate; Convolver does not resample |
+| The track has fewer inputs than the filter, or a different number of outputs | Use a track or bus with at least the filter's inputs and exactly its outputs, or choose a filter that matches the track |
+| A file chosen in Convolver's window is refused for its channels, although a preset of the same filter plays (the track gives more inputs than the filter has, as REAPER's six-channel track does) | A chosen file needs exactly the host's inputs; a preset needs only at least them. Load the filter as a preset ([plug-in presets](presets.md)) |
+| A project was opened at another rate or layout | VST® 3 and Audio Unit: set the host back to the rate and layout the filter was made for, and the filter returns. LV2: do not save; reopen the session at the filter's rate, or load the filter again ([details](plugins.md#when-a-filter-does-not-fit)) |
+| No filter is loaded, and the input and output counts differ (a crossover, for example) | Choose a filter in Convolver's window, or load a preset |
+| The project was saved after its first filter failed | Choose or load a matching filter |
 | Bypass is on, and the filter's input and output counts differ | Switch bypass off |
 | Bypass is on (or Mix below 100%) after a load failed and no earlier filter is kept, or with a kept filter whose counts differ, such as a crossover at the wrong rate | Fix the load as above. Bypass passes nothing here on purpose: Convolver cannot tell that the failed filter was not a crossover ([bypass](plugins.md#bypass)) |
 | The filter plays but some channels are missing, and Status ends "plug-in inputs … ignored" | The track gives more inputs than the filter reads: it reads the first ones only. Put the source on those inputs ([channels](plugins.md#channels)) |
 
-To see why, read the plug-in's **Status** parameter in the host's generic
-plug-in window or parameter list (VST3 and Audio Unit), then the
+To see why, read the message in [Convolver's window](plugins.md#convolvers-window)
+(macOS) or the plug-in's **Status** parameter in the host's generic plug-in
+window or parameter list (VST3 and Audio Unit), then the
 [Convolver log](plugins.md#status-and-the-convolver-log), which says what
 differs and what to change. The LV2 plug-in shows Load failed on its `status`
 output and writes the reason to the host's log.
@@ -109,9 +111,18 @@ See [Equalizer APO troubleshooting](equalizer-apo.md#troubleshooting).
 
 ## Report a problem
 
-Report the package's SHA-256 checksum, the system and its version, the
-processor, the host and its version, the sample rate, channel layout and buffer
-size, any error message, the [Convolver log](plugins.md#status-and-the-convolver-log)
+Open an issue on [GitHub](https://github.com/jrp2014/convolver/issues/new/choose)
+and choose *Problem report*. In the report, give:
+
+- **Copy Diagnostics** from Convolver's window (macOS), pasted as text.
+- The host and its version, and the system and its version.
+- How you loaded the filter: **Choose…**, **Recent**, **Reload**, a preset
+  from the host's menu, or a reopened project.
+- Whether the problem is in what you hear while playing, in an export or
+  render, or after reopening the project.
+
+Where you can, also give the package's SHA-256 checksum, the processor,
+the sample rate, channel layout and buffer size, any error message, the [Convolver log](plugins.md#status-and-the-convolver-log)
 (or the host's log for LV2), and the smallest example that shows the problem. Use the bundled synthetic examples where you can, and keep private
 audio and session files out of the report. Keep levels low when trying
 unfamiliar IRs.
