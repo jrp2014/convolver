@@ -680,6 +680,15 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Audio Unit (AU-16, an intermittent au.adapter failure in CI on `2f3cb80`):
+  switching the host's bypass could leave Status at Active while the audio
+  was bypassed, and the reverse. The bypass setter does not wait for the
+  control lock, and when a load or the Latency work held it, the setter
+  left the Status to that call, which might already have set it or never
+  set it. The Latency work's serial queue now updates the Status once the
+  lock is free. No change to the audio. A test holds the Latency work
+  while bypass is switched both ways; TODO PLUG-30 records the pattern and
+  the other places that skip a busy lock.
 - VST3 (PLUG-23, from jrp's REAPER crossover retest at `5d188a7`): a project
   saved with the 2→6 crossover on a six-channel track played silence after
   reopening, and after FX Offline then Online. REAPER starts the plug-in on

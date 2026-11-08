@@ -69,7 +69,7 @@ inline void (*load_started_for_tests)() noexcept = nullptr;
 inline int latency_queue_failure_for_tests = 0;
 // For the tests only (AU-14, from jrp's reviews of db54160 and 5f47ecb): a
 // witness that a unit's Latency work has finished, in place of a sleep. Each
-// unit numbers its requests (request_latency()) from 1. When set, a unit
+// unit numbers its requests (wake()) from 1. When set, a unit
 // calls this with itself and `requested` after each request (`done` 0), on
 // the requesting thread, and with `done` at the end of each run of its work
 // (logged, the host told), the newest number that run had seen when it
@@ -87,6 +87,13 @@ inline void (*latency_progress_for_tests)(AudioComponentInstance unit, std::uint
 // change them only while no unit's Latency work is running.
 inline void (*latency_started_for_tests)(AudioComponentInstance unit) noexcept = nullptr;
 inline void (*latency_closing_for_tests)(AudioComponentInstance unit) noexcept = nullptr;
+// For the tests only (AU-16): when set, each run of a unit's Latency work
+// calls it at the end of the part that holds the control lock, after it has
+// shown any bypass change, on the work's queue, so that au.adapter can
+// switch bypass while the lock is taken and only a later run can show it.
+// Null in the component; change it only while no unit's Latency work is
+// running.
+inline void (*latency_locked_for_tests)(AudioComponentInstance unit) noexcept = nullptr;
 
 // One input bus and one output bus, 1 to 8 channels each (counts may differ),
 // following the shared adapter contract
@@ -242,9 +249,20 @@ class Effect final : public ausdk::AUBase {
     // new one starts with no history, so the sound has a gap (the new latency
     // plus the filter's own delay). The host is told of the new latency and
     // tail, from the queue, and the log says what happened. A Latency
-    // that cannot be built is tried again only when chosen again.
-    void request_latency() noexcept;
-    void apply_latency() noexcept;
+    // that cannot be built is tried again only when chosen again. A bypass
+    // switched while another call held `control_` wakes the work too, with
+    // its own bit of the source's data (request_status()), and such a run
+    // only shows the bypass in the Status: it does not touch the Latency
+    // (AU-16).
+    static constexpr std::uintptr_t latency_wake = 1, status_wake = 2;
+    void request_latency() noexcept {
+        wake(latency_wake);
+    }
+    void request_status() noexcept {
+        wake(status_wake);
+    }
+    void wake(std::uintptr_t why) noexcept;
+    void apply_latency(std::uintptr_t wakes) noexcept; // The wakes' bits, ORed.
     // Under `control_`: makes `next` (null when uninitializing) the processor
     // Render uses and returns the previous one, for release_processor().
     std::unique_ptr<HostProcessor> install_processor(std::unique_ptr<HostProcessor> next) noexcept;
@@ -276,6 +294,7 @@ class Effect final : public ausdk::AUBase {
     std::optional<HostLayout> committed_;
     HostStatusLine status_;          // Under control_.
     bool status_log_written_ = true; // host_log_written() when status_ was set; under control_.
+    bool status_bypassed_ = false;   // bypass_ when status_ was set; under control_ (AU-16).
     std::chrono::steady_clock::time_point
         report_faults_at_{}; // Last report_locked() look; under control_.
     // AU-6: the last report read, for a read while another call holds
