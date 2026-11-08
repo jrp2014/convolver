@@ -398,7 +398,8 @@ The defaults are what to ship. Specific to the Audio Unit:
   fallback build it lists them instead.
 - The window's Software detail names the FFT library and the file reader,
   so a report shows which build it came from.
-- The Audio Unit workflow's `au-sanitizers` job builds both fallbacks.
+- The Audio Unit workflow's `au-sanitizers` job builds both fallbacks in
+  its ASan and UBSan entry.
 
 The AU target builds as C++23 because AudioUnitSDK needs it; the core
 and other formats stay C++20.

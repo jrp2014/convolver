@@ -394,7 +394,8 @@ LV2 tests under ASan and UBSan, `lv2.adapter` under ThreadSanitizer, and
 `lv2lint` on every plug-in ([LV2 tests](#lv2-tests)). The
 [Audio Unit](../../.github/workflows/au.yml) workflow builds the AU component
 against the newest AudioUnitSDK, runs its CTest tests and `auval -strict` on
-it, and runs the AU tests again in a Debug build with ASan and UBSan
+it, and runs the AU tests again in a Debug build with ASan and UBSan and
+`au.adapter` under ThreadSanitizer
 ([Audio Unit tests](#audio-unit-tests)). Not every job runs every CTest
 entry: see [which configurations run which tests](#which-configurations-run-which-tests). These
 workflows and the candidate workflow also run every Monday, so a new upstream
@@ -791,7 +792,18 @@ Five CTest tests run when the adapter is built (label `au`):
   host switches bypass on and then off: the setter must return without
   waiting, and only a later run, which the setter must ask for, can show
   the change, so the check needs both halves of the fix (AU-16, the
-  intermittent "bypass not shown" failure made deterministic).
+  intermittent "bypass not shown" failure made deterministic). The test
+  sets these hooks once, before any unit exists, and publishes each hold
+  through an atomic pointer only once the hold is complete (AU-3); leaving
+  a test, even on a failed check, releases a held run, so that closing the
+  unit then cannot wait for it for ever.
+  ThreadSanitizer does not treat the dispatch source's wake-up
+  (`dispatch_source_merge_data`) as ordering the waker's writes before the
+  run, so a hook or hold set just before a wake was reported as a race
+  (four reports at `3c57325`, all in the test). The component does not rely
+  on that ordering: the Latency work reads what the host thread wrote under
+  the control lock or from atomics. A new test that hands data to the
+  Latency work must do the same.
 - `au.log_evidence`: the adapter test's Convolver log, the file CTest
   names in the build folder (`convolver-adapter-tests.log`), reaches the
   [CI evidence](#evidence-from-failed-ci-runs) after the test aborts, as a
@@ -861,9 +873,15 @@ The tests register the unit inside the test process with
 `AudioComponentRegister`, so they need no installation. The
 [Audio Unit workflow](../../.github/workflows/au.yml) runs them on macOS, then
 installs the component for the runner's user and runs `auval -strict` and
-[pluginval](#pluginval); its `au-sanitizers` job runs them again with ASan and UBSan, built with the
-fallbacks (`CONVOLVER_AU_FILE_READER=LIBSNDFILE`, `CONVOLVER_FFT_BACKEND=FFTW`)
-so that they keep working. Named
+[pluginval](#pluginval). Its `au-sanitizers` job runs two Debug builds side
+by side: the AU tests again with ASan and UBSan, built with the fallbacks
+(`CONVOLVER_AU_FILE_READER=LIBSNDFILE`, `CONVOLVER_FFT_BACKEND=FFTW`) so that
+they keep working, and `au.adapter` alone under ThreadSanitizer (AU-3), built
+with the defaults the packages use. There it switches bypass from another
+thread while rendering, sets the Latency from audio threads and holds the
+Latency work's lock while bypass changes. Every report is printed and any
+report fails the test; a step first checks that the test program links the
+ThreadSanitizer runtime, so an uninstrumented build cannot pass. Named
 host results (Logic, GarageBand, SoundSource, Live, REAPER, FL Studio) are
 AU-4.
 
@@ -1480,8 +1498,8 @@ format's whole test label, with the CLI for the `examples.first_use` fixture:
 | `convolver_au_suite` | Audio Unit with sanitizers | `ctest -L au` |
 | `convolver_lv2_tests` | LV2 with ASan and UBSan, and the upstream lilv check | `examples.first_use` and `lv2.*` |
 
-The LV2 ThreadSanitizer job, the lv2lint bundle and the fuzz workflow name
-their few targets directly in the workflow; the other jobs build everything.
+The LV2 and Audio Unit ThreadSanitizer jobs, the lv2lint bundle and the fuzz
+workflow name their few targets directly in the workflow; the other jobs build everything.
 A test whose program the target does not build fails (CTest reports "Could
 not find executable", a Python-driven test its own error), so a new plug-in
 test's target goes into its format's target (`au_test_targets` for the Audio
