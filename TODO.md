@@ -1001,6 +1001,13 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   change at `endEdit`, not the whole component state, so the workaround
   waits for jrp's test. Draft upstream issue for jrp to post: project
   files `audacity-upstream/`.
+  **Recent**, **Reload** and reloading when the file changes go through
+  the same `Controller::load_file` as **Choose…**, so they share the
+  problem; what the export keeps is whatever Audacity stored last, which
+  may be an older filter rather than none. jrp, later on 8 November: fix
+  and retest it, or explicitly narrow the preview's supported Audacity
+  workflow and verify that alternative; defer implementation changes that
+  do not prevent the walkthrough.
 - [ ] **VST3-12 — Editor window on Windows.** The same window as a Win32 view
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.
