@@ -1271,6 +1271,19 @@ policy rejects ad-hoc code. These runs retain signature-integrity and standalone
 adapter checks but omit all dynamic SDK bundle loading; they are not release
 qualification. Never bypass system security to turn those checks green.
 
+### Draft release rehearsal
+
+The "Draft preview release" workflow ([`publish.yml`](../../.github/workflows/publish.yml),
+REL-8) runs for pull requests that change it, `prepare_release.py`,
+`promotion_gate.py` or `contract.py`. It takes the newest passed candidate
+run started by hand on a `vX.Y.Z` tag, downloads its
+`complete-preview-candidate`, checks it against the tag
+(`prepare_release.py`) and shows the release notes in the run's summary; it
+creates no draft. `tests/release/prepare_release_tests.py`, in the candidate
+workflow's contract checks, covers the refusals on a made-up candidate. Only
+jrp's manual run from `main` creates a draft
+([publishing](releasing.md#publishing-an-unsigned-preview)).
+
 ## Evidence from failed CI runs
 
 When a test job fails, the native, VST3, LV2 and Audio Unit workflows keep an
