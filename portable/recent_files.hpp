@@ -3,7 +3,7 @@
 // VST3-11, AU-6: the filter files recently loaded in a Convolver window, kept
 // per user in a small text file beside the Convolver log, so every host and
 // instance shares them and no project holds them (jrp, 25 October 2026;
-// docs/project/plans/2026-10-24-plugin-editor.md#what-the-window-does). One UTF-8
+// docs/archive/plans/2026-10-24-plugin-editor.md#what-the-window-does). One UTF-8
 // path per line, newest first. Control thread only (a window's main
 // thread): never from audio processing.
 #include <cstddef>

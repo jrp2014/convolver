@@ -4,7 +4,7 @@
 // sound file) to the state a plug-in saves. convolver-preset and the
 // plug-ins share it, so a file loaded in a plug-in's window gives the same
 // saved state as the preset the tool writes for the same rate and channels
-// (docs/project/plans/2026-10-24-plugin-editor.md#how-the-window-connects).
+// (docs/archive/plans/2026-10-24-plugin-editor.md#how-the-window-connects).
 // Reads files: control or worker thread only, never audio processing.
 #include "convolver/host.hpp"
 #include "convolver/io.hpp"

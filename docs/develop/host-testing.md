@@ -29,8 +29,8 @@ compatibility claim is inferred.
 
 There are two levels of testing. An **unsigned preview** needs the smoke test
 below. A **signed production release** needs the full qualification procedure.
-Both gates are set out in the
-[plug-in formats plan](../project/plans/2026-10-21-plugin-formats.md#unsigned-previews-and-production).
+What the production gate adds is set out in
+[releasing](releasing.md#production-gates).
 
 ## First hosts
 

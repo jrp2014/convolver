@@ -248,6 +248,19 @@ Until 1.0 the C++ API may change between minor versions.
   name. The controller state's reader and writer moved to
   `portable/vst3_controller_state.hpp` so the tool, which needs no SDK,
   shares them.
+- Documentation (DOC-13, from jrp's review of `main` at `21711c5`, 8
+  November 2026): [TODO](TODO.md) holds open work only. The 122 finished
+  items' one-line entries moved, with their IDs and links, to
+  [`docs/archive/todo/`](docs/archive/todo/2026-11-08-done-items.md), whose
+  IDs the repository checks (`scripts/check_repository.py`) now count as
+  defined and done; the execution priorities no longer describe VST3-16 as an
+  open draft. The plug-in formats and editor plans, whose state paragraphs
+  dated from October, are [archived as superseded](docs/archive/plans/README.md);
+  the risks, the PipeWire comparison and one owner's question they still
+  held moved to HOST-2, VST3-6, AU-6, LV2-4 and LV2-5. Dated dependency versions, fixed intermittent failures and old
+  timings moved from the [testing guide](docs/develop/testing.md) to an
+  [evidence record](docs/archive/reviews/2026-11-08-testing-guide-evidence.md),
+  leaving the two failure causes that still apply to new work.
 - Documentation (DOC-11, from jrp's review of `main` at `bf6a207`, 8
   November 2026): the [status page](docs/project/status.md) agrees with the
   dated host records. It is dated 8 November 2026 against 0.12.1, no longer

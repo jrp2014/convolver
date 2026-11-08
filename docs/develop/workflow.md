@@ -90,7 +90,7 @@ repository; recording a review's or a host test's results in it is a change.
   [changelog](../../CHANGELOG.md) entry says what changed.
 - **Keep shared files small to merge.** Several streams edit `TODO.md`,
   `CHANGELOG.md`, `CMakeLists.txt`, `packaging/release-policy.json`,
-  `docs/README.md` and the [plug-in formats plan](../project/plans/2026-10-21-plugin-formats.md).
+  and `docs/README.md`.
   Change only the lines your item needs, and merge `main` into your branch
   often. A change to something every stream relies on (the
   [shared adapter contract](plugin-contract.md),
@@ -320,14 +320,18 @@ describes it. In the same pull request, add an entry naming the ID under
 `[Unreleased]` in the [CHANGELOG](../../CHANGELOG.md), even for work only
 contributors see. TODO keeps open work only; the one-line entry keeps the ID
 defined, and the [repository checks](#automated-checks) reject a TODO ID that
-is used but never defined.
+is used but never defined. When the done list grows long, a documentation
+change moves its lines unchanged, apart from relative links, into a new dated
+list in [`docs/archive/todo/`](../archive/todo/README.md), with a row in that
+folder's index; an ID ticked there stays defined.
 
 ## Automated checks
 
 `scripts/check_repository.py` runs in pre-commit and lint CI. It checks that:
 
-- every TODO ID mentioned in the maintained documentation is defined in TODO,
-  and no ID is defined twice;
+- every TODO ID mentioned in the maintained documentation is defined in TODO
+  or listed as done in [`docs/archive/todo/`](../archive/todo/README.md), and
+  no ID is defined twice;
 - every maintained page under `docs/` is listed in the [index](../README.md)
   and sits in a reader folder (`use/`, `develop/` or `project/`);
 - every open plan in [`project/plans/`](../project/plans/) has a dated file name, and every

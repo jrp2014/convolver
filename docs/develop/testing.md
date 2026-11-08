@@ -1171,26 +1171,9 @@ universal host compatibility or hard real-time deadlines. The historical
 extraction tests also leave old full-width PCM32, nonzero noise shaping, CMD
 tail handling and full host negotiation outside their coverage. Preserve these
 limits when quoting a result. [TODO](../../TODO.md#documented-limitations) gathers
-open validation gaps and intentional constraints.
-
-### Record: local dependency versions, October 2026
-
-The native tests link actual production translation units and actual
-libraries. The earlier October 2026 local test setup used these sources; they
-are not the versions current builds use (those take the newest releases; see
-[build from source](build.md#supporting-libraries)):
-
-- FFTW 3.3.11, archive SHA256
-  `5630c24cdeb33b131612f7eb4b1a9934234754f9f388ff8617458d0be6f239a1`.
-- libsndfile 1.2.2, archive SHA256
-  `3799ca9924d3125038880367bf1468e53a1b7e3686a934f098b7e1d286cdb80e`;
-  optional external codecs disabled for that local installation.
-
-FFTW's 3.3.11 CMake sources still set their reported version to 3.3.10. That
-local verification used the official configure/make build of that source
-archive, which reports 3.3.11. Convolver itself is built with CMake in both
-cases. Current LLVM, SDK and library results must be tied to the revision
-actually tested.
+open validation gaps and intentional constraints. Tie LLVM, SDK and library
+results to the revision actually tested; the October 2026 local dependency
+versions are [archived](../archive/reviews/2026-11-08-testing-guide-evidence.md#local-dependency-versions-october-2026).
 
 ## Documentation checks
 
@@ -1208,11 +1191,10 @@ replay. CI runs each libFuzzer target for 60 seconds on pull requests and
 at most one per physical core, so each keeps a core to itself for its whole
 budget; each log ends with the campaign's `Done N runs` count. The Linux
 runner's 4 CPUs are 2 cores with 2 hardware threads each, so two campaigns
-run at a time and the step takes about 2 minutes instead of 4. On 27 October
-2026 four at once gave each campaign about half its executions on `main`
-(`config_text` 194k against 447k); two at once gave 426k, and
-`config_list` 86k against 56k, `host_state` 1751k against 1640k and
-`ir_file` 121k against 161k. A manual workflow run defaults to
+run at a time and the step takes about 2 minutes instead of 4 (four at once
+gave each campaign about half its executions; the
+[27 October 2026 counts](../archive/reviews/2026-11-08-testing-guide-evidence.md#fuzz-campaigns-side-by-side-27-october-2026)
+are archived). A manual workflow run defaults to
 600 seconds per target; set its `seconds` input to `60` to reproduce the
 smoke-test budget. Keep crashes
 as committed regression inputs after investigating them.
@@ -1251,17 +1233,13 @@ runs `auval -strict` on the installed component and uninstalls it
 ([what a package holds](releasing.md#what-a-package-holds)). Windows also compiles a fixture installer and exercises
 changed-directory upgrades and locked-file uninstall recovery. The Linux
 candidate is built with networking disabled, from the archive alone, with
-CMake's default generator (Unix Makefiles). Until 27 October 2026 the
-candidate was built with networking, and a second, offline build of the same
-archive with `tests/release/source_build.py` checked that it builds offline;
-the script remains for [local checks](build.md#preview-recipe). The macOS
-candidates use Ninja and Windows Visual Studio (CI-10). Both macOS candidates
-build on macOS 15 runners (`macos-15` for arm64, `macos-15-intel` for x86-64) with a macOS 14
-deployment target, the [proposed minimum system](releasing.md#candidates).
-GitHub retires its macOS 14 image on 2 November 2026 and cancelled the arm64
-candidate during its scheduled brownouts on 30 October
-([runner-images#13518](https://github.com/actions/runner-images/issues/13518),
-CI-19). So no CI job runs a candidate on macOS 14: `verify_artifact.py` fails
+CMake's default generator (Unix Makefiles); the
+[earlier build](../archive/reviews/2026-11-08-testing-guide-evidence.md#how-the-candidates-were-built-before-november-2026)
+is archived. The macOS candidates use Ninja and Windows Visual Studio
+(CI-10). Both macOS candidates build on macOS 15 runners (`macos-15` for
+arm64, `macos-15-intel` for x86-64) with a macOS 14 deployment target, the
+[proposed minimum system](releasing.md#candidates). No CI job runs a
+candidate on macOS 14 (GitHub retired that image; CI-19): `verify_artifact.py` fails
 any binary whose `minos` is newer than 14.0, but it cannot see a newer macOS
 API used without an availability check. See the
 [qualification record](releasing.md) for external gates.
@@ -1327,46 +1305,21 @@ checks the adapter test's log after an abort and a kill, and
 A test that fails on one run and passes on the next has a cause, usually a
 race or a time limit that a busy runner exceeds; find and fix it rather than
 re-running until green. CI does not repeat failed tests automatically, as
-that would hide real races like the Audio Unit's lost stop. Causes found so
-far, starting with CI-22's survey (1 November 2026, the 1,000 most recent
-workflow runs, 25 October to 1 November, with their re-run attempts):
+that would hide real races like the Audio Unit's lost stop. The causes found
+so far, from CI-22's survey of 1 November 2026 onwards, each with its fix, are
+[archived](../archive/reviews/2026-11-08-testing-guide-evidence.md#causes-of-intermittent-failures-found-to-6-november-2026).
+Two still apply to new work:
 
-- Windows builds, "The process cannot access the file because it is being
-  used by another process", exit 32, in the app-local DLL step
-  (`vcpkg.exe z-applocal`) after a link, both in the main build (PR #88) and
-  in `packaging.consumer.source-no-ctest` (PR #102). The message is the
-  system's, not one of vcpkg's own errors, and 32 is Windows'
-  sharing-violation code: the command could not start `vcpkg.exe`. In #88
-  it came 8 ms after another target's `z-applocal` had copied its DLL and
-  was exiting. An exiting vcpkg sends its metrics by first copying
-  `vcpkg.exe` to a temporary folder, and vcpkg opened the source of that
-  copy without sharing
-  ([microsoft/vcpkg-tool#2163](https://github.com/microsoft/vcpkg-tool/issues/2163),
-  reported with vcpkg-tool 2026-09-26; fixed by #2165, merged 28 October
-  2026). The Windows jobs set
-  `VCPKG_DISABLE_METRICS=1`, which removes that copy; do the same for local
-  parallel builds with an older vcpkg. No handle trace was taken, so this
-  is the cause the evidence points to; if the error comes back with metrics
-  off, it is another one.
-- `au.editor` (PR #103): the read after a held load could get the last
-  report while the Latency worker held the lock a moment; the test now reads
-  until the result shows, as the window's next timed read would.
-- `au.adapter` under ASan (`au-sanitizers`, PR #104, d7a9795):
-  heap-use-after-free in `host_log_path()`, which read `CONVOLVER_LOG`
-  with `getenv` on a unit's Latency worker while the test's private-log
-  helper changed the variable with `setenv` for the next case. The test
-  now sets the variable once, before any unit exists, and each case reads
-  what the log gained while it ran. The log is the file CTest names in the
-  build folder, its own since CI-27 (it was a private file copied at exit,
-  which an abort lost; `au.editor`'s was a private file deleted at exit).
-- `native.cli` (PR #123, `ec631a8`, Ooura build): the no-clip case for
-  float output compared two renders byte for byte, and libsndfile writes
-  the second a float WAV file was made into its `PEAK` chunk, so renders
-  either side of a second differed. The test now compares the sample data
-  as stored and the format fields (CI-33).
-- The Audio Unit's former Latency worker (`native.request_worker`, CI-24,
-  and its watchdog check, CI-25) was removed by AU-12; its tests and the
-  evidence from its failures are [archived](../archive/reviews/2026-11-05-request-worker.md).
+- A Windows build that fails now and then with "The process cannot access
+  the file because it is being used by another process" (exit 32) in
+  vcpkg's app-local DLL step: an older vcpkg's metrics upload
+  ([microsoft/vcpkg-tool#2163](https://github.com/microsoft/vcpkg-tool/issues/2163)).
+  The Windows jobs set `VCPKG_DISABLE_METRICS=1`; do the same for local
+  parallel builds. If the error comes back with metrics off, it has another
+  cause.
+- A test that changes an environment variable (`setenv`) while a plug-in's
+  worker may read it (`getenv`) races: set such variables once, before any
+  unit exists, as the Audio Unit tests do with `CONVOLVER_LOG`.
 
 To check that two renders hold the same audio, compare the sample data
 exactly as stored and check the format, sample rate, channel count and frame count one
@@ -1607,9 +1560,7 @@ fixture's setup), then the ready tests in decreasing `COST`. The long tests
 carry a `COST` of about their longest CI time in seconds, so they start at
 once instead of last. Plug-in tests set it where they are defined; the core's
 are one list in the top-level `CMakeLists.txt`, before the `check` target,
-which skips a name no longer defined, so rename a test there too. On `main` at
-b9381e4 (25 October 2026, VST3 run 40236000059), Windows `vst3.lifecycle`
-took 100 s and began 21 s into its step, which then took 122 s. Static
+which skips a name no longer defined, so rename a test there too. Static
 analysis runs LLVM's `run-clang-tidy.py`, which analyses the same file list
 one file per CPU and fails if any file did
 ([lint checks](../../CONTRIBUTING.md#formatting-and-analysis)).

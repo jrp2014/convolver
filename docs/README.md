@@ -146,11 +146,11 @@ changes to source files, invariants and tests without requiring a history lesson
 
 These dated plans in [`project/plans/`](project/plans/) describe work that is not finished;
 open work and the current order are tracked in
-[TODO](../TODO.md#execution-priorities). The plug-in formats plan is the
-current direction; the Media Foundation and FFmpeg plans are parked.
+[TODO](../TODO.md#execution-priorities). The Media Foundation and FFmpeg
+plans are parked.
 [Completed and superseded plans](archive/plans/README.md) are archived,
-including the 18 October plug-in distribution plan, whose open work is now in
-[releasing](develop/releasing.md) and TODO.
+including the plug-in distribution, formats and editor plans, whose open work
+is now in the maintained guides and TODO.
 
 - [Finish and qualify the first preview](project/plans/2026-11-08-preview-acceptance.md)
   (REL-7, Reference): acceptance criteria, blocking defects, retest boundaries
@@ -158,17 +158,6 @@ including the 18 October plug-in distribution plan, whose open work is now in
 - [Reduce CI waiting without losing useful coverage](project/plans/2026-11-08-ci-scheduling.md)
   (CI-34, Reference): separate proposed scheduling work with coverage and
   measurement requirements; no workflow changes yet.
-- [Plug-in formats: VST3, LV2 and AU](project/plans/2026-10-21-plugin-formats.md)
-  (PLUG, LV2 and AU items): which hosts load VST3, AU, LV2 and CLAP, framework
-  choice, and the plan to develop VST3, LV2 and AU in parallel, including LV2
-  for PipeWire system audio.
-- [Plug-in editor](project/plans/2026-10-24-plugin-editor.md) (HOST-2,
-  PLUG-9, PLUG-10, PLUG-11, VST3-3, VST3-4, VST3-11 to VST3-13, AU-6, AU-7,
-  LV2-6, LV2-7): a window in every plug-in format that configures the plug-in
-  (filter, gain, latency, mix) as the old Convolver did, modernised, and shows
-  the status, the full explanation of a failure, what is loaded and the
-  Convolver log; settings, framework, threads, testing, accessibility and
-  phases, with decisions for jrp.
 - [Edges over the leading convolution plug-ins](project/plans/2026-11-06-edges-over-other-convolvers.md)
   (EDGE-1 to EDGE-13, PERF-2, PERF-3, IO-2): how Convolver compares with Altiverb,
   Reverberate, Space Designer, Hang Loose Convolver, CamillaDSP and X-MCFX,

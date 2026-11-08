@@ -527,7 +527,7 @@ threshold of hearing at a stated playback level.
   correction needs. Reverb users who want them have Valhalla, FabFilter and
   Reverberate.
 - **Copying any product's look or design.** Convolver's window keeps its own
-  native design ([editor plan](2026-10-24-plugin-editor.md)).
+  native design ([editor plan](../../archive/plans/2026-10-24-plugin-editor.md)).
 - **AAX (Pro Tools).** Not proposed: it would need a licence assessment
   against Avid's SDK and signing terms first.
 - **Larger blocks during offline renders.** The reported latency must stay
