@@ -36,7 +36,7 @@ def generate(output, converter):
                 for channel in range(channels):
                     config += f'impulse.wav\n{channel}\n{channel}\n{channel}\n'
                 (folder / 'filter.cfg').write_text(config, encoding='utf-8')
-                preset = folder / 'filter.vstpreset'
+                preset = folder / f'{name}.vstpreset'  # Hosts list presets by file name (PLUG-28).
                 if preset.exists():
                     preset.unlink()  # Only this generator's own output directory.
                 subprocess.run([str(converter), str(folder / 'impulse.wav'), str(preset)], check=True)

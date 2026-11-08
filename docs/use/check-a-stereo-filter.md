@@ -128,11 +128,11 @@ so the example's WAV and `.cfg` files are not needed once it is loaded.
 
 ## 6. Load a preset that does not fit
 
-1. Load `presets/echo-44100-stereo/filter.vstpreset`, made for 44100 Hz. The
+1. Load `presets/echo-44100-stereo/echo-44100-stereo.vstpreset`, made for 44100 Hz. The
    stereo filter keeps playing, and Status reads `Load failed, previous filter
    kept: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in the
    Convolver log.` Some hosts also report the failure themselves.
-2. Load `presets/echo-48000-mono/filter.vstpreset`, made for one channel.
+2. Load `presets/echo-48000-mono/echo-48000-mono.vstpreset`, made for one channel.
    The stereo filter keeps playing, and Status says the filter has
    `1 in, 1 out`, the plug-in `2 in, 2 out`.
 3. Render again and compare: still `Match`. To recover, load the stereo

@@ -452,19 +452,6 @@ LV2 (Linux first; also PipeWire system audio):
   and [plug-ins guide](docs/use/plugins.md#loading-a-filter) say when a
   chosen file is checked. Waits for the freeze unless jrp
   brings it forward.
-- [ ] **PLUG-28 — Name the packaged presets after their filter.** From the
-  same review: every example preset is called `filter.vstpreset`, named
-  only by its folder (`scripts/release/generate_examples.py`), so copying
-  them into a host's preset folder means renaming each one first, and a
-  host that lists presets by file name, such as Audacity, shows only
-  "filter". Name new ones `KIND-RATE-LAYOUT.vstpreset` (for example
-  `repeat-48000-stereo.vstpreset`), keeping each `.cfg` and IR file beside
-  it; update the package manifest, the journeys, the release tests and the
-  guides that name the file together, and leave dated records alone. Done
-  when the package and its release tests use the new names and the
-  journeys and host-testing steps no longer rename files. jrp decided
-  (8 November 2026): before the first preview, so the independent tester
-  learns the final names.
 - [ ] **PLUG-29 — Keep the Recent list out of the log folder.** From the
   same review: the window's Recent list is saved beside the log
   (`recent-filters.txt` in `~/Library/Logs/Convolver/`,
@@ -1504,6 +1491,8 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **PERF-12 — Load-timing verdicts from records, tested without timing.** 5
   November 2026; [load timing](docs/develop/testing.md#load-timing-perf-9).
 - [x] **PERF-14 — Load timing from a full history.** 5 November 2026.
+- [x] **PLUG-28 — Name the packaged presets after their filter.** 8
+  November 2026, PR #141; [first sound in a host](docs/use/first-sound-in-a-host.md#load-the-examples).
 - [x] **PLUG-23 — A filter reads the first inputs of a wider input bus.** 6
   November 2026; [channels](docs/use/plugins.md#channels).
 - [x] **PLUG-22 — Name the filter in the window, and say each fact once.** 7
