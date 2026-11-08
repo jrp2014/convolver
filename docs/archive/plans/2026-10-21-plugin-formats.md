@@ -1,11 +1,30 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Plug-in formats plan: VST3, LV2 and AU
 
+> **Archived 8 November 2026 as superseded** (DOC-13). This plan set the
+> order and design of the VST3, LV2 and Audio Unit adapters on 21 October
+> 2026; its "current state" paragraph below dates from 24 October. Its shared
+> groundwork and the VST3 and Audio Unit streams are on `main`, and what it
+> leaves open is owned elsewhere: the rules every adapter follows by the
+> [plug-in adapter contract](../../develop/plugin-contract.md), what users see
+> by [how the plug-ins behave](../../use/plugins.md) (the Audio Unit licence,
+> and PipeWire in brief), its choices by the
+> [decisions log](../../project/decisions.md#direction), and the open work by
+> TODO: PLUG-5 and REL-1 (the release pipeline and the production gate),
+> LV2-3 to LV2-5 (named layouts; the LV2 guide and host matrix, which takes
+> over the [PipeWire section](#system-wide-use-with-pipewire); release
+> bundles) and the host tests HOST-1 and AU-4. Of the two recommendations
+> under [decisions for the owner](#decisions-for-the-owner) that were not
+> marked decided, restoring the embedded filter first is what LV2-2
+> implemented; whether to publish LV2 bundles for macOS and Windows is listed
+> under LV2-5. When archiving, only relative links changed. Use the
+> [current documentation](../../README.md) for how Convolver behaves now.
+
 Status: written on 21 October 2026 against Convolver `75f3924` (package 0.4.3)
 and revised the same day against `4e1bb1b` (0.4.6) after the owner's review.
 It revises the format order in the
-[FFmpeg filter plan](2026-10-21-ffmpeg-filter.md) and the
-[plug-in distribution plan](../../archive/plans/2026-10-18-plugin-distribution.md).
+[FFmpeg filter plan](../../project/plans/2026-10-21-ffmpeg-filter.md) and the
+[plug-in distribution plan](2026-10-18-plugin-distribution.md).
 **Current state (24 October 2026, `9fa13f7`, 0.4.44):** the shared
 groundwork is done (PLUG-1 to PLUG-4 and PLUG-6 to PLUG-8), and so are the
 first steps of each stream: VST3-1, VST3-7, VST3-8 and VST3-10; LV2-1 and
@@ -14,7 +33,7 @@ now lives in the developer guides; it applies to every format and takes
 precedence over a per-format section below that seems to disagree. Still open: the release pipeline for all
 three formats (PLUG-5), LV2-3 to LV2-5, AU-3 to AU-5 and the named-host tests
 (HOST-1, AU-4). The first preview holds VST3 and the Audio Unit; LV2 joins a
-later preview ([decisions](../decisions.md#releases)). Open work and its order are in [TODO](../../../TODO.md#execution-priorities).
+later preview ([decisions](../../project/decisions.md#releases)). Open work and its order are in [TODO](../../../TODO.md#execution-priorities).
 The sections below are the plan as revised on 21 October 2026.
 
 **Priority:** develop VST3, LV2 and AU in
@@ -74,7 +93,7 @@ Contents: [recommendations](#revised-recommendations) ·
 | First (parallel) | **AU (AUv2)** | Logic and GarageBand load nothing else; SoundSource applies AU effects to Mac system audio. First releases unsigned; signing and notarization later. | macOS |
 | On request | CLAP | No host found that loads CLAP but not VST3 | All |
 | Parked | FFmpeg filter | The pipe works today; a built-in filter would mean maintaining a patched FFmpeg | All |
-| Parked | Windows-native (MFT, APO) | Needs more thought first; see the [Media Foundation plan](2026-10-21-media-foundation-transform.md) | Windows |
+| Parked | Windows-native (MFT, APO) | Needs more thought first; see the [Media Foundation plan](../../project/plans/2026-10-21-media-foundation-transform.md) | Windows |
 | Not planned | AAX | Pro Tools only; licence and signing burden for a room-correction tool | Windows, macOS |
 
 ## Who loads which format
@@ -116,7 +135,7 @@ Sources: [LV2 on Wikipedia](https://en.wikipedia.org/wiki/LV2),
 [Cubase 15](https://sonicstate.com/news/2025/11/06/steinberg-releases-cubase-15/),
 [CLAP two years later](https://librearts.org/2024/11/clap-api-two-years-later/),
 [PipeWire filter-chain](https://docs.pipewire.org/page_module_filter_chain.html),
-and FFmpeg's `af_lv2.c` (see the [FFmpeg plan](2026-10-21-ffmpeg-filter.md#integration-options)).
+and FFmpeg's `af_lv2.c` (see the [FFmpeg plan](../../project/plans/2026-10-21-ffmpeg-filter.md#integration-options)).
 A vendor's 2026 overview
 ([Antares](https://www.antarestech.com/blog/vst3-au-aax-clap-plugin-formats-2026))
 gives the same picture for the big DAWs but misses FL Studio's CLAP support,
@@ -141,7 +160,7 @@ No public data counts plug-in installs by format. The available evidence:
 - **Convolver's own users.** Historical downloads with a recorded operating
   system were mostly Windows (about 30,000), and the `.cfg` readers that keep the
   format alive (Roon, JRiver, Audiolense) are Windows and macOS products. See the
-  [downstream-use record](../history.md#downstream-use).
+  [downstream-use record](../../project/history.md#downstream-use).
 - **CLAP.** About 99% of CLAP plug-ins also ship in another format, per the
   [CLAP review](https://librearts.org/2024/11/clap-api-two-years-later/).
 

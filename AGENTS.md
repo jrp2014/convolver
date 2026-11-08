@@ -25,7 +25,7 @@ plug-in rules in `docs/develop/plugin-contract.md` and the procedures in
 `docs/develop/workflow.md`. User behaviour is described in `docs/use/`: the
 command line in `docs/use/command-line.md`, configurations in
 `docs/use/configuration.md` and the plug-ins in `docs/use/plugins.md`. Open plans are in `docs/project/plans/`;
-the plug-in direction is `docs/project/plans/2026-10-21-plugin-formats.md`. How the
+finished and superseded ones are in `docs/archive/plans/`. How the
 documentation is organised and written, for agents too, is in
 `docs/develop/documentation.md`.
 

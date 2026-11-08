@@ -375,7 +375,7 @@
   configuration, and Jalv drops requests only when it quits. The tests'
   deferred worker stays as a stress case; reopen if a host is found that
   drops requests and reactivates
-  ([worker lifecycle](../../project/plans/2026-10-21-plugin-formats.md#lv2-adapter-design)).
+  ([worker lifecycle](../plans/2026-10-21-plugin-formats.md#lv2-adapter-design)).
 - [x] **PERF-4 — Compiler flags and CPU-specific kernels.** 24 October 2026,
   PR #61: run-time AVX2+FMA kernels, with FMA by jrp's decision and a divergence test; [compiler flags and AVX2 kernels](../../develop/fft-backends.md#compiler-flags-and-avx2-kernels).
 - [x] **PERF-5 — Track valid input history.** 24 October 2026, PR #70: paths

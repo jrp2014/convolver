@@ -1,6 +1,25 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Plug-in editor plan: a window to configure, load and debug
 
+> **Archived 8 November 2026 as superseded** (DOC-13). This plan designed the
+> plug-in window and its settings on 24 and 25 October 2026; its status
+> paragraph below, which says most of the window was not yet implemented,
+> dates from then. The macOS window that VST3 and the Audio Unit share, with
+> Gain, Mix and Latency, is on `main` (VST3-3 and VST3-4 done; VST3-11, AU-6
+> and AU-7 built for the first preview and still open for their host checks,
+> such as VoiceOver),
+> and what the plan leaves open is owned elsewhere: the window and settings
+> as users see them by [how the plug-ins behave](../../use/plugins.md), the
+> rules by the [plug-in adapter contract](../../develop/plugin-contract.md),
+> jrp's answers by the [decisions log](../../project/decisions.md#direction),
+> and the remaining phases by TODO: the other gain modes and the meters
+> (PLUG-9, PLUG-10, AU-7), FFT planning in FFTW builds (PLUG-11), the Windows
+> and Linux windows (VST3-12, VST3-13), LV2's settings and window (LV2-7,
+> LV2-6), and the host steps (VST3-11, AU-6, HOST-1, AU-4). Its open
+> [risks](#risks-and-open-questions) not already under those items are
+> listed under HOST-2, VST3-6 and AU-6. When archiving, only relative links changed. Use the
+> [current documentation](../../README.md) for how Convolver behaves now.
+
 Status: written on 24 October 2026 against Convolver `80ac07a` (0.4.45), at
 jrp's request ("I think that doing that would be helpful, not least for
 debugging"), and revised the same day after jrp asked that the window
@@ -12,7 +31,7 @@ parameters (AU-7), were implemented on 25 October 2026 (PR #80; the
 first because jrp starts testing in GarageBand, and kept simple at jrp's
 request; the rest is not implemented. jrp's choices are recorded in
 [decisions for jrp](#decisions-for-jrp) and the
-[decisions log](../decisions.md#direction): native views, with VSTGUI as a
+[decisions log](../../project/decisions.md#direction): native views, with VSTGUI as a
 stop-gap for the Linux VST3 window; each format's own way of saving the
 settings; and a first preview, now macOS-only, with the Gain, Mix and
 Latency settings and the window that VST3 and the Audio Unit share there. What remains for jrp comes up as each phase proposes it: the Gain
@@ -66,7 +85,7 @@ whoever then implements one of its phases.
   window (VST3-11, reused by the Audio Unit in AU-6) follows, because jrp's
   test hosts are on his Mac, then Windows (VST3-12) and the Linux stop-gap
   (VST3-13). The first preview is macOS-only
-  ([decisions](../decisions.md#plug-in-behaviour)): it has the settings and
+  ([decisions](../../project/decisions.md#plug-in-behaviour)): it has the settings and
   the shared macOS window, and the Windows and Linux windows come in later
   previews; an LV2 UI (LV2-6) only if Linux users ask.
 - **Testing.** Gain, mix and latency pass the double-precision oracle tests
@@ -88,7 +107,7 @@ Contents: [what the window does](#what-the-window-does) ·
 
 The window configures first and explains always. Configuring is what the old
 Convolver's windows were for; explaining is what jrp asked for in debugging,
-and diagnostics that explain generously ([decisions](../decisions.md#diagnostics)):
+and diagnostics that explain generously ([decisions](../../project/decisions.md#diagnostics)):
 today the full explanation of a failure is only in the Convolver log, while
 the host shows at most the Status parameter's one line
 ([status and log](../../develop/plugin-contract.md#status-and-log)).
@@ -166,7 +185,7 @@ setting they offered, and what it becomes:
 | **Calculate optimum attenuation** button (property pages); estimated and peak gain in the description (VST2) | Ran the noise estimate; the peak gain was a guaranteed but "extremely conservative" bound | **Modernised:** the Estimate and No clipping modes, recomputed automatically for each filter, seeded so the estimate is the same every time (the old one varied), plus an output peak and clip count so the user sees the result |
 | **Effect level (%)** (wrapper, version 2.3) | Wet/dry mix | **Kept as Mix**, with the dry path latency-aligned |
 | **Partitions** / **No of partitions** (all) | Traded latency against processor load and cache use; 0 meant plain overlap-save | **Modernised as Latency:** the engine always uses uniform partitions of B frames, so the choice is B itself, shown as delay in milliseconds, with the measured load beside it instead of the old advice to time "Calculate optimum attenuation" or run `perftest` |
-| **Tuning rigour** (Estimate, Measure, Patient, Exhaustive, Take 1 minute; `wisdom.fftw`) (all) | FFTW planning effort | **Dropped from released plug-ins; optional in FFTW builds (PLUG-11):** released plug-ins use Ooura (Linux, Windows) or Accelerate (macOS), which have no planner to tune, because FFTW's planner is not thread-safe and another plug-in or the host may load the same FFTW ([plug-in builds](../../develop/fft-backends.md#plug-in-builds); [decisions](../decisions.md#releases)). A plug-in built with FFTW anyway (`-DCONVOLVER_FFT_BACKEND=FFTW`, which CMake warns about) plans with FFTW's quick estimate, and PLUG-11 offers measured planning there, with a tooltip stating its small measured gain ([FFT planning](#settings) below). The window always shows the FFT library and CPU kernels. The CLI keeps full FFTW tuning |
+| **Tuning rigour** (Estimate, Measure, Patient, Exhaustive, Take 1 minute; `wisdom.fftw`) (all) | FFTW planning effort | **Dropped from released plug-ins; optional in FFTW builds (PLUG-11):** released plug-ins use Ooura (Linux, Windows) or Accelerate (macOS), which have no planner to tune, because FFTW's planner is not thread-safe and another plug-in or the host may load the same FFTW ([plug-in builds](../../develop/fft-backends.md#plug-in-builds); [decisions](../../project/decisions.md#releases)). A plug-in built with FFTW anyway (`-DCONVOLVER_FFT_BACKEND=FFTW`, which CMake warns about) plans with FFTW's quick estimate, and PLUG-11 offers measured planning there, with a tooltip stating its small measured gain ([FFT planning](#settings) below). The window always shows the FFT library and CPU kernels. The CLI keeps full FFTW tuning |
 | **Dither** and **noise shaping** menus (property pages) | Applied only to 8- to 24-bit integer output | **Dropped from the plug-ins:** the old players wrote integer samples straight to the sound card, so Convolver was the last step and had to dither. A plug-in exchanges 32-bit floating-point audio with the host, and more processing (other plug-ins, faders) usually follows it; dither added there would be added again or undone later. Dither belongs once, at the final conversion to integer, which the host's render or the audio driver does (24-bit playback rounding is far below a converter's own noise). The 2006 VST2 window had no dither either. The CLI keeps both |
 | Version and `http://convolver.sf.net` (property pages); help text with an e-mail address (VST2) | Identification and help | **Kept:** version in the title; links to the user guide and the GitHub issues instead of the retired address |
 | OK, Cancel, Apply, Help (property pages) | Dialog buttons | **Dropped:** a plug-in window applies changes at once, as hosts expect, and the host's undo covers parameters |
@@ -221,7 +240,7 @@ settings existed therefore keeps sounding the same.
   the CLI's `--gain-db auto` stops; in Set mode the load goes ahead and the
   window shows the estimates as unavailable.
 - Parameter: VST3 ID 0, the ID VST2's "Attenuation" had, rather than a new
-  one ([decisions](../decisions.md#identities-and-file-formats)), but not the
+  one ([decisions](../../project/decisions.md#identities-and-file-formats)), but not the
   2006 mapping (0 to 1 linearly onto -200 to +200 dB, `float2dB` in
   `historical/convolverVST/convolverVST.cpp`), which is too coarse for a
   slider or automation. PLUG-10 proposes a range suited to room correction
@@ -275,7 +294,7 @@ bypass. With unequal input and output counts there is no dry signal (the
     and tail notifications. AU-7 chooses between the two and records it.
     (Resolved: at once, rebuilt on a control thread and handed to Render at
     its next call, because GarageBand starts the unit before it restores a
-    project; [decisions](../decisions.md#plug-in-behaviour),
+    project; [decisions](../../project/decisions.md#plug-in-behaviour),
     [contract](../../develop/plugin-contract.md#settings).)
   - LV2 (LV2-7): `run()` compares the port with the active size and, when it
     differs, calls `schedule_work` once (allocation-free, as filter loads do).
@@ -329,7 +348,7 @@ asked).
 **Where settings are saved.** Each format saves the settings in its own
 usual way, and the differences are documented rather than smoothed over
 (jrp: "live with the platform defaults for now, but document the potential
-source of divergence"; [decisions](../decisions.md#identities-and-file-formats)).
+source of divergence"; [decisions](../../project/decisions.md#identities-and-file-formats)).
 
 - VST3 saves its parameters in the component state, as it does Bypass. The
   host state codec gains the settings in a new version (3), written only
@@ -389,7 +408,7 @@ which one is saved, so it waits for a request.
 ## Framework choice
 
 jrp asked for stability and longevity over features
-([direction](../decisions.md#direction)), and the
+([direction](../../project/decisions.md#direction)), and the
 [plug-in formats plan](2026-10-21-plugin-formats.md#development-frameworks)
 chose each format's own headers over a framework, naming DPF as the fallback
 "if a shared editor across formats is ever needed". The window is small
@@ -413,7 +432,7 @@ view drawn with xcb (and cairo for text), or VSTGUI for Linux only, or no
 Linux window: Linux users already have LV2, whose generic host UIs show a file
 chooser for the `filter` parameter and the status port, and the VST3 Status
 parameter. Neither drawn option is accessible. jrp chose VSTGUI for the
-Linux VST3 window only, as a stop-gap ([decisions](../decisions.md#direction)): it saves writing a third
+Linux VST3 window only, as a stop-gap ([decisions](../../project/decisions.md#direction)): it saves writing a third
 view where no accessible native option exists anyway, and the preview that
 adds Linux needs a window there too. A native X11 view can replace it later if Linux
 users need one. VSTGUI is then a shipped dependency of the Linux VST3 build
@@ -646,7 +665,7 @@ display, in the existing CTest targets and CI jobs:
 | Saved settings | State version 3 round trip; states with default settings still written as version 1, byte-identical to today's; `convolver-preset` presets and states moved between formats give the documented settings in each format; AU and LV2 restore older sessions with defaults | `native.state`, `plugins.presets`, each format's adapter tests |
 | Latency changes | Changing latency while active: the reported latency and tail follow, the format's change notification is sent, no audio-thread allocation (the audio guard), and the PLUG-7 sequences with a latency change between steps | `vst3.lifecycle`, `au.lifecycle`, `lv2.lifecycle` |
 | Meters | Peak, clip count and timings from known signals; allocation-free under the audio guard; reset requests | `native.host` |
-| Report content and text | Table-driven: one case per `HostFailureKind`, notice, fault kind, Not checked yet, and log not writable, each checking `report_fields()` and `report_text()`; this can share DIAG-1's [diagnostics by surface](../../archive/plans/2026-10-24-diagnostics-by-surface.md) table | `native.host` |
+| Report content and text | Table-driven: one case per `HostFailureKind`, notice, fault kind, Not checked yet, and log not writable, each checking `report_fields()` and `report_text()`; this can share DIAG-1's [diagnostics by surface](2026-10-24-diagnostics-by-surface.md) table | `native.host` |
 | Load from a file equals the preset tool | For a WAV, a `.cfg` and a list, the state after a load from the window's path equals `convolver-preset`'s output byte for byte, and a refused file keeps the previous filter (PLUG-2 comparison of the audio) | `plugins.presets`, the PLUG-2 harness |
 | VST3 messaging | Through the existing controller and processor in the test harness: `ConvolverLoad` loads, refuses with the right reason, calls `setDirty`, and the controller's report copy follows every load, activation and fault | `vst3.adapter`, `vst3.lifecycle` |
 | AU properties | Report and load properties through `AudioUnitGetProperty`/`SetProperty`, with property-change events, under the same failure cases | `au.adapter` |
@@ -697,7 +716,7 @@ change, in its own pull request, before VST3-3); the new folder for view code
 [testing](../../develop/testing.md).
 
 **The first preview is macOS-only**
-([decisions](../decisions.md#plug-in-behaviour)): it has PLUG-10's Gain, Mix
+([decisions](../../project/decisions.md#plug-in-behaviour)): it has PLUG-10's Gain, Mix
 and Latency, PLUG-9's report, VST3-3, VST3-4 and the macOS window VST3-11,
 and for the Audio Unit AU-6 and AU-7's settings (with its own AU-3 to AU-5).
 The Windows and Linux windows (VST3-12, VST3-13) and the remaining gain
@@ -760,7 +779,7 @@ with the macOS one and differ only in views.
 
 ## Decisions for jrp
 
-All answered (recorded in the [decisions log](../decisions.md)). Still to come, as each phase proposes
+All answered (recorded in the [decisions log](../../project/decisions.md)). Still to come, as each phase proposes
 them: the Gain range (PLUG-10), new parameter IDs and LV2 port symbols.
 
 1. **Framework (decided):** native views (AppKit, Win32), no framework, with
@@ -768,7 +787,7 @@ them: the Gain range (PLUG-10), new parameter IDs and LV2 port symbols.
    base, no accessibility, a new shipped dependency) or DPF (replaces our
    adapters). This replaces the formats plan's "DPF is the fallback for a
    shared editor": the shared part is our own report code
-   ([decisions](../decisions.md#direction)). Linux uses VSTGUI as a
+   ([decisions](../../project/decisions.md#direction)). Linux uses VSTGUI as a
    stop-gap (see 6).
 2. **Settings:** Gain with the Set, Estimate and No clipping modes, Latency,
    Mix (the old "Effect level"; decided) and meters, as host parameters in
@@ -776,7 +795,7 @@ them: the Gain range (PLUG-10), new parameter IDs and LV2 port symbols.
    brought back, and tuning rigour returns only as PLUG-11's optional
    planning choice in FFTW-built plug-ins, as jrp asked.
 3. **Gain parameter (decided):** VST3 ID 0, with no new ID, but a new
-   mapping rather than the 2006 one ([decisions](../decisions.md#identities-and-file-formats)).
+   mapping rather than the 2006 one ([decisions](../../project/decisions.md#identities-and-file-formats)).
    Its range is jrp's to approve when PLUG-10 proposes it.
 4. **Saved form (decided):** each format's own way for now: VST3 host
    state version 3, written only when a setting is not at its default;
@@ -796,7 +815,7 @@ them: the Gain range (PLUG-10), new parameter IDs and LV2 port symbols.
    VST3 controller state and an AU `ClassInfo` key, a format change.
    Superseded by PLUG-22 (jrp, 6 November 2026): the project keeps the
    file's name, with its extension and without its folder, for the window
-   ([decisions](../decisions.md)).
+   ([decisions](../../project/decisions.md)).
 8. **Accessibility (decided):** highly desirable, not essential. The goals
    above are checked in each window phase (VoiceOver in REAPER), and gaps are
    recorded rather than blocking.
@@ -805,4 +824,4 @@ them: the Gain range (PLUG-10), new parameter IDs and LV2 port symbols.
    shared macOS window. Narrowed since: the first preview is macOS-only, with
    the existing shared window and Gain, Mix and Latency; the Windows and
    Linux windows, the other gain modes and the meters come in later previews
-   ([decisions](../decisions.md#plug-in-behaviour)).
+   ([decisions](../../project/decisions.md#plug-in-behaviour)).

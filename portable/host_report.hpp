@@ -10,7 +10,7 @@
 #include <vector>
 
 // PLUG-9: what a plug-in window and its Copy diagnostics button show about one
-// instance (docs/project/plans/2026-10-24-plugin-editor.md#how-the-window-connects).
+// instance (docs/archive/plans/2026-10-24-plugin-editor.md#how-the-window-connects).
 // It is built on the control side from the same functions as the Status
 // parameter (host_status) and the Convolver log (host_log.hpp), so the
 // window, a copied report and the log never disagree. Internal to the
