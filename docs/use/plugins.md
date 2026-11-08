@@ -22,10 +22,10 @@ does not fit. Installing is in [install](install.md); making presets is in
   what to change, the filter and settings, what plays in plain words, with
   Copy Diagnostics and Show Log; the VST3 plug-in on Windows and Linux and
   the LV2 plug-in have no window yet.
-- Latency is 256 samples by default, and the host makes up for it. The
-  VST3 plug-in and the Audio Unit have [settings](#settings) for the gain,
-  the wet/dry mix and the latency; the LV2 plug-in does not have them yet
-  (its latency stays 256 samples).
+- There is no latency by default: the filtered sound comes out with the
+  input. The VST3 plug-in and the Audio Unit have [settings](#settings) for
+  the gain, the wet/dry mix and the latency; the LV2 plug-in does not have
+  them yet (it always has zero latency).
 - A filter that does not fit the host's sample rate or channel counts never
   plays unfiltered audio in its place: a first filter that fails to load
   plays silence, even bypassed, and one that replaces a working filter is
@@ -459,8 +459,8 @@ From the top, the window has:
   does not yet mark the start and end of a drag, so a host recording
   automation from it may record each step separately; not yet tried in
   GarageBand.
-- **Latency**: a menu of block sizes, with the delay it adds at the host's
-  rate beside it ("adds 21.3 ms"). A new choice plays once the plug-in
+- **Latency**: a menu of delays in frames, from 0 (none) up, with the delay
+  a choice adds at the host's rate beside it ("adds 21.3 ms"). A new choice plays once the plug-in
   restarts with it, and until then the row says it is "not in use yet"
   ([settings](#settings)). The host is told the delay, so it can delay
   other tracks to keep them in time.
@@ -533,7 +533,7 @@ defaults play exactly as Convolver did before the settings existed.
 | --- | --- | --- | --- |
 | **Gain** | −100 to +24 dB | 0 dB | Scales the filtered signal, as the command line's `--gain-db` does. Negative values make room for a filter that boosts some frequencies; positive values make up level. |
 | **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. Whenever bypass plays silence there is no dry signal, so the mix stays at 100%: when the filter's input and output counts differ, and in the cases [bypass](#bypass) lists when no filter plays. Where bypass passes the input, the input share of Mix still plays while a kept filter is silent. |
-| **Latency** | 64, 128, 256, 512, 1024, 2048 or 4096 frames | 256 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. Smaller values mean less delay and more processor load; larger values the opposite. It is the old Convolver's partitions setting in modern form, and the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
+| **Latency** | 0, 64, 128, 256, 512, 1024, 2048 or 4096 frames | 0 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. At 0 the filtered sound is not delayed at all. A larger value can use somewhat less processor time, most of it gained by 64 frames. It is the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
 
 - Gain and Mix changes fade over 1.3 ms (64 samples at 48 kHz, 128 at
   96 kHz), so automating them does not click. Latency cannot be automated.
@@ -547,7 +547,7 @@ defaults play exactly as Convolver did before the settings existed.
 - **Settings and other formats.** Each format saves its settings its own
   way, so a filter moved between them (a VST3 preset opened as an Audio
   Unit, say) keeps the filter but not the settings: it plays at 0 dB, fully
-  wet, with a latency of 256 frames. The LV2 plug-in has no settings yet.
+  wet, with no latency. The LV2 plug-in has no settings yet.
   The same project can therefore sound different in another format.
 - **VST3 hosts** mark Mix as the plug-in's dry/wet control where they have
   one. A new Latency asks the host to restart the plug-in; until it does,
@@ -560,10 +560,11 @@ defaults play exactly as Convolver did before the settings existed.
 
 ## Latency and tail
 
-Latency is 256 samples by default, whatever the host's buffer size, and the
-plug-in reports it so the host can line the audio up. At 48 kHz that is about 5.3 ms.
-In the VST3 plug-in and the Audio Unit the [Latency setting](#settings)
-chooses it, from 64 to 4096 samples; LV2 always uses 256.
+There is no latency by default, whatever the host's buffer size: the
+engine sums a filter's first taps directly, so its output starts with the
+input. In the VST3 plug-in and the Audio Unit the [Latency setting](#settings)
+can add one, from 64 to 4096 samples, and the plug-in reports it so the host
+can line the audio up; LV2 always uses none.
 
 In the Audio Unit a new Latency plays at once; in VST3 it plays when the host
 restarts the plug-in, which Convolver asks it to do at once. Changing it during playback leaves a gap in the
@@ -579,7 +580,7 @@ The tail is the time the filter keeps sounding after the input stops: its
 longest response plus any delays. VST3 and the Audio Unit report it (the Audio
 Unit in seconds, as Audio Units do). VST3 counts it at the plug-in's output,
 as Steinberg's own tests measure it, so it adds the latency: an instance
-with no filter reports 256 samples at the default Latency, because its output
+with no filter reports 256 samples at a Latency of 256, because its output
 still carries the last 256 samples of input after the input stops. After a filter is replaced during
 playback, the Audio Unit keeps reporting the longest tail used until the host
 restarts it. LV2 cannot report a tail, so hosts that stop processing at the end
@@ -633,7 +634,7 @@ a preset leaves the switch as it is.
 ## Replacing a filter
 
 Loading a preset while audio plays prepares the new filter in the background,
-lets it run for the latency (256 samples by default), then crossfades to it
+lets it run for the latency (none by default), then crossfades to it
 over 5.3 ms (256 samples at 48 kHz). The new
 filter starts with no history, so it cannot filter audio that played before
 it was loaded. When the host stops and restarts processing, a pending filter
@@ -667,7 +668,7 @@ URIs are `https://github.com/jrp2014/convolver/lv2#discrete-N-M`.
 | Index | Symbol | Kind | Meaning |
 | --- | --- | --- | --- |
 | 0 | `enabled` | Control input | 1 processes, 0 bypasses (a 1.3 ms fade) |
-| 1 | `latency` | Control output | 256 samples |
+| 1 | `latency` | Control output | 0 samples |
 | 2 | `status` | Control output | 0 Active, 1 No filter, 2 Load failed, 3 Loading, 4 Fault |
 | 3… | `in_1` … `in_N` | Audio input | Input channels in order |
 | then | `out_1` … `out_M` | Audio output | Output channels in order |

@@ -431,7 +431,7 @@ separate processes, so each carries values, never pointers:
   the restored configuration. There is no warm-up or crossfade, so output
   matches the filter from the first block (after the reported latency).
 - **Live replacement** uses `HostProcessor::replace`: the new filter starts with
-  fresh history, warms up for one Latency block and crossfades for 5.33 ms, as described under
+  fresh history, warms up for the Latency (none at zero) and crossfades for 5.33 ms, as described under
   [replacement and threads](#replacement-and-threads).
 - Pending replacements coalesce to the newest, as `HostProcessor` already does.
 
@@ -504,8 +504,8 @@ whose choices jrp made on 24 and 25 October 2026
 ([decisions](../project/decisions.md#identities-and-file-formats)). Every
 adapter offers the same settings as host parameters, so they work in generic
 host controls, automation and host presets without a window. The defaults
-(gain 0 dB, mix 100%, latency 256 frames) leave every output sample exactly
-as it was before the settings existed, which `native.host_settings` checks
+(gain 0 dB, mix 100%, latency 0 frames since PERF-2) leave every output
+sample exactly as a processor built without settings at that latency plays it, which `native.host_settings` checks
 bit for bit. The first version had Gain and Mix only (jrp asked to keep it
 simple, 25 October 2026); Latency followed (PLUG-10, 31 October 2026), and
 the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
@@ -537,10 +537,17 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   (PLUG-22). Like bypass, a mix below 1 still
   passes its dry share while a kept filter that does not suit the host plays
   silence, where there is a dry signal.
-- **Latency** is the block size `HostProcessor` is built with, the engine's
-  uniform partition (the CLI's `--block-size`): one of `host_latencies`, 64 to
-  4096 frames in powers of two, default 256 (jrp). Smaller is less delay and
-  more processor load. The settings constructor refuses any other value. It
+- **Latency** is the latency `HostProcessor` and its engine are built with
+  (the CLI's `--block-size`): one of `host_latencies`, 0 or 64 to 4096 frames
+  in powers of two (jrp, 25 October 2026), with 0 first and the default (jrp,
+  8 November 2026, PERF-2). A larger value can use somewhat less processor
+  time. The settings constructor refuses any other value. Since the state
+  stores frames, not the menu position, adding 0 first left saved projects'
+  latencies unchanged (a VST3 test restores one saved at each earlier
+  choice); a project saved at the old default, 256, has no settings saved
+  and opens at the new default. At zero latency the first frames after a
+  reset are heard, so a bypass, gain or mix change made before them applies
+  at once, without the ramp a latency used to hide. It
   cannot change while a processor runs, so a new choice needs a new
   processor, built off the audio thread. It starts with no history, so the
   sound has a gap of the new latency plus the filter's own delay (its peak's
@@ -648,16 +655,16 @@ or cut to, other outputs.
 The host owns the audio device, clock and scheduling. Each callback supplies
 the next section of one continuous stream; convolution history persists
 between callbacks, and processing produces one output frame per input frame
-after the reported latency (the Latency setting's block, 256 samples by
-default, independent of the callback length).
+after the reported latency (the Latency setting, none by default,
+independent of the callback length).
 
 Filters are prepared outside processing and transferred through a bounded
 single-producer/single-consumer pointer handoff. A filter that arrives before
 any audio has been processed since activation or reset is installed directly.
 A reset (the host stopping and restarting processing) also ends a crossfade in
 progress, so the newer filter plays at once, and a filter published before
-audio resumes is installed directly. Later, a replacement runs for one Latency
-block to fill its latency, then crossfades for 5.33 ms. It starts with fresh
+audio resumes is installed directly. Later, a replacement runs for the Latency
+to fill its latency (at once at zero latency), then crossfades for 5.33 ms. It starts with fresh
 input history: it cannot reconstruct audio that preceded loading. Old engines
 are retired on the control thread. Pending changes coalesce to the newest; at
 most one transition and one pending replacement are retained, with up to two

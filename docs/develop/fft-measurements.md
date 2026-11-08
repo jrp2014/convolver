@@ -31,6 +31,7 @@ Contents: [processing benchmark](#processing-benchmark) ·
 [compiler flags and AVX2 kernels](#compiler-flags-and-avx2-kernels) ·
 [startup, reset and filter loading](#startup-reset-and-filter-loading) ·
 [long reverbs and zero latency](#long-reverbs-and-zero-latency) ·
+[the non-uniform engine](#the-non-uniform-engine) ·
 [reproduce](#reproduce)
 
 ## Processing benchmark
@@ -732,6 +733,76 @@ Larger final blocks cost less on average but make larger single transforms,
 which no schedule can split; 8192 with growth 4 balances the two here, and
 the right value may differ on Apple silicon.
 
+## The non-uniform engine
+
+PERF-2's engine (8 November 2026, draft pull request #139, for after the
+first release) against the engine on `main`, each built separately from its
+own commit by
+[`compare_engines.py`](../../tests/native/benchmarks/compare_engines.py), so
+that a later change to the engine cannot change the baseline. Baseline:
+`main` at `5cc95cd`, uniform partitions at Latency 256 (the plug-ins'
+default before PERF-2). Candidate: `b29f0d2` at Latency 0 (its default) and
+256. Machine: the 4-vCPU Intel Xeon cloud VM at 2.30 GHz, Ubuntu 24.04,
+Clang 18.1, Release, Ubuntu FFTW 3.3.10, AVX2+FMA kernels. Workload:
+`convolver_callback_benchmark --scenario warm` (a prepared engine, warmed,
+production routing in one engine), 1 s per run, three rounds with the two
+builds alternating; the tables give the median of the three. Before timing,
+both builds rendered the stereo and 2-to-6 crossover first-use examples
+within the oracle tolerance of their direct double-precision references
+(worst error 1.2e-7 for the baseline and 7.5e-8 for the candidate).
+[Raw data](../benchmarks/2026-11-08-x86-engine-compare.csv).
+
+The layouts are real routings in one engine, not independent mono
+convolutions: **stereo** (2 in, 2 out, two paths), **true stereo** (2 in,
+2 out, four paths) and **crossover** (2 in, 6 out, six paths).
+
+Mean cost in ns per output frame at 64-frame callbacks (48 kHz: 1,000 ns per
+frame is 4.8% of a core):
+
+| Filter | Stereo: main 256 | PERF-2 0 | PERF-2 256 | True stereo: main 256 | PERF-2 0 | PERF-2 256 | Crossover: main 256 | PERF-2 0 | PERF-2 256 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 4,096 taps | 41 | 62 | 51 | 58 | 94 | 71 | 88 | 149 | 106 |
+| 16,384 | 69 | 77 | 68 | 111 | 125 | 99 | 173 | 187 | 147 |
+| 65,536 | 214 | 101 | 96 | 574 | 176 | 141 | 1,218 | 261 | 235 |
+| 480,000 (10 s) | 2,172 | 202 | 193 | 6,920 | 311 | 294 | 7,874 | 590 | 449 |
+| 1,440,000 (30 s) | 6,105 | 336 | 333 | 22,452 | 772 | 619 | 42,923 | 1,141 | 1,087 |
+
+99th-percentile callback time in µs at 64-frame callbacks (the period is
+1,333 µs):
+
+| Filter | Stereo: main 256 | PERF-2 0 | True stereo: main 256 | PERF-2 0 | Crossover: main 256 | PERF-2 0 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 65,536 taps | 78 | 21 | 176 | 50 | 316 | 55 |
+| 480,000 | 649 | 59 | 1,834 | 60 | 2,139 | 101 |
+| 1,440,000 | 1,649 | 61 | 5,844 | 120 | 11,806 | 122 |
+
+At 512-frame callbacks the order is the same (all rows in the raw data).
+
+- **Long filters cost far less.** Somewhere between 16,384 and 65,536 taps
+  the new engine becomes cheaper, by 2 to 5 times at 65,536 taps and by 11 to 38 times at 10 and
+  30 s, and its 99th-percentile callback stays near a tenth of the period
+  where `main`'s exceeds it: `main` cannot play a 30 s true-stereo or
+  crossover filter in real time on this machine at all.
+- **Short filters cost more**, though little in absolute terms: at 4,096
+  taps 20 to 25% more at Latency 256 and 50 to 70% more at Latency 0, all
+  under 0.8% of a core. At Latency 256 the planner covers the first 256
+  taps with 64-frame blocks, because a larger block is only allowed where it
+  has a block period of slack to spread its work; computing a first block of
+  the Latency whole when it completes, as `main` does, would remove most of
+  that difference (open, in PERF-2).
+- **Zero latency is not free in the production engine**, unlike the
+  prototype above: the direct sum of the first 64 taps and three more
+  64-frame partitions add 13 to 40% for filters up to 16,384 taps; for long
+  filters the difference (up to 30% at 64-frame callbacks, either way at
+  512) is within this VM's noise.
+- **Worst callbacks** (the `max_us` column) vary by tens of milliseconds
+  between rounds on this shared VM for both builds; judge them on a quiet
+  machine, not here.
+
+These are one cloud VM's figures. jrp asked (8 November 2026) that speed
+claims be measured on his Mac before they are quoted: PERF-3 and this
+comparison run there before #139 is merged.
+
 ## Reproduce
 
 The benchmark programs and scripts are in
@@ -879,6 +950,19 @@ The automatic-gain analysis in the
 [edges plan](../project/plans/2026-11-06-edges-over-other-convolvers.md#automatic-gain)
 needs only Python and numpy:
 `python3 tests/native/benchmarks/auto_gain.py` ([output](../benchmarks/2026-11-07-auto-gain.txt)).
+
+### The non-uniform engine
+
+Needs the default build's libraries, CMake and git; each revision is
+checked out into its own worktree under `--work` and built in Release:
+
+```sh
+python3 tests/native/benchmarks/compare_engines.py --baseline 5cc95cd \
+    --candidate HEAD --work ../engine-compare > engines.csv   # about 40 minutes
+python3 tests/native/benchmarks/compare_engines.py --baseline 5cc95cd \
+    --candidate HEAD --work ../engine-compare --rounds 1 --taps 4096,480000 \
+    --cmake -DCONVOLVER_FFT_BACKEND=ACCELERATE > engines-quick.csv
+```
 
 ### Comparing backends
 

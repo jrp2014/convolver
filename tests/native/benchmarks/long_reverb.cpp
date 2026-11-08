@@ -434,7 +434,10 @@ class NonUniform final : public Mono {
     std::size_t by_worker_ = 0, by_fallback_ = 0;
 };
 
-// --- Today's engine -------------------------------------------------------
+// --- This build's Engine -----------------------------------------------------
+// Whatever convolver::Engine this revision has: on PR #139 the non-uniform
+// engine, so it is no baseline. To compare engines, build each revision and run
+// tests/native/benchmarks/compare_engines.py (jrp's review of c2edf84).
 class EngineMono final : public Mono {
   public:
     EngineMono(const std::vector<float>& h, std::size_t block, int rate) : block_(block) {
@@ -451,7 +454,7 @@ class EngineMono final : public Mono {
         return engine_->latency_frames();
     }
     std::string describe() const override {
-        return "uniform " + std::to_string(block_);
+        return "this build's Engine, latency " + std::to_string(block_);
     }
 
   private:
@@ -555,8 +558,10 @@ const char* usage =
     "  [--ir-seconds S] [--rate HZ] [--paths N] [--callback FRAMES] [--seconds S]\n"
     "  [--block B] (engine) [--first N0] [--largest N] [--ratio 2|4] [--latency L]\n"
     "  [--paced 0|1] (sleep to real time between callbacks) [--warm 0|1]\n"
-    "measure: one CSV row of callback times for N independent paths (a stereo reverb is 2,\n"
-    "true stereo 4). check: every candidate against the double-precision oracle.";
+    "measure: one CSV row of callback times for N independent mono convolutions (not one\n"
+    "engine's routing: --paths 4 is four separate mono convolutions, not true stereo; use\n"
+    "convolver_callback_benchmark --layout matrix for that). check: every candidate against\n"
+    "the double-precision oracle.";
 
 Options parse(int argc, char** argv) {
     Options o;

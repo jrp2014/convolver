@@ -304,7 +304,8 @@ void timing_in_seconds() {
     const auto tail = configuration_tail_frames(filter);
     check(unit.configure(48000, 2, 6, 512), "formats");
     // 256 frames (index 3), so the rate visibly changes the seconds.
-    set_parameter(unit, au::latency_parameter, 3);
+    check(AudioUnitSetParameter(unit.get(), au::latency_parameter, kAudioUnitScope_Global, 0, 3, 0),
+          "set Latency");
     require(latency_settled(unit), "the Latency work for 256 frames did not finish");
     require(unit.seconds(kAudioUnitProperty_Latency) == 256.0 / 48000,
             "latency at 48 kHz is not 256 frames in seconds");

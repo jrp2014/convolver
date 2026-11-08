@@ -206,13 +206,13 @@ struct Engine::Impl {
         std::vector<PathStage> stages;
     };
     struct Stage {
-        std::size_t block, bins, offset;
+        std::size_t block = 0, bins = 0, offset = 0;
         std::unique_ptr<detail::RealFft> fft;
         std::vector<float> re, im;
         // Cost weights in floating-point operations: a real transform of 2n
         // points is about 5 n log2(2n); a partition's complex multiply-add is
         // 8 per bin. They spread a block's work evenly over its slack.
-        double transform_cost, partition_cost;
+        double transform_cost = 0, partition_cost = 0;
         // The block being computed, and how far the work has gone.
         bool active = false;
         std::size_t job = 0, boundaries = 0, boundary = 0;
@@ -250,12 +250,17 @@ struct Engine::Impl {
             output_delays.emplace_back(delay_at(c.output_delays, i) + layout.extra);
         stages.reserve(layout.stages.size());
         for (const auto& s : layout.stages) {
-            const auto bins = s.block + 1;
+            // Member by member, so each allocation is owned as soon as it is made.
+            auto& stage = stages.emplace_back();
             const auto n = static_cast<double>(s.block);
-            stages.push_back({s.block, bins, s.offset,
-                              std::make_unique<detail::RealFft>(2 * s.block, options),
-                              std::vector<float>(bins), std::vector<float>(bins),
-                              5.0 * n * std::log2(2.0 * n), 8.0 * static_cast<double>(bins)});
+            stage.block = s.block;
+            stage.bins = s.block + 1;
+            stage.offset = s.offset;
+            stage.transform_cost = 5.0 * n * std::log2(2.0 * n);
+            stage.partition_cost = 8.0 * static_cast<double>(stage.bins);
+            stage.re.assign(stage.bins, 0.f);
+            stage.im.assign(stage.bins, 0.f);
+            stage.fft = std::make_unique<detail::RealFft>(2 * s.block, options);
         }
         paths.reserve(c.paths.size());
         for (const auto& source : c.paths) {

@@ -211,8 +211,8 @@ void window() {
     require([shown.titleField.stringValue rangeOfString:@"VST3 #"].location != NSNotFound,
             "title " + text(shown.titleField.stringValue));
     require(shown.settingSliders.count == 2 && shown.settingMenus.count == 1 &&
-                shown.settingMenus[0].numberOfItems == 7 &&
-                [shown.settingMenus[0].titleOfSelectedItem isEqualToString:@"256 frames"],
+                shown.settingMenus[0].numberOfItems == 8 &&
+                [shown.settingMenus[0].titleOfSelectedItem isEqualToString:@"0 frames"],
             "settings rows");
 
     // A Gain the host set shows in the window; Option-click's reset is one
@@ -233,10 +233,10 @@ void window() {
     // asked to restart, and the window says it is not in use yet.
     handler.edits.clear();
     NSPopUpButton* latency = shown.settingMenus[0];
-    [latency selectItemAtIndex:4];
+    [latency selectItemAtIndex:5];
     [latency sendAction:latency.action to:latency.target];
     require(handler.kinds(latency_id) == "bpe" && p.settings().latency == 1024 &&
-                p.getLatencySamples() == 256 && handler.latency_restarts == 1,
+                p.getLatencySamples() == 0 && handler.latency_restarts == 1,
             "Latency choice: " + handler.kinds(latency_id));
     [shown refresh];
     require([shown.settingValues[2].stringValue rangeOfString:@"not in use yet"].location !=

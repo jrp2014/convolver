@@ -42,10 +42,12 @@ int probe(const std::filesystem::path& path, int rate, int count, const std::str
         require(PresetFile::loadPreset(&preset, processor_id, &p), "load embedded preset");
         p.activateBus(kAudio, kInput, 0, true);
         p.activateBus(kAudio, kOutput, 0, true);
+        // The default Latency (zero since PERF-2): a packaged preset holds no settings.
+        const int latency = static_cast<int>(convolver::default_host_latency);
         ProcessSetup setup{kOffline, kSample32, 137, static_cast<double>(rate)};
         require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
                 "activate matching rate/layout");
-        require(p.setProcessing(true) == kResultOk && p.getLatencySamples() == 256, "latency");
+        require(p.setProcessing(true) == kResultOk && p.getLatencySamples() == latency, "latency");
         std::array<float, 137> left{}, right{};
         float* channels[] = {left.data(), right.data()};
         AudioBusBuffers in{}, out{};
@@ -62,7 +64,7 @@ int probe(const std::filesystem::path& path, int rate, int count, const std::str
         constexpr std::array<int, 8> blocks{1, 73, 137, 3, 129, 137, 137, 137};
         int position = 0;
         // Past the delayed tap (for the repeat, a quarter of a second).
-        for (std::size_t b = 0; b < blocks.size() || position <= 256 + delay + 137; ++b) {
+        for (std::size_t b = 0; b < blocks.size() || position <= latency + delay + 137; ++b) {
             const int block = blocks[b % blocks.size()];
             left.fill(0);
             right.fill(0);
@@ -75,9 +77,9 @@ int probe(const std::filesystem::path& path, int rate, int count, const std::str
             require(p.process(data) == kResultOk, "process");
             for (int i = 0; i < block; ++i) {
                 const int sample = position + i;
-                const float expected = sample == 256                        ? (delayed ? .5f : 1.f)
-                                       : (delayed && sample == 256 + delay) ? .25f
-                                                                            : 0.f;
+                const float expected = sample == latency ? (delayed ? .5f : 1.f)
+                                       : (delayed && sample == latency + delay) ? .25f
+                                                                                : 0.f;
                 for (int c = 0; c < count; ++c)
                     require(std::isfinite(channels[c][i]) &&
                                 std::abs(channels[c][i] - expected * (c == 0 ? 1.f : -.5f)) < 1e-5f,

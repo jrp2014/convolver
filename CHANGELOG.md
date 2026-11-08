@@ -197,6 +197,25 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Engine (PERF-2, draft for after the first release): non-uniformly
+  partitioned convolution with zero latency. A filter's first taps are
+  summed directly and the rest by stages of blocks growing from 64 to 8192
+  frames, whose larger blocks spread their work over the following
+  callbacks. Long filters need far less processor time (a 480,000-tap
+  stereo filter about 11 times less, a 30 s crossover 38 times less, on
+  the Linux cloud VM; see the
+  [measurements](docs/develop/fft-measurements.md#the-non-uniform-engine))
+  and the worst callback falls with them; short filters cost slightly
+  more. The Latency setting gains 0 frames, first in the list and the
+  default, and the command line's `--block-size` and inspection default to
+  0 to match, so default renders still equal the plug-ins' output.
+  `--block-size 0` is accepted everywhere, and `--tune-fft` plans every
+  transform size the engine uses, whatever the latency. Output differs
+  from before by rounding only (worst oracle error 5.2e-7 of the peak).
+  Projects keep the latency they were saved with; one saved at the old
+  default (256) opens at zero. The C++ `Engine`, `analyze_configuration`,
+  `validate_configuration` and `configuration_tail_frames` default to
+  latency 0.
 - Host checks (HOST-1): jrp's Audacity 4.0.2 session with the VST3
   plug-in (7 November 2026, candidate 0.10.13) is
   [recorded](docs/archive/reviews/2026-11-07-host1-audacity.md): the seven

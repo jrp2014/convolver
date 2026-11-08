@@ -842,6 +842,22 @@ so the preset file path is not needed).
   Latency setting stays and shows the CPU a larger value saves, and a new
   filter still plays as soon as possible (the plan's
   [rank 3](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#3-long-reverbs-at-low-cpu-and-latency)).
+  Built at jrp's request (8 November 2026) on draft PR #139, unmerged until
+  after the release: the non-uniform engine in `Engine` (routing, delays,
+  tail, reset and shared transforms kept; worst oracle error 5.2e-7 of the
+  peak), zero first in the Latency list and the default (jrp's choice), the
+  CLI and inspection defaulting to 0 to match. In the engine zero latency is
+  not free, unlike the prototype's single path: the direct sum costs about
+  10 to 15 ns per frame for stereo, and short filters (4096 taps) cost about
+  a fifth more than today's engine at Latency 256, against several times
+  less for long ones ([measurements](docs/develop/fft-measurements.md#the-non-uniform-engine),
+  `compare_engines.py`, which builds the two revisions separately). Still
+  open: computing a first block of the Latency whole at Latency 64 and
+  above (the planner now covers those taps with 64-frame blocks, most of
+  the short-filter difference), the CPU indication beside the Latency menu, block sizes tuned on
+  Apple silicon, PERF-3's measurements on jrp's Mac with both engines, and
+  an independent review. Merging needs a minor version step (the C++
+  defaults change).
 - [ ] **PERF-3 — Resource budgets and supported workloads.** Measure, on
   named machines, the distribution of callback durations (median, 99th
   percentile, 99.9th percentile and maximum, not only the average), memory in
