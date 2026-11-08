@@ -87,6 +87,10 @@ COMMAND_SEPARATOR = re.compile(r'\|\|?|&&|;')
 CLI_OPTION = re.compile(r'(?<![\w-])(--[A-Za-z][A-Za-z0-9-]*)')
 
 TODO_DEFINITION = re.compile(r'^- \[([ xX])\] \*\*([A-Z][A-Z0-9]*-\d+) — ', re.MULTILINE)
+# Finished TODO items move here, one line each; an ID ticked in one of these
+# files counts as defined and done. The files are dated records, so an ID may
+# appear in more than one of them.
+TODO_ARCHIVE = 'docs/archive/todo/'
 PLAN_NAME = re.compile(r'^\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*\.md$')
 CODE_SPAN = re.compile(r'`([^`\n]+)`')
 
@@ -145,6 +149,20 @@ def check_todo_ids(root, files, errors):
         if identifier in defined:
             errors.append(f'TODO.md: {identifier} is defined more than once; IDs must be unique')
         defined[identifier] = done
+    archived = set()
+    for name in files:
+        if name.startswith(TODO_ARCHIVE) and name.endswith('.md'):
+            archived.update(
+                match.group(2) for match in TODO_DEFINITION.finditer(read(root, name)) if match.group(1) != ' '
+            )
+    for identifier in sorted(archived):
+        if identifier in defined:
+            errors.append(
+                f'TODO.md: {identifier} is also listed as done in {TODO_ARCHIVE}; '
+                'IDs must be unique, so remove one or give reopened work a new ID'
+            )
+        else:
+            defined[identifier] = True
     prefixes = sorted({identifier.rsplit('-', 1)[0] for identifier in defined}, key=len, reverse=True)
     if not prefixes:
         return defined

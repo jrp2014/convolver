@@ -90,7 +90,7 @@ repository; recording a review's or a host test's results in it is a change.
   [changelog](../../CHANGELOG.md) entry says what changed.
 - **Keep shared files small to merge.** Several streams edit `TODO.md`,
   `CHANGELOG.md`, `CMakeLists.txt`, `packaging/release-policy.json`,
-  `docs/README.md` and the [plug-in formats plan](../project/plans/2026-10-21-plugin-formats.md).
+  and `docs/README.md`.
   Change only the lines your item needs, and merge `main` into your branch
   often. A change to something every stream relies on (the
   [shared adapter contract](plugin-contract.md),
@@ -153,12 +153,12 @@ the pull request which rows you followed and what you ran.
 
 | What changed | Run before pushing | Not needed |
 | --- | --- | --- |
-| **Prose:** Markdown whose commands no test runs (most of `docs/develop/`, `docs/project/`, `TODO.md`, `CHANGELOG.md`, `AGENTS.md`, `.claude/skills/`, and pages in `docs/use/` whose marked commands did not change) | `pre-commit run --all-files`: Markdown lint, links and anchors, the repository rules | A native build, CTest or clang-tidy. CI runs only Lint, and for `docs/use/`, which the packages ship, the candidate workflow too ([documentation-only pull requests](testing.md#documentation-only-pull-requests)) |
+| **Prose:** Markdown whose commands no test runs (most of `docs/develop/`, `docs/project/`, `TODO.md`, `CHANGELOG.md`, `AGENTS.md`, `.claude/skills/`, and pages in `docs/use/` whose marked commands did not change) | `pre-commit run --all-files`: Markdown lint, links and anchors, the repository rules | A native build, CTest or clang-tidy. CI runs only Lint, and for a `docs/use/` page with marked commands, which the packages ship and run, the candidate workflow too ([documentation-only pull requests](testing.md#documentation-only-pull-requests)) |
 | **Executable examples:** `README.md`, `examples/first-use/README.md` and `docs/use/first-filter.md` (`examples.first_use` runs their commands), or a command marked `<!-- executable-example -->` or `<!-- refused-example -->` in `docs/use/` | An [everyday build](build.md#everyday-build) and `ctest --test-dir build -R '^examples\.first_use$' --output-on-failure`; run each changed marked command with that build's `convolver` and check its output against the page (the [candidate workflow](testing.md#plug-in-candidate-checks) runs them from a package) | The sanitizer build and clang-tidy, unless code changed too |
 | **Tooling:** Python under `scripts/` or `tests/` that CTest does not run, `.pre-commit-config.yaml`, `.github/`, `.claude/hooks/` | pre-commit (ruff, actionlint, and the checkers' own tests); the script's own tests, such as `python3 tests/repository_checks_tests.py`; for a workflow, the CI run on the draft pull request | A native build, unless the script is run by CTest or builds something |
 | **Code:** C++, CMake, or a test CTest runs, outside the DSP path (CLI, I/O, configuration, presets, host lifecycle) | The [sanitizer build](build.md#sanitizer-build-for-changes) with the full CTest configuration; clang-tidy on the changed portable sources ([CONTRIBUTING](../../CONTRIBUTING.md#formatting-and-analysis)); the focused tests in the [change and test map](architecture.md#change-and-test-map) | |
 | **DSP:** convolution, routes, delays, FFT backends, kernels, dither | As for code, and report the worst error of the direct double-precision oracle tests in `tests/native/engine_tests.cpp`; measure any speed claim in a separate Release build ([how to measure](fft-measurements.md#reproduce)) | |
-| **Plug-in adapter or window:** `plugins/`, or shared host code they call | As for code, configured with the format's SDK; the format's validator, its [PLUG-2 comparisons](testing.md#plug-in-comparisons-plug-2) and [pluginval](testing.md#pluginval) where they apply. What only macOS builds (the window, the Audio Unit) runs in CI if you have no Mac; say so | Host steps, unless the change is about behaviour only a host shows ([host testing](host-testing.md)) |
+| **Plug-in adapter or window:** `plugins/`, or shared host code they call | As for code, configured with the format's SDK; the format's validator, its [PLUG-2 comparisons](testing.md#plug-in-comparisons-plug-2) and [pluginval](testing.md#pluginval) where they apply. What only macOS builds (the window, the Audio Unit) runs in CI if you have no Mac; say so. Before host steps on the branch, start the candidates by hand unless the pull request built them ([when pull requests build the candidates](testing.md#when-pull-requests-build-the-candidates)) | Host steps, unless the change is about behaviour only a host shows ([host testing](host-testing.md)) |
 | **Versioning:** `VERSION`, `SOURCE_PATHS`, the version workflow | `python3 tests/versioning_tests.py` ([source versioning](versioning.md)) | Running the version helper, which commits and tags |
 
 ## Definition of done
@@ -320,14 +320,18 @@ describes it. In the same pull request, add an entry naming the ID under
 `[Unreleased]` in the [CHANGELOG](../../CHANGELOG.md), even for work only
 contributors see. TODO keeps open work only; the one-line entry keeps the ID
 defined, and the [repository checks](#automated-checks) reject a TODO ID that
-is used but never defined.
+is used but never defined. When the done list grows long, a documentation
+change moves its lines unchanged, apart from relative links, into a new dated
+list in [`docs/archive/todo/`](../archive/todo/README.md), with a row in that
+folder's index; an ID ticked there stays defined.
 
 ## Automated checks
 
 `scripts/check_repository.py` runs in pre-commit and lint CI. It checks that:
 
-- every TODO ID mentioned in the maintained documentation is defined in TODO,
-  and no ID is defined twice;
+- every TODO ID mentioned in the maintained documentation is defined in TODO
+  or listed as done in [`docs/archive/todo/`](../archive/todo/README.md), and
+  no ID is defined twice;
 - every maintained page under `docs/` is listed in the [index](../README.md)
   and sits in a reader folder (`use/`, `develop/` or `project/`);
 - every open plan in [`project/plans/`](../project/plans/) has a dated file name, and every
