@@ -94,6 +94,16 @@ is superseded.
   and deferred limitations are linked from the gate summary; jrp publishes.
   The plan is written; qualification is not claimed complete. CI-34 is
   separate and does not gate the walkthrough.
+  Progress (8 November 2026): from jrp's release-readiness review of
+  v0.12.8, the checks still to run are one list,
+  [checks left before publication](docs/project/status.md#checks-left-before-publication),
+  which keeps the results jrp accepted and names what could be narrowed.
+  REL-6 qualified the 0.12.5 source on his MacBook Pro (all 24
+  combinations passed on the first run; longest hold 43.2 ms, longest
+  judged callback 2.95 ms;
+  [record](docs/archive/reviews/2026-11-08-rel6-qualification.md)).
+  Remaining: jrp's choice of the final candidate's tag, the host checks on
+  it, REL-3, then his publication.
 
 - [ ] **REL-8 — Rehearse publishing before the preview.** From jrp's
   8 November 2026 request to stop adding edge-case tests and smoke test the
@@ -133,6 +143,9 @@ is superseded.
   [next milestone](#execution-priorities). jrp chooses the tester. Record
   the evidence HOST-1 lists (package hash, host and OS versions, expected
   outputs, recovery from a refused filter) for each journey.
+  jrp's review of 8 November 2026 adds the first thing to try: "The
+  independent tester should try installing, loading their own filter,
+  saving and reopening with only the supplied instructions."
 - [ ] **REL-4 — Make the preview findable.** Room-correction users and the
   `.cfg` format's existing users should find Convolver from search, the old
   SourceForge site, KVR and their forums. Done on the repository side: a README
@@ -1164,12 +1177,14 @@ callbacks, loaded into an empty instance, replaced by another as long and
 reset, through each adapter's load and restore entry points. PERF-3's wider
 measurements (6- and 8-channel routing, 96 kHz, other block sizes, memory)
 become stated supported workloads after the first preview; they are not a
-preview gate. What remains for the gate: the release qualification run on
-the intended machine ([REL-6](docs/develop/releasing.md#responsiveness-qualification),
-a first-preview gate) and, if the 30 s case
-exceeds 250 ms on a supported platform, jrp's choice between background
-preparation in VST3 and the Audio Unit (VST3-5) and a higher limit with the
-pause documented.
+preview gate. The release qualification on the intended machine
+([REL-6](docs/develop/releasing.md#responsiveness-qualification), a
+first-preview gate) passed for the 0.12.5 source on jrp's MacBook Pro
+(8 November 2026, longest hold 43.2 ms;
+[record](docs/archive/reviews/2026-11-08-rel6-qualification.md)), so
+background preparation (VST3-5) is not needed for the preview; whether
+that result stands for the final candidate is jrp's choice
+([checks left](docs/project/status.md#checks-left-before-publication)).
 First optimised-build figures (Linux cloud VM, 4 cores, clang Release with
 Ooura, 5 November 2026; stereo 48 kHz, 512-frame callbacks): VST3 `setState`
 held the host's thread for 4 ms with a 1 s filter, 43 to 61 ms with 10 s,

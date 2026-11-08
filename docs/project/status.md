@@ -9,38 +9,28 @@ going. [TODO](../../TODO.md) is the backlog and owns the order of work; the
 linked guides own the behaviour.
 
 **In short:** status checked on 8 November 2026 against `main` at
-`5cc95cd` (0.12.1), whose last source change is `b50e50e`
-([PR #136](https://github.com/jrp2014/convolver/pull/136): one set of words
-for filters, presets and projects, DOC-9). The 0.11 series began with
-[PR #131](https://github.com/jrp2014/convolver/pull/131), which lets a filter
-read the first inputs of a wider host bus (PLUG-23), and the 0.12 series with
-[PR #128](https://github.com/jrp2014/convolver/pull/128), which redesigned the
-shared macOS window to name the filter and say each fact once (PLUG-22).
-Every workflow that runs on `main` passed on `b50e50e`, including
-[Native and historical tests](https://github.com/jrp2014/convolver/actions/runs/42427162872)
-and the
-[Plug-in distribution candidates](https://github.com/jrp2014/convolver/actions/runs/42427162803).
-Since then, [PR #141](https://github.com/jrp2014/convolver/pull/141) named the
-packaged example presets after their folder (PLUG-28, 0.12.2).
-Nothing has been published yet: there are no GitHub releases, and
-preview packages exist only as temporary CI artifacts. The command-line
-renderer, the preset tool, the Equalizer APO export and the VST3, Audio Unit
-and LV2 plug-ins are implemented and tested automatically; VST3 and the
-Audio Unit have Gain, Mix and Latency and share one macOS window. jrp has
-run the VST3 plug-in in REAPER (6 and 7 November) and Audacity (7
-November), and the Audio Unit in GarageBand (up to 1 November), all with
-the window from before PLUG-22; on 8 November, with the 0.12.5 candidate,
-he ran the current window in REAPER and GarageBand, where controls, saved
-state and exports passed and listening was not checked. The one open fix, a new VST3 Latency that
-REAPER used only after the project was reopened, is done: VST3-16
-([PR #134](https://github.com/jrp2014/convolver/pull/134)) passed jrp's
-REAPER check on 8 November
-([record](../archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md)). No independent
-user has followed the instructions. The next milestone is end-to-end
-testing of a fixed feature set: an independent user installing and using
-an exact preview package, cut from the 0.12 series.
+`88ea8ec` (0.12.8). Since 0.12.5 the plug-ins changed only in PLUG-31
+([PR #148](https://github.com/jrp2014/convolver/pull/148), `f11a3dd`):
+generated VST3 presets name their filter file, and the window heads a
+restored filter with no saved name "Restored filter". AU-3 added the Audio
+Unit's ThreadSanitizer run
+([PR #150](https://github.com/jrp2014/convolver/pull/150)) and REL-8 the
+draft-release workflow
+([PR #152](https://github.com/jrp2014/convolver/pull/152)), which jrp
+rehearsed on 8 November and whose draft he deleted. Nothing has been
+published: there are no GitHub releases, and preview packages exist only as
+CI artifacts. The command-line renderer, the preset tool, the Equalizer APO
+export and the VST3, Audio Unit and LV2 plug-ins are implemented and tested
+automatically; VST3 and the Audio Unit have Gain, Mix and Latency and share
+one macOS window. jrp has run the VST3 plug-in in REAPER (6 to 8 November)
+and Audacity (7 November), and the Audio Unit in GarageBand (up to 8
+November); loading responsiveness qualified on his MacBook Pro with the
+0.12.5 source (REL-6, gate 5). No independent user has followed the
+instructions. The next milestone is an independent user installing and
+using an exact preview package from the 0.12 series.
 [What still blocks it](#what-still-blocks-the-first-preview) lists each
-remaining gate once, with its status and evidence.
+gate once, and [checks left](#checks-left-before-publication) is the one
+list of what remains to be run.
 
 The **oracle** named below is a direct double-precision convolution computed
 independently of the engine, the project's reference for correct output
@@ -59,6 +49,7 @@ Contents: [evidence levels](#evidence-levels) ·
 [user journeys](#user-journeys-for-the-first-preview) ·
 [next milestone](#next-milestone-an-independent-user-runs-a-preview) ·
 [what still blocks it](#what-still-blocks-the-first-preview) ·
+[checks left](#checks-left-before-publication) ·
 [performance](#performance-what-is-measured) ·
 [compatibility guarantees](#compatibility-guarantees) ·
 [what the tests do not establish](#what-the-tests-do-not-establish) ·
@@ -185,7 +176,8 @@ order of [TODO's priorities](../../TODO.md#execution-priorities), except that
 the exact candidate (gate 6) comes just before the walkthrough that uses it.
 Each row names only
 what remains and where the evidence is; the items hold the detail. Gates 2,
-3, 5 and 7 are run on one exact candidate.
+3 and 7 are run on one exact candidate; gate 5's result is for the 0.12.5
+source.
 
 | Gate | Item | Status | Evidence |
 | --- | --- | --- | --- |
@@ -193,9 +185,44 @@ what remains and where the evidence is; the items hold the detail. Gates 2,
 | 2. VST3 smoke tests in named hosts, with the current window | HOST-1, VST3-11 | REAPER passed on 6 November apart from the Latency (gate 1), and its crossover on 7 November; Audacity's exports all matched on 7 November; both ran the window from before PLUG-22. On 8 November REAPER's part C passed its controls and state on the redesigned window with the 0.12.5 candidate; listening was not checked. PLUG-31 ([PR #148](https://github.com/jrp2014/convolver/pull/148)), which jrp chose to merge before the preview, changes the candidate (the window's heading for a restored filter, and a controller-state chunk in generated presets; audio state unchanged), but jrp [decided](decisions.md#plug-in-behaviour) that the 0.12.5 part C results stand; loading packaged presets and save and reopen then passed in REAPER with the candidate from `f11a3dd` (PLUG-31 merged), the heading naming each preset's file, and jrp [decided](decisions.md#plug-in-behaviour) those stand too, so on the final candidate, with the package SHA-256 recorded, part C needs only listening and REAPER's display of the Status parameter. Remaining there: the other REAPER steps (parts A, B and D), and every Audacity step, including those HOST-1 lists as not yet run: listening, **Choose…**, a mono track, a Latency change, a long tail and VoiceOver | [REAPER](../archive/reviews/2026-11-06-host1-reaper.md), [crossover](../archive/reviews/2026-11-07-reaper-crossover-retest.md), [Audacity](../archive/reviews/2026-11-07-host1-audacity.md), [REAPER window](../archive/reviews/2026-11-08-host1-reaper-window.md) and [PLUG-31 REAPER](../archive/reviews/2026-11-08-plug31-reaper.md) records; [smoke tests](../develop/host-testing.md#smoke-test-in-each-first-host) |
 | 3. The Audio Unit smoke test in GarageBand | AU-4, AU-6 | jrp's checks of the settings (25 October) and of the window up to `bbf94c5` (1 November) passed. On 8 November, with the 0.12.5 candidate, GarageBand's controls, state, refusal and exports passed on the current window; listening was not checked. Those results stand for the final candidate ([decision](decisions.md#plug-in-behaviour)). Remaining, on that candidate (after PLUG-31, with the package SHA-256): loading a packaged preset and save and reopen, which PLUG-31 touches, and the unchecked steps: listening to the presets and to Gain and Mix, a click when bypassing, whether GarageBand keeps the track in time after a Latency change, VoiceOver, and the Recent list (AU-6) | [GarageBand record](../archive/reviews/2026-11-08-au4-garageband.md); AU-4 and AU-6 in [TODO](../../TODO.md) |
 | 4. A ThreadSanitizer build of the Audio Unit | AU-3 | **Done** (8 November 2026, [PR #150](https://github.com/jrp2014/convolver/pull/150)). The Audio Unit workflow runs `au.adapter` under ThreadSanitizer, with bypass switched while rendering, the Latency set from audio threads and its work held while bypass changes; the first runs' four reports were all in the test's own setup (none in the component), and the test now orders that setup where ThreadSanitizer can see it. Passed in Audio Unit [run 42491345430](https://github.com/jrp2014/convolver/actions/runs/42491345430) | [Audio Unit tests](../develop/testing.md#audio-unit-tests), [decisions](decisions.md#plug-in-behaviour) |
-| 5. Loading responsiveness qualified on a named machine | REL-6 (the procedure is written; the run remains), [loading responsiveness](../../TODO.md#loading-responsiveness) | The timing tests and jrp's limits are in place (PERF-9 to PERF-11), but CI's shared runners judge the callbacks only on Linux ([performance](#performance-what-is-measured) below). Not yet run on jrp's MacBook Pro from the candidate's source, cold and from a full history. An entry that fails or is not qualified means the release is not qualified on that machine; if the 30 s filter holds the host's thread over 250 ms, jrp chooses between background preparation (VST3-5) and a higher, documented limit. Kept as a first-preview gate by jrp | [Responsiveness qualification](../develop/releasing.md#responsiveness-qualification), [decisions](decisions.md#plug-in-behaviour) |
-| 6. One exact candidate from a 0.12.x tag | PLUG-5 | The candidates hold everything the preview ships ([what a package holds](../develop/releasing.md#what-a-package-holds)), with the example presets named after their folder since [PR #141](https://github.com/jrp2014/convolver/pull/141) (PLUG-28). Remaining: a candidate cut after gate 1, for gates 2, 3, 5 and 7 | PLUG-5 in [TODO](../../TODO.md) |
-| 7. An independent user completes the journeys from those exact files | REL-3 | Not started. jrp chooses the tester; the walkthrough uses the candidate's files before upload. Then jrp publishes | [Releasing](../develop/releasing.md#publishing-an-unsigned-preview) |
+| 5. Loading responsiveness qualified on a named machine | REL-6, [loading responsiveness](../../TODO.md#loading-responsiveness) | **Qualified for the 0.12.5 source** on jrp's MacBook Pro: all 24 combinations passed on the first run; the longest hold of the host's thread was 43.2 ms (limits 100 ms up to 10 s, 250 ms at 30 s) and the longest judged callback 2.95 ms. This qualifies that source under the recorded conditions, not every later build. Since 0.12.5 no engine, loading or Audio Unit code has changed (PLUG-31 changed only the VST3 controller's saved name and the window's heading); whether the result stands for the final candidate is jrp's choice ([checks left](#checks-left-before-publication)) | [REL-6 record](../archive/reviews/2026-11-08-rel6-qualification.md); [responsiveness qualification](../develop/releasing.md#responsiveness-qualification) |
+| 6. One exact candidate from a 0.12.x tag | PLUG-5, REL-7 | The candidates hold everything the preview ships ([what a package holds](../develop/releasing.md#what-a-package-holds)). The final candidate is a hand-run of "Plug-in distribution candidates" on one 0.12.x tag that holds the draft-release workflow (v0.12.8 or later); which tag is jrp's choice ([checks left](#checks-left-before-publication)). Its package SHA-256 goes in every remaining record | PLUG-5 and REL-7 in [TODO](../../TODO.md) |
+| 7. An independent user completes the journeys from those exact files | REL-3 | Not started. jrp chooses the tester; the walkthrough uses the final candidate's files before upload. Then jrp publishes | [Releasing](../develop/releasing.md#publishing-an-unsigned-preview) |
+
+### Checks left before publication
+
+This is the one list of what remains (REL-7), from jrp's direction of
+8 November 2026: finish the genuinely missing listening, host and
+independent-user checks, or narrow the preview's claims where he defers a
+requirement, without repeating checks already accepted or another general
+review. Each host check runs on the final candidate (gate 6), with its
+package SHA-256 in the record; the steps are those of the
+[smoke tests](../develop/host-testing.md#smoke-test-in-each-first-host).
+If a fix changes plug-in code after a check, that check runs again.
+
+| # | Check | Steps | About |
+| --- | --- | --- | --- |
+| 1 | REAPER, by ear: the identity, echo and repeat presets, Gain and Mix, a click on bypass, and where REAPER shows the Status parameter | [REAPER](../develop/host-testing.md#reaper-vst3) steps 3 to 5 and the listening in 11 | 10 min |
+| 2 | REAPER, numerically: a render, a refused preset, the wrong host rate, and the stereo journey (three `convolver --compare` results) | REAPER steps 6, 8, 9 and 10 | 15 min |
+| 3 | REAPER, the 2→6 crossover: render, Mix 0% still filtered, bypass silent, save and reopen, refused presets | REAPER step 12 | 15 min |
+| 4 | Audacity, every step on the current window: listening, the system preset folder, **Choose…** at 48 kHz, save and reopen, a refused preset, a mono track and a Latency change; HOST-1 also lists VoiceOver and a tail longer than the clip (see the narrowing below) | [Audacity](../develop/host-testing.md#audacity-vst3) steps 1 to 9 | 30 min |
+| 5 | GarageBand: a packaged preset and save and reopen (what PLUG-31 touches); listening to the presets, Gain and Mix; a click on bypass; whether the track stays in time after a Latency change; **Recent** and **Reload**; VoiceOver on the window | [GarageBand](../develop/host-testing.md#garageband-audio-unit) steps 4 to 6, 9 and 10; AU-6 | 20 min |
+| 6 | The independent walkthrough: install, load their own filter, save and reopen, with only the supplied instructions; then the stereo journey from the package | REL-3 | the tester |
+
+Accepted and not repeated: VST3-16's latency compensation in REAPER (gate
+1); REAPER's window controls and saved settings on 0.12.5, and its packaged
+presets and save and reopen after PLUG-31 (`f11a3dd`); GarageBand's
+controls, saved settings, refusal and exports on 0.12.5
+([decisions](decisions.md#plug-in-behaviour)); AU-3 (gate 4); and the CI
+checks of every candidate. REL-6 (gate 5) is on this list only if jrp
+chooses to run it again on the final candidate.
+
+Candidates for narrowing, for jrp to decide; until he does they stay
+required. VoiceOver once, in GarageBand, since VST3 and the Audio Unit
+share the window. A filter tail longer than a clip's silent ending (an
+Audacity export question HOST-1 lists) is recorded as unverified rather
+than checked. The Audio Unit in REAPER, other hosts and two instances side
+by side are already follow-up work.
 
 The LV2 version mapping (LV2-5) is needed only before LV2 joins a preview.
 
@@ -235,6 +262,11 @@ them on the intended machine, REL-6). The figures and their sources are in
   runs; no limit for steady playing is decided). So the 30 s workload is not
   qualified on that machine, which neither condemns the engine nor shows
   that loading needs to move to the background.
+- **Release qualification on jrp's MacBook Pro** (REL-6, the 0.12.5
+  source, recorded 8 November 2026): the cold and warm runs on a named
+  machine, in an optimised build. All 24 combinations passed on the first run; the
+  longest hold of the host's thread was 43.2 ms and the longest judged
+  callback 2.95 ms ([record](../archive/reviews/2026-11-08-rel6-qualification.md)).
 
 ## Compatibility guarantees
 

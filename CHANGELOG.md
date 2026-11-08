@@ -12,6 +12,14 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Release evidence (REL-6, REL-7): jrp's responsiveness qualification of
+  the 0.12.5 source on his MacBook Pro is recorded: all 24 combinations
+  passed on the first run, with the longest hold of the host's thread
+  43.2 ms and the longest judged callback 2.95 ms
+  ([record](docs/archive/reviews/2026-11-08-rel6-qualification.md)). The
+  status page now lists, once, the checks left before the first preview
+  is published, keeping the host results jrp accepted
+  ([checks left](docs/project/status.md#checks-left-before-publication)).
 - Releases (REL-8): a "Draft preview release" workflow turns a passed
   candidate run on a `vX.Y.Z` tag into a draft GitHub pre-release. It refuses
   a run that was not started by hand on the tag or did not pass, or whose
