@@ -185,6 +185,20 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Documentation (DOC-11, from jrp's review of `main` at `bf6a207`, 8
+  November 2026): the [status page](docs/project/status.md) agrees with the
+  dated host records. It is dated 8 November 2026 against 0.12.1, no longer
+  says there are no open fixes while the VST3 Latency finding in REAPER
+  (VST3-16) is open, says which window each host run used (none yet the
+  0.12 window), and gives the crossover's passing REAPER retest without the
+  older refusal as a current result. [What still blocks the first
+  preview](docs/project/status.md#what-still-blocks-the-first-preview) is now
+  one table listing each remaining gate once, with its status and evidence:
+  VST3-16, the VST3 smoke tests on the current window (HOST-1), the Audio
+  Unit in GarageBand (AU-4), the Audio Unit's ThreadSanitizer build (AU-3),
+  responsiveness qualified on a named machine (REL-6), one exact candidate
+  (PLUG-5, PLUG-28) and the independent walkthrough (REL-3). The dated
+  records are unchanged. No code or sound changes.
 - Documentation (DOC-10, from jrp's file-loading review of 7 November 2026,
   [recorded](docs/archive/reviews/2026-11-07-file-loading-review.md)):
   [plug-in presets](docs/use/presets.md) no longer says the plug-ins have no

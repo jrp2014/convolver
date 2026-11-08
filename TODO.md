@@ -135,20 +135,6 @@ is superseded.
   Audacity cleanup in [host testing](docs/develop/host-testing.md#prepare-the-mac)
   removes only the files it copied. Follows PLUG-26 for the wording of
   choosing a preset.
-- [ ] **DOC-11 — Reconcile the release status page.** From jrp's review
-  of `main` at `bf6a207` (0.12.1, 8 November 2026): the
-  [status page](docs/project/status.md) gives conflicting answers about
-  release readiness. Its "open fixes: none" conflicts with the unresolved
-  VST3 Latency finding (VST3-16); its settings row says VST3's window has
-  not been checked in a host, while other rows record the REAPER checks;
-  its opening revision and date describe 0.10.9 while the page records
-  later results and targets the 0.12 series; and the crossover's passing
-  retest sits beside older unresolved wording. Done when the summary
-  agrees with the dated evidence, the dated records are unchanged, and
-  each remaining first-preview gate is listed once with its status and
-  evidence link, keeping the Audio Unit's ThreadSanitizer build, the
-  responsiveness qualification on a named machine and the independent
-  walkthrough as gates.
 - [ ] **HOST-1 — Named host matrix.** Record versions and results for Windows/macOS
   hosts: scan, load, preset/state restore, silence/tails, seek, variable callbacks,
   bypass, filter changes, multiple instances and unequal channel counts. SDK
@@ -1464,6 +1450,9 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **DOC-9 — Consistent words for filters, presets and projects.** 7
   November 2026, PR #136, from jrp's review, with clearer Waiting status wording;
   [words Convolver uses](docs/use/concepts.md#words-convolver-uses).
+- [x] **DOC-11 — Reconcile the release status page.** 8 November 2026,
+  PR #142, from jrp's review of `bf6a207`; [what still blocks the first
+  preview](docs/project/status.md#what-still-blocks-the-first-preview).
 - [x] **FFMPEG-1 — Test the pipe workflow.** 5 November 2026;
   [tests](docs/develop/testing.md#native-production-tests).
 - [x] **FFT-1 — Check that we have the latest Ooura version.** 21 October 2026;
