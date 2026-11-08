@@ -143,23 +143,6 @@ is superseded.
   preview, and the SourceForge project summary now points here (24 October
   2026); the old SourceForge website stays as it is. Remaining, at each
   preview: the steps after publishing.
-- [ ] **DOC-10 — One short route to load a filter.** From jrp's
-  [file-loading review](docs/archive/reviews/2026-11-07-file-loading-review.md)
-  (written 7 November 2026, posted 8 November): the guides lead readers into making and
-  installing presets, and host preset folders appear on several pages.
-  The ordinary instructions should be: choose a filter, check its rate and
-  channels, play, save the project; host preset libraries go in a separate
-  optional section, with one page owning the inputs each plug-in reads and
-  one table of preset folders, linked rather than repeated. Done when
-  [plug-in presets](docs/use/presets.md), the plug-ins guide and the
-  journeys lead with choosing a filter, one page lists the inputs each
-  plug-in reads, and one table gives the preset folders. Progress
-  (8 November 2026, PR #140): [plug-in presets](docs/use/presets.md) no longer says
-  the plug-ins have no window or that LV2 has no file chooser, the
-  plug-ins guide's summary names Choose… beside presets, and the
-  Audacity cleanup in [host testing](docs/develop/host-testing.md#prepare-the-mac)
-  removes only the files it copied. Follows PLUG-26 for the wording of
-  choosing a preset.
 - [ ] **HOST-1 — Named host matrix.** Record versions and results for Windows/macOS
   hosts: scan, load, preset/state restore, silence/tails, seek, variable callbacks,
   bypass, filter changes, multiple instances and unequal channel counts. SDK
@@ -1567,6 +1550,10 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **DOC-9 — Consistent words for filters, presets and projects.** 7
   November 2026, PR #136, from jrp's review, with clearer Waiting status wording;
   [words Convolver uses](docs/use/concepts.md#words-convolver-uses).
+- [x] **DOC-10 — One short route to load a filter.** 8 November 2026,
+  PR #157, from jrp's file-loading review; [your first sound in a
+  host](docs/use/first-sound-in-a-host.md), [inputs](docs/use/plugins.md#loading-a-filter),
+  [preset folders](docs/use/presets.md#preset-folders).
 - [x] **DOC-11 — Reconcile the release status page.** 8 November 2026,
   PR #142, from jrp's review of `bf6a207`; [what still blocks the first
   preview](docs/project/status.md#what-still-blocks-the-first-preview).

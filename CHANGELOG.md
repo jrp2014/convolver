@@ -221,6 +221,20 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Documentation (DOC-10, from jrp's file-loading review of 7 November 2026
+  and his release-direction review of 8 November): [your first sound in a
+  host](docs/use/first-sound-in-a-host.md) now runs choose a filter, check
+  its rate and channels, play, save the project, with **Choose…** in
+  Convolver's window and the package's `filter.cfg` files; host presets and
+  `convolver-preset` are an optional section for plug-ins without a window
+  and for preset libraries. It says that Choose… reads IR files, `.cfg`
+  files and lists from any folder but not preset files. One table in [how
+  the plug-ins behave](docs/use/plugins.md#loading-a-filter) lists what each
+  way of loading a filter reads, and one table in [plug-in
+  presets](docs/use/presets.md#preset-folders) gives the host preset
+  folders. The stereo and crossover checks choose `filter.cfg` in the
+  window, with the `.vstpreset` as the route without one. No behaviour
+  change.
 - Plug-in presets (PLUG-31, from jrp's REAPER check of VST3-16, 8 November
   2026): a `.vstpreset` made by `convolver-preset` also holds the name of
   the file it was made from, with its extension and without its folder, and
