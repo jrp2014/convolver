@@ -111,6 +111,17 @@ is superseded.
   tag's candidate run, the draft pre-release and his publication; the
   checks move to HOST-1, AU-4 and REL-3 when this item closes.
 
+- [ ] **REL-9 — Windows and Linux in the next preview.** jrp decided (8
+  November 2026) to publish the Windows and Linux packages the candidate
+  run already builds, VST3 plug-in and tools, with the next preview, for
+  people to try. The draft release attaches all four platforms with notes
+  for each, and an automated check first runs the exact files on machines
+  that never built Convolver: fresh Linux containers (Ubuntu 22.04 and
+  24.04, Debian 12, Fedora) and a fresh Windows runner, where the installer
+  is also installed and removed silently. Nobody has run these packages on
+  a Windows or Linux computer or in a named host there; the notes say so.
+  Done when the draft-release workflow attaches and checks all four
+  platforms and the guides describe them.
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The candidate workflow
   builds unsigned packages with pinned dependencies, corresponding source,
   staging, installers, artifact verification and promotion gates
