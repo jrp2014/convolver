@@ -1545,7 +1545,7 @@ entries written before 7 November 2026, with their evidence, are
   [settings](docs/use/plugins.md#settings),
   [acceptance](docs/archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md).
 - [x] **PLUG-28 — Name the packaged presets after their filter.** 8
-  November 2026, PR #141; [first sound in a host](docs/use/first-sound-in-a-host.md#load-the-examples).
+  November 2026, PR #141 and, for the first-use presets, PR #144; [first sound in a host](docs/use/first-sound-in-a-host.md#load-the-examples).
 - [x] **PLUG-23 — A filter reads the first inputs of a wider input bus.** 6
   November 2026; [channels](docs/use/plugins.md#channels).
 - [x] **PLUG-22 — Name the filter in the window, and say each fact once.** 7

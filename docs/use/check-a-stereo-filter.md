@@ -8,8 +8,8 @@ check the result with a command, save and reopen the project, and see what
 happens when a preset does not fit.
 
 **In short:** check the package's checksum, install the VST® 3 plug-in, load
-`examples/first-use/stereo/filter.vstpreset` on a stereo track at 48000 Hz,
-render `input.wav` through it, and run
+`examples/first-use/stereo/first-use-stereo.vstpreset` on a stereo track at
+48000 Hz, render `input.wav` through it, and run
 `./bin/convolver --compare host-render.wav examples/first-use/stereo/expected.wav`.
 It should print `Match`. The filter must survive saving and reopening, and a
 preset for another rate or channel count must leave it playing.
@@ -84,8 +84,8 @@ The second command ends with `Match: no sample differs by more than the limit
 feeds some of the left into the right and delays the right by 1 ms, so a
 swapped, missing or misrouted channel would not match.
 `examples/first-use/stereo/` holds the filter (`filter.cfg` and `room.wav`),
-`input.wav`, `expected.wav` and `filter.vstpreset`, a preset made from the
-filter.
+`input.wav`, `expected.wav` and `first-use-stereo.vstpreset`, a preset made
+from the filter.
 
 ## 4. Render the example in the host
 
@@ -98,9 +98,9 @@ filter.
 3. Add Convolver to the track as an effect. On macOS its window opens and
    shows the status; on Windows and Linux the host shows its generic controls,
    with a read-only **Status**.
-4. Load `examples/first-use/stereo/filter.vstpreset` from the host's preset
-   menu (REAPER: the **+** button beside the preset menu, then the item that
-   imports a VST preset file). Status reads
+4. Load `examples/first-use/stereo/first-use-stereo.vstpreset` from the
+   host's preset menu (REAPER: the **+** button beside the preset menu, then
+   the item that imports a VST preset file). Status reads
    `Filter loaded: 48000 Hz, 2 in, 2 out.`
 5. Leave the track's volume, pan and the master at their defaults, and render
    the whole project offline to `host-render.wav` in the package folder:
