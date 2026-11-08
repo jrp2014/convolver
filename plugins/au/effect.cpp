@@ -77,8 +77,11 @@ struct Effect::LatencyQueue {
             throw std::bad_alloc();
         }
         dispatch_set_context(source, this);
-        dispatch_source_set_event_handler_f(
-            source, [](void* self) { static_cast<LatencyQueue*>(self)->effect.apply_latency(); });
+        // The data is the ORed bits of the wakes since the last run (AU-16).
+        dispatch_source_set_event_handler_f(source, [](void* self) {
+            auto& q = *static_cast<LatencyQueue*>(self);
+            q.effect.apply_latency(dispatch_source_get_data(q.source));
+        });
         dispatch_source_set_cancel_handler_f(source, [](void* self) {
             dispatch_semaphore_signal(static_cast<LatencyQueue*>(self)->ended);
         });
@@ -95,8 +98,8 @@ struct Effect::LatencyQueue {
         dispatch_release(queue);
         dispatch_release(ended);
     }
-    void request() noexcept {
-        dispatch_source_merge_data(source, 1);
+    void request(std::uintptr_t why) noexcept {
+        dispatch_source_merge_data(source, why);
     }
 
     Effect& effect;
@@ -305,22 +308,22 @@ void Effect::release_processor(std::unique_ptr<HostProcessor> previous) noexcept
         std::this_thread::yield();
 }
 
-void Effect::request_latency() noexcept {
+void Effect::wake(std::uintptr_t why) noexcept {
     // Numbered before the wake-up, which the run follows.
     const auto number = latency_requests_.fetch_add(1) + 1;
     if (const auto hook = latency_progress_for_tests)
         hook(GetComponentInstance(), number, 0);
     if (latency_queue_) // Absent only before the constructor's end and in the destructor.
-        latency_queue_->request();
+        latency_queue_->request(why);
 }
 
-void Effect::apply_latency() noexcept {
+void Effect::apply_latency(std::uintptr_t wakes) noexcept {
     if (const auto hook = latency_started_for_tests)
         hook(GetComponentInstance());
     // Before the settings are read: the requests this run is sure to see.
     const auto seen = latency_requests_.load();
-    std::string message, faults;
-    bool changed = false, problem = false;
+    std::string message, faults, bypass_faults;
+    bool changed = false, problem = false, bypass_shown = false;
     std::unique_ptr<HostProcessor> previous;
     {
         std::lock_guard lock(control_);
@@ -329,7 +332,10 @@ void Effect::apply_latency() noexcept {
         // parameter meanwhile (that wakes the queue again).
         const auto current = settings();
         const auto chosen = current.latency;
-        if (!host_) {
+        if (!(wakes & latency_wake)) {
+            // Only a bypass to show (request_status()): a Latency that could
+            // not be built is not tried again for it.
+        } else if (!host_) {
             changed = latency_.exchange(chosen) != chosen; // The next Initialize uses it.
         } else if (host_->latency_frames() != chosen && initialized_) {
             const auto before = host_->latency_frames();
@@ -381,9 +387,21 @@ void Effect::apply_latency() noexcept {
             }
             update_status();
         }
+        // AU-16: a bypass switched while another call held the lock
+        // (SetProperty) is shown here, with Render's faults explained first
+        // as SetProperty does. Not needed when the update above read it.
+        if (status_bypassed_ != bypass_.load()) {
+            // Kept apart from any faults the old processor counted above.
+            bypass_faults = observe_faults();
+            update_status();
+            bypass_shown = true;
+        }
+        if (const auto hook = latency_locked_for_tests)
+            hook(GetComponentInstance());
     }
     release_processor(std::move(previous));
     log_faults(faults);
+    log_faults(bypass_faults);
     log(message, problem);
     if (changed) {
         try {
@@ -391,7 +409,7 @@ void Effect::apply_latency() noexcept {
         } catch (...) {
         }
     }
-    if (!message.empty() || problem)
+    if (!message.empty() || problem || bypass_shown)
         notify_status();
     // Finished: the tests' witness (AU-14).
     if (const auto hook = latency_progress_for_tests)
