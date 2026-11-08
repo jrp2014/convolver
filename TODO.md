@@ -120,14 +120,18 @@ is superseded.
   preview: the steps after publishing.
 - [ ] **DOC-10 — One short route to load a filter.** From jrp's
   [file-loading review](docs/archive/reviews/2026-11-07-file-loading-review.md)
-  (8 November 2026): the guides lead readers into making and
+  (written 7 November 2026, posted 8 November): the guides lead readers into making and
   installing presets, and host preset folders appear on several pages.
   The ordinary instructions should be: choose a filter, check its rate and
   channels, play, save the project; host preset libraries go in a separate
   optional section, with one page owning the inputs each plug-in reads and
-  one table of preset folders, linked rather than repeated. Progress
-  (8 November 2026): [plug-in presets](docs/use/presets.md) no longer says
-  the plug-ins have no window or that LV2 has no file chooser, and the
+  one table of preset folders, linked rather than repeated. Done when
+  [plug-in presets](docs/use/presets.md), the plug-ins guide and the
+  journeys lead with choosing a filter, one page lists the inputs each
+  plug-in reads, and one table gives the preset folders. Progress
+  (8 November 2026, PR #140): [plug-in presets](docs/use/presets.md) no longer says
+  the plug-ins have no window or that LV2 has no file chooser, the
+  plug-ins guide's summary names Choose… beside presets, and the
   Audacity cleanup in [host testing](docs/develop/host-testing.md#prepare-the-mac)
   removes only the files it copied. Follows PLUG-26 for the wording of
   choosing a preset.
@@ -397,10 +401,14 @@ LV2 (Linux first; also PipeWire system audio):
   guides now say so ([plug-ins](docs/use/plugins.md#status-and-the-convolver-log),
   [Audacity steps](docs/develop/host-testing.md#audacity-vst3)). jrp agreed
   (8 November 2026): a refusal for the rate adds one line to its Fix, that
-  the host may play at a different rate from the one it exports at. Done
-  when every format's rate refusal says so, in the window, Status details
-  and the log, and the message tests cover it. Diagnostic text only, no
-  sound change; waits for the freeze unless jrp brings it forward.
+  the host may play at a different rate from the one it exports at. Still
+  to decide with jrp: whether the window should mark a host rate as not
+  yet confirmed when it comes from a copy that has not processed audio
+  (the copy in Audacity's effect window, which a host may start briefly at
+  another rate); PLUG-27 overlaps it. Done when every format's rate
+  refusal carries the agreed line, in the window, Status details and the
+  log, and the message tests cover it. Diagnostic text only, no sound
+  change; waits for the freeze unless jrp brings it forward.
 - [ ] **PLUG-26 — Choose a `.vstpreset` in the window.** From jrp's
   [file-loading review](docs/archive/reviews/2026-11-07-file-loading-review.md)
   (posted 8 November 2026, with the Audacity session): the
@@ -435,20 +443,27 @@ LV2 (Linux first; also PipeWire system audio):
   rate and channels to choose its entry, so say plainly that the choice
   waits for the host's audio settings rather than pick an entry for a
   proposed rate. Keep the protection for an unsuitable replacement during
-  playback; no resampling. Check the Audio Unit's route the same way. Done
-  when tests cover choosing before activation, a refusal during playback,
-  a changed host rate and list selection, through the existing acceptance
-  code rather than a second state machine. Waits for the freeze unless jrp
+  playback; no resampling. The Audio Unit reads a chosen file the same way
+  (`effect_state.cpp`), so it is in scope too. Done when tests cover
+  choosing before activation, a refusal during playback, a changed host
+  rate and list selection, through the existing acceptance code rather
+  than a second state machine, and the
+  [plug-in contract](docs/develop/plugin-contract.md#loading-and-failure)
+  and [plug-ins guide](docs/use/plugins.md#loading-a-filter) say when a
+  chosen file is checked. Waits for the freeze unless jrp
   brings it forward.
 - [ ] **PLUG-28 — Name the packaged presets after their filter.** From the
   same review: every example preset is called `filter.vstpreset`, named
-  only by its folder (`scripts/release/generate_examples.py`), and hosts
-  that list presets by file name, such as Audacity, show 18 entries called
+  only by its folder (`scripts/release/generate_examples.py`), so copying
+  them into a host's preset folder means renaming each one first, and a
+  host that lists presets by file name, such as Audacity, shows only
   "filter". Name new ones `KIND-RATE-LAYOUT.vstpreset` (for example
   `repeat-48000-stereo.vstpreset`), keeping each `.cfg` and IR file beside
   it; update the package manifest, the journeys, the release tests and the
-  guides that name the file together, and leave dated records alone. It
-  changes the preview package's contents, so jrp decides when.
+  guides that name the file together, and leave dated records alone. Done
+  when the package and its release tests use the new names and the
+  journeys and host-testing steps no longer rename files. It changes the
+  preview package's contents, so jrp decides when.
 - [ ] **PLUG-29 — Keep the Recent list out of the log folder.** From the
   same review: the window's Recent list is saved beside the log
   (`recent-filters.txt` in `~/Library/Logs/Convolver/`,
@@ -456,7 +471,9 @@ LV2 (Linux first; also PipeWire system audio):
   diagnostics a user may delete. Save it under
   `~/Library/Application Support/Convolver/` (each platform's equivalent,
   and the sandboxed path for GarageBand), reading the old file once if the
-  new one is missing. Lower priority than PLUG-26 and PLUG-27; waits for
+  new one is missing. Done when the Recent-list tests cover the new path
+  and the one-time read of the old file, and the plug-ins guide says where
+  the list is kept. Lower priority than PLUG-26 and PLUG-27; waits for
   the freeze.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.

@@ -4,20 +4,23 @@
 [Using Convolver](README.md) · [How the plug-ins behave](plugins.md) ·
 [Configuration files](configuration.md)
 
-For anyone loading their own filter into a Convolver plug-in. You will make a
-preset from an IR or `.cfg` with `convolver-preset` and load it in your host.
+For anyone who wants a preset of their own filter, for a plug-in without a
+window or for a host's preset library. You will make a preset from an IR or
+`.cfg` with `convolver-preset` and load it in your host.
 
 **In short:**
 
 - The simplest way to give a plug-in a filter is to choose the IR file,
   `.cfg` or configuration list itself: with **Choose…** in
   [Convolver's window](plugins.md#convolvers-window) (the VST® 3 plug-in on
-  macOS and the Audio Unit) or the host's file chooser (LV2). A **preset**
+  macOS and the Audio Unit) or the host's file chooser (LV2, in hosts that
+  show its file parameter, such as Ardour). A **preset**
   is the other way, through the host's preset menu, and
   `convolver-preset` makes one from an impulse response (IR), a
   [`.cfg`](configuration.md) or a configuration list. You need one where the
-  plug-in has no window (the VST3 plug-in on Windows and Linux) or to keep
-  filters in the host's preset library.
+  plug-in has no window (the VST3 plug-in on Windows and Linux), in an LV2
+  host with no file chooser, or to keep filters in the host's preset
+  library.
 - The name you give the new file picks the format: `room.vstpreset` (VST® 3),
   `room.aupreset` (Audio Unit) or `room.preset.lv2` (an LV2 preset folder).
   Name several to make them all at once:

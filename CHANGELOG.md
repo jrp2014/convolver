@@ -189,7 +189,9 @@ Until 1.0 the C++ API may change between minor versions.
   [recorded](docs/archive/reviews/2026-11-07-file-loading-review.md)):
   [plug-in presets](docs/use/presets.md) no longer says the plug-ins have no
   window or that the LV2 plug-in has no file chooser; it now starts from
-  choosing the filter file itself, with presets as the other way. The
+  choosing the filter file itself, with presets as the other way, and the
+  [plug-ins guide](docs/use/plugins.md)'s summary names **Choose…** beside
+  presets. The
   Audacity preparation in [host testing](docs/develop/host-testing.md#prepare-the-mac)
   removes only the presets it copied into the system folder, not the whole
   folder. The review's other points are TODO items PLUG-26 (choose a

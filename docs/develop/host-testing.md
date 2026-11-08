@@ -248,6 +248,7 @@ except the Audio Unit build, which runs in a source checkout.
    for d in presets/*-stereo; do
      sudo rm -f "/Library/Audio/Presets/Convolver/Convolver/$(basename "$d").vstpreset"
    done
+   sudo rmdir /Library/Audio/Presets/Convolver/Convolver /Library/Audio/Presets/Convolver 2>/dev/null || true
    ```
 
    In jrp's Audacity 4.0.2 session (7 November 2026) the administrator
