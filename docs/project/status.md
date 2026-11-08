@@ -20,6 +20,8 @@ Every workflow that runs on `main` passed on `b50e50e`, including
 [Native and historical tests](https://github.com/jrp2014/convolver/actions/runs/42427162872)
 and the
 [Plug-in distribution candidates](https://github.com/jrp2014/convolver/actions/runs/42427162803).
+Since then, [PR #141](https://github.com/jrp2014/convolver/pull/141) named the
+packaged example presets after their folder (PLUG-28, 0.12.2).
 Nothing has been published yet: there are no GitHub releases, and
 preview packages exist only as temporary CI artifacts. The command-line
 renderer, the preset tool, the Equalizer APO export and the VST3, Audio Unit
@@ -183,7 +185,7 @@ what remains and where the evidence is; the items hold the detail. Gates 2,
 | 3. The Audio Unit smoke test in GarageBand | AU-4, AU-6 | jrp's checks of the settings (25 October) and of the window up to `bbf94c5` (1 November) passed. Remaining, on the preview candidate: the full [smoke test](../develop/host-testing.md#garageband-audio-unit), Latency included, with the current window, the checks that passed on earlier builds and those still open under AU-6 | AU-4 and AU-6 in [TODO](../../TODO.md) |
 | 4. A ThreadSanitizer build of the Audio Unit | AU-3 | Remaining: `au.adapter` built with ThreadSanitizer, with bypass switched while rendering; `auval` and pluginval already run in CI. Kept as a first-preview gate by jrp | [Decisions](decisions.md#plug-in-behaviour) |
 | 5. Loading responsiveness qualified on a named machine | REL-6 (the procedure is written; the run remains), [loading responsiveness](../../TODO.md#loading-responsiveness) | The timing tests and jrp's limits are in place (PERF-9 to PERF-11), but CI's shared runners judge the callbacks only on Linux ([performance](#performance-what-is-measured) below). Not yet run on jrp's MacBook Pro from the candidate's source, cold and from a full history. An entry that fails or is not qualified means the release is not qualified on that machine; if the 30 s filter holds the host's thread over 250 ms, jrp chooses between background preparation (VST3-5) and a higher, documented limit. Kept as a first-preview gate by jrp | [Responsiveness qualification](../develop/releasing.md#responsiveness-qualification), [decisions](decisions.md#plug-in-behaviour) |
-| 6. One exact candidate from a 0.12.x tag | PLUG-5, PLUG-28 | The candidates hold everything the preview ships ([what a package holds](../develop/releasing.md#what-a-package-holds)). Remaining: the packaged presets named after their filter (PLUG-28, draft [PR #141](https://github.com/jrp2014/convolver/pull/141); jrp decided this comes before the first preview), then a candidate cut after gate 1 for gates 2, 3, 5 and 7 | PLUG-5 and PLUG-28 in [TODO](../../TODO.md) |
+| 6. One exact candidate from a 0.12.x tag | PLUG-5 | The candidates hold everything the preview ships ([what a package holds](../develop/releasing.md#what-a-package-holds)), with the example presets named after their folder since [PR #141](https://github.com/jrp2014/convolver/pull/141) (PLUG-28). Remaining: a candidate cut after gate 1, for gates 2, 3, 5 and 7 | PLUG-5 in [TODO](../../TODO.md) |
 | 7. An independent user completes the journeys from those exact files | REL-3 | Not started. jrp chooses the tester; the walkthrough uses the candidate's files before upload. Then jrp publishes | [Releasing](../develop/releasing.md#publishing-an-unsigned-preview) |
 
 The LV2 version mapping (LV2-5) is needed only before LV2 joins a preview.

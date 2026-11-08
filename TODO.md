@@ -63,7 +63,7 @@ boundary and C++20 in the core.
 | --- | --- | --- |
 | 1. Finish the open fixes | **DIAG-1** fault state after reloads and Load failed before Fault ([PR #73](https://github.com/jrp2014/convolver/pull/73)); from jrp's review of `6920a45` (31 October 2026), **PLUG-12** (a filter that loads but cannot be saved) and **ROBUST-3** (silence after a failed first load that cannot run out of memory); from his review of `276c7dc` (1 November 2026), **PLUG-13** (room for the settings in saved state, [PR #105](https://github.com/jrp2014/convolver/pull/105)); from jrp's HOST-1 REAPER run (6 November 2026), **VST3-16** (a new VST3 Latency comes into use in REAPER) | DIAG-1 done: merged on 25 October 2026 (`7ed7e38`), and the "Plug-in distribution candidates" run on that commit passed ([run](https://github.com/jrp2014/convolver/actions/runs/40145929436)). PLUG-12 and ROBUST-3 done: merged on 31 October 2026 ([PR #91](https://github.com/jrp2014/convolver/pull/91), `7542576`), each with a test of the sequence that failed. VST3-16 open: its fix is in draft [PR #134](https://github.com/jrp2014/convolver/pull/134). |
 | 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, the Audio Unit from the same candidate, which holds it since PR #115) at the same sitting | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 and AU-4 both gate the first preview, which holds the Audio Unit too. Needs no CLI in the package, so it can start now that step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
-| 3. Alongside step 2 | **PLUG-5** first-preview contents: in the candidates since PR #115 (the Audio Unit on macOS, the VST trademark notice; the `convolver` CLI and the first-use presets since PR #101); what remains is qualifying one exact candidate (HOST-1, AU-4, REL-3) and jrp's publication. **REL-2** (done): the stereo, 2→6 crossover and CLI journeys are written in `docs/use/`. **PLUG-28**: the packaged presets named after their filter, before the first preview | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
+| 3. Alongside step 2 | **PLUG-5** first-preview contents: in the candidates since PR #115 (the Audio Unit on macOS, the VST trademark notice; the `convolver` CLI and the first-use presets since PR #101); what remains is qualifying one exact candidate (HOST-1, AU-4, REL-3) and jrp's publication. **REL-2** (done): the stereo, 2→6 crossover and CLI journeys are written in `docs/use/`. **PLUG-28** (done, PR #141): the packaged presets named after their folder, before the first preview | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
 | Early walkthrough (macOS) (done) | **REL-5**: an explicitly limited walkthrough of an exact candidate on macOS, the stereo journey only | Done on 1 November 2026 as a package and command-line check only, by jrp's choice ([done](#done)); its host steps moved to HOST-1's REAPER smoke test and REL-3. It did not change the first preview's contents and does not replace REL-3. |
 | 4. Settings, windows and the Audio Unit | The **HOST-2** editor as the macOS-only first preview has it: **PLUG-9** (the report and loading from a file) and **PLUG-10** (Gain, Mix and Latency), **VST3-3**, **VST3-4**, **AU-7**, and the window **VST3-11** shared with the Audio Unit in **AU-6**; and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview, in the macOS candidates since PR #115). For later previews: **VST3-12** (Windows), **VST3-13** (Linux), and PLUG-9, PLUG-10 and AU-7's remaining gain modes and meters | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items) the first preview needs, each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the [preview workloads](#loading-responsiveness), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). |
 | 5. The milestone | A candidate from a 0.12.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
@@ -404,9 +404,10 @@ LV2 (Linux first; also PipeWire system audio):
   and the exports passed. Refusing the filter is correct; what was hard was
   telling the rate the playing copy runs at from the export's rate. The
   guides now say so ([plug-ins](docs/use/plugins.md#status-and-the-convolver-log),
-  [Audacity steps](docs/develop/host-testing.md#audacity-vst3)). jrp agreed
-  (8 November 2026): a refusal for the rate adds one line to its Fix, that
-  the host may play at a different rate from the one it exports at. Still
+  [Audacity steps](docs/develop/host-testing.md#audacity-vst3)). A refusal
+  for the rate adds one line to its Fix, that the host may play at a
+  different rate from the one it exports at
+  ([decided](docs/project/decisions.md#diagnostics)). Still
   to decide with jrp: whether the window should mark a host rate as not
   yet confirmed when it comes from a copy that has not processed audio
   (the copy in Audacity's effect window, which a host may start briefly at
@@ -427,10 +428,11 @@ LV2 (Linux first; also PipeWire system audio):
   `.vstpreset`, through one input reader shared with `convolver-preset`,
   reusing its decoder and identity and size checks; `.cfg` files, nested
   lists and their relative paths work as today. No `.aupreset` or LV2
-  reader only for symmetry. jrp decided (8 November 2026): choosing a
-  preset loads its Gain, Mix and Latency too, as the host's own preset
-  menu does; a preset made by `convolver-preset`, which holds only a
-  filter, leaves the current settings as they are. Done
+  reader only for symmetry. Choosing a preset loads its Gain, Mix and
+  Latency too, as the host's own preset menu does; a preset made by
+  `convolver-preset`, which holds only a filter, leaves the current
+  settings as they are ([decided](docs/project/decisions.md#plug-in-behaviour)).
+  Done
   when the same file loads from any user folder in VST3 and the Audio Unit
   with no installation, conversion or administrator step, saving and
   reopening reproduces the CLI's output, and another plug-in's preset or a
@@ -457,19 +459,6 @@ LV2 (Linux first; also PipeWire system audio):
   and [plug-ins guide](docs/use/plugins.md#loading-a-filter) say when a
   chosen file is checked. Waits for the freeze unless jrp
   brings it forward.
-- [ ] **PLUG-28 — Name the packaged presets after their filter.** From the
-  same review: every example preset is called `filter.vstpreset`, named
-  only by its folder (`scripts/release/generate_examples.py`), so copying
-  them into a host's preset folder means renaming each one first, and a
-  host that lists presets by file name, such as Audacity, shows only
-  "filter". Name new ones `KIND-RATE-LAYOUT.vstpreset` (for example
-  `repeat-48000-stereo.vstpreset`), keeping each `.cfg` and IR file beside
-  it; update the package manifest, the journeys, the release tests and the
-  guides that name the file together, and leave dated records alone. Done
-  when the package and its release tests use the new names and the
-  journeys and host-testing steps no longer rename files. jrp decided
-  (8 November 2026): before the first preview, so the independent tester
-  learns the final names.
 - [ ] **PLUG-29 — Keep the Recent list out of the log folder.** From the
   same review: the window's Recent list is saved beside the log
   (`recent-filters.txt` in `~/Library/Logs/Convolver/`,
@@ -1513,6 +1502,8 @@ entries written before 7 November 2026, with their evidence, are
 - [x] **PERF-12 — Load-timing verdicts from records, tested without timing.** 5
   November 2026; [load timing](docs/develop/testing.md#load-timing-perf-9).
 - [x] **PERF-14 — Load timing from a full history.** 5 November 2026.
+- [x] **PLUG-28 — Name the packaged presets after their filter.** 8
+  November 2026, PR #141; [first sound in a host](docs/use/first-sound-in-a-host.md#load-the-examples).
 - [x] **PLUG-23 — A filter reads the first inputs of a wider input bus.** 6
   November 2026; [channels](docs/use/plugins.md#channels).
 - [x] **PLUG-22 — Name the filter in the window, and say each fact once.** 7

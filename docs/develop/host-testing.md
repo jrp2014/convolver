@@ -223,21 +223,18 @@ except the Audio Unit build, which runs in a source checkout.
    mkdir -p ~/Library/Audio/Presets/Convolver/Convolver
    for kind in identity echo repeat; do
      for layout in mono stereo; do
-       ./bin/convolver-preset "presets/$kind-44100-$layout/filter.vstpreset" \
+       ./bin/convolver-preset "presets/$kind-44100-$layout/$kind-44100-$layout.vstpreset" \
          ~/Library/Audio/Presets/Convolver/Convolver/$kind-44100-$layout.aupreset
      done
    done
    ```
 
 3. For Audacity, copy the stereo VST3 examples into the system VST3 preset
-   folder, each under its own name (Audacity names a preset after its file,
-   and every example file is called `filter.vstpreset`):
+   folder (Audacity names a preset after its file):
 
    ```sh
    sudo mkdir -p /Library/Audio/Presets/Convolver/Convolver
-   for d in presets/*-stereo; do
-     sudo cp "$d/filter.vstpreset" "/Library/Audio/Presets/Convolver/Convolver/$(basename "$d").vstpreset"
-   done
+   sudo cp presets/*-stereo/*-stereo.vstpreset /Library/Audio/Presets/Convolver/Convolver/
    ```
 
    Audacity reads this folder once per session, so restart it if it was
@@ -291,13 +288,13 @@ except the Audio Unit build, which runs in a source checkout.
    read-only **Status**, which should read `No filter: audio passes
    unchanged. Load a Convolver preset.` Record what REAPER shows.
 4. From the **+** button beside the FX window's preset menu, import
-   `presets/identity-48000-stereo/filter.vstpreset` (the import item for VST
+   `presets/identity-48000-stereo/identity-48000-stereo.vstpreset` (the import item for VST
    preset files). Play: the sound is unchanged. Import
-   `presets/echo-48000-stereo/filter.vstpreset`: about 5 dB quieter, with a
+   `presets/echo-48000-stereo/echo-48000-stereo.vstpreset`: about 5 dB quieter, with a
    hollow, comb-filtered tone. (Its echo comes 257 samples, about 5 ms, after
    the direct sound, too soon to hear as a separate repeat.) Status reads
    `Filter loaded: 48000 Hz, 2 in, 2 out.` Import
-   `presets/repeat-48000-stereo/filter.vstpreset`: each sound comes again,
+   `presets/repeat-48000-stereo/repeat-48000-stereo.vstpreset`: each sound comes again,
    quieter, a quarter of a second later. Import the echo preset again for the
    next steps.
 5. Toggle the plug-in's bypass (the checkbox beside its name) while playing.
@@ -307,7 +304,7 @@ except the Audio Unit build, which runs in a source checkout.
    late.
 7. Save the project, quit REAPER, reopen the project and play: the echo is
    still there.
-8. While the echo plays, import `presets/identity-44100-stereo/filter.vstpreset`.
+8. While the echo plays, import `presets/identity-44100-stereo/identity-44100-stereo.vstpreset`.
    The echo keeps playing. Status reads `Load failed, previous filter kept:
    the filter is for 44100 Hz, the host runs at 48000 Hz. Details in the
    Convolver log.`, and the log has a line `Request N: Not loaded; the
@@ -448,7 +445,7 @@ preparation and steps 2, 3 and 9 below include what it found.
 7. Export the song (*Share › Export Song to Disk*) and check that the file holds
    the echo.
 8. Build a 48 kHz preset with `./bin/convolver-preset
-   presets/echo-48000-stereo/filter.vstpreset
+   presets/echo-48000-stereo/echo-48000-stereo.vstpreset
    ~/Library/Audio/Presets/Convolver/Convolver/echo-48000-stereo.aupreset`
    and choose it while the 44.1 kHz echo plays. The echo keeps playing. Record
    what GarageBand shows. Status, where it is shown, reads `Load failed,
