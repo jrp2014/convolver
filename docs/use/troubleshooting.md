@@ -111,23 +111,9 @@ See [Equalizer APO troubleshooting](equalizer-apo.md#troubleshooting).
 
 ## Report a problem
 
-Open an issue on [GitHub](https://github.com/jrp2014/convolver/issues/new/choose)
-and choose *Problem report*. In the report, give:
-
-- **Copy Diagnostics** from Convolver's window (macOS), pasted as text. On
-  Windows and Linux, where the plug-in has no window yet, attach the
-  [Convolver log](plugins.md#status-and-the-convolver-log) instead.
-- The host and its version, and the system and its version.
-- How you loaded the filter: **Choose…**, **Recent**, **Reload**, a preset
-  from the host's menu, or a reopened project.
-- Whether the problem is in what you hear while playing, in an export or
-  render, or after reopening the project.
-
-Where you can, also give the package's SHA-256 checksum, the processor,
-the sample rate, channel layout and buffer size, any error message, the [Convolver log](plugins.md#status-and-the-convolver-log)
-(or the host's log for LV2), and the smallest example that shows the problem. Use the bundled synthetic examples where you can, and keep private
-audio and session files out of the report. Keep levels low when trying
-unfamiliar IRs.
+If none of this helps, or Convolver did something it should not, open an
+issue: [report a problem](report-a-problem.md) says what to collect on each
+system and how to send it.
 
 <!-- VST trademark notice: written by scripts/trademarks.py from packaging/trademarks/vst.json -->
 

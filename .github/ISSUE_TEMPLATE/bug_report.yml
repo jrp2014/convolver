@@ -1,6 +1,6 @@
 ---
 # SPDX-License-Identifier: GPL-2.0-or-later
-# Asks for what docs/use/troubleshooting.md#report-a-problem lists.
+# Asks for what docs/use/report-a-problem.md tells users to collect.
 name: Problem report
 description: Convolver crashed, played the wrong thing, or refused a filter it should accept.
 labels: [bug]
@@ -8,9 +8,11 @@ body:
   - type: markdown
     attributes:
       value: >-
-        Thank you for reporting a problem. Please keep private audio and session
-        files out of the report, and use the bundled examples (the package's
-        `presets/` folder, or `examples/first-use/` in the source) to show the
+        Thank you for reporting a problem.
+        [Report a problem](https://github.com/jrp2014/convolver/blob/main/docs/use/report-a-problem.md)
+        says what to collect on macOS, Windows and Linux. Please keep private
+        audio and session files out of the report, and use the bundled examples
+        (the package's `presets/` folder, or `examples/first-use/`) to show the
         problem where you can.
   - type: textarea
     id: what-happened
@@ -19,13 +21,31 @@ body:
       description: What you did, what you expected, and what happened instead.
     validations:
       required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: System
+      options:
+        - macOS
+        - Windows
+        - Linux
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System version and processor
+      description: For example macOS 26.1 on Apple M2, Windows 11 on x64, or Ubuntu 24.04 on x64.
+    validations:
+      required: true
   - type: input
     id: version
     attributes:
       label: Convolver version or package
       description: >-
-        The version (`convolver --version`), or the package's SHA-256 checksum
-        if you installed a preview package.
+        The version (every line of the Convolver log names it, as do
+        Convolver's window and `convolver --version`), or the name of the
+        file you downloaded.
     validations:
       required: true
   - type: dropdown
@@ -34,6 +54,7 @@ body:
       label: Where you used it
       multiple: true
       options:
+        - Installing (package or installer)
         - Command-line tool (convolver)
         - VST3 plug-in
         - Audio Unit plug-in
@@ -41,13 +62,6 @@ body:
         - Preset tool (convolver-preset)
         - Equalizer APO export
         - C++ library
-    validations:
-      required: true
-  - type: input
-    id: system
-    attributes:
-      label: System
-      description: Operating system and version, and processor (for example macOS 26.1, Apple M2).
     validations:
       required: true
   - type: input
@@ -85,9 +99,11 @@ body:
     attributes:
       label: Messages
       description: >-
-        Copy Diagnostics from Convolver's window (macOS), or any error message
-        or log, pasted as text.
-      render: text
+        macOS: press Copy Diagnostics in Convolver's window and paste it here.
+        Windows and Linux: drag the Convolver log file here, and paste the
+        plug-in's Status text if the host shows it. Command-line tools: paste
+        the command and its whole message. The log names file paths, which can
+        include your user name; edit them out if you prefer.
   - type: textarea
     id: filter
     attributes:

@@ -19,6 +19,7 @@ Convolver applies that response continuously to every input sample.
 | Write a filter configuration | [Configuration files](use/configuration.md) |
 | Use a configuration from Roon, JRiver, Audiolense or the old Windows Convolver | [Other programs](use/other-programs.md) |
 | Fix a filter that does not load or play | [Troubleshooting](use/troubleshooting.md) |
+| Report a problem or say how a preview went | [Report a problem](use/report-a-problem.md) |
 | Filter the audio of a video with FFmpeg | [FFmpeg pipe example](use/command-line.md#with-ffmpeg); a built-in filter was [planned](project/plans/2026-10-21-ffmpeg-filter.md) and is parked |
 | Build Convolver from source, or a plug-in | [Build from source](develop/build.md) |
 | Use the C++ libraries in another application | [Library guide](develop/library.md) |
@@ -54,6 +55,7 @@ These pages are in `docs/use/` and are shipped in preview packages.
 | [Equalizer APO export](use/equalizer-apo.md) | How-to | `convolver-equalizer-apo`: system-wide filtering on Windows, how a filter is chosen, installation and troubleshooting |
 | [Other programs](use/other-programs.md) | How-to | Path portability, what other programs read, configurations from the old Windows Convolver |
 | [Troubleshooting](use/troubleshooting.md) | How-to | Symptoms, causes and fixes for plug-ins, configurations and tools |
+| [Report a problem](use/report-a-problem.md) | How-to | What to collect on macOS, Windows and Linux, and the GitHub issue forms for problems and preview feedback |
 | [Command-line reference](use/command-line.md) | Reference | Every `convolver` option, output formats, streams, inspection, FFTW tuning |
 | [Configuration files](use/configuration.md) | Reference | `.cfg` and list syntax, routes, paths |
 | [How the plug-ins behave](use/plugins.md) | Reference | VST3, AU and LV2: channels, loading, failures, latency, bypass, LV2 ports, licence |
