@@ -335,7 +335,7 @@ if(CONVOLVER_BUILD_TESTS)
     add_custom_target(convolver_vst3_suite)
     add_dependencies(convolver_vst3_suite convolver_vst3 validator convolver_vst3_tests)
     foreach(target IN ITEMS convolver_vst3_preset convolver_vst3_preset_format convolver_vst3_harness
-            convolver_vst3_lifecycle convolver_preset_tool convolver_cli)
+            convolver_vst3_lifecycle convolver_vst3_render convolver_preset_tool convolver_cli)
         if(TARGET ${target})
             add_dependencies(convolver_vst3_suite ${target})
         endif()

@@ -32,7 +32,10 @@ TOLERANCE = 1e-5
 
 
 def run(args):
-    result = subprocess.run([str(a) for a in args], capture_output=True, text=True, check=False)
+    try:
+        result = subprocess.run([str(a) for a in args], capture_output=True, text=True, check=False)
+    except OSError as error:
+        return 127, f'cannot run {args[0]}: {error}'
     return result.returncode, result.stdout + result.stderr
 
 
