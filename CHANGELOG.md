@@ -12,6 +12,14 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Benchmark documentation (PERF-1): distinguish the older FFTW/Accelerate
+  comparison from the Accelerate-only PERF-2 engine results. Add a matched
+  new-engine comparison of Accelerate, native NEON FFTW estimation and
+  patient wisdom, with raw timings and practical CPU/tuning trade-offs;
+  explain that explicit CLI wisdom tuning does not configure the Mac plug-in.
+  Add paired Ooura measurements and review portable FFT alternatives (FFT-2),
+  including the real-time integration limits of PocketFFT and an isolated
+  ordered-PFFFT Mac experiment. No production backend or default changes.
 - Releases: the notes of the second preview say that the new engine has
   not been heard in a host yet, that the earlier host results were from
   0.12.12, and that some 0.12.12 projects open at Latency 0, and link the

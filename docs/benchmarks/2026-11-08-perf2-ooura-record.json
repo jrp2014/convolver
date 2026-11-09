@@ -1,0 +1,74 @@
+{
+  "date": "2026-11-08",
+  "source": "c607fe9db2a63136d4808cfeeb0c84021c8e15b8",
+  "machine": "Apple M5 Max, 128 GB, macOS 27.2",
+  "compiler": "Apple Clang 21.0.0",
+  "flags": "Release -O3 -DNDEBUG, C++20, arm64; baseline kernels, sanitizers off",
+  "conditions": "AC power at start; other apps remain active; not quiet-machine qualification",
+  "rounds": 4,
+  "modes": [
+    "accelerate",
+    "ooura"
+  ],
+  "seconds_after_warmup": 1,
+  "driver": "2026-11-08-perf2-fft-run.py ROOT --ooura",
+  "method": "All 2 permutations repeated twice. Same source, wrapper and settings as FFTW comparison; fresh paired Accelerate controls. Separate session, not a four-way concurrent comparison.",
+  "fixture_errors": [
+    {
+      "mode": "accelerate",
+      "latency": 0,
+      "fixture": "stereo",
+      "error": 8.940696716308594e-08
+    },
+    {
+      "mode": "accelerate",
+      "latency": 0,
+      "fixture": "crossover",
+      "error": 7.450580596923828e-08
+    },
+    {
+      "mode": "accelerate",
+      "latency": 256,
+      "fixture": "stereo",
+      "error": 1.4901161193847656e-07
+    },
+    {
+      "mode": "accelerate",
+      "latency": 256,
+      "fixture": "crossover",
+      "error": 5.960464477539063e-08
+    },
+    {
+      "mode": "ooura",
+      "latency": 0,
+      "fixture": "stereo",
+      "error": 8.940696716308594e-08
+    },
+    {
+      "mode": "ooura",
+      "latency": 0,
+      "fixture": "crossover",
+      "error": 6.705522537231445e-08
+    },
+    {
+      "mode": "ooura",
+      "latency": 256,
+      "fixture": "stereo",
+      "error": 1.1920928955078125e-07
+    },
+    {
+      "mode": "ooura",
+      "latency": 256,
+      "fixture": "crossover",
+      "error": 5.960464477539063e-08
+    }
+  ],
+  "oracles": "UpdateCTestConfiguration  from :/Users/jrp/perf2-backends/ooura/convolver/DartConfiguration.tcl\nTest project /Users/jrp/perf2-backends/ooura/convolver\nConstructing a list of tests\nDone constructing a list of tests\nUpdating test list for fixtures\nAdded 0 tests to meet fixture requirements\nChecking test dependency graph...\nChecking test dependency graph end\ntest 1\n    Start 1: native.fft\n\n1: Test command: /Users/jrp/perf2-backends/ooura/convolver/convolver_fft_tests\n1: Working Directory: /Users/jrp/perf2-backends/ooura/convolver\n1: Test timeout computed to be: 120\n1: FFT layout, DC/Nyquist, direct DFT and normalization passed\n1/2 Test #1: native.fft .......................   Passed    0.19 sec\ntest 2\n    Start 2: native.engine\n\n2: Test command: /Users/jrp/perf2-backends/ooura/convolver/convolver_engine_tests\n2: Working Directory: /Users/jrp/perf2-backends/ooura/convolver\n2: Test timeout computed to be: 120\n2: no-clip gain on the worst-case input: largest output 0.99999994\n2: native engine tests passed (Ooura, baseline kernels)\n2: Worst error against the double oracle, relative to the output peak, by group of cases and kernel set:\n2:   cases, baseline                               2.58e-07 of peak (2.17 float epsilons); 1.06e-07 absolute at peak 0.411, B = 18\n2:   shared_input_mixes, baseline                  3.14e-07 of peak (2.63 float epsilons); 1.83e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.45e-07 of peak (2.05 float epsilons); 1.22e-06 absolute at peak 4.99, B = 255\n2:   cases, baseline                               2.58e-07 of peak (2.17 float epsilons); 1.06e-07 absolute at peak 0.411, B = 18\n2:   shared_input_mixes, baseline                  3.14e-07 of peak (2.63 float epsilons); 1.83e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.45e-07 of peak (2.05 float epsilons); 1.22e-06 absolute at peak 4.99, B = 255\n2:   cases, baseline                               2.25e-07 of peak (1.89 float epsilons); 1.07e-07 absolute at peak 0.474, B = 21\n2:   shared_input_mixes, baseline                  2.21e-07 of peak (1.86 float epsilons); 1.29e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.53e-07 of peak (2.13 float epsilons); 1.93e-06 absolute at peak 7.63, B = 257\n2:   layouts, baseline                             2.57e-07 of peak (2.15 float epsilons); 2.69e-07 absolute at peak 1.05, B = 69\n2:   cases, baseline                               2.25e-07 of peak (1.89 float epsilons); 1.07e-07 absolute at peak 0.474, B = 21\n2:   shared_input_mixes, baseline                  2.21e-07 of peak (1.86 float epsilons); 1.29e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.53e-07 of peak (2.13 float epsilons); 1.93e-06 absolute at peak 7.63, B = 257\n2:   layouts, baseline                             2.57e-07 of peak (2.15 float epsilons); 2.69e-07 absolute at peak 1.05, B = 69\n2:   cases, baseline                               1.81e-07 of peak (1.52 float epsilons); 8.59e-08 absolute at peak 0.474, B = 21\n2:   shared_input_mixes, baseline                  2.21e-07 of peak (1.86 float epsilons); 1.29e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.41e-07 of peak (2.02 float epsilons); 1.84e-06 absolute at peak 7.63, B = 257\n2:   layouts, baseline                             2.68e-07 of peak (2.25 float epsilons); 1.04e-06 absolute at peak 3.87, B = 1\n2:   cases, baseline                               1.81e-07 of peak (1.52 float epsilons); 8.59e-08 absolute at peak 0.474, B = 21\n2:   shared_input_mixes, baseline                  2.21e-07 of peak (1.86 float epsilons); 1.29e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.41e-07 of peak (2.02 float epsilons); 1.84e-06 absolute at peak 7.63, B = 257\n2:   layouts, baseline                             2.68e-07 of peak (2.25 float epsilons); 1.04e-06 absolute at peak 3.87, B = 1\n2:   cases, baseline                               1.81e-07 of peak (1.52 float epsilons); 8.59e-08 absolute at peak 0.474, B = 21\n2:   shared_input_mixes, baseline                  2.21e-07 of peak (1.86 float epsilons); 1.29e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.45e-07 of peak (2.05 float epsilons); 1.22e-06 absolute at peak 4.99, B = 255\n2:   layouts, baseline                             2.79e-07 of peak (2.34 float epsilons); 9.38e-07 absolute at peak 3.37, B = 0\n2:   cases, baseline                               1.81e-07 of peak (1.52 float epsilons); 8.59e-08 absolute at peak 0.474, B = 21\n2:   shared_input_mixes, baseline                  2.21e-07 of peak (1.86 float epsilons); 1.29e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.45e-07 of peak (2.05 float epsilons); 1.22e-06 absolute at peak 4.99, B = 255\n2:   layouts, baseline                             2.79e-07 of peak (2.34 float epsilons); 9.38e-07 absolute at peak 3.37, B = 0\n2:   overall: shared_input_mixes, baseline         3.14e-07 of peak (2.63 float epsilons); 1.83e-07 absolute at peak 0.581, B = 12\n2:   largest absolute: history_validity, baseline  2.53e-07 of peak (2.13 float epsilons); 1.93e-06 absolute at peak 7.63, B = 257\n2:   (Absolute errors grow with the signal level; compare the relative figures.)\n2/2 Test #2: native.engine ....................   Passed    0.41 sec\n\nThe following tests passed:\n\tnative.fft\n\tnative.engine\n\n100% tests passed out of 2\n\nLabel Time Summary:\nnative            =   0.60 sec*proc (2 tests)\nreal-libraries    =   0.60 sec*proc (2 tests)\n\nTotal Test time (real) =   0.61 sec\n",
+  "run_output": "All 8 fixture comparisons passed; worst error 1.4901161193847656e-07\n36/288 rows, elapsed 38.0 s\n72/288 rows, elapsed 80.9 s\n108/288 rows, elapsed 118.8 s\n144/288 rows, elapsed 161.7 s\n180/288 rows, elapsed 199.6 s\n216/288 rows, elapsed 242.5 s\n252/288 rows, elapsed 280.3 s\n288/288 rows, elapsed 323.3 s\nProcessing comparison complete\nPreparation comparison complete\n",
+  "exit_code": 0,
+  "csv_note": "LF normalized for Git; values unchanged.",
+  "checksums": {
+    "2026-11-08-perf2-ooura-preparation.csv": "f686548256901211fdacaf164abf9df9d8e2b1c067d98e65494aba687714a4f2",
+    "2026-11-08-perf2-ooura-processing.csv": "42d7cb759f2cb218e14cf26890500693550638a4355d46f927bec5fea5e8d7db"
+  }
+}

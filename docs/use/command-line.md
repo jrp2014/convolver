@@ -533,6 +533,10 @@ convolver --compare host-render.wav examples/first-use/stereo/expected.wav
 
 ## FFTW plan tuning
 
+This is an optional command-line workflow, not a setup step for the
+distributed Mac plug-in, which uses Accelerate. A custom FFTW plug-in build
+does not automatically read wisdom files made by this tool.
+
 This applies only to builds that use FFTW (`convolver --version` says which).
 Builds for Linux and Windows use FFTW by default. On macOS the default is
 Apple's Accelerate, which has no tuned plans; to use them there, build with
@@ -568,6 +572,24 @@ FFTW wisdom and requires matching plans, with no silent measured fallback. A
 missing size or insufficient planning rigor fails before opening the audio
 output. Wisdom of one rigor satisfies requests of lower rigor (exhaustive covers
 patient, patient covers measure and estimate), not higher. CLI wisdom input is limited to 1 MiB.
+
+Convolver does not automatically save or discover a wisdom file. Use
+`--tune-fft FILE` to save one, then pass `--fft-wisdom FILE` on later renders.
+Measured planning without a wisdom file is repeated in a fresh CLI process.
+
+For a long-standing FFTW setup, where you regularly reuse the same filters
+and settings, tuning once may reduce processing CPU across many sessions.
+Wisdom describes transform plans, not the filter coefficients: another
+filter using the same transform sizes and execution settings can reuse it.
+Saving wisdom avoids repeating the measured search; it does not make a
+given measured plan execute faster than that same plan without saving it.
+Compare the gain with the one-off tuning time and preparation cost in the
+[backend measurements](../develop/fft-measurements.md#perf-2-backend-and-wisdom-comparison).
+For example, the 8 November PERF-2 candidate took 1.72 seconds to tune on an
+M5 Max; saved patient wisdom reduced processing time by a median 3.7% over
+FFTW estimation across the tested cases, with little or no gain in some.
+Neither measured planning nor saved wisdom guarantees a speedup for every
+workload, so estimation remains a reasonable starting point.
 
 Keep wisdom with the CPU, FFTW build and precision it was tuned for.
 Retune after changing them; loading successfully is **not** proof that old wisdom
