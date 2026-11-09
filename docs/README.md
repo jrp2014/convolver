@@ -136,6 +136,9 @@ is now in the maintained guides and TODO.
 - [Finish and qualify the first preview](project/plans/2026-11-08-preview-acceptance.md)
   (REL-7, Reference): acceptance criteria, blocking defects, retest boundaries
   and deferred work for the fixed macOS candidate.
+- [Sign and notarize the macOS packages](project/plans/2026-11-09-macos-signing.md)
+  (REL-1, Reference): the Apple account, certificates, notary key and cost,
+  the steps only jrp can take, and the pipeline changes; no workflow changes yet.
 - [Reduce CI waiting without losing useful coverage](project/plans/2026-11-08-ci-scheduling.md)
   (CI-34, Reference): separate proposed scheduling work with coverage and
   measurement requirements; no workflow changes yet.
