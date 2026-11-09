@@ -49,11 +49,11 @@ runtime changes are frozen and further optimisation waits until feedback on
 the preview arrives. Crashes, lost state, wrong audio, compatibility failures
 and dropouts are still fixed at once, with a regression test where practical
 ([preview acceptance](docs/project/plans/2026-11-08-preview-acceptance.md#3-decide-whether-a-finding-blocks-the-preview)).
-This file reads a runtime change as one that changes what the packages run
-or hold: the code in `portable/`, `plugins/` and `include/`, the packaged
-presets, and the release scripts and packaging files that decide a
-package's contents. Documentation, tests, measurements and CI can go ahead
-while they leave the packages unchanged.
+A runtime change is one that changes what the packages run or hold: the
+code in `portable/`, `plugins/` and `include/`, the packaged presets, and the
+release scripts and packaging files that decide a package's contents.
+Documentation, tests, measurements and CI can go ahead while they leave the
+packages unchanged (jrp confirmed this reading on 9 November 2026).
 
 **Next milestone** (jrp's [guidance](docs/review-2026-10/release-readiness-guidance-2026-10-22.md),
 22 October 2026): an independent user installs and uses an exact preview
@@ -93,7 +93,7 @@ passes for 0.13, since PERF-2 changed the engine
 | **COMPAT-1** | Keep presets, a REAPER project and expected audio made by 0.13.2, the baseline, with their own runner and the capture step in the publication steps | Tests and files only |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **HOST-4** | The check on a real Windows device, now that the Windows package ships `convolver-equalizer-apo` | A check; needs a Windows computer |
-| **VST3-17** | Known defect: in Audacity a filter chosen in the window plays but is missing from the export and the saved project. jrp narrowed Audacity to its preset menu, and the guides say so | jrp decided that the fix waits until after the preview ([decision](docs/project/decisions.md#plug-in-behaviour)). It is lost state, which the freeze still fixes, so whether that brings it forward is his to decide |
+| **VST3-17** | Known defect: in Audacity a filter chosen in the window plays but is missing from the export and the saved project. jrp narrowed Audacity to its preset menu, and the guides say so | Lost state, one of the freeze's exceptions: jrp brought the fix forward on 9 November 2026 ("Fix now"; [decision](docs/project/decisions.md#plug-in-behaviour)), replacing the earlier decision that it waits until after the preview |
 | **PLUG-33** | Known limitation: **Choose…** needs the host's exact input count where a preset needs at least that many; the guides give the preset route | A runtime change; waits unless jrp brings it forward |
 
 ### 2. Decided or likely, after the freeze
@@ -109,7 +109,7 @@ the suggested one.
 | A window fix from jrp's sessions | **PLUG-26** (choose a `.vstpreset` in the window) | From his file-loading review of 7 November 2026 |
 | Other configuration readers | **CFG-1**, then **CFG-2** | CFG-2 waits for CFG-1 to show which readers matter |
 | Only on request | **VST3-2** (switch filters from the host), **VST3-6** (replacing the old VST2 plug-in), **HOST-2** (CLAP), **LV2-6** (an LV2 window) | Each needs a stated user need and acceptance tests first |
-| Measurements, then optimisation | **PERF-3** and **PERF-1** measure; then, only where PERF-3 shows a need, **FFT-2**, **VST3-5** and **PLUG-11** | PERF-3's resource budgets (callback tail latency, peak memory and preparation time while loading, replacing and resetting) decide whether further optimisation is worth doing. Its measurements, and PERF-1's reruns, change no shipped code, so this file reads them as allowed during the freeze; the optimisation they might justify waits |
+| Measurements, then optimisation | **PERF-3** and **PERF-1** measure; then, only where PERF-3 shows a need, **FFT-2**, **VST3-5** and **PLUG-11** | PERF-3's resource budgets (callback tail latency, peak memory and preparation time while loading, replacing and resetting) decide whether further optimisation is worth doing. Its measurements, and PERF-1's reruns, change no shipped code, so they may go ahead during the freeze; the optimisation they might justify waits |
 
 ### 3. Parked and later
 
