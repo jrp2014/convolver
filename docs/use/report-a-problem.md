@@ -35,18 +35,20 @@ Write down, while you remember them:
 - The host and its version (for example REAPER 7.2), your system and its
   version, and the processor (for example macOS 26.1 on Apple M2, or
   Windows 11 on x64).
+- The sample rate, the track's input and output channels and the buffer
+  size, if you know them.
 
 ## 2. Collect Convolver's messages
 
 Convolver explains every failure in the
 [Convolver log](plugins.md#status-and-the-convolver-log), a text file with
-one line for each load and failure. Each line names the Convolver version,
-so the log also says which version you ran.
+one line for each load and failure. Each line of the file names the
+Convolver version, so it also says which version you ran.
 
 ### macOS
 
-In Convolver's window, open **File, software and log** and press
-**Copy Diagnostics**. It copies the filter's details, the software versions
+In Convolver's window, press **Copy Diagnostics**, on the **File, software
+and log** row. It copies the filter's details, the software versions
 and this instance's recent log lines as text, ready to paste.
 
 If the window will not open, copy the whole log in Terminal instead:
@@ -55,8 +57,11 @@ If the window will not open, copy the whole log in Terminal instead:
 pbcopy < ~/Library/Logs/Convolver/Convolver.log
 ```
 
-GarageBand and other sandboxed hosts keep the log inside their own folder.
-Copy the last hour's lines from the system log instead:
+GarageBand and other sandboxed hosts keep that file inside their own
+folder, `~/Library/Containers/<host>/Data/Library/Logs/Convolver/`, which
+**Show Log** in the window opens. If the window will not open there, copy
+the last hour's lines from the system log instead, and give the Convolver
+version in the report, since these lines do not name it:
 
 ```sh
 log show --last 1h --info --predicate 'eventMessage CONTAINS "Convolver"' --style compact | pbcopy
@@ -78,11 +83,15 @@ generic plug-in window or parameter list.
 ### Linux
 
 Attach `~/.local/state/convolver/convolver.log` to the report (under
-`$XDG_STATE_HOME` if you set it), or copy it with `wl-copy` (Wayland) or
-`xclip` (X11):
+`$XDG_STATE_HOME` if you set it), or copy it. On Wayland:
 
 ```sh
 wl-copy < ~/.local/state/convolver/convolver.log
+```
+
+On X11:
+
+```sh
 xclip -selection clipboard < ~/.local/state/convolver/convolver.log
 ```
 
@@ -91,8 +100,11 @@ plug-in has no file of its own: copy the host's log instead.
 
 ### The command-line tools
 
-Copy the whole message the tool printed, and the command you ran. Run
-`./bin/convolver --version` from the package folder for the version.
+Copy the whole message the tool printed, and the command you ran. For the
+version, run `./bin/convolver --version` (`.\bin\convolver --version` in
+PowerShell) from the folder that holds `bin/`: the extracted package, or
+where an installer put the tools (`/Library/Application Support/Convolver`
+on macOS, the folder you chose on Windows).
 
 ## 3. Open the issue
 
@@ -113,4 +125,5 @@ Keep levels low when you try unfamiliar IRs.
 **Check it worked:** the issue appears in the
 [list of issues](https://github.com/jrp2014/convolver/issues) with your
 form's answers. jrp, the maintainer, may ask for more details there, so keep
-notifications on for it.
+notifications on for it. If the form will not take the log file, paste its
+last lines into **Messages** instead.

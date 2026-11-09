@@ -167,7 +167,8 @@ class PrepareReleaseTests(unittest.TestCase):
         for words in ('Copy Diagnostics', 'Convolver log', 'host and version', 'playback', 'export or reopening'):
             self.assertIn(words, text)
         self.assertIn(
-            f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/plugins.md#status-and-the-convolver-log', text
+            f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/report-a-problem.md#2-collect-convolvers-messages',
+            text,
         )
         # Preview users are asked for feedback as well as problems.
         self.assertIn('https://github.com/owner/convolver/issues/new?template=preview_feedback.yml', text)

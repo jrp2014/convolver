@@ -155,10 +155,10 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
         '## Report a problem',
         (
             "Copy Diagnostics from Convolver's window on macOS, or attach the Convolver log on Windows and Linux "
-            f'([where it is]({docs}/plugins.md#status-and-the-convolver-log)). Say which system, host and version '
-            'you used, how you loaded the filter (on macOS Choose…, Recent or Reload; anywhere a preset or a saved '
-            'project), and whether '
-            'the problem is in playback, export or reopening '
+            f'([where it is]({docs}/report-a-problem.md#2-collect-convolvers-messages)). '
+            'Say which system, host and version you used, how you loaded the filter '
+            '(on macOS Choose…, Recent or Reload; anywhere a preset or a saved project), '
+            'and whether the problem is in playback, export or reopening '
             f'([how to report]({docs}/report-a-problem.md)). '
             'To say what worked, what was hard to follow or what you missed, open a '
             f'[Preview feedback]({base}/issues/new?template=preview_feedback.yml) issue.'
