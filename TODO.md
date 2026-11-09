@@ -1036,12 +1036,19 @@ so the preset file path is not needed).
 ## FFT libraries and performance
 
 - [ ] **FFT-2 — Evaluate alternatives only against a measured need.** These are
-  candidates, not supported backends or automatic fallbacks:
+  candidates, not supported backends or automatic fallbacks. The
+  [8 November integration review](docs/develop/fft-backends.md#alternatives-for-linux-and-windows)
+  prioritizes an ordered PFFFT adapter. The
+  [isolated Mac trial](docs/develop/fft-measurements.md#pffft-ordered-transform-experiment)
+  passed the FFT/engine oracles and saved 13–36% processing time versus Ooura,
+  including reordering; no shipped backend changed. PocketFFT currently allocates during
+  execution and its optional plan cache locks. Windows/MSVC and Linux/x86
+  measurements remain required before selecting a replacement.
 
   | Candidate / primary reference | Question to answer |
   | --- | --- |
   | [PFFFT](https://github.com/marton78/pffft) | Does its SIMD implementation improve the target audio workloads after layout conversion? Check supported lengths, alignment and workspace requirements. |
-  | [PocketFFT](https://github.com/mreineck/pocketfft) | Does its C++ implementation simplify deployment or improve awkward transform lengths? Confirm preparation and execution allocation behavior. |
+  | [PocketFFT](https://github.com/mreineck/pocketfft) | Current real-transform execution allocates; optional plan caching locks. Revisit only with a suitable prepared workspace interface or an offline use case. |
   | [KissFFT](https://github.com/mborgerding/kissfft) | Is a small alternative useful on constrained platforms compared with the existing Ooura backend? Measure the whole engine. |
   | [Intel oneMKL DFT](https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-c/2025-0/fourier-transform-functions.html) | Is there a demonstrated Intel workload benefit worth another platform dependency and redistribution review? |
 
@@ -1053,6 +1060,13 @@ so the preset file path is not needed).
 - [ ] **PERF-1 — Reproducible current benchmarks.** Rerun workloads on named target
   machines after substantial engine changes; record commit, compiler, dependency
   revisions, plans, block size and numerical error. Keep dated results labelled.
+  The [8 November PERF-2 backend comparison](docs/develop/fft-measurements.md#perf-2-backend-and-wisdom-comparison)
+  measures Accelerate, native NEON FFTW estimation and saved patient wisdom
+  on an M5 Max; a separate paired run records Ooura
+  [costs as a percentage of one core](docs/develop/fft-measurements.md#ooura-with-the-nonuniform-engine).
+  These records include timing after warm-up and callback counts, but
+  does not establish threaded FFTW performance, cold plug-in loading times
+  or dropout-free host playback; pursue these only for a demonstrated need.
   Plug-in workloads (6- and 8-channel filters, callback-time distributions)
   belong to PERF-3. On the 19 October cloud VM, a
   65536-tap stereo filter at B = 256 took about 0.6 µs per frame (about 3% of

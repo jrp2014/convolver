@@ -1,0 +1,128 @@
+{
+  "os": "ProductName:\t\tmacOS\nProductVersion:\t\t27.2\nBuildVersion:\t\t26B123",
+  "cpu": "Apple M5 Max",
+  "power": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23593059)\t71%; charging; 1:00 remaining present: true",
+  "power_settings": "Battery Power:\n Sleep On Power Button 1\n powermode            0\n standby              1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n ttyskeepawake        1\n womp                 0\n displaysleep         2\n networkoversleep     0\n sleep                1\n lessbright           1\n tcpkeepalive         1\n disksleep            10\nAC Power:\n Sleep On Power Button 1\n powermode            0\n standby              1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n ttyskeepawake        1\n womp                 1\n displaysleep         10\n networkoversleep     0\n sleep                1\n tcpkeepalive         1\n disksleep            10",
+  "compiler": "Apple clang version 21.0.0 (clang-2100.4.1.1)\nTarget: arm64-apple-darwin27.2.0\nThread model: posix\nInstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
+  "source": "c607fe9db2a63136d4808cfeeb0c84021c8e15b8",
+  "conditions": "Other apps may remain active; no quiet-machine qualification.",
+  "rounds": 6,
+  "seconds_per_warmed_case": 1,
+  "fftw": "3.3.11 single precision NEON static",
+  "tuning": {
+    "command": [
+      "/Users/jrp/perf2-backends/fftw/convolver/convolver",
+      "--tune-fft",
+      "/Users/jrp/perf2-backends/patient.fftw",
+      "--fft-plan",
+      "patient"
+    ],
+    "wall_seconds": 1.7156721250066767,
+    "returncode": 0,
+    "stdout": "Saved FFTW wisdom for every transform size the engine uses, which serves every --block-size (forward and inverse plans)\n",
+    "stderr": ""
+  },
+  "configure": "--enable-float --enable-neon --enable-static --disable-shared --disable-fortran",
+  "fftw_cflags": "-O3 -fomit-frame-pointer -mtune=native -fstrict-aliasing",
+  "dependencies/fftw-3.3.11.tar.gz_sha256": "5630c24cdeb33b131612f7eb4b1a9934234754f9f388ff8617458d0be6f239a1",
+  "patient.fftw_sha256": "c00d464ff86fd5875868b7d13d37d83ab8700d9c8d7370d958ce57e39041876b",
+  "fixture_errors": [
+    {
+      "mode": "accelerate",
+      "latency": 0,
+      "fixture": "stereo",
+      "error": 8.940696716308594e-08
+    },
+    {
+      "mode": "accelerate",
+      "latency": 0,
+      "fixture": "crossover",
+      "error": 7.450580596923828e-08
+    },
+    {
+      "mode": "accelerate",
+      "latency": 256,
+      "fixture": "stereo",
+      "error": 1.4901161193847656e-07
+    },
+    {
+      "mode": "accelerate",
+      "latency": 256,
+      "fixture": "crossover",
+      "error": 5.960464477539063e-08
+    },
+    {
+      "mode": "fftw_estimate",
+      "latency": 0,
+      "fixture": "stereo",
+      "error": 5.960464477539063e-08
+    },
+    {
+      "mode": "fftw_estimate",
+      "latency": 0,
+      "fixture": "crossover",
+      "error": 5.960464477539063e-08
+    },
+    {
+      "mode": "fftw_estimate",
+      "latency": 256,
+      "fixture": "stereo",
+      "error": 1.1920928955078125e-07
+    },
+    {
+      "mode": "fftw_estimate",
+      "latency": 256,
+      "fixture": "crossover",
+      "error": 7.450580596923828e-08
+    },
+    {
+      "mode": "fftw_patient_wisdom",
+      "latency": 0,
+      "fixture": "stereo",
+      "error": 8.940696716308594e-08
+    },
+    {
+      "mode": "fftw_patient_wisdom",
+      "latency": 0,
+      "fixture": "crossover",
+      "error": 7.450580596923828e-08
+    },
+    {
+      "mode": "fftw_patient_wisdom",
+      "latency": 256,
+      "fixture": "stereo",
+      "error": 1.1920928955078125e-07
+    },
+    {
+      "mode": "fftw_patient_wisdom",
+      "latency": 256,
+      "fixture": "crossover",
+      "error": 8.940696716308594e-08
+    }
+  ],
+  "oracle_output": {
+    "accelerate": "UpdateCTestConfiguration  from :/Users/jrp/perf2-backends/accelerate/convolver/DartConfiguration.tcl\nTest project /Users/jrp/perf2-backends/accelerate/convolver\nConstructing a list of tests\nDone constructing a list of tests\nUpdating test list for fixtures\nAdded 0 tests to meet fixture requirements\nChecking test dependency graph...\nChecking test dependency graph end\ntest 1\n    Start 1: native.fft\n\n1: Test command: /Users/jrp/perf2-backends/accelerate/convolver/convolver_fft_tests\n1: Working Directory: /Users/jrp/perf2-backends/accelerate/convolver\n1: Test timeout computed to be: 120\n1: FFT layout, DC/Nyquist, direct DFT and normalization passed\n1/2 Test #1: native.fft .......................   Passed    0.13 sec\ntest 2\n    Start 2: native.engine\n\n2: Test command: /Users/jrp/perf2-backends/accelerate/convolver/convolver_engine_tests\n2: Working Directory: /Users/jrp/perf2-backends/accelerate/convolver\n2: Test timeout computed to be: 120\n2: no-clip gain on the worst-case input: largest output 1\n2: native engine tests passed (Accelerate, baseline kernels)\n2: Worst error against the double oracle, relative to the output peak, by group of cases and kernel set:\n2:   cases, baseline                               2.58e-07 of peak (2.17 float epsilons); 1.06e-07 absolute at peak 0.411, B = 18\n2:   shared_input_mixes, baseline                  3.14e-07 of peak (2.63 float epsilons); 1.83e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.87e-07 of peak (2.4 float epsilons); 2.19e-06 absolute at peak 7.63, B = 257\n2:   cases, baseline                               2.58e-07 of peak (2.17 float epsilons); 1.06e-07 absolute at peak 0.411, B = 18\n2:   shared_input_mixes, baseline                  3.14e-07 of peak (2.63 float epsilons); 1.83e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.87e-07 of peak (2.4 float epsilons); 2.19e-06 absolute at peak 7.63, B = 257\n2:   cases, baseline                               2.18e-07 of peak (1.83 float epsilons); 6.74e-08 absolute at peak 0.309, B = 26\n2:   shared_input_mixes, baseline                  2.21e-07 of peak (1.86 float epsilons); 1.29e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.24e-07 of peak (1.88 float epsilons); 7.45e-07 absolute at peak 3.33, B = 64\n2:   layouts, baseline                             2.35e-07 of peak (1.98 float epsilons); 6.24e-07 absolute at peak 2.65, B = 0\n2:   cases, baseline                               2.18e-07 of peak (1.83 float epsilons); 6.74e-08 absolute at peak 0.309, B = 26\n2:   shared_input_mixes, baseline                  2.21e-07 of peak (1.86 float epsilons); 1.29e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.24e-07 of peak (1.88 float epsilons); 7.45e-07 absolute at peak 3.33, B = 64\n2:   layouts, baseline                             2.35e-07 of peak (1.98 float epsilons); 6.24e-07 absolute at peak 2.65, B = 0\n2:   cases, baseline                               2.13e-07 of peak (1.79 float epsilons); 2.4e-07 absolute at peak 1.13, B = 29\n2:   shared_input_mixes, baseline                  2.21e-07 of peak (1.86 float epsilons); 1.29e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.58e-07 of peak (2.16 float epsilons); 1.29e-06 absolute at peak 4.99, B = 255\n2:   layouts, baseline                             2.77e-07 of peak (2.32 float epsilons); 3.21e-07 absolute at peak 1.16, B = 1\n2:   cases, baseline                               2.13e-07 of peak (1.79 float epsilons); 2.4e-07 absolute at peak 1.13, B = 29\n2:   shared_input_mixes, baseline                  2.21e-07 of peak (1.86 float epsilons); 1.29e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.58e-07 of peak (2.16 float epsilons); 1.29e-06 absolute at peak 4.99, B = 255\n2:   layouts, baseline                             2.77e-07 of peak (2.32 float epsilons); 3.21e-07 absolute at peak 1.16, B = 1\n2:   cases, baseline                               2.13e-07 of peak (1.79 float epsilons); 2.4e-07 absolute at peak 1.13, B = 29\n2:   shared_input_mixes, baseline                  2.21e-07 of peak (1.86 float epsilons); 1.29e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.3e-07 of peak (1.93 float epsilons); 1.15e-06 absolute at peak 4.99, B = 255\n2:   layouts, baseline                             2.42e-07 of peak (2.03 float epsilons); 1.21e-06 absolute at peak 5.02, B = 11\n2:   cases, baseline                               2.13e-07 of peak (1.79 float epsilons); 2.4e-07 absolute at peak 1.13, B = 29\n2:   shared_input_mixes, baseline                  2.21e-07 of peak (1.86 float epsilons); 1.29e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.3e-07 of peak (1.93 float epsilons); 1.15e-06 absolute at peak 4.99, B = 255\n2:   layouts, baseline                             2.42e-07 of peak (2.03 float epsilons); 1.21e-06 absolute at peak 5.02, B = 11\n2:   overall: shared_input_mixes, baseline         3.14e-07 of peak (2.63 float epsilons); 1.83e-07 absolute at peak 0.581, B = 12\n2:   largest absolute: history_validity, baseline  2.87e-07 of peak (2.4 float epsilons); 2.19e-06 absolute at peak 7.63, B = 257\n2:   (Absolute errors grow with the signal level; compare the relative figures.)\n2/2 Test #2: native.engine ....................   Passed    0.40 sec\n\nThe following tests passed:\n\tnative.fft\n\tnative.engine\n\n100% tests passed out of 2\n\nLabel Time Summary:\nnative            =   0.54 sec*proc (2 tests)\nreal-libraries    =   0.54 sec*proc (2 tests)\n\nTotal Test time (real) =   0.54 sec\n",
+    "fftw": "UpdateCTestConfiguration  from :/Users/jrp/perf2-backends/fftw/convolver/DartConfiguration.tcl\nTest project /Users/jrp/perf2-backends/fftw/convolver\nConstructing a list of tests\nDone constructing a list of tests\nUpdating test list for fixtures\nAdded 0 tests to meet fixture requirements\nChecking test dependency graph...\nChecking test dependency graph end\ntest 1\n    Start 1: native.fft\n\n1: Test command: /Users/jrp/perf2-backends/fftw/convolver/convolver_fft_tests\n1: Working Directory: /Users/jrp/perf2-backends/fftw/convolver\n1: Test timeout computed to be: 120\n1: FFT layout, DC/Nyquist, direct DFT and normalization passed\n1/2 Test #1: native.fft .......................   Passed    1.05 sec\ntest 2\n    Start 2: native.engine\n\n2: Test command: /Users/jrp/perf2-backends/fftw/convolver/convolver_engine_tests\n2: Working Directory: /Users/jrp/perf2-backends/fftw/convolver\n2: Test timeout computed to be: 120\n2: no-clip gain on the worst-case input: largest output 0.99999994\n2: native engine tests passed (FFTW, baseline kernels)\n2: Worst error against the double oracle, relative to the output peak, by group of cases and kernel set:\n2:   cases, baseline                               2.58e-07 of peak (2.17 float epsilons); 1.06e-07 absolute at peak 0.411, B = 18\n2:   shared_input_mixes, baseline                  3.14e-07 of peak (2.63 float epsilons); 1.83e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.21e-07 of peak (1.85 float epsilons); 1.1e-06 absolute at peak 4.99, B = 255\n2:   cases, baseline                               2.58e-07 of peak (2.17 float epsilons); 1.06e-07 absolute at peak 0.411, B = 18\n2:   shared_input_mixes, baseline                  3.14e-07 of peak (2.63 float epsilons); 1.83e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.21e-07 of peak (1.85 float epsilons); 1.1e-06 absolute at peak 4.99, B = 255\n2:   cases, baseline                               2.42e-07 of peak (2.03 float epsilons); 8.81e-08 absolute at peak 0.364, B = 5\n2:   shared_input_mixes, baseline                  1.86e-07 of peak (1.56 float epsilons); 2.17e-07 absolute at peak 1.17, B = 7\n2:   history_validity, baseline                    2.12e-07 of peak (1.78 float epsilons); 1.06e-06 absolute at peak 4.99, B = 255\n2:   layouts, baseline                             2.1e-07 of peak (1.76 float epsilons); 1.83e-07 absolute at peak 0.871, B = 1\n2:   cases, baseline                               2.42e-07 of peak (2.03 float epsilons); 8.81e-08 absolute at peak 0.364, B = 5\n2:   shared_input_mixes, baseline                  1.86e-07 of peak (1.56 float epsilons); 2.17e-07 absolute at peak 1.17, B = 7\n2:   history_validity, baseline                    2.12e-07 of peak (1.78 float epsilons); 1.06e-06 absolute at peak 4.99, B = 255\n2:   layouts, baseline                             2.1e-07 of peak (1.76 float epsilons); 1.83e-07 absolute at peak 0.871, B = 1\n2:   cases, baseline                               1.93e-07 of peak (1.62 float epsilons); 9.17e-08 absolute at peak 0.474, B = 21\n2:   shared_input_mixes, baseline                  1.65e-07 of peak (1.38 float epsilons); 8.42e-08 absolute at peak 0.511, B = 15\n2:   history_validity, baseline                    2.34e-07 of peak (1.96 float epsilons); 7.77e-07 absolute at peak 3.33, B = 64\n2:   layouts, baseline                             2.68e-07 of peak (2.25 float epsilons); 1.04e-06 absolute at peak 3.87, B = 1\n2:   cases, baseline                               1.93e-07 of peak (1.62 float epsilons); 9.17e-08 absolute at peak 0.474, B = 21\n2:   shared_input_mixes, baseline                  1.65e-07 of peak (1.38 float epsilons); 8.42e-08 absolute at peak 0.511, B = 15\n2:   history_validity, baseline                    2.34e-07 of peak (1.96 float epsilons); 7.77e-07 absolute at peak 3.33, B = 64\n2:   layouts, baseline                             2.68e-07 of peak (2.25 float epsilons); 1.04e-06 absolute at peak 3.87, B = 1\n2:   cases, baseline                               1.93e-07 of peak (1.62 float epsilons); 9.17e-08 absolute at peak 0.474, B = 21\n2:   shared_input_mixes, baseline                  1.77e-07 of peak (1.48 float epsilons); 1.67e-07 absolute at peak 0.944, B = 4\n2:   history_validity, baseline                    2.21e-07 of peak (1.85 float epsilons); 1.1e-06 absolute at peak 4.99, B = 255\n2:   layouts, baseline                             2.96e-07 of peak (2.49 float epsilons); 7.5e-07 absolute at peak 2.53, B = 1\n2:   cases, baseline                               1.93e-07 of peak (1.62 float epsilons); 9.17e-08 absolute at peak 0.474, B = 21\n2:   shared_input_mixes, baseline                  1.77e-07 of peak (1.48 float epsilons); 1.67e-07 absolute at peak 0.944, B = 4\n2:   history_validity, baseline                    2.21e-07 of peak (1.85 float epsilons); 1.1e-06 absolute at peak 4.99, B = 255\n2:   layouts, baseline                             2.96e-07 of peak (2.49 float epsilons); 7.5e-07 absolute at peak 2.53, B = 1\n2:   overall: shared_input_mixes, baseline         3.14e-07 of peak (2.63 float epsilons); 1.83e-07 absolute at peak 0.581, B = 12\n2:   largest absolute: layouts, baseline           2.53e-07 of peak (2.12 float epsilons); 2.04e-06 absolute at peak 8.09, B = 128\n2:   (Absolute errors grow with the signal level; compare the relative figures.)\n2/2 Test #2: native.engine ....................   Passed    1.08 sec\n\nThe following tests passed:\n\tnative.fft\n\tnative.engine\n\n100% tests passed out of 2\n\nLabel Time Summary:\nnative            =   2.12 sec*proc (2 tests)\nreal-libraries    =   2.12 sec*proc (2 tests)\n\nTotal Test time (real) =   2.12 sec\n"
+  },
+  "harness_patch": "--- callback_benchmark.cpp\n+++ callback_backend.cpp\n@@ -1,3 +1,7 @@\n+#include \"fft.hpp\"\n+#include \"partitions.hpp\"\n+#include <cstdlib>\n+#include <iterator>\n // SPDX-License-Identifier: GPL-2.0-or-later\n // Callback-level measurements for the costly moments as well as warmed\n // throughput: the host callback size is chosen independently of the partition\n@@ -203,6 +207,18 @@\n \n int main(int argc, char** argv) {\n     try {\n+        if (const char* path = std::getenv(\"CONVOLVER_BENCH_WISDOM\")) {\n+            std::ifstream file(path);\n+            if (!file) throw std::runtime_error(\"cannot open benchmark wisdom\");\n+            const std::string wisdom((std::istreambuf_iterator<char>(file)), {});\n+            convolver::import_fft_wisdom(wisdom);\n+            const auto& layout = convolver::detail::partition_layout();\n+            for (std::size_t n = layout.first;; n = std::min(n * layout.growth, layout.largest)) {\n+                convolver::detail::RealFft proof(2 * n,\n+                    convolver::FftOptions{convolver::FftPlanning::patient, true, 0});\n+                if (n == layout.largest) break;\n+            }\n+        }\n         const auto o = parse(argc, argv);\n         convolver::detail::set_denormals_flushed(o.thread_denormals == \"flush\");\n         if (o.scenario == \"load\") {\n",
+  "harness_cmake": "# SPDX-License-Identifier: GPL-2.0-or-later\ncmake_minimum_required(VERSION 3.20)\nset(CMAKE_OSX_DEPLOYMENT_TARGET \"14.0\" CACHE STRING \"Deployment target\")\nproject(ConvolverBackendComparison LANGUAGES CXX)\nenable_testing()\nadd_subdirectory(\"${CMAKE_CURRENT_LIST_DIR}/../source\" convolver)\nadd_executable(convolver_backend_benchmark callback_backend.cpp)\ntarget_compile_features(convolver_backend_benchmark PRIVATE cxx_std_20)\ntarget_include_directories(convolver_backend_benchmark PRIVATE \"${CMAKE_CURRENT_LIST_DIR}/../source/portable\")\ntarget_link_libraries(convolver_backend_benchmark PRIVATE convolver_core convolver_host convolver_io)\n",
+  "power_after": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23593059)\t82%; charging; 0:54 remaining present: true\n",
+  "readme": "Dated reproduction record. Create root/source at the recorded commit; build FFTW in root/fftw-neon with the recorded configure flags; create root/harness/CMakeLists.txt from harness_cmake and apply harness_patch to source/tests/native/callback_benchmark.cpp as root/harness/callback_backend.cpp. Configure root/accelerate and root/fftw from harness with Release, CONVOLVER_BUILD_TESTS=ON and the respective CONVOLVER_FFT_BACKEND; supply the FFTW installation and libsndfile prefix in CMAKE_PREFIX_PATH. Build convolver_backend_benchmark, convolver_cli, convolver_engine_tests, convolver_fft_tests. Run both oracles. Generate root/patient.fftw with the recorded tuning command, then run the sibling dated -run.py script with root as its argument. Local paths in captured command output identify this run; substitute your root when reproducing.",
+  "checksums": {
+    "2026-11-08-perf2-fft-processing.csv": "780a520c972f86dc88fc2544610b36e09457776b40103039a8cf54572674a6ad",
+    "2026-11-08-perf2-fft-preparation.csv": "3e3314588ee6b45b46924617c31f60078f83c4d9540b3b96be5201073bcf9407"
+  },
+  "original_capture_checksums": {
+    "2026-11-08-perf2-fft-processing.csv": "93ab4ce9bf0061fdad0ab14e60e376fb4d10908f0709f7253b2cb3f7daef507c",
+    "2026-11-08-perf2-fft-preparation.csv": "79a2ce7960e69ff56251985e37feb6c6a008c1ba9d198aaa3b948d7d9fe6d068"
+  },
+  "line_endings": "Repository CSV copies use LF; original_capture_checksums describe the unchanged CRLF captures under the benchmark scratch directory. CSV cell values are unchanged.",
+  "convolver_flags": "Release: -O3 -DNDEBUG, C++20, arm64, deployment target macOS 14.0; system AppleClang; sanitizers off",
+  "planning_sizes": [
+    128,
+    512,
+    2048,
+    8192,
+    16384
+  ]
+}

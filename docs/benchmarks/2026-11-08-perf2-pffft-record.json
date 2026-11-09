@@ -1,0 +1,94 @@
+{
+  "date": "2026-11-08",
+  "status": "completed",
+  "source": "c607fe9db2a63136d4808cfeeb0c84021c8e15b8",
+  "pffft_revision": "237ffa283b17e5ef88ef8198b465f41b0268011d",
+  "pocketfft_inspected_revision": "4d865cba24359b05b37da4e75aee24498c3b78e7",
+  "machine": "Apple M5 Max, 128 GB, macOS 27.2",
+  "compiler": "Apple Clang 21.0.0",
+  "flags": "Release -O3 -DNDEBUG, arm64 NEON, no explicit -march, baseline convolution kernels, sanitizers off",
+  "scope": "Experimental ordered-transform adapter only, outside repository production targets. Not a shipped backend; no Linux or Windows execution.",
+  "rounds": 4,
+  "modes": [
+    "ooura",
+    "pffft"
+  ],
+  "seconds_after_warmup": 1,
+  "method": "All 2 order permutations repeated twice, same workloads as preceding comparisons; new Ooura controls. FFT sizes in timed production layout: 128, 512, 2048, 8192, 16384.",
+  "tiny_transform_policy": "Native engine oracle exercises custom N=8, unsupported by SIMD PFFFT. Adapter uses existing Ooura for N<32; timed workloads use PFFFT throughout.",
+  "prototype_limits": "Uses conservative resource allowance; full package exports, symbol visibility, all-C-allocation interception and host qualification not performed. Build bootstrap uses OOURA then replaces target source: configure label is OOURA, but binary and CSV report PFFFT-experimental. Existing native.engine allocation guard intercepts C++ new, not every C allocator; the PFFFT no-allocation execution claim also relies on its API/source contract.",
+  "configure_library": "cmake -S pffft -B pffft-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DPFFFT_USE_TYPE_DOUBLE=OFF -DPFFFT_BUILD_TESTS=OFF -DPFFFT_BUILD_BENCHMARKS=OFF -DPFFFT_BUILD_EXAMPLES=OFF -DPFFFT_USE_FFTPACK=OFF",
+  "build_library": "cmake --build pffft-build --target PFFFT --parallel 4",
+  "configure_adapter": "cmake -S harness -B pffft-convolver -DCMAKE_BUILD_TYPE=Release -DCONVOLVER_FFT_BACKEND=OOURA -DCMAKE_PREFIX_PATH=/opt/homebrew -DCONVOLVER_SANITIZERS=OFF -DCONVOLVER_BUILD_TESTS=ON",
+  "build_adapter": "cmake --build pffft-convolver --target convolver_backend_benchmark convolver_fft_tests convolver_engine_tests convolver_cli --parallel 4",
+  "correctness": "ctest --test-dir pffft-convolver -R ^native\\.(fft|engine)$ -V",
+  "driver": "python 2026-11-08-perf2-fft-run.py /Users/jrp/perf2-backends --pffft-build /private/tmp/convolver-fft-alternatives/pffft-convolver",
+  "reproduction": "Clone pinned PFFFT in the scratch directory. Write harness files below; substitute scratch paths in CMake. Reuse the pinned Convolver source and callback wrapper in the preceding FFT run record. Build library, then adapter and tests, then run driver. No engine source edits.",
+  "adapter_cpp": "// SPDX-License-Identifier: GPL-2.0-or-later\n// EXPERIMENT ONLY: ordered PFFFT adapter, never installed in a plug-in.\n#include \"fft.hpp\"\n#include \"third_party/ooura/fftsg.hpp\"\n#include <array>\n#include <pffft/pffft.h>\n#include <algorithm>\n#include <bit>\n#include <memory>\n#include <stdexcept>\n\nnamespace convolver {\nconst char* fft_backend_name() noexcept { return \"PFFFT-experimental\"; }\nconst char* fft_backend_version() noexcept { return \"237ffa283b17 ordered NEON\"; }\nbool fft_supports_wisdom() noexcept { return false; }\nvoid import_fft_wisdom(std::string_view) { throw std::invalid_argument(\"wisdom requires FFTW\"); }\nstd::string export_fft_wisdom() { throw std::invalid_argument(\"wisdom requires FFTW\"); }\nnamespace detail {\nvoid check_fft_options(const FftOptions& o) {\n    if (o.planning != FftPlanning::estimate || o.wisdom_only || o.time_limit_seconds != 0)\n        throw std::invalid_argument(\"measured planning and wisdom require FFTW\");\n}\nstd::size_t fft_size(std::size_t b) noexcept { return std::max(std::size_t(4), std::bit_ceil(2*b)); }\nstd::size_t fft_storage(std::size_t n) noexcept {\n    // Four owned buffers plus N twiddles and an upper allowance for setup/alignment.\n    return 5*n + 256;\n}\nstruct Free { void operator()(float* p) const noexcept { pffft_aligned_free(p); } };\nusing Buffer = std::unique_ptr<float, Free>;\nBuffer buffer(std::size_t n) {\n    auto p = Buffer(static_cast<float*>(pffft_aligned_malloc(n*sizeof(float))));\n    if (!p) throw std::bad_alloc();\n    std::fill_n(p.get(), n, 0.f);\n    return p;\n}\nstruct Destroy { void operator()(PFFFT_Setup* p) const noexcept { pffft_destroy_setup(p); } };\nstruct RealFft::Impl {\n    std::size_t n;\n    Buffer time, frequency, sum, work;\n    std::unique_ptr<PFFFT_Setup, Destroy> setup;\n    std::array<float,16> twiddles{};\n    std::array<int,8> bits{};\n    explicit Impl(std::size_t size, FftOptions options)\n        : n(size), time(buffer(n)), frequency(buffer(n+2)), sum(buffer(n+2)), work(buffer(n)) {\n        check_fft_options(options);\n        if (n < 32) {\n            ooura::rdft(static_cast<int>(n),1,work.get(),bits.data(),twiddles.data());\n            return;\n        }\n        setup.reset(pffft_new_setup(static_cast<int>(n), PFFFT_REAL));\n        if (!setup) throw std::runtime_error(\"PFFFT setup failed for N=\" + std::to_string(n));\n    }\n};\nRealFft::RealFft(std::size_t n, FftOptions o) : impl_(std::make_unique<Impl>(n,o)) {}\nRealFft::~RealFft() = default;\nfloat* RealFft::time() noexcept { return impl_->time.get(); }\nfloat* RealFft::frequency() noexcept { return impl_->frequency.get(); }\nfloat* RealFft::sum() noexcept { return impl_->sum.get(); }\nvoid RealFft::forward() noexcept {\n    auto& s = *impl_;\n    if (s.n < 32) {\n        std::copy_n(s.time.get(),s.n,s.work.get());\n        ooura::rdft(static_cast<int>(s.n),1,s.work.get(),s.bits.data(),s.twiddles.data());\n        std::copy_n(s.work.get(),s.n,s.frequency.get());\n        for (std::size_t k=1;k<s.n/2;++k) s.frequency.get()[2*k+1] *= -1;\n    } else pffft_transform_ordered(s.setup.get(), s.time.get(), s.frequency.get(), s.work.get(), PFFFT_FORWARD);\n    s.frequency.get()[s.n] = s.frequency.get()[1];\n    s.frequency.get()[1] = s.frequency.get()[s.n+1] = 0;\n}\nvoid RealFft::inverse() noexcept {\n    auto& s = *impl_;\n    if (s.n < 32) {\n        s.time.get()[0] = 2*s.sum.get()[0];\n        s.time.get()[1] = 2*s.sum.get()[s.n];\n        for (std::size_t k=1;k<s.n/2;++k) {\n            s.time.get()[2*k]=2*s.sum.get()[2*k];\n            s.time.get()[2*k+1]=-2*s.sum.get()[2*k+1];\n        }\n        ooura::rdft(static_cast<int>(s.n),-1,s.time.get(),s.bits.data(),s.twiddles.data());\n        return;\n    }\n    s.sum.get()[1] = s.sum.get()[s.n];\n    pffft_transform_ordered(s.setup.get(), s.sum.get(), s.time.get(), s.work.get(), PFFFT_BACKWARD);\n    s.sum.get()[1] = 0;\n}\n} // namespace detail\n} // namespace convolver\n",
+  "cmake_wrapper": "# SPDX-License-Identifier: GPL-2.0-or-later\ncmake_minimum_required(VERSION 3.20)\nset(CMAKE_OSX_DEPLOYMENT_TARGET \"14.0\" CACHE STRING \"Deployment target\")\nproject(ConvolverPffftSpike LANGUAGES CXX)\nenable_testing()\nset(ROOT \"/Users/jrp/perf2-backends\")\nadd_subdirectory(\"${ROOT}/source\" convolver)\n# Replace the backend only in this scratch target, leaving source untouched.\nget_target_property(core_sources convolver_core SOURCES)\nlist(FILTER core_sources EXCLUDE REGEX \"fft_ooura.cpp\")\nset_property(TARGET convolver_core PROPERTY SOURCES \"${core_sources}\")\ntarget_sources(convolver_core PRIVATE \"${CMAKE_CURRENT_LIST_DIR}/fft_pffft.cpp\")\ntarget_include_directories(convolver_core PRIVATE \"${ROOT}/source/portable\")\nadd_library(pffft_spike STATIC IMPORTED GLOBAL)\nset_target_properties(pffft_spike PROPERTIES\n    IMPORTED_LOCATION \"${CMAKE_CURRENT_LIST_DIR}/../pffft-build/libpffft.a\"\n    INTERFACE_INCLUDE_DIRECTORIES \"${CMAKE_CURRENT_LIST_DIR}/../pffft/include\"\n    INTERFACE_COMPILE_DEFINITIONS \"PFFFT_STATIC_DEFINE\")\ntarget_link_libraries(convolver_core PRIVATE pffft_spike)\nadd_executable(convolver_backend_benchmark \"${ROOT}/harness/callback_backend.cpp\")\ntarget_compile_features(convolver_backend_benchmark PRIVATE cxx_std_20)\ntarget_include_directories(convolver_backend_benchmark PRIVATE \"${ROOT}/source/portable\")\ntarget_link_libraries(convolver_backend_benchmark PRIVATE convolver_core convolver_host convolver_io)\n",
+  "oracles": "UpdateCTestConfiguration  from :/private/tmp/convolver-fft-alternatives/pffft-convolver/DartConfiguration.tcl\nTest project /private/tmp/convolver-fft-alternatives/pffft-convolver\nConstructing a list of tests\nDone constructing a list of tests\nUpdating test list for fixtures\nAdded 0 tests to meet fixture requirements\nChecking test dependency graph...\nChecking test dependency graph end\ntest 1\n    Start 1: native.fft\n\n1: Test command: /private/tmp/convolver-fft-alternatives/pffft-convolver/convolver/convolver_fft_tests\n1: Working Directory: /private/tmp/convolver-fft-alternatives/pffft-convolver/convolver\n1: Test timeout computed to be: 120\n1: FFT layout, DC/Nyquist, direct DFT and normalization passed\n1/2 Test #1: native.fft .......................   Passed    0.15 sec\ntest 2\n    Start 2: native.engine\n\n2: Test command: /private/tmp/convolver-fft-alternatives/pffft-convolver/convolver/convolver_engine_tests\n2: Working Directory: /private/tmp/convolver-fft-alternatives/pffft-convolver/convolver\n2: Test timeout computed to be: 120\n2: no-clip gain on the worst-case input: largest output 1\n2: native engine tests passed (PFFFT-experimental, baseline kernels)\n2: Worst error against the double oracle, relative to the output peak, by group of cases and kernel set:\n2:   cases, baseline                               2.58e-07 of peak (2.17 float epsilons); 1.06e-07 absolute at peak 0.411, B = 18\n2:   shared_input_mixes, baseline                  3.14e-07 of peak (2.63 float epsilons); 1.83e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.42e-07 of peak (2.03 float epsilons); 1.21e-06 absolute at peak 4.99, B = 255\n2:   cases, baseline                               2.58e-07 of peak (2.17 float epsilons); 1.06e-07 absolute at peak 0.411, B = 18\n2:   shared_input_mixes, baseline                  3.14e-07 of peak (2.63 float epsilons); 1.83e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.42e-07 of peak (2.03 float epsilons); 1.21e-06 absolute at peak 4.99, B = 255\n2:   cases, baseline                               1.7e-07 of peak (1.43 float epsilons); 9.49e-08 absolute at peak 0.558, B = 26\n2:   shared_input_mixes, baseline                  2.21e-07 of peak (1.86 float epsilons); 1.29e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    1.99e-07 of peak (1.67 float epsilons); 9.91e-07 absolute at peak 4.99, B = 255\n2:   layouts, baseline                             2.29e-07 of peak (1.92 float epsilons); 1.69e-07 absolute at peak 0.737, B = 7\n2:   cases, baseline                               1.7e-07 of peak (1.43 float epsilons); 9.49e-08 absolute at peak 0.558, B = 26\n2:   shared_input_mixes, baseline                  2.21e-07 of peak (1.86 float epsilons); 1.29e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    1.99e-07 of peak (1.67 float epsilons); 9.91e-07 absolute at peak 4.99, B = 255\n2:   layouts, baseline                             2.29e-07 of peak (1.92 float epsilons); 1.69e-07 absolute at peak 0.737, B = 7\n2:   cases, baseline                               1.81e-07 of peak (1.52 float epsilons); 8.59e-08 absolute at peak 0.474, B = 21\n2:   shared_input_mixes, baseline                  2.21e-07 of peak (1.86 float epsilons); 1.29e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.17e-07 of peak (1.82 float epsilons); 1.08e-06 absolute at peak 4.99, B = 255\n2:   layouts, baseline                             2.67e-07 of peak (2.24 float epsilons); 2.24e-07 absolute at peak 0.838, B = 1\n2:   cases, baseline                               1.81e-07 of peak (1.52 float epsilons); 8.59e-08 absolute at peak 0.474, B = 21\n2:   shared_input_mixes, baseline                  2.21e-07 of peak (1.86 float epsilons); 1.29e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.17e-07 of peak (1.82 float epsilons); 1.08e-06 absolute at peak 4.99, B = 255\n2:   layouts, baseline                             2.67e-07 of peak (2.24 float epsilons); 2.24e-07 absolute at peak 0.838, B = 1\n2:   cases, baseline                               1.81e-07 of peak (1.52 float epsilons); 8.59e-08 absolute at peak 0.474, B = 21\n2:   shared_input_mixes, baseline                  2.21e-07 of peak (1.86 float epsilons); 1.29e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.42e-07 of peak (2.03 float epsilons); 1.21e-06 absolute at peak 4.99, B = 255\n2:   layouts, baseline                             2.68e-07 of peak (2.25 float epsilons); 9.09e-07 absolute at peak 3.39, B = 127\n2:   cases, baseline                               1.81e-07 of peak (1.52 float epsilons); 8.59e-08 absolute at peak 0.474, B = 21\n2:   shared_input_mixes, baseline                  2.21e-07 of peak (1.86 float epsilons); 1.29e-07 absolute at peak 0.581, B = 12\n2:   history_validity, baseline                    2.42e-07 of peak (2.03 float epsilons); 1.21e-06 absolute at peak 4.99, B = 255\n2:   layouts, baseline                             2.68e-07 of peak (2.25 float epsilons); 9.09e-07 absolute at peak 3.39, B = 127\n2:   overall: shared_input_mixes, baseline         3.14e-07 of peak (2.63 float epsilons); 1.83e-07 absolute at peak 0.581, B = 12\n2:   largest absolute: layouts, baseline           2.01e-07 of peak (1.69 float epsilons); 1.79e-06 absolute at peak 8.89, B = 127\n2:   (Absolute errors grow with the signal level; compare the relative figures.)\n2/2 Test #2: native.engine ....................   Passed    0.40 sec\n\nThe following tests passed:\n\tnative.fft\n\tnative.engine\n\n100% tests passed out of 2\n\nLabel Time Summary:\nnative            =   0.55 sec*proc (2 tests)\nreal-libraries    =   0.55 sec*proc (2 tests)\n\nTotal Test time (real) =   0.55 sec\n",
+  "pffft_configure_output": "-- The C compiler identification is AppleClang 21.0.0.21000401\n-- The CXX compiler identification is AppleClang 21.0.0.21000401\n-- Detecting C compiler ABI info\n-- Detecting C compiler ABI info - done\n-- Check for working C compiler: /usr/bin/cc - skipped\n-- Detecting C compile features\n-- Detecting C compile features - done\n-- Detecting CXX compiler ABI info\n-- Detecting CXX compiler ABI info - done\n-- Check for working CXX compiler: /usr/bin/c++ - skipped\n-- Detecting CXX compile features\n-- Detecting CXX compile features - done\n-- Could NOT find PAPI (missing: PAPI_LIBRARIES PAPI_INCLUDE_DIRS) \n-- Could NOT find MIPP (missing: MIPP_INCLUDE_DIRS) \nCMake Warning at cmake/FindMIPP.cmake:23 (message):\n  MIPP not found.\nCall Stack (most recent call first):\n  CMakeLists.txt:74 (find_package)\n\n\n-- NOT found MIPP\n-- INFO: CMAKE_C_COMPILER_ID is AppleClang\n-- INFO: CMAKE_CXX_COMPILER_ID is AppleClang\n-- INFO: NOT WIN32\n-- INFO: NOT MINGW\n-- INFO: will not link math lib m, no need for this target\n-- TARGET_C_ARCH not set for target PFFFT, using default\n-- TARGET_C_EXTRA not set for target PFFFT, using default\n-- Detected SIMD backend for PFFFT: float: NEON\n-- TARGET_CXX_ARCH not set for target PFDSP, using default\n-- TARGET_CXX_EXTRA not set for target PFDSP, using default\n-- Configuring done (0.6s)\n-- Generating done (0.0s)\n-- Build files have been written to: /private/tmp/convolver-fft-alternatives/pffft-build\n",
+  "csv_note": "LF normalized for Git; values unchanged.",
+  "binary_checksums": {
+    "/private/tmp/convolver-fft-alternatives/pffft-build/libpffft.a": "154b4a9cbf4259ea9db293c7e4e4ad8de41f75252e5c5b272d43239c78fa12f0",
+    "/private/tmp/convolver-fft-alternatives/pffft-convolver/convolver_backend_benchmark": "c40b534ef430feeac2956de06348655034f8e58e41a638135cff55b0571e6a1b"
+  },
+  "exit_code": 0,
+  "power_before": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23593059)\t92%; charging; 0:27 remaining present: true\n",
+  "conditions": "Other apps remained active; no quiet-machine or host-playback qualification.",
+  "fixture_errors": [
+    {
+      "mode": "ooura",
+      "latency": 0,
+      "fixture": "stereo",
+      "error": 8.940696716308594e-08
+    },
+    {
+      "mode": "ooura",
+      "latency": 0,
+      "fixture": "crossover",
+      "error": 6.705522537231445e-08
+    },
+    {
+      "mode": "ooura",
+      "latency": 256,
+      "fixture": "stereo",
+      "error": 1.1920928955078125e-07
+    },
+    {
+      "mode": "ooura",
+      "latency": 256,
+      "fixture": "crossover",
+      "error": 5.960464477539063e-08
+    },
+    {
+      "mode": "pffft",
+      "latency": 0,
+      "fixture": "stereo",
+      "error": 6.705522537231445e-08
+    },
+    {
+      "mode": "pffft",
+      "latency": 0,
+      "fixture": "crossover",
+      "error": 8.940696716308594e-08
+    },
+    {
+      "mode": "pffft",
+      "latency": 256,
+      "fixture": "stereo",
+      "error": 1.341104507446289e-07
+    },
+    {
+      "mode": "pffft",
+      "latency": 256,
+      "fixture": "crossover",
+      "error": 5.960464477539063e-08
+    }
+  ],
+  "run_output": "All 8 fixture comparisons passed; worst error 1.341104507446289e-07\n36/288 rows, elapsed 37.8 s\n72/288 rows, elapsed 80.2 s\n108/288 rows, elapsed 117.8 s\n144/288 rows, elapsed 160.2 s\n180/288 rows, elapsed 197.8 s\n216/288 rows, elapsed 239.9 s\n252/288 rows, elapsed 277.6 s\n288/288 rows, elapsed 319.9 s\nProcessing comparison complete\nPreparation comparison complete\n",
+  "checksums": {
+    "2026-11-08-perf2-pffft-preparation.csv": "5620f3cae470ed6e263e0073f0d769ec5507ab99cb3ccd46fda5d8c22e8c64f2",
+    "2026-11-08-perf2-pffft-processing.csv": "ded50b58ed78e6c306e64f7c1e2546dab3707d80ee6e4438348093975aa3850f"
+  }
+}
