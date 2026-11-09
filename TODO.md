@@ -906,6 +906,16 @@ means a patched FFmpeg build with `--enable-gpl`.
   level or clipped elsewhere; rank 1 of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#1-a-filter-for-every-sample-rate),
   with EDGE-1. jrp decides whether Convolver resamples at all. Compare [libsamplerate](https://libsndfile.github.io/libsamplerate/)
   and other suitable implementations before choosing a dependency.
+- [ ] **IO-10 — WAV files that other programs read are refused.** From the
+  project review of 9 November 2026. Convolver's own truncation check
+  refuses two kinds of file that libsndfile and FFmpeg read whole: a last
+  chunk of odd length with no pad byte (Python's `wave` module writes one
+  for mono 24-bit audio with an odd number of frames), and sizes of
+  `0xFFFFFFFF` left by a writer that could not seek (FFmpeg writing WAV to
+  a pipe). As a filter such a file is reported as "neither a configuration
+  nor a sound file". Accept both, keep refusing files that really are cut
+  short, and test each case with both file readers. jrp admitted it to the
+  freeze as a compatibility failure.
 - [ ] **ROBUST-1 — Longer fuzz and transition stress.** Keep discovered inputs as
   regressions. Measure worst callback times and exercise repeated filter changes;
   allocation guards and average throughput are not a deadline guarantee.

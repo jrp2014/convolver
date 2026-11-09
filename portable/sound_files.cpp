@@ -52,6 +52,24 @@ HeaderMarker header_marker(const std::filesystem::path& path) {
     return HeaderMarker::none;
 }
 namespace {
+// A size a writer leaves when it cannot go back to fill in the real one
+// (FFmpeg writing WAV to a pipe leaves it in the RIFF header and in 'data').
+constexpr std::uint32_t unknown_size = 0xffffffff;
+
+// libsndfile takes a WAV that ends early for a shorter one, so the chunk
+// layout is checked here first. IO-10: two layouts that are not cut short are
+// accepted although they break the format's rules, because libsndfile,
+// FFmpeg and other readers take them and common writers produce them. Both
+// rules are narrow on purpose; every other mismatch is still refused.
+// - Sizes never filled in: a RIFF size of unknown_size that the file is too
+//   short for means "to the end of the file", and so does a 'data' size of
+//   unknown_size in such a file. The data must still end on a whole frame,
+//   which is all that can be checked: a copy of the stream cut off between
+//   two frames cannot be told from a whole one.
+// - No pad byte after the last chunk: a chunk of odd length ending exactly
+//   where the RIFF size ends (Python's wave module writes mono 24-bit audio
+//   with an odd number of frames so). A RIFF size that counts the pad byte
+//   in a file that lacks it is a file cut short, and is refused.
 void check_wave(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary);
     std::array<unsigned char, 40> bytes{};
@@ -60,13 +78,17 @@ void check_wave(const std::filesystem::path& path) {
         std::string_view(reinterpret_cast<char*>(bytes.data()), 4) != "RIFF" ||
         std::string_view(reinterpret_cast<char*>(bytes.data() + 8), 4) != "WAVE")
         return;
-    const std::uint64_t end =
-        std::uint64_t(detail::read_le32(std::as_bytes(std::span(bytes)).subspan(4))) + 8;
-    if (end < 12 || end > std::filesystem::file_size(path))
+    const std::uint64_t file_size = std::filesystem::file_size(path);
+    const auto riff_size = detail::read_le32(std::as_bytes(std::span(bytes)).subspan(4));
+    std::uint64_t end = std::uint64_t(riff_size) + 8;
+    const bool unsized = riff_size == unknown_size && end > file_size;
+    if (unsized)
+        end = file_size;
+    if (end < 12 || end > file_size)
         throw std::runtime_error("truncated or invalid RIFF/WAVE size");
     unsigned block_align = 0;
     bool pcm_or_float = false;
-    std::vector<std::uint32_t> data_sizes;
+    std::vector<std::uint64_t> data_sizes;
     std::uint64_t position = 12;
     std::size_t chunks = 0;
     while (position < end) {
@@ -76,17 +98,26 @@ void check_wave(const std::filesystem::path& path) {
         file.read(reinterpret_cast<char*>(bytes.data()), 8);
         if (!file)
             throw std::runtime_error("cannot read RIFF/WAVE chunk header");
-        const auto length = detail::read_le32(std::as_bytes(std::span(bytes)).subspan(4));
-        const auto chunk_end = position + 8 + length + (length & 1u);
+        // Read before 'fmt ' below reuses the buffer.
+        const auto tag = std::string_view(reinterpret_cast<char*>(bytes.data()), 4);
+        const bool data = tag == "data", format_chunk = tag == "fmt ";
+        std::uint64_t length = detail::read_le32(std::as_bytes(std::span(bytes)).subspan(4));
+        auto chunk_end = position + 8 + length + (length & 1u);
+        if (unsized && data && length == unknown_size) {
+            length = end - position - 8;
+            chunk_end = end;
+        } else if ((length & 1u) && chunk_end == end + 1) {
+            chunk_end = end; // The last chunk, without its pad byte.
+        }
         if (chunk_end > end)
             throw std::runtime_error("truncated RIFF/WAVE chunk");
-        const auto tag = std::string_view(reinterpret_cast<char*>(bytes.data()), 4);
-        if (tag == "data")
+        if (data)
             data_sizes.push_back(length);
-        if (tag == "fmt ") {
+        if (format_chunk) {
             if (length < 16)
                 throw std::runtime_error("invalid WAV format chunk");
-            file.read(reinterpret_cast<char*>(bytes.data()), std::min<std::uint32_t>(length, 40));
+            file.read(reinterpret_cast<char*>(bytes.data()),
+                      static_cast<std::streamsize>(std::min<std::uint64_t>(length, 40)));
             if (!file)
                 throw std::runtime_error("cannot read WAV format");
             unsigned format = detail::read_le16(std::as_bytes(std::span(bytes)));
