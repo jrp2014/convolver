@@ -163,14 +163,14 @@ class PrepareReleaseTests(unittest.TestCase):
         self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/CHANGELOG.md', text)
         # How to report a problem, with what makes a report useful.
         self.assertIn('## Report a problem', text)
-        self.assertIn(
-            f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/troubleshooting.md#report-a-problem', text
-        )
+        self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/report-a-problem.md', text)
         for words in ('Copy Diagnostics', 'Convolver log', 'host and version', 'playback', 'export or reopening'):
             self.assertIn(words, text)
         self.assertIn(
             f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/plugins.md#status-and-the-convolver-log', text
         )
+        # Preview users are asked for feedback as well as problems.
+        self.assertIn('https://github.com/owner/convolver/issues/new?template=preview_feedback.yml', text)
 
     def test_refuses_a_run_that_is_not_a_manual_successful_candidate_run_on_the_tag(self):
         for key, value, words in [

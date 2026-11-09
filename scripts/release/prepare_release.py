@@ -159,7 +159,9 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'you used, how you loaded the filter (on macOS Choose…, Recent or Reload; anywhere a preset or a saved '
             'project), and whether '
             'the problem is in playback, export or reopening '
-            f'([how to report]({docs}/troubleshooting.md#report-a-problem)).'
+            f'([how to report]({docs}/report-a-problem.md)). '
+            'To say what worked, what was hard to follow or what you missed, open a '
+            f'[Preview feedback]({base}/issues/new?template=preview_feedback.yml) issue.'
         ),
         '## Loading responsiveness',
         qualification,
