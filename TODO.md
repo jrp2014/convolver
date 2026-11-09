@@ -95,6 +95,8 @@ is superseded.
   dependency closure, the final licence and corresponding-source review,
   signing and notarization, installation on clean machines, and immutable
   release assets ([production gates](docs/develop/releasing.md#production-gates)).
+  What macOS signing and notarization need, and jrp's steps, are in the
+  [signing plan](docs/project/plans/2026-11-09-macos-signing.md).
   The 18 October [distribution plan](docs/archive/plans/2026-10-18-plugin-distribution.md)
   is archived as superseded.
 - [ ] **REL-3 — Independent walkthrough of an exact preview.** Someone who
