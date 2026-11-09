@@ -10,15 +10,6 @@ Until 1.0 the C++ API may change between minor versions.
 
 ## [Unreleased]
 
-### Changed
-
-- CI (CI-35): a pull request that edits the README, the first-use
-  examples' README or `docs/use/first-filter.md` without changing a
-  command marked `<!-- first-use-example -->` now runs Lint (and, for the
-  packaged guide, only what a guide edit runs) instead of every workflow;
-  a change to those commands still runs everything
-  ([CI triggers](docs/develop/testing.md#documentation-only-pull-requests)).
-
 ### Added
 
 - Windows and Linux previews (REL-9): from the second preview, the draft
@@ -54,6 +45,12 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- CI (CI-35): a pull request that edits the README, the first-use
+  examples' README or `docs/use/first-filter.md` without changing a
+  command marked `<!-- first-use-example -->` now runs Lint (and, for the
+  packaged guide, only what a guide edit runs) instead of every workflow;
+  a change to those commands still runs everything
+  ([CI triggers](docs/develop/testing.md#documentation-only-pull-requests)).
 - Version 0.13.0 for PERF-2 (jrp, 8 November 2026): the next minor-version
   pre-release after the published `v0.12.12`. C++ consumers request
   `find_package(Convolver 0.13)`.
