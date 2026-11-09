@@ -53,7 +53,7 @@ void check(bool condition, const std::string& what) {
         std::cout << "FAIL  " << what << '\n';
     }
 }
-constexpr std::size_t latency = 256;
+constexpr std::size_t latency = default_host_latency;
 
 // PLUG-21: waits for a step that must finish once nothing holds it back. A
 // deadlock cannot be unwound (a thread is stuck), so the test stops at once,
@@ -341,7 +341,7 @@ void status_and_log(host::World& world, const Fixture& f) {
     auto p = instance(world, a);
     p->activate();
     p->run_empty();
-    check(p->latency == 256, label + "latency port reports 256");
+    check(p->latency == latency, label + "latency port reports the default");
     check(p->status == static_cast<float>(lv2::Status::no_filter),
           label + "empty: status no filter");
     check(p->save().properties == 1 && !decode_host_state(p->save().bytes).configuration,
@@ -745,7 +745,7 @@ void lifecycle(host::World& world, const Fixture& f, unsigned seed,
         check(p->status == static_cast<float>(m.status()),
               label() + ": status " + std::to_string(p->status) + ", expected " +
                   std::to_string(static_cast<int>(m.status())));
-        check(p->latency == 256, label() + ": latency");
+        check(p->latency == latency, label() + ": latency");
         const auto r = p->failure();
         check(r.has_value() == m.kind.has_value() &&
                   (!r || (r->kind == *m.kind && r->request.number == m.failed_request &&

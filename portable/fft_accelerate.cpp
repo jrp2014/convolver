@@ -47,6 +47,11 @@ template <class T> struct Aligned {
     }
 };
 } // namespace
+void check_fft_options(const FftOptions& options) {
+    if (options.planning != FftPlanning::estimate || options.wisdom_only ||
+        options.time_limit_seconds != 0)
+        throw std::invalid_argument("measured planning and wisdom require the FFTW backend");
+}
 // Use at least four real points; padding leaves audio block/latency unchanged.
 std::size_t fft_size(std::size_t b) noexcept {
     return std::max(std::size_t(4), std::bit_ceil(2 * b));
@@ -62,9 +67,7 @@ struct RealFft::Impl {
     explicit Impl(std::size_t length, FftOptions options)
         : n(length), half(n / 2), log2(std::bit_width(n) - 1), time(n), frequency(n + 2),
           sum(n + 2), real(half), imag(half) {
-        if (options.planning != FftPlanning::estimate || options.wisdom_only ||
-            options.time_limit_seconds != 0)
-            throw std::invalid_argument("measured planning and wisdom require the FFTW backend");
+        check_fft_options(options);
         setup = vDSP_create_fftsetup(log2, kFFTRadix2);
         if (!setup)
             throw std::runtime_error("Accelerate FFT setup creation failed");

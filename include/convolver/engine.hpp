@@ -40,19 +40,22 @@ struct Configuration {
 struct ConfigurationAnalysis {
     std::size_t latency_frames = 0; // Engine::latency_frames()
     std::size_t tail_frames = 0;    // Engine::tail_frames()
-    std::size_t fft_frames = 0;     // Real transform length per partition.
+    // The longest real transform the stages use (twice the largest block),
+    // 0 when the direct sum covers every filter.
+    std::size_t fft_frames = 0;
     // Prepared float buffers the engine accounts against its storage limit: block
     // and delay lines, routes, filter/input spectra, overlap and backend transform
     // buffers. Excludes FFT plan internals, allocator overhead and file decoding.
     // Paths sharing an input mix share history, so this is an upper bound.
     std::size_t accounted_buffer_bytes = 0;
+    // Each path's partitions, summed over the stages it reaches.
     std::vector<std::size_t> partitions_per_path;
 };
-ConfigurationAnalysis analyze_configuration(const Configuration&, std::size_t block_frames = 256);
+ConfigurationAnalysis analyze_configuration(const Configuration&, std::size_t block_frames = 0);
 // Validate dimensions, coefficients and prepared-storage limits without FFT planning.
-void validate_configuration(const Configuration&, std::size_t block_frames = 256);
+void validate_configuration(const Configuration&, std::size_t block_frames = 0);
 // Validate and return FIR/routing support, excluding latency, without FFT planning.
-std::size_t configuration_tail_frames(const Configuration&, std::size_t block_frames = 256);
+std::size_t configuration_tail_frames(const Configuration&, std::size_t block_frames = 0);
 
 // The largest |output| any input within full scale can produce through `c`
 // (AttenuationEstimate::worst_case_peak), without running the convolution:
@@ -106,20 +109,27 @@ struct FftOptions {
 bool fft_supports_wisdom() noexcept;
 void import_fft_wisdom(std::string_view wisdom);
 std::string export_fft_wisdom();
-// Prepare this block size's forward/inverse plans; no audio or filter is needed.
-// Use measure, patient or exhaustive; export_fft_wisdom() then saves accumulated
-// plans. The FftOptions form also takes a time limit (wisdom_only must be false).
+// Prepare the forward/inverse plans of every transform size the engine uses
+// (one per stage block, whatever the latency; block_frames is checked only);
+// no audio or filter is needed. Use measure, patient or exhaustive;
+// export_fft_wisdom() then saves accumulated plans. The FftOptions form also
+// takes a time limit (wisdom_only must be false).
 void tune_fft(std::size_t block_frames, FftPlanning = FftPlanning::patient);
 void tune_fft(std::size_t block_frames, FftOptions);
 
-// Prepared single-precision uniformly partitioned convolution.
+// Prepared single-precision non-uniformly partitioned convolution (PERF-2).
+// block_frames is the latency in frames, from 0 to max_block_frames: the
+// first taps, up to the first block's output time, are summed directly, and
+// the rest by stages of uniform blocks that grow from 64 to 8192 frames
+// (portable/partitions.hpp), whose larger blocks spread their work over the
+// following callbacks. Latencies above 16384 frames add a plain delay.
 // Construction/destruction must be outside processing and are serialized for
 // FFTW planning. Each instance has independent processing state. Construction
 // and process() flush subnormal floats to zero while they run (x86-64 and
 // AArch64) and restore the calling thread's floating-point mode on return.
 class Engine {
   public:
-    explicit Engine(const Configuration&, std::size_t block_frames = 256, FftOptions = {});
+    explicit Engine(const Configuration&, std::size_t block_frames = 0, FftOptions = {});
     ~Engine();
     Engine(Engine&&) noexcept;
     Engine& operator=(Engine&&) noexcept;

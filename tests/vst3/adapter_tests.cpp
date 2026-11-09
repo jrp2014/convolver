@@ -65,6 +65,7 @@ void play_block(Processor& p, int inputs, int outputs, int frames) {
 }
 // The default Latency, the delay these tests expect unless they choose another.
 constexpr uint32 latency_samples = convolver::default_host_latency;
+constexpr int L = static_cast<int>(latency_samples); // For frame indexes.
 // What a host's component handler receives from the controller: restart
 // requests (kLatencyChanged), edits and dirty marks.
 class Handler final : public IComponentHandler, public IComponentHandler2 {
@@ -146,7 +147,7 @@ void edge_cases() {
     require(p.setState(&state) == kResultOk, "restore routed state");
     ProcessSetup setup{kOffline, kSample32, 512, 48000};
     require(p.setupProcessing(setup) == kResultOk, "offline setup");
-    // The tail is measured at the output, so it includes the 256-sample latency.
+    // The tail is measured at the output, so it includes the latency.
     require(p.getTailSamples() == 1 + latency_samples, "tail unavailable before activation");
     require(p.setActive(true) == kResultOk, "offline activate");
     require(p.getTailSamples() == 1 + latency_samples, "reported FIR tail");
@@ -172,8 +173,12 @@ void edge_cases() {
     input.silenceFlags = 3;
     d.numSamples = 512;
     require(p.process(d) == kResultOk, "silent input with wet tail");
+    // The filter echoes each impulse one frame late, plus the latency: the
+    // second impulse (frame 0 of this block) at latency + 1, and the first
+    // (100 frames earlier) at latency - 99, if that falls in this block.
+    const auto echo = static_cast<int>(latency_samples) + 1, earlier = echo - 100;
     for (int i = 0; i < 512; ++i)
-        require(std::abs(out_right[i] - (i == 157 || i == 257 ? 1.f : 0.f)) < 1e-5 &&
+        require(std::abs(out_right[i] - (i == earlier || i == echo ? 1.f : 0.f)) < 1e-5 &&
                     out_left[i] == 0,
                 "silence flags cut the tail or dropped flagged audio");
     // Only the left output, all zero, is flagged (VST3-10); the right holds the tail.
@@ -313,7 +318,7 @@ void multichannel() {
         {{1, 0}, {2, 0}, {0, 0}, {.5f, 0}, {0, 2}, {0, -2}}};
     for (int c = 0; c < 6; ++c)
         for (int i = 0; i < 300; ++i) {
-            float want = i == 256 ? expected[c][0] : i == 257 ? expected[c][1] : 0.f;
+            float want = i == L ? expected[c][0] : i == L + 1 ? expected[c][1] : 0.f;
             require(std::abs(outs[c][i] - want) < 1e-5, "2x6 routing");
         }
     output.numChannels = 2;
@@ -351,7 +356,7 @@ void multichannel() {
         require(p.process(d) == kResultOk, (what + ": 6x6 process").c_str());
         for (int c = 0; c < 6; ++c)
             for (int i = 0; i < 300; ++i) {
-                float want = i == 256 ? expected[c][0] : i == 257 ? expected[c][1] : 0.f;
+                float want = i == L ? expected[c][0] : i == L + 1 ? expected[c][1] : 0.f;
                 require(std::abs(outs[c][i] - want) < 1e-5, (what + ": routing").c_str());
             }
     };
@@ -436,7 +441,7 @@ void multichannel() {
     require(p.process(d) == kResultOk, "8x8 in-place double process");
     for (int c = 0; c < 8; ++c)
         for (int i = 0; i < 300; ++i)
-            require(std::abs(wide[c][i] - (i == 256 ? c + 1. : 0.)) < 1e-5, "8x8 identity");
+            require(std::abs(wide[c][i] - (i == L ? c + 1. : 0.)) < 1e-5, "8x8 identity");
     p.setProcessing(false);
     p.setActive(false);
     convolver::HostState too_wide;
@@ -604,7 +609,7 @@ void restored_while_host_settles() {
         need(p.process(d) == kResultOk, "six-channel process");
         for (int c = 0; c < 6; ++c)
             for (int i = 0; i < 300; ++i) {
-                const float want = i == 256 ? expected[c][0] : i == 257 ? expected[c][1] : 0.f;
+                const float want = i == L ? expected[c][0] : i == L + 1 ? expected[c][1] : 0.f;
                 need(std::abs(outs[c][i] - want) < 1e-5, "routing on six channels");
             }
         // Once the host has played with its buses, a preset that does not
@@ -735,7 +740,7 @@ void version1_presets() {
             require(p.process(d) == kResultOk, "version-1 process");
             for (int c = 0; c < 6; ++c)
                 for (int i = 0; i < 300; ++i) {
-                    const float want = i == 256 + c % 2 ? static_cast<float>(c + 1) : 0.f;
+                    const float want = i == L + c % 2 ? static_cast<float>(c + 1) : 0.f;
                     require(std::abs(outs[c][i] - want) < 1e-5,
                             "version-1 preset not routed by bus index");
                 }
@@ -843,7 +848,7 @@ void placeholder_setup() {
     d.numSamples = 512;
     require(p.process(d) == kResultOk, "placeholder process");
     for (int i = 0; i < 512; ++i)
-        require(out_left[i] == 0 && std::abs(out_right[i] - (i == 256 ? .5f : 0.f)) < 1e-6,
+        require(out_left[i] == 0 && std::abs(out_right[i] - (i == L ? .5f : 0.f)) < 1e-6,
                 "state restored after a placeholder setup does not play");
     // Now the rate is committed: a mismatch while inactive is rejected at once.
     p.setProcessing(false);
@@ -904,7 +909,7 @@ void restart_mid_transition() {
         d.numSamples = 512;
         require(p.process(d) == kResultOk, "restart resumed");
         for (int i = 0; i < 512; ++i)
-            require(std::abs(out_left[i] - (i < 256 ? 0.f : 3.f)) < 1e-5 && out_right[i] == 0,
+            require(std::abs(out_left[i] - (i < L ? 0.f : 3.f)) < 1e-5 && out_right[i] == 0,
                     "preset loaded while stopped mid-transition does not play at once");
     }
     p.setProcessing(false);
@@ -1383,7 +1388,7 @@ void status_and_log() {
         d.outputParameterChanges = &changes;
         d.numSamples = 64;
         p.setProcessing(true);
-        // The overflow reaches the output after the 256-frame latency.
+        // The overflow reaches the output after the latency.
         for (int block = 0; block < 6; ++block) {
             left.fill(0);
             left[0] = std::numeric_limits<float>::max() / 4;
@@ -1621,7 +1626,7 @@ void output_silence_flags() {
     require(write_state(&state, saved), "encode silence state");
     state.seek(0, IBStream::kIBSeekSet, nullptr);
     require(p.setState(&state) == kResultOk, "restore silence state");
-    // 100-frame calls: not a multiple or divisor of the 256-frame partition.
+    // 100-frame calls: not a multiple or divisor of the 64-frame first block.
     constexpr int frames = 100;
     ProcessSetup setup{kRealtime, kSample32, frames, 48000};
     require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
@@ -1673,7 +1678,8 @@ void output_silence_flags() {
     auto music = [&](int n) {
         return n < stop ? (n == stop - 1 ? 1.f : std::sin(.37f * float(n)) * .5f + .6f) : 0.f;
     };
-    require(call(music) == 3, "the latency is silence, so it is flagged");
+    require(call(music) == (L >= frames ? 3 : 0),
+            "the latency is silence, so it is flagged; audio is not");
     while (frame < stop + tail - frames)
         require(call(music) == 0 || frame < latency_samples,
                 "audio or the filter's tail was flagged silent");
@@ -1691,17 +1697,18 @@ void output_silence_flags() {
     drained(music);
     // Bypass on while silent: the dry signal is silence too, so still flagged.
     require(call(music, std::pair{0, true}) == 3, "bypassed silence not flagged");
-    // An impulse played during bypass, then bypass off 300 frames later: the
-    // filter's tail of that impulse (its last tap, 1, at 299 + latency) is
-    // heard, because bypass kept the convolution running.
+    // An impulse played during bypass, then bypass off 200 frames later: the
+    // filter's tail of that impulse (its last tap, 1, at 299 + latency, after
+    // the 64-frame ramp even at zero latency) is heard, because bypass kept
+    // the convolution running.
     const int impulse = frame + 5;
     auto click = [&](int n) { return n == impulse ? 1.f : 0.f; };
     float last = 0;
     for (int k = 0; k < 8; ++k) {
-        const bool switch_off = frame <= impulse + 300 && impulse + 300 < frame + frames;
+        const bool switch_off = frame <= impulse + 200 && impulse + 200 < frame + frames;
         // Flags are checked against the content in call().
         if (switch_off)
-            call(click, std::pair{impulse + 300 - frame, false});
+            call(click, std::pair{impulse + 200 - frame, false});
         else
             call(click);
         const int at = impulse + latency_samples + 299;
@@ -1747,8 +1754,8 @@ void output_silence_flags_64() {
     d.inputs = &input;
     d.outputs = &output;
     d.numSamples = frames;
-    // An impulse at frame 0 reaches output 1 at 256 and 258 (taps 1 and .5);
-    // rounding residue can follow until the block's overlap (frame 767) ends.
+    // An impulse at frame 0 reaches output 1 at the latency and two frames
+    // later (taps 1 and .5); rounding residue can follow for a few blocks.
     std::vector<std::uint64_t> flags;
     for (int b = 0; b < 10; ++b) {
         left[0] = b == 0 ? 1 : 0;
@@ -1762,7 +1769,10 @@ void output_silence_flags_64() {
         }
         flags.push_back(output.silenceFlags);
     }
-    require(flags[0] == 3 && flags[1] == 3 && flags[2] == 1 && flags[8] == 3 && flags[9] == 3,
+    const auto arrives = static_cast<std::size_t>(L / frames);
+    require(std::all_of(flags.begin(), flags.begin() + static_cast<std::ptrdiff_t>(arrives),
+                        [](std::uint64_t f) { return f == 3; }) &&
+                flags[arrives] == 1 && flags[8] == 3 && flags[9] == 3,
             "64-bit output flags do not follow the output");
     p.setProcessing(false);
     p.setActive(false);
@@ -1803,8 +1813,8 @@ void settings_parameters() {
         if (info.id == mix_id)
             require(automatable && info.defaultNormalizedValue == 1, "Mix parameter");
         if (info.id == latency_id)
-            require(!automatable && (info.flags & ParameterInfo::kIsList) && info.stepCount == 6 &&
-                        latency_frames(info.defaultNormalizedValue) == 256,
+            require(!automatable && (info.flags & ParameterInfo::kIsList) && info.stepCount == 7 &&
+                        latency_frames(info.defaultNormalizedValue) == 0,
                     "Latency parameter");
     }
     const auto text = [&](ParamID id, ParamValue v) {
@@ -1899,7 +1909,7 @@ void settings_parameters() {
     }
     const auto restored = read_state(&saved);
     require(restored.settings && std::abs(restored.settings->gain_db - halve) < 1e-9 &&
-                restored.settings->mix == .25 && restored.settings->latency == 256,
+                restored.settings->mix == .25 && restored.settings->latency == latency_samples,
             "saved settings");
     Handler other_handler;
     Controller other;
@@ -1950,7 +1960,7 @@ void settings_parameters() {
             read_at_restart.push_back(p.getLatencySamples());
     };
     handler.restarts.clear();
-    require(impulse_delay() == 256, "output not delayed by the default Latency");
+    require(impulse_delay() == L, "output not delayed by the default Latency");
     {
         const convolver::test_log::LogSince log(process_log);
         require(c.setParamNormalized(latency_id, normalized_latency(1024)) == kResultOk &&
@@ -1958,7 +1968,8 @@ void settings_parameters() {
                     p.getTailSamples() == 1024 && handler.latency_restarts() == 1 &&
                     read_at_restart == std::vector<uint32>{1024},
                 "the new Latency was not in use when the host was asked to restart");
-        require(log.text().find("Latency changed from 256 to 1024 frames; the sound paused "
+        require(log.text().find("Latency changed from " + std::to_string(latency_samples) +
+                                " to 1024 frames; the sound paused "
                                 "briefly") != std::string::npos,
                 "the Latency change not logged");
     }
@@ -1974,11 +1985,11 @@ void settings_parameters() {
     require(impulse_delay() == 1024, "output not delayed by the Latency after the restart");
     // Back down, and quick successive choices: each plays when it is read.
     read_at_restart.clear();
-    for (const std::size_t frames : {256, 512, 2048, 64, 512})
+    for (const std::size_t frames : {256, 0, 2048, 64, 512})
         require(c.setParamNormalized(latency_id, normalized_latency(frames)) == kResultOk &&
                     p.getLatencySamples() == frames && read_at_restart.back() == frames,
                 "a successive Latency was not in use when read");
-    require(read_at_restart == std::vector<uint32>{256, 512, 2048, 64, 512},
+    require(read_at_restart == std::vector<uint32>{256, 0, 2048, 64, 512},
             "successive Latency choices");
     require(impulse_delay() == 512, "output not delayed by the last of several choices");
     // A processor that cannot be built: the running one keeps playing, the
@@ -2017,15 +2028,37 @@ void settings_parameters() {
     require(read_state(&with_latency).settings->latency == 1024, "latency not saved");
     handler.restarts.clear();
     state.seek(0, IBStream::kIBSeekSet, nullptr);
-    require(p.setState(&state) == kResultOk && p.settings().latency == 256 &&
-                p.getLatencySamples() == 256 && impulse_delay() == 256,
+    require(p.setState(&state) == kResultOk && p.settings().latency == latency_samples &&
+                p.getLatencySamples() == latency_samples && impulse_delay() == L,
             "an older state kept the Latency, or it did not play at once");
     state.seek(0, IBStream::kIBSeekSet, nullptr);
     read_at_restart.clear();
     require(c.setComponentState(&state) == kResultOk &&
-                latency_frames(c.getParamNormalized(latency_id)) == 256 &&
-                handler.latency_restarts() == 1 && read_at_restart == std::vector<uint32>{256},
+                latency_frames(c.getParamNormalized(latency_id)) == latency_samples &&
+                handler.latency_restarts() == 1 &&
+                read_at_restart == std::vector<uint32>{latency_samples},
             "controller did not ask to restart for the restored Latency");
+    // PERF-2 (jrp, 8 November 2026: zero first in the list): a project saved
+    // before zero was offered keeps its Latency, since the state holds frames,
+    // not the menu position, and hosts cannot automate Latency. Every earlier
+    // choice restores to the same frames in the processor and the controller.
+    // (One saved at the old default, 256, has no settings and now opens at
+    // the new default, as the decision accepted.)
+    for (const std::size_t frames : {64, 128, 256, 512, 1024, 2048, 4096}) {
+        convolver::HostState earlier;
+        earlier.configuration = half.configuration;
+        earlier.settings = convolver::HostSettings{0, 1, frames};
+        MemoryStream old_project;
+        require(write_state(&old_project, earlier), "encode an earlier project");
+        old_project.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(p.setState(&old_project) == kResultOk && p.settings().latency == frames,
+                "an earlier project's Latency changed in the processor");
+        old_project.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(c.setComponentState(&old_project) == kResultOk &&
+                    latency_frames(c.getParamNormalized(latency_id)) == frames &&
+                    latency_frames(normalized_latency(frames)) == frames,
+                "an earlier project's Latency changed in the controller");
+    }
     handler.on_restart = nullptr;
     p.setProcessing(false);
     p.setActive(false);
@@ -2102,17 +2135,18 @@ void latency_while_playing() {
         while (blocks.load() == seen && !failed.load())
             std::this_thread::yield();
     };
-    std::size_t chosen = 256, playing = 256; // The controller's and the processor's.
-    float gain = .5f;                        // The filter that plays.
+    std::size_t chosen = latency_samples,
+                playing = latency_samples; // The controller's and the processor's.
+    float gain = .5f;                      // The filter that plays.
     std::vector<uint32> expected;
     for (int i = 0; i < 24; ++i) {
         after_a_block();
-        if (i % 3 == 2) { // A replacement filter, whose state resets the Latency to 256.
+        if (i % 3 == 2) { // A replacement filter, whose state resets the Latency to the default.
             auto& next = i % 2 ? quarter : half;
             gain = i % 2 ? .25f : .5f;
             next->seek(0, IBStream::kIBSeekSet, nullptr);
             require(p.setState(next.get()) == kResultOk, "playing latency filter");
-            playing = 256;
+            playing = latency_samples;
             after_a_block();
         }
         // A choice the controller does not hold and the processor does not
@@ -2924,15 +2958,15 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         p.activateBus(kAudio, kInput, 0, true);
         p.activateBus(kAudio, kOutput, 0, true);
         auto expected = [&](int sample) {
-            return preset_path.empty() ? (sample == 256 ? 1. : 0.)
-                                       : (sample == 256   ? .5
-                                          : sample == 257 ? .25
-                                                          : 0.);
+            return preset_path.empty() ? (sample == L ? 1. : 0.)
+                                       : (sample == L       ? .5
+                                          : sample == L + 1 ? .25
+                                                            : 0.);
         };
         ProcessSetup setup{kRealtime, kSample32, 73, 48000};
         require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
                 "activate");
-        require(p.setProcessing(true) == kResultOk && p.getLatencySamples() == 256,
+        require(p.setProcessing(true) == kResultOk && p.getLatencySamples() == latency_samples,
                 "start latency");
         std::array<float, 73> samples{};
         float* channels[] = {samples.data()};

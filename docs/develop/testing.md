@@ -86,6 +86,42 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   where the peak is 7.6 and the absolute error 3.4e-6 (3.8e-7 of peak with the
   baseline kernels); with Ooura, 2.8e-7 of peak in `history_validity` at B = 5,
   and the largest absolute error 1.5e-6, at peak 7.6.
+- `native.engine_stress` (PERF-2): the production partition layout with real
+  filter lengths, which `native.engine`'s small forced layouts stand in for.
+  It first checks that the large blocks' work is spread, which keeps the
+  worst callback short but leaves the output unchanged when it breaks (the
+  independent review found nothing else would notice): through a test-only
+  probe of the engine, in its cost weights, each boundary does no more of a
+  block than its even share plus one unit of work, each block's shares add
+  up to its total, and only blocks no larger than the latency are computed
+  whole. Seven cases at latencies 0, 32, 256 and 4096, with the production
+  layout and forced small ones; no timing. Doing all of a block at its first
+  or last boundary, or computing it whole, fails. Then the stress trials.
+  Each filter is sparse apart from a dense start, with a tap at and beside
+  every block boundary the engine plans for its longest path, so a direct double-precision
+  sum over the nonzero taps checks every output frame of filters up to
+  hundreds of thousands of taps. Random latencies (0 to 20000, including
+  every Latency choice and both sides of the planned limit), routing, delays,
+  filter lengths at and beside block boundaries, and host callback patterns
+  from 1 to 16384 frames; each trial also requires two callback patterns to
+  give identical samples after a reset part-way through, and a reset engine
+  to be silent. CTest runs 12 trials up to 40,000 taps;
+  `convolver_engine_stress --trials N --seed S --longest TAPS` runs more.
+  `--soak SECONDS` runs one true-stereo engine with 480,000-tap filters, at
+  latency 0 and then 256, through loud, quiet, tiny (subnormal products)
+  and silent passages with a dense start that decays into subnormal
+  coefficients. It checks sampled callbacks against the reference and
+  requires exact silence once a silent passage outlasts the filter by two of
+  the largest blocks (until then the largest blocks' transforms leave rounding
+  residue, about 1e-9). It also prints callback-time percentiles, as a report
+  rather than a check. On 8 November 2026, on the Linux cloud VM, Clang 18
+  Release, at the commit that added it: 360 trials (seeds 21 and 22,
+  filters up to 500,000 and 1,500,000 taps) passed, worst error 1.9e-6 of
+  the peak; an hour of audio at each latency passed, worst sampled error
+  3.4e-6 of the callback's peak (or of -20 dBFS when quieter), about 30
+  million frames of exact silence, largest residue before it 1.1e-8. A
+  deliberately dropped final partition failed the stress run at once (error
+  0.087 of the peak).
 - `native.kernel_divergence`: the AVX2+FMA kernels against the baseline set and
   against a direct double-precision convolution on room-correction workloads
   at B = 256 (64k stereo with white noise, a full-scale sine, noise at

@@ -23,6 +23,9 @@ struct Kernels {
     void (*accumulate)(float* re, float* im, const float* history, std::size_t head,
                        std::size_t ring_size, const float* filters, std::size_t partitions,
                        std::size_t bins) noexcept;
+    // The direct sum of a filter's first taps over a chunk (kernels.inc).
+    void (*direct)(float* out, const float* x, const float* h, std::size_t taps,
+                   std::size_t frames) noexcept;
     const char* name; // "AVX2+FMA" or "baseline"
 };
 // The fastest set this CPU and build support, chosen once. Engines take it when

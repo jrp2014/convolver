@@ -2,6 +2,7 @@
 #include "convolver/engine.hpp"
 #include "kernels.hpp"
 #include "oracle.hpp"
+#include "partitions.hpp"
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -330,6 +331,54 @@ void history_validity() {
         }
     }
 }
+// PERF-2: the non-uniform stages, under layouts small enough for short
+// filters to reach every stage, many partitions of the largest block and the
+// latency beyond the planned limit. Random routing, delays, filter lengths,
+// latencies and host callback sizes, against the oracle, with chunk
+// invariance, reset and silence checked by scenario().
+void layouts() {
+    std::mt19937 random(0x9a27);
+    std::uniform_real_distribution<float> sample(-.6f, .6f);
+    const auto& layout = detail::partition_layout();
+    const auto largest = layout.largest;
+    for (std::size_t trial = 0; trial < 40; ++trial) {
+        const std::size_t latencies[] = {0,
+                                         1,
+                                         layout.first - 1,
+                                         layout.first,
+                                         layout.first + 3,
+                                         2 * largest - 1,
+                                         2 * largest,
+                                         2 * largest + 37};
+        const auto latency = latencies[trial % std::size(latencies)];
+        Configuration c{48000, 2, 3, 0, {random() % 5, random() % 5}, {}, {}};
+        if (trial % 3)
+            c.output_delays = {random() % 7, random() % 7, random() % 7};
+        const auto count = 1 + random() % 4;
+        for (std::size_t path = 0; path < count; ++path) {
+            FilterPath p;
+            // Up to about 12 largest blocks, so the last stage has many partitions.
+            p.impulse.resize(1 + random() % (12 * largest + 2 * layout.first));
+            for (auto& x : p.impulse)
+                x = sample(random);
+            p.inputs = {{random() % 2, 1}};
+            if (random() % 2)
+                p.inputs.push_back({random() % 2, sample(random)});
+            p.outputs = {{random() % 3, sample(random)}};
+            c.paths.push_back(std::move(p));
+        }
+        std::vector<float> in((1 + random() % (30 * largest)) * c.input_channels);
+        for (auto& x : in)
+            x = sample(random);
+        scenario(c, latency, in);
+        Engine engine(c, latency);
+        const auto expected = oracle(c, in, latency);
+        std::vector<std::size_t> chunks;
+        for (int i = 0; i < 9; ++i)
+            chunks.push_back(1 + random() % (3 * largest));
+        close(run(engine, in, expected.size() / c.output_channels, chunks), expected, latency);
+    }
+}
 void no_processing_allocation() {
     Engine engine(mono(std::vector<float>(71, .01f)), 7);
     std::vector<float> input(100, 1), output(100);
@@ -362,8 +411,22 @@ void no_processing_allocation() {
     forbid_allocation = false;
 }
 void invalid() {
-    rejects([] { Engine e(mono(), 0); });
+    rejects([] { Engine e(mono(), max_block_frames + 1); });
     rejects([] { Engine e(mono(), std::numeric_limits<std::size_t>::max()); });
+    // FFT options every backend refuses (a negative time limit) are refused
+    // whatever the filter length, including filters short enough for the
+    // direct sum alone, which make no transform (jrp's review of f5d460e).
+    for (const std::size_t taps : {1, 64, 65, 5000})
+        for (const std::size_t latency : {0, 256})
+            rejects([&] {
+                Engine e(mono(std::vector<float>(taps, .1f)), latency,
+                         FftOptions{FftPlanning::estimate, false, -1});
+            });
+    if (!fft_supports_wisdom())
+        for (const std::size_t taps : {1, 65})
+            rejects([&] {
+                Engine e(mono(std::vector<float>(taps, .1f)), 0, FftOptions{FftPlanning::measure});
+            });
     for (auto rate : {0, -1, 768001}) {
         auto c = mono();
         c.sample_rate = rate;
@@ -666,15 +729,28 @@ int main() {
     try {
         // Oracle checks with the kernels this CPU selects, then with the baseline set.
         const auto* selected = detail::kernels().name;
-        for (bool baseline : {false, true}) {
-            detail::force_baseline_kernels(baseline);
-            oracle_group = "cases";
-            cases();
-            oracle_group = "shared_input_mixes";
-            shared_input_mixes();
-            oracle_group = "history_validity";
-            history_validity();
+        // The default layout, then small ones in which short filters reach
+        // every stage (PERF-2).
+        const detail::PartitionLayout small[] = {{4, 16, 2}, {2, 32, 4}, {8, 64, 4}};
+        for (const detail::PartitionLayout* layout :
+             {static_cast<const detail::PartitionLayout*>(nullptr), &small[0], &small[1],
+              &small[2]}) {
+            detail::force_partition_layout(layout);
+            for (bool baseline : {false, true}) {
+                detail::force_baseline_kernels(baseline);
+                oracle_group = "cases";
+                cases();
+                oracle_group = "shared_input_mixes";
+                shared_input_mixes();
+                oracle_group = "history_validity";
+                history_validity();
+                if (layout) {
+                    oracle_group = "layouts";
+                    layouts();
+                }
+            }
         }
+        detail::force_partition_layout(nullptr);
         detail::force_baseline_kernels(false);
         kernels_agree();
         attenuation();

@@ -78,9 +78,8 @@ Options parse(int argc, char** argv) {
         else
             throw std::invalid_argument(usage);
     }
-    if (!o.taps || !o.inputs || !o.outputs || !o.block || !o.callback ||
-        !std::isfinite(o.seconds) || o.seconds <= 0 || o.seconds > 600 ||
-        (o.filter != "noise" && o.filter != "decaying") ||
+    if (!o.taps || !o.inputs || !o.outputs || !o.callback || !std::isfinite(o.seconds) ||
+        o.seconds <= 0 || o.seconds > 600 || (o.filter != "noise" && o.filter != "decaying") ||
         (o.thread_denormals != "gradual" && o.thread_denormals != "flush"))
         throw std::invalid_argument(usage);
     return o;
@@ -169,14 +168,14 @@ void report(const Options& o, std::size_t paths, Callbacks& c, double event_us, 
     // New columns go at the end, so rows from older builds still line up.
     std::cout << "backend,kernels,scenario,block,callback,taps,channels,paths,repetitions,"
                  "ns_per_frame,p50_us,p99_us,p999_us,max_us,event_us,prepare_ms,filter,"
-                 "thread_denormals\n"
+                 "thread_denormals,callbacks\n"
               << std::setprecision(6) << convolver::fft_backend_name() << ','
               << convolver::detail::kernels().name << ',' << o.scenario << ',' << o.block << ','
               << o.callback << ',' << o.taps << ',' << o.inputs << "->" << o.outputs << ',' << paths
               << ',' << repetitions << ',' << c.total_us * 1e3 / c.frames << ',' << percentile(.5)
               << ',' << percentile(.99) << ',' << percentile(.999) << ','
               << (c.us.empty() ? 0.0 : c.us.back()) << ',' << event_us << ',' << prepare_ms << ','
-              << o.filter << ',' << o.thread_denormals << '\n';
+              << o.filter << ',' << o.thread_denormals << ',' << c.us.size() << '\n';
 }
 void write_crossover(const Options& o, const std::filesystem::path& dir) {
     std::filesystem::create_directories(dir);
@@ -234,7 +233,7 @@ int main(int argc, char** argv) {
         Callbacks callbacks;
         double event_us = 0, prepare_ms = 0;
         std::size_t repetitions = 0;
-        const auto start = Clock::now();
+        auto start = Clock::now();
         const auto elapsed = [&] {
             return std::chrono::duration<double>(Clock::now() - start).count();
         };
@@ -252,6 +251,10 @@ int main(int argc, char** argv) {
             convolver::HostProcessor p(config, o.callback, o.block);
             for (std::size_t i = 0; i < span; ++i)
                 driver.call(p);
+            // The timed seconds start after preparation and warm-up, so a
+            // slow preparation cannot leave only one batch of callbacks to
+            // measure (jrp's Mac results on PERF-2).
+            start = Clock::now();
             if (o.scenario == "warm") {
                 do {
                     for (int i = 0; i < 64; ++i)

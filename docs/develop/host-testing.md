@@ -309,8 +309,8 @@ Do this once. Run the commands in the extracted preview package folder.
 5. Toggle the plug-in's bypass (the checkbox beside its name) while playing.
    The sound switches between filtered and unfiltered; note any click.
 6. Render the project (*File › Render*, offline) to a WAV and check that it
-   holds the echo, starting in time with the source rather than 256 samples
-   late.
+   holds the echo, starting in time with the source (at a Latency above 0,
+   rather than that many samples late).
 7. Save the project, quit REAPER, reopen the project and play: the echo is
    still there.
 8. While the echo plays, import `presets/identity-44100-stereo/identity-44100-stereo.vstpreset`.
@@ -403,7 +403,7 @@ preparation and steps 2, 3 and 9 below include what it found.
 6. Remove the real-time effect. Select a few seconds, choose Convolver from the
    **Effect** menu with the `echo-48000-stereo` preset, and apply it. Zoom in on
    a transient: the result starts where the original did (Audacity removes the
-   reported 256-sample delay by default). Undo.
+   reported delay by default; at the default Latency of 0 there is none). Undo.
 7. Add the effect again with the echo preset, play, and choose
    `identity-44100-stereo`. The echo keeps playing. Stop and start playback:
    the echo must still play, not silence or unfiltered sound. Record what
@@ -522,7 +522,7 @@ seen in, what was observed, what is not yet known, and the evidence.
    `convolver-preset` operation too.
 2. Check identity, echo and repeat output at 44.1/48/96 kHz, mono/stereo, variable blocks,
    long-tail silence, stop/start/seek and offline/bounce rendering. Align numerical
-   comparison by 256 samples; use an independent time-domain convolution reference.
+   comparison by the reported latency (0 frames by default); use an independent time-domain convolution reference.
 3. Exercise bypass automation, multiple instances and filter replacements. Check
    levels and nonfinite output. The filter transition starts with fresh history.
 4. Save a project, remove its original IRs, close/reopen, and transfer the project

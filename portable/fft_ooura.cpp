@@ -26,6 +26,11 @@ std::string export_fft_wisdom() {
     throw std::invalid_argument("wisdom requires the FFTW backend");
 }
 namespace detail {
+void check_fft_options(const FftOptions& options) {
+    if (options.planning != FftPlanning::estimate || options.wisdom_only ||
+        options.time_limit_seconds != 0)
+        throw std::invalid_argument("measured planning and wisdom require the FFTW backend");
+}
 // Ooura transforms powers of two; padding leaves audio block/latency unchanged.
 std::size_t fft_size(std::size_t b) noexcept {
     return std::max(std::size_t(4), std::bit_ceil(2 * b));
@@ -42,9 +47,7 @@ struct RealFft::Impl {
         : n(static_cast<int>(length)), time(length), frequency(length + 2), sum(length + 2),
           work(length), twiddles(length / 2),
           bit_reversal(2 + static_cast<std::size_t>(std::sqrt(double(length / 2))) + 1) {
-        if (options.planning != FftPlanning::estimate || options.wisdom_only ||
-            options.time_limit_seconds != 0)
-            throw std::invalid_argument("measured planning and wisdom require the FFTW backend");
+        check_fft_options(options);
         // Build the twiddle and bit-reversal tables now, not on the audio thread.
         bit_reversal[0] = 0;
         ooura::rdft(n, 1, work.data(), bit_reversal.data(), twiddles.data());

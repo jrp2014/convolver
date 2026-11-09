@@ -120,7 +120,8 @@ from the filter.
 
    It prints `Match`. If it prints `Different`, the line after it says why:
    output that is late means the host did not make up for the plug-in's
-   256-frame delay (turn on its delay compensation); output that ends too soon
+   latency (there is none at the default, 0 frames; for another Latency,
+   turn on the host's delay compensation); output that ends too soon
    needs a longer tail; another level means a volume, pan or gain setting
    changed it. A 16- or 24-bit render also matches.
 

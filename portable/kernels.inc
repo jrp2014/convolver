@@ -129,12 +129,27 @@ void accumulate(float* CONVOLVER_RESTRICT re, float* CONVOLVER_RESTRICT im,
         multiply_accumulate(re, im, history + slot * stride, filters + p * stride, bins);
     }
 }
+// PERF-2: the direct sum of a filter's first taps, out[t] = sum over j of
+// h[j] x[t - j] for t < frames, where x points at the chunk's first frame and
+// the taps - 1 frames before it are readable. A tap at a time over the chunk,
+// in increasing j, so the loop over t vectorizes and both sets round alike.
+void direct(float* CONVOLVER_RESTRICT out, const float* CONVOLVER_RESTRICT x,
+            const float* CONVOLVER_RESTRICT h, std::size_t taps, std::size_t frames) noexcept {
+    for (std::size_t t = 0; t < frames; ++t)
+        out[t] = h[0] * x[t];
+    for (std::size_t j = 1; j < taps; ++j) {
+        const float tap = h[j];
+        const float* CONVOLVER_RESTRICT from = x - j;
+        for (std::size_t t = 0; t < frames; ++t)
+            out[t] += tap * from[t];
+    }
+}
 #undef CONVOLVER_RESTRICT
 // The set, for kernels.cpp. Declaring the functions there instead would not link
 // with MSVC, which puts __restrict into their mangled names.
 const Kernels& kernel_set() noexcept {
     static constexpr Kernels set{deinterleave, interleave, multiply, multiply_accumulate, accumulate,
-                                 CONVOLVER_KERNEL_NAME};
+                                 direct, CONVOLVER_KERNEL_NAME};
     return set;
 }
 } // namespace convolver::detail::CONVOLVER_KERNEL_NAMESPACE

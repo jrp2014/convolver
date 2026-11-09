@@ -552,8 +552,8 @@ InspectionReport detail::inspect_configuration(const std::filesystem::path& path
         throw std::invalid_argument("expected audio properties out of range");
     if (options.raw_filter_encoding.sample == SampleType::pcm8)
         throw std::invalid_argument("raw filters have no 8-bit sample type");
-    if (!options.block_frames || options.block_frames > max_block_frames)
-        throw std::invalid_argument("block frames must be between 1 and " +
+    if (options.block_frames > max_block_frames)
+        throw std::invalid_argument("block frames must be between 0 and " +
                                     std::to_string(max_block_frames));
     if (options.all_configurations &&
         (options.expected_rate || options.expected_inputs || options.expected_outputs))

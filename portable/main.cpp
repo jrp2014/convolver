@@ -43,7 +43,8 @@ Usage: convolver --filter FILTER --input FILE --output FILE [options]
        convolver --compare OUTPUT EXPECTED  (see --compare --help)
 FILTER is an IR file (an impulse response in a WAV or other sound file), a .cfg
 or a configuration list.
-  --block-size N       Partition payload in frames (default 256)
+  --block-size N       Engine latency in frames, 0 for none (default 0, as the plug-ins); the
+                      output is aligned with the input unless --keep-latency
   --fft-plan MODE      estimate (render default), measure, patient (tune default)
                       or exhaustive
   --fft-time-limit S   Limit each FFTW plan search to S seconds (best plan so
@@ -102,14 +103,16 @@ Files retain the entire FIR/routing tail. Algorithmic latency is trimmed unless
 }
 // `option` names the value in the problem ("--block", "--raw-input's sample
 // rate"); `example` is the fix's example, by default `option` followed by 2.
-std::size_t count(std::string_view s, std::string_view option, std::string_view example = {}) {
+std::size_t count(std::string_view s, std::string_view option, std::string_view example = {},
+                  std::size_t least = 1) {
     std::size_t n = 0;
     const auto [end, error] = std::from_chars(s.data(), s.data() + s.size(), n);
-    if (error != std::errc{} || end != s.data() + s.size() || n == 0)
-        bad_option(
-            std::string(option) + " " + std::string(s) + " is not a whole number of at least 1", {},
-            "Write a whole number, such as " +
-                (example.empty() ? std::string(option) + " 2" : std::string(example)) + ".");
+    if (error != std::errc{} || end != s.data() + s.size() || n < least)
+        bad_option(std::string(option) + " " + std::string(s) +
+                       " is not a whole number of at least " + std::to_string(least),
+                   {},
+                   "Write a whole number, such as " +
+                       (example.empty() ? std::string(option) + " 2" : std::string(example)) + ".");
     return n;
 }
 // A decimal number in the C locale, or nothing (std::stod's only message is
@@ -252,7 +255,9 @@ int run(int argc, char** argv) {
         std::optional<std::uint64_t> dither_seed;
         std::optional<convolver::NoiseShaping> shaping;
         unsigned valid_bits = 0;
-        std::size_t block = 256, output_channels = 0;
+        // The plug-ins' default Latency, so a default render matches their
+        // output sample for sample (PLUG-2).
+        std::size_t block = 0, output_channels = 0;
         float gain = 1;
         std::optional<std::string> automatic_gain;
         bool keep = false, speaker_map = false, raw_format = false, raw_filter_format = false;
@@ -322,7 +327,7 @@ int run(int argc, char** argv) {
                                "Ask for at most " + std::to_string(convolver::max_channel_count) +
                                    " channels.");
             } else if (option == "--block-size")
-                block = count(value(), option);
+                block = count(value(), option, "--block-size 256", 0); // 0: zero latency.
             else if (option == "--keep-latency") {
                 keep = true;
                 audio_options = true;
@@ -504,8 +509,8 @@ int run(int argc, char** argv) {
             convolver::tune_fft(block, fft_options);
             const auto wisdom_text = convolver::export_fft_wisdom();
             convolver::detail::write_new_file(tune, std::as_bytes(std::span(wisdom_text)));
-            std::cout << "Saved FFTW wisdom for block size " << block
-                      << " (forward and inverse plans)\n";
+            std::cout << "Saved FFTW wisdom for every transform size the engine uses, "
+                         "which serves every --block-size (forward and inverse plans)\n";
             return 0;
         }
         if (filter.empty() || input.empty() || output.empty())

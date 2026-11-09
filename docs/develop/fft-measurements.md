@@ -30,6 +30,8 @@ Contents: [processing benchmark](#processing-benchmark) ·
 [overlap-add and overlap-save](#overlap-add-and-overlap-save) ·
 [compiler flags and AVX2 kernels](#compiler-flags-and-avx2-kernels) ·
 [startup, reset and filter loading](#startup-reset-and-filter-loading) ·
+[long reverbs and zero latency](#long-reverbs-and-zero-latency) ·
+[the non-uniform engine](#the-non-uniform-engine) ·
 [reproduce](#reproduce)
 
 ## Processing benchmark
@@ -619,6 +621,265 @@ size) took a median of 2.42 ms before and 0.86 ms after (2.8×), because the
 file is opened and decoded once instead of six times (PERF-6). The remaining
 time is parsing, path resolution and copying each path's channel.
 
+## Long reverbs and zero latency
+
+An experiment for PERF-2 (7 November 2026, at jrp's request): ways of
+making long reverbs cheaper, zero latency above all, measured beside the
+engine and beside KlangFalter's engine. None of it is in the product. Machine:
+the 4-vCPU Intel Xeon cloud VM at 2.30 GHz, Ubuntu 24.04, GCC 13.3, Release,
+Ubuntu FFTW 3.3.10 (estimate plans for Convolver's code, measure plans for
+KlangFalter's), AVX2+FMA kernels. One run of 5 s of audio per workload; it
+is a shared machine, and repeated workloads differed by up to about 30%,
+so read the tables for their order of magnitude.
+[Raw data](../benchmarks/2026-11-07-x86-long-reverb.csv), made with
+[`run_long_reverb.sh`](../../tests/native/benchmarks/run_long_reverb.sh)
+and [`long_reverb.cpp`](../../tests/native/benchmarks/long_reverb.cpp).
+
+The candidates, each one input and one output per path:
+
+- **Today's engine**: uniform partitions of the Latency block, at Latency
+  256 (the default) and 1024.
+- **Non-uniform partitions** (Gardner 1995; Garcia 2002), built from the
+  engine's own FFT and multiply-accumulate kernels: blocks of 64, 256, 1024,
+  4096 and then 8192 frames for the rest of the filter (growth 4, largest
+  8192, chosen from the tuning runs below). At zero latency a direct
+  time-domain sum covers the first 64 taps, so nothing is delayed. Each
+  larger block has one block period of slack before its output is needed,
+  and three schedules use it differently: **no spreading** (all of a block's
+  work at its boundary), **spread** (its work divided by estimated cost over
+  the boundaries of its slack, on the calling thread, with no thread at
+  all), and **worker** (the multiply-accumulates and inverse transform on a
+  worker thread; when a result is late, the calling thread computes it
+  itself and never waits).
+- **KlangFalter** (its FFTConvolver, MIT, at commit `f2cdeb0`, fetched by the
+  script and never copied into the tree): head block = host callback, tail
+  block 8192, as KlangFalter configures it; its tail run inline, and on a
+  thread with KlangFalter's blocking wait.
+
+Every candidate passed the direct double-precision oracle at irregular
+callback sizes from 1 to 300 frames (`--mode check`, a 20,000-tap filter
+with small blocks so that every stage boundary is crossed): worst error
+2.3e-7 to 2.7e-7 of the output peak for the non-uniform candidates (−131 to
+−133 dB), 4.9e-7 for the engine at B = 64 and 4.3e-7 for KlangFalter. The
+worker schedule was checked both faster than real time, where most results
+came from the calling thread's fallback, and paced, where most came from the
+worker.
+
+The workloads are a stereo reverb (two paths, each a decaying-noise filter)
+at 48 kHz. CPU is the whole process's CPU time per second of audio (one core
+= 100%), so it includes worker threads; p99.9 and max are the calling
+thread's callback times. The callback periods are 1.33, 5.33 and 21.3 ms for
+64, 256 and 1024 frames: a callback slower than its period is a dropout.
+
+| Filter | Today, Latency 256: CPU, p99.9 at 64 / 256 / 1024 frames | Non-uniform, zero latency, spread: CPU, p99.9 at 64 / 256 / 1024 frames |
+| --- | --- | --- |
+| 10 s | 11–15%; 0.69 / 1.38 / 3.03 ms | 0.9–1.3%; 0.13 / 0.32 / 0.38 ms |
+| 30 s | 30–47%; **3.43** / 1.85 / 7.89 ms | 1.6–1.9%; 0.16 / 0.24 / 0.60 ms |
+| 60 s | 90–136%; **10.6 / 14.9 / 48.9** ms | 2.7–4.8%; 0.16 / 0.39 / 1.27 ms |
+
+The bold values exceed the callback period. The 30 s filter's 4-path true
+stereo at 256 frames: today 120% CPU, non-uniform 6.6%, KlangFalter inline
+4.5%. At 96 kHz (30 s, 256 frames): today 235%, non-uniform 11.5%,
+KlangFalter inline 10.3%.
+
+All candidates at 30 s (CPU; p99.9 / max in ms):
+
+| Candidate | Latency | 64 frames | 256 frames | 1024 frames |
+| --- | --- | --- | --- | --- |
+| Today, Latency 256 | 256 | 46.6%; 3.43 / 4.29 | 29.6%; 1.85 / 1.92 | 31.1%; 7.89 / 8.35 |
+| Today, Latency 1024 | 1024 | 9.5%; 2.41 / 4.78 | 8.7%; 2.82 / 2.85 | 7.8%; 1.84 / 1.88 |
+| Non-uniform, no spreading | 0 | 1.8%; 2.47 / 3.30 | 1.8%; 4.04 / 4.04 | 1.6%; 3.11 / 3.17 |
+| Non-uniform, spread | 0 | 1.9%; 0.16 / 0.22 | 1.9%; 0.24 / 0.28 | 1.6%; 0.60 / 0.63 |
+| Non-uniform, spread | 256 | 1.4%; 0.15 / 0.18 | 1.7%; 0.23 / 0.23 | 1.5%; 0.53 / 0.55 |
+| Non-uniform, worker | 0 | 6.7%; 0.34 / 0.40 | 5.8%; 0.82 / 2.24 | 3.6%; 0.57 / 0.66 |
+| KlangFalter, tail inline | 0 | 2.7%; 2.64 / 4.26 | 1.8%; 4.02 / 4.13 | 1.3%; 3.22 / 3.36 |
+| KlangFalter, tail thread | 0 | 7.1%; 0.20 / 0.79 | 3.9%; 0.95 / 1.82 | 2.7%; 0.21 / 0.22 |
+
+What this shows:
+
+- **Non-uniform partitions cut CPU by about 15 to 35 times** for 30 and
+  60 s filters (about 12 times at 10 s), as the edges plan's hypothesis
+  expected, and make 60 s filters playable at all: today's engine needs
+  more than one core for them at Latency 256.
+- **Zero latency costs almost nothing extra** with non-uniform partitions:
+  at most about half a percentage point of a core over the same layout at
+  latency 256, within the run-to-run noise, because only the first 64 taps
+  are summed directly.
+- **Spreading is what removes the spikes.** Without it the largest blocks
+  land in one callback (3 to 8 ms), as do KlangFalter's inline tail and
+  today's engine with callbacks smaller than its block. Spread, the worst
+  callback stays under a sixth of the period at 64 frames, with no thread.
+- **A worker thread did not pay.** It took two to three and a half times
+  the total CPU (thread wake-ups and cache traffic, not profiled) and
+  lowered the calling thread's worst callbacks only for the 60 s filter at
+  1024 frames. Within a 1024-frame callback the stage deadlines all fall
+  inside the one call, so 56% of the jobs fell back to the calling thread. KlangFalter's thread lowers its peaks only by blocking the audio
+  thread when the tail is late.
+- **KlangFalter's mean cost is close to the non-uniform candidate's** (same
+  8192 tail block, measured FFTW plans); its weakness is the spike of its
+  inline tail or the blocking wait of its threaded one.
+
+Layout tuning, 30 s at zero latency (largest block × growth; CPU, and p99.9
+in ms at 64 / 256 frames; the full rows are in the raw data):
+
+| Largest block | Growth 2 | Growth 4 |
+| --- | --- | --- |
+| 4096 | 3.2–3.3%; 0.12 / 0.35 | 3.1–3.8%; 0.25 / 0.42 |
+| 8192 | 2.1–2.2%; 0.21 / 0.27 | 1.6–2.5%; 0.22 / 0.34 |
+| 16384 | 1.8%; 0.44 / 0.47 | 1.1–1.9%; 0.41 / 0.39 |
+| 32768 | 1.5–1.6%; 0.86 / 0.98 | 1.2–1.4%; 0.65 / 1.01 |
+
+Larger final blocks cost less on average but make larger single transforms,
+which no schedule can split; 8192 with growth 4 balances the two here, and
+the right value may differ on Apple silicon.
+
+## The non-uniform engine
+
+PERF-2's engine (8 November 2026, draft pull request #139, for after the
+first release) against the engine on `main`, each built separately from its
+own commit by
+[`compare_engines.py`](../../tests/native/benchmarks/compare_engines.py), so
+that a later change to the engine cannot change the baseline. Baseline:
+`main` at `5cc95cd`, uniform partitions at Latency 256 (the plug-ins'
+default before PERF-2). Candidate: `b29f0d2` at Latency 0 (its default) and
+256. Machine: the 4-vCPU Intel Xeon cloud VM at 2.30 GHz, Ubuntu 24.04,
+Clang 18.1, Release, Ubuntu FFTW 3.3.10, AVX2+FMA kernels. Workload:
+`convolver_callback_benchmark --scenario warm` (a prepared engine, warmed,
+production routing in one engine), 1 s per run, three rounds with the two
+builds taking turns case by case, the baseline first in every round (the
+script has reversed the order in every other round since jrp's review of
+`f983dfa`); the tables give the median of the three. Before timing,
+both builds rendered the stereo and 2-to-6 crossover first-use examples
+within the oracle tolerance of their direct double-precision references
+(worst error 1.2e-7 for the baseline and 7.5e-8 for the candidate).
+[Raw data](../benchmarks/2026-11-08-x86-engine-compare.csv).
+
+The layouts are real routings in one engine, not independent mono
+convolutions: **stereo** (2 in, 2 out, two paths), **true stereo** (2 in,
+2 out, four paths) and **crossover** (2 in, 6 out, six paths).
+
+Mean cost in ns per output frame at 64-frame callbacks (48 kHz: 1,000 ns per
+frame is 4.8% of a core):
+
+| Filter | Stereo: main 256 | PERF-2 0 | PERF-2 256 | True stereo: main 256 | PERF-2 0 | PERF-2 256 | Crossover: main 256 | PERF-2 0 | PERF-2 256 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 4,096 taps | 41 | 62 | 51 | 58 | 94 | 71 | 88 | 149 | 106 |
+| 16,384 | 69 | 77 | 68 | 111 | 125 | 99 | 173 | 187 | 147 |
+| 65,536 | 214 | 101 | 96 | 574 | 176 | 141 | 1,218 | 261 | 235 |
+| 480,000 (10 s) | 2,172 | 202 | 193 | 6,920 | 311 | 294 | 7,874 | 590 | 449 |
+| 1,440,000 (30 s) | 6,105 | 336 | 333 | 22,452 | 772 | 619 | 42,923 | 1,141 | 1,087 |
+
+99th-percentile callback time in µs at 64-frame callbacks (the period is
+1,333 µs):
+
+| Filter | Stereo: main 256 | PERF-2 0 | True stereo: main 256 | PERF-2 0 | Crossover: main 256 | PERF-2 0 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 65,536 taps | 78 | 21 | 176 | 50 | 316 | 55 |
+| 480,000 | 649 | 59 | 1,834 | 60 | 2,139 | 101 |
+| 1,440,000 | 1,649 | 61 | 5,844 | 120 | 11,806 | 122 |
+
+At 512-frame callbacks the order is the same (all rows in the raw data).
+
+- **Long filters cost far less.** Somewhere between 16,384 and 65,536 taps
+  the new engine becomes cheaper, by 2 to 5 times at 65,536 taps and by 11 to 38 times at 10 and
+  30 s, and its 99th-percentile callback stays near a tenth of the period
+  where `main`'s exceeds it: `main` cannot play a 30 s true-stereo or
+  crossover filter in real time on this machine at all.
+- **Short filters cost more**, though little in absolute terms: at 4,096
+  taps 20 to 25% more at Latency 256 and 50 to 70% more at Latency 0, all
+  under 0.8% of a core. At Latency 256 the planner covers the first 256
+  taps with 64-frame blocks, because a larger block is only allowed where it
+  has a block period of slack to spread its work. The engine now computes a
+  block no larger than the latency whole when it completes, as `main` does,
+  where it has too little slack to spread it (after these measurements; see
+  [the short-filter fix](#the-short-filter-fix) below).
+- **Zero latency is not free in the production engine**, unlike the
+  prototype above: the direct sum of the first 64 taps and three more
+  64-frame partitions add 13 to 40% for filters up to 16,384 taps; for long
+  filters the difference (up to 30% at 64-frame callbacks, either way at
+  512) is within this VM's noise.
+- **Worst callbacks** (the `max_us` column) vary by tens of milliseconds
+  between rounds on this shared VM for both builds; judge them on a quiet
+  machine, not here.
+
+### The short-filter fix
+
+The same comparison, rerun with the candidate at `662c0b7`, which may
+compute a block no larger than the latency whole when it completes (same
+machine and build, filters up to 480,000 taps, three rounds;
+[raw data](../benchmarks/2026-11-08-x86-engine-compare-whole-blocks.csv)).
+Mean ns per output frame at 64-frame callbacks:
+
+| Filter | Stereo: main 256 | PERF-2 0 | PERF-2 256 | True stereo: main 256 | PERF-2 0 | PERF-2 256 | Crossover: main 256 | PERF-2 0 | PERF-2 256 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 4,096 taps | 43 | 79 | 41 | 56 | 101 | 55 | 88 | 141 | 83 |
+| 16,384 | 71 | 76 | 53 | 110 | 121 | 74 | 171 | 189 | 117 |
+| 65,536 | 257 | 108 | 85 | 587 | 165 | 122 | 926 | 259 | 181 |
+| 480,000 (10 s) | 2,628 | 182 | 174 | 5,535 | 311 | 277 | 7,687 | 478 | 384 |
+
+- **At the same latency the new engine is never slower** in these runs: at
+  Latency 256 a 4,096-tap filter costs the same as `main` (one 256-frame
+  stage, as `main` has), and from 16,384 taps it costs less.
+- **Zero latency costs most on short filters**: at 4,096 taps 60 to 85% more
+  than `main` at 256 (61 against 40 ns for stereo at 512-frame callbacks),
+  under 0.7% of a core; from 65,536 taps it is cheaper than `main`. On this
+  VM the cost at latency 0 also varies by up to about 30% between nearby
+  filter lengths, in both revisions alike (most likely where buffers land in
+  memory); measure several lengths before tuning it.
+
+These are one cloud VM's figures. jrp asked (8 November 2026) that speed
+claims be measured on his Mac before they are quoted; the next section
+has those measurements.
+
+### On Apple silicon
+
+jrp's run of the same comparison (8 November 2026): the published preview
+v0.12.12 (`7451d76`) at Latency 256 against the candidate `6cf7260`
+(0.13.0) at 0 and 256. Machine: Apple M5 Max, 128 GB, macOS 27.2, separate
+Release builds, Accelerate, baseline kernels, sanitizers off, on AC power
+with Low Power Mode off, but with other applications running, so it was not
+a quiet machine. Command:
+`compare_engines.py --baseline v0.12.12 --candidate 6cf7260 --rounds 5`,
+all 450 measurements, with the build order alternating between rounds.
+Before timing, the fixtures rendered within tolerance (worst error 1.49e-7
+for the baseline, 8.94e-8 for the candidate). The raw data
+(`engines-mac.csv`, SHA-256 `838dc4b6…af802a1`) stays on jrp's Mac.
+
+Median over five rounds; each range covers the three layouts and both
+callback sizes:
+
+| Filter | v0.12.12 at 256 against 0.13.0 at 256 | 0.13.0 at 0: extra CPU over 0.13.0 at 256 |
+| --- | --- | --- |
+| 4,096 taps | 1.04 to 1.08× faster | 73 to 96% |
+| 16,384 | 1.44 to 1.73× | 55 to 74% |
+| 65,536 | 2.97 to 3.90× | 45 to 54% |
+| 480,000 (10 s) | 9.81 to 12.08× | 28 to 34% |
+| 1,440,000 (30 s) | 15.19 to 16.86× | 16 to 18% |
+
+- **The engine is faster at the same latency** for every filter length,
+  most of all for long reverbs.
+- **Zero latency costs more on this machine than on the VM**, from 16% for
+  a 30 s filter to nearly double for a 4,096-tap one (the absolute costs are
+  in jrp's raw data).
+- **Worst callbacks** (64-frame callbacks, period 1,333 µs): v0.12.12
+  exceeded the period in seven rows, including all five 30 s crossover
+  rows. The candidate at 256 exceeded it once (round 1, crossover, 65,536
+  taps, maximum 1,511 µs against a 99th percentile of 16 µs); at 0 it never
+  did. On a shared machine an isolated maximum neither shows a dropout nor
+  identifies its cause.
+- **Percentiles rest on unequal counts.** Up to 0.13.0 the benchmark started
+  its timer before preparation and warm-up, so a slow case could leave only
+  one batch of 64 timed callbacks, and p99.9 is not equally supported across
+  rows. The benchmark now starts timing after warm-up, and each row reports
+  its number of timed callbacks.
+
+The engine's stress and soak tests passed on the same machine:
+`convolver_engine_stress --trials 200 --seed 31 --longest 500000` (seven
+spreading cases and 200 trials, worst error 5.07e-7 of the peak) and
+`--soak 3600` (one hour of audio at Latency 0 and at 256, processed
+offline, four paths of 480,000 taps; worst error 1.39e-6 and 3.76e-6 of the
+callback peak, limit 1e-5; finite output and exact silence held).
+
 ## Reproduce
 
 The benchmark programs and scripts are in
@@ -741,6 +1002,43 @@ scenario on its own, for example jrp's baseline at B = 1024:
 ```sh
 build/convolver_callback_benchmark --scenario warm --taps 65536 --inputs 6 --outputs 6 \
     --layout matrix --block 1024 --callback 64 --seconds 5
+```
+
+### Long reverbs and zero latency
+
+Needs the default build's libraries, CMake, git and network access (the
+script fetches FFTConvolver, MIT, at a pinned commit into the build
+directory):
+
+```sh
+sh tests/native/benchmarks/run_long_reverb.sh > long-reverb.csv   # about 20 minutes
+sh tests/native/benchmarks/run_long_reverb.sh --quick             # 1 s per workload
+build-long-reverb/convolver_long_reverb_benchmark --mode check    # oracle check, all candidates
+```
+
+One workload on its own, for example the candidate layout at zero latency:
+
+```sh
+build-long-reverb/convolver_long_reverb_benchmark --candidate nonuniform --schedule spread \
+    --first 64 --largest 8192 --ratio 4 --latency 0 --ir-seconds 30 --callback 64 --seconds 5
+```
+
+The automatic-gain analysis in the
+[edges plan](../project/plans/2026-11-06-edges-over-other-convolvers.md#automatic-gain)
+needs only Python and numpy:
+`python3 tests/native/benchmarks/auto_gain.py` ([output](../benchmarks/2026-11-07-auto-gain.txt)).
+
+### The non-uniform engine
+
+Needs the default build's libraries, CMake and git; each revision is
+checked out into its own worktree under `--work` and built in Release:
+
+```sh
+python3 tests/native/benchmarks/compare_engines.py --baseline 5cc95cd \
+    --candidate HEAD --work ../engine-compare > engines.csv   # about 40 minutes
+python3 tests/native/benchmarks/compare_engines.py --baseline 5cc95cd \
+    --candidate HEAD --work ../engine-compare --rounds 1 --taps 4096,480000 \
+    --cmake -DCONVOLVER_FFT_BACKEND=ACCELERATE > engines-quick.csv
 ```
 
 ### Comparing backends
