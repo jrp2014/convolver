@@ -173,9 +173,9 @@ order:
 
 ### Local trial
 
-With a candidate ZIP downloaded (for example from the 0.13.2 release), on
-jrp's Mac, using the names from steps 2 and 4, in the folder holding both
-downloads. Store the notary key once,
+On jrp's Mac, download `Convolver-0.13.2-preview-macos-arm64.zip` and
+`Convolver-0.13.2-preview-macos-arm64-unsigned.pkg` from the 0.13.2 release
+into one folder and work there, using the names from steps 2 and 4. Store the notary key once,
 from wherever the `.p8` file was saved, so that no later command names it and
 it is never inside a folder that is uploaded:
 
@@ -248,11 +248,14 @@ no secret is exposed to a pull request.
   step gets the secrets, in its own `env:`. That step creates the keychain
   itself: `security create-keychain`, `set-keychain-settings -lut` with a
   timeout that covers the notary waits, `unlock-keychain`, `import` with
-  `-T /usr/bin/codesign -T /usr/bin/productbuild` (not `-A`, which lets any
-  program use the key), `set-key-partition-list` and `list-keychain`; it
+  `-T /usr/bin/codesign -T /usr/bin/productbuild` rather than `-A`,
+  `set-key-partition-list` and `list-keychain`; it
   writes the `.p8` key to `$RUNNER_TEMP`. A following `if: always()` step
   deletes the keychain and the key file. Keys and certificates stay in
-  `$RUNNER_TEMP`, never under `build/`, whose files are uploaded.
+  `$RUNNER_TEMP`, never under `build/`, whose files are uploaded. `-T`
+  limits direct use of the key, but any process can still run `codesign`
+  while the keychain exists, so what protects the key is that the keychain
+  lives only for the package step.
   `candidate.py` receives identity names and the key's path, never a
   password on its command line, because `run()` prints the command when it
   fails. Both the step's 40-minute and the job's 60-minute limits grow, by
@@ -296,7 +299,7 @@ from a keychain profile on a Mac, where CI needs an API key file. Rebuild it ins
 
 1. **Individual or organization membership.** Recommended: individual,
    unless a legal entity already exists. It is quicker and cheaper; the cost
-   is that jrp's legal name is shown as the developer.
+   is that jrp's legal name is shown in the certificates and the installer.
 2. **When to sign.** The 21 October 2026 decision keeps signing for the
    production gate. Recommended: sign the next preview once the account
    exists. It removes the hardest step for Mac users and changes no source
