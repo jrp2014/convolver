@@ -225,31 +225,50 @@ mechanical part, but only as a draft: nothing is public until jrp presses
    It refuses a run that was not started by hand on a `vX.Y.Z` tag, did not
    pass, or whose tag holds another commit or `VERSION`; it checks every file
    against `SHA256SUMS` and the candidate record, and refuses if a release or
-   draft for the tag already exists. It then creates a draft pre-release on
-   the tag, titled "Convolver X.Y.Z (unsigned developer preview)", with only
-   the macOS files: for arm64 and for x86-64, the ZIP archive and the
-   `-unsigned.pkg` installer, with the
+   draft for the tag already exists. Next, its clean-machine jobs (REL-9,
+   [`clean_machine.py`](../../tests/release/clean_machine.py)) run the exact
+   Windows and Linux files on machines that never built Convolver: stock
+   Ubuntu 22.04, Ubuntu 24.04, Debian 12 and Fedora images with only Python
+   added, and a Windows Server 2025 runner (the package is built on 2022).
+   Each checks the files' sums, unpacks the ZIP into a folder whose name has
+   spaces and `ü`, runs `package_smoke.py` there without the build's SDK tools,
+   and loads the VST3 library as a host does to list its factory's classes
+   against [`identities.json`](../../plugins/identities.json) (no instance,
+   no audio); on Windows the installer is also run silently and must install
+   exactly the ZIP's files, byte for byte, plus its uninstaller, the
+   installed CLI renders a first-use example and the installed library
+   loads, and the uninstaller must remove every file and registry key.
+   GitHub's Windows images include the Visual C++ runtime, so a computer
+   without it is not tried. Nothing is drafted unless all pass. These are
+   not host tests; the scripts come from the tag, as the files do. It
+   then creates a draft pre-release on the tag, titled "Convolver X.Y.Z
+   (unsigned developer preview)", with every platform's files: the ZIP
+   archive for each, the `-unsigned.pkg` installers for macOS arm64 and
+   x86-64 and the `-unsigned-setup.exe` installer for Windows, with the
    [corresponding source](#licences-and-corresponding-source)
-   (`Convolver-source.tar.gz`), as the first preview is macOS-only
-   ([decisions](../project/decisions.md#plug-in-behaviour)). Its notes give
-   the SHA-256 of each attached file, the run link, the source commit, links
+   (`Convolver-source.tar.gz`). The first preview held only the macOS files;
+   Windows and Linux joined from the second
+   ([decisions](../project/decisions.md#releases)). Its notes give
+   the SHA-256 of each attached file and each system's command to check it,
+   the run link, the source commit, links
    to the [install guide](../use/install.md#unsigned-previews) at the tag,
-   the known limitations, how to
+   the known limitations (among them that the Windows and Linux plug-in has
+   no window and was checked only automatically), how to
    [report a problem](../use/troubleshooting.md#report-a-problem) (Copy
-   Diagnostics, the host and its version, how the filter was loaded, and
-   whether playback, export or reopening is affected) and the
-   responsiveness result. Finally it downloads
+   Diagnostics on macOS or the Convolver log elsewhere, the host and its
+   version, how the filter was loaded, and whether playback, export or
+   reopening is affected) and the responsiveness result. Finally it downloads
    every attached file again and compares it with its sum. The run's summary
    shows the notes and links to the draft. A pull request that changes the
    workflow or its scripts runs a dry run on the newest candidate run on a
-   tag: every check and the notes, but no draft.
+   tag: every check, the clean-machine jobs and the notes, but no draft.
 5. Read the draft as a user would, edit its notes if needed (a draft's notes
    can change; its files must not), then press **Publish release**. To start
    again, delete the draft and run step 4 again. Never replace or edit an
    asset after publication; a fix gets a new version.
 6. Download one asset from the published page and compare it with its line
-   in the notes, and download the candidate run's `symbols-macos-arm64` and
-   `symbols-macos-x86_64` artifacts and keep them
+   in the notes, and download the candidate run's `symbols-<platform>`
+   artifacts (all four) and keep them
    ([debugging symbols](#debugging-symbols)): artifacts expire after 90 days.
    Then record the published version in the
    [changelog](../../CHANGELOG.md): a heading for the tag above the entries it
@@ -258,7 +277,7 @@ mechanical part, but only as a draft: nothing is public until jrp presses
 
 Without the workflow (for example while it is being fixed), the same steps by
 hand: download `complete-preview-candidate`, run `sha256sum -c SHA256SUMS`,
-and create the pre-release on the tag with the five files above and notes
+and create the pre-release on the tag with the eight files above and notes
 giving their sums, the run link and the install guide.
 
 `production_enabled` stays false for a preview. Previews are unsigned on macOS

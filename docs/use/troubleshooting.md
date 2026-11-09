@@ -114,7 +114,9 @@ See [Equalizer APO troubleshooting](equalizer-apo.md#troubleshooting).
 Open an issue on [GitHub](https://github.com/jrp2014/convolver/issues/new/choose)
 and choose *Problem report*. In the report, give:
 
-- **Copy Diagnostics** from Convolver's window (macOS), pasted as text.
+- **Copy Diagnostics** from Convolver's window (macOS), pasted as text. On
+  Windows and Linux, where the plug-in has no window yet, attach the
+  [Convolver log](plugins.md#status-and-the-convolver-log) instead.
 - The host and its version, and the system and its version.
 - How you loaded the filter: **Choose…**, **Recent**, **Reload**, a preset
   from the host's menu, or a reopened project.

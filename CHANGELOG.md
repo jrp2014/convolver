@@ -21,6 +21,17 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Windows and Linux previews (REL-9): from the second preview, the draft
+  release attaches the Windows and Linux packages with the macOS ones: the
+  VST3 plug-in (no window yet on those systems; filters load from the
+  host's preset menu) and the tools, with a Windows installer. Its notes
+  give each system's checksum command, what Windows and Linux lack and how
+  to report a problem without the window. Before the draft is made, the
+  exact files run on machines that never built Convolver: stock Ubuntu
+  22.04, Ubuntu 24.04, Debian 12 and Fedora images and a fresh Windows
+  runner, where the tools render the examples, the plug-in's library loads
+  and lists its classes, and the installer installs and removes itself
+  ([publishing](docs/develop/releasing.md#publishing-an-unsigned-preview)).
 - Releases (REL-7): jrp decided to publish the first preview without the
   remaining host checks and the independent walkthrough; they stay open
   as follow-up, and the release notes list what was not checked
