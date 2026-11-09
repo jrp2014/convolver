@@ -13,9 +13,9 @@ the preview arrives; crashes, lost state, wrong audio, compatibility failures
 and dropouts are still fixed
 ([decision](docs/project/decisions.md#releases)). The
 [execution priorities](#execution-priorities) sort every open item into three
-groups: checks of and support for the published preview, work that waits for
-its feedback, and later work. The next milestone is still an independent user
-running a published preview (REL-3).
+groups: checks and known defects in the published previews, work decided
+or likely once the freeze lifts, and parked or later work. The next
+milestone is still an independent user running a published preview (REL-3).
 [Status](docs/project/status.md) shows what users can run now and the checks
 left, and [decisions](docs/project/decisions.md) what jrp has decided. Open
 themes beyond the preview are the Windows and Linux windows and LV2, signing
@@ -46,76 +46,80 @@ request before starting so independent tasks do not duplicate changes.
 **The freeze** (jrp, 9 November 2026,
 [decision](docs/project/decisions.md#releases)): after the second preview,
 runtime changes are frozen and further optimisation waits until feedback on
-the preview arrives. Here a runtime change is one that changes what the
-packages run: the code in `portable/`, `plugins/` and `include/`, and the
-packaged presets. Crashes, lost state, wrong audio, compatibility failures
-and dropouts are still fixed at once, each with a test of the sequence that
-failed ([preview acceptance](docs/project/plans/2026-11-08-preview-acceptance.md#3-decide-whether-a-finding-blocks-the-preview)).
-Documentation, tests, measurements, CI and release tooling can go ahead
-while they leave the shipped behaviour unchanged.
+the preview arrives. Crashes, lost state, wrong audio, compatibility failures
+and dropouts are still fixed at once, with a regression test where practical
+([preview acceptance](docs/project/plans/2026-11-08-preview-acceptance.md#3-decide-whether-a-finding-blocks-the-preview)).
+This file reads a runtime change as one that changes what the packages run
+or hold: the code in `portable/`, `plugins/` and `include/`, the packaged
+presets, and the release scripts and packaging files that decide a
+package's contents. Documentation, tests, measurements and CI can go ahead
+while they leave the packages unchanged.
 
 **Next milestone** (jrp's [guidance](docs/review-2026-10/release-readiness-guidance-2026-10-22.md),
 22 October 2026): an independent user installs and uses an exact preview
 package, following only the documentation (REL-3). jrp published both
 previews before it ([decisions](docs/project/decisions.md#releases)), so the
-walkthrough uses the published 0.13.2 files and its findings join the other
-preview feedback. Finishing a dependable product matters more than another
-substantial refactor: move code into shared layers only when two formats
-need the same behaviour (as with `HostFilter`), do not generalise host
-lifecycle or release machinery beyond the requirements in hand, and keep
-libsndfile at the I/O boundary and C++20 in the core.
+walkthrough uses published files, and its findings join the other preview
+feedback. The decision of 8 November kept the remaining host checks and
+REL-3 as gates for later previews; jrp waived them for the second preview
+too, so whether a third waits for them is his to decide. Finishing a
+dependable product matters more than another substantial refactor: move
+code into shared layers only when two formats need the same behaviour (as
+with `HostFilter`), do not generalise host lifecycle or release machinery
+beyond the requirements in hand, and keep libsndfile at the I/O boundary and
+C++20 in the core.
 
 Triaged on 9 November 2026 against `main` at `b96b98e` (0.13.2). Each open
 item is in one group below; the item itself holds the detail and its
 progress.
 
-### 1. The published preview: checks and known defects
+### 1. The published previews: checks and known defects
 
-Work on what 0.13.2 ships. The checks change no shipped code, so they go
-ahead under the freeze; [checks left](docs/project/status.md#checks-left-before-publication)
-on the status page is the one list of the host steps that remain.
+Checks of what the previews ship, which change no shipped code and so go
+ahead under the freeze, and the known defects users meet.
+[Checks left](docs/project/status.md#checks-left-before-publication) on the
+status page is the one list of the host steps that remain. Most of them
+ran, or were planned, on v0.12.8 or a final 0.12 candidate; which published
+preview they and REL-3 now use, given PERF-2's engine change in 0.13, is
+jrp's call.
 
 | Item | What remains | Under the freeze |
 | --- | --- | --- |
-| **REL-3** | The independent walkthrough of the published files; jrp chooses the tester | Goes ahead. A finding in the freeze's exceptions is fixed at once; the rest joins the preview feedback |
-| **HOST-1**, **VST3-11** | REAPER and Audacity (status checks 1 to 4): listening, REAPER's two journeys and its refusal step, Audacity through its preset menu, VoiceOver on the window | Host checks on jrp's Mac |
-| **AU-4**, **AU-6** | GarageBand (status checks 5 and 8): listening, the bypass click, staying in time after a Latency change, VoiceOver, a Latency change with the window open | Host checks on jrp's Mac |
-| **PERF-2** | Its focused REAPER and GarageBand session (status check 9): a long filter at Latency 0 by ear, Latency changes and replacement while playing, 0.12.12 projects reopening | The session goes ahead; the CPU indication beside Latency and the block-size tuning are optimisation and wait (group 2) |
-| **COMPAT-1** | Keep presets, a REAPER project and expected audio made by 0.13.2, with their own runner and the capture step in the publication steps | Tests and files only |
-| **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for 0.13.2 | No code |
+| **REL-3** | The independent walkthrough of a published preview; jrp chooses the tester | Goes ahead. A finding in the freeze's exceptions is fixed at once; the rest joins the preview feedback |
+| **HOST-1**, **VST3-11** | REAPER and Audacity, status checks 1 to 4 | Host checks on jrp's Mac |
+| **AU-4**, **AU-6** | GarageBand, status checks 5 and 8 | Host checks on jrp's Mac |
+| **PERF-2** | Its focused REAPER and GarageBand session, status check 9; then the CPU indication beside the Latency menu and block sizes tuned on Apple silicon | The session goes ahead. The CPU indication changes the window and the tuning is optimisation, so both wait for the freeze to lift |
+| **COMPAT-1** | Keep presets, a REAPER project and expected audio made by each published preview (0.12.12 and 0.13.2), with their own runner and the capture step in the publication steps | Tests and files only |
+| **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **HOST-4** | The check on a real Windows device, now that the Windows package ships `convolver-equalizer-apo` | A check; needs a Windows computer |
-| **VST3-17** | Known defect: in Audacity a filter chosen in the window plays but is missing from the export and the saved project. jrp narrowed Audacity to its preset menu for the previews, and the guides say so | Lost state, one of the freeze's exceptions: fixing it now is jrp's call; otherwise it waits for Audacity's own fix or preview feedback |
+| **VST3-17** | Known defect: in Audacity a filter chosen in the window plays but is missing from the export and the saved project. jrp narrowed Audacity to its preset menu, and the guides say so | jrp decided that the fix waits until after the preview ([decision](docs/project/decisions.md#plug-in-behaviour)). It is lost state, which the freeze still fixes, so whether that brings it forward is his to decide |
 | **PLUG-33** | Known limitation: **Choose…** needs the host's exact input count where a preset needs at least that many; the guides give the preset route | A runtime change; waits unless jrp brings it forward |
 
-### 2. Waiting for preview feedback
+### 2. Decided or likely, after the freeze
 
-Start one of these when preview feedback or REL-3 shows users need it, or
-jrp lifts the freeze. Almost all change runtime code. Within each row the
-order is the suggested one.
-
-| Group | Items | Reason it waits |
-| --- | --- | --- |
-| Small usability fixes from jrp's sessions | **PLUG-26** (choose a `.vstpreset` in the window), **PLUG-25** (say which rate the host plays at), **PLUG-27** (a chosen filter before the host's audio settings are known), **PLUG-29** (the Recent list out of the log folder) | Users' reports show which matter. jrp parked PLUG-25, PLUG-27 and PLUG-29 until after REL-3 on 8 November 2026 ([decision](docs/project/decisions.md#releases)) |
-| Windows and Linux windows | **VST3-12** (Windows), **VST3-13** (Linux) | The 0.13.2 Windows and Linux packages use the host's own controls; build the windows when their users ask |
-| Settings beyond Gain, Mix and Latency | **PLUG-9**, **PLUG-10**, **AU-7**: the other gain modes and the meters | Planned for a later preview; feedback shows whether they are wanted |
-| LV2 in a preview | **LV2-5** (jrp first decides how `VERSION` maps to LV2's version numbers), **LV2-3**, **LV2-4**, **LV2-7** | LV2 joins a preview once its own journeys are demonstrated; Linux users' interest decides when |
-| Configurations and command-line reports | **CFG-1** (other readers), **CFG-3** (a configuration that is not UTF-8), **DIAG-5** (clipping after a render) | Room-correction users' reports show which readers and failures matter. jrp parked CFG-3 and DIAG-5 until after REL-3 |
-| Only on request | **VST3-2** (switch filters from the host), **VST3-6** (replacing the old VST2 plug-in), **HOST-2** (CLAP), **LV2-6** (an LV2 window) | Each needs a stated user need and acceptance tests first |
-| Optimisation, deferred by the freeze | **PERF-3** first; then, only where PERF-3 shows a need, **PERF-1**, **FFT-2**, **VST3-5**, **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19** and **PLUG-11** | PERF-3's resource budgets (callback tail latency, peak memory and preparation time while loading, replacing and resetting) decide whether any of the rest is worth doing. PERF-3's measurements change no shipped code, but jrp deferred optimisation as a whole |
-
-### 3. Later
-
-Not tied to the preview's feedback. Each item starts with the owner's
-decision it names.
+Runtime changes, so each waits until preview feedback arrives or jrp lifts
+the freeze; feedback may change their order. Within each row the order is
+the suggested one.
 
 | Group | Items | Note |
 | --- | --- | --- |
+| Later previews, as decided | **VST3-12** and **VST3-13** (the Windows and Linux windows); **PLUG-9**, **PLUG-10** and **AU-7** (the other gain modes and the meters) | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)). The 0.13.2 Windows and Linux packages use the host's own controls meanwhile |
+| LV2 in a preview | **LV2-5** (jrp first decides how `VERSION` maps to LV2's version numbers), **LV2-3**, **LV2-4**, **LV2-7** | LV2 joins a preview once its own journeys are demonstrated |
+| A window fix from jrp's sessions | **PLUG-26** (choose a `.vstpreset` in the window) | From his file-loading review of 7 November 2026 |
+| Other configuration readers | **CFG-1**, then **CFG-2** | CFG-2 waits for CFG-1 to show which readers matter |
+| Only on request | **VST3-2** (switch filters from the host), **VST3-6** (replacing the old VST2 plug-in), **HOST-2** (CLAP), **LV2-6** (an LV2 window) | Each needs a stated user need and acceptance tests first |
+| Measurements, then optimisation | **PERF-3** and **PERF-1** measure; then, only where PERF-3 shows a need, **FFT-2**, **VST3-5** and **PLUG-11** | PERF-3's resource budgets (callback tail latency, peak memory and preparation time while loading, replacing and resetting) decide whether further optimisation is worth doing. Its measurements, and PERF-1's reruns, change no shipped code, so this file reads them as allowed during the freeze; the optimisation they might justify waits |
+
+### 3. Parked and later
+
+| Group | Items | Note |
+| --- | --- | --- |
+| Parked by jrp until after REL-3 | **ROBUST-1**, **ROBUST-8**, **PLUG-25**, **PLUG-27**, **PLUG-29**, **PLUG-30**, **HOST-6**, **CFG-3**, **DIAG-5**, **CI-32**; **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19**; and **CI-34** apart from its first step (done) | jrp, 8 November 2026: "park any non-essential corner or edge case robustness tests", and "Park both" for the items and CI-34's narrowing ([decision](docs/project/decisions.md#releases)); CI-34's remaining steps wait for his go-ahead. No existing test is removed, and a reproduced crash, lost state, unsafe output or wrong audio reopens one at once |
 | The production gate | **REL-1**, **PLUG-5**, **AU-5**: Developer ID signing and notarization on macOS, Authenticode on Windows, verified minimum OS and CPU versions, the final licence and corresponding-source review; **PLUG-20** (the VST logo in the window, optional) | The previews are unsigned by decision ([releasing](docs/develop/releasing.md#production-gates)). Planning it changes nothing shipped |
-| Edges over other convolvers | First the limitations users cite: **EDGE-1** with **IO-2**, **EDGE-11** on PERF-3's long-reverb workloads, then **EDGE-10**, **EDGE-3** and **EDGE-13**; then **EDGE-12**, **EDGE-9**, **EDGE-2**, **EDGE-4** and **EDGE-5**; then **EDGE-6** to **EDGE-8**; **EDGE-14**, **EDGE-15** and **CFG-2** | jrp's goal (6 November 2026): be better than the most popular reverb plug-ins, in the ranked order of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build), keeping its non-negotiables. Waits for REL-3 unless jrp lifts the freeze; feedback that asks for one of them (sample rates, true stereo, a filter's own delay, an output ceiling) moves it up |
-| Robustness parked by jrp | **ROBUST-1**, **ROBUST-8**, **PLUG-30**, **HOST-6**, **CI-32**; **IO-1** | Parked until after REL-3 (8 November 2026). No existing test is removed; a reproduced crash, lost state, unsafe output or wrong audio reopens one at once |
+| Edges over other convolvers | First the limitations users cite: **EDGE-1** with **IO-2**, **EDGE-11** on PERF-3's long-reverb workloads, then **EDGE-10**, **EDGE-3** and **EDGE-13**; then **EDGE-12**, **EDGE-9**, **EDGE-2**, **EDGE-4** and **EDGE-5**; then **EDGE-6** to **EDGE-8**; **EDGE-14** and **EDGE-15** | jrp's goal (6 November 2026): be better than the most popular reverb plug-ins, in the ranked order of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build), keeping its non-negotiables; each starts with the owner's decision its plan row names. Waits for REL-3 unless jrp lifts the freeze; feedback that asks for one of them (sample rates, true stereo, a filter's own delay, an output ceiling) moves it up |
+| Supporting work | **IO-1** (large files) | Take it up when a reproducible defect or a user need calls for it |
 | Code organisation | **PLUG-24** (`HostProcessor` in its own source file) | When `host.cpp` next changes for another reason; a runtime change, so not during the freeze |
-| Developer tooling | **CI-34**: the fuzz triggers, the coverage table and matched runs | Changes no shipped code, so it may go ahead during the freeze; it must not delay preview work |
-| Parked | **FFMPEG-2** to **FFMPEG-5**, **HOST-3** | Revisit only by an owner decision |
+| Parked by owner decision | **FFMPEG-2** to **FFMPEG-5**, **HOST-3** | Revisit only by an owner decision |
 
 The ordering of the first preview's steps that this section held until
 9 November 2026 is in the history of this file; the dated
