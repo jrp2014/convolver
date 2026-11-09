@@ -122,6 +122,8 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             f'[check a crossover]({docs}/check-a-crossover-in-a-host.md).\n'
             f'- [Limits]({docs}/limits.md): what Convolver does not do.'
         ),
+        '## What changed',
+        f"Each preview's changes are in the [changelog]({base}/blob/{tag}/CHANGELOG.md).",
         '## Known limitations',
         (
             "- On Windows and Linux the VST3 plug-in has no window yet. Load a filter from the host's preset menu "
@@ -132,17 +134,23 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             '- Unsigned: macOS asks you to confirm that you want to open it, and Windows shows a SmartScreen '
             'warning.\n'
             '- Windows needs the Microsoft Visual C++ 2015-2022 x64 runtime, which most computers already have.\n'
-            '- An early preview, published before its last checks. On one Mac, renders and exports from REAPER and '
-            'Audacity (VST3) and GarageBand (Audio Unit) matched the command-line tool, and saved projects reopened '
-            'with their filter. Not yet checked: listening in any host, VoiceOver, the latest Audio Unit change in '
-            'GarageBand, and anyone outside the project following the guides. The Windows and Linux packages were '
+            '- An early preview, published before its last checks. Its new audio engine, which adds no delay at '
+            'Latency 0, has been checked only automatically, against an exact reference and the command-line tool, '
+            'on macOS, Windows and Linux; nobody has listened to it in a host yet. With the previous engine '
+            '(0.12.12), on one Mac, renders and exports from REAPER and Audacity (VST3) and GarageBand (Audio Unit) '
+            'matched the command-line tool, and saved projects reopened with their filter. Not yet checked: '
+            'listening in any host, VoiceOver, the latest Audio Unit changes in GarageBand, and anyone outside the '
+            'project following the guides. The Windows and Linux packages were '
             'checked only automatically, on CI machines that had never built Convolver: the tools and examples ran '
             "from them, the plug-in's library loaded and listed its classes, and the Windows installer installed "
             'and removed itself. Nobody has used them in a host yet. '
             f'[Status]({base}/blob/{tag}/docs/project/status.md#checks-left-before-publication) lists what is open. '
             'Other hosts are untested.\n'
             "- In Audacity, load filters from Audacity's own preset menu. A filter loaded from Convolver's window "
-            '(Choose…, Recent or Reload) plays there, but Audacity 4 does not keep it for exports or saved projects.'
+            '(Choose…, Recent or Reload) plays there, but Audacity 4 does not keep it for exports or saved projects.\n'
+            '- Latency now starts at 0 frames. Some projects saved with 0.12.12 at its default of 256 frames open at '
+            '0; choose 256 again if you want its delay back '
+            f'([projects from earlier versions]({docs}/plugins.md#settings)).'
         ),
         '## Report a problem',
         (

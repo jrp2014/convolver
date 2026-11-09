@@ -12,6 +12,12 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Releases: the notes of the second preview say that the new engine has
+  not been heard in a host yet, that the earlier host results were from
+  0.12.12, and that some 0.12.12 projects open at Latency 0, and link the
+  changelog; jrp decided to publish 0.13.0 for macOS, Windows and Linux
+  without PERF-2's host session or the checks left from the first preview
+  ([decision](docs/project/decisions.md#releases)).
 - Windows and Linux previews (REL-9): from the second preview, the draft
   release attaches the Windows and Linux packages with the macOS ones: the
   VST3 plug-in (no window yet on those systems; filters load from the
