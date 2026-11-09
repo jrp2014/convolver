@@ -377,7 +377,7 @@ Shared work, done once for all three formats:
   with three modes (a set value, the noise estimate and the no-clip bound of
   `estimate_attenuation()`, computed during preparation), a
   latency-aligned wet/dry mix, and a chosen block size (64 to 4096 frames,
-  default 256), with 64-sample ramps; output peak, clip count and callback
+  default 256; since PERF-2, 0 or 64 to 4096, default 0), with 64-sample ramps; output peak, clip count and callback
   load as audio-thread counters; host state version 3 written only for
   non-default settings; each format saves the settings its own way, and
   where they can diverge (presets from `convolver-preset` carry the filter
@@ -1077,6 +1077,55 @@ so the preset file path is not needed).
   scheduling and the switches between them: results ready when their
   samples are needed, never assumed from wall-clock time (the plan's
   [scheduling rule](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#3-long-reverbs-at-low-cpu-and-latency)).
+  Progress: a prototype experiment (7 November 2026, at jrp's request;
+  `convolver_long_reverb_benchmark`, not in the product) measured
+  non-uniform partitions with a direct head for zero latency and the large
+  blocks' work spread over the callbacks of their slack: about 15 to 35
+  times less CPU than the engine at Latency 256 for 30 and 60 s reverbs, no
+  extra cost at zero latency, worst 64-frame callback near 0.2 ms, oracle
+  worst −131 dB; a worker thread did not help
+  ([measurements](docs/develop/fft-measurements.md#long-reverbs-and-zero-latency)).
+  Decided (jrp, 7 November 2026): a working release comes first; after it,
+  move the spread non-uniform scheme into `Engine`, keeping routing,
+  delays, tail, reset and shared forward transforms, with block sizes tuned
+  on each platform. Zero latency then becomes the plug-ins' default, the
+  Latency setting stays and shows the CPU a larger value saves, and a new
+  filter still plays as soon as possible (the plan's
+  [rank 3](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#3-long-reverbs-at-low-cpu-and-latency)).
+  Built at jrp's request (8 November 2026) on draft PR #139, unmerged until
+  after the release: the non-uniform engine in `Engine` (routing, delays,
+  tail, reset and shared transforms kept; worst oracle error 5.2e-7 of the
+  peak), zero first in the Latency list and the default (jrp's choice), the
+  CLI and inspection defaulting to 0 to match. In the engine zero latency is
+  not free, unlike the prototype's single path: the direct sum costs about
+  10 to 15 ns per frame for stereo, and short filters (4096 taps) cost about
+  a fifth more than today's engine at Latency 256, against several times
+  less for long ones ([measurements](docs/develop/fft-measurements.md#the-non-uniform-engine),
+  `compare_engines.py`, which builds the two revisions separately). Still
+  open: the CPU indication beside the Latency menu, the cost at latency 0
+  varying by up to about 30% between nearby filter lengths on the Linux VM
+  (both revisions alike, most likely buffer placement; measure several
+  lengths on the Mac before tuning it), block sizes tuned on
+  Apple silicon, and PERF-3's measurements on jrp's Mac with both engines.
+  When tuning: every spread stage's last unit (the last path's inverse
+  transform) waits for that stage's last boundary, and all stages' last
+  boundaries fall together, at frames 8064 mod 8192, where the review saw
+  the worst ordinary callbacks (about 100 µs against a 13 µs mean on the
+  Linux VM). The independent review of `6056ef3` found two blocking
+  problems, both fixed on the PR: Audio Unit projects reopened at a shifted
+  Latency (the AU now also saves frames, and older state is read through
+  the earlier menu), and no test checked spreading (`native.engine_stress`
+  now does). The branch carries the minor version step, 0.13.0 (the C++
+  defaults change). jrp (8 November): it merges for the 0.13.0 pre-release
+  after the Mac benchmarks, stress and soak, a focused REAPER and
+  GarageBand session, and CI, compared against the published `v0.12.12`.
+  The Mac benchmarks, stress and soak passed on jrp's M5 Max at `6cf7260`
+  ([measurements](docs/develop/fft-measurements.md#on-apple-silicon)):
+  3 to 17 times faster than `v0.12.12` at the same Latency from 65,536
+  taps, and Latency 0 costing 16 to 96% more than 256, most for short
+  filters. The REAPER and GarageBand session is still open. jrp decided no
+  separate zero-latency switch is needed: the Latency menu is the choice,
+  with 0 the default, and the user guide explains the trade-off.
 - [ ] **PERF-3 — Resource budgets and supported workloads.** Measure, on
   named machines, the distribution of callback durations (median, 99th
   percentile, 99.9th percentile and maximum, not only the average), memory in
@@ -1433,6 +1482,17 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   Needs jrp's decision on whether to offer it, how the delay is found and
   what a replacement with a different delay does, since the latency is
   fixed for a processor's life. Effort S to M.
+- [ ] **EDGE-14 — Match the loudness of a reverb response, as an option.**
+  Done when a "Match loudness" checkbox, off by default (jrp, 7 November
+  2026), matches the wet signal's K-weighted loudness for pink noise to the
+  dry signal, computed when the filter loads and applied as one fixed gain;
+  off plays every filter as designed, as today; a `.cfg` configuration
+  always plays as designed; and the gain is the same at every sample rate
+  for the same response. Evidence and the methods compared: the plan's
+  [automatic gain](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#automatic-gain).
+  Still needs jrp's decision on its parameter ID, how it is saved, and the
+  proposed Status warning when a filter plays more than 12 dB louder than
+  its input at 100% Mix. Effort S to M.
 - [ ] **EDGE-15 — Optional output safety ceiling.** From the BruteFIR
   comparison (8 November 2026): BruteFIR's `safety_limit` (1.0m, 2013)
   checks every output sample and stops before one above the set level
@@ -1501,7 +1561,7 @@ with compatibility tests; linked IDs point to open work above.
 | One FFT backend per binary; Ooura/Accelerate have no FFTW-style measured plans or wisdom | Intentional deployment choice. Assess alternatives under FFT-2; do not imply runtime fallback. | [FFT guide](docs/develop/fft-backends.md#selection-and-contract) |
 | FFTW wisdom is CPU/build/size-sensitive and process-global | Retune when relevant inputs change; external planner users must coordinate. A successful import does not prove optimality. | [Planning](docs/use/command-line.md#fftw-plan-tuning) |
 | Core processing uses interleaved float buffers that must not overlap | Use `HostProcessor` for planar/in-place float/double host buffers; internal DSP remains float. | [Engine API](docs/develop/library.md#engine-api) |
-| Latency and filter replacement are not instantaneous | Core latency is B; the plug-ins' default is 256 frames. Replacement starts with fresh history and warms/crossfades; reset work scales with the block buffers and delay lines, not the filter length (PERF-5). | [Replacement](docs/develop/plugin-contract.md#replacement-and-threads) |
+| Latency and filter replacement are not instantaneous | Core latency is B; the plug-ins' default is 0 frames (PERF-2); a larger Latency adds its delay. Replacement starts with fresh history and warms/crossfades; reset work scales with the block buffers and delay lines, not the filter length (PERF-5). | [Replacement](docs/develop/plugin-contract.md#replacement-and-threads) |
 | Callback safety has a defined thread contract | One audio thread per instance; serialized control calls; teardown requires stopped audio. Stress/deadline evidence remains ROBUST-1. | [Implementation invariants](docs/develop/architecture.md#invariants-to-preserve) |
 | Resource limits cap channels, paths, delays, text, IRs and state | Intentional bounds; assess any increase with memory/overflow tests. | [Core limits](docs/develop/library.md#resource-limits), [tests](docs/develop/testing.md) |
 | The configuration format is not identical across consumers | No external consumer has verified this corpus yet; CFG-1. Older bundled configs may need delay lines and portable paths. | [Compatibility matrix](docs/use/other-programs.md#what-convolver-accepts) |

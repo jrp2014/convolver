@@ -88,7 +88,7 @@ audio when you chose the file: start playback, then choose it again.
 ## 3. Play
 
 1. Play quiet audio and watch the meters. Identity leaves the sound
-   unchanged, apart from a delay of 256 samples that most hosts make up for.
+   unchanged, with no added delay at the default Latency of 0 frames.
 2. Choose the matching `echo` folder's `filter.cfg`. Its filter is half the
    input at once plus a quarter of it 257 samples (about 5 ms) later: too
    soon to hear as a separate repeat, so it sounds about 5 dB quieter and

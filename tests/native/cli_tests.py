@@ -1001,8 +1001,10 @@ def main():
         no_clip_headroom_tests(d)
         output_selection_tests(d)
         # Errors must be failures, not successful silent output.
-        for extra in (['--block-size', '0'], ['--block-size', '-1'], ['--gain-db', 'nan'], ['--unknown']):
+        for extra in (['--block-size', '1048577'], ['--block-size', '-1'], ['--gain-db', 'nan'], ['--unknown']):
             call(['--filter', ir, '--input', src, '--output', dst, *extra], ok=False)
+        # Zero latency (PERF-2) renders the same audio, aligned as usual.
+        call(['--filter', ir, '--input', src, '--output', dst, '--block-size', '0'])
         call(['--filter', ir, '--input', src, '--output', src], ok=False)
         call(['--filter', ir, '--input', '-', '--output', dst], ok=False, data=raw)
         call(['--filter', ir, '--input', '-', '--raw-input', '44100', '1', '--output', dst], ok=False, data=raw)

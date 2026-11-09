@@ -32,7 +32,7 @@ std::string seconds(std::size_t frames, int rate) {
 // PLUG-10: a Latency chosen but not yet in use: the adapter has not applied
 // it yet, or could not (docs/develop/plugin-contract.md#settings).
 bool latency_waits(const HostReportFacts& facts) {
-    return facts.latency_frames && facts.settings.latency != facts.latency_frames;
+    return facts.settings.latency != facts.latency_frames;
 }
 
 // DIAG-2: what the window shows above the form, from the most important

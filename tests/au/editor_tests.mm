@@ -605,23 +605,23 @@ void window() {
         return false;
     };
     NSPopUpButton* latency = view.settingMenus[0];
-    require(latency.numberOfItems == 7 && [latency.itemTitles[0] isEqualToString:@"64 frames"] &&
-                [latency.itemTitles[6] isEqualToString:@"4096 frames"] &&
-                latency.indexOfSelectedItem == 2 &&
+    require(latency.numberOfItems == 8 && [latency.itemTitles[0] isEqualToString:@"0 frames"] &&
+                [latency.itemTitles[7] isEqualToString:@"4096 frames"] &&
+                latency.indexOfSelectedItem == 0 &&
                 [latency.accessibilityLabel isEqualToString:@"Latency"] &&
-                [view.settingValues[2].stringValue isEqualToString:@"adds 5.8 ms"],
+                [view.settingValues[2].stringValue isEqualToString:@""],
             "Latency menu: " + text([latency.itemTitles componentsJoinedByString:@", "]));
-    [latency selectItemAtIndex:3];
+    [latency selectItemAtIndex:4];
     [latency sendAction:latency.action to:latency.target];
     check(AudioUnitGetParameter(unit.get(), au::latency_parameter, kAudioUnitScope_Global, 0, &now),
           "Latency value");
-    require(now == 3, "the Latency menu did not set Latency: " + std::to_string(now));
+    require(now == 4, "the Latency menu did not set Latency: " + std::to_string(now));
     require(shows(@"adds 11.6 ms") && !contains(view.explanationView.string, "is chosen"),
             "the window does not show the new Latency in use:\n" +
                 text(view.explanationView.string) + "\n" + text(view.settingValues[2].stringValue));
-    check(AudioUnitSetParameter(unit.get(), au::latency_parameter, kAudioUnitScope_Global, 0, 2, 0),
+    check(AudioUnitSetParameter(unit.get(), au::latency_parameter, kAudioUnitScope_Global, 0, 3, 0),
           "Latency from the host");
-    require(shows(@"adds 5.8 ms") && latency.indexOfSelectedItem == 2 &&
+    require(shows(@"adds 5.8 ms") && latency.indexOfSelectedItem == 3 &&
                 !contains(view.explanationView.string, "is chosen"),
             "the Latency menu did not follow the host");
 

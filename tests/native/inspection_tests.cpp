@@ -2,6 +2,7 @@
 // Inspection API: selection, diagnostics, null fields, and agreement with Engine.
 #include "convolver/inspection.hpp"
 #include "convolver/io.hpp"
+#include "partitions.hpp"
 #include <bit>
 #include <chrono>
 #include <cmath>
@@ -93,10 +94,18 @@ void run(const fs::path& dir) {
                 "inspection uses the core analysis");
         require(analysis.tail_frames == configuration_tail_frames(cfg, block),
                 "analysis tail matches configuration_tail_frames");
-        require(analysis.partitions_per_path ==
-                    std::vector<std::size_t>{(999 + block) / block, (1 + block) / block},
-                "partition counts");
-        require(analysis.fft_frames >= 2 * block && analysis.accounted_buffer_bytes > 0,
+        // PERF-2: the partitions of every stage each filter reaches.
+        const auto layout = detail::partition(1000, block);
+        std::vector<std::size_t> partitions;
+        for (const std::size_t taps : {std::size_t(1000), std::size_t(2)}) {
+            std::size_t count = 0;
+            for (std::size_t s = 0; s < layout.stages.size(); ++s)
+                count += layout.partitions(s, taps);
+            partitions.push_back(count);
+        }
+        require(analysis.partitions_per_path == partitions, "partition counts");
+        require(analysis.fft_frames >= 2 * detail::partition_layout().first &&
+                    analysis.accounted_buffer_bytes > 0,
                 "FFT length and storage");
     }
     {
@@ -257,10 +266,10 @@ void run(const fs::path& dir) {
     rejects_argument(
         [&] {
             InspectionOptions o;
-            o.block_frames = 0;
+            o.block_frames = max_block_frames + 1;
             inspect_configuration(dir / "room.cfg", o);
         },
-        "zero block");
+        "latency above the limit");
     // Unicode, spaces and (where the filesystem allows) quotes in names survive.
 #ifdef _WIN32
     const std::u8string odd_name = u8"ïr 'q' ü.wav";

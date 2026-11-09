@@ -107,9 +107,9 @@ std::vector<float> noise(std::mt19937& random, std::size_t samples, float level 
 void defaults_unchanged() {
     std::mt19937 random(0x5e771);
     const auto first = random_filter(random, 2, 2, 300), second = random_filter(random, 2, 2, 200);
-    HostProcessor plain(first, 100, 256);
+    HostProcessor plain(first, 100, default_host_latency);
     HostProcessor set(first, 100, HostSettings{});
-    require(set.latency_frames() == 256, "default latency");
+    require(set.latency_frames() == default_host_latency, "default latency");
     const auto input = noise(random, 2 * 3000);
     const std::vector<float> part1(input.begin(), input.begin() + 2000),
         part2(input.begin() + 2000, input.end());
@@ -369,14 +369,14 @@ void latency_choices() {
         require(host.latency_frames() == frames, "latency " + std::to_string(frames) + " not used");
     }
     for (const std::size_t frames :
-         {std::size_t{0}, std::size_t{32}, std::size_t{100}, std::size_t{8192}}) {
+         {std::size_t{1}, std::size_t{32}, std::size_t{100}, std::size_t{8192}}) {
         HostSettings s;
         s.latency = frames;
         bool refused = false;
         try {
             HostProcessor host(tap_filter(1), 512, s);
         } catch (const std::invalid_argument& e) {
-            refused = std::string(e.what()).find("64 to 4096 frames") != std::string::npos;
+            refused = std::string(e.what()).find("64 to 4096") != std::string::npos;
         }
         require(refused, "latency " + std::to_string(frames) + " not refused with a reason");
     }
@@ -384,7 +384,7 @@ void latency_choices() {
 
 void settings_text() {
     require(settings_words(HostSettings{}, HostDrySignal::present) ==
-                "gain 0 dB, mix 100% wet, latency 256 frames",
+                "gain 0 dB, mix 100% wet, latency 0 frames",
             "settings words: " + settings_words(HostSettings{}, HostDrySignal::present));
     HostSettings s{-6, .5, 1024};
     require(settings_words(s, HostDrySignal::present) ==
@@ -402,7 +402,7 @@ void settings_text() {
           std::pair{HostSettings{-99.99, .99999}, "gain -99.99 dB, mix 99.999% wet"},
           std::pair{HostSettings{-.04, .0004}, "gain -0.04 dB, mix 0.04% wet"}})
         require(settings_words(settings, HostDrySignal::present) ==
-                    std::string(words) + ", latency 256 frames",
+                    std::string(words) + ", latency 0 frames",
                 "settings words: " + settings_words(settings, HostDrySignal::present));
     // The window's slider text: never an exponent, never a range end it is not.
     for (const auto& [value, text] :

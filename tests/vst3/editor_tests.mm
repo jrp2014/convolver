@@ -211,8 +211,8 @@ void window() {
     require([shown.titleField.stringValue rangeOfString:@"VST3 #"].location != NSNotFound,
             "title " + text(shown.titleField.stringValue));
     require(shown.settingSliders.count == 2 && shown.settingMenus.count == 1 &&
-                shown.settingMenus[0].numberOfItems == 7 &&
-                [shown.settingMenus[0].titleOfSelectedItem isEqualToString:@"256 frames"],
+                shown.settingMenus[0].numberOfItems == 8 &&
+                [shown.settingMenus[0].titleOfSelectedItem isEqualToString:@"0 frames"],
             "settings rows");
 
     // A Gain the host set shows in the window; Option-click's reset is one
@@ -234,7 +234,7 @@ void window() {
     // time it adds.
     handler.edits.clear();
     NSPopUpButton* latency = shown.settingMenus[0];
-    [latency selectItemAtIndex:4];
+    [latency selectItemAtIndex:5];
     [latency sendAction:latency.action to:latency.target];
     require(handler.kinds(latency_id) == "bpe" && p.settings().latency == 1024 &&
                 p.getLatencySamples() == 1024 && handler.latency_restarts == 1,
@@ -245,7 +245,7 @@ void window() {
     // A choice whose processor cannot be built is not in use yet; the next
     // activation builds it.
     latency_preparation_for_tests = [] { throw std::runtime_error("test"); };
-    [latency selectItemAtIndex:5];
+    [latency selectItemAtIndex:6];
     [latency sendAction:latency.action to:latency.target];
     latency_preparation_for_tests = nullptr;
     require(p.settings().latency == 2048 && p.getLatencySamples() == 1024 &&

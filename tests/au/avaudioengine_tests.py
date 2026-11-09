@@ -7,8 +7,8 @@ AVAudioEngine and AVAudioUnitEffect are Apple's own hosting stack, which
 other Apple-platform hosts build on, and share no code with Convolver's tests
 or with pluginval. avaudioengine_render.swift renders each first-use fixture
 (examples/first-use: mono 1 in 1 out, stereo cross-feed 2 in 2 out, the 2 in
-6 out crossover) offline at a block size that is not a multiple of the
-256-frame partition, with the filter loaded as an .aupreset through
+6 out crossover) offline at block sizes that are not multiples of the
+engine's 64-frame first block, with the filter loaded as an .aupreset through
 ClassInfo. The output, less the latency the unit reports, must match the
 fixture's expected output from the direct double-precision oracle.
 
@@ -31,8 +31,8 @@ from fixtures import LATENCY, TOLERANCE, read_float_wav, worst_error  # noqa: E4
 EXAMPLES = REPOSITORY / 'examples' / 'first-use'
 REGISTRY = json.loads((REPOSITORY / 'plugins' / 'identities.json').read_text(encoding='utf-8'))
 CODES = ','.join(REGISTRY['au'][key] for key in ('type', 'subtype', 'manufacturer'))
-# Fixture, filter file and block size. 61 is smaller than a partition, so
-# partitions straddle render calls; 300 and 1000 are not multiples of 256.
+# Fixture, filter file and block size. None is a multiple of the engine's
+# 64-frame first block, so its blocks straddle render calls.
 CASES = [('mono', 'impulse.wav', 61), ('stereo', 'filter.cfg', 300), ('crossover', 'filter.cfg', 1000)]
 
 

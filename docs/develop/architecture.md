@@ -74,17 +74,35 @@ workflow.
    in-memory `Configuration`. No path lookup is needed during processing.
    `decode_impulses` opens and decodes each filter file once, however many
    paths name it (PERF-6), and keeps no cache between loads.
-2. `Engine` validates that graph, prepares FFTs, partitions the IRs and allocates
-   all buffers. Filter spectra receive their `1/N` normalization here.
-3. `Engine::process` accepts interleaved float frames, applies input delays, and
-   stages B frames. `Engine::Impl::compute` does the block convolution.
+2. `Engine` validates that graph, divides the IRs (`portable/partitions.hpp`,
+   PERF-2), prepares FFTs and allocates all buffers. Filter spectra receive
+   their `1/N` normalization here. The engine's latency L (the CLI's
+   `--block-size`, the plug-ins' Latency) may be 0. The first taps, up to
+   the first block's output time, are summed directly (the `direct` kernel);
+   the rest is covered by stages of uniform blocks that grow from 64 to 8192
+   frames, chosen per filter by an operation-count model. Each stage is a
+   uniformly partitioned overlap-add convolution whose output starts at a
+   fixed offset after its input block.
+3. `Engine::process` accepts interleaved float frames, applies input delays,
+   and works in chunks up to the next 64-frame boundary. At each boundary the
+   64-frame stage runs whole, and so does any stage the layout marks whole: at
+   a latency of 64 or more, a block no larger than the latency whose offset
+   (one to two blocks) is too short to spread it, as the uniform engine
+   computed every block. Any other larger stage's block (n frames) is started
+   and its transforms and multiply-adds are spread over the n/64 boundaries
+   that follow, by cost, so no callback carries a whole large block. The
+   layout leaves each spread stage a block period of slack (an offset of at
+   least 2n).
 4. `same_mix` groups identical **ordered** input routes, including gain bits.
-   Each `Mix` owns one forward-transform history shared by its paths. Each path
-   retains its own filter spectra, inverse transform contribution and overlap.
-5. Results are added in path/route order, pass through output delays, and leave
-   through the output staging buffer. Caller chunk sizes do not change the stream.
-6. `reset` invalidates processing history: each `Mix` counts the spectra
-   written since construction or reset, and paths multiply only those
+   Each `Mix` owns, per stage, one forward-transform history shared by its
+   paths, plus the mixed input and the direct sum's history. Each path keeps
+   its own filter spectra and direct taps.
+5. Every stage and the direct sum add their results into one output ring per
+   output channel, ahead of the frame being produced, in path/route order; the
+   ring then passes through the output delays. Caller chunk sizes do not
+   change the stream.
+6. `reset` invalidates processing history: each `Mix` counts, per stage, the
+   spectra written since construction or reset, and paths multiply only those
    partitions (PERF-5), so neither reset nor the blocks after it pay for
    history known to be silence. It does not rebuild plans or read files.
 
@@ -174,7 +192,7 @@ configuration before reporting success. [Testing](testing.md) gives commands.
 
 | If changing… | Inspect together | Focused verification |
 | --- | --- | --- |
-| Convolution, routes or delays | `engine.cpp`, analysis/tail functions, host assumptions | `native.engine`, `native.host`, `native.cli`; report worst oracle error |
+| Convolution, routes or delays | `engine.cpp`, `partitions.cpp` (the stage layout), `kernels.inc` (the direct sum), analysis/tail functions, host assumptions | `native.engine`, `native.engine_stress`, `native.host`, `native.cli`; report worst oracle error |
 | FFT backend | `fft.hpp`, all three adapters, CMake discovery/exports | `native.fft`, `native.engine`, `native.fft_planning`, external consumer, cross-backend comparison |
 | Configuration syntax or selection | Parser, resolver, inspection, CLI and preset selectors | `native.config_parse`, `native.inspection`, `native.inspection_cli`, corpus, config fuzz replays |
 | Decoder or quantizer | I/O API, CLI validation, direct-audio decoding, IR fuzz caller | `native.io`, `native.cli`, `native.limits`, `fuzz.replay.ir_file` |
@@ -248,6 +266,33 @@ and AArch64 kernels. Each platform-specific path:
   [24 October 2026 vDSP experiment](../archive/reviews/2026-10-24-apple-vdsp.md)
   found none);
 - adds no shipped dependency without jrp's decision.
+
+### Threads and cores
+
+Convolver does not spread one instance's work over several cores, and does
+not plan to unless a measurement shows it is needed ([decided](../project/decisions.md#direction)
+by jrp, 8 November 2026). Machines with many cores are used as follows:
+
+- **Real-time processing** runs on the host's audio thread for the track.
+  Hosts such as REAPER, Logic and GarageBand already spread separate tracks
+  and instances over their cores. With the non-uniform engine (PERF-2) one
+  instance needs little: a 30 s stereo reverb at Latency 0 takes under 2% of
+  one core on the Linux cloud VM
+  ([measurements](fft-measurements.md#the-non-uniform-engine)). In the
+  7 November experiment a worker thread used 2 to 3.5 times more processor
+  time in total and did not shorten the worst callback
+  ([long reverbs](fft-measurements.md#long-reverbs-and-zero-latency)), and
+  it would add the scheduling rules a worker needs (results ready when their
+  samples are due, in real-time, prefetch and offline modes).
+- **Loading a filter** runs on one control thread and already meets the
+  [loading limits](load-timing.md); spreading it over cores would save tens
+  of milliseconds at most.
+- **The command line** renders one file per run; several runs at once use
+  every core with no change ([file rendering](../use/command-line.md#file-rendering)).
+
+Revisit only if a measured workload on a named machine shows one instance
+needing a large share of a core (PERF-3), and then with Apple's audio
+workgroups or Windows MMCSS for any helper thread, as EDGE-10 lists.
 
 ## Where future work belongs
 

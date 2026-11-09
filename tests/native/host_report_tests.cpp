@@ -56,7 +56,7 @@ HostReportFacts facts(std::optional<HostLayout> host, HostSettings settings = {}
     f.host = host;
     f.max_frames = host ? 512 : 0;
     f.settings = settings;
-    f.latency_frames = 256;
+    f.latency_frames = settings.latency; // In use, as chosen.
     f.tail_frames = 2;
     return f;
 }
@@ -497,7 +497,9 @@ void cases() {
     // PLUG-10: a Latency chosen but not yet in use (not applied yet, or it
     // could not be), and the window says so.
     require(!contains(r.explanation, "is chosen"), "a latency in use reads as waiting");
-    const auto waiting = host_report(f, facts(stereo, {0, 1, 1024}));
+    auto waiting_facts = facts(stereo, {0, 1, 1024});
+    waiting_facts.latency_frames = 256;
+    const auto waiting = host_report(f, waiting_facts);
     require(waiting.note.starts_with("Latency 1024 frames is chosen but not in use yet, so "
                                      "the plug-in keeps 256 frames for now.") &&
                 contains(waiting.explanation, "\nNote: Latency 1024 frames"),

@@ -33,7 +33,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-LATENCY = 256  # Frames every adapter reports; the CLI trims them.
+LATENCY = 0  # Frames every adapter reports by default (PERF-2: zero latency); the CLI trims any.
 TOLERANCE = 1e-5  # Single-precision FFT convolution against the double oracle.
 RATE = 48000
 INPUT_FRAMES = 4096

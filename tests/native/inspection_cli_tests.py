@@ -53,6 +53,26 @@ def report(args, code=0, cwd=None):
     return data
 
 
+def zero_latency():
+    """PERF-2 (jrp's review of c2edf84): inspection and validation accept the
+    zero latency rendering accepts, report it, and the render at that latency
+    matches the fixture's direct double-precision reference."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugins'))
+    from fixtures import TOLERANCE, read_float_wav, worst_error
+
+    stereo = Path(__file__).resolve().parents[2] / 'examples' / 'first-use' / 'stereo'
+    cfg = str(stereo / 'filter.cfg')
+    call(['--validate', cfg, '--block-size', '0'], 0)
+    inspected = report(['--inspect', cfg, '--block-size', '0'])['configurations'][0]
+    assert inspected['timing']['latency_frames'] == 0, inspected['timing']
+    with tempfile.TemporaryDirectory() as directory:
+        out = Path(directory) / 'out.wav'
+        call(['--filter', cfg, '--input', str(stereo / 'input.wav'), '--output', str(out), '--block-size', '0'], 0)
+        rendered, expected = read_float_wav(out), read_float_wav(stereo / 'expected.wav')
+        worst = worst_error(rendered, expected)
+        assert worst < TOLERANCE, f'render at zero latency: worst error {worst}'
+
+
 def damaged_audio_reports():
     # A failed direct sound-file leaf must not abort JSON or its valid sibling.
     with tempfile.TemporaryDirectory(prefix='convolver-damaged-') as t:
@@ -168,7 +188,7 @@ def main():
             {'token': '1.25', 'channel': 1, 'gain': 0.25},
         ]
         assert leaf['input_delays'][1] == {'token': '0.5', 'milliseconds': 0.5, 'frames': 24}
-        assert leaf['timing'] == {'latency_frames': 256, 'tail_frames': 26}
+        assert leaf['timing'] == {'latency_frames': 0, 'tail_frames': 26}
         assert leaf['resources']['accounted_buffer_bytes'] > 0
         assert 'FFT plan internals' in leaf['resources']['excludes']
         assert (
@@ -177,6 +197,7 @@ def main():
             ]
             == 3
         )
+        zero_latency()
 
         # Determinism: the same inputs give byte-identical reports.
         first = call(['--inspect', 'list.txt', '--json', '--sample-rate', '48000'], 1, d).stdout
@@ -233,7 +254,7 @@ def main():
         assert b'absent.cfg:5:1:' in p.stderr and b'[missing-asset]' in p.stderr
         assert p.stdout.startswith(b'invalid: ')
         p = call(['--inspect', str(d / 'room.cfg')], 0)
-        assert b'latency 256 frames, tail 26 frames' in p.stdout
+        assert b'latency 0 frames, tail 26 frames' in p.stdout
 
         # Profiles add warnings; only --warnings-as-errors makes them fail.
         (d / 'abs.cfg').write_text('48000 1 1 0\n0\n0\n{}\n0\n0\n0\n'.format((d / 'ir.wav').resolve().as_posix()))
@@ -257,7 +278,7 @@ def main():
             ['--inspect', cfg, '--all-configurations', '--sample-rate', '48000'],
             ['--inspect', cfg, '--all-configurations', '--syntax-only'],
             ['--inspect', cfg, '--profile', 'roon'],
-            ['--inspect', cfg, '--block-size', '0'],
+            ['--inspect', cfg, '--block-size', '1048577'],
             ['--inspect', '-'],
             ['--inspect', cfg, '--fft-wisdom', cfg],
         ):

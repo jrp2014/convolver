@@ -266,7 +266,8 @@ source and records exactly which releases it used.
 | `CONVOLVER_DISTRIBUTION_LICENSE_DIR` | empty | Dependency notices from `build_dependencies.py`, for packaging |
 | `CONVOLVER_DEBUG_SYMBOLS` | OFF | Compile Release code with debug information and keep the packaged binaries' symbols in `symbols/` in the build folder, outside everything installed; release candidates set it ([debugging symbols](releasing.md#debugging-symbols)) |
 | `CONVOLVER_BUILD_FUZZERS` | OFF | Clang libFuzzer targets; requires I/O |
-| `CONVOLVER_BUILD_BENCHMARKS` | OFF | Build `convolver_benchmark`, and `convolver_callback_benchmark` when the I/O adapter is built |
+| `CONVOLVER_BUILD_BENCHMARKS` | OFF | Build `convolver_benchmark`, `convolver_kernel_benchmark` and the PERF-2 experiment `convolver_long_reverb_benchmark`, and `convolver_callback_benchmark` when the I/O adapter is built |
+| `CONVOLVER_FFTCONVOLVER_DIR` | empty | A checkout of FFTConvolver (KlangFalter's engine, MIT) to compare in `convolver_long_reverb_benchmark`; [`run_long_reverb.sh`](../../tests/native/benchmarks/run_long_reverb.sh) fetches a pinned copy |
 | `CONVOLVER_AVX2_KERNELS` | ON when targeting x86-64 | Also compile the multiply-accumulate kernels for AVX2 with FMA and use them on CPUs that have both; output then differs from the baseline kernels by float rounding only, below -120 dBFS ([measurements](fft-backends.md#compiler-flags-and-avx2-kernels)) |
 | `CMAKE_OSX_DEPLOYMENT_TARGET` | 14.0 on macOS, unless `MACOSX_DEPLOYMENT_TARGET` is set | The oldest macOS the binaries run on, the same for every target and the packages ([candidates](releasing.md#candidates)); set it on the first configure, as CMake reads it before `project()` |
 | `BUILD_TESTING` | ON at top level | Master test switch |

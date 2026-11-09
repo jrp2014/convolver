@@ -37,7 +37,7 @@ they are not automatically normalized.
 | FFT | Fast Fourier transform; used to calculate long convolutions efficiently |
 | FFT plan | Prepared data or a selected algorithm for a transform of a particular size |
 | FFTW wisdom | FFTW's saved plan information; useful for avoiding measured planning at startup |
-| Latency | Delay introduced by processing: B frames in the command-line tool before it trims them, 256 in the plug-ins |
+| Latency | Delay introduced by processing: B frames in the command-line tool before it trims them (0 by default), and the Latency setting in the plug-ins (0 frames by default) |
 | Tail | FIR and routing-delay output that can remain after input ends; excludes processing latency |
 | PCM | Pulse-code modulation; the CLI's PCM format names refer to integer samples, such as 16-bit or 24-bit WAV |
 | Dither | Low-level noise added before integer rounding to reduce signal-dependent quantization distortion |

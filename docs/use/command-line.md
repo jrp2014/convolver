@@ -51,6 +51,14 @@ convolver --filter room.cfg --input music.wav --output corrected.wav
 convolver --filter impulse.wav --input music.wav --output corrected.wav --block-size 128 --gain-db -6 --output-format wav-pcm24
 ```
 
+Each run renders one file on one processor core. To render a folder of files
+on every core, run several at once, for example eight at a time:
+
+```sh
+mkdir -p out
+ls *.wav | xargs -P 8 -I{} convolver --filter room.cfg --input {} --output out/{}
+```
+
 The filter may be an IR file, a [configuration](configuration.md) (`.cfg`), or a
 configuration list. An IR file used directly maps each IR channel to the
 corresponding input and output; a mono IR requires mono input. Use a
@@ -60,11 +68,14 @@ requirement of N output channels; a single configuration or IR file that has a
 different count is rejected (an IR file has as many outputs as inputs). There is no resampling or
 nearest-rate substitution.
 
-`--block-size` is the uniform partition payload B, not the historical partition
-count. FFTW uses FFT length 2B; Accelerate and Ooura round up to a power of two
-(at least four). Positive non-power-of-two B values work with all three backends. The core
-has B frames of algorithmic latency. The CLI trims that leading latency by
-default and always drains the complete FIR/routing tail. `--keep-latency` retains
+`--block-size` is the engine's latency in frames, from 0 (the default, as the
+plug-ins) to 1048576. It is not the historical partition count, and since
+PERF-2 it does not set the transform size: the engine sums a filter's first
+taps directly and divides the rest into blocks of 64 to 8192 frames whatever
+the latency, so any value works with all three backends. A larger latency can
+use somewhat less processor time; above 16384 frames it only adds delay. The
+CLI trims the leading latency by default and always drains the complete
+FIR/routing tail. `--keep-latency` retains
 it for callers that need the untrimmed stream. No input frames means no
 output audio frames. Gain is a finite decibel value; finite float output can
 exceed unity. Integer output clips to its representable range.
@@ -532,12 +543,14 @@ them for the transform size actually used. Run this once on the target machine
 with a Release binary and little competing CPU activity:
 
 ```sh
-convolver --tune-fft machine-b256.fftw --block-size 256
+convolver --tune-fft machine.fftw --block-size 0
 convolver --filter room.cfg --input music.wav --output corrected.wav \
-  --block-size 256 --fft-wisdom machine-b256.fftw
+  --fft-wisdom machine.fftw
 ```
 
-Tuning needs no input audio or IR. It prepares both transforms using `patient`
+Tuning needs no input audio or IR. It prepares the forward and inverse
+transforms of every block size the engine uses (128 to 16384 points), so one
+file serves every `--block-size`, using `patient`
 planning by default; `--fft-plan measure` searches less extensively and
 `--fft-plan exhaustive` tries every algorithm FFTW has, which can take much
 longer for large blocks. `--fft-time-limit S` bounds each plan's search to S
@@ -556,17 +569,17 @@ missing size or insufficient planning rigor fails before opening the audio
 output. Wisdom of one rigor satisfies requests of lower rigor (exhaustive covers
 patient, patient covers measure and estimate), not higher. CLI wisdom input is limited to 1 MiB.
 
-Keep wisdom with the CPU, FFTW build, precision and block size it was tuned for.
+Keep wisdom with the CPU, FFTW build and precision it was tuned for.
 Retune after changing them; loading successfully is **not** proof that old wisdom
 is optimal for a different CPU. The native wisdom format performs FFTW's own
 compatibility checks; Convolver does not add a CPU fingerprint. Timing is noisy
-and does not guarantee a globally optimal plan. This step does not choose B or
-change B-frame latency. Accelerate and Ooura reject measured planning, wisdom and time-limit options.
+and does not guarantee a globally optimal plan. This step does not change the
+latency. Accelerate and Ooura reject measured planning, wisdom and time-limit options.
 See [FFTW's planning/wisdom explanation](https://fftw.org/fftw3_doc/Words-of-Wisdom_002dSaving-Plans.html).
 
 ## Limits
 
-Up to 256 channels, sample rates up to 768 kHz and block sizes up to 1048576
-frames. A configuration has at most 4096 paths, each delay at most 16777216 frames,
+Up to 256 channels, sample rates up to 768 kHz and latencies (`--block-size`)
+up to 1048576 frames. A configuration has at most 4096 paths, each delay at most 16777216 frames,
 and all its IRs together at most 67108864 samples; the [library guide](../develop/library.md#resource-limits) has
 the complete list. What Convolver does not do is in [limits](limits.md).

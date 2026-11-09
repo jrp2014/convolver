@@ -39,6 +39,47 @@ Until 1.0 the C++ API may change between minor versions.
 - Releases (REL-7): jrp published Convolver 0.12.12 as the first unsigned
   developer preview for macOS on 8 November 2026
   ([release](https://github.com/jrp2014/convolver/releases/tag/v0.12.12)).
+- Long-reverb experiment (PERF-2): `convolver_long_reverb_benchmark`
+  compares today's engine with prototype non-uniform partitions (zero
+  latency, large blocks' work spread over callbacks, or on a worker thread)
+  and with KlangFalter's engine, checks each against the double-precision
+  oracle, and `auto_gain.py` measures what automatic gain would do to
+  reverb and room-correction filters. Results are in the
+  [measurements](docs/develop/fft-measurements.md#long-reverbs-and-zero-latency)
+  and the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#automatic-gain),
+  with a review of eleven other open-source convolvers and of algorithms
+  beyond partitioned convolution
+  ([other convolvers](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#other-convolvers-and-algorithms));
+  the product is unchanged.
+
+### Changed
+
+- Version 0.13.0 for PERF-2 (jrp, 8 November 2026): the next minor-version
+  pre-release after the published `v0.12.12`. C++ consumers request
+  `find_package(Convolver 0.13)`.
+- Engine (PERF-2): non-uniformly
+  partitioned convolution that adds no processing delay at Latency 0. A filter's first taps are
+  summed directly and the rest by stages of blocks growing from 64 to 8192
+  frames, whose larger blocks spread their work over the following
+  callbacks. Long filters need far less processor time (a 480,000-tap
+  stereo filter about 11 times less, a 30 s crossover 38 times less, on
+  the Linux cloud VM; 10 to 17 times less at 10 and 30 s on an Apple M5
+  Max at the same latency; see the
+  [measurements](docs/develop/fft-measurements.md#the-non-uniform-engine))
+  and the worst callback falls with them. At the same latency short filters
+  cost no more than before; zero latency costs more for them (about 60 to
+  85% more than the old default for 4096 taps, under 1% of a core). The
+  Latency setting gains 0 frames, first in the list and the default, and the command line's `--block-size` and inspection default to
+  0 to match, so default renders still equal the plug-ins' output.
+  `--block-size 0` is accepted everywhere, and `--tune-fft` plans every
+  transform size the engine uses, whatever the latency. Output differs
+  from before by rounding only (worst oracle error 5.2e-7 of the peak).
+  Projects keep the latency they were saved with, except some at the old
+  default, 256, which open at zero: in VST3, a project that saved no
+  settings (all at their defaults); in the Audio Unit, every project saved
+  at 256. The C++ `Engine`, `analyze_configuration`,
+  `validate_configuration` and `configuration_tail_frames` default to
+  latency 0.
 
 ## [0.12.12] - 2026-11-08
 

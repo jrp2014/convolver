@@ -19,7 +19,7 @@ struct InspectionOptions {
     int expected_rate = 0;            // Zero: unspecified, as load_configuration.
     std::size_t expected_inputs = 0;  // Zero: unspecified.
     std::size_t expected_outputs = 0; // Zero: unspecified.
-    std::size_t block_frames = 256;   // For latency/tail/storage analysis.
+    std::size_t block_frames = 0;     // Engine latency for latency/tail/storage analysis.
     bool syntax_only = false;         // One configuration text; IRs are not opened.
     bool all_configurations = false;  // Validate every list leaf; no selectors allowed.
     InspectionProfile profile = InspectionProfile::convolver;
