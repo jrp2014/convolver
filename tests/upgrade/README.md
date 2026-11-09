@@ -11,7 +11,8 @@ its expectations are written by hand, while these come from a release.
 ```sh
 python3 tests/upgrade/run_upgrade.py --cli build/convolver
 python3 tests/upgrade/run_upgrade.py --vst3-render build-vst3/plugins/vst3/convolver_vst3_render \
-  --vst3-bundle build-vst3/VST3/Release/Convolver.vst3 --vst3-backend OOURA --kernels-from build-vst3/convolver
+  --vst3-bundle build-vst3/VST3/Release/Convolver.vst3 --vst3-backend OOURA --kernels-from build-vst3/convolver \
+  --compiler "GNU 11.4.0" --configuration Release
 ```
 
 CTest runs them as `upgrade.cli` (whenever the CLI is built) and
@@ -51,15 +52,18 @@ For each case, `run_upgrade.py`:
   repeated), and renders the input, dropping the latency the plug-in
   reports;
 - requires the same rate, channel count and frame count, and samples within
-  1e-5 absolute (the PLUG-2 oracle tolerance). When this build's FFT backend
-  and CPU kernels (PERF-4) are the capture's, the samples must be identical;
-  the block sizes always are. It prints the first differing sample and the
+  1e-5 absolute (the PLUG-2 oracle tolerance). When this build's compiler and
+  its version, configuration, FFT backend and CPU kernels (PERF-4) are the
+  capture's, the samples must be identical; the block sizes always are.
+  CTest passes the compiler and configuration; run by hand without
+  `--compiler` and `--configuration`, the check uses the tolerance. It prints the first differing sample and the
   largest difference.
 
 The capture renders and the double-precision references in
-`examples/first-use/` agree within 1.3e-7. The 0.13.2 files were reproduced
-sample for sample by a Clang 18 Release build of the same source with Ooura
-and AVX2+FMA (the release used GCC 11).
+`examples/first-use/` agree within 1.3e-7. The compiler matters: with the
+same source, Ooura and AVX2+FMA, a Clang 18 Release build reproduced the
+0.13.2 files (built with GCC 11.4) sample for sample, while CI's GCC 15
+Release build differed by up to 1.3e-7.
 
 ## Rules
 

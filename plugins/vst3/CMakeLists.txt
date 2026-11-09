@@ -201,7 +201,8 @@ if(CONVOLVER_BUILD_TESTS)
         add_test(NAME vst3.upgrade COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
             "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tests/upgrade/run_upgrade.py"
             --vst3-render "$<TARGET_FILE:convolver_vst3_render>" --vst3-bundle "${bundle}"
-            --vst3-backend "${fft_backend}" ${upgrade_kernels})
+            --vst3-backend "${fft_backend}" ${upgrade_kernels}
+            --compiler "${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}" --configuration "$<CONFIG>")
         set_tests_properties(vst3.upgrade PROPERTIES LABELS "vst3;real-libraries;upgrade" TIMEOUT 300)
         add_dependencies(check convolver_vst3_render)
     else()

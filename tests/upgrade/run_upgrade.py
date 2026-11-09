@@ -5,11 +5,15 @@ Each folder beside this script (tests/upgrade/VERSION/) holds presets, filters
 and inputs from one published release, with the audio that release rendered
 (see README.md). This build must load every retained file and reproduce that
 audio after the latency it reports: within 1e-5 absolute (the PLUG-2 oracle
-tolerance), and sample for sample where it builds and runs as the capture did.
+tolerance), and sample for sample where it builds and runs as the capture did:
+the same compiler and version, configuration, FFT backend and CPU kernels.
 
     python3 tests/upgrade/run_upgrade.py --cli build/convolver
     python3 tests/upgrade/run_upgrade.py --vst3-render build/.../convolver_vst3_render \
         --vst3-bundle build/VST3/Release/Convolver.vst3 --vst3-backend OOURA
+
+CTest also passes --compiler and --configuration; without them the check
+is held to the tolerance only.
 
 Only the standard library is used.
 """
@@ -162,6 +166,8 @@ def main(argv=None):
     parser.add_argument('--vst3-render', type=Path, help='convolver_vst3_render')
     parser.add_argument('--vst3-bundle', type=Path, help='the Convolver.vst3 bundle to check')
     parser.add_argument('--vst3-backend', help="the bundle's FFT backend, as CMake names it (OOURA)")
+    parser.add_argument('--compiler', help='this build\'s compiler and version, as CMake names them ("GNU 11.4.0")')
+    parser.add_argument('--configuration', help="this build's configuration (Release)")
     parser.add_argument(
         '--kernels-from', type=Path, help='a convolver CLI from this build, asked which CPU kernels run here'
     )
@@ -180,14 +186,16 @@ def main(argv=None):
         for folder in folders:
             record = json.loads((folder / 'manifest.json').read_text(encoding='utf-8'))
             failures += check_files(folder, record)
-            # Sample for sample when the FFT backend and the CPU kernels are the
-            # capture's (the block sizes always are). The bundle's kernels are
-            # chosen on this CPU as the CLI's are; without a CLI to report them,
-            # the bundle is held to the tolerance only.
-            cli_exact = same_backend(record, cli_lines) and same_kernels(record, cli_lines)
-            vst3_exact = same_kernels(record, kernel_lines) and (
-                args.vst3_backend == record['captured']['build']['backend']
-            )
+            # Sample for sample only where this build compiles and runs as the
+            # capture did (the block sizes always are): the same compiler and
+            # version (GCC 15 differs from 0.13.2's GCC 11 by up to 1.3e-7 with
+            # the same backend and kernels), configuration, FFT backend and CPU
+            # kernels. The bundle's kernels are chosen on this CPU as the CLI's
+            # are; without a CLI to report them, the bundle gets the tolerance.
+            build = record['captured']['build']
+            same_build = args.compiler == build['compiler'] and args.configuration == build['configuration']
+            cli_exact = same_build and same_backend(record, cli_lines) and same_kernels(record, cli_lines)
+            vst3_exact = same_build and same_kernels(record, kernel_lines) and args.vst3_backend == build['backend']
             for case in record['cases']:
                 for check in case['checks']:
                     if check['renderer'] == 'cli' and args.cli:

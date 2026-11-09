@@ -548,7 +548,8 @@ if(CONVOLVER_BUILD_TESTS)
         # those releases' command-line tools rendered.
         add_test(NAME upgrade.cli COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
             "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/upgrade/run_upgrade.py"
-            --cli "$<TARGET_FILE:convolver_cli>")
+            --cli "$<TARGET_FILE:convolver_cli>"
+            --compiler "${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}" --configuration "$<CONFIG>")
         set_tests_properties(upgrade.cli PROPERTIES LABELS "upgrade;real-libraries;cli" TIMEOUT 300)
         # DOC-1 and PLUG-2: the shared fixtures, and the documented first-use commands run
         # as written. The renders it leaves are the CLI reference for plug-in comparisons.
