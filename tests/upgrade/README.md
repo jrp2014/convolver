@@ -50,7 +50,8 @@ For each case, `run_upgrade.py`:
   its file by [`vst3_render.cpp`](vst3_render.cpp) as a host loads it (an
   offline host, host blocks of 1, 73, 137, 3, 129, 512, 64 and 137 frames,
   repeated), and renders the input, dropping the latency the plug-in
-  reports;
+  reports, which must be the latency the release reported (a host delays
+  the other tracks by it);
 - requires the same rate, channel count and frame count, and samples within
   1e-5 absolute (the PLUG-2 oracle tolerance). When this build's compiler and
   its version, configuration, FFT backend and CPU kernels (PERF-4) are the
@@ -68,6 +69,9 @@ Release build differed by up to 1.3e-7.
 ## Rules
 
 - Never regenerate or edit a retained file; the runner fails if one changes.
+  The version folders are checked out byte for byte (`.gitattributes`), left
+  alone by the formatters and markdownlint, and any change to them runs the
+  full CI ([CI triggers](../../docs/develop/testing.md#ci-triggers)).
   A deliberate incompatibility is jrp's decision, recorded in the
   [decisions log](../../docs/project/decisions.md), and the check it breaks is
   changed in the same pull request, not the file.

@@ -22,6 +22,7 @@ import hashlib
 import json
 import platform
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -37,6 +38,16 @@ BLOCK_SIZES = (0, 256)  # The CLI's default (no latency), and the old default 25
 
 def sha256(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def machine():
+    """The capture's system: Ooura's twiddle factors come from this libm."""
+    try:
+        system = platform.freedesktop_os_release().get('PRETTY_NAME', platform.system())
+    except OSError:
+        system = platform.system()
+    libc = ' '.join(platform.libc_ver())
+    return f'{system}, {libc}, {platform.machine()}'
 
 
 def run(args):
@@ -94,13 +105,13 @@ def render_vst3(render, bundle, out, case, frames, work):
     planar = fixtures.read_float_wav(out / case['input'])
     raw_in, raw_out = work / 'in.f32', work / 'out.f32'
     interleaved = [planar[c][i] for i in range(len(planar[0])) for c in range(len(planar))]
-    raw_in.write_bytes(fixtures.struct.pack(f'={len(interleaved)}f', *interleaved))
+    raw_in.write_bytes(struct.pack(f'={len(interleaved)}f', *interleaved))
     printed = run(
         [render, bundle, out / case['preset'], case['rate'], case['inputs'], case['outputs'], raw_in, raw_out, frames]
     )
     latency = int(printed.split()[1])
     data = raw_out.read_bytes()
-    samples = fixtures.struct.unpack(f'={len(data) // 4}f', data)
+    samples = struct.unpack(f'={len(data) // 4}f', data)
     channels = [list(samples[c :: case['outputs']]) for c in range(case['outputs'])]
     return channels, latency
 
@@ -175,7 +186,7 @@ def main():
             'date': dt.datetime.now(tz=dt.timezone.utc).date().isoformat(),
             'by': 'tests/upgrade/capture.py',
             'from': next((z.name for z in args.zip if 'linux' in z.name), 'unknown'),
-            'machine': f'{platform.system()} {platform.machine()}, {platform.processor() or "unknown CPU"}',
+            'machine': machine(),
             'cli_version': version_text,
             'build': {k: manifest['build'][k] for k in ('compiler', 'configuration', 'flags', 'backend')},
             'vst3_host_blocks': '1, 73, 137, 3, 129, 512, 64, 137, repeated (tests/upgrade/vst3_render.cpp)',

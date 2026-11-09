@@ -276,7 +276,7 @@ mechanical part, but only as a draft: nothing is public until jrp presses
    expected: the tag, not `main`, is what was published.
 7. Keep the release's files for later builds (COMPAT-1): on Linux x86-64,
    download every published ZIP, unpack the Linux one, build
-   `convolver_vst3_render` (any VST3 build), and run
+   `convolver_vst3_render` (a VST3 build without sanitizers), and run
    [`tests/upgrade/capture.py`](../../tests/upgrade/capture.py) with the
    tag's version, commit and candidate run, as its docstring shows. It copies
    the example presets, renders them with the package's own CLI and VST3

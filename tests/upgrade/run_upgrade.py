@@ -153,7 +153,11 @@ def check_vst3(folder, case, check, render, bundle, exact, work):
     )
     if code != 0:
         return f'{label}: exit {code}\n{text}'
-    print(f'{label}: {text.strip()} (captured {check["latency"]})')
+    reported = text.split()
+    if len(reported) != 2 or reported[0] != 'latency' or int(reported[1]) != check['latency']:
+        # Hosts delay other tracks by the reported latency, so a change is
+        # audible in a project even when the aligned audio matches.
+        return f'{label}: reported {text.strip()!r}; the release reported latency {check["latency"]}'
     data = raw_out.read_bytes()
     samples = struct.unpack(f'={len(data) // 4}f', data)
     actual = [list(samples[c :: case['outputs']]) for c in range(case['outputs'])]
@@ -196,6 +200,11 @@ def main(argv=None):
             same_build = args.compiler == build['compiler'] and args.configuration == build['configuration']
             cli_exact = same_build and same_backend(record, cli_lines) and same_kernels(record, cli_lines)
             vst3_exact = same_build and same_kernels(record, kernel_lines) and args.vst3_backend == build['backend']
+            print(f'{folder.name}: captured by {build["compiler"]} {build["configuration"]}, {build["backend"]}')
+            if args.cli:
+                print(f'  cli: {"identical samples required" if cli_exact else f"within {TOLERANCE}"}')
+            if args.vst3_render and args.vst3_bundle:
+                print(f'  vst3: {"identical samples required" if vst3_exact else f"within {TOLERANCE}"}')
             for case in record['cases']:
                 for check in case['checks']:
                     if check['renderer'] == 'cli' and args.cli:

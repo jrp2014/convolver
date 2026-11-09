@@ -14,7 +14,7 @@
     "date": "2026-11-09",
     "by": "tests/upgrade/capture.py",
     "from": "Convolver-0.13.2-preview-linux-x86_64.zip",
-    "machine": "Linux x86_64, x86_64",
+    "machine": "Ubuntu 24.04.5 LTS, glibc 2.39, x86_64",
     "cli_version": [
       "Convolver portable 0.13.2",
       "FFT backend: Ooura / fftsg (built in)",

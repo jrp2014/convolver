@@ -88,8 +88,9 @@ int render(const std::vector<std::string>& args) {
     require(PresetFile::loadPreset(&preset, FUID::fromTUID(info->ID().data()), component),
             "the plug-in refused the preset");
 
-    component->activateBus(kAudio, kInput, 0, true);
-    component->activateBus(kAudio, kOutput, 0, true);
+    require(component->activateBus(kAudio, kInput, 0, true) == kResultOk &&
+                component->activateBus(kAudio, kOutput, 0, true) == kResultOk,
+            "activateBus");
     ProcessSetup setup{kOffline, kSample32, max_block, static_cast<double>(rate)};
     require(processor->setupProcessing(setup) == kResultOk, "setupProcessing");
     require(component->setActive(true) == kResultOk, "the plug-in did not activate");

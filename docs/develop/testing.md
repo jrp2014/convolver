@@ -1449,6 +1449,8 @@ except:
   `<!-- first-use-example -->` changes (`examples.first_use` runs those
   commands; CI-35). Other edits to those three pages count as the
   documentation or packaged page each otherwise is;
+- Markdown under `tests/upgrade/`, which `upgrade.cli` and `vst3.upgrade`
+  read: the version folders hash their files, Markdown included (COMPAT-1);
 - pages copied into the preview packages, which also run the
   [candidate workflow](#plug-in-candidate-checks): everything under `docs/use/`,
   `examples/plugin-presets/README.md` and the Ooura `README.md`. A page in
