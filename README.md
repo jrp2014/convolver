@@ -1,8 +1,8 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Convolver
 
-**Download:** [Convolver 0.12.12 for macOS](https://github.com/jrp2014/convolver/releases/tag/v0.12.12), an unsigned developer
-preview; read [opening an unsigned preview](docs/use/install.md#unsigned-previews)
+**Download:** [Convolver 0.13.2 for macOS, Windows and Linux](https://github.com/jrp2014/convolver/releases/tag/v0.13.2), an
+unsigned developer preview; read [opening an unsigned preview](docs/use/install.md#unsigned-previews)
 first.
 
 Convolver applies finite impulse response (FIR) filters to multichannel audio:
@@ -23,17 +23,18 @@ a configuration list naming several of them. Roon, JRiver and Audiolense use
 variants of the `.cfg` format ([other programs](docs/use/other-programs.md)).
 Coming from the old Windows Convolver? Your `.cfg` files may need a few
 edits ([how](docs/use/other-programs.md#configurations-from-the-old-windows-convolver)).
-Convolver is a developer preview: the first, [0.12.12](https://github.com/jrp2014/convolver/releases/tag/v0.12.12), is an
-unsigned macOS pre-release. It was published before its last host checks
-and before an independent user's walkthrough, which are still to come
-([status](docs/project/status.md)).
+Convolver is a developer preview: the latest, [0.13.2](https://github.com/jrp2014/convolver/releases/tag/v0.13.2), is an
+unsigned pre-release for macOS, Windows and Linux. On Windows and Linux the
+VST3 plug-in has no window yet. It was published before anyone listened to
+its new audio engine in a host and before an independent user's
+walkthrough, which are still to come ([status](docs/project/status.md)).
 
 ## Start here
 
 | I want to… | Read |
 | --- | --- |
 | Use Convolver | [Using Convolver](docs/use/README.md), then [your first filter](docs/use/first-filter.md) |
-| Download the macOS preview | [0.12.12 pre-release](https://github.com/jrp2014/convolver/releases/tag/v0.12.12) |
+| Download the preview (macOS, Windows, Linux) | [0.13.2 pre-release](https://github.com/jrp2014/convolver/releases/tag/v0.13.2) |
 | Use the plug-ins | [Install](docs/use/install.md) and [your first sound in a host](docs/use/first-sound-in-a-host.md) |
 | Build it, embed it or change it | [Build from source](docs/develop/build.md), [library guide](docs/develop/library.md), [implementation map](docs/develop/architecture.md), [contributing](CONTRIBUTING.md) |
 | Find any page | [Documentation index](docs/README.md) |

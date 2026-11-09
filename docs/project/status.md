@@ -21,7 +21,10 @@ rehearsed on 8 November and whose draft he deleted. On 8 November
 2026 jrp published the first preview, [Convolver 0.12.12](https://github.com/jrp2014/convolver/releases/tag/v0.12.12) for macOS,
 as an unsigned GitHub pre-release, without the remaining host checks and
 the independent walkthrough, which stay open
-([checks left](#checks-left-before-publication)). The command-line renderer, the preset tool, the Equalizer APO
+([checks left](#checks-left-before-publication)). On 9 November 2026 he
+published the second, [Convolver 0.13.2](https://github.com/jrp2014/convolver/releases/tag/v0.13.2) for macOS, Windows
+and Linux, with the new audio engine (PERF-2) and without its host
+listening session (check 9). The command-line renderer, the preset tool, the Equalizer APO
 export and the VST3, Audio Unit and LV2 plug-ins are implemented and tested
 automatically; VST3 and the Audio Unit have Gain, Mix and Latency and share
 one macOS window. jrp has run the VST3 plug-in in REAPER (6 to 8 November)
@@ -29,7 +32,7 @@ and Audacity (7 November), and the Audio Unit in GarageBand (up to 8
 November); loading responsiveness qualified on his MacBook Pro with the
 0.12.5 source (REL-6, gate 5). No independent user has followed the
 instructions. The next milestone is an independent user installing and
-using an exact preview package from the 0.12 series. jrp
+using an exact published preview package. jrp
 [decided](decisions.md#releases) to publish the first preview without the
 remaining host checks and walkthrough, which stay open.
 [What still blocks it](#what-still-blocks-the-first-preview) lists each

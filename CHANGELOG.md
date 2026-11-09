@@ -12,6 +12,9 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Releases: jrp published Convolver 0.13.2, the second unsigned developer
+  preview and the first for Windows and Linux, on 9 November 2026
+  ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.2)).
 - Benchmark documentation (PERF-1): distinguish the older FFTW/Accelerate
   comparison from the Accelerate-only PERF-2 engine results. Add a matched
   new-engine comparison of Accelerate, native NEON FFTW estimation and
@@ -20,6 +23,15 @@ Until 1.0 the C++ API may change between minor versions.
   Add paired Ooura measurements and review portable FFT alternatives (FFT-2),
   including the real-time integration limits of PocketFFT and an isolated
   ordered-PFFFT Mac experiment. No production backend or default changes.
+
+## [0.13.2] - 2026-11-09
+
+The second published preview: macOS, Windows and Linux, unsigned, with the
+new audio engine (PERF-2), published before anyone listened to that engine
+in a host ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.2)).
+
+### Added
+
 - Releases: the notes of the second preview say that the new engine has
   not been heard in a host yet, that the earlier host results were from
   0.12.12, and that some 0.12.12 projects open at Latency 0, and link the
@@ -2023,7 +2035,8 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.12.12...HEAD
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.13.2...HEAD
+[0.13.2]: https://github.com/jrp2014/convolver/releases/tag/v0.13.2
 [0.12.12]: https://github.com/jrp2014/convolver/releases/tag/v0.12.12
 [0.7.1]: https://github.com/jrp2014/convolver/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/jrp2014/convolver/compare/v0.6.10...v0.7.0

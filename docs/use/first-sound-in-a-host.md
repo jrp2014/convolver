@@ -146,7 +146,7 @@ choosing an entry from a list, and the folders where hosts look for presets.
 
 ## In Audacity
 
-The first preview supports Audacity 4 through Audacity's own preset menu
+The previews support Audacity 4 through Audacity's own preset menu
 only. A filter loaded from Convolver's window (**Choose…**, **Recent**,
 **Reload**, or reloading when the file changes) plays while you listen, but
 Audacity 4.0.2 does not keep it for an export or a saved project: they keep

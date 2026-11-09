@@ -129,7 +129,7 @@ the one list of what each way reads:
 or a Convolver `.vstpreset`, and lists the folders where hosts look for
 presets. A preset is needed where the plug-in has no window (the VST3
 plug-in on Windows and Linux), in an LV2 host with no file chooser, and in
-Audacity, where the first preview supports only Audacity's own preset menu:
+Audacity, where the previews support only Audacity's own preset menu:
 Audacity 4.0.2 does not keep a filter loaded in the window (with Choose…,
 Recent, Reload or reloading when the file changes) for exports or saved
 projects, which keep whatever Audacity stored last, possibly no filter or an
