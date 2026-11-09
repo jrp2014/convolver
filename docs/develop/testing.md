@@ -220,8 +220,9 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
 - `upgrade.cli`: the [files kept from published releases](../../tests/upgrade/README.md)
   (COMPAT-1), each filter rendered by this build's CLI at each recorded block
   size and compared with the audio that release's own CLI rendered: within
-  1e-5, and identical when the compiler and its version, configuration, FFT
-  backend and CPU kernels match the capture's. It also fails if a retained file changed.
+  1e-5 (times the peak for a file louder than full scale), and identical when
+  the compiler and its version, configuration, flags, FFT backend and CPU
+  kernels match the capture's. It also fails if a retained file changed.
 - `native.filter_file`: a filter file chosen in a plug-in and refused, through
   `read_filter_file()` and `HostFilter::reject()` as the Audio Unit and LV2
   use them. The short status text gives the refused file's own channels

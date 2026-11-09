@@ -202,7 +202,9 @@ if(CONVOLVER_BUILD_TESTS)
             "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tests/upgrade/run_upgrade.py"
             --vst3-render "$<TARGET_FILE:convolver_vst3_render>" --vst3-bundle "${bundle}"
             --vst3-backend "${fft_backend}" ${upgrade_kernels}
-            --compiler "${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}" --configuration "$<CONFIG>")
+            --compiler "${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}" --configuration "$<CONFIG>"
+            # As the package manifest records them; "=" keeps a leading "-" a value.
+            "--flags=${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}")
         set_tests_properties(vst3.upgrade PROPERTIES LABELS "vst3;real-libraries;upgrade" TIMEOUT 300)
         add_dependencies(check convolver_vst3_render)
     else()

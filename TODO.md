@@ -872,8 +872,11 @@ means a patched FFmpeg build with `--enable-gpl`.
   adapter; the project itself is kept for reopening by hand in the host. Later
   builds must load every retained file and reproduce the expected audio after
   the reported latency: bit-identical when the FFT backend, block size,
-  kernel set (AVX2+FMA or baseline, PERF-4), compiler and its version and
-  configuration are unchanged, otherwise within the PLUG-2 oracle tolerance (1e-5 absolute). Never regenerate a retained file; a deliberate
+  kernel set (AVX2+FMA or baseline, PERF-4), compiler and its version,
+  configuration and compiler flags are unchanged, otherwise within the PLUG-2
+  oracle tolerance (1e-5, scaled by the peak of a file louder than full
+  scale); a newer compiler may change the output within it
+  ([decision](docs/project/decisions.md#releases)). Never regenerate a retained file; a deliberate
   incompatibility is jrp's decision, recorded in the
   [decisions log](docs/project/decisions.md). The literal
   version-1 and version-2 state bytes in `native.state` stay as the first
@@ -888,8 +891,9 @@ means a patched FFmpeg build with `--enable-gpl`.
   (identical to each other). `upgrade.cli` and `vst3.upgrade` check every
   later build; the capture step is in the publication steps. CI's GCC 15
   build, with the same backend and kernels, differed from the release's
-  GCC 11 by up to 1.3e-7, so the criterion above now names the compiler
-  and configuration too. Remaining: a
+  GCC 11 by up to 1.3e-7, so the criterion above now names the compiler,
+  configuration and flags too; the runner reports each check's largest
+  difference as a share of its bound. Remaining: a
   REAPER project saved with 0.13.2, with its state chunk restored through
   each adapter, and Audio Unit state from a release.
 - [ ] **DIAG-5 — Report clipping after a command-line render.** From the

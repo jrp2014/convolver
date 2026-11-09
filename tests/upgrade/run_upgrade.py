@@ -4,16 +4,19 @@
 Each folder beside this script (tests/upgrade/VERSION/) holds presets, filters
 and inputs from one published release, with the audio that release rendered
 (see README.md). This build must load every retained file and reproduce that
-audio after the latency it reports: within 1e-5 absolute (the PLUG-2 oracle
-tolerance), and sample for sample where it builds and runs as the capture did:
-the same compiler and version, configuration, FFT backend and CPU kernels.
+audio after the latency it reports, within the tolerance: 1e-5 (the PLUG-2
+oracle tolerance) times the expected file's peak, or 1e-5 absolute for a file
+that peaks below full scale. A newer compiler may change the samples within
+that bound. Sample for sample is required only where this build compiles and
+runs as the capture did: the same compiler and version, configuration,
+compiler flags, FFT backend and CPU kernels.
 
     python3 tests/upgrade/run_upgrade.py --cli build/convolver
     python3 tests/upgrade/run_upgrade.py --vst3-render build/.../convolver_vst3_render \
         --vst3-bundle build/VST3/Release/Convolver.vst3 --vst3-backend OOURA
 
-CTest also passes --compiler and --configuration; without them the check
-is held to the tolerance only.
+CTest also passes --compiler, --configuration and --flags; without all
+three the check is held to the tolerance only.
 
 Only the standard library is used.
 """
@@ -33,6 +36,21 @@ sys.path.insert(0, str(HERE.parent / 'plugins'))
 import fixtures  # noqa: E402  (tests/plugins/fixtures.py: WAV helpers)
 
 TOLERANCE = 1e-5
+EPSILON = 2.0**-23  # Single-precision machine epsilon, for the report.
+
+
+def bound(expected):
+    """The largest difference allowed from the expected audio.
+
+    Single-precision FFT convolution errors grow with the signal level, so the
+    bound scales with the expected file's peak above full scale; at or below
+    it, the PLUG-2 oracle's absolute tolerance applies.
+    """
+    return TOLERANCE * max(1.0, max((abs(v) for channel in expected for v in channel), default=0.0))
+
+
+def normal_flags(flags):
+    return ' '.join((flags or '').split())
 
 
 def run(args):
@@ -43,8 +61,12 @@ def run(args):
     return result.returncode, result.stdout + result.stderr
 
 
-def compare(label, actual, expected, exact):
-    """None when actual reproduces expected, otherwise what differs."""
+def compare(label, actual, expected, exact, worst_seen):
+    """None when actual reproduces expected, otherwise what differs.
+
+    worst_seen keeps the largest difference of any check against its bound,
+    for the summary.
+    """
     if len(actual) != len(expected):
         return f'{label}: {len(actual)} channels, expected {len(expected)}'
     worst, first, where = 0.0, None, None
@@ -62,16 +84,25 @@ def compare(label, actual, expected, exact):
     if first is None:
         print(f'{label}: identical')
         return None
+    limit = bound(expected)
+    peak = max(abs(v) for channel in expected for v in channel)
+    if worst / limit > worst_seen.get('share', 0.0):
+        worst_seen.update(share=worst / limit, worst=worst, limit=limit, label=label)
     c, i, x, y = first
     detail = (
         f'first difference at channel {c}, frame {i}: {x!r} for {y!r}; '
-        f'largest {worst:.3g} at channel {where[0]}, frame {where[1]}'
+        f'largest {worst:.3g} at channel {where[0]}, frame {where[1]}, '
+        f'{worst / limit:.1%} of the bound {limit:.3g}, '
+        f'{worst / (peak or 1.0) / EPSILON:.1f} float epsilons of the peak'
     )
+    if worst > limit:
+        return f'{label}: {detail}; above the bound'
     if exact:
+        # Within the bound, so the audio is compatible, but something that
+        # changes rounding differs from the capture without the check knowing
+        # (a libm, a per-target flag), or the DSP changed.
         return f'{label}: not identical, though built and run as the capture was; {detail}'
-    if worst > TOLERANCE:
-        return f'{label}: {detail}, above {TOLERANCE}'
-    print(f'{label}: within {TOLERANCE} ({detail})')
+    print(f'{label}: within the bound ({detail})')
     return None
 
 
@@ -107,7 +138,7 @@ def same_backend(record, lines):
     return wanted is not None and wanted in lines
 
 
-def check_cli(folder, record, case, check, cli, exact, work):
+def check_cli(folder, record, case, check, cli, exact, work, worst_seen):
     output = work / 'cli.wav'
     code, text = run(
         [
@@ -128,10 +159,10 @@ def check_cli(folder, record, case, check, cli, exact, work):
     actual, rate = fixtures.read_float_wav(output, with_rate=True)
     if rate != case['rate']:
         return f'{label}: rate {rate}, expected {case["rate"]}'
-    return compare(label, actual, fixtures.read_float_wav(folder / check['expected']), exact)
+    return compare(label, actual, fixtures.read_float_wav(folder / check['expected']), exact, worst_seen)
 
 
-def check_vst3(folder, case, check, render, bundle, exact, work):
+def check_vst3(folder, case, check, render, bundle, exact, work, worst_seen):
     label = f'{folder.name} {case["name"]} vst3'
     expected = fixtures.read_float_wav(folder / check['expected'])
     planar = fixtures.read_float_wav(folder / case['input'])
@@ -161,7 +192,7 @@ def check_vst3(folder, case, check, render, bundle, exact, work):
     data = raw_out.read_bytes()
     samples = struct.unpack(f'={len(data) // 4}f', data)
     actual = [list(samples[c :: case['outputs']]) for c in range(case['outputs'])]
-    return compare(label, actual, expected, exact)
+    return compare(label, actual, expected, exact, worst_seen)
 
 
 def main(argv=None):
@@ -173,6 +204,9 @@ def main(argv=None):
     parser.add_argument('--compiler', help='this build\'s compiler and version, as CMake names them ("GNU 11.4.0")')
     parser.add_argument('--configuration', help="this build's configuration (Release)")
     parser.add_argument(
+        '--flags', help='this build\'s compiler flags, as the package manifest records them (" -O3 -DNDEBUG -g")'
+    )
+    parser.add_argument(
         '--kernels-from', type=Path, help='a convolver CLI from this build, asked which CPU kernels run here'
     )
     args = parser.parse_args(argv)
@@ -183,6 +217,7 @@ def main(argv=None):
     if not folders:
         sys.exit('no retained releases found')
     failures = []
+    worst_seen = {}
     cli_lines = version_lines(args.cli) if args.cli else []
     kernel_lines = version_lines(args.kernels_from) if args.kernels_from else cli_lines
     with tempfile.TemporaryDirectory() as temporary:
@@ -193,28 +228,42 @@ def main(argv=None):
             # Sample for sample only where this build compiles and runs as the
             # capture did (the block sizes always are): the same compiler and
             # version (GCC 15 differs from 0.13.2's GCC 11 by up to 1.3e-7 with
-            # the same backend and kernels), configuration, FFT backend and CPU
-            # kernels. The bundle's kernels are chosen on this CPU as the CLI's
-            # are; without a CLI to report them, the bundle gets the tolerance.
+            # the same backend and kernels; jrp: a newer compiler may change
+            # the output within the tolerance), configuration, flags, FFT
+            # backend and CPU kernels. Anything missing means the tolerance.
+            # The bundle's kernels are chosen on this CPU as the CLI's are;
+            # without a CLI to report them, the bundle gets the tolerance.
             build = record['captured']['build']
-            same_build = args.compiler == build['compiler'] and args.configuration == build['configuration']
+            same_build = (
+                args.compiler == build['compiler']
+                and args.configuration == build['configuration']
+                and args.flags is not None
+                and normal_flags(args.flags) == normal_flags(build['flags'])
+            )
             cli_exact = same_build and same_backend(record, cli_lines) and same_kernels(record, cli_lines)
             vst3_exact = same_build and same_kernels(record, kernel_lines) and args.vst3_backend == build['backend']
             print(f'{folder.name}: captured by {build["compiler"]} {build["configuration"]}, {build["backend"]}')
             if args.cli:
-                print(f'  cli: {"identical samples required" if cli_exact else f"within {TOLERANCE}"}')
+                print(f'  cli: {"identical samples required" if cli_exact else "within the bound"}')
             if args.vst3_render and args.vst3_bundle:
-                print(f'  vst3: {"identical samples required" if vst3_exact else f"within {TOLERANCE}"}')
+                print(f'  vst3: {"identical samples required" if vst3_exact else "within the bound"}')
             for case in record['cases']:
                 for check in case['checks']:
                     if check['renderer'] == 'cli' and args.cli:
-                        failure = check_cli(folder, record, case, check, args.cli, cli_exact, work)
+                        failure = check_cli(folder, record, case, check, args.cli, cli_exact, work, worst_seen)
                     elif check['renderer'] == 'vst3' and args.vst3_render and args.vst3_bundle:
-                        failure = check_vst3(folder, case, check, args.vst3_render, args.vst3_bundle, vst3_exact, work)
+                        failure = check_vst3(
+                            folder, case, check, args.vst3_render, args.vst3_bundle, vst3_exact, work, worst_seen
+                        )
                     else:
                         continue
                     if failure:
                         failures.append(failure)
+    if worst_seen:
+        print(
+            f'largest difference: {worst_seen["worst"]:.3g} in {worst_seen["label"]}, '
+            f'{worst_seen["share"]:.1%} of its bound {worst_seen["limit"]:.3g}'
+        )
     for failure in failures:
         print(f'FAIL {failure}', file=sys.stderr)
     if failures:

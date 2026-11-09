@@ -12,7 +12,7 @@ its expectations are written by hand, while these come from a release.
 python3 tests/upgrade/run_upgrade.py --cli build/convolver
 python3 tests/upgrade/run_upgrade.py --vst3-render build-vst3/plugins/vst3/convolver_vst3_render \
   --vst3-bundle build-vst3/VST3/Release/Convolver.vst3 --vst3-backend OOURA --kernels-from build-vst3/convolver \
-  --compiler "GNU 11.4.0" --configuration Release
+  --compiler "GNU 11.4.0" --configuration Release "--flags= -O3 -DNDEBUG -g"
 ```
 
 CTest runs them as `upgrade.cli` (whenever the CLI is built) and
@@ -53,18 +53,33 @@ For each case, `run_upgrade.py`:
   reports, which must be the latency the release reported (a host delays
   the other tracks by it);
 - requires the same rate, channel count and frame count, and samples within
-  1e-5 absolute (the PLUG-2 oracle tolerance). When this build's compiler and
-  its version, configuration, FFT backend and CPU kernels (PERF-4) are the
-  capture's, the samples must be identical; the block sizes always are.
-  CTest passes the compiler and configuration; run by hand without
-  `--compiler` and `--configuration`, the check uses the tolerance. It prints the first differing sample and the
-  largest difference.
+  the bound: 1e-5 (the PLUG-2 oracle tolerance), times the expected file's
+  peak when it is louder than full scale, since float rounding grows with the
+  level. A newer compiler may change the samples within it (jrp's
+  [decision](../../docs/project/decisions.md#releases)).
+- requires identical samples only when this build compiles and runs as the
+  capture did: the same compiler and version, configuration, compiler flags
+  (as the package manifest records them), FFT backend and CPU kernels
+  (PERF-4); the block sizes always are. CTest passes the compiler,
+  configuration and flags; run by hand without all three, the check uses the
+  bound. Each run prints which rule applies.
+- prints, for each check that is not identical, the first differing sample,
+  the largest difference as a share of the bound and in float epsilons of the
+  peak, and at the end the largest share of any check, so a drift towards
+  the bound shows before it fails.
 
-The capture renders and the double-precision references in
-`examples/first-use/` agree within 1.3e-7. The compiler matters: with the
-same source, Ooura and AVX2+FMA, a Clang 18 Release build reproduced the
-0.13.2 files (built with GCC 11.4) sample for sample, while CI's GCC 15
-Release build differed by up to 1.3e-7.
+How far builds fall from the bound, on Linux x86-64 against the 0.13.2
+files (peaks 0.25 to 0.53): a Clang 18 Release build with Ooura reproduced
+them (built with GCC 11.4) sample for sample; CI's GCC 15 Release build
+with Ooura differed by up to 1.3e-7, and a Clang 18 build with FFTW by up to
+2.1e-7 (2% of the bound). The capture renders and the double-precision
+references in `examples/first-use/` agree within 1.3e-7.
+
+An identical-samples failure that stays within the bound means the audio is
+still compatible but something that changes rounding differs from the
+capture without the check knowing (a different libm, which computes Ooura's
+twiddle factors, or a per-target flag), or the DSP changed; the message says
+so.
 
 ## Rules
 
@@ -74,7 +89,9 @@ Release build differed by up to 1.3e-7.
   full CI ([CI triggers](../../docs/develop/testing.md#ci-triggers)).
   A deliberate incompatibility is jrp's decision, recorded in the
   [decisions log](../../docs/project/decisions.md), and the check it breaks is
-  changed in the same pull request, not the file.
+  changed in the same pull request, not the file. So is a deliberate
+  numerical change that stays within the bound (an optimisation, say) but
+  breaks an identical-samples check.
 - Capture each published preview once, after publication, with
   [`capture.py`](capture.py) on Linux x86-64 from that release's Linux ZIP
   ([publication steps](../../docs/develop/releasing.md#publishing-an-unsigned-preview)).
