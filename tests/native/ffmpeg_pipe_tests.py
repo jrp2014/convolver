@@ -123,19 +123,36 @@ def audio(path):
 
 def piped_wav(d, frames):
     """IO-10: a WAV that FFmpeg wrote to a pipe, where it cannot go back to
-    fill in the sizes, saved as a file. Convolver reads all of it: the
-    render has every frame and equals the render of the file it was copied
-    from."""
+    fill in the sizes, saved as a file. An FFmpeg run stopped half way leaves
+    the same header, so Convolver refuses the file and says why and what to
+    do; the same audio written by FFmpeg to a file renders whole."""
     source = CROSSOVER / 'input.wav'
     piped = d / 'piped.wav'
-    piped.write_bytes(run([FFMPEG, '-v', 'error', '-i', str(source), '-c:a', 'pcm_f32le', '-f', 'wav', '-']))
-    sizes = struct.unpack_from('<I', piped.read_bytes(), 4)[0]
+    encode = [FFMPEG, '-v', 'error', '-y', '-i', str(source), '-c:a', 'pcm_f32le', '-f', 'wav']
+    piped.write_bytes(run([*encode, '-']))
+    header = piped.read_bytes()
+    riff_size = struct.unpack_from('<I', header, 4)[0]
+    data_size = struct.unpack_from('<I', header, header.index(b'data') + 4)[0]
+    assert riff_size == data_size == 0xFFFFFFFF, (
+        'FFmpeg no longer leaves the sizes of a piped WAV unfilled, so this test no longer covers that',
+        hex(riff_size),
+        hex(data_size),
+    )
     render = [CONVOLVER, '--filter', str(CROSSOVER / 'filter.cfg'), '--output', '-', '--output-format', 'raw-float']
+    refused = subprocess.run([*render, '--input', str(piped)], capture_output=True, check=False)
+    message = refused.stderr.decode('utf-8', 'replace')
+    assert refused.returncode != 0 and not refused.stdout, (refused.returncode, len(refused.stdout))
+    for part in ('never filled in', 'to a pipe', 'Write the file again'):
+        assert part in message, (part, message)
+    whole = d / 'whole.wav'
+    run([*encode, str(whole)])
     from_source = run([*render, '--input', str(source)])
-    from_piped = run([*render, '--input', str(piped)])
-    assert len(from_piped) == frames * 6 * 4, (len(from_piped) // 24, frames)
-    assert from_piped == from_source, 'the piped WAV rendered differently from its source'
-    print(f'WAV from an FFmpeg pipe (RIFF size field {sizes:#x}): all {frames} frames, as from its source')
+    from_whole = run([*render, '--input', str(whole)])
+    assert len(from_whole) == frames * 6 * 4, (len(from_whole) // 24, frames)
+    assert from_whole == from_source, 'the WAV FFmpeg wrote to a file rendered differently from its source'
+    print(
+        f'WAV from an FFmpeg pipe (sizes {riff_size:#x}): refused with the reason; written to a file: {frames} frames'
+    )
 
 
 def main():

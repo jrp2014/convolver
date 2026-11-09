@@ -370,30 +370,25 @@ An ordinary WAV file is checked more strictly than libsndfile checks it,
 because libsndfile takes a WAV that was cut short for a shorter one. Convolver
 reads the sizes in the file's header and in each of its chunks (its named
 parts, such as the format and the audio data), and refuses the file when a
-chunk runs past the end of the file or the samples end inside a frame. The
-plug-ins check the WAV files they load in the same way.
+chunk runs past the size the header gives or past the end of the file, or
+when the samples end inside a frame. The plug-ins check the WAV files they
+load in the same way.
 
-Two layouts that break the format's rules are still read, because the file is
-whole and other programs both write and read them:
+One layout that breaks the format's rules is still read, because the file is
+whole and other programs both write and read it: the last chunk has an odd
+number of bytes and the padding byte that should follow it is missing.
+Python's `wave` module writes mono 24-bit files this way when the number of
+frames is odd. If the header counts a padding byte that the file does not
+have, the file was cut short, and it is refused.
 
-- The last chunk has an odd number of bytes and the padding byte that should
-  follow it is missing. Python's `wave` module writes mono 24-bit files this
-  way when the number of frames is odd.
-- The sizes were never filled in, and say `0xFFFFFFFF`. FFmpeg leaves them so
-  when it writes a WAV to a pipe (`-f wav -`), because it cannot go back to the
-  header. The audio then runs to the end of the file.
-
-A file in either layout that was cut short is still refused where that can be
-seen: when the header counts a padding byte the file does not have, or when
-the audio of a file without sizes ends inside a frame. A file without sizes
-that lost whole frames cannot be told from a complete one.
-
-One file without sizes is refused although it may be whole: one whose audio
-is an odd number of bytes, which takes 8-bit or 24-bit audio with an odd
-number of channels and of frames (mono, usually). Programs disagree about
-where such a file ends, and macOS's own reader, which the Mac plug-ins use,
-stops a frame early. Have the file written to disk instead of a pipe, or
-give FFmpeg `-c:a pcm_f32le`.
+A WAV whose sizes were never filled in (they say `0xFFFFFFFF`) is refused,
+although some programs read such a file to its end. FFmpeg leaves the sizes
+so when it writes a WAV to a pipe (`-f wav -`), because it cannot go back to
+the header, and also when it is stopped before it finishes writing a file;
+Convolver cannot tell the two apart, so it cannot tell whether the audio is
+all there. The message says so. Write the file again, to a file instead of a
+pipe, and let the program finish; to send audio through a pipe, use
+[RAW streams](#raw-streams).
 
 Other containers, including RF64, get libsndfile's own checks; Convolver does
 not validate every codec libsndfile supports.

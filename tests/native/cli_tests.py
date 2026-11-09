@@ -261,6 +261,11 @@ def other_writers_tests(d):
         f.setsampwidth(3)
         f.setframerate(48000)
         f.writeframes(b''.join(struct.pack('<i', v)[:3] for v in taps))
+    size = odd.stat().st_size
+    assert size % 2 == 1 and struct.unpack_from('<I', odd.read_bytes(), 4)[0] == size - 8, (
+        "Python's wave module no longer leaves out the pad byte, so this test no longer covers that",
+        size,
+    )
     other = d / 'odd-other.wav'
     values = [12000, -6000, 3000, 1500, -750, 0, 375]
     pcm(other, values)

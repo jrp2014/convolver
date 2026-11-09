@@ -26,16 +26,16 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
-- WAV files (IO-10): two kinds of WAV file that other programs write and
-  read were refused as cut short, by the command line and by the plug-ins,
-  and as a filter were reported as "neither a configuration nor a sound
-  file". Both are now read whole: a file whose last chunk has an odd number
-  of bytes and no padding byte after it (Python's `wave` module writes mono
-  24-bit files with an odd number of frames this way), and a file whose
-  sizes were left at `0xFFFFFFFF` (FFmpeg writing a WAV to a pipe). Such a
-  file that really was cut short is still refused where that can be seen,
-  and so is a file without sizes whose audio is an odd number of bytes,
-  because macOS's reader stops a frame early in one
+- WAV files (IO-10): a WAV file whose last chunk has an odd number of
+  bytes and no padding byte after it was refused as cut short, by the
+  command line and by the plug-ins, and as a filter was reported as
+  "neither a configuration nor a sound file". Python's `wave` module writes
+  mono 24-bit files with an odd number of frames this way, and other
+  programs read them. Such a file is now read whole; one whose header
+  counts the missing byte is still refused. A WAV whose sizes were never
+  filled in (FFmpeg writing to a pipe, or stopped half way) is still
+  refused, because the two cannot be told apart, and the command line now
+  says that this is why and what to do
   ([input files](docs/use/command-line.md#input-files)). Found by the
   project review of 9 November 2026.
 
