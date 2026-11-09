@@ -52,10 +52,6 @@ void check_fft_options(const FftOptions& options) {
         options.time_limit_seconds != 0)
         throw std::invalid_argument("measured planning and wisdom require the FFTW backend");
 }
-// Use at least four real points; padding leaves audio block/latency unchanged.
-std::size_t fft_size(std::size_t b) noexcept {
-    return std::max(std::size_t(4), std::bit_ceil(2 * b));
-}
 std::size_t fft_storage(std::size_t n) noexcept {
     return 2 * n + 2 * (n + 2);
 }

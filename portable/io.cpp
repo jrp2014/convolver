@@ -271,12 +271,6 @@ sf_count_t frames(std::size_t samples, std::size_t channels) {
         throw std::length_error("audio buffer too large");
     return static_cast<sf_count_t>(n);
 }
-std::uint64_t splitmix64(std::uint64_t& state) noexcept {
-    std::uint64_t z = (state += 0x9e3779b97f4a7c15ULL);
-    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
-    z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
-    return z ^ (z >> 31);
-}
 } // namespace
 bool supported(OutputEncoding e) noexcept {
     switch (e.container) {
@@ -455,7 +449,7 @@ Quantizer::Quantizer(std::size_t channels, unsigned bits, QuantizationOptions op
 }
 float Quantizer::uniform() noexcept {
     // 24 random bits give exactly representable floats in [0, 1).
-    return static_cast<float>(splitmix64(state_) >> 40) * 0x1p-24f;
+    return static_cast<float>(detail::splitmix64(state_) >> 40) * 0x1p-24f;
 }
 float Quantizer::dither() noexcept {
     switch (options_.dither) {

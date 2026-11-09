@@ -82,9 +82,6 @@ unsigned long process_id() {
     return static_cast<unsigned long>(getpid());
 #endif
 }
-std::string ports(std::size_t inputs, std::size_t outputs) {
-    return std::to_string(inputs) + " in, " + std::to_string(outputs) + " out";
-}
 std::atomic<bool> last_written{true};
 // The line, and once per run of failures why the file could not be written,
 // where a user or developer can still find them.

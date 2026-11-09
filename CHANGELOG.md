@@ -50,6 +50,12 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Source (TIDY-1, from the whole-project review of 9 November 2026): small
+  helpers that existed in two or three copies now have one: the SplitMix64
+  generator and the little-endian readers and writers in `bytes.hpp`, and
+  "2 in, 6 out" in `host_log.hpp`. The macOS window names its status
+  values from `HostStatus`, and the FFT backends lose `fft_size()`, unused
+  since the PERF-2 engine. No change in behaviour or output.
 - Tests (CI-37, from the whole-project review of 9 November 2026): ten C++
   test programs, among them `native.engine`, `native.host` and the VST3
   and Audio Unit adapter tests, run every case and report each failure by

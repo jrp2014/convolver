@@ -15,9 +15,6 @@
 
 namespace convolver {
 namespace {
-std::string ports(std::size_t inputs, std::size_t outputs) {
-    return std::to_string(inputs) + " in, " + std::to_string(outputs) + " out";
-}
 std::string seconds(std::size_t frames, int rate) {
     if (rate <= 0)
         return {};

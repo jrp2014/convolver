@@ -82,10 +82,10 @@ normalizes filter spectra once by 1/N. Accelerate's adapter handles the packed
 DC/Nyquist and factor-of-two forward scaling described in
 [Apple's real FFT guide](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/vDSP_Programming_Guide/UsingFourierTransforms/UsingFourierTransforms.html).
 
-FFTW uses N=2B. Accelerate and Ooura use the next power of two at least 2B (minimum four),
-while keeping the requested B-frame latency, partition payload, delays and tail.
-Neither silently falls back to FFTW for awkward sizes. Extra padding consumes
-more spectrum/history storage; validation accounts for that before allocation.
+Each transform has N = 2B points for a partition of B frames, and partition
+sizes are powers of two (PERF-2), so every backend gets a power-of-two
+length, which Accelerate and Ooura need. Neither silently falls back to
+FFTW. Validation accounts for spectrum and history storage before allocation.
 Planning/allocation remain outside processing. The backend does not change routing,
 configuration import, sample formats, or the overlap-add scheduling algorithm.
 
@@ -149,8 +149,8 @@ defaults (`packaging/release-policy.json`).
 library, CLI and VST3 plug-in need no FFT library at all. The configured CI exercises it with Clang, GCC and MSVC. The code is vendored in `portable/third_party/ooura/`
 with its permissive licence ("use, copy, modify and distribute this code for any
 purpose ... without fee"), which is compatible with GPL-2.0-or-later; see the
-README there for the source and the small changes made. Like Accelerate it uses
-the next power of two at least 2B (minimum four) and accepts only estimate
+README there for the source and the small changes made. Like Accelerate it takes
+only power-of-two lengths, which the engine always asks for, and accepts only estimate
 planning, without wisdom or time limits. Its tables are built when the engine is
 prepared, not on the audio thread.
 
