@@ -441,7 +441,16 @@ separate processes, so each carries values, never pointers:
   records the refusal; its `ConvolverStatus` answer names the request and
   whether the file was accepted, and the controller then calls
   `setDirty(true)` for an accepted file, so the host marks the project
-  changed. Reading happens on the thread that delivered the message, never
+  changed. A host without `IComponentHandler2`, where `setDirty` cannot
+  reach it, is instead shown one edit of Latency that keeps its value
+  (`beginEdit`, `performEdit` with the current value, `endEdit`; VST3-17).
+  Audacity 4.0.2 stores the whole state only after an edit, so without it a
+  filter chosen in the window played but was missing from exports and saved
+  projects. Latency is used because it is not automatable and `process()`
+  ignores it (the controller sends a new Latency as a message, only when the
+  value changes), so neither the sound nor Gain, Mix or automation change.
+  It is a narrow fix: hosts that offer `setDirty` see nothing new, and the
+  general fix is the host implementing `IComponentHandler2`. Reading happens on the thread that delivered the message, never
   in `process()`.
 - A host may put a proxy between the two components
   ([`IConnectionPoint`](https://steinbergmedia.github.io/vst3_doc/vstinterfaces/classSteinberg_1_1Vst_1_1IConnectionPoint.html))

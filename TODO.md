@@ -1012,6 +1012,23 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   Audacity to presets for the first preview
   ([decisions](docs/project/decisions.md#plug-in-behaviour)): the item
   stays open for after the preview, or for Audacity's own fix.
+  Progress (9 November 2026): jrp chose to fix it now, despite the
+  runtime freeze, as lost state. Audacity 4.0.2's source
+  (`src/effects/vst/view/vstviewmodel.cpp`, `au3-vst3/VST3Wrapper.cpp`)
+  reads as though, while its vendor window is open, it stores the whole state,
+  both `getState` calls, within 100 ms of any `performEdit` when not
+  playing, and on the first check after playback stops when the edit came
+  during playback; it also stores it when the window closes. So after an
+  accepted file, a controller whose `setDirty` does not reach the host
+  (no `IComponentHandler2`) reports one edit of Latency that keeps its
+  value: not automatable, ignored by `process()`, and `endEdit` in
+  Audacity only marks the project unsaved and amends its current undo
+  state. No Gain or Mix edit is made, and hosts that offer `setDirty` see
+  nothing new (`vst3.adapter` checks both). Remaining: jrp's Audacity
+  check (Choose, export, save and reopen with no parameter touched, while
+  stopped and during playback) and a REAPER check that a chosen file adds
+  no Latency entry to its undo history; then the guides, release notes and
+  decision row lose the presets-only narrowing.
 - [ ] **VST3-12 — Editor window on Windows.** The same window as a Win32 view
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.

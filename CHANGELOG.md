@@ -24,6 +24,17 @@ Until 1.0 the C++ API may change between minor versions.
   including the real-time integration limits of PocketFFT and an isolated
   ordered-PFFFT Mac experiment. No production backend or default changes.
 
+### Fixed
+
+- VST3 (VST3-17): in a host that cannot be told the project changed
+  (no `IComponentHandler2`, such as Audacity 4.0.2), a filter loaded from
+  Convolver's window (Choose…, Recent, Reload or reloading when the file
+  changes) is now reported as an edit of Latency that keeps its value, so
+  the host stores it for exports and saved projects. The sound, Gain, Mix
+  and automation do not change, and hosts that can be told see no edit.
+  Not yet checked in Audacity; until it is, the guides still say to load
+  filters there from Audacity's preset menu.
+
 ## [0.13.2] - 2026-11-09
 
 The second published preview: macOS, Windows and Linux, unsigned, with the

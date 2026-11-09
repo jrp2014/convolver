@@ -380,7 +380,9 @@ class Controller final : public Steinberg::Vst::EditController,
     // Has the processor load the filter file at `path` (UTF-8); false if it
     // refused it. An accepted file changes the component state without a
     // parameter change, so the host is told the project changed
-    // (IComponentHandler2::setDirty) when the processor's answer says so.
+    // (IComponentHandler2::setDirty) when the processor's answer says so;
+    // a host without setDirty is shown an edit of Latency that keeps its
+    // value instead (VST3-17, notify).
     // A host that delivers the message later (VST3-15) brings the answer
     // after this returns true: the report then says what plays.
     bool load_file(const std::string& path);

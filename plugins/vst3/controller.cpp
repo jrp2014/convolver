@@ -222,8 +222,22 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     }
     // The component state now holds the file's filter: the host saves it
     // only if it knows the project changed.
-    if (load_request && load_accepted)
-        setDirty(true); // IComponentHandler2, where the host offers it.
+    if (load_request && load_accepted && setDirty(true) != kResultOk) {
+        // VST3-17, a narrow fix: a host without IComponentHandler2 cannot
+        // hear setDirty. Audacity 4.0.2 is one; it stores the whole state
+        // (both getState calls) only after the plug-in reports an edit, so
+        // without one a filter chosen in the window plays but is missing
+        // from exports and saved projects. Report an edit of Latency that
+        // keeps its value: not automatable, ignored by process() (the
+        // controller sends Latency as a message, only when it changes), so
+        // the sound, automation and Gain and Mix are untouched. Hosts that
+        // offer setDirty never get here. A more general fix is the host's:
+        // implementing IComponentHandler2 (draft Audacity issue, VST3-17).
+        const auto latency = getParamNormalized(latency_id);
+        beginEdit(latency_id);
+        performEdit(latency_id, latency);
+        endEdit(latency_id);
+    }
     // The SDK's way to report a new latency: the host deactivates the
     // component, reads getLatencySamples() and activates it again; some
     // (REAPER 7.85) only read it. The processor already plays the new
