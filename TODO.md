@@ -1614,7 +1614,8 @@ move to the archive.
   PR #163: from the second preview the draft release attaches the Windows
   and Linux packages, after they run on clean machines
   ([publishing](docs/develop/releasing.md#publishing-an-unsigned-preview),
-  [decision](docs/project/decisions.md#releases)).
+  [decision](docs/project/decisions.md#releases)). jrp published the first
+  such preview, [0.13.2](https://github.com/jrp2014/convolver/releases/tag/v0.13.2), on 9 November 2026.
 - [x] **REL-7 — Apply bounded preview acceptance.** 8 November 2026,
   PRs #156 and #159; jrp published [0.12.12](https://github.com/jrp2014/convolver/releases/tag/v0.12.12) without the remaining
   host checks and REL-3, which stay open under HOST-1, AU-4 and REL-3
