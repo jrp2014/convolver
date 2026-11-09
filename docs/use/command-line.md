@@ -34,7 +34,7 @@ Contents:
   [output formats](#output-formats),
   [integer output and dither](#integer-formats-dither-and-noise-shaping),
   [speaker labels](#speaker-labels), [FLAC and Ogg](#flac-and-ogg),
-  [output safety](#output-safety)
+  [output safety](#output-safety), [input files](#input-files)
 - [RAW streams](#raw-streams) and [FFmpeg](#with-ffmpeg)
 - [Inspection and validation](#inspecting-and-validating-configurations)
 - [Comparing two files](#comparing-two-files)
@@ -358,6 +358,39 @@ from 0, channels from 1); an overflow with its time, frame and channel in the
 output, and what to lower. For headerless input the message names the sample
 type it was read as, since a wrong `--raw-format` is the usual cause.
 
+For output that can exceed 4 GiB, use an `rf64`, `w64`, `caf`, `flac` or `raw`
+format; `wav` and `aiff` stop with an error at their limit.
+
+### Input files
+
+The input, and every IR file, can be any sound file the installed libsndfile
+reads; which codecs that includes depends on how libsndfile was built.
+
+An ordinary WAV file is checked more strictly than libsndfile checks it,
+because libsndfile takes a WAV that was cut short for a shorter one. Convolver
+reads the sizes in the file's header and in each of its chunks (its named
+parts, such as the format and the audio data), and refuses the file when a
+chunk runs past the end of the file or the samples end inside a frame. The
+plug-ins check the WAV files they load in the same way.
+
+Two layouts that break the format's rules are still read, because the file is
+whole and other programs both write and read them:
+
+- The last chunk has an odd number of bytes and the padding byte that should
+  follow it is missing. Python's `wave` module writes mono 24-bit files this
+  way when the number of frames is odd.
+- The sizes were never filled in, and say `0xFFFFFFFF`. FFmpeg leaves them so
+  when it writes a WAV to a pipe (`-f wav -`), because it cannot go back to the
+  header. The audio then runs to the end of the file.
+
+A file in either layout that was cut short is still refused where that can be
+seen: when the header counts a padding byte the file does not have, or when
+the audio of a file without sizes ends inside a frame. A file without sizes
+that lost whole frames cannot be told from a complete one.
+
+Other containers, including RF64, get libsndfile's own checks; Convolver does
+not validate every codec libsndfile supports.
+
 ## RAW streams
 
 Standard streams carry headerless samples, interleaved by frame, so no header
@@ -430,14 +463,6 @@ The new audio keeps the filter tail, so it can run past the video; add
 `-shortest` to cut it. It starts at time zero, so check sync for files whose
 audio starts late. FFmpeg has no built-in Convolver filter; this pipe is the way
 to use the two together.
-
-Ordinary RIFF/WAVE inputs receive extra chunk-boundary and PCM/float alignment
-validation, because libsndfile can otherwise silently accept truncation. Other
-input containers, including RF64, retain libsndfile's validation semantics; this
-is not a complete validator for every supported codec. Additional codecs depend
-on how the installed libsndfile was built. For output that can exceed 4 GiB,
-use an `rf64`, `w64`, `caf`, `flac` or `raw` format; `wav` and `aiff` stop with
-an error at their limit.
 
 ## Inspecting and validating configurations
 

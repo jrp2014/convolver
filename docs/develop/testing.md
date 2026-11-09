@@ -160,7 +160,10 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   and noise-shaping behavior,
   legacy parser/config lists, Windows/POSIX/mixed relative paths, signed zero, malformed input,
   truncation, RAW alignment, and which files libsndfile recognises as sound
-  files (`sound_file_header`). POSIX-specific tests also exercise fragmented
+  files (`sound_file_header`). The two WAV layouts that are read although
+  they break the format's rules (a last odd chunk without its padding byte,
+  and sizes left at `0xFFFFFFFF`) give every frame as a sound file and as a
+  filter, and the same layouts cut short are refused (IO-10). POSIX-specific tests also exercise fragmented
   descriptors, borrowed descriptor ownership, broken pipes and injected WAV
   header-finalization errors. For integer output they check rounding and
   clipping endpoints for 8 to 32 bits, reproducibility and chunk independence,
@@ -180,7 +183,9 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   output; empty, exact and partial last blocks, gain/matrix routing, both latency
   modes, real RAW pipelines, protection against overwriting inputs/IRs/configs,
   the dither default by resolution, the advice on pointless or beaten dither and
-  shaping choices, and the errors for removed options.
+  shaping choices, and the errors for removed options. A mono 24-bit WAV of
+  five frames written by Python's `wave` module, which leaves out the final
+  padding byte, renders as a filter and as an input (IO-10).
 - `native.inspection`: the inspection API's selection traversal, located and
   chained diagnostics, syntax-only null fields, all-entry validation after
   failures, raw filters (including AU files named `.raw` and `.pcm`, read
@@ -210,7 +215,9 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   time zero afterwards, as the guide warns (FFMPEG-1). The video packets'
   checksums are unchanged. Registered only when CMake finds `ffmpeg` and
   `ffprobe`; CI installs FFmpeg in the native g++ Release job on Linux,
-  which fails if the test is missing.
+  which fails if the test is missing. A WAV that FFmpeg wrote to a pipe,
+  with its sizes never filled in, renders to the same bytes as the file it
+  was made from, with every frame (IO-10).
 - `compatibility.corpus`: [generated configuration fixtures](../../tests/compatibility/README.md)
   rendered at block sizes 1, 3, 17 and 256 in both latency modes against an
   independent direct-convolution reference, then inspected to check the reported
@@ -248,7 +255,10 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   truncated, damaged, incomplete raw or wrong-rate filter, a float WAV holding
   a NaN, a double WAV holding 1e300 (infinite as a float), and a headerless
   `.pcm` chosen directly (starting like an MPEG frame) must be refused with
-  the same diagnostic code by both. A WAV whose header claims 800 kHz,
+  the same diagnostic code by both. The two WAV layouts of IO-10 (a last
+  odd chunk without its padding byte, and sizes left at `0xFFFFFFFF`) must
+  give the same five frames from both, and the same layouts cut short must be
+  refused with the same code. A WAV whose header claims 800 kHz,
   which the reader opens and then refuses, is refused 20 times without
   leaving a file descriptor open (counted in `/dev/fd`).
 - `fuzz.replay.config_text`, `fuzz.replay.config_list`, `fuzz.replay.host_state`,

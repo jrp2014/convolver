@@ -24,6 +24,19 @@ Until 1.0 the C++ API may change between minor versions.
   including the real-time integration limits of PocketFFT and an isolated
   ordered-PFFFT Mac experiment. No production backend or default changes.
 
+### Fixed
+
+- WAV files (IO-10): two kinds of WAV file that other programs write and
+  read were refused as cut short, by the command line and by the plug-ins,
+  and as a filter were reported as "neither a configuration nor a sound
+  file". Both are now read whole: a file whose last chunk has an odd number
+  of bytes and no padding byte after it (Python's `wave` module writes mono
+  24-bit files with an odd number of frames this way), and a file whose
+  sizes were left at `0xFFFFFFFF` (FFmpeg writing a WAV to a pipe). Such a
+  file that really was cut short is still refused where that can be seen
+  ([input files](docs/use/command-line.md#input-files)). Found by the
+  project review of 9 November 2026.
+
 ## [0.13.2] - 2026-11-09
 
 The second published preview: macOS, Windows and Linux, unsigned, with the
