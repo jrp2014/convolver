@@ -66,7 +66,9 @@ jobs:
       fail-fast: false
       matrix:
         # AUTO is what plug-in builds ship (Ooura, Accelerate on macOS);
-        # the sanitizer job below keeps the explicit FFTW override working.
+        # the sanitizer job below builds the explicit FFTW override and runs
+        # its in-process tests (no job loads an FFTW bundle in the validator
+        # or pluginval, since FFTW plug-ins are not distributed).
         # The core suite runs here only where no other job builds the same
         # compiler, flags and backend: on Linux the native g++ jobs do,
         # so this one runs the VST3 tests alone. macos-latest has a newer
@@ -422,13 +424,18 @@ jobs:
           ${{ matrix.configure }}
       - name: Build
         run: cmake --build build-vst3 --target ${{ matrix.targets }}
-      # A run without the runtime would pass without checking anything.
-      - name: Check that the test links ThreadSanitizer
+      # A run without instrumentation would pass without checking anything:
+      # the program must link the runtime (Clang links it statically, so that
+      # alone proves little) and the adapter's own code must call into it.
+      - name: Check that the test is instrumented for ThreadSanitizer
         if: matrix.tsan
         run: |
           test_program=$(find build-vst3 -type f -perm -u+x -name convolver_vst3_tests | head -n 1)
           test -n "$test_program"
           nm "$test_program" | grep -c '__tsan_func_entry'
+          object=$(find build-vst3 -path '*convolver_vst3_tests.dir*' -name 'processor.cpp.o' | head -n 1)
+          test -n "$object"
+          nm "$object" | grep -c ' U __tsan_func_entry'
       # A test renamed away from the selection fails rather than passing unrun.
       - name: Test
         run: >-

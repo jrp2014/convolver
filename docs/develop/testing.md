@@ -721,12 +721,14 @@ pluginval. Its `sanitizers` job (CI-36) runs two Debug builds with Clang on
 Linux side by side: every `vst3.*` test the build can run with ASan and
 UBSan and the FFTW backend (the validator and pluginval cannot load an
 instrumented bundle, so they do not run there, and `vst3.load_timing` skips
-itself), and `vst3.adapter` alone under ThreadSanitizer with the shipped
+itself; no job loads an FFTW bundle in them, since FFTW plug-ins are not
+distributed), and `vst3.adapter` alone under ThreadSanitizer with the shipped
 Ooura backend, where `latency_while_playing()` and
 `latency_handover_waits()` replace the processor while another thread calls
 `process()`. Every report is printed and any report fails the test; a step
-first checks that the test program carries the ThreadSanitizer
-instrumentation, so an uninstrumented build cannot pass.
+first checks that the test program links the ThreadSanitizer runtime and
+that the adapter's compiled code calls into it, so an uninstrumented build
+cannot pass.
 
 ### pluginval
 
@@ -1591,7 +1593,7 @@ format's whole test label, with the CLI for the `examples.first_use` fixture:
 
 | Target | Built by | Tests |
 | --- | --- | --- |
-| `convolver_vst3_suite` | VST3 on Linux | `ctest -L vst3` (with `CONVOLVER_PACKAGE_PLUGINS`, also what `release.stage` installs) |
+| `convolver_vst3_suite` | VST3 on Linux (Release, and Debug with ASan and UBSan) | `ctest -L vst3` (with `CONVOLVER_PACKAGE_PLUGINS`, also what `release.stage` installs) |
 | `convolver_au_suite` | Audio Unit with sanitizers | `ctest -L au` |
 | `convolver_lv2_tests` | LV2 with ASan and UBSan, and the upstream lilv check | `examples.first_use` and `lv2.*` |
 

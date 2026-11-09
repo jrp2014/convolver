@@ -27,10 +27,12 @@ Until 1.0 the C++ API may change between minor versions.
   Audio Unit and LV2 workflows already did. The Linux FFTW job is now a
   Debug build with ASan and UBSan running every `vst3.*` test it can (the
   SDK validator and pluginval cannot load an instrumented bundle and keep
-  running on the Release jobs), and a new Debug build runs `vst3.adapter`
-  under ThreadSanitizer with the shipped Ooura backend; a step checks that
-  the test is instrumented. From the whole-project review of 9 November
-  2026. No change to the plug-in
+  running on the Release jobs, so no job now loads an FFTW bundle in them),
+  and a new Debug build runs `vst3.adapter` under ThreadSanitizer with the
+  shipped Ooura backend; a step checks that the test is instrumented.
+  `vst3.preset` gets 300 s in sanitizer builds. Both passed on their first
+  run, with no reports. From the whole-project review of 9 November 2026.
+  No change to the plug-in
   ([VST3 tests](docs/develop/testing.md#vst3-tests)).
 
 ## [0.13.2] - 2026-11-09
