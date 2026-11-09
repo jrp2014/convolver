@@ -22,10 +22,11 @@ from pathlib import Path
 from contract import load_policy, sha256
 from promotion_gate import check
 
-# The first preview is macOS only (docs/project/decisions.md, 6 November
-# 2026); the run also builds Windows and Linux, which are not attached.
-PUBLISHED_PLATFORMS = ('macos-arm64', 'macos-x86_64')
-AUDIENCE = 'macOS 14 or later, on Apple silicon or Intel'
+# Every platform the candidate run builds: the first preview was macOS only,
+# and Windows and Linux joined from the next one (REL-9, jrp's decision of
+# 8 November 2026 in docs/project/decisions.md).
+PUBLISHED_PLATFORMS = ('macos-arm64', 'macos-x86_64', 'windows-x86_64', 'linux-x86_64')
+AUDIENCE = 'macOS 14 or later, Windows 11 and Linux (x86-64, glibc 2.35 or later)'
 CANDIDATE_WORKFLOW = '.github/workflows/release.yml'
 TAG = re.compile(r'v(\d+\.\d+\.\d+)')
 DESCRIPTIONS = {
@@ -98,15 +99,18 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
     # is one line, built here from adjacent strings.
     paragraphs = [
         (
-            f'**Unsigned developer preview.** Convolver {version} for {AUDIENCE}: the VST® 3 plug-in, the Audio Unit, '
-            'the `convolver` command-line tool, `convolver-preset` and `convolver-equalizer-apo`, with example presets '
-            'and the user guides. It is not signed with an Apple Developer ID: read the '
-            f'[install guide]({docs}/install.md#unsigned-previews) before opening it.'
+            f'**Unsigned developer preview.** Convolver {version} for {AUDIENCE}: the VST® 3 plug-in, on macOS the '
+            'Audio Unit, the `convolver` command-line tool, `convolver-preset` and `convolver-equalizer-apo`, with '
+            'example presets and the user guides. It is not signed with an Apple Developer ID or a Windows '
+            f'code-signing certificate: read the [install guide]({docs}/install.md#unsigned-previews) before '
+            'opening it.'
         ),
         '## Download',
         (
-            'Choose the installer (`.pkg`) or the ZIP archive for your Mac, and check its SHA-256 before opening it '
-            '(`shasum -a 256 <file>` in Terminal).'
+            'Choose the file for your system: on macOS and Windows the installer (`.pkg`, `-setup.exe`) or the ZIP '
+            'archive, on Linux the ZIP archive. Check its SHA-256 before opening it: `shasum -a 256 <file>` in '
+            "macOS's Terminal, `Get-FileHash <file>` in Windows PowerShell (which prints it in capitals), "
+            '`sha256sum <file>` on Linux.'
         ),
         '| File | For | Kind | SHA-256 |\n| --- | --- | --- | --- |\n' + rows.rstrip('\n'),
         '## Install and first use',
@@ -120,26 +124,41 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
         ),
         '## Known limitations',
         (
-            '- macOS only. Windows, Linux and the LV2 plug-in come with later previews; until then, build from '
-            'source.\n'
-            '- Unsigned: macOS asks you to confirm that you want to open it.\n'
-            '- Checked by hand on one Mac in REAPER and Audacity (VST3) and GarageBand (Audio Unit); '
-            f'[status]({base}/blob/{tag}/docs/project/status.md) says which steps. Other hosts are untested.\n'
+            "- On Windows and Linux the VST3 plug-in has no window yet. Load a filter from the host's preset menu "
+            '(each example comes with a `.vstpreset`, and `convolver-preset` makes one from your own filter) and set '
+            "Gain, Mix and Latency in the host's own controls "
+            f'([load a preset]({docs}/first-sound-in-a-host.md#optional-load-a-preset)). The LV2 plug-in comes with '
+            'a later preview; until then, build it from source.\n'
+            '- Unsigned: macOS asks you to confirm that you want to open it, and Windows shows a SmartScreen '
+            'warning.\n'
+            '- Windows needs the Microsoft Visual C++ 2015-2022 x64 runtime, which most computers already have.\n'
+            '- An early preview, published before its last checks. On one Mac, renders and exports from REAPER and '
+            'Audacity (VST3) and GarageBand (Audio Unit) matched the command-line tool, and saved projects reopened '
+            'with their filter. Not yet checked: listening in any host, VoiceOver, the latest Audio Unit change in '
+            'GarageBand, and anyone outside the project following the guides. The Windows and Linux packages were '
+            'checked only automatically, on CI machines that had never built Convolver: the tools and examples ran '
+            "from them, the plug-in's library loaded and listed its classes, and the Windows installer installed "
+            'and removed itself. Nobody has used them in a host yet. '
+            f'[Status]({base}/blob/{tag}/docs/project/status.md#checks-left-before-publication) lists what is open. '
+            'Other hosts are untested.\n'
             "- In Audacity, load filters from Audacity's own preset menu. A filter loaded from Convolver's window "
             '(Choose…, Recent or Reload) plays there, but Audacity 4 does not keep it for exports or saved projects.'
         ),
         '## Report a problem',
         (
-            "Copy Diagnostics from Convolver's window, and say which host and version you used, how you loaded the "
-            'filter (Choose…, Recent, Reload, a preset or a saved project), and whether the problem is in playback, '
-            f'export or reopening ([how to report]({docs}/troubleshooting.md#report-a-problem)).'
+            "Copy Diagnostics from Convolver's window on macOS, or attach the Convolver log on Windows and Linux "
+            f'([where it is]({docs}/plugins.md#status-and-the-convolver-log)). Say which system, host and version '
+            'you used, how you loaded the filter (on macOS Choose…, Recent or Reload; anywhere a preset or a saved '
+            'project), and whether '
+            'the problem is in playback, export or reopening '
+            f'([how to report]({docs}/troubleshooting.md#report-a-problem)).'
         ),
         '## Loading responsiveness',
         qualification,
         '## How it was built',
         (
-            f'Built and tested by [run {run["id"]}]({run["html_url"]}) from commit `{commit}` (tag `{tag}`). The same '
-            'run built Windows and Linux packages, which are not part of this preview. `Convolver-source.tar.gz` is '
+            f'Built and tested by [run {run["id"]}]({run["html_url"]}) from commit `{commit}` (tag `{tag}`). '
+            '`Convolver-source.tar.gz` is '
             'the corresponding source: Convolver with the exact SDK and library sources the packages were built from. '
             'The maintainer keeps the matching debugging symbols.'
         ),

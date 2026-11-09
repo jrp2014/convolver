@@ -69,7 +69,7 @@ boundary and C++20 in the core.
 | Early walkthrough (macOS) (done) | **REL-5**: an explicitly limited walkthrough of an exact candidate on macOS, the stereo journey only | Done on 1 November 2026 as a package and command-line check only, by jrp's choice ([done](#done)); its host steps moved to HOST-1's REAPER smoke test and REL-3. It did not change the first preview's contents and does not replace REL-3. |
 | 4. Settings, windows and the Audio Unit (first-preview parts built) | The **HOST-2** editor as the macOS-only first preview has it: **PLUG-9** (the report and loading from a file) and **PLUG-10** (Gain, Mix and Latency), **VST3-3**, **VST3-4**, **AU-7**, and the window **VST3-11** shared with the Audio Unit in **AU-6**; and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview, in the macOS candidates since PR #115). For later previews: **VST3-12** (Windows), **VST3-13** (Linux), and PLUG-9, PLUG-10 and AU-7's remaining gain modes and meters | The [editor plan's phases](docs/archive/plans/2026-10-24-plugin-editor.md#phases-and-todo-items) the first preview needs, each merged with its tests (what remains of each item for the first preview is its host steps, under HOST-1 and AU-4); the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the [preview workloads](#loading-responsiveness), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). |
 | 5. The milestone | A candidate from a 0.12.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
-| 6. Later previews | Windows and Linux (**VST3-12**, **VST3-13**), the remaining gain modes and meters (**PLUG-9**, **PLUG-10**, **AU-7**), PERF-3's supported workloads; **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
+| 6. Later previews | The Windows and Linux packages without a window (**REL-9**, from the second preview); their windows (**VST3-12**, **VST3-13**), the remaining gain modes and meters (**PLUG-9**, **PLUG-10**, **AU-7**), PERF-3's supported workloads; **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview, except the Windows and Linux VST3 packages, published for people to try after the automated clean-machine run ([decision](docs/project/decisions.md#releases)). Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need. Not a first-preview gate: the loading-responsiveness gate uses the finite preview workloads instead. |
 | Supporting, cheap | **PERF-1**, **HOST-4** | HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
 | After the milestone: edges over other convolvers | First the limitations users cite: **EDGE-1** with **IO-2**, **PERF-3**'s long-reverb workloads with **EDGE-11**, then **PERF-2** with **EDGE-10**, **EDGE-3** and **EDGE-13**; then **EDGE-12**, **EDGE-9**, **EDGE-2**, **EDGE-4** and **EDGE-5**; then **EDGE-6** to **EDGE-8**, in the ranked order of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) | jrp's goal (6 November 2026): be better than the most popular reverb plug-ins. Waits for REL-3 unless jrp lifts the freeze; each item starts with the owner's decision its plan row names, and keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#non-negotiables). PERF-2 still waits for PERF-3's budgets. |
@@ -85,26 +85,6 @@ needs them. This table owns the current ordering; the dated
 is superseded.
 
 ## User experience and distribution
-
-- [ ] **REL-7 — Apply bounded preview acceptance.** Follow the
-  [qualification plan](docs/project/plans/2026-11-08-preview-acceptance.md):
-  hold one candidate still, complete the existing required host and release
-  gates, classify blockers by consequence, and record lower-risk work for
-  later. Done when the final candidate meets the stop rule and its evidence
-  and deferred limitations are linked from the gate summary; jrp publishes.
-  The plan is written; qualification is not claimed complete. CI-34 is
-  separate and does not gate the walkthrough.
-  Progress (8 November 2026): from jrp's release-readiness review of
-  v0.12.8, the checks still to run are one list,
-  [checks left before publication](docs/project/status.md#checks-left-before-publication),
-  which keeps the results jrp accepted and names what could be narrowed.
-  REL-6 qualified the 0.12.5 source on his MacBook Pro
-  ([record](docs/archive/reviews/2026-11-08-rel6-qualification.md)).
-  jrp chose the final candidate: the first tag after DOC-10 merges, with
-  most host checks run first on a v0.12.8 candidate and REL-6's 0.12.5
-  result standing while no engine, loading or plug-in code changes
-  ([decisions](docs/project/decisions.md#releases)). Remaining: the
-  checks in that list, then his publication.
 
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The candidate workflow
   builds unsigned packages with pinned dependencies, corresponding source,
@@ -128,7 +108,10 @@ is superseded.
   it worked, where they hesitated and what they could not do without help.
   Fix the guides or the product for each finding and repeat the affected
   steps. This is the exit criterion of the
-  [next milestone](#execution-priorities). jrp chooses the tester. Record
+  [next milestone](#execution-priorities). jrp chooses the tester.
+  jrp decided (8 November 2026) to publish the first preview before this
+  walkthrough, so it uses the published files and gates the next preview
+  ([decisions](docs/project/decisions.md#releases)). Record
   the evidence HOST-1 lists (package hash, host and OS versions, expected
   outputs, recovery from a refused filter) for each journey.
   jrp's review of 8 November 2026 adds the first thing to try: "The
@@ -1608,6 +1591,15 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **REL-9 — Windows and Linux in previews.** 8 November 2026,
+  PR #163: from the second preview the draft release attaches the Windows
+  and Linux packages, after they run on clean machines
+  ([publishing](docs/develop/releasing.md#publishing-an-unsigned-preview),
+  [decision](docs/project/decisions.md#releases)).
+- [x] **REL-7 — Apply bounded preview acceptance.** 8 November 2026,
+  PRs #156 and #159; jrp published [0.12.12](https://github.com/jrp2014/convolver/releases/tag/v0.12.12) without the remaining
+  host checks and REL-3, which stay open under HOST-1, AU-4 and REL-3
+  ([checks left](docs/project/status.md#checks-left-before-publication)).
 - [x] **AU-17 — Audio Unit listeners told on the main thread.** 8
   November 2026, PR #158, from a ThreadSanitizer report on `main`
   ([run 42512164144](https://github.com/jrp2014/convolver/actions/runs/42512164144));

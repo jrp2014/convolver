@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Preparing a draft pre-release must refuse any run, tag or file that is not
-the candidate it claims to be (REL-8), and attach only the published files."""
+the candidate it claims to be (REL-8), and attach only the published files:
+every platform's packages and the source (REL-9)."""
 
 import json
 import shutil
@@ -104,7 +105,8 @@ class PrepareReleaseTests(unittest.TestCase):
         arguments.update(changes)
         return prepare_release.prepare(**arguments)
 
-    def test_attaches_only_the_macos_files_and_the_source(self):
+    def test_attaches_every_platform_and_the_source_but_no_manifest(self):
+        # REL-9: Windows and Linux joined macOS from the second preview.
         names = self.prepare()
         version = self.version
         self.assertEqual(
@@ -114,6 +116,9 @@ class PrepareReleaseTests(unittest.TestCase):
                 f'Convolver-{version}-preview-macos-arm64-unsigned.pkg',
                 f'Convolver-{version}-preview-macos-x86_64.zip',
                 f'Convolver-{version}-preview-macos-x86_64-unsigned.pkg',
+                f'Convolver-{version}-preview-windows-x86_64.zip',
+                f'Convolver-{version}-preview-windows-x86_64-unsigned-setup.exe',
+                f'Convolver-{version}-preview-linux-x86_64.zip',
                 'Convolver-source.tar.gz',
             ],
         )
@@ -131,12 +136,23 @@ class PrepareReleaseTests(unittest.TestCase):
             digest, name = line.split('  ')
             self.assertIn(f'| `{name}` |', text)
             self.assertIn(f'`{digest}`', text)
-        self.assertNotIn('windows-x86_64.zip', text)
-        self.assertNotIn('linux-x86_64.zip', text)
+        self.assertNotIn('artifact-manifest.json', text)
+        # Each system's own checksum command, and what Windows and Linux lack.
+        for words in ('shasum -a 256', 'Get-FileHash', 'sha256sum', 'SmartScreen', 'Visual C++'):
+            self.assertIn(words, text)
+        self.assertIn('On Windows and Linux the VST3 plug-in has no window yet', text)
+        self.assertIn(
+            f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/first-sound-in-a-host.md#optional-load-a-preset',
+            text,
+        )
+        self.assertIn('Nobody has used them in a host yet', text)
+        self.assertNotIn('macOS only', text)
         self.assertIn('Qualified on a named Mac.', text)
         self.assertIn(self.commit, text)
         self.assertIn('https://github.com/owner/convolver/actions/runs/42', text)
         self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/install.md#unsigned-previews', text)
+        # What was not checked before publication (jrp's decision of 8 November 2026).
+        self.assertIn('Not yet checked: listening in any host', text)
         # The Audacity limitation (VST3-17), which jrp chose to state rather than fix.
         self.assertIn("load filters from Audacity's own preset menu", text)
         # How to report a problem, with what makes a report useful.
@@ -144,8 +160,11 @@ class PrepareReleaseTests(unittest.TestCase):
         self.assertIn(
             f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/troubleshooting.md#report-a-problem', text
         )
-        for words in ('Copy Diagnostics', 'host and version', 'playback', 'export or reopening'):
+        for words in ('Copy Diagnostics', 'Convolver log', 'host and version', 'playback', 'export or reopening'):
             self.assertIn(words, text)
+        self.assertIn(
+            f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/plugins.md#status-and-the-convolver-log', text
+        )
 
     def test_refuses_a_run_that_is_not_a_manual_successful_candidate_run_on_the_tag(self):
         for key, value, words in [

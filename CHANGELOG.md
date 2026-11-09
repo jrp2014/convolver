@@ -12,6 +12,73 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Windows and Linux previews (REL-9): from the second preview, the draft
+  release attaches the Windows and Linux packages with the macOS ones: the
+  VST3 plug-in (no window yet on those systems; filters load from the
+  host's preset menu) and the tools, with a Windows installer. Its notes
+  give each system's checksum command, what Windows and Linux lack and how
+  to report a problem without the window. Before the draft is made, the
+  exact files run on machines that never built Convolver: stock Ubuntu
+  22.04, Ubuntu 24.04, Debian 12 and Fedora images and a fresh Windows
+  runner, where the tools render the examples, the plug-in's library loads
+  and lists its classes, and the installer installs and removes itself
+  ([publishing](docs/develop/releasing.md#publishing-an-unsigned-preview)).
+- Releases (REL-7): jrp decided to publish the first preview without the
+  remaining host checks and the independent walkthrough; they stay open
+  as follow-up, and the release notes list what was not checked
+  ([decision](docs/project/decisions.md#releases)).
+- Releases (REL-7): jrp published Convolver 0.12.12 as the first unsigned
+  developer preview for macOS on 8 November 2026
+  ([release](https://github.com/jrp2014/convolver/releases/tag/v0.12.12)).
+- Long-reverb experiment (PERF-2): `convolver_long_reverb_benchmark`
+  compares today's engine with prototype non-uniform partitions (zero
+  latency, large blocks' work spread over callbacks, or on a worker thread)
+  and with KlangFalter's engine, checks each against the double-precision
+  oracle, and `auto_gain.py` measures what automatic gain would do to
+  reverb and room-correction filters. Results are in the
+  [measurements](docs/develop/fft-measurements.md#long-reverbs-and-zero-latency)
+  and the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#automatic-gain),
+  with a review of eleven other open-source convolvers and of algorithms
+  beyond partitioned convolution
+  ([other convolvers](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#other-convolvers-and-algorithms));
+  the product is unchanged.
+
+### Changed
+
+- Version 0.13.0 for PERF-2 (jrp, 8 November 2026): the next minor-version
+  pre-release after the published `v0.12.12`. C++ consumers request
+  `find_package(Convolver 0.13)`.
+- Engine (PERF-2): non-uniformly
+  partitioned convolution that adds no processing delay at Latency 0. A filter's first taps are
+  summed directly and the rest by stages of blocks growing from 64 to 8192
+  frames, whose larger blocks spread their work over the following
+  callbacks. Long filters need far less processor time (a 480,000-tap
+  stereo filter about 11 times less, a 30 s crossover 38 times less, on
+  the Linux cloud VM; 10 to 17 times less at 10 and 30 s on an Apple M5
+  Max at the same latency; see the
+  [measurements](docs/develop/fft-measurements.md#the-non-uniform-engine))
+  and the worst callback falls with them. At the same latency short filters
+  cost no more than before; zero latency costs more for them (about 60 to
+  85% more than the old default for 4096 taps, under 1% of a core). The
+  Latency setting gains 0 frames, first in the list and the default, and the command line's `--block-size` and inspection default to
+  0 to match, so default renders still equal the plug-ins' output.
+  `--block-size 0` is accepted everywhere, and `--tune-fft` plans every
+  transform size the engine uses, whatever the latency. Output differs
+  from before by rounding only (worst oracle error 5.2e-7 of the peak).
+  Projects keep the latency they were saved with, except some at the old
+  default, 256, which open at zero: in VST3, a project that saved no
+  settings (all at their defaults); in the Audio Unit, every project saved
+  at 256. The C++ `Engine`, `analyze_configuration`,
+  `validate_configuration` and `configuration_tail_frames` default to
+  latency 0.
+
+## [0.12.12] - 2026-11-08
+
+The first published preview: macOS only, unsigned, published before its
+last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0.12.12)).
+
+### Added
+
 - Release evidence (REL-6, REL-7): jrp's responsiveness qualification of
   the 0.12.5 source on his MacBook Pro is recorded: all 24 combinations
   passed on the first run, with the longest hold of the host's thread
@@ -68,18 +135,6 @@ Until 1.0 the C++ API may change between minor versions.
   CI-34 proposes scheduling improvements separately; workflows and useful
   test coverage are unchanged.
 
-- Long-reverb experiment (PERF-2, in progress): `convolver_long_reverb_benchmark`
-  compares today's engine with prototype non-uniform partitions (zero
-  latency, large blocks' work spread over callbacks, or on a worker thread)
-  and with KlangFalter's engine, checks each against the double-precision
-  oracle, and `auto_gain.py` measures what automatic gain would do to
-  reverb and room-correction filters. Results are in the
-  [measurements](docs/develop/fft-measurements.md#long-reverbs-and-zero-latency)
-  and the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#automatic-gain),
-  with a review of eleven other open-source convolvers and of algorithms
-  beyond partitioned convolution
-  ([other convolvers](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#other-convolvers-and-algorithms));
-  the product is unchanged.
 - Host checks (HOST-1): a reusable 20-second, 48 kHz stereo listening WAV
   with quiet clicks and sustained tones, a standard-library Python generator,
   and [usage notes](examples/host-audio/README.md). The REAPER smoke-test
@@ -359,31 +414,6 @@ Until 1.0 the C++ API may change between minor versions.
   host's audio settings are known), PLUG-28 (packaged presets named after
   their filter) and PLUG-29 (the Recent list out of the log folder), and
   PLUG-25 records jrp's agreed wording for a rate refusal.
-- Version 0.13.0 for PERF-2 (jrp, 8 November 2026): the next minor-version
-  pre-release after the published `v0.12.12`. C++ consumers request
-  `find_package(Convolver 0.13)`.
-- Engine (PERF-2, draft for after the first release): non-uniformly
-  partitioned convolution that adds no processing delay at Latency 0. A filter's first taps are
-  summed directly and the rest by stages of blocks growing from 64 to 8192
-  frames, whose larger blocks spread their work over the following
-  callbacks. Long filters need far less processor time (a 480,000-tap
-  stereo filter about 11 times less, a 30 s crossover 38 times less, on
-  the Linux cloud VM; see the
-  [measurements](docs/develop/fft-measurements.md#the-non-uniform-engine))
-  and the worst callback falls with them. At the same latency short filters
-  cost no more than before; zero latency costs more for them (about 60 to
-  85% more than the old default for 4096 taps, under 1% of a core). The
-  Latency setting gains 0 frames, first in the list and the default, and the command line's `--block-size` and inspection default to
-  0 to match, so default renders still equal the plug-ins' output.
-  `--block-size 0` is accepted everywhere, and `--tune-fft` plans every
-  transform size the engine uses, whatever the latency. Output differs
-  from before by rounding only (worst oracle error 5.2e-7 of the peak).
-  Projects keep the latency they were saved with, except some at the old
-  default, 256, which open at zero: in VST3, a project that saved no
-  settings (all at their defaults); in the Audio Unit, every project saved
-  at 256. The C++ `Engine`, `analyze_configuration`,
-  `validate_configuration` and `configuration_tail_frames` default to
-  latency 0.
 - Host checks (HOST-1): jrp's Audacity 4.0.2 session with the VST3
   plug-in (7 November 2026, candidate 0.10.13) is
   [recorded](docs/archive/reviews/2026-11-07-host1-audacity.md): the seven
@@ -1973,7 +2003,8 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.12.12...HEAD
+[0.12.12]: https://github.com/jrp2014/convolver/releases/tag/v0.12.12
 [0.7.1]: https://github.com/jrp2014/convolver/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/jrp2014/convolver/compare/v0.6.10...v0.7.0
 [0.6.10]: https://github.com/jrp2014/convolver/compare/v0.5.6...v0.6.10
