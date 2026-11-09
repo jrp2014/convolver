@@ -544,6 +544,12 @@ if(CONVOLVER_BUILD_TESTS)
             "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/compatibility/run_corpus.py"
             "$<TARGET_FILE:convolver_cli>")
         set_tests_properties(compatibility.corpus PROPERTIES LABELS "compatibility;real-libraries;cli" TIMEOUT 300)
+        # COMPAT-1: filters kept from published releases must reproduce the audio
+        # those releases' command-line tools rendered.
+        add_test(NAME upgrade.cli COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
+            "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/upgrade/run_upgrade.py"
+            --cli "$<TARGET_FILE:convolver_cli>")
+        set_tests_properties(upgrade.cli PROPERTIES LABELS "upgrade;real-libraries;cli" TIMEOUT 300)
         # DOC-1 and PLUG-2: the shared fixtures, and the documented first-use commands run
         # as written. The renders it leaves are the CLI reference for plug-in comparisons.
         add_test(NAME examples.fixtures COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"

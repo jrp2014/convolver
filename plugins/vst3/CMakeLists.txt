@@ -170,6 +170,40 @@ if(CONVOLVER_BUILD_TESTS)
             "${PROJECT_SOURCE_DIR}/tests/vst3/validate_bundle.py" "$<TARGET_FILE:validator>" -e "${bundle}")
         set_tests_properties(vst3.validator vst3.validator.extensive
             PROPERTIES LABELS "vst3;real-libraries" TIMEOUT 180)
+        # COMPAT-1: presets kept from published releases, restored by the bundle
+        # as a host loads it, must reproduce the audio those releases rendered.
+        # Like the validator, the program loads the bundle from its file, so it
+        # is not instrumented and needs runtime validation.
+        set(vst3_render_sources "${PROJECT_SOURCE_DIR}/tests/upgrade/vst3_render.cpp"
+            "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
+        if(APPLE)
+            list(APPEND vst3_render_sources "${SDK_ROOT}/public.sdk/source/vst/hosting/module_mac.mm")
+            set_source_files_properties("${SDK_ROOT}/public.sdk/source/vst/hosting/module_mac.mm"
+                PROPERTIES COMPILE_FLAGS "-fobjc-arc")
+        elseif(WIN32)
+            list(APPEND vst3_render_sources "${SDK_ROOT}/public.sdk/source/vst/hosting/module_win32.cpp")
+        else()
+            list(APPEND vst3_render_sources "${SDK_ROOT}/public.sdk/source/vst/hosting/module_linux.cpp")
+        endif()
+        add_executable(convolver_vst3_render ${vst3_render_sources})
+        target_link_libraries(convolver_vst3_render PRIVATE sdk sdk_hosting ${CMAKE_DL_LIBS})
+        if(APPLE)
+            target_link_libraries(convolver_vst3_render PRIVATE "-framework Cocoa")
+        elseif(WIN32)
+            target_link_options(convolver_vst3_render PRIVATE
+                "/MANIFEST:EMBED" "/MANIFESTINPUT:${PROJECT_SOURCE_DIR}/tests/vst3/windows-utf8.manifest")
+        endif()
+        # The CLI only reports which CPU kernels run here; upgrade.cli checks it.
+        set(upgrade_kernels "")
+        if(TARGET convolver_cli)
+            set(upgrade_kernels --kernels-from "$<TARGET_FILE:convolver_cli>")
+        endif()
+        add_test(NAME vst3.upgrade COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
+            "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tests/upgrade/run_upgrade.py"
+            --vst3-render "$<TARGET_FILE:convolver_vst3_render>" --vst3-bundle "${bundle}"
+            --vst3-backend "${fft_backend}" ${upgrade_kernels})
+        set_tests_properties(vst3.upgrade PROPERTIES LABELS "vst3;real-libraries;upgrade" TIMEOUT 300)
+        add_dependencies(check convolver_vst3_render)
     else()
         message(STATUS "VST3 runtime validation and moduleinfo loading disabled: developer build only")
     endif()

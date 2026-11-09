@@ -880,6 +880,14 @@ means a patched FFmpeg build with `--enable-gpl`.
   [publication steps](docs/develop/releasing.md#publishing-an-unsigned-preview)
   when this is implemented. The four guarantees it protects are listed in
   [status](docs/project/status.md#compatibility-guarantees).
+  Progress (9 November 2026, PR #170): 0.13.2 is kept in
+  [`tests/upgrade/0.13.2/`](tests/upgrade/README.md): its 21 example presets
+  and their filters, byte for byte from the Linux ZIP (the same bytes as
+  macOS), with inputs and the audio its own CLI and VST3 plug-in rendered
+  (identical to each other). `upgrade.cli` and `vst3.upgrade` check every
+  later build; the capture step is in the publication steps. Remaining: a
+  REAPER project saved with 0.13.2, with its state chunk restored through
+  each adapter, and Audio Unit state from a release.
 - [ ] **DIAG-5 — Report clipping after a command-line render.** From the
   BruteFIR comparison (8 November 2026): BruteFIR has printed each output's
   count of overflowed samples and its peak by default since 0.99
