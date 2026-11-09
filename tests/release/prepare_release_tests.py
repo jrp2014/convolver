@@ -155,6 +155,12 @@ class PrepareReleaseTests(unittest.TestCase):
         self.assertIn('Not yet checked: listening in any host', text)
         # The Audacity limitation (VST3-17), which jrp chose to state rather than fix.
         self.assertIn("load filters from Audacity's own preset menu", text)
+        # The new engine was published without a host listening session (jrp, 9 November 2026),
+        # and some older projects open at the new default Latency (PERF-2).
+        self.assertIn('nobody has listened to it in a host yet', text)
+        self.assertIn('Some projects saved with 0.12.12', text)
+        self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/plugins.md#settings', text)
+        self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/CHANGELOG.md', text)
         # How to report a problem, with what makes a report useful.
         self.assertIn('## Report a problem', text)
         self.assertIn(

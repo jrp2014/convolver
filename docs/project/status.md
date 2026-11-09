@@ -222,7 +222,10 @@ jrp decided to publish the first preview without running these
 ([decision](decisions.md#releases)): they stay open as follow-up work after
 publication, not gates, and the release notes list them as not checked.
 Check 6 (the final tag's candidate run) still runs before publication.
-They gate the next preview unless jrp decides otherwise.
+jrp decided on 9 November 2026 to publish the second preview, a 0.13.x tag for
+macOS, Windows and Linux, without them too, and without check 9
+([decision](decisions.md#releases)); they stay open as follow-up work, and
+its release notes say what was not checked.
 
 This is the one list of what remains (REL-7), from jrp's direction of
 8 November 2026: finish the genuinely missing listening, host and
@@ -249,6 +252,7 @@ If a fix changes plug-in code after a check, that check runs again.
 | 6 | The final candidate: the candidates workflow hand-run on the first tag after DOC-10 merges passes; its package SHA-256 and the code comparison with v0.12.8 recorded | [Releasing](../develop/releasing.md#candidates); gate 6 | CI | Not started |
 | 8 | GarageBand with the Audio Unit's window open: change Latency stopped and while playing, then save and reopen (AU-17, PR #158, changed how the unit tells the host about latency) | GarageBand steps 4 to 6 with the window open | 5 min | Not run (after v0.12.8) |
 | 7 | The independent walkthrough of the final candidate: install, load their own filter, save and reopen, with only the supplied instructions; then the REL-2 journeys (stereo, 2→6 crossover, file rendering) from the package | REL-3 | the tester | Not started |
+| 9 | PERF-2's focused session on a 0.13 candidate: a long filter at Latency 0 by ear in REAPER and GarageBand, Latency changes and filter replacement while playing, projects saved by 0.12.12 reopening at the Latency the [plug-in guide](../use/plugins.md#settings) gives, and a saved Latency of 1024 reopening in time | PERF-2 in [TODO](../../TODO.md) | 30 min | Not run (the second preview published without it) |
 
 Accepted and not repeated: VST3-16's latency compensation in REAPER (gate
 1); REAPER's window controls and saved settings on 0.12.5, and its packaged
