@@ -159,7 +159,15 @@ order:
 ### Local trial
 
 With a candidate ZIP downloaded (for example from the 0.13.2 release), on
-jrp's Mac, using the names from steps 2 and 4:
+jrp's Mac, using the names from steps 2 and 4. Store the notary key once,
+from wherever the `.p8` file was saved, so that no later command names it and
+it is never inside a folder that is uploaded:
+
+```sh
+xcrun notarytool store-credentials convolver-notary --key "$HOME/Downloads/AuthKey_KEYID.p8" --key-id KEYID --issuer ISSUER
+```
+
+Then sign, submit only the signed bundles and tools, and staple:
 
 ```sh
 ditto -x -k Convolver-0.13.2-preview-macos-arm64.zip trial
@@ -170,8 +178,12 @@ for f in VST3/Convolver.vst3/Contents/MacOS/Convolver Components/Convolver.compo
 done
 codesign --force --options runtime --timestamp --sign "$id" VST3/Convolver.vst3
 codesign --force --options runtime --timestamp --sign "$id" Components/Convolver.component
-xcrun notarytool store-credentials convolver-notary --key AuthKey_KEYID.p8 --key-id KEYID --issuer ISSUER
-ditto -c -k . ../submit.zip
+mkdir ../submit
+ditto VST3 ../submit/VST3
+ditto Components ../submit/Components
+ditto bin ../submit/bin
+ditto -c -k ../submit ../submit.zip
+zipinfo -1 ../submit.zip   # lists only VST3/, Components/ and bin/
 xcrun notarytool submit ../submit.zip --keychain-profile convolver-notary --wait
 for b in VST3/Convolver.vst3 Components/Convolver.component; do
   xcrun stapler staple "$b" && xcrun stapler validate "$b"
@@ -181,7 +193,9 @@ done
 The trial is done when the submission reports `status: Accepted` and both
 bundles validate. Read the log either way
 (`xcrun notarytool log ID --keychain-profile convolver-notary`). The trial's
-files are for checking only, not for publishing.
+files are for checking only, not for publishing. Never put a `.p12` or `.p8`
+file in a folder that is zipped, uploaded or committed; afterwards, move the
+`.p8` file somewhere safe or delete it (the keychain keeps the profile).
 
 ## Pipeline changes
 
@@ -198,7 +212,10 @@ no secret is exposed to a pull request.
   tags are how candidates for a release are made today). A step makes a
   temporary keychain and imports both certificates as GitHub's page shows
   (`security create-keychain`, `import`, `set-key-partition-list`,
-  `list-keychain`), and writes the `.p8` key to `$RUNNER_TEMP`. The job's
+  `list-keychain`), and writes the `.p8` key to `$RUNNER_TEMP`. Keys and
+  certificates stay in `$RUNNER_TEMP`, never under `build/`, whose files are
+  uploaded as artifacts, and the notary submission is a ZIP made from the
+  signed items only. The job's
   time limit grows by about 30 minutes for the notary service.
 - **`scripts/release/candidate.py`:** a signing step on Darwin, after
   `keep_symbols` and before the artifact manifest: sign the programs and
