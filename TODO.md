@@ -1688,6 +1688,9 @@ move to the archive.
   from the whole-project review: ASan and UBSan for the `vst3.*` tests,
   ThreadSanitizer for `vst3.adapter`
   ([VST3 tests](docs/develop/testing.md#vst3-tests)).
+- [x] **DIAG-6 — Show the reader's reason when a sound file is refused as
+  a filter.** 9 November 2026, from the whole-project review of that day
+  ([filter files](docs/use/configuration.md#filter-files)).
 - [x] **DIAG-7 — File names as UTF-8 in messages and paths on Windows.** 9
   November 2026, from the whole-project review of that day: one shared
   helper, and a non-ANSI name loaded and refused on every system

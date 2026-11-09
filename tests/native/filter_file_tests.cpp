@@ -295,7 +295,9 @@ void non_ansi_names(const fs::path& dir) {
         FilterFileFailure why;
         const auto next =
             read_filter_file(detail::utf8_string(cut), stereo, detail::libsndfile_files(), why);
-        require(!next && has(why.message.problem, name + "-cut.wav"),
+        // DIAG-6: with the reader's reason, not "neither a configuration".
+        require(!next && has(why.message.problem, name + "-cut.wav") &&
+                    has(why.message.problem, "RIFF/WAVE"),
                 "a damaged file with a non-ANSI name: " + why.message.problem);
     }
 }

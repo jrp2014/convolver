@@ -441,7 +441,7 @@ void run(const fs::path& dir) {
             text_file(box / "broken.cfg",
                       std::string("44100 1 1 0\n0\n0\n") + name + "\n0\n0\n0\n");
             const auto broken = inspect_configuration(box / "broken.cfg");
-            require(!broken.valid && has_code(broken, "missing-asset") &&
+            require(!broken.valid && has_code(broken, "unreadable-asset") &&
                         broken.diagnostics.at(0).message.find(
                             "the content starts like a sound file") != std::string::npos,
                     std::string("an unreadable header is reported, not read as samples: ") + name);
