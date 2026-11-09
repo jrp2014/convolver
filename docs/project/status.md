@@ -228,7 +228,10 @@ Check 6 (the final tag's candidate run) still runs before publication.
 jrp decided on 9 November 2026 to publish the second preview, a 0.13.x tag for
 macOS, Windows and Linux, without them too, and without check 9
 ([decision](decisions.md#releases)); they stay open as follow-up work, and
-its release notes say what was not checked.
+its release notes say what was not checked. On 9 November 2026 he made the
+published 0.13 preview (0.13.2) the baseline: the checks left and REL-3 run on
+its exact files, and the v0.12.8 results in the table below are records of
+that build, not passes for 0.13 ([decision](decisions.md#releases)).
 
 This is the one list of what remains (REL-7), from jrp's direction of
 8 November 2026: finish the genuinely missing listening, host and

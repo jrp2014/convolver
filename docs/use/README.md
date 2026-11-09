@@ -47,6 +47,7 @@ and the plug-ins have not yet been tested in named DAWs. The
 | [Equalizer APO export](equalizer-apo.md) | How-to | System-wide filtering on Windows |
 | [Other programs](other-programs.md) | How-to | Configurations shared with Roon, JRiver, Audiolense and the old Windows Convolver |
 | [Troubleshooting](troubleshooting.md) | How-to | Symptoms, causes and fixes |
+| [Report a problem](report-a-problem.md) | How-to | What to send when something goes wrong, or to say how a preview went |
 | [Command-line reference](command-line.md) | Reference | Every option of `convolver` |
 | [Configuration files](configuration.md) | Reference | The `.cfg` and list formats |
 | [How the plug-ins behave](plugins.md) | Reference | Channels, latency, bypass, loading and failures, for VST® 3, Audio Unit and LV2 |

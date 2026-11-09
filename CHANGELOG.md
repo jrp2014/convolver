@@ -34,6 +34,13 @@ Until 1.0 the C++ API may change between minor versions.
   run, with no reports. From the whole-project review of 9 November 2026.
   No change to the plug-in
   ([VST3 tests](docs/develop/testing.md#vst3-tests)).
+- Problem reports: a new page, [report a problem](docs/use/report-a-problem.md),
+  says what to collect on macOS, Windows and Linux (Copy Diagnostics, or
+  where the Convolver log is and how to attach or copy it) and how to keep
+  private paths out. A **Preview feedback** issue form asks what worked,
+  what was hard to follow and what is missing; the **Problem report** form
+  asks for the system and points Windows and Linux users to the log, and the
+  release notes link both. No change to the plug-ins or tools.
 
 ## [0.13.2] - 2026-11-09
 

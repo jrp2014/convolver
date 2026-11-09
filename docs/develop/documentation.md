@@ -131,6 +131,7 @@ can act on it without a separate copy of the rules:
 | CLI options, output formats and inspection | [Command-line reference](../use/command-line.md) | `main.cpp`, `inspection_cli.cpp`, `compare_cli.cpp`, `dither_advice.cpp` and tests |
 | What Convolver does not do | [Limits](../use/limits.md) | TODO's documented limitations |
 | Symptoms and fixes | [Troubleshooting](../use/troubleshooting.md) | Diagnostics in `config.cpp`, the tools and the adapters |
+| Reporting a problem or preview feedback | [Report a problem](../use/report-a-problem.md) | The issue forms in `.github/ISSUE_TEMPLATE/`, the release notes written by `scripts/release/prepare_release.py`, the log locations in [how the plug-ins behave](../use/plugins.md#status-and-the-convolver-log) |
 | Other readers of the format, path portability | [Other programs](../use/other-programs.md) | `tests/compatibility/`, `downstream-evidence.json` |
 | Component boundaries and change map | [Implementation map](architecture.md) | Actual symbols, callers, targets and test names |
 | Package consumption, engine API and resource limits | [Library guide](library.md) | CMake exports, public headers, external-consumer tests, `native.limits` |

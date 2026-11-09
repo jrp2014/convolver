@@ -306,7 +306,7 @@ since some hosts do not say so: the project or preset saved then does not
 hold the filter. The first line each
 time a host starts Convolver says what is running: the version, the FFT
 library, the CPU kernels, the plug-in SDK it was built with (VST3 and Audio Unit) and the process. When something does not work, send
-this file with your report.
+this file with your [report](report-a-problem.md).
 
 If the file cannot be written (its folder cannot be created or written to, or
 there is no home folder), the Status text ends with "The log could not be
@@ -314,20 +314,18 @@ written." instead of pointing to it, and the lines go to the
 host's standard error output instead (and, on Windows, to the debugger output,
 which DebugView shows). On macOS they are in the system log either way.
 
-| System | Log file | Copy it to the clipboard |
-| --- | --- | --- |
-| macOS | `~/Library/Logs/Convolver/Convolver.log` (the Console application lists it under Log Reports) | `pbcopy < ~/Library/Logs/Convolver/Convolver.log` |
-| Windows | `%LOCALAPPDATA%\Convolver\Convolver.log` | `Get-Content "$env:LOCALAPPDATA\Convolver\Convolver.log" \| Set-Clipboard` (PowerShell) |
-| Linux | `~/.local/state/convolver/convolver.log` (or under `$XDG_STATE_HOME`) | `xclip -selection clipboard < ~/.local/state/convolver/convolver.log` |
+| System | Log file |
+| --- | --- |
+| macOS | `~/Library/Logs/Convolver/Convolver.log` (the Console application lists it under Log Reports) |
+| Windows | `%LOCALAPPDATA%\Convolver\Convolver.log` |
+| Linux | `~/.local/state/convolver/convolver.log` (or under `$XDG_STATE_HOME`) |
 
 On macOS the same lines also go to the system log, which also works when a
 sandboxed host such as GarageBand keeps the file inside its own container
-(`~/Library/Containers/<host>/Data/Library/Logs/Convolver/`). To copy the
-last hour's lines from there:
-
-```sh
-log show --last 1h --info --predicate 'eventMessage CONTAINS "Convolver"' --style compact | pbcopy
-```
+(`~/Library/Containers/<host>/Data/Library/Logs/Convolver/`).
+[Report a problem](report-a-problem.md#2-collect-convolvers-messages) gives
+each system's commands to copy the log, or the system log's recent lines,
+for a report.
 
 When the file passes 1 MB it is renamed with `.old` added and a new one is
 started. Setting the environment variable `CONVOLVER_LOG` to a file path
