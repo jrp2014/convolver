@@ -4,6 +4,7 @@
 #pragma once
 #include "convolver/io.hpp"
 #include "sound_files.hpp"
+#include "utf8.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -47,8 +48,6 @@ struct SourceLocation {
 };
 // One list entry that led to a nested file, outermost first.
 using IncludeChain = std::vector<SourceLocation>;
-
-std::string utf8_string(const std::filesystem::path&);
 
 // Expected configuration failures. what() is "FILE:LINE:COLUMN: PROBLEM" plus
 // "; included from LIST:LINE" for each enclosing list, innermost first, then

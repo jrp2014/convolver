@@ -3,6 +3,7 @@
 #include "advice.hpp"
 #include "convolver_version.hpp"
 #include "host_log.hpp"
+#include "utf8.hpp"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -52,10 +53,9 @@ std::string short_problem(std::string problem, const HostFailure& failure) {
     if (failure.request.source != HostFilterSource::file || path.empty() ||
         !problem.starts_with(path))
         return problem;
-    const auto name = std::filesystem::path(std::u8string(path.begin(), path.end())).filename();
-    const auto u8 = name.u8string();
-    if (!u8.empty())
-        problem.replace(0, path.size(), std::string(u8.begin(), u8.end()));
+    const auto name = detail::utf8_string(detail::utf8_path(path).filename());
+    if (!name.empty())
+        problem.replace(0, path.size(), name);
     return problem;
 }
 // What the window says to do with no filter loaded.
@@ -432,8 +432,7 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
     r.reference.emplace_back("Software", software);
 
     r.log_written = facts.log_written;
-    const auto path = host_log_path().u8string();
-    r.log_path.assign(path.begin(), path.end());
+    r.log_path = detail::utf8_string(host_log_path());
 #ifdef _WIN32
     const bool turned_off = false;
 #else

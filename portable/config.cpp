@@ -87,9 +87,6 @@ std::string about_filter(const std::string& prefix, const std::string& message,
         a.note += (a.note.empty() ? "" : " ") + note;
     return advice_text(a);
 }
-std::filesystem::path utf8_path(const std::string& text) {
-    return std::filesystem::path(std::u8string(text.begin(), text.end()));
-}
 #ifndef _WIN32
 bool drive_letter(const std::string& name) {
     return name.size() >= 2 && name[1] == ':' &&
@@ -496,7 +493,7 @@ Configuration configuration_graph(const ParsedConfiguration& parsed) {
 }
 
 bool raw_filter_name(const std::filesystem::path& path) {
-    auto extension = path.extension().string();
+    auto extension = utf8_string(path.extension());
     std::transform(extension.begin(), extension.end(), extension.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return extension == ".pcm" || extension == ".raw";

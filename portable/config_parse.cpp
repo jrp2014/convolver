@@ -12,10 +12,6 @@
 #include <sstream>
 
 namespace convolver::detail {
-std::string utf8_string(const std::filesystem::path& path) {
-    const auto text = path.u8string();
-    return {text.begin(), text.end()};
-}
 ConfigurationError::ConfigurationError(std::string code, SourceLocation location,
                                        std::string reason)
     : std::runtime_error(reason), code_(std::move(code)), location_(std::move(location)),

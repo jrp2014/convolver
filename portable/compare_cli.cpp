@@ -2,6 +2,7 @@
 #include "compare_cli.hpp"
 #include "advice.hpp"
 #include "convolver/io.hpp"
+#include "utf8.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -42,13 +43,8 @@ struct Sound {
     }
 };
 
-std::string text(const std::filesystem::path& p) {
-    const auto s = p.u8string();
-    return {s.begin(), s.end()};
-}
-std::filesystem::path utf8_path(std::string_view s) {
-    return std::filesystem::path(std::u8string(s.begin(), s.end()));
-}
+using detail::utf8_path;
+using detail::utf8_string;
 std::string number(const char* format, double value) {
     std::array<char, 64> buffer{};
     std::snprintf(buffer.data(), buffer.size(), format, value);
@@ -67,7 +63,7 @@ Sound read(const std::filesystem::path& path) {
     while (const auto frames = reader.read(block)) {
         const auto count = frames * sound.info.channels;
         if (sound.samples.size() + count > max_samples)
-            throw std::runtime_error(text(path) + ": too long to compare (more than " +
+            throw std::runtime_error(utf8_string(path) + ": too long to compare (more than " +
                                      std::to_string(max_samples) + " samples)");
         sound.samples.insert(sound.samples.end(), block.begin(),
                              block.begin() + static_cast<std::ptrdiff_t>(count));
@@ -142,8 +138,9 @@ int run_comparison(int argc, char** argv) {
                    std::to_string(s.frames()) + " frames (" +
                    milliseconds(s.frames(), s.info.sample_rate) + ")";
         };
-        std::cout << "Output:   " << text(output_path) << ": " << describe(output) << '\n'
-                  << "Expected: " << text(expected_path) << ": " << describe(expected) << '\n';
+        std::cout << "Output:   " << utf8_string(output_path) << ": " << describe(output) << '\n'
+                  << "Expected: " << utf8_string(expected_path) << ": " << describe(expected)
+                  << '\n';
         if (output.info.sample_rate != expected.info.sample_rate) {
             std::cout << "Different: the output is at " << output.info.sample_rate
                       << " Hz and the expected file at " << expected.info.sample_rate

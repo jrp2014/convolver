@@ -70,6 +70,13 @@ Until 1.0 the C++ API may change between minor versions.
   ([input files](docs/use/command-line.md#input-files)). Found by the
   project review of 9 November 2026; jrp chose to read files without sizes
   on 10 November 2026.
+- Windows (DIAG-7, from the whole-project review of 9 November 2026): a
+  file whose name holds characters outside the Windows ANSI code page is
+  named correctly in messages, where Convolver used to report a text
+  conversion error in place of the reason; a configuration naming an IR
+  whose extension holds such characters now loads; and the plug-ins read
+  the UTF-8 path a window passes as UTF-8. One shared helper replaces the
+  copies that did these conversions.
 
 ## [0.13.2] - 2026-11-09
 

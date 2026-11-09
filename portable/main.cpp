@@ -9,6 +9,7 @@
 #include "file.hpp"
 #include "inspection_cli.hpp"
 #include "sound_files.hpp"
+#include "utf8.hpp"
 #include <algorithm>
 #include <charconv>
 #include <cmath>
@@ -36,6 +37,8 @@
 #endif
 
 namespace {
+using convolver::detail::utf8_path;
+using convolver::detail::utf8_string;
 constexpr auto help = R"(Convolver portable CLI
 Usage: convolver --filter FILTER --input FILE --output FILE [options]
        convolver --tune-fft NEW_WISDOM_FILE --block-size N [--fft-plan MODE]
@@ -176,9 +179,6 @@ std::optional<convolver::OutputEncoding> parse_output_format(std::string_view na
         return std::nullopt;
     return result;
 }
-std::filesystem::path utf8_path(const std::string& text) {
-    return std::filesystem::path(std::u8string(text.begin(), text.end()));
-}
 bool same_file(const std::filesystem::path& a, const std::filesystem::path& b) {
     if (a == "-" || b == "-")
         return false;
@@ -219,7 +219,7 @@ std::string read_wisdom(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary);
     if (!file)
         throw std::runtime_error(convolver::detail::advice_text(
-            {"cannot open the FFTW wisdom file " + path.string(),
+            {"cannot open the FFTW wisdom file " + utf8_string(path),
              std::filesystem::exists(path) ? "The file is there, but this program may not read it."
                                            : "There is no file at that path.",
              "Check the path, or save wisdom first with --tune-fft.",
@@ -502,7 +502,8 @@ int run(int argc, char** argv) {
                            "filtering.");
             // Reject existing targets before the potentially lengthy calibration.
             if (std::filesystem::exists(std::filesystem::symlink_status(tune)))
-                bad_option(tune.string() + " already exists", "--tune-fft never replaces a file.",
+                bad_option(utf8_string(tune) + " already exists",
+                           "--tune-fft never replaces a file.",
                            "Choose a new file name, or remove the old file first.");
             if (!explicit_plan)
                 fft_options.planning = convolver::FftPlanning::patient;
@@ -554,8 +555,7 @@ int run(int argc, char** argv) {
                 ec);
             if (ec || shown.empty())
                 shown = raw_filter;
-            const auto name = shown.generic_u8string();
-            std::cerr << "convolver: raw filter '" << std::string(name.begin(), name.end())
+            std::cerr << "convolver: raw filter '" << convolver::detail::utf8_generic_string(shown)
                       << "' read as mono " << convolver::raw_encoding_name(raw_filter_encoding)
                       << " at " << config.sample_rate << " Hz"
                       << (raw_filter_format ? ""
@@ -568,7 +568,7 @@ int run(int argc, char** argv) {
                          "has no headerless .pcm or .raw filters\n";
         for (const auto& source : dependencies)
             if (same_file(source, output))
-                bad_option("the output is the same file as " + source.string(),
+                bad_option("the output is the same file as " + utf8_string(source),
                            "The configuration reads that file, so writing over it would destroy "
                            "the filter.",
                            "Choose another output name.");
@@ -721,7 +721,7 @@ int run(int argc, char** argv) {
             auto advice = convolver::detail::parse_advice(error.what());
             const auto incomplete =
                 (output == "-" ? std::string("the audio written to standard output")
-                               : output.string()) +
+                               : utf8_string(output)) +
                 " is incomplete: it holds only the audio written before this failure, so do not "
                 "use it.";
             advice.note = advice.note.empty() ? incomplete : advice.note + " " + incomplete;

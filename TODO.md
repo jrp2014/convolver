@@ -1688,6 +1688,10 @@ move to the archive.
   from the whole-project review: ASan and UBSan for the `vst3.*` tests,
   ThreadSanitizer for `vst3.adapter`
   ([VST3 tests](docs/develop/testing.md#vst3-tests)).
+- [x] **DIAG-7 — File names as UTF-8 in messages and paths on Windows.** 9
+  November 2026, from the whole-project review of that day: one shared
+  helper, and a non-ANSI name loaded and refused on every system
+  ([invariants](docs/develop/architecture.md#invariants-to-preserve)).
 - [x] **CI-35 — Prose edits to the first-use pages run Lint only.** 8
   November 2026, from jrp's question why a README link ran every workflow;
   [CI triggers](docs/develop/testing.md#documentation-only-pull-requests).

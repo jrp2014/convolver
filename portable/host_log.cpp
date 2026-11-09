@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "host_log.hpp"
 #include "convolver_version.hpp"
+#include "utf8.hpp"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -67,8 +68,7 @@ std::string program() {
     if (!size || size >= module.size())
         return {};
     module.resize(size);
-    const auto name = std::filesystem::path(module).stem().u8string();
-    return std::string(name.begin(), name.end());
+    return detail::utf8_string(std::filesystem::path(module).stem());
 #elif defined(__GLIBC__)
     return program_invocation_short_name ? program_invocation_short_name : "";
 #else
@@ -372,9 +372,8 @@ void host_log(const char* format, const std::string& lines, bool problem) noexce
             session_in_file = true;
             explained = false; // A later failure explains itself again.
         } else {
-            const auto where = path.u8string();
             fall_back(fall_back_line(),
-                      "The Convolver log file " + std::string(where.begin(), where.end()) +
+                      "The Convolver log file " + detail::utf8_string(path) +
                           " could not be written (check that its folder exists and can "
                           "be written to).");
         }
