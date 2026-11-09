@@ -1433,10 +1433,13 @@ on macOS.
 Documentation here means Markdown files anywhere and everything under `docs/`,
 except:
 
-- pages the build's tests read, which run everything: the top-level
-  `README.md`, `examples/first-use/README.md` and `docs/use/first-filter.md`
-  (`examples.first_use` runs their commands) and the archived website with its
-  two records in `docs/review-2026-10/` (`documentation`);
+- pages the build's tests read, which run everything: the archived website
+  with its two records in `docs/review-2026-10/` (`documentation`), and the
+  top-level `README.md`, `examples/first-use/README.md` and
+  `docs/use/first-filter.md` when a command marked
+  `<!-- first-use-example -->` changes (`examples.first_use` runs those
+  commands; CI-35). Other edits to those three pages count as the
+  documentation or packaged page each otherwise is;
 - pages copied into the preview packages, which also run the
   [candidate workflow](#plug-in-candidate-checks): everything under `docs/use/`,
   `examples/plugin-presets/README.md` and the Ooura `README.md`. A page in

@@ -1591,6 +1591,9 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **CI-35 — Prose edits to the first-use pages run Lint only.** 8
+  November 2026, from jrp's question why a README link ran every workflow;
+  [CI triggers](docs/develop/testing.md#documentation-only-pull-requests).
 - [x] **REL-9 — Windows and Linux in previews.** 8 November 2026,
   PR #163: from the second preview the draft release attaches the Windows
   and Linux packages, after they run on clean machines
