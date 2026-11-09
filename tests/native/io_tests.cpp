@@ -1508,11 +1508,14 @@ void run(const fs::path& dir) {
         text_file(dir / "overrun.wav", layout(4, 36 + 11, 12, ""));
         refused(dir / "overrun.wav", "an even chunk that overruns the RIFF size is refused");
         // Sizes never filled in, as FFmpeg writes WAV to a pipe: the data
-        // runs to the end of the file, with an odd or an even byte count.
-        text_file(dir / "unsized.wav", layout(5, unknown, unknown, ""));
-        reads(dir / "unsized.wav", 5, "sizes a writer could not fill in, odd data");
-        text_file(dir / "unsized-even.wav", layout(4, unknown, unknown, ""));
-        reads(dir / "unsized-even.wav", 4, "sizes a writer could not fill in, even data");
+        // runs to the end of the file.
+        text_file(dir / "unsized.wav", layout(4, unknown, unknown, ""));
+        reads(dir / "unsized.wav", 4, "sizes a writer could not fill in");
+        // With an odd number of data bytes readers disagree where such a
+        // file ends (macOS's reads a frame fewer than libsndfile), so it is
+        // refused rather than read differently by the plug-ins.
+        text_file(dir / "unsized-odd.wav", layout(5, unknown, unknown, ""));
+        refused(dir / "unsized-odd.wav", "an unsized file of odd data length is refused");
         // A real data size in such a file, and a chunk after the data.
         text_file(dir / "unsized-riff.wav",
                   layout(4, unknown, 12, std::string("LIST\4\0\0\0INFO", 12)));

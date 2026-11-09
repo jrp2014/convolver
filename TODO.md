@@ -1610,8 +1610,9 @@ move to the archive.
 - [x] **IO-10 — WAV files that other programs read are refused.** 9
   November 2026, PR #176, from that day's project review: a WAV whose last
   odd chunk lacks its padding byte (Python's `wave` module) or whose sizes
-  were left at `0xFFFFFFFF` (FFmpeg writing to a pipe) is read whole, and
-  the same layouts cut short are still refused
+  were left at `0xFFFFFFFF` (FFmpeg writing to a pipe) is read whole; the
+  same layouts cut short are still refused, and so is a file without sizes
+  whose audio is an odd number of bytes
   ([input files](docs/use/command-line.md#input-files),
   [decision](docs/project/decisions.md#identities-and-file-formats)).
 - [x] **CI-35 — Prose edits to the first-use pages run Lint only.** 8

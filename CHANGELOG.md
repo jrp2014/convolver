@@ -33,7 +33,9 @@ Until 1.0 the C++ API may change between minor versions.
   of bytes and no padding byte after it (Python's `wave` module writes mono
   24-bit files with an odd number of frames this way), and a file whose
   sizes were left at `0xFFFFFFFF` (FFmpeg writing a WAV to a pipe). Such a
-  file that really was cut short is still refused where that can be seen
+  file that really was cut short is still refused where that can be seen,
+  and so is a file without sizes whose audio is an odd number of bytes,
+  because macOS's reader stops a frame early in one
   ([input files](docs/use/command-line.md#input-files)). Found by the
   project review of 9 November 2026.
 

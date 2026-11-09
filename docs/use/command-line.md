@@ -388,6 +388,13 @@ seen: when the header counts a padding byte the file does not have, or when
 the audio of a file without sizes ends inside a frame. A file without sizes
 that lost whole frames cannot be told from a complete one.
 
+One file without sizes is refused although it may be whole: one whose audio
+is an odd number of bytes, which takes 8-bit or 24-bit audio with an odd
+number of channels and of frames (mono, usually). Programs disagree about
+where such a file ends, and macOS's own reader, which the Mac plug-ins use,
+stops a frame early. Have the file written to disk instead of a pipe, or
+give FFmpeg `-c:a pcm_f32le`.
+
 Other containers, including RF64, get libsndfile's own checks; Convolver does
 not validate every codec libsndfile supports.
 

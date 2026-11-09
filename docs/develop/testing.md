@@ -163,7 +163,8 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   files (`sound_file_header`). The two WAV layouts that are read although
   they break the format's rules (a last odd chunk without its padding byte,
   and sizes left at `0xFFFFFFFF`) give every frame as a sound file and as a
-  filter, and the same layouts cut short are refused (IO-10). POSIX-specific tests also exercise fragmented
+  filter, and the same layouts cut short are refused, as is a file without
+  sizes whose audio is an odd number of bytes (IO-10). POSIX-specific tests also exercise fragmented
   descriptors, borrowed descriptor ownership, broken pipes and injected WAV
   header-finalization errors. For integer output they check rounding and
   clipping endpoints for 8 to 32 bits, reproducibility and chunk independence,
@@ -256,9 +257,15 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   a NaN, a double WAV holding 1e300 (infinite as a float), and a headerless
   `.pcm` chosen directly (starting like an MPEG frame) must be refused with
   the same diagnostic code by both. The two WAV layouts of IO-10 (a last
-  odd chunk without its padding byte, and sizes left at `0xFFFFFFFF`) must
-  give the same five frames from both, and the same layouts cut short must be
-  refused with the same code. A WAV whose header claims 800 kHz,
+  odd chunk without its padding byte, and sizes left at `0xFFFFFFFF`, in a
+  mono 24-bit file and in a stereo float file with the header FFmpeg writes
+  to a pipe) must give the same frames from both, to the last one, and the
+  same layouts cut short must be refused with the same code. So must a file
+  without sizes whose audio is an odd number of bytes: AudioToolbox read it
+  one frame shorter than libsndfile
+  ([run 42715853793](https://github.com/jrp2014/convolver/actions/runs/42715853793)),
+  which is why the shared check refuses it. The test prints what each
+  reader makes of every layout before it requires anything. A WAV whose header claims 800 kHz,
   which the reader opens and then refuses, is refused 20 times without
   leaving a file descriptor open (counted in `/dev/fd`).
 - `fuzz.replay.config_text`, `fuzz.replay.config_list`, `fuzz.replay.host_state`,

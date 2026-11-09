@@ -107,6 +107,43 @@ void pcm24_layout(const fs::path& path, std::size_t frames, std::uint32_t riff_s
         put(static_cast<std::uint32_t>(n + 1) << 16, 3);
     text_file(path, out + after_data);
 }
+// IO-10: a stereo float WAV with the header FFmpeg writes to a pipe: an
+// extensible format chunk, its LIST chunk naming the writer, and RIFF and
+// data sizes it could not go back to fill in. Frame n holds (n + 1) / 128
+// in the first channel and the negative of that in the second.
+void piped_float_layout(const fs::path& path, std::size_t frames) {
+    std::string out = "RIFF";
+    const auto put = [&](std::uint32_t value, int bytes) {
+        for (int i = 0; i < bytes; ++i)
+            out += static_cast<char>((value >> (8 * i)) & 0xffU);
+    };
+    put(0xffffffff, 4);
+    out += "WAVEfmt ";
+    put(40, 4);
+    put(0xfffe, 2); // WAVE_FORMAT_EXTENSIBLE
+    put(2, 2);
+    put(48000, 4);
+    put(48000 * 8, 4);
+    put(8, 2);
+    put(32, 2);
+    put(22, 2); // The extension's size.
+    put(32, 2); // Valid bits.
+    put(3, 4);  // Front left and right.
+    out += "\x03\x00\x00\x00\x00\x00\x10\x00\x80\x00\x00\xaa\x00\x38\x9b\x71"s; // IEEE float
+    out += "LIST";
+    put(26, 4);
+    out += "INFOISFT";
+    put(14, 4);
+    out += "Lavf60.16.100\0"s;
+    out += "data";
+    put(0xffffffff, 4);
+    for (std::size_t n = 0; n < frames; ++n) {
+        const auto x = static_cast<float>(n + 1) / 128;
+        put(std::bit_cast<std::uint32_t>(x), 4);
+        put(std::bit_cast<std::uint32_t>(-x), 4);
+    }
+    text_file(path, out);
+}
 void sound_file(const fs::path& path, AudioInfo info, OutputEncoding encoding) {
     AudioWriter writer(path, info, encoding);
     writer.write(samples(info.channels, 1000));
@@ -152,6 +189,20 @@ std::string refusal(const fs::path& path, const detail::SoundFiles& files) {
     return "";
 }
 
+// What a reader makes of a file, for the log: the frames of its first
+// channel, or how it is refused.
+std::string outcome(const fs::path& path, const detail::SoundFiles& files) {
+    try {
+        const auto loaded = load(path, files);
+        return std::to_string(loaded.paths.empty() ? 0 : loaded.paths[0].impulse.size()) +
+               " frames";
+    } catch (const detail::ConfigurationError& e) {
+        return "refused as "s + e.code();
+    } catch (const std::exception& e) {
+        return "failed: "s + e.what();
+    }
+}
+
 void run(const fs::path& dir) {
     const auto& reference = detail::libsndfile_files();
     const auto& reader = under_test();
@@ -188,29 +239,58 @@ void run(const fs::path& dir) {
                                           std::to_string(worst) + " ulp");
     }
 
-    // IO-10: two layouts that break RIFF's rules without being cut short,
-    // which both readers take: a last chunk of odd length without its pad
-    // byte (Python's wave module), and sizes a writer could not fill in
-    // (FFmpeg writing to a pipe). Five frames are 15 bytes of data.
+    // IO-10: layouts that break RIFF's rules without being cut short, which
+    // both readers take: a last chunk of odd length without its pad byte
+    // (Python's wave module), and sizes a writer could not fill in (FFmpeg
+    // writing to a pipe), first in the smallest form and then with the
+    // header FFmpeg writes. The same layouts cut short are refused by both:
+    // a RIFF size that counts a pad byte the file lacks, and an unsized file
+    // cut off inside a frame. So is an unsized file with an odd number of
+    // data bytes, which AudioToolbox read a frame shorter than libsndfile
+    // before the shared check refused it.
     constexpr std::uint32_t unknown_size = 0xffffffff;
     pcm24_layout(dir / "unpadded.wav", 5, 36 + 15, 15, "");
-    pcm24_layout(dir / "unsized.wav", 5, unknown_size, unknown_size, "");
-    for (const auto* name : {"unpadded.wav", "unsized.wav"}) {
+    pcm24_layout(dir / "unsized.wav", 4, unknown_size, unknown_size, "");
+    pcm24_layout(dir / "unsized-riff.wav", 4, unknown_size, 12, "LIST\4\0\0\0INFO"s);
+    piped_float_layout(dir / "piped-float.wav", 7);
+    pcm24_layout(dir / "counted-pad.wav", 5, 36 + 16, 15, "");
+    pcm24_layout(dir / "unsized-odd.wav", 5, unknown_size, unknown_size, "");
+    pcm24_layout(dir / "unsized-cut.wav", 5, unknown_size, unknown_size, "");
+    fs::resize_file(dir / "unsized-cut.wav", fs::file_size(dir / "unsized-cut.wav") - 1);
+    struct Layout {
+        const char* name;
+        std::size_t channels, frames; // No frames: refused.
+    };
+    const Layout layouts[] = {
+        {"unpadded.wav", 1, 5},    {"unsized.wav", 1, 4},     {"unsized-riff.wav", 1, 4},
+        {"piped-float.wav", 2, 7}, {"counted-pad.wav", 1, 0}, {"unsized-odd.wav", 1, 0},
+        {"unsized-cut.wav", 1, 0},
+    };
+    // What each reader makes of every layout, printed before anything is
+    // required, so that one failed run shows them all.
+    for (const auto& layout : layouts)
+        std::cout << layout.name << ": libsndfile " << outcome(dir / layout.name, reference)
+                  << ", AudioToolbox " << outcome(dir / layout.name, reader) << '\n';
+    for (const auto& layout : layouts) {
+        const std::string name = layout.name;
+        if (!layout.frames) {
+            const auto expected = refusal(dir / name, reference);
+            const auto got = refusal(dir / name, reader);
+            require(!expected.empty() && expected == got,
+                    name + ": libsndfile refuses it as '" + expected +
+                        "', the reader under test as '" + got + "'");
+            continue;
+        }
         const auto from_reader = load(dir / name, reader);
         require(compare(load(dir / name, reference), from_reader, name) == 0,
-                std::string(name) + ": the readers' samples differ");
-        require(from_reader.paths.size() == 1 && from_reader.paths[0].impulse.size() == 5 &&
-                    from_reader.paths[0].impulse[4] == 5.f / 128,
-                std::string(name) + ": all five frames are read");
-        std::cout << name << ": read whole by both readers\n";
-    }
-    // The same layouts cut short are refused by both (with the files below):
-    // a RIFF size that counts a pad byte the file lacks, and an unsized file
-    // cut off inside a frame.
-    pcm24_layout(dir / "counted-pad.wav", 5, 36 + 16, 15, "");
-    {
-        pcm24_layout(dir / "unsized-cut.wav", 5, unknown_size, unknown_size, "");
-        fs::resize_file(dir / "unsized-cut.wav", fs::file_size(dir / "unsized-cut.wav") - 1);
+                name + ": the readers' samples differ");
+        // The last frame holds (frames) / 128, negated in a second channel.
+        const auto last = static_cast<float>(layout.frames) / 128;
+        bool whole = from_reader.paths.size() == layout.channels;
+        for (std::size_t c = 0; whole && c < layout.channels; ++c)
+            whole = from_reader.paths[c].impulse.size() == layout.frames &&
+                    from_reader.paths[c].impulse.back() == (c ? -last : last);
+        require(whole, name + ": every frame is read, to the last one");
     }
 
     // A configuration naming a WAV and a headerless float filter, and a .pcm
@@ -275,9 +355,8 @@ void run(const fs::path& dir) {
                 raw += static_cast<char>((std::bit_cast<std::uint32_t>(x) >> (8 * b)) & 0xffU);
         text_file(dir / "direct.pcm", raw);
     }
-    for (const auto* name :
-         {"missing.cfg", "truncated.wav", "damaged.wav", "short.cfg", "rate.cfg", "nan.wav",
-          "huge.wav", "direct.pcm", "counted-pad.wav", "unsized-cut.wav"}) {
+    for (const auto* name : {"missing.cfg", "truncated.wav", "damaged.wav", "short.cfg", "rate.cfg",
+                             "nan.wav", "huge.wav", "direct.pcm"}) {
         const auto expected = refusal(dir / name, reference);
         const auto got = refusal(dir / name, reader);
         std::cout << name << ": refused as " << got << '\n';

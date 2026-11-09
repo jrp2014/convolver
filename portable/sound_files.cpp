@@ -65,7 +65,11 @@ constexpr std::uint32_t unknown_size = 0xffffffff;
 //   short for means "to the end of the file", and so does a 'data' size of
 //   unknown_size in such a file. The data must still end on a whole frame,
 //   which is all that can be checked: a copy of the stream cut off between
-//   two frames cannot be told from a whole one.
+//   two frames cannot be told from a whole one. It must also be an even
+//   number of bytes: readers disagree about an odd one (libsndfile reads
+//   every byte; macOS's AudioToolbox read one mono 24-bit frame fewer in
+//   native.audio_toolbox), and a file must not load shorter in a plug-in
+//   than on the command line.
 // - No pad byte after the last chunk: a chunk of odd length ending exactly
 //   where the RIFF size ends (Python's wave module writes mono 24-bit audio
 //   with an odd number of frames so). A RIFF size that counts the pad byte
@@ -106,6 +110,10 @@ void check_wave(const std::filesystem::path& path) {
         if (unsized && data && length == unknown_size) {
             length = end - position - 8;
             chunk_end = end;
+            if (length & 1u)
+                throw std::runtime_error(
+                    "WAV sizes were never filled in and its audio is an odd number of bytes, "
+                    "which programs read differently");
         } else if ((length & 1u) && chunk_end == end + 1) {
             chunk_end = end; // The last chunk, without its pad byte.
         }
