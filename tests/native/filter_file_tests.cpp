@@ -6,6 +6,7 @@
 // counts, never "0 in, 0 out" (jrp's GarageBand run, 30 October 2026: a
 // mono WAV refused on a stereo track read "the filter has 0 in, 0 out").
 #include "advice.hpp"
+#include "cases.hpp"
 #include "convolver/host.hpp"
 #include "convolver/io.hpp"
 #include "filter_file.hpp"
@@ -309,14 +310,17 @@ int main() {
                       std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     try {
         fs::create_directory(dir);
-        run(dir);
-        non_ansi_names(dir);
-        fs::remove_all(dir);
-        std::cout << "filter file tests passed\n";
     } catch (const std::exception& e) {
-        std::error_code ec;
-        fs::remove_all(dir, ec);
         std::cerr << e.what() << '\n';
         return 1;
     }
+    const auto failed = convolver::test::run_cases({
+        {"run", [&] { run(dir); }},
+        {"non_ansi_names", [&] { non_ansi_names(dir); }},
+    });
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    if (failed)
+        return 1;
+    std::cout << "filter file tests passed\n";
 }

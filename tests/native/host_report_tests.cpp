@@ -3,6 +3,7 @@
 // state a plug-in window shows: its status, the full explanation with what
 // to change, the Audio facts and reference lines, the fields an adapter sends, the plain text and
 // the Copy diagnostics text with this instance's Convolver log lines.
+#include "cases.hpp"
 #include "convolver/host.hpp"
 #include "host_log.hpp"
 #include "host_report.hpp"
@@ -726,16 +727,14 @@ void wider_inputs() {
 }
 
 int main() {
-    try {
-        cases();
-        actions();
-        log_agrees();
-        diagnostics();
-        wider_inputs();
-    } catch (const std::exception& e) {
-        std::cerr << "FAIL: " << e.what() << "\n";
+    if (convolver::test::run_cases({
+            {"cases", cases},
+            {"actions", actions},
+            {"log_agrees", log_agrees},
+            {"diagnostics", diagnostics},
+            {"wider_inputs", wider_inputs},
+        }))
         return 1;
-    }
     std::cout << "host report tests passed\n";
     return 0;
 }

@@ -58,6 +58,19 @@ misses all of that. Plug-in tests are built in their format's folder under
 `plugins/`; list each there in `convolver_sanitize()`, so that the sanitizer
 build compiles it, and the adapter code it holds, with ASan and UBSan.
 
+Write a test program's checks as cases, one function each, and run them
+with `run_cases()` from [`tests/native/cases.hpp`](../../tests/native/cases.hpp)
+(CI-37). A failed `require()` then fails its case, the runner prints the
+case's name and reason and goes on, and the program fails at the end, so one
+failure does not hide the next. Give `run_cases()` a function to undo what a
+failed case can leave set, such as an allocation guard. `native.engine`,
+`native.host`, `native.host_settings`, `native.host_report`,
+`native.denormals`, `native.io`, `native.utilities`, `native.filter_file`,
+`vst3.adapter` and `au.adapter` use it. The lifecycle tests and
+`lv2.adapter` count their failed sequences themselves; the other programs
+still stop at their first failure, which goes when one is next split into
+cases.
+
 - `native.fft`: independent direct DFT, canonical spectrum layout, DC/Nyquist,
   forward/inverse normalization and padded lengths.
 - `native.engine`: independent double time-domain oracle, real FFT backend, seeded

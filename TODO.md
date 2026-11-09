@@ -1688,6 +1688,10 @@ move to the archive.
   from the whole-project review: ASan and UBSan for the `vst3.*` tests,
   ThreadSanitizer for `vst3.adapter`
   ([VST3 tests](docs/develop/testing.md#vst3-tests)).
+- [x] **CI-37 — Test programs report every failing case.** 9 November
+  2026, from the whole-project review of that day: ten programs run their
+  cases through one shared runner
+  ([native production tests](docs/develop/testing.md#native-production-tests)).
 - [x] **DIAG-6 — Show the reader's reason when a sound file is refused as
   a filter.** 9 November 2026, from the whole-project review of that day
   ([filter files](docs/use/configuration.md#filter-files)).

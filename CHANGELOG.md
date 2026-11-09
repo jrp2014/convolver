@@ -50,6 +50,11 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Tests (CI-37, from the whole-project review of 9 November 2026): ten C++
+  test programs, among them `native.engine`, `native.host` and the VST3
+  and Audio Unit adapter tests, run every case and report each failure by
+  name, where the first failed check used to end the program and hide the
+  rest. The shared runner is `tests/native/cases.hpp`.
 - Command line and plug-ins (DIAG-6, from the whole-project review of 9
   November 2026): a sound file refused as a filter is reported with the
   reader's reason, for example "truncated or invalid RIFF/WAVE size" or
