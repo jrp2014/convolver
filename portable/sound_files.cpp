@@ -139,20 +139,20 @@ void validate_wave(const std::filesystem::path& path) {
         return;
     try {
         check_wave(path);
-    } catch (const UnfilledSizes& e) {
+    } catch (const std::runtime_error& e) {
+        // One place turns the path into text, whichever advice follows.
+        const bool unfilled = dynamic_cast<const UnfilledSizes*>(&e) != nullptr;
         throw std::runtime_error(advice_text(
             {"cannot read sound file " + path.string() + ": " + e.what(),
-             "The program that wrote it could not go back to fill them in: it wrote to a pipe "
-             "(as FFmpeg does with '-f wav -'), or it was stopped before it finished. Convolver "
-             "cannot tell how much audio the file should hold.",
-             "Write the file again, to a file instead of a pipe, and let the program finish.",
+             unfilled
+                 ? "The program that wrote it could not go back to fill them in: it wrote to a "
+                   "pipe (as FFmpeg does with '-f wav -'), or it was stopped before it finished. "
+                   "Convolver cannot tell how much audio the file should hold."
+                 : "The file is damaged or incomplete, or is not a sound file.",
+             unfilled
+                 ? "Write the file again, to a file instead of a pipe, and let the program finish."
+                 : "Export it again from the program that made it.",
              {}}));
-    } catch (const std::runtime_error& e) {
-        throw std::runtime_error(
-            advice_text({"cannot read sound file " + path.string() + ": " + e.what(),
-                         "The file is damaged or incomplete, or is not a sound file.",
-                         "Export it again from the program that made it.",
-                         {}}));
     }
 }
 std::string sample_position(std::uint64_t frame, std::size_t channel, int sample_rate) {
