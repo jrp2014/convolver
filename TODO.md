@@ -1040,7 +1040,7 @@ so the preset file path is not needed).
   [8 November integration review](docs/develop/fft-backends.md#alternatives-for-linux-and-windows)
   prioritizes an ordered PFFFT adapter. The
   [isolated Mac trial](docs/develop/fft-measurements.md#pffft-ordered-transform-experiment)
-  passed the FFT/engine oracles and saved 13–36% processing time versus Ooura,
+  passed the FFT/engine oracles and saved 12–36% processing time versus Ooura,
   including reordering; no shipped backend changed. PocketFFT currently allocates during
   execution and its optional plan cache locks. Windows/MSVC and Linux/x86
   measurements remain required before selecting a replacement.
@@ -1065,7 +1065,7 @@ so the preset file path is not needed).
   on an M5 Max; a separate paired run records Ooura
   [costs as a percentage of one core](docs/develop/fft-measurements.md#ooura-with-the-nonuniform-engine).
   These records include timing after warm-up and callback counts, but
-  does not establish threaded FFTW performance, cold plug-in loading times
+  do not establish threaded FFTW performance, cold plug-in loading times
   or dropout-free host playback; pursue these only for a demonstrated need.
   Plug-in workloads (6- and 8-channel filters, callback-time distributions)
   belong to PERF-3. On the 19 October cloud VM, a

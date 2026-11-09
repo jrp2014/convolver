@@ -217,7 +217,7 @@ production stage lengths (128 through 16,384) fit; tiny test partition
 layouts need an existing Ooura fallback or a deliberately supported policy.
 
 The [isolated Mac trial](fft-measurements.md#pffft-ordered-transform-experiment)
-used 13–36% less processing time than Ooura across the measured cases, with
+used 12–36% less processing time than Ooura across the measured cases, with
 ordered transforms, so reordering is included in the measured cost. PFFFT's unordered `pffft_zconvolve_accumulate` could
 avoid that cost, but using it would change the engine's spectrum-storage and
 multiply-accumulate contract. Its separate PFFASTCONV implementation is not
