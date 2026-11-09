@@ -10,7 +10,7 @@
   states the conclusions.
 - In the uniform-engine measurements, long filters spent most of their time
   in the per-partition multiply-accumulate. That finding does not establish
-  the FFT share of the nonuniform engine proposed in PERF-2.
+  the FFT share of the nonuniform engine (PERF-2).
 - Measure again on the target machine before a speed claim
   ([reproduce](#reproduce)).
 
