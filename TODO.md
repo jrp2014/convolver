@@ -90,7 +90,7 @@ passes for 0.13, since PERF-2 changed the engine
 | **HOST-1**, **VST3-11** | REAPER and Audacity, status checks 1 to 4 | Host checks on jrp's Mac |
 | **AU-4**, **AU-6** | GarageBand, status checks 5 and 8 | Host checks on jrp's Mac |
 | **PERF-2** | Its focused REAPER and GarageBand session, status check 9; then the CPU indication beside the Latency menu and block sizes tuned on Apple silicon | The session goes ahead. The CPU indication changes the window and the tuning is optimisation, so both wait for the freeze to lift |
-| **COMPAT-1** | Keep presets, a REAPER project and expected audio made by each published preview (0.12.12 and 0.13.2), with their own runner and the capture step in the publication steps | Tests and files only |
+| **COMPAT-1** | Keep presets, a REAPER project and expected audio made by 0.13.2, the baseline, with their own runner and the capture step in the publication steps | Tests and files only |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **HOST-4** | The check on a real Windows device, now that the Windows package ships `convolver-equalizer-apo` | A check; needs a Windows computer |
 | **VST3-17** | Known defect: in Audacity a filter chosen in the window plays but is missing from the export and the saved project. jrp narrowed Audacity to its preset menu, and the guides say so | jrp decided that the fix waits until after the preview ([decision](docs/project/decisions.md#plug-in-behaviour)). It is lost state, which the freeze still fixes, so whether that brings it forward is his to decide |
