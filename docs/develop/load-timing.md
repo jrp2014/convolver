@@ -35,7 +35,7 @@ on a runner where every other phase had two or three late callbacks.
 
 | Test | Entry points timed |
 | --- | --- |
-| `vst3.load_timing` | `setState`, and the window's file (the controller's load message to `notify`) where the build reads files: macOS, and elsewhere with libsndfile lent as in `vst3.adapter` |
+| `vst3.load_timing` | `setState`, and the window's file (the controller's load message to `notify`), read with AudioToolbox on macOS and libsndfile elsewhere |
 | `au.load_timing` | `RestoreState` (ClassInfo) and the window's load property, macOS only |
 | `lv2.load_timing` | `restore()`, with `run()` held back meanwhile because the plug-in does not declare `state:threadSafeRestore`, and a file chosen on the filter parameter, timed as the worker's `work()` |
 

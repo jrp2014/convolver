@@ -77,8 +77,8 @@ show routing; they are not a crossover ready for real speakers.
    **Route** button, then *Track channels: 6*). Insert
    `examples/first-use/crossover/input.wav` at the very start of the project,
    with no fade in or out (REAPER: *Item properties*, both fades 0).
-3. Add Convolver to the track as an effect. On macOS its window opens and
-   shows the status; on Windows and Linux the host shows its generic controls,
+3. Add Convolver to the track as an effect. On macOS and Windows its window
+   opens and shows the status; on Linux the host shows its generic controls,
    with a read-only **Status**.
 4. Load the filter. If the host gives Convolver exactly 2 inputs and 6
    outputs, click **Choose…** in its window and pick

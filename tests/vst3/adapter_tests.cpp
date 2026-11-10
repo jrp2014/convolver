@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "../native/cases.hpp"
 #include "../plugins/test_log.hpp"
 #include "advice.hpp"
 #include "host_log.hpp"
@@ -2355,11 +2356,6 @@ void report_and_files() {
     const auto good = folder / "room.wav", wrong = folder / "other rate.wav";
     write_wav(good, 48000, 1, 8);
     write_wav(wrong, 44100, 1, 8);
-    const auto* reader = convolver::vst3::test_file_reader;
-#if defined(CONVOLVER_VST3_TESTS_IO) && !defined(__APPLE__)
-    convolver::vst3::test_file_reader = &convolver::detail::libsndfile_files();
-#endif
-#if defined(__APPLE__) || defined(CONVOLVER_VST3_TESTS_IO)
     // Accepted: the filter plays, the report names the file, the host is told
     // the project changed, and the saved state holds the filter.
     require(c.load_file(good.string()) && handler.dirty == 1, "file not loaded");
@@ -2387,14 +2383,6 @@ void report_and_files() {
                 field(report, "filter note") != "(missing)" &&
                 !field(report, "filter note").empty(),
             "report after a refused file");
-#else
-    // A build with no reader refuses, and says why.
-    require(!c.load_file(good.string()) && handler.dirty == 0, "a file loaded without a reader");
-    const auto f = p.failure();
-    require(f && f->message.problem.find("cannot read filter files") != std::string::npos,
-            "no reader not explained");
-#endif
-    convolver::vst3::test_file_reader = reader;
     require(!c.load_file(""), "an empty path accepted");
     std::filesystem::remove_all(folder);
     p.setActive(false);
@@ -2469,16 +2457,11 @@ void saved_filter_name() {
         require(fresh.c.setState(&empty) == kResultOk && fresh.c.setState(nullptr) == kResultOk,
                 "an empty controller state refused");
     }
-#if defined(__APPLE__) || defined(CONVOLVER_VST3_TESTS_IO)
     const auto folder = private_temp("convolver-vst3-name");
     std::filesystem::create_directories(folder);
     const auto good = folder / "room.wav", other = folder / "hall.wav";
     write_wav(good, 48000, 1, 8);
     write_wav(other, 48000, 1, 16);
-    const auto* reader = convolver::vst3::test_file_reader;
-#if defined(CONVOLVER_VST3_TESTS_IO) && !defined(__APPLE__)
-    convolver::vst3::test_file_reader = &convolver::detail::libsndfile_files();
-#endif
     MemoryStream component, controller, hall;
     std::string identity;
     {
@@ -2607,9 +2590,7 @@ void saved_filter_name() {
                     saved_name(playing.c) == "hall.wav",
                 "a preset after a refusal lost its name");
     }
-    convolver::vst3::test_file_reader = reader;
     std::filesystem::remove_all(folder);
-#endif
 }
 // PLUG-31: a preset made by convolver-preset, loaded as the SDK's
 // PresetFile::loadPreset does for a host (the component state, then the
@@ -2804,11 +2785,6 @@ void messages_through_proxies() {
                   "host not asked to restart for the last Latency");
         }
         handler.on_restart = nullptr;
-#if defined(__APPLE__) || defined(CONVOLVER_VST3_TESTS_IO)
-        const auto* reader = convolver::vst3::test_file_reader;
-#if defined(CONVOLVER_VST3_TESTS_IO) && !defined(__APPLE__)
-        convolver::vst3::test_file_reader = &convolver::detail::libsndfile_files();
-#endif
         // Accepted: the project is marked changed once, when the answer arrives.
         check(c.load_file(good.string()), "proxy file not loaded");
         deliver();
@@ -2824,8 +2800,6 @@ void messages_through_proxies() {
         check(handler.dirty == 1, "a refused file marked the project changed");
         check(field(shown, "filter name") == "room.wav" && !field(shown, "filter note").empty(),
               "refused file not explained in the report");
-        convolver::vst3::test_file_reader = reader;
-#endif
         p.setActive(false);
         p.disconnect(&to_controller);
         c.disconnect(&to_processor);
@@ -2917,110 +2891,113 @@ void controller_conversions() {
     require(c.setState(&state) == kResultOk, "controller setState");
     c.terminate();
 }
-int run(const std::filesystem::path& preset_path, const std::optional<std::string>& preset_name) {
-    try {
-        if (preset_name)
-            preset_filter_name(preset_path, *preset_name);
-        edge_cases();
-        fractional_rates();
-        controller_conversions();
-        settings_parameters();
-        latency_while_playing();
-        latency_handover_waits();
-        report_and_files();
-        saved_filter_name();
-        messages_through_proxies();
-        settings_at_state_limit();
-        tail_measured_at_output();
-        output_silence_flags();
-        output_silence_flags_64();
-        multichannel();
-        restored_while_host_settles();
-        version1_presets();
-        speaker_arrangements();
-        placeholder_setup();
-        restart_mid_transition();
-        failed_first_loads();
-        failure_records();
-        status_and_log();
-        HostApplication context;
-        Processor p;
-        require(p.initialize(&context) == kResultOk, "initialize");
-        SpeakerArrangement mono = SpeakerArr::kMono, stereo = SpeakerArr::kStereo;
-        require(p.setBusArrangements(&mono, 1, &stereo, 1) == kResultOk, "mono to stereo buses");
-        require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "mono buses");
-        if (!preset_path.empty()) {
-            std::ifstream file(preset_path, std::ios::binary);
-            std::vector<char> bytes((std::istreambuf_iterator<char>(file)), {});
-            MemoryStream preset(bytes.data(), static_cast<TSize>(bytes.size()));
-            require(PresetFile::loadPreset(&preset, processor_id, &p), "SDK preset loading");
-        }
-        p.activateBus(kAudio, kInput, 0, true);
-        p.activateBus(kAudio, kOutput, 0, true);
-        auto expected = [&](int sample) {
-            return preset_path.empty() ? (sample == L ? 1. : 0.)
-                                       : (sample == L       ? .5
-                                          : sample == L + 1 ? .25
-                                                            : 0.);
-        };
-        ProcessSetup setup{kRealtime, kSample32, 73, 48000};
-        require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
-                "activate");
-        require(p.setProcessing(true) == kResultOk && p.getLatencySamples() == latency_samples,
-                "start latency");
-        std::array<float, 73> samples{};
-        float* channels[] = {samples.data()};
-        AudioBusBuffers input{}, output{};
-        input.numChannels = output.numChannels = 1;
-        input.channelBuffers32 = output.channelBuffers32 = channels;
-        ProcessData d{};
-        d.symbolicSampleSize = kSample32;
-        d.numInputs = d.numOutputs = 1;
-        d.inputs = &input;
-        d.outputs = &output;
-        for (int k = 0; k < 8; ++k) {
-            samples.fill(0);
-            if (k == 0)
-                samples[0] = 1;
-            d.numSamples = 73;
-            require(p.process(d) == kResultOk, "process");
-            for (int i = 0; i < 73; ++i)
-                require(std::abs(samples[i] - expected(k * 73 + i)) < 1e-5,
-                        "adapter identity latency");
-        }
-        MemoryStream state;
-        require(p.getState(&state) == kResultOk, "save state");
-        state.seek(0, IBStream::kIBSeekSet, nullptr);
-        require(p.setState(&state) == kResultOk, "restore while active");
-        ProcessData flush{};
-        require(p.process(flush) == kResultOk, "parameter-only flush");
-        require(p.setProcessing(false) == kResultOk && p.setActive(false) == kResultOk, "stop");
-        setup.symbolicSampleSize = kSample64;
-        require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
-                "64-bit setup");
-        require(p.canProcessSampleSize(kSample64) == kResultOk, "64-bit negotiation");
-        p.setProcessing(true);
-        std::array<double, 73> doubles{};
-        double* ptr[] = {doubles.data()};
-        input.channelBuffers64 = output.channelBuffers64 = ptr;
-        d.symbolicSampleSize = kSample64;
-        for (int k = 0; k < 8; ++k) {
-            doubles.fill(0);
-            if (k == 0)
-                doubles[0] = 1;
-            require(p.process(d) == kResultOk, "double process");
-            for (int i = 0; i < 73; ++i)
-                require(std::abs(doubles[i] - expected(k * 73 + i)) < 1e-5, "double identity");
-        }
-        p.setProcessing(false);
-        p.setActive(false);
-        p.terminate();
-        std::cout << "VST3 adapter compatibility passed\n";
-        return 0;
-    } catch (const std::exception& e) {
-        std::cerr << e.what() << '\n';
-        return 1;
+// The identity filter, or the preset given on the command line, through
+// 32-bit and 64-bit processing and a state round trip.
+void processing(const std::filesystem::path& preset_path) {
+    HostApplication context;
+    Processor p;
+    require(p.initialize(&context) == kResultOk, "initialize");
+    SpeakerArrangement mono = SpeakerArr::kMono, stereo = SpeakerArr::kStereo;
+    require(p.setBusArrangements(&mono, 1, &stereo, 1) == kResultOk, "mono to stereo buses");
+    require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "mono buses");
+    if (!preset_path.empty()) {
+        std::ifstream file(preset_path, std::ios::binary);
+        std::vector<char> bytes((std::istreambuf_iterator<char>(file)), {});
+        MemoryStream preset(bytes.data(), static_cast<TSize>(bytes.size()));
+        require(PresetFile::loadPreset(&preset, processor_id, &p), "SDK preset loading");
     }
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    auto expected = [&](int sample) {
+        return preset_path.empty() ? (sample == L ? 1. : 0.)
+                                   : (sample == L       ? .5
+                                      : sample == L + 1 ? .25
+                                                        : 0.);
+    };
+    ProcessSetup setup{kRealtime, kSample32, 73, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk, "activate");
+    require(p.setProcessing(true) == kResultOk && p.getLatencySamples() == latency_samples,
+            "start latency");
+    std::array<float, 73> samples{};
+    float* channels[] = {samples.data()};
+    AudioBusBuffers input{}, output{};
+    input.numChannels = output.numChannels = 1;
+    input.channelBuffers32 = output.channelBuffers32 = channels;
+    ProcessData d{};
+    d.symbolicSampleSize = kSample32;
+    d.numInputs = d.numOutputs = 1;
+    d.inputs = &input;
+    d.outputs = &output;
+    for (int k = 0; k < 8; ++k) {
+        samples.fill(0);
+        if (k == 0)
+            samples[0] = 1;
+        d.numSamples = 73;
+        require(p.process(d) == kResultOk, "process");
+        for (int i = 0; i < 73; ++i)
+            require(std::abs(samples[i] - expected(k * 73 + i)) < 1e-5, "adapter identity latency");
+    }
+    MemoryStream state;
+    require(p.getState(&state) == kResultOk, "save state");
+    state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&state) == kResultOk, "restore while active");
+    ProcessData flush{};
+    require(p.process(flush) == kResultOk, "parameter-only flush");
+    require(p.setProcessing(false) == kResultOk && p.setActive(false) == kResultOk, "stop");
+    setup.symbolicSampleSize = kSample64;
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "64-bit setup");
+    require(p.canProcessSampleSize(kSample64) == kResultOk, "64-bit negotiation");
+    p.setProcessing(true);
+    std::array<double, 73> doubles{};
+    double* ptr[] = {doubles.data()};
+    input.channelBuffers64 = output.channelBuffers64 = ptr;
+    d.symbolicSampleSize = kSample64;
+    for (int k = 0; k < 8; ++k) {
+        doubles.fill(0);
+        if (k == 0)
+            doubles[0] = 1;
+        require(p.process(d) == kResultOk, "double process");
+        for (int i = 0; i < 73; ++i)
+            require(std::abs(doubles[i] - expected(k * 73 + i)) < 1e-5, "double identity");
+    }
+    p.setProcessing(false);
+    p.setActive(false);
+    p.terminate();
+}
+int run(const std::filesystem::path& preset_path, const std::optional<std::string>& preset_name) {
+    std::vector<convolver::test::Case> list{
+        {"edge_cases", edge_cases},
+        {"fractional_rates", fractional_rates},
+        {"controller_conversions", controller_conversions},
+        {"settings_parameters", settings_parameters},
+        {"latency_while_playing", latency_while_playing},
+        {"latency_handover_waits", latency_handover_waits},
+        {"report_and_files", report_and_files},
+        {"saved_filter_name", saved_filter_name},
+        {"messages_through_proxies", messages_through_proxies},
+        {"settings_at_state_limit", settings_at_state_limit},
+        {"tail_measured_at_output", tail_measured_at_output},
+        {"output_silence_flags", output_silence_flags},
+        {"output_silence_flags_64", output_silence_flags_64},
+        {"multichannel", multichannel},
+        {"restored_while_host_settles", restored_while_host_settles},
+        {"version1_presets", version1_presets},
+        {"speaker_arrangements", speaker_arrangements},
+        {"placeholder_setup", placeholder_setup},
+        {"restart_mid_transition", restart_mid_transition},
+        {"failed_first_loads", failed_first_loads},
+        {"failure_records", failure_records},
+        {"status_and_log", status_and_log},
+    };
+    if (preset_name)
+        list.insert(list.begin(),
+                    {"preset_filter_name", [&] { preset_filter_name(preset_path, *preset_name); }});
+    list.push_back({"processing", [&] { processing(preset_path); }});
+    if (convolver::test::run_cases(list))
+        return 1;
+    std::cout << "VST3 adapter compatibility passed\n";
+    return 0;
 }
 
 #ifdef _WIN32

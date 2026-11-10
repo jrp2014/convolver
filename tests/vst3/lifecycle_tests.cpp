@@ -9,9 +9,6 @@
 #include "public.sdk/source/common/memorystream.h"
 #include "public.sdk/source/vst/hosting/hostclasses.h"
 #include "public.sdk/source/vst/hosting/parameterchanges.h"
-#if defined(CONVOLVER_VST3_TESTS_IO) && !defined(__APPLE__)
-#include "sound_files.hpp"
-#endif
 #include <array>
 #include <cstring>
 #include <iostream>
@@ -234,17 +231,9 @@ int load_timing(int argc, char** argv) {
     std::vector<timing::Entry> entries{{"setState", [&](const timing::Filter& f, timing::Audio&) {
                                             return timing::Outcome{driver.restore(f.state)};
                                         }}};
-#if defined(CONVOLVER_VST3_TESTS_IO) && !defined(__APPLE__)
-    // Plug-in builds here read no files; the tests lend it the tools' reader.
-    convolver::vst3::test_file_reader = &convolver::detail::libsndfile_files();
-#endif
-#if defined(__APPLE__) || defined(CONVOLVER_VST3_TESTS_IO)
     entries.push_back({"window file", [&](const timing::Filter& f, timing::Audio&) {
                            return timing::Outcome{driver.load_file(f.file.string())};
                        }});
-#else
-    std::cout << "VST3: this build reads no filter files, so the window's file is not timed\n";
-#endif
     return timing::exit_code(timing::run(driver, entries, timing::workloads(options), options));
 }
 } // namespace

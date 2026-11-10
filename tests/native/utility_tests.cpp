@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "bytes.hpp"
+#include "cases.hpp"
 #include "file.hpp"
 #include <array>
 #include <chrono>
@@ -105,15 +106,17 @@ int main() {
     const auto dir = fs::temp_directory_path() /
                      ("convolver-utilities-" +
                       std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-    try {
-        bytes_test();
-        require(fs::create_directory(dir), "create temporary directory");
-        files_test(dir);
-        fs::remove_all(dir);
-        std::cout << "byte encoding and exclusive file creation passed\n";
-    } catch (const std::exception& e) {
-        fs::remove_all(dir);
-        std::cerr << e.what() << '\n';
+    const auto failed = convolver::test::run_cases({
+        {"bytes_test", bytes_test},
+        {"files_test",
+         [&] {
+             require(fs::create_directory(dir), "create temporary directory");
+             files_test(dir);
+         }},
+    });
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    if (failed)
         return 1;
-    }
+    std::cout << "byte encoding and exclusive file creation passed\n";
 }

@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #import "diagnostic_view.h"
-#import "file_watch.h"
 #include "recent_files.hpp"
 #import "view_layout.h"
+#include "window_model.hpp"
 #include <cmath>
+#include <optional>
+#include <string>
 
 using namespace convolver::view;
 
@@ -26,45 +28,66 @@ constexpr CGFloat most_text =
 constexpr NSTimeInterval refresh_interval = 0.5;
 constexpr unsigned ticks_per_check = 2; // Files are checked once a second.
 
-NSString* field(NSDictionary<NSString*, NSString*>* report, NSString* key) {
-    NSString* value = report[key];
-    return [value isKindOfClass:[NSString class]] ? value : @"";
+// UTF-8 text from the shared window model (portable/window_model.hpp) as a
+// string, and back.
+NSString* ns(const std::string& text) {
+    NSString* value = [NSString stringWithUTF8String:text.c_str()];
+    return value ? value : @"";
+}
+std::string utf8(NSString* text) {
+    const char* chars = text.UTF8String;
+    return chars ? chars : "";
+}
+
+// The report's fields, as the format's block gives them, for the model.
+ReportFields report_fields_of(NSDictionary<NSString*, NSString*>* report) {
+    ReportFields fields;
+    for (NSString* key in report) {
+        NSString* value = report[key];
+        if ([key isKindOfClass:[NSString class]] && [value isKindOfClass:[NSString class]])
+            fields.insert_or_assign(utf8(key), utf8(value));
+    }
+    return fields;
 }
 
 // The status as a symbol and a colour; the status word is always written
-// beside them, so neither is the only signal. Values are HostStatus numbers.
-NSColor* status_colour(NSInteger status) {
-    switch (status) {
-    case 0: // Active
+// beside them, so neither is the only signal.
+NSColor* status_colour(StatusTone tone) {
+    switch (tone) {
+    case StatusTone::positive:
         return [NSColor systemGreenColor];
-    case 2: // Load failed
+    case StatusTone::failure:
         return [NSColor systemRedColor];
-    case 4: // Fault
+    case StatusTone::warning:
         return [NSColor systemOrangeColor];
-    default: // No filter, Waiting, Bypassed
-        return [NSColor labelColor];
+    case StatusTone::plain:
+        break;
     }
+    return [NSColor labelColor]; // No filter, Waiting, Bypassed
 }
-NSString* status_symbol(NSInteger status) {
-    switch (status) {
-    case 0:
+NSString* _Nullable status_symbol(StatusSymbol symbol) {
+    switch (symbol) {
+    case StatusSymbol::active:
         return @"checkmark.circle.fill";
-    case 2:
+    case StatusSymbol::failed:
         return @"xmark.octagon.fill";
-    case 3:
+    case StatusSymbol::waiting:
         return @"clock";
-    case 4:
+    case StatusSymbol::fault:
         return @"exclamationmark.triangle.fill";
-    case 5:
+    case StatusSymbol::bypassed:
         return @"pause.circle";
-    default:
+    case StatusSymbol::empty:
         return @"circle.dashed";
+    case StatusSymbol::none:
+        break;
     }
+    return nil;
 }
 // Whether the status has a colour of its own (the others are drawn in the
 // secondary colour).
-bool coloured(NSInteger status) {
-    return status == 0 || status == 2 || status == 4;
+bool coloured(StatusTone tone) {
+    return tone != StatusTone::plain;
 }
 
 NSBox* separator() {
@@ -100,7 +123,7 @@ NSAttributedString* fact_text(NSString* value, NSString* note, BOOL problem) {
 
 // The file, software and log lines: each "Label: value" as a row, the label
 // before a tab stop, wrapped lines indented under the value.
-NSAttributedString* reference_text(NSString* lines) {
+NSAttributedString* reference_text(const std::vector<ReferenceLine>& lines) {
     NSMutableParagraphStyle* row = [[NSMutableParagraphStyle alloc] init];
     row.tabStops = @[ [[NSTextTab alloc] initWithTextAlignment:NSTextAlignmentLeft
                                                       location:fact_label
@@ -118,14 +141,9 @@ NSAttributedString* reference_text(NSString* lines) {
         NSParagraphStyleAttributeName : row
     };
     NSMutableAttributedString* text = [[NSMutableAttributedString alloc] init];
-    for (NSString* line in [lines componentsSeparatedByString:@"\n"]) {
-        if (line.length == 0)
-            continue;
-        const NSRange colon = [line rangeOfString:@": "];
-        NSString* name =
-            colon.location == NSNotFound ? @"" : [line substringToIndex:colon.location];
-        NSString* value =
-            colon.location == NSNotFound ? line : [line substringFromIndex:NSMaxRange(colon)];
+    for (const auto& line : lines) {
+        NSString* name = ns(line.label);
+        NSString* value = ns(line.value);
         if (text.length)
             [text appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n"
                                                                          attributes:value_style]];
@@ -227,14 +245,13 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSStackView* mixNoteRow_;   // The mix note's row, hidden while Mix applies.
     NSUInteger mix_;            // Mix's index among the settings (NSNotFound: none).
     NSTimer* timer_;
-    NSString* shown_; // The text last shown, so a refresh keeps a selection.
+    std::optional<WindowContent> shown_; // What was last shown, so a refresh keeps a selection.
     NSString* logPath_;
     CONVOLVER_SETTING_ROWS* settings_; // Gain, Mix and Latency, and what the user does to them.
-    NSUInteger choosing_,
-        requests_;       // The pending Choose… request (0: none), the last number.
-    NSOpenPanel* panel_; // Its dialog, while one is open.
+    ChooseRequests choose_;            // The pending Choose… request.
+    NSOpenPanel* panel_;               // Its dialog, while one is open.
     // Reload: the playing filter's file and the files it was read from
-    // (file_watch.h); timer ticks, for the checks.
+    // (FileWatch in window_model.hpp); timer ticks, for the checks.
     FileWatch watch_;
     unsigned ticks_;
 }
@@ -612,7 +629,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 
 // Forgets a pending Choose… request and closes its dialog.
 - (void)stopChoosing {
-    choosing_ = 0;
+    choose_.stop();
     NSOpenPanel* panel = panel_;
     panel_ = nil;
     [panel cancel:nil];
@@ -679,30 +696,26 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [settings_ resetSetting:i];
 }
 
-// Rebuilds the Audio rows from the report's "audio" field: one line per
-// fact, label, value, note, "problem" or empty, and help, between tabs.
-- (void)showAudio:(NSString*)lines {
+// Rebuilds the Audio rows from the report's facts.
+- (void)showAudio:(const std::vector<AudioFact>&)facts {
     for (NSView* row in [audio_.arrangedSubviews copy]) {
         [audio_ removeArrangedSubview:row];
         [row removeFromSuperview];
     }
     NSMutableArray<NSTextField*>* labels = [NSMutableArray array];
     NSMutableArray<NSTextField*>* values = [NSMutableArray array];
-    for (NSString* line in [lines componentsSeparatedByString:@"\n"]) {
-        NSArray<NSString*>* parts = [line componentsSeparatedByString:@"\t"];
-        if (parts.count < 5)
-            continue;
+    for (const auto& fact : facts) {
+        NSString* help = ns(fact.help);
         NSTextField* name = label(body_font(), [NSColor secondaryLabelColor]);
-        name.stringValue = parts[0];
-        name.toolTip = parts[4];
+        name.stringValue = ns(fact.label);
+        name.toolTip = help;
         name.selectable = NO;
         fixed_width(name, fact_label);
         NSTextField* value = wrapping(body_font(), [NSColor labelColor], inner - fact_label - 10);
         value.allowsEditingTextAttributes = YES; // Keeps the note's colour when selected.
-        value.attributedStringValue =
-            fact_text(parts[1], parts[2], [parts[3] isEqualToString:@"problem"]);
-        value.toolTip = parts[4];
-        value.accessibilityLabel = parts[0];
+        value.attributedStringValue = fact_text(ns(fact.value), ns(fact.note), fact.problem);
+        value.toolTip = help;
+        value.accessibilityLabel = ns(fact.label);
         stretches(value);
         NSStackView* row = stack(@[ name, value ], NSUserInterfaceLayoutOrientationHorizontal, 10);
         row.alignment = NSLayoutAttributeFirstBaseline;
@@ -717,79 +730,45 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 }
 
 - (void)refresh {
+    // What to show comes from the shared model (portable/window_model.hpp),
+    // so every system's window shows the same for the same report.
     NSDictionary<NSString*, NSString*>* report = report_ ? report_() : nil;
-    NSString *problem, *plays, *cause, *fix, *advice, *action, *audio, *reference, *name, *note;
-    NSInteger status = -1;
-    if (!report) {
-        _titleField.stringValue = @"Convolver";
-        _statusField.stringValue = @"Not available";
-        _statusField.textColor = [NSColor labelColor];
-        _statusSymbol.image = nil;
-        problem = @"Convolver could not read its report from the plug-in.";
-        plays = cause = advice = action = @"";
-        fix = @"Close this window and open it again. If it keeps happening, the Convolver log "
-              @"has the details.";
-        audio = reference = name = note = @"";
-        logPath_ = nil;
-    } else {
-        status = field(report, @"status").integerValue;
-        _titleField.stringValue = field(report, @"title");
-        _statusField.stringValue = field(report, @"status name");
-        _statusField.textColor = status_colour(status);
-        _statusSymbol.image = [NSImage imageWithSystemSymbolName:status_symbol(status)
-                                        accessibilityDescription:nil];
-        _statusSymbol.contentTintColor =
-            coloured(status) ? status_colour(status) : [NSColor secondaryLabelColor];
-        problem = field(report, @"problem");
-        plays = field(report, @"plays");
-        cause = field(report, @"cause");
-        fix = field(report, @"fix");
-        advice = field(report, @"note");
-        action = field(report, @"action");
-        audio = field(report, @"audio");
-        reference = field(report, @"reference");
-        name = field(report, @"filter name");
-        note = field(report, @"filter note");
-        logPath_ = field(report, @"log path");
-    }
+    const ReportFields fields = report_fields_of(report);
+    const WindowContent c = window_content(report ? &fields : nullptr, loader_ != nil);
+    _titleField.stringValue = ns(c.title);
+    _statusField.stringValue = ns(c.status_name);
+    _statusField.textColor = status_colour(c.tone);
+    NSString* symbol = status_symbol(c.symbol);
+    _statusSymbol.image =
+        symbol ? [NSImage imageWithSystemSymbolName:symbol accessibilityDescription:nil] : nil;
+    _statusSymbol.contentTintColor =
+        coloured(c.tone) ? status_colour(c.tone) : [NSColor secondaryLabelColor];
+    logPath_ = c.log_path.empty() ? nil : ns(c.log_path);
     // The Latency row shows the time a choice adds at the host's rate, and
     // whether the chosen Latency is in use yet.
-    [settings_ readWithSampleRate:field(report, @"sample rate").intValue
-                     latencyWaits:[field(report, @"latency waits") isEqualToString:@"yes"]];
+    [settings_ readWithSampleRate:c.sample_rate latencyWaits:c.latency_waits];
     _logButton.enabled = logPath_.length > 0;
     [self readBypass];
-    watch_.follow(report ? field(report, @"filter path") : @"",
-                  report ? field(report, @"filter files") : @"");
-    _reloadButton.enabled = watch_.path().length > 0;
-    _watchButton.enabled = watch_.path().length > 0;
-    if (loader_)
-        note = note.length ? [note stringByAppendingString:@" Or drop a file on this window."]
-                           : @"Or drop an IR file or .cfg on this window.";
-    // Choose Filter… only where the window can choose a file.
-    if ([action isEqualToString:@"choose filter"] && !loader_)
-        action = @"";
+    watch_.follow(c.filter_path, c.filter_files);
+    _reloadButton.enabled = !watch_.path().empty();
+    _watchButton.enabled = !watch_.path().empty();
     // Every refresh: reading the settings enables every control again.
-    NSString* mixNote = field(report, @"mix note");
-    [self showMixNote:mixNote];
-    NSString* text = [@[
-        @(status).stringValue, problem, plays, cause, fix, advice, action, name, note, audio,
-        reference, field(report, @"filter rate"), field(report, @"filter channels"),
-        field(report, @"filter length"), field(report, @"filter speakers"), mixNote
-    ] componentsJoinedByString:@"\v"];
-    if ([text isEqualToString:shown_])
+    [self showMixNote:ns(c.mix_note)];
+    if (shown_ && *shown_ == c)
         return;
-    shown_ = text;
-    [_explanationView.textStorage setAttributedString:message_text(problem, plays, cause, fix)];
-    [self showAction:action];
-    _noteField.stringValue = advice;
-    noteRow_.hidden = advice.length == 0;
-    [self showMessage:problem status:status];
-    _filterNameField.stringValue = name;
-    _filterNameField.toolTip = name.length ? name : nil;
-    _filterNoteField.stringValue = note;
-    [self showAudio:audio];
-    [self showGlance:report];
-    _referenceField.attributedStringValue = reference_text(reference);
+    shown_ = c;
+    [_explanationView.textStorage
+        setAttributedString:message_text(ns(c.problem), ns(c.plays), ns(c.cause), ns(c.fix))];
+    [self showAction:c.action];
+    _noteField.stringValue = ns(c.note);
+    noteRow_.hidden = c.note.empty();
+    [self showMessage:c];
+    _filterNameField.stringValue = ns(c.filter_name);
+    _filterNameField.toolTip = c.filter_name.empty() ? nil : ns(c.filter_name);
+    _filterNoteField.stringValue = ns(c.filter_note);
+    [self showAudio:c.audio];
+    [self showGlance:c];
+    _referenceField.attributedStringValue = reference_text(c.reference);
     [self fit];
 }
 
@@ -813,14 +792,13 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 // the speakers its outputs are labelled for (jrp, 7 November 2026), which
 // the Audio section's host values need not match. Shown while a filter is
 // loaded; the speakers column only when the filter names them.
-- (void)showGlance:(NSDictionary<NSString*, NSString*>*)report {
-    NSString* speakers = field(report, @"filter speakers");
-    factsRow_.hidden = field(report, @"filter rate").length == 0;
-    _glanceValues[0].stringValue = field(report, @"filter rate");
-    _glanceValues[1].stringValue = field(report, @"filter channels");
-    _glanceValues[2].stringValue = field(report, @"filter length");
-    _glanceValues[2].toolTip =
-        field(report, @"filter taps").length ? field(report, @"filter taps") : nil;
+- (void)showGlance:(const WindowContent&)c {
+    NSString* speakers = ns(c.filter_speakers);
+    factsRow_.hidden = !c.facts_shown;
+    _glanceValues[0].stringValue = ns(c.filter_rate);
+    _glanceValues[1].stringValue = ns(c.filter_channels);
+    _glanceValues[2].stringValue = ns(c.filter_length);
+    _glanceValues[2].toolTip = c.filter_taps.empty() ? nil : ns(c.filter_taps);
     _glanceValues[3].stringValue = speakers;
     _glanceValues[3].toolTip = speakers.length ? speakers : nil;
     _glanceValues[3].superview.hidden = speakers.length == 0;
@@ -829,12 +807,12 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 // The message under the heading: hidden when there is nothing to say, in a
 // box tinted with the status colour when it states a problem, and plain text
 // otherwise (Bypassed's line, a note).
-- (void)showMessage:(NSString*)problem status:(NSInteger)status {
+- (void)showMessage:(const WindowContent&)c {
     const BOOL text = _explanationView.string.length > 0;
     scroll_.hidden = !text;
     message_.hidden = !text && noteRow_.hidden;
-    const BOOL boxed = problem.length > 0;
-    NSColor* tint = coloured(status) ? status_colour(status) : [NSColor secondaryLabelColor];
+    const BOOL boxed = c.boxed();
+    NSColor* tint = coloured(c.tone) ? status_colour(c.tone) : [NSColor secondaryLabelColor];
     message_.fillColor = boxed ? [tint colorWithAlphaComponent:0.08] : [NSColor clearColor];
     message_.borderColor = boxed ? [tint colorWithAlphaComponent:0.4] : [NSColor clearColor];
     message_.borderWidth = boxed ? 1 : 0;
@@ -845,11 +823,11 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 // The button that carries out the fix, highlighted in the accent colour:
 // Choose… or Copy Diagnostics, or neither. Not the default button, so
 // Return still goes to the host.
-- (void)showAction:(NSString*)action {
+- (void)showAction:(WindowAction)action {
     _chooseButton.bezelColor =
-        [action isEqualToString:@"choose filter"] ? [NSColor controlAccentColor] : nil;
+        action == WindowAction::choose_filter ? [NSColor controlAccentColor] : nil;
     _diagnosticsButton.bezelColor =
-        [action isEqualToString:@"copy diagnostics"] ? [NSColor controlAccentColor] : nil;
+        action == WindowAction::copy_diagnostics ? [NSColor controlAccentColor] : nil;
 }
 
 - (BOOL)checkForChanges {
@@ -858,12 +836,12 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     // The host may have replaced the filter (a preset, an undo) while the
     // window was covered and not reading the report: reload only the file
     // that still plays.
-    NSString* path = watch_.path();
-    NSString* files = watch_.files();
+    const std::string path = watch_.path();
+    const std::string files = watch_.files();
     [self refresh];
-    if (![watch_.path() isEqualToString:path] || ![watch_.files() isEqualToString:files])
+    if (watch_.path() != path || watch_.files() != files)
         return NO;
-    [self loadFile:path];
+    [self loadFile:ns(path)];
     return YES;
 }
 
@@ -874,7 +852,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 
 - (void)reloadFilter:(id)sender {
     static_cast<void>(sender);
-    NSString* path = watch_.path();
+    NSString* path = ns(watch_.path());
     if (path.length == 0 || ![self loadFile:path])
         NSBeep();
 }
@@ -890,18 +868,10 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSMenu* menu = _recentButton.menu;
     while (menu.numberOfItems > 1) // The first item is the button's title.
         [menu removeItemAtIndex:1];
-    NSFileManager* files = [NSFileManager defaultManager];
     BOOL any = NO;
-    for (const auto& file : convolver::recent_files()) {
-        NSString* path = [NSString stringWithUTF8String:file.c_str()];
-        if (!path || ![files fileExistsAtPath:path])
-            continue;
-        NSString* folder = path.stringByDeletingLastPathComponent.lastPathComponent;
-        NSString* title =
-            folder.length && ![folder isEqualToString:@"/"]
-                ? [NSString stringWithFormat:@"%@ — %@", path.lastPathComponent, folder]
-                : path.lastPathComponent;
-        NSMenuItem* item = [menu addItemWithTitle:title
+    for (const auto& entry : recent_entries(convolver::recent_files())) {
+        NSString* path = ns(entry.path);
+        NSMenuItem* item = [menu addItemWithTitle:ns(entry.title)
                                            action:@selector(recentChosen:)
                                     keyEquivalent:@""];
         item.target = self;
@@ -977,14 +947,12 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 
 - (NSUInteger)startChoosing {
     [self stopChoosing];
-    choosing_ = ++requests_;
-    return choosing_;
+    return static_cast<NSUInteger>(choose_.start());
 }
 
 - (BOOL)finishChoosing:(NSUInteger)request URL:(NSURL*)url {
-    if (request == 0 || request != choosing_)
+    if (!choose_.finish(request))
         return NO; // Forgotten: the window closed, or a newer request replaced it.
-    choosing_ = 0;
     panel_ = nil;
     if (!url.fileURL || !self.window)
         return NO;

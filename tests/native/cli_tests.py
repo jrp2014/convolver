@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """End-to-end CLI checks through real FFTW and libsndfile, no Python packages."""
 
+import json
 import math
 import os
 import re
@@ -280,6 +281,41 @@ def other_writers_tests(d):
         assert (channels, rate) == (1, 48000)
         near(y, expected)
         out.unlink()
+
+
+def refused_sound_filter_tests(d):
+    """DIAG-6: a sound file refused as a filter gives its reader's reason."""
+    good = d / 'refused-in.wav'
+    pcm(good, [1000, -1000, 500])
+    out = d / 'refused-out.wav'
+    garbage = d / 'refused-garbage.wav'
+    garbage.write_bytes(b'RIFF\0\1\2\3' + b'\xff' * 64)
+    truncated = d / 'refused-truncated.wav'
+    pcm(truncated, list(range(100)))
+    truncated.write_bytes(truncated.read_bytes()[:-20])
+    wide = d / 'refused-wide.wav'
+    pcm(wide, [0] * 300, channels=300)
+    cases = (
+        (garbage, ['refused-garbage.wav', 'Format not recognised', 'Export it again']),
+        (truncated, ['refused-truncated.wav', 'truncated or invalid RIFF/WAVE size']),
+        (wide, ['refused-wide.wav', 'channels 1..256']),
+    )
+    for ir, texts in cases:
+        message = call(['--filter', ir, '--input', good, '--output', out], ok=False).stderr.decode()
+        assert 'neither a configuration' not in message, (ir, message)
+        for text in texts:
+            assert text in message, (ir, text, message)
+        # The location names the file; the reader's copy of its path is left out.
+        assert message.count(ir.name) == 1, (ir, message)
+        for extra in ([], ['--syntax-only']):
+            report = json.loads(call(['--inspect', ir, '--json', *extra], ok=False).stdout)
+            assert report['diagnostics'][0]['code'] == 'unreadable-asset', (ir, extra, report)
+    # A container marker alone does not make a file a sound file: a list
+    # whose first entry starts with FORM is still read as a list.
+    (d / 'FORMAT.cfg').write_text('48000 1 1 0\n0\n0\nrefused-in.wav\n0\n0\n0\n')
+    listed = d / 'refused-list.txt'
+    listed.write_text('FORMAT.cfg\n')
+    call(['--filter', listed, '--input', good, '--output', out])
 
 
 def integer_format_tests(d):
@@ -1046,6 +1082,7 @@ def main():
         container_tests(d)
         other_writers_tests(d)
         failure_message_tests(d)
+        refused_sound_filter_tests(d)
         # An option value spelled like an inspection flag is still a value.
         pcm(d / 'v-ir.wav', [16384])
         pcm(d / 'v-in.wav', [1000, -1000])

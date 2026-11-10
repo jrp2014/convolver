@@ -1,0 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+/* The Linux VST3 module exports its entry points and nothing else, so a host
+   or another plug-in cannot bind to the libsndfile and Convolver code built
+   into it (VST3-12). */
+{
+    global: GetPluginFactory; ModuleEntry; ModuleExit;
+    local: *;
+};

@@ -901,6 +901,29 @@ How each adapter meets the contract where its format differs:
   does afterwards (a timer, a closing file dialog) reaches a controller the
   host has released. The view does not touch the processor or the audio
   thread.
+- **VST3 window on Windows (VST3-12).** `createView(ViewType::kEditor)`
+  returns an `EditorView` for `kPlatformTypeHWND` only (`editor_win.cpp`):
+  `attached()` makes a child window of the host's window with Windows'
+  standard controls, and `removed()` destroys it. The view stays alive
+  between the two, and a second `attached()` makes every control afresh. It
+  talks to the edit controller on the host's main thread exactly as the
+  macOS window does (the same edits, one per click, key, typed value or
+  Latency choice, a trackbar drag as one edit; the same report, load and
+  bypass messages), and does not touch the processor or the audio thread.
+  Sizes follow the window's DPI (`WM_DPICHANGED_AFTERPARENT`); before
+  attachment, `IPlugViewContentScaleSupport` gives the host's scale; a
+  taller content asks the host with `IPlugFrame::resizeView`, as on macOS.
+  Unlike the macOS sheet, the file dialog (`IFileOpenDialog`) and the
+  Recent menu (`TrackPopupMenu`) are Windows' own modal loops, owned by the
+  host's top-level window, as Windows applications expect. During either
+  loop the host may remove and release the view, so the view holds a
+  reference to itself until the loop returns, `removed()` closes an open
+  dialog, and a file chosen for a window that has gone is not loaded. If
+  the host destroys its own window before calling `removed()`, the view
+  notices the window has gone and `removed()` only forgets it. The window
+  polls the report twice a second while it is on screen and the filter's
+  files once a second while it is open, with window timers on the host's
+  thread.
 - **Audio Unit window in a host** (the evidence is in TODO AU-6); the VST3
   window (VST3-11) follows these too:
   - The host may run the plug-in in a process of its own (GarageBand:

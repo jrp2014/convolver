@@ -24,10 +24,11 @@ variants of the `.cfg` format ([other programs](docs/use/other-programs.md)).
 Coming from the old Windows Convolver? Your `.cfg` files may need a few
 edits ([how](docs/use/other-programs.md#configurations-from-the-old-windows-convolver)).
 Convolver is a developer preview: the latest, [0.13.2](https://github.com/jrp2014/convolver/releases/tag/v0.13.2), is an
-unsigned pre-release for macOS, Windows and Linux. On Windows and Linux the
-VST3 plug-in has no window yet. It was published before anyone listened to
-its new audio engine in a host and before an independent user's
-walkthrough, which are still to come ([status](docs/project/status.md)).
+unsigned pre-release for macOS, Windows and Linux. In it the VST3 plug-in
+has no window on Windows and Linux; the Windows window has been built
+since, and is not yet in a published package. 0.13.2 was published before
+anyone listened to its new audio engine in a host and before an independent
+user's walkthrough, which are still to come ([status](docs/project/status.md)).
 
 ## Start here
 

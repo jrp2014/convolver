@@ -32,7 +32,9 @@ struct SourcePosition {
 };
 enum class DiagnosticSeverity { error, warning };
 struct Diagnostic {
-    std::string code; // Stable identifier, for example "missing-asset" or "syntax".
+    // The kind of problem, for example "missing-asset" or "syntax"; the list is
+    // in docs/use/command-line.md. Before 1.0 a code may be corrected.
+    std::string code;
     DiagnosticSeverity severity = DiagnosticSeverity::error;
     std::string message; // Without the location prefix.
     SourcePosition location;

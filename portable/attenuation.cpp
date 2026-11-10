@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Offline gain estimates; the historical engine called this "optimum attenuation".
+#include "bytes.hpp"
 #include "convolver/engine.hpp"
 #include <algorithm>
 #include <bit>
@@ -11,12 +12,6 @@ namespace convolver {
 namespace {
 double attenuation_db(double peak) {
     return peak > 0 ? -20 * std::log10(peak) : 0;
-}
-std::uint64_t splitmix64(std::uint64_t& state) noexcept {
-    std::uint64_t z = (state += 0x9e3779b97f4a7c15ULL);
-    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
-    z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
-    return z ^ (z >> 31);
 }
 } // namespace
 // Exact peak bound: output o is sum_i (k_oi * x_i) with k_oi the sum over paths of
@@ -90,7 +85,7 @@ AttenuationEstimate estimate_attenuation(const Configuration& c, std::uint64_t s
         const auto frames = std::min(chunk, remaining);
         for (std::size_t i = 0; i < frames * c.input_channels; ++i)
             // 24 random bits: exactly representable floats in [-1, 1).
-            in[i] = static_cast<float>(splitmix64(state) >> 40) * 0x1p-23f - 1.0f;
+            in[i] = static_cast<float>(detail::splitmix64(state) >> 40) * 0x1p-23f - 1.0f;
         engine.process(std::span<const float>(in).first(frames * c.input_channels), out, frames);
         scan(frames);
         remaining -= frames;

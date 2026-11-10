@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "advice.hpp"
+#include "cases.hpp"
 #include "convolver/host.hpp"
 #include "host_log.hpp"
 #include "oracle.hpp"
@@ -2050,32 +2051,35 @@ void costly_moments_against_oracle() {
     }
 }
 int main() {
-    try {
-        numeric<float>();
-        numeric<double>();
-        lifecycle();
-        queued_replacements();
-        unequal_channels();
-        direct_installation();
-        prepared_replacements();
-        reset_during_transition();
-        filter_contract();
-        failure_reasons();
-        speaker_notices();
-        unequal_bypass();
-        wider_inputs();
-        muting();
-        control_silence();
-        allocation_failures();
-        unrecorded_failures();
-        saved_state_limit();
-        status_lines();
-        processing_faults();
-        costly_moments_against_oracle();
-        std::cout << "host lifecycle passed\n";
-    } catch (const std::exception& e) {
-        audio_thread = false;
-        std::cerr << e.what() << '\n';
+    const auto failed = convolver::test::run_cases(
+        {
+            {"numeric<float>", numeric<float>},
+            {"numeric<double>", numeric<double>},
+            {"lifecycle", lifecycle},
+            {"queued_replacements", queued_replacements},
+            {"unequal_channels", unequal_channels},
+            {"direct_installation", direct_installation},
+            {"prepared_replacements", prepared_replacements},
+            {"reset_during_transition", reset_during_transition},
+            {"filter_contract", filter_contract},
+            {"failure_reasons", failure_reasons},
+            {"speaker_notices", speaker_notices},
+            {"unequal_bypass", unequal_bypass},
+            {"wider_inputs", wider_inputs},
+            {"muting", muting},
+            {"control_silence", control_silence},
+            {"allocation_failures", allocation_failures},
+            {"unrecorded_failures", unrecorded_failures},
+            {"saved_state_limit", saved_state_limit},
+            {"status_lines", status_lines},
+            {"processing_faults", processing_faults},
+            {"costly_moments_against_oracle", costly_moments_against_oracle},
+        },
+        [] {
+            audio_thread = false;
+            allocations_left = -1;
+        });
+    if (failed)
         return 1;
-    }
+    std::cout << "host lifecycle passed\n";
 }

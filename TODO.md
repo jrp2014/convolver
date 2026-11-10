@@ -43,17 +43,15 @@ This is the order for new work, not approval to start every item. Correctness
 regressions take priority whenever discovered. Claim an item with a draft pull
 request before starting so independent tasks do not duplicate changes.
 
-**The freeze** (jrp, 9 November 2026,
-[decision](docs/project/decisions.md#releases)): after the second preview,
-runtime changes are frozen and further optimisation waits until feedback on
-the preview arrives. Crashes, lost state, wrong audio, compatibility failures
-and dropouts are still fixed at once, with a regression test where practical
+**The freeze is lifted** (jrp, 10 November 2026,
+[decision](docs/project/decisions.md#releases)): runtime changes, frozen
+after the second preview on 9 November, can go ahead again now that
+previews are out, with significant features before corner and edge cases.
+Crashes, lost state, wrong audio, compatibility failures and dropouts are
+still fixed at once, with a regression test where practical
 ([preview acceptance](docs/project/plans/2026-11-08-preview-acceptance.md#3-decide-whether-a-finding-blocks-the-preview)).
-A runtime change is one that changes what the packages run or hold: the
-code in `portable/`, `plugins/` and `include/`, the packaged presets, and the
-release scripts and packaging files that decide a package's contents.
-Documentation, tests, measurements and CI can go ahead while they leave the
-packages unchanged (jrp confirmed this reading on 9 November 2026).
+The sections below were ordered under the freeze, and their order stands
+until the next triage.
 
 **Next milestone** (jrp's [guidance](docs/review-2026-10/release-readiness-guidance-2026-10-22.md),
 22 October 2026): an independent user installs and uses an exact preview
@@ -104,7 +102,7 @@ the suggested one.
 
 | Group | Items | Note |
 | --- | --- | --- |
-| Later previews, as decided | **VST3-12** and **VST3-13** (the Windows and Linux windows); **PLUG-9**, **PLUG-10** and **AU-7** (the other gain modes and the meters) | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)). The 0.13.2 Windows and Linux packages use the host's own controls meanwhile |
+| Later previews, as decided | **VST3-12** (the Windows window, built: host and screen-reader checks left); **VST3-13** (the Linux window) only once LV2 is in a Linux package and users ask; **PLUG-9**, **PLUG-10** and **AU-7** (the other gain modes and the meters) | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the windows' order is [decided](docs/project/decisions.md#direction) in the [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md). The 0.13.2 Windows and Linux packages use the host's own controls meanwhile |
 | LV2 in a preview | **LV2-5** (packaging; jrp decides how `VERSION` maps to LV2's version numbers), then **LV2-7**; **LV2-3** and **LV2-4** after | LV2 joins the Linux package once LV2-5 and LV2-7 are in ([decision](docs/project/decisions.md#releases)) |
 | A window fix from jrp's sessions | **PLUG-26** (choose a `.vstpreset` in the window) | From his file-loading review of 7 November 2026 |
 | Other configuration readers | **CFG-1**, then **CFG-2** | CFG-2 waits for CFG-1 to show which readers matter |
@@ -1084,6 +1082,16 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.
   For a later preview: the first preview is macOS-only ([decided](docs/project/decisions.md#plug-in-behaviour)).
+  Built next among the windows, after PLUG-34; its first part gives the Windows
+  and Linux plug-in a sound-file reader (libsndfile, if jrp agrees)
+  ([decided](docs/project/decisions.md#direction); [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md#steps)).
+  Progress (10 November 2026, PR #181): the plug-in reads filter files with
+  libsndfile on Windows and Linux (pending jrp's choice of reader), and the
+  Win32 window is built (`plugins/vst3/editor_win.cpp`) with `vst3.editor`
+  on Windows and pluginval's editor tests there; it ran under Wine before
+  Windows CI. Left: a tester in REAPER and one other Windows host, and a
+  screen reader (NVDA or Narrator); the release notes' Windows window
+  limitation goes with the next preview's notes change.
 - [ ] **VST3-13 — Editor window on Linux.** The window in VSTGUI, for the
   Linux VST3 build only, as a stop-gap, driven by the
   host's `IRunLoop`; VSTGUI (BSD-3-Clause) and the libraries it links added
@@ -1092,6 +1100,8 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   X11 view can replace it later if Linux users need one
   ([editor plan](docs/archive/plans/2026-10-24-plugin-editor.md#framework-choice)).
   For a later preview: the first preview is macOS-only ([decided](docs/project/decisions.md#plug-in-behaviour)).
+  Waits until LV2 is in a Linux package and Linux VST3 users ask for a window
+  ([decided](docs/project/decisions.md#direction); [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md)).
 Not relevant to a convolver unless the product changes: MIDI and note
 interfaces (`IMidiMapping2`, `IMidiLearn2`, note expression, MIDI 2.0
 articulations), `ITransportControl`, `IPrefetchableSupport`,
@@ -1676,6 +1686,12 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **PLUG-34 — The window's behaviour in shared code.** 10 November
+  2026, PR #181: what the window shows and what a user's action means, in
+  `portable/window_model.hpp`, used by the macOS window with no visible
+  change and by the Windows one
+  ([implementation map](docs/develop/architecture.md#the-shared-macos-window)).
+
 - [x] **IO-11 — WAV files with unfilled sizes are read.** 10 November
   2026, PR #176. jrp chose to read them everywhere: a WAV whose sizes were
   left at `0xFFFFFFFF` (FFmpeg writing to a pipe) is read to its end,
@@ -1695,6 +1711,22 @@ move to the archive.
   from the whole-project review: ASan and UBSan for the `vst3.*` tests,
   ThreadSanitizer for `vst3.adapter`
   ([VST3 tests](docs/develop/testing.md#vst3-tests)).
+- [x] **TIDY-1 — Remove small duplicated helpers.** 9 November 2026, from
+  the whole-project review of that day (M2; its `utf8_path` part is
+  DIAG-7): one copy each of `splitmix64`, `ports()` and the little-endian
+  helpers, the window's status numbers named, and the unused `fft_size()`
+  removed ([implementation map](docs/develop/architecture.md#components-and-source-of-truth)).
+- [x] **CI-37 — Test programs report every failing case.** 9 November
+  2026, from the whole-project review of that day: ten programs run their
+  cases through one shared runner
+  ([native production tests](docs/develop/testing.md#native-production-tests)).
+- [x] **DIAG-6 — Show the reader's reason when a sound file is refused as
+  a filter.** 9 November 2026, from the whole-project review of that day
+  ([filter files](docs/use/configuration.md#filter-files)).
+- [x] **DIAG-7 — File names as UTF-8 in messages and paths on Windows.** 9
+  November 2026, from the whole-project review of that day: one shared
+  helper, and a non-ANSI name loaded and refused on every system
+  ([invariants](docs/develop/architecture.md#invariants-to-preserve)).
 - [x] **CI-35 — Prose edits to the first-use pages run Lint only.** 8
   November 2026, from jrp's question why a README link ran every workflow;
   [CI triggers](docs/develop/testing.md#documentation-only-pull-requests).

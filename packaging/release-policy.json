@@ -203,6 +203,8 @@
       "WS2_32.dll",
       "VERSION.dll",
       "SHLWAPI.dll",
+      "COMCTL32.dll",
+      "OLEACC.dll",
       "VCRUNTIME140.dll",
       "VCRUNTIME140_1.dll",
       "MSVCP140.dll",
