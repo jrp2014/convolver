@@ -217,6 +217,12 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   selection, routes, delays and tail, and the `portable-paths` warnings, against
   the same expectations: routes, signed zero, delays, BOM/CRLF,
   relative/Windows/mixed/UTF-8 paths, list selection and diagnostics.
+- `upgrade.cli`: the [files kept from published releases](../../tests/upgrade/README.md)
+  (COMPAT-1), each filter rendered by this build's CLI at each recorded block
+  size and compared with the audio that release's own CLI rendered: within
+  1e-5 (times the peak for a file louder than full scale), and identical when
+  the compiler and its version, configuration, flags, FFT backend and CPU
+  kernels match the capture's. It also fails if a retained file changed.
 - `native.filter_file`: a filter file chosen in a plug-in and refused, through
   `read_filter_file()` and `HostFilter::reject()` as the Audio Unit and LV2
   use them. The short status text gives the refused file's own channels
@@ -641,6 +647,10 @@ deallocation guards, corrupted state, and presets after their source files are
 deleted. The SDK validator loads the actual bundle; separate tests call the
 real processor and controller SDK interfaces. `vst3.harness` runs the PLUG-2
 comparisons; since VST3-7 the adapter lists no known deviations.
+`vst3.upgrade` restores each preset kept from a published release
+(COMPAT-1) in the bundle, loaded from its file as a host loads it, and
+compares the render with the audio that release rendered, by the rule
+`upgrade.cli` uses; it runs where `vst3.validator` runs.
 
 `vst3.adapter` also checks the settings (VST3-4): the parameters' order,
 flags, ranges, value text and `kDryWetMix`, Gain and Mix in the audio,
@@ -1457,6 +1467,8 @@ except:
   `<!-- first-use-example -->` changes (`examples.first_use` runs those
   commands; CI-35). Other edits to those three pages count as the
   documentation or packaged page each otherwise is;
+- Markdown under `tests/upgrade/`, which `upgrade.cli` and `vst3.upgrade`
+  read: the version folders hash their files, Markdown included (COMPAT-1);
 - pages copied into the preview packages, which also run the
   [candidate workflow](#plug-in-candidate-checks): everything under `docs/use/`,
   `examples/plugin-presets/README.md` and the Ooura `README.md`. A page in
@@ -1578,7 +1590,7 @@ another job runs only its own format's tests. The CTest labels select them.
 | --- | --- | --- |
 | `repository` label: `versioning`, `identities`, `examples.fixtures`, `documentation` (no build option changes them) | Native full builds with Clang on Linux and macOS and with MSVC on Windows; the release candidates | Native g++, Ooura and Accelerate builds; VST3; Audio Unit |
 | `consumer` label: `packaging.consumer.*` (the CMake development package) | Every native build | VST3, Audio Unit and the release candidates (none of them ships that package; the candidates' ZIP has its own relocation and smoke tests) |
-| Core and CLI suite (`native.*`, `compatibility.corpus`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build, Audio Unit (Release Accelerate, Xcode on `macos-15`), VST3 on macOS (Release Accelerate, the newer Xcode on `macos-latest`), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates; `native.ffmpeg_pipe` only in native g++ Release on Linux, the one job that installs FFmpeg | VST3 on Linux (Release with Ooura has the compiler, flags and image of native g++ Release; Debug with sanitizers and FFTW those of native Clang Debug) |
+| Core and CLI suite (`native.*`, `compatibility.corpus`, `upgrade.cli`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build, Audio Unit (Release Accelerate, Xcode on `macos-15`), VST3 on macOS (Release Accelerate, the newer Xcode on `macos-latest`), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates; `native.ffmpeg_pipe` only in native g++ Release on Linux, the one job that installs FFmpeg | VST3 on Linux (Release with Ooura has the compiler, flags and image of native g++ Release; Debug with sanitizers and FFTW those of native Clang Debug) |
 | Format and release tests (`vst3.*`, `au.*`, `lv2.*`, `release.*`) | Their format's jobs and the candidates | — |
 
 CTest still runs a fixture's setup when a selected test needs it, so

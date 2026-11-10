@@ -58,6 +58,8 @@ class Classification(unittest.TestCase):
             'docs/use/first-filter.md': 'code',
             'docs/historical/convolver-4.4/index.html': 'code',
             'docs/review-2026-10/archive-documentation.json': 'code',
+            'tests/upgrade/0.13.2/package/presets/README.md': 'code',
+            'tests/upgrade/README.md': 'code',
             'portable/third_party/ooura/README.md': 'packaged',
             'portable/engine.cpp': 'code',
             'COPYING': 'code',

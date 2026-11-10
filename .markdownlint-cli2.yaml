@@ -17,3 +17,5 @@ ignores:
   - 'review/**'
   - 'docs/archive/**'
   - 'docs/historical/**'
+  # Kept byte for byte from published releases (COMPAT-1).
+  - 'tests/upgrade/*/**'
