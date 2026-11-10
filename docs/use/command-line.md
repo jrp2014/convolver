@@ -386,9 +386,14 @@ although some programs read such a file to its end. FFmpeg leaves the sizes
 so when it writes a WAV to a pipe (`-f wav -`), because it cannot go back to
 the header, and also when it is stopped before it finishes writing a file;
 Convolver cannot tell the two apart, so it cannot tell whether the audio is
-all there. The message says so. Write the file again, to a file instead of a
-pipe, and let the program finish; to send audio through a pipe, use
-[RAW streams](#raw-streams).
+all there. Write the file again, to a file instead of a pipe, and let the
+program finish; to send audio through a pipe, use [RAW streams](#raw-streams).
+
+For such a file given as `--input`, or named as an IR file in a
+configuration, the message says that the sizes were never filled in, and
+why. A file chosen directly as the filter, here or in a plug-in, gets the
+general message for any file that cannot be read: that it is neither a
+configuration nor a sound file Convolver can read.
 
 Other containers, including RF64, get libsndfile's own checks; Convolver does
 not validate every codec libsndfile supports.

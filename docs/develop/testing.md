@@ -219,8 +219,9 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   checksums are unchanged. Registered only when CMake finds `ffmpeg` and
   `ffprobe`; CI installs FFmpeg in the native g++ Release job on Linux,
   which fails if the test is missing. A WAV that FFmpeg wrote to a pipe,
-  whose sizes the test first checks are `0xFFFFFFFF`, is refused with that
-  message, and the same audio written by FFmpeg to a file renders to the
+  whose sizes the test first checks are `0xFFFFFFFF`, is refused as
+  `--input` with the message that names the cause and the fix, and the same
+  audio written by FFmpeg to a file renders to the
   same bytes as its source, with every frame (IO-10).
 - `compatibility.corpus`: [generated configuration fixtures](../../tests/compatibility/README.md)
   rendered at block sizes 1, 3, 17 and 256 in both latency modes against an
@@ -262,10 +263,16 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   the same diagnostic code by both. For IO-10, a mono 24-bit WAV whose last
   odd chunk lacks its padding byte must give the same five frames from
   both, to the last one, and a RIFF size that counts the missing byte and
-  sizes left at `0xFFFFFFFF` must be refused with the same code. With the
-  shared check letting the unfilled sizes through, AudioToolbox read five
-  mono 24-bit frames as four
-  ([run 42715853793](https://github.com/jrp2014/convolver/actions/runs/42715853793)).
+  sizes left at `0xFFFFFFFF` must be refused with the same code. Evidence
+  from PR #176 on 9 November 2026, from two commits that let unfilled sizes
+  through the shared check and were not merged: at b1597a0 AudioToolbox
+  (macOS 15.8.2 and macOS 26) read five mono 24-bit frames, an odd number of
+  bytes, as four
+  ([run 42715853793](https://github.com/jrp2014/convolver/actions/runs/42715853793));
+  at 840c452 it gave libsndfile's frames for unfilled sizes over an even
+  number of bytes, including a stereo float file with the header FFmpeg
+  writes to a pipe
+  ([job 129504519445](https://github.com/jrp2014/convolver/actions/runs/42718018388/job/129504519445)).
   A WAV whose header claims 800 kHz,
   which the reader opens and then refuses, is refused 20 times without
   leaving a file descriptor open (counted in `/dev/fd`).

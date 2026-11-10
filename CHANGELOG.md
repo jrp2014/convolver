@@ -52,9 +52,10 @@ Until 1.0 the C++ API may change between minor versions.
   programs read them. Such a file is now read whole; one whose header
   counts the missing byte is still refused. A WAV whose sizes were never
   filled in (FFmpeg writing to a pipe, or stopped half way) is still
-  refused, because the two cannot be told apart, and the command line now
-  says that this is why and what to do
-  ([input files](docs/use/command-line.md#input-files)). Found by the
+  refused, because the two cannot be told apart. As `--input`, or as an IR
+  file named in a configuration, the message now says that this is why and
+  what to do; chosen directly as the filter it still gets the general
+  message ([input files](docs/use/command-line.md#input-files)). Found by the
   project review of 9 November 2026.
 
 ## [0.13.2] - 2026-11-09

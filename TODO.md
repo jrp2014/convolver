@@ -108,7 +108,7 @@ the suggested one.
 | LV2 in a preview | **LV2-5** (jrp first decides how `VERSION` maps to LV2's version numbers), **LV2-3**, **LV2-4**, **LV2-7** | LV2 joins a preview once its own journeys are demonstrated |
 | A window fix from jrp's sessions | **PLUG-26** (choose a `.vstpreset` in the window) | From his file-loading review of 7 November 2026 |
 | Other configuration readers | **CFG-1**, then **CFG-2** | CFG-2 waits for CFG-1 to show which readers matter |
-| Only on request | **VST3-2** (switch filters from the host), **VST3-6** (replacing the old VST2 plug-in), **HOST-2** (CLAP), **LV2-6** (an LV2 window) | Each needs a stated user need and acceptance tests first |
+| Only on request | **VST3-2** (switch filters from the host), **VST3-6** (replacing the old VST2 plug-in), **HOST-2** (CLAP), **LV2-6** (an LV2 window), **IO-11** (reading WAV files whose sizes were never filled in, which jrp decides) | Each needs a stated user need and acceptance tests first |
 | Measurements, then optimisation | **PERF-3** and **PERF-1** measure; then, only where PERF-3 shows a need, **FFT-2**, **VST3-5** and **PLUG-11** | PERF-3's resource budgets (callback tail latency, peak memory and preparation time while loading, replacing and resetting) decide whether further optimisation is worth doing. Its measurements, and PERF-1's reruns, change no shipped code, so they may go ahead during the freeze; the optimisation they might justify waits |
 
 ### 3. Parked and later
@@ -951,6 +951,17 @@ means a patched FFmpeg build with `--enable-gpl`.
   level or clipped elsewhere; rank 1 of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#1-a-filter-for-every-sample-rate),
   with EDGE-1. jrp decides whether Convolver resamples at all. Compare [libsamplerate](https://libsndfile.github.io/libsamplerate/)
   and other suitable implementations before choosing a dependency.
+- [ ] **IO-11 — Decide whether WAV files with unfilled sizes are read.**
+  From IO-10 (PR #176, 9 November 2026). A WAV whose RIFF and `data` sizes
+  were left at `0xFFFFFFFF` is refused, with a message that says why.
+  FFmpeg, libsndfile and (unless the audio is an odd number of bytes)
+  macOS's AudioToolbox read such a file to its end, and FFmpeg writes one
+  to a pipe; but FFmpeg stopped half way through writing a file leaves the
+  same header, and three of six such files loaded as complete when the
+  check let them through. jrp decides: keep refusing them, read them
+  everywhere, or read them as `--input` only. The evidence and the code
+  that read them are in PR #176 (commit 840c452) and
+  [testing](docs/develop/testing.md#native-production-tests).
 - [ ] **ROBUST-1 — Longer fuzz and transition stress.** Keep discovered inputs as
   regressions. Measure worst callback times and exercise repeated filter changes;
   allocation guards and average throughput are not a deadline guarantee.

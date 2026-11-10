@@ -74,8 +74,9 @@ struct UnfilledSizes : std::runtime_error {
 // Sizes that were never filled in stay refused, although other programs
 // read such a file to its end: the same header is left by a writer that
 // was stopped half way (FFmpeg killed while writing to a file), which cannot
-// be told from a pipe's output saved whole, and AudioToolbox read one such
-// file a frame shorter than libsndfile (native.audio_toolbox, PR #176).
+// be told from a pipe's output saved whole, and AudioToolbox drops the last
+// byte of such a file when its audio is an odd number of bytes, reading a
+// frame fewer than libsndfile (native.audio_toolbox, PR #176).
 void check_wave(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary);
     std::array<unsigned char, 40> bytes{};
@@ -145,7 +146,7 @@ void validate_wave(const std::filesystem::path& path) {
         throw std::runtime_error(advice_text(
             {"cannot read sound file " + path.string() + ": " + e.what(),
              unfilled
-                 ? "The program that wrote it could not go back to fill them in: it wrote to a "
+                 ? "The program that wrote it could not go back to the header: it wrote to a "
                    "pipe (as FFmpeg does with '-f wav -'), or it was stopped before it finished. "
                    "Convolver cannot tell how much audio the file should hold."
                  : "The file is damaged or incomplete, or is not a sound file.",
