@@ -141,6 +141,10 @@ is now in the maintained guides and TODO.
 - [Sign and notarize the macOS packages](project/plans/2026-11-09-macos-signing.md)
   (REL-1, Reference): the Apple account, certificates, notary key and cost,
   the steps only jrp can take, and the pipeline changes; no workflow changes yet.
+- [Plug-in windows on Windows and Linux](project/plans/2026-11-10-windows-linux-plugin-windows.md)
+  (VST3-12, VST3-13, PLUG-34 proposed): what any route needs first (a
+  sound-file reader and the window's behaviour in shared code), the routes
+  compared, and a recommended order; no code changes yet.
 - [Reduce CI waiting without losing useful coverage](project/plans/2026-11-08-ci-scheduling.md)
   (CI-34, Reference): separate proposed scheduling work with coverage and
   measurement requirements; no workflow changes yet.
