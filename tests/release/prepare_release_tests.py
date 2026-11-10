@@ -153,8 +153,8 @@ class PrepareReleaseTests(unittest.TestCase):
         self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/install.md#unsigned-previews', text)
         # What was not checked before publication (jrp's decision of 8 November 2026).
         self.assertIn('Not yet checked: listening in any host', text)
-        # The Audacity limitation (VST3-17), which jrp chose to state rather than fix.
-        self.assertIn("load filters from Audacity's own preset menu", text)
+        # VST3-17 is fixed; the release notes' changes list says what is checked.
+        self.assertNotIn('Audacity 4 does not keep it', text)
         # The new engine was published without a host listening session (jrp, 9 November 2026),
         # and some older projects open at the new default Latency (PERF-2).
         self.assertIn('nobody has listened to it in a host yet', text)

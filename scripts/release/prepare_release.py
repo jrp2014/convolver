@@ -152,8 +152,6 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'and removed itself. Nobody has used them in a host yet. '
             f'[Status]({base}/blob/{tag}/docs/project/status.md#checks-left-before-publication) lists what is open. '
             'Other hosts are untested.\n'
-            "- In Audacity, load filters from Audacity's own preset menu. A filter loaded from Convolver's window "
-            '(Choose…, Recent or Reload) plays there, but Audacity 4 does not keep it for exports or saved projects.\n'
             '- Latency now starts at 0 frames. Some projects saved with 0.12.12 at its default of 256 frames open at '
             '0; choose 256 again if you want its delay back '
             f'([projects from earlier versions]({docs}/plugins.md#settings)).'

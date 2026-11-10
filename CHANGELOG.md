@@ -128,6 +128,16 @@ Until 1.0 the C++ API may change between minor versions.
   the UTF-8 path a window passes as UTF-8. One shared helper replaces the
   copies that did these conversions.
 
+- VST3 (VST3-17): in a host that cannot be told the project changed
+  (no `IComponentHandler2`, such as Audacity 4.0.2), a filter loaded from
+  Convolver's window (Choose…, Recent, Reload or reloading when the file
+  changes) is now reported as an edit of Latency that keeps its value, so
+  that such a host stores it for exports and saved projects. The sound,
+  Gain, Mix and automation do not change, and hosts that can be told see no
+  edit.
+  Checked by automated tests only, not yet in Audacity, so the guides keep
+  Audacity's preset menu as the checked route.
+
 ## [0.13.2] - 2026-11-09
 
 The second published preview: macOS, Windows and Linux, unsigned, with the
