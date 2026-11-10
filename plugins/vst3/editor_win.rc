@@ -1,0 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// VST3-12: the window's manifest (editor_win.manifest) as resource 2 of the
+// plug-in's DLL, for builds whose linker does not embed it (MinGW); MSVC
+// builds list the manifest itself as a source instead.
+2 24 "editor_win.manifest"
