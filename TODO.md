@@ -623,6 +623,8 @@ LV2 (Linux first; also PipeWire system audio):
   jrp's to decide; the archived
   [formats plan](docs/archive/plans/2026-10-21-plugin-formats.md#decisions-for-the-owner)
   recommended building them in CI and publishing once Linux has users.
+  Progress (10 November 2026): the Linux package's LV2 bundle is in progress
+  on the draft pull request titled LV2-5.
 - [ ] **LV2-6 — Editor report and UI (optional).** Only if Linux users show a
   need: generic UIs already offer the `filter` file chooser and the status
   port. The report as `patch:Set` atoms on the notify port, prepared in
