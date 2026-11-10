@@ -17,7 +17,7 @@ Until 1.0 the C++ API may change between minor versions.
   changelog; each preview's release-notes change updates the list
   ([publishing](docs/develop/releasing.md#publishing-an-unsigned-preview)).
   jrp decided on 10 November 2026 to publish a third preview, a 0.13.x tag,
-  without the checks left and without waiting for VST3-17
+  without the checks left but after VST3-17's Audacity fix
   ([decision](docs/project/decisions.md#releases)).
 - Tests (COMPAT-1, in progress): the example presets of the published 0.13.2,
   with the audio its own CLI and VST3 plug-in rendered from them, are kept in
