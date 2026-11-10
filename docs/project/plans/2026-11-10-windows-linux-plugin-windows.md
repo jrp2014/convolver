@@ -238,7 +238,8 @@ otherwise:
 1. **The route:** C, chosen by jrp on 10 November 2026
    ([decision](../decisions.md#direction)).
 2. **libsndfile inside the Windows and Linux plug-in**, rather than Media
-   Foundation on Windows and nothing on Linux. It is already in the packages
+   Foundation on Windows and nothing on Linux: chosen by jrp on 10 November
+   2026 ([decision](../decisions.md#licences-and-dependencies)). It is already in the packages
    and their notices; the change is that the plug-in links it. The trade-off:
    with libsndfile the Windows plug-in reads AIFF, CAF and raw files but not
    FLAC (as the packaged tool); with Media Foundation it reads FLAC (as the
