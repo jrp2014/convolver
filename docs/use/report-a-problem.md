@@ -11,9 +11,9 @@ where to send it.
   **Problem report** for a crash, wrong sound or refused filter, **Preview
   feedback** for what worked, what was confusing or what you missed. You
   need a free GitHub account.
-- On macOS, press **Copy Diagnostics** in Convolver's window and paste it
-  into the report. On Windows and Linux, where the plug-in has no window,
-  attach the Convolver log file instead.
+- On macOS and Windows, press **Copy Diagnostics** in Convolver's window
+  and paste it into the report. On Linux, and on Windows up to 0.13.2,
+  where the plug-in has no window, attach the Convolver log file instead.
 - Say which system, host and version you used, how you loaded the filter,
   and whether the problem is in playback, an export or a reopened project.
 

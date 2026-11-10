@@ -12,6 +12,17 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- VST3 plug-in on Windows (VST3-12): Convolver's window, the same as on
+  macOS, built from Windows' own controls: the status, why it is silent and
+  what to change, Choose…, Recent and Reload, a dropped file, Gain, Mix and
+  Latency, the Audio facts, Copy Diagnostics and Show Log. It follows the
+  screen's scaling and high-contrast mode, moves between controls with Tab,
+  and names its controls for screen readers. `vst3.editor` opens it on
+  Windows CI and keeps a picture of it, and pluginval's editor tests now run
+  there. Not yet tried in a host or with a screen reader. The Windows and
+  Linux plug-in reads filter files with libsndfile (WAV, RF64, W64, AIFF,
+  CAF and headerless files), and on Linux exports only its entry points. No
+  change to the sound.
 - Tests (COMPAT-1, in progress): the example presets of the published 0.13.2,
   with the audio its own CLI and VST3 plug-in rendered from them, are kept in
   `tests/upgrade/0.13.2/`. `upgrade.cli` and `vst3.upgrade` fail if a later
@@ -50,6 +61,13 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Source (PLUG-34): what Convolver's window does, apart from drawing it,
+  moved from the macOS window's Objective-C into shared C++
+  (`portable/window_model.hpp`), so the coming Windows window behaves the
+  same; `native.window_model` tests it on every system. The macOS window
+  looks and behaves as before, except in typed values nobody would type:
+  `0x10` now reads as 0 rather than 16, and `5e` is refused rather than
+  read as 5.
 - Source (TIDY-1, from the whole-project review of 9 November 2026): small
   helpers that existed in two or three copies now have one: the SplitMix64
   generator and the little-endian readers and writers in `bytes.hpp`, and

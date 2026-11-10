@@ -2,11 +2,8 @@
 #import "setting_rows.h"
 #include "host_log.hpp"
 #import "view_layout.h"
-#include <algorithm>
+#include "window_model.hpp"
 #include <cmath>
-#include <cstdlib> // Before xlocale.h, which declares strtod_l only after it.
-#include <locale.h>
-#include <xlocale.h>
 
 using namespace convolver::view;
 
@@ -153,13 +150,9 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
 // whether it is not in use yet; the item titles begin with the frames ("256
 // frames"). The Audio section does not repeat it (PLUG-22).
 - (NSString*)latencyNote:(NSPopUpButton*)menu {
-    const double frames = menu.titleOfSelectedItem.doubleValue;
-    NSString* time = sampleRate_ > 0 && frames > 0
-                         ? [NSString stringWithFormat:@"adds %.1f ms", 1000 * frames / sampleRate_]
-                         : @"";
-    if (!latencyWaits_)
-        return time;
-    return time.length ? [time stringByAppendingString:@", not in use yet"] : @"Not in use yet";
+    const auto note = convolver::view::latency_note(menu.titleOfSelectedItem.doubleValue,
+                                                    sampleRate_, latencyWaits_);
+    return @(note.c_str());
 }
 
 // Shows `value` for setting `i`: in its typed field (unless the user is
@@ -298,22 +291,17 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     auto* slider = static_cast<NSSlider*>(controls_[i]);
     if (typed_ == value.tag) {
         typed_ = -1;
-        // A decimal comma reads as a point ("-6,5"), whatever the host's locale.
-        NSString* typed = [[[value.stringValue stringByReplacingOccurrencesOfString:@"−"
-                                                                         withString:@"-"]
-            stringByReplacingOccurrencesOfString:@","
-                                      withString:@"."]
-            stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-        // The number at the start, read in the C locale, so a host's LC_NUMERIC
-        // cannot change it; a unit typed after it ("-6 dB") is ignored.
-        static const locale_t c_locale = newlocale(LC_NUMERIC_MASK, "C", nullptr);
-        const char* chars = typed.UTF8String;
-        char* end = nullptr;
-        const double number = chars && c_locale ? strtod_l(chars, &end, c_locale) : 0;
-        if (!chars || !c_locale || end == chars || !std::isfinite(number)) {
+        // A decimal comma reads as a point ("-6,5") and a unit typed after the
+        // number ("-6 dB") is ignored, whatever the host's locale (the shared
+        // window model, portable/window_model.hpp).
+        const char* chars = value.stringValue.UTF8String;
+        const auto number =
+            chars ? convolver::view::typed_value(chars, slider.minValue, slider.maxValue)
+                  : std::nullopt;
+        if (!number) {
             NSBeep();
         } else {
-            slider.doubleValue = std::clamp(number, slider.minValue, slider.maxValue);
+            slider.doubleValue = *number;
             [self set:slider.doubleValue at:i];
         }
     }

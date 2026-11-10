@@ -17,8 +17,9 @@ and the supported one [in Audacity](#in-audacity).
 
 You need a plug-in host that loads VST® 3, such as REAPER or Audacity
 (version 4 or later), or one that loads Audio Units, such as GarageBand or
-Logic. On macOS both formats have the same window, so the steps are the same.
-On Windows and Linux the VST3 plug-in has no window yet: use a
+Logic. On macOS both formats have the same window, and the VST3 plug-in on
+Windows has it too, so the steps are the same. On Linux the VST3 plug-in
+has no window yet, nor on Windows up to 0.13.2: use a
 [preset](#optional-load-a-preset) instead. Installing a plug-in does not
 filter an ordinary music player or everything the computer plays; for that
 on Windows, see the [Equalizer APO export](equalizer-apo.md).
@@ -118,7 +119,7 @@ report a problem, see [report a problem](report-a-problem.md).
 
 A preset is the filter saved in the host's preset format, loaded from the
 host's preset menu instead of the window. You need one where the plug-in has
-no window (the VST3 plug-in on Windows and Linux), to keep filters in the
+no window (the VST3 plug-in on Linux, and on Windows up to 0.13.2), to keep filters in the
 host's preset library, or to pass one self-contained file to someone else.
 
 Each example folder holds a VST3 preset named after it

@@ -2362,11 +2362,6 @@ void report_and_files() {
     const auto good = folder / "room.wav", wrong = folder / "other rate.wav";
     write_wav(good, 48000, 1, 8);
     write_wav(wrong, 44100, 1, 8);
-    const auto* reader = convolver::vst3::test_file_reader;
-#if defined(CONVOLVER_VST3_TESTS_IO) && !defined(__APPLE__)
-    convolver::vst3::test_file_reader = &convolver::detail::libsndfile_files();
-#endif
-#if defined(__APPLE__) || defined(CONVOLVER_VST3_TESTS_IO)
     // Accepted: the filter plays, the report names the file, the host is told
     // the project changed, and the saved state holds the filter.
     handler.edits.clear();
@@ -2397,14 +2392,6 @@ void report_and_files() {
                 field(report, "filter note") != "(missing)" &&
                 !field(report, "filter note").empty(),
             "report after a refused file");
-#else
-    // A build with no reader refuses, and says why.
-    require(!c.load_file(good.string()) && handler.dirty == 0, "a file loaded without a reader");
-    const auto f = p.failure();
-    require(f && f->message.problem.find("cannot read filter files") != std::string::npos,
-            "no reader not explained");
-#endif
-    convolver::vst3::test_file_reader = reader;
     require(!c.load_file(""), "an empty path accepted");
     std::filesystem::remove_all(folder);
     p.setActive(false);
@@ -2573,16 +2560,11 @@ void saved_filter_name() {
         require(fresh.c.setState(&empty) == kResultOk && fresh.c.setState(nullptr) == kResultOk,
                 "an empty controller state refused");
     }
-#if defined(__APPLE__) || defined(CONVOLVER_VST3_TESTS_IO)
     const auto folder = private_temp("convolver-vst3-name");
     std::filesystem::create_directories(folder);
     const auto good = folder / "room.wav", other = folder / "hall.wav";
     write_wav(good, 48000, 1, 8);
     write_wav(other, 48000, 1, 16);
-    const auto* reader = convolver::vst3::test_file_reader;
-#if defined(CONVOLVER_VST3_TESTS_IO) && !defined(__APPLE__)
-    convolver::vst3::test_file_reader = &convolver::detail::libsndfile_files();
-#endif
     MemoryStream component, controller, hall;
     std::string identity;
     {
@@ -2711,9 +2693,7 @@ void saved_filter_name() {
                     saved_name(playing.c) == "hall.wav",
                 "a preset after a refusal lost its name");
     }
-    convolver::vst3::test_file_reader = reader;
     std::filesystem::remove_all(folder);
-#endif
 }
 // PLUG-31: a preset made by convolver-preset, loaded as the SDK's
 // PresetFile::loadPreset does for a host (the component state, then the
@@ -2908,11 +2888,6 @@ void messages_through_proxies() {
                   "host not asked to restart for the last Latency");
         }
         handler.on_restart = nullptr;
-#if defined(__APPLE__) || defined(CONVOLVER_VST3_TESTS_IO)
-        const auto* reader = convolver::vst3::test_file_reader;
-#if defined(CONVOLVER_VST3_TESTS_IO) && !defined(__APPLE__)
-        convolver::vst3::test_file_reader = &convolver::detail::libsndfile_files();
-#endif
         // Accepted: the project is marked changed once, when the answer arrives.
         check(c.load_file(good.string()), "proxy file not loaded");
         deliver();
@@ -2928,8 +2903,6 @@ void messages_through_proxies() {
         check(handler.dirty == 1, "a refused file marked the project changed");
         check(field(shown, "filter name") == "room.wav" && !field(shown, "filter note").empty(),
               "refused file not explained in the report");
-        convolver::vst3::test_file_reader = reader;
-#endif
         p.setActive(false);
         p.disconnect(&to_controller);
         c.disconnect(&to_processor);

@@ -226,6 +226,16 @@ jobs:
           path: build-vst3/*-load-timing/*-load-timing.json
           retention-days: 14
           if-no-files-found: ignore
+      # VST3-12: the Windows window as vst3.editor drew it, with a filter
+      # playing and with one refused (docs/develop/testing.md#vst3-tests).
+      - name: Keep the window's pictures
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: vst3-window-windows-attempt-${{ github.run_attempt }}
+          path: build-vst3/plugins/vst3/vst3-editor*.bmp
+          retention-days: 14
+          if-no-files-found: ignore
       # The newest pluginval beta or release candidate, when one is newer than
       # the release above: what it reports is a warning in the summary, not a
       # failure, since a pre-release only signposts what is coming. The one
