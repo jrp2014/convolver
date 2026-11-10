@@ -2,6 +2,7 @@
 #include "filter_file.hpp"
 #include "advice.hpp"
 #include "config_parse.hpp"
+#include "utf8.hpp"
 #include <algorithm>
 #include <exception>
 #include <string>
@@ -64,7 +65,8 @@ std::optional<HostState> read_filter_file(const std::string& path, const HostLay
         // Explained in the host's terms, not the command line's (jrp's
         // GarageBand run: the window advised omitting --output-channels).
         std::vector<std::filesystem::path> sources;
-        auto state = filter_file_state(path, {host.sample_rate, host.inputs, host.outputs}, reader,
+        auto state = filter_file_state(detail::utf8_path(path),
+                                       {host.sample_rate, host.inputs, host.outputs}, reader,
                                        nullptr, true, false, &sources);
         // VST3-9: the selection used the whole part of a fractional rate;
         // a filter made for that whole part does not suit it either.
@@ -82,10 +84,8 @@ std::optional<HostState> read_filter_file(const std::string& path, const HostLay
         if (files) {
             // As UTF-8, which every window's file APIs take.
             std::vector<std::string> named;
-            for (const auto& source : sources) {
-                const auto text = source.u8string();
-                named.emplace_back(text.begin(), text.end());
-            }
+            for (const auto& source : sources)
+                named.push_back(detail::utf8_string(source));
             *files = std::move(named);
         }
         return state;

@@ -11,6 +11,7 @@
 //     double-precision oracle, and no output sample is subnormal.
 // On a processor without a flush control in denormals.hpp the restoration
 // checks still run and the arithmetic checks expect IEEE gradual underflow.
+#include "cases.hpp"
 #include "convolver/engine.hpp"
 #include "convolver/host.hpp"
 #include "denormals.hpp"
@@ -372,13 +373,22 @@ int main() {
     try {
         std::cout << "flush control: "
                   << (flush_denormals_supported ? "yes" : "none on this processor") << '\n';
-        helper();
-        engine_restores();
-        host_restores<float>();
-        host_restores<double>();
-        subnormal_input();
-        decaying_tail();
-        require(gradual(), "the test left flushing on");
+        // Each case must leave gradual underflow on, as it found it.
+        const auto restores = [](void (*test)()) {
+            return [test] {
+                test();
+                require(gradual(), "the test left flushing on");
+            };
+        };
+        if (convolver::test::run_cases({
+                {"helper", restores(helper)},
+                {"engine_restores", restores(engine_restores)},
+                {"host_restores<float>", restores(host_restores<float>)},
+                {"host_restores<double>", restores(host_restores<double>)},
+                {"subnormal_input", restores(subnormal_input)},
+                {"decaying_tail", restores(decaying_tail)},
+            }))
+            return 1;
         std::cout << "denormal tests passed\n";
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';

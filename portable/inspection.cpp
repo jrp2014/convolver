@@ -6,6 +6,7 @@
 #include "config_parse.hpp"
 #include <algorithm>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -349,9 +350,12 @@ class Inspector {
         const auto& path = report_.path;
         report_.selection_reason = "syntax-only check of one configuration file";
         std::unique_ptr<AudioReader> audio;
+        std::optional<std::string> refused; // DIAG-6, as Resolver::visit() reports it.
         try {
             audio = std::make_unique<AudioReader>(path);
-        } catch (const std::runtime_error&) { /* Not a sound file: parse as text. */
+        } catch (const std::runtime_error& e) { // Not a sound file: parse as text.
+            if (detail::header_marker(path) == detail::HeaderMarker::container)
+                refused = e.what();
         }
         auto scope = [&](const char* what) {
             add({"syntax-only-scope",
@@ -368,7 +372,10 @@ class Inspector {
         }
         ParsedDocument doc;
         try {
-            doc = detail::parse_configuration_text(detail::read_configuration_text(path), path);
+            const auto text = detail::read_configuration_text(path);
+            if (refused && detail::not_configuration_text(text))
+                throw detail::refused_sound_file(path, std::move(*refused));
+            doc = detail::parse_configuration_text(text, path);
         } catch (const ConfigurationError& e) {
             fail(e);
             return;

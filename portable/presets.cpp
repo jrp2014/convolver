@@ -14,6 +14,9 @@
 
 namespace convolver::presets {
 namespace {
+using detail::append_le32;
+using detail::append_le64;
+using detail::read_le64;
 constexpr std::size_t vst3_header_bytes = 48; // 'VST3', version, class ID, list offset
 constexpr std::string_view base64_digits =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -21,22 +24,6 @@ constexpr std::string_view base64_digits =
 void append(std::vector<std::byte>& out, std::string_view text) {
     for (char c : text)
         out.push_back(static_cast<std::byte>(c));
-}
-void append_le32(std::vector<std::byte>& out, std::uint32_t value) {
-    for (unsigned i = 0; i < 4; ++i)
-        out.push_back(std::byte((value >> (8 * i)) & 255));
-}
-void append_le64(std::vector<std::byte>& out, std::uint64_t value) {
-    for (unsigned i = 0; i < 8; ++i)
-        out.push_back(std::byte((value >> (8 * i)) & 255));
-}
-std::uint64_t read_le64(std::span<const std::byte> bytes) {
-    if (bytes.size() < 8)
-        throw std::invalid_argument("truncated 64-bit value");
-    std::uint64_t value = 0;
-    for (unsigned i = 0; i < 8; ++i)
-        value |= std::to_integer<std::uint64_t>(bytes[i]) << (8 * i);
-    return value;
 }
 bool equal_text(std::span<const std::byte> bytes, std::string_view text) {
     return bytes.size() >= text.size() &&

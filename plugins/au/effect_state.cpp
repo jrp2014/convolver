@@ -7,6 +7,7 @@
 #include "filter_file.hpp"
 #include "host_log.hpp"
 #include "presets.hpp"
+#include "utf8.hpp"
 #include <AudioToolbox/AudioUnitUtilities.h>
 #include <algorithm>
 #include <array>
@@ -386,7 +387,7 @@ OSStatus Effect::load_file(const std::string& path) {
     // what kind of filter it is, and the project saves it, so the window
     // names the filter after reopening (RestoreState).
     if (accepted) {
-        const auto name = std::filesystem::path(path).filename().string();
+        const auto name = detail::utf8_string(detail::utf8_path(path).filename());
         if (const auto preset_name = cf_string(name.empty() ? path : name)) {
             static_cast<void>(NewCustomPresetSet(AUPreset{-1, preset_name.get()}));
             PropertyChanged(kAudioUnitProperty_PresentPreset, kAudioUnitScope_Global, 0);

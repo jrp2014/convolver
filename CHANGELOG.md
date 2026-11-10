@@ -55,6 +55,34 @@ Until 1.0 the C++ API may change between minor versions.
   asks for the system and points Windows and Linux users to the log, and the
   release notes link both. No change to the plug-ins or tools.
 
+### Changed
+
+- Source (TIDY-1, from the whole-project review of 9 November 2026): small
+  helpers that existed in two or three copies now have one: the SplitMix64
+  generator and the little-endian readers and writers in `bytes.hpp`, and
+  "2 in, 6 out" in `host_log.hpp`. The macOS window names its status
+  values from `HostStatus`, and the FFT backends lose `fft_size()`, unused
+  since the PERF-2 engine. No change in behaviour or output.
+- Tests (CI-37, from the whole-project review of 9 November 2026): ten C++
+  test programs, among them `native.engine`, `native.host` and the VST3
+  and Audio Unit adapter tests, run every case and report each failure by
+  name, where the first failed check used to end the program and hide the
+  rest. The shared runner is `tests/native/cases.hpp`.
+- Command line and plug-ins (DIAG-6, from the whole-project review of 9
+  November 2026): a sound file refused as a filter is reported with the
+  reader's reason, for example "truncated or invalid RIFF/WAVE size" or
+  "channels 1..256", where Convolver used to say only that the file was
+  neither a configuration nor a sound file it can read. This applies to
+  files that start like a WAV, RF64, BW64, W64, RIFX, AIFF, CAF, AU, FLAC or
+  Ogg file.
+- Command line (DIAG-6): a new `--inspect` code, `unreadable-asset`, for a
+  sound file that is there but cannot be read, also with `--syntax-only`.
+  A file refused as the filter itself used to get `syntax`, and an IR file
+  named by a configuration used to get `missing-asset`, as if it were
+  absent ([decision](docs/project/decisions.md#diagnostics)). The
+  [command-line guide](docs/use/command-line.md#inspecting-and-validating-configurations)
+  now lists every code.
+
 ### Fixed
 
 - WAV files (IO-10, IO-11): two kinds of WAV file that other programs read
@@ -68,15 +96,20 @@ Until 1.0 the C++ API may change between minor versions.
   half way through writing a file leaves the same header, so that file is
   now read as if it were complete, unless it is PCM or float audio that
   stops inside a frame. A file without sizes of 4 GiB or more is still
-  refused, because nothing says where its audio ends. As `--input`, or as
-  an IR file named in a configuration, it gets a message that says why and
-  what to do; chosen directly as the filter it gets a general message that
-  does not give the reason. On a Mac the plug-ins read a file without sizes
+  refused, because nothing says where its audio ends, with a message that
+  says why and what to do. On a Mac the plug-ins read a file without sizes
   as the command line does: macOS's own reader, left to open one, read some
   of them a frame short, so it is shown the file with its sizes filled in
   ([input files](docs/use/command-line.md#input-files)). Found by the
   project review of 9 November 2026; jrp chose to read files without sizes
   on 10 November 2026.
+- Windows (DIAG-7, from the whole-project review of 9 November 2026): a
+  file whose name holds characters outside the Windows ANSI code page is
+  named correctly in messages, where Convolver used to report a text
+  conversion error in place of the reason; a configuration naming an IR
+  whose extension holds such characters now loads; and the plug-ins read
+  the UTF-8 path a window passes as UTF-8. One shared helper replaces the
+  copies that did these conversions.
 
 ## [0.13.2] - 2026-11-09
 

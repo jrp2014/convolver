@@ -4,6 +4,7 @@
 #include "sound_files.hpp"
 #include "advice.hpp"
 #include "bytes.hpp"
+#include "utf8.hpp"
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -184,7 +185,7 @@ std::optional<WaveSizes> validate_wave(const std::filesystem::path& path) {
         // One place turns the path into text, whichever advice follows.
         const auto* unsized = dynamic_cast<const UnsizedRefusal*>(&e);
         throw std::runtime_error(
-            advice_text({"cannot read sound file " + path.string() + ": " + e.what(),
+            advice_text({"cannot read sound file " + detail::utf8_string(path) + ": " + e.what(),
                          unsized ? unsized->cause
                                  : "The file is damaged or incomplete, or is not a sound file.",
                          unsized ? unsized->fix : "Export it again from the program that made it.",
@@ -203,7 +204,7 @@ std::string invalid_sample_message(const std::filesystem::path& path, std::uint6
                                    std::optional<RawEncoding> raw) {
     const bool stream = path == "-";
     Advice a{std::string(stream ? "cannot read audio from standard input"
-                                : "cannot read sound file " + path.string()) +
+                                : "cannot read sound file " + detail::utf8_string(path)) +
                  ": invalid sample (not a number, or infinite) " +
                  sample_position(frame, channel, sample_rate),
              {},

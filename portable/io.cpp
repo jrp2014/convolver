@@ -3,6 +3,7 @@
 #include "advice.hpp"
 #include "bytes.hpp"
 #include "sound_files.hpp"
+#include "utf8.hpp"
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -130,7 +131,7 @@ std::optional<Extensible> declared_extensible(const std::filesystem::path& path)
 void write_extensible(const std::filesystem::path& path, unsigned bits, std::uint32_t mask) {
     const auto format = declared_extensible(path);
     if (!format)
-        throw std::runtime_error("audio output " + path.string() +
+        throw std::runtime_error("audio output " + detail::utf8_string(path) +
                                  " has no WAVE_FORMAT_EXTENSIBLE header for its valid bits");
     std::fstream file(path, std::ios::binary | std::ios::in | std::ios::out);
     file.seekp(format->valid_bits_offset);
@@ -143,7 +144,7 @@ void write_extensible(const std::filesystem::path& path, unsigned bits, std::uin
     file.write(value.data(), value.size());
     file.close();
     if (!file)
-        throw std::runtime_error("cannot record valid bits in " + path.string());
+        throw std::runtime_error("cannot record valid bits in " + detail::utf8_string(path));
 }
 void validate_raw_stdin(std::size_t frame_bytes) {
     // On a seekable descriptor libsndfile reports a whole-frame count, which
@@ -208,7 +209,7 @@ SNDFILE* open_or_throw(const std::filesystem::path& path, int mode, SF_INFO& inf
         // the public ones.
         const int code = sf_error(nullptr);
         const std::string library = sf_strerror(nullptr);
-        detail::Advice a{action + " " + path.string(), {}, {}, {}};
+        detail::Advice a{action + " " + detail::utf8_string(path), {}, {}, {}};
         std::error_code ec;
         const auto folder =
             path.has_parent_path() ? path.parent_path() : std::filesystem::path(".");
@@ -216,7 +217,7 @@ SNDFILE* open_or_throw(const std::filesystem::path& path, int mode, SF_INFO& inf
             a.cause = "libsndfile could not use the standard stream: " + library;
             a.fix = "Check the command the stream comes from or goes to.";
         } else if (mode == SFM_WRITE && !std::filesystem::is_directory(folder, ec)) {
-            a.cause = "Its folder " + folder.string() + " does not exist.";
+            a.cause = "Its folder " + detail::utf8_string(folder) + " does not exist.";
             a.fix = "Create the folder, or choose an output in an existing folder.";
         } else if (mode == SFM_WRITE) {
             a.cause = "The system refused to create it (" + library + ").";
@@ -269,12 +270,6 @@ sf_count_t frames(std::size_t samples, std::size_t channels) {
     if (n > static_cast<std::size_t>(std::numeric_limits<sf_count_t>::max()))
         throw std::length_error("audio buffer too large");
     return static_cast<sf_count_t>(n);
-}
-std::uint64_t splitmix64(std::uint64_t& state) noexcept {
-    std::uint64_t z = (state += 0x9e3779b97f4a7c15ULL);
-    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
-    z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
-    return z ^ (z >> 31);
 }
 } // namespace
 bool supported(OutputEncoding e) noexcept {
@@ -454,7 +449,7 @@ Quantizer::Quantizer(std::size_t channels, unsigned bits, QuantizationOptions op
 }
 float Quantizer::uniform() noexcept {
     // 24 random bits give exactly representable floats in [0, 1).
-    return static_cast<float>(splitmix64(state_) >> 40) * 0x1p-24f;
+    return static_cast<float>(detail::splitmix64(state_) >> 40) * 0x1p-24f;
 }
 float Quantizer::dither() noexcept {
     switch (options_.dither) {
@@ -614,7 +609,8 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
         validate(impl_->info);
     } catch (const std::invalid_argument& e) {
         // The file's own metadata is out of range: a data error, not a caller error.
-        throw std::runtime_error("unsupported audio input " + path.string() + ": " + e.what());
+        throw std::runtime_error("unsupported audio input " + detail::utf8_string(path) + ": " +
+                                 e.what());
     }
     if (path != "-" && sf.frames >= 0 && sf.frames != SF_COUNT_MAX)
         impl_->frames = static_cast<std::size_t>(sf.frames);
@@ -828,7 +824,8 @@ AudioWriter::AudioWriter(const std::filesystem::path& path, AudioInfo info, Outp
         if (sf_command(impl_->handle.file, SFC_SET_CHANNEL_MAP_INFO, map.data(),
                        static_cast<int>(map.size() * sizeof(int))) != SF_TRUE)
             throw std::runtime_error(std::string(sf_version_string()) +
-                                     " cannot write this speaker map to " + path.string());
+                                     " cannot write this speaker map to " +
+                                     detail::utf8_string(path));
     }
 }
 AudioWriter::~AudioWriter() = default;
@@ -894,10 +891,10 @@ void AudioWriter::close() {
     // Confirm the finished header carries the requested labels and valid bits.
     const auto declared = declared_extensible(impl_->path);
     if (!declared || declared->channel_mask != impl_->speakers)
-        throw std::runtime_error("audio output " + impl_->path.string() +
+        throw std::runtime_error("audio output " + detail::utf8_string(impl_->path) +
                                  " was written without the requested speaker mask");
     if (impl_->container_bits && declared->valid_bits != impl_->valid_bits)
-        throw std::runtime_error("audio output " + impl_->path.string() +
+        throw std::runtime_error("audio output " + detail::utf8_string(impl_->path) +
                                  " was written without the requested valid bits");
 }
 namespace detail {

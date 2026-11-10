@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #import "diagnostic_view.h"
+#include "convolver/host.hpp"
 #import "file_watch.h"
 #include "recent_files.hpp"
 #import "view_layout.h"
@@ -32,14 +33,18 @@ NSString* field(NSDictionary<NSString*, NSString*>* report, NSString* key) {
 }
 
 // The status as a symbol and a colour; the status word is always written
-// beside them, so neither is the only signal. Values are HostStatus numbers.
+// beside them, so neither is the only signal. The report carries the
+// status as its HostStatus number.
+constexpr NSInteger status_number(convolver::HostStatus status) {
+    return static_cast<NSInteger>(status);
+}
 NSColor* status_colour(NSInteger status) {
     switch (status) {
-    case 0: // Active
+    case status_number(convolver::HostStatus::active):
         return [NSColor systemGreenColor];
-    case 2: // Load failed
+    case status_number(convolver::HostStatus::load_failed):
         return [NSColor systemRedColor];
-    case 4: // Fault
+    case status_number(convolver::HostStatus::fault):
         return [NSColor systemOrangeColor];
     default: // No filter, Waiting, Bypassed
         return [NSColor labelColor];
@@ -47,15 +52,15 @@ NSColor* status_colour(NSInteger status) {
 }
 NSString* status_symbol(NSInteger status) {
     switch (status) {
-    case 0:
+    case status_number(convolver::HostStatus::active):
         return @"checkmark.circle.fill";
-    case 2:
+    case status_number(convolver::HostStatus::load_failed):
         return @"xmark.octagon.fill";
-    case 3:
+    case status_number(convolver::HostStatus::unchecked):
         return @"clock";
-    case 4:
+    case status_number(convolver::HostStatus::fault):
         return @"exclamationmark.triangle.fill";
-    case 5:
+    case status_number(convolver::HostStatus::bypassed):
         return @"pause.circle";
     default:
         return @"circle.dashed";
@@ -64,7 +69,9 @@ NSString* status_symbol(NSInteger status) {
 // Whether the status has a colour of its own (the others are drawn in the
 // secondary colour).
 bool coloured(NSInteger status) {
-    return status == 0 || status == 2 || status == 4;
+    return status == status_number(convolver::HostStatus::active) ||
+           status == status_number(convolver::HostStatus::load_failed) ||
+           status == status_number(convolver::HostStatus::fault);
 }
 
 NSBox* separator() {

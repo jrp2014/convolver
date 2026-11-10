@@ -6,11 +6,13 @@
 // counts, never "0 in, 0 out" (jrp's GarageBand run, 30 October 2026: a
 // mono WAV refused on a stereo track read "the filter has 0 in, 0 out").
 #include "advice.hpp"
+#include "cases.hpp"
 #include "convolver/host.hpp"
 #include "convolver/io.hpp"
 #include "filter_file.hpp"
 #include "host_report.hpp"
 #include "sound_files.hpp"
+#include "utf8.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -48,12 +50,15 @@ std::string refused(const fs::path& path, const HostLayout& host, HostFailureKin
         playing.configuration->paths.push_back({{1.f}, {{ch, 1}}, {{ch, 1}}});
     filter.load(std::move(playing), host);
     FilterFileFailure why;
-    const auto next = read_filter_file(path.string(), host, detail::libsndfile_files(), why);
-    require(!next, path.filename().string() + " was accepted");
-    require(why.kind == expected, path.filename().string() + ": wrong failure kind");
-    filter.reject(why.kind, why.message, {HostFilterSource::file, path.string(), 0}, why.filter());
+    const auto text = detail::utf8_string(path);
+    const auto name = detail::utf8_string(path.filename());
+    const auto next = read_filter_file(text, host, detail::libsndfile_files(), why);
+    require(!next, name + " was accepted");
+    require(why.kind == expected, name + ": wrong failure kind");
+    require(has(why.message.problem, name), name + ": not named in " + why.message.problem);
+    filter.reject(why.kind, why.message, {HostFilterSource::file, text, 0}, why.filter());
     const auto line = host_status(filter, host).text;
-    std::cout << path.filename().string() << ": " << line << '\n';
+    std::cout << name << ": " << line << '\n';
     require(has(line, "Load failed, previous filter kept: "), "status: " + line);
     require(!has(line, "0 in, 0 out") && !has(line, " 0 Hz"), "unknown values shown: " + line);
     return line;
@@ -252,6 +257,51 @@ void run(const fs::path& dir) {
                 "the host's values: " + line);
     }
 }
+
+// DIAG-7: a name with characters from no single Windows ANSI code page
+// (Greek, Cyrillic and Chinese), passed as UTF-8 as every window passes it.
+// On Windows, path::string() throws for such a name and path(std::string)
+// misreads it, so before DIAG-7 these failed there with a conversion error.
+void non_ansi_names(const fs::path& dir) {
+    const std::string name = "\xce\xa9\xd0\x96\xe6\xbf\xbe"; // Omega, Zhe, a CJK character.
+    const auto folder = dir / detail::utf8_path(name);
+    fs::create_directory(folder);
+    const HostLayout stereo{44100, 2, 2};
+    // An IR file loads directly; a .cfg naming an IR whose extension holds
+    // such characters loads too (raw_filter_name() reads every IR's extension).
+    impulse(folder / detail::utf8_path(name + ".wav"), 44100, 2);
+    impulse(folder / detail::utf8_path("ir." + name), 44100, 2);
+    {
+        std::ofstream cfg(folder / detail::utf8_path(name + ".cfg"), std::ios::binary);
+        cfg << "44100 2 2 0\n0 0\n0 0\nir." << name << "\n0\n0\n0\nir." << name << "\n1\n1\n1\n";
+    }
+    for (const auto& file : {name + ".wav", name + ".cfg"}) {
+        const auto text = detail::utf8_string(folder / detail::utf8_path(file));
+        FilterFileFailure why;
+        std::vector<std::string> files;
+        const auto next = read_filter_file(text, stereo, detail::libsndfile_files(), why, &files);
+        require(next.has_value(), file + " was refused: " + why.message.problem);
+        require(!files.empty() && has(files.front(), name) && has(files.back(), name),
+                file + ": the files read are not named in UTF-8");
+    }
+    // Refusals name the file in UTF-8: a filter for other channels, and a
+    // damaged WAV (validate_wave()'s message).
+    impulse(folder / detail::utf8_path(name + "-mono.wav"), 44100, 1);
+    refused(folder / detail::utf8_path(name + "-mono.wav"), stereo, HostFailureKind::channels);
+    {
+        const auto whole = folder / detail::utf8_path(name + ".wav");
+        const auto cut = folder / detail::utf8_path(name + "-cut.wav");
+        fs::copy_file(whole, cut);
+        fs::resize_file(cut, fs::file_size(whole) - 6);
+        FilterFileFailure why;
+        const auto next =
+            read_filter_file(detail::utf8_string(cut), stereo, detail::libsndfile_files(), why);
+        // DIAG-6: with the reader's reason, not "neither a configuration".
+        require(!next && has(why.message.problem, name + "-cut.wav") &&
+                    has(why.message.problem, "RIFF/WAVE"),
+                "a damaged file with a non-ANSI name: " + why.message.problem);
+    }
+}
 } // namespace
 
 int main() {
@@ -260,13 +310,17 @@ int main() {
                       std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     try {
         fs::create_directory(dir);
-        run(dir);
-        fs::remove_all(dir);
-        std::cout << "filter file tests passed\n";
     } catch (const std::exception& e) {
-        std::error_code ec;
-        fs::remove_all(dir, ec);
         std::cerr << e.what() << '\n';
         return 1;
     }
+    const auto failed = convolver::test::run_cases({
+        {"run", [&] { run(dir); }},
+        {"non_ansi_names", [&] { non_ansi_names(dir); }},
+    });
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    if (failed)
+        return 1;
+    std::cout << "filter file tests passed\n";
 }
