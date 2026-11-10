@@ -43,17 +43,15 @@ This is the order for new work, not approval to start every item. Correctness
 regressions take priority whenever discovered. Claim an item with a draft pull
 request before starting so independent tasks do not duplicate changes.
 
-**The freeze** (jrp, 9 November 2026,
-[decision](docs/project/decisions.md#releases)): after the second preview,
-runtime changes are frozen and further optimisation waits until feedback on
-the preview arrives. Crashes, lost state, wrong audio, compatibility failures
-and dropouts are still fixed at once, with a regression test where practical
+**The freeze is lifted** (jrp, 10 November 2026,
+[decision](docs/project/decisions.md#releases)): runtime changes, frozen
+after the second preview on 9 November, can go ahead again now that
+previews are out, with significant features before corner and edge cases.
+Crashes, lost state, wrong audio, compatibility failures and dropouts are
+still fixed at once, with a regression test where practical
 ([preview acceptance](docs/project/plans/2026-11-08-preview-acceptance.md#3-decide-whether-a-finding-blocks-the-preview)).
-A runtime change is one that changes what the packages run or hold: the
-code in `portable/`, `plugins/` and `include/`, the packaged presets, and the
-release scripts and packaging files that decide a package's contents.
-Documentation, tests, measurements and CI can go ahead while they leave the
-packages unchanged (jrp confirmed this reading on 9 November 2026).
+The sections below were ordered under the freeze, and their order stands
+until the next triage.
 
 **Next milestone** (jrp's [guidance](docs/review-2026-10/release-readiness-guidance-2026-10-22.md),
 22 October 2026): an independent user installs and uses an exact preview
