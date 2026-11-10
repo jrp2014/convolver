@@ -398,11 +398,9 @@ use [RAW streams](#raw-streams).
 One file without sizes is refused: one of 4 GiB or more. A WAV header cannot
 give a size that large, so nothing says where the audio ends, and libsndfile
 would read the first 4 GiB and stop. Write the audio to a file in a format
-for long audio, such as RF64 or W64, or send it as a RAW stream. Given as
-`--input`, or named as an IR file in a configuration, the file gets a message
-that says so. Chosen directly as the filter, here or in a plug-in, it gets a
-general message that does not give this reason: that it is too large for a
-configuration.
+for long audio, such as RF64 or W64, or send it as a RAW stream. Wherever the
+file is used, as `--input`, as the filter or as an IR file named in a
+configuration, here or in a plug-in, the message says so.
 
 Other containers, including RF64, get libsndfile's own checks; Convolver does
 not validate every codec libsndfile supports.
@@ -534,9 +532,32 @@ not opened); partitions per path; latency (one block) and the FIR/delay tail
 separately; and `accounted_buffer_bytes`, the engine's prepared float buffers
 (an upper bound: paths with the same input mix share their history). That
 estimate excludes FFT plan internals, allocator overhead and file decoding
-buffers; it is not total process memory. Diagnostics carry a stable `code`,
+buffers; it is not total process memory. Diagnostics carry a `code`,
 severity, message, file, line, column and the chain of enclosing list entries.
 Resolved paths are machine-specific; source spellings are kept as written.
+
+A script should test the `code`, not the message, whose wording can change.
+The error codes are:
+
+| Code | The problem |
+| --- | --- |
+| `syntax` | The text is not a valid configuration or list, or a file is neither text nor a sound file |
+| `syntax-only-scope` | `--syntax-only` was given an IR file or a list, which it does not check |
+| `unreadable` | The filter given, or a list entry, is not there or cannot be read (permissions, a read error) |
+| `missing-asset` | An IR file named by a configuration is not there, or is `-` |
+| `unreadable-asset` | A filter file is there, and starts like a sound file or is named by a configuration, but cannot be read: damaged, or in a format or layout this Convolver does not read |
+| `damaged-asset` | A filter file opened but its samples could not be read: cut short, a sample that is not a number, or a raw filter that is not a whole number of samples |
+| `empty-ir` | A filter file holds no samples |
+| `ir-channel` | A path names a channel its IR file does not have |
+| `rate-mismatch` | An IR file's sample rate is not the configuration's |
+| `nonportable-path` | A Windows drive, UNC or `\`-rooted path on macOS or Linux |
+| `cycle` | A list includes itself |
+| `no-match` | No entry suits the requested rate and channels |
+| `limit` | A size or count limit was reached |
+| `engine` | The audio engine refused the filter |
+
+Before 1.0 a code can be corrected to describe a case more accurately
+([decision](../project/decisions.md#diagnostics)); the release notes say when.
 
 [Other programs](other-programs.md) lists the `portable-paths` profile's
 warnings and what is known about other programs that read the format. The same

@@ -6,6 +6,7 @@
 #include "convolver/io.hpp"
 #include "filter_file.hpp"
 #include "presets.hpp"
+#include "utf8.hpp"
 #include <charconv>
 #include <cstddef>
 #include <fstream>
@@ -22,6 +23,7 @@ using convolver::detail::advice_problem;
 using convolver::detail::advice_text;
 using convolver::detail::cli_error;
 using convolver::detail::parse_advice;
+using convolver::detail::utf8_string;
 using convolver::presets::Format;
 
 #ifdef CONVOLVER_VST3_PRESET_ALIAS
@@ -66,10 +68,6 @@ template <class Char> std::string ascii(const Char* text) {
     }
     return result;
 }
-std::string utf8(const fs::path& path) {
-    const auto text = path.u8string();
-    return {text.begin(), text.end()};
-}
 bool positive(const std::string& text, unsigned long maximum, unsigned long& value) {
     const auto* end = text.data() + text.size();
     auto [p, error] = std::from_chars(text.data(), end, value);
@@ -80,18 +78,18 @@ std::string default_name(const fs::path& output) {
     auto stem = output.filename().stem();
     if (stem.extension() == ".preset")
         stem = stem.stem();
-    return utf8(stem);
+    return utf8_string(stem);
 }
 std::vector<std::byte> read_file(const fs::path& path) {
     // A preset is at most the state limit plus its small containers.
     constexpr auto limit = convolver::max_host_state_bytes + 4096;
     std::error_code error;
     if (const auto size = fs::file_size(path, error); !error && size > limit)
-        throw std::runtime_error(utf8(path) + " is too large to be a Convolver preset");
+        throw std::runtime_error(utf8_string(path) + " is too large to be a Convolver preset");
     std::ifstream file(path, std::ios::binary);
     if (!file)
         throw std::runtime_error(advice_text(
-            {"cannot open " + utf8(path),
+            {"cannot open " + utf8_string(path),
              fs::exists(path, error) ? "The file is there, but this program may not read it."
                                      : "There is no file at that path.",
              fs::exists(path, error) ? "Check the file's permissions."
@@ -101,7 +99,7 @@ std::vector<std::byte> read_file(const fs::path& path) {
     std::vector<char> text((std::istreambuf_iterator<char>(file)),
                            std::istreambuf_iterator<char>());
     if (text.size() > limit)
-        throw std::runtime_error(utf8(path) + " is too large to be a Convolver preset");
+        throw std::runtime_error(utf8_string(path) + " is too large to be a Convolver preset");
     const auto* bytes = reinterpret_cast<const std::byte*>(text.data());
     return {bytes, bytes + text.size()};
 }
@@ -120,7 +118,7 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
             auto format = convolver::presets::format_for(output);
             if (!format)
                 throw std::invalid_argument(advice_text(
-                    {utf8(output) + ": the preset format is not known from this name",
+                    {utf8_string(output) + ": the preset format is not known from this name",
                      "convolver-preset chooses the format by the name's ending.",
                      "End the name with .vstpreset (VST3), .aupreset (AU) or .preset.lv2 (an LV2 "
                      "preset folder).",
@@ -152,7 +150,7 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
                     filter_file_name = kept.name;
             } catch (const std::invalid_argument& e) {
                 throw std::invalid_argument(advice_text(
-                    {utf8(input) + ": " + advice_problem(e.what()),
+                    {utf8_string(input) + ": " + advice_problem(e.what()),
                      "Only a .vstpreset that holds a Convolver filter can be converted.",
                      "Convert a .vstpreset that a VST3 host saved from Convolver, or make the "
                      "preset from the filter itself (an IR, .cfg or configuration list).",
@@ -166,10 +164,10 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
                                                  &raw_filters, false, !alias);
             // The alias keeps its original output bytes, so it writes no name.
             if (!alias)
-                filter_file_name = utf8(input.filename());
+                filter_file_name = utf8_string(input.filename());
             // Presets embed the decoded taps, so say what a raw filter was taken to be.
             for (const auto& raw_filter : raw_filters)
-                std::cerr << program << "raw filter '" << utf8(raw_filter.filename())
+                std::cerr << program << "raw filter '" << utf8_string(raw_filter.filename())
                           << "' read as mono f32le at " << state.configuration->sample_rate
                           << " Hz; convert raw filters in other sample types to WAV first\n";
         }
@@ -205,7 +203,7 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
             std::error_code error;
             if (!alias && fs::symlink_status(outputs[i], error).type() != fs::file_type::not_found)
                 throw std::invalid_argument(
-                    advice_text({utf8(outputs[i]) + " already exists",
+                    advice_text({utf8_string(outputs[i]) + " already exists",
                                  "convolver-preset writes only to new paths, so it never "
                                  "replaces a preset.",
                                  "Choose another name, or remove the old preset first.",
@@ -220,7 +218,7 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
                     throw;
                 std::error_code error;
                 throw std::runtime_error(advice_text(
-                    {utf8(outputs[i]) + ": " + advice_problem(e.what()),
+                    {utf8_string(outputs[i]) + ": " + advice_problem(e.what()),
                      fs::is_directory(outputs[i].parent_path().empty() ? fs::path(".")
                                                                        : outputs[i].parent_path(),
                                       error)
@@ -238,7 +236,7 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
                 continue;
             }
             std::cout << "Created self-contained " << convolver::presets::format_name(formats[i])
-                      << " preset " << utf8(outputs[i]);
+                      << " preset " << utf8_string(outputs[i]);
             if (formats[i] == Format::lv2) {
                 const auto& c = *state.configuration;
                 std::cout << " for " << convolver::identity::lv2_base_uri
@@ -322,7 +320,7 @@ template <class Char> int run(int argc, Char** argv) {
             selection.output_channels = value;
         else if (!alias && option == "--name") {
             try {
-                name = utf8(fs::path(argv[i]));
+                name = utf8_string(fs::path(argv[i]));
             } catch (const std::exception&) { // Windows: unpaired UTF-16 surrogates
                 name.clear();
             }

@@ -7,6 +7,7 @@
 #include "convolver_version.hpp"
 #include "equalizer_apo.hpp"
 #include "file.hpp"
+#include "utf8.hpp"
 #include <cstddef>
 #include <filesystem>
 #include <iostream>
@@ -20,6 +21,7 @@ namespace {
 namespace fs = std::filesystem;
 namespace eapo = convolver::equalizer_apo;
 using convolver::detail::advice_text;
+using convolver::detail::utf8_string;
 
 constexpr const char* usage =
     "Usage: convolver-equalizer-apo INPUT NEW_FOLDER\n"
@@ -36,14 +38,10 @@ constexpr const char* usage =
     "  Include: NEW_FOLDER\\convolver.txt\n"
     "to its config.txt. See docs/use/equalizer-apo.md.\n";
 
-std::string utf8(const fs::path& path) {
-    const auto text = path.u8string();
-    return {text.begin(), text.end()};
-}
 std::string location(const convolver::SourcePosition& p) {
     if (p.file.empty())
         return {};
-    auto s = utf8(p.file);
+    auto s = utf8_string(p.file);
     if (p.line)
         s += ':' + std::to_string(p.line);
     return s + ": ";
@@ -55,7 +53,7 @@ std::vector<eapo::Source> load(const fs::path& input) {
     options.all_configurations = true;
     const auto report = convolver::inspect_configuration(input, options);
     if (!report.valid) {
-        std::string message = utf8(input) + " cannot be exported until these are fixed:";
+        std::string message = utf8_string(input) + " cannot be exported until these are fixed:";
         for (const auto& d : report.diagnostics)
             if (d.severity == convolver::DiagnosticSeverity::error) {
                 // Each diagnostic's own Cause and Fix lines, indented under it.
@@ -67,14 +65,14 @@ std::vector<eapo::Source> load(const fs::path& input) {
         throw std::runtime_error(message +
                                  "\nFix: Correct each one, then export again; convolver "
                                  "--validate " +
-                                 utf8(input) + " lists them too.");
+                                 utf8_string(input) + " lists them too.");
     }
     std::vector<eapo::Source> sources;
     for (const auto& c : report.configurations)
-        sources.push_back({convolver::load_configuration(c.file), utf8(c.file.filename())});
+        sources.push_back({convolver::load_configuration(c.file), utf8_string(c.file.filename())});
     if (sources.empty())
         throw std::runtime_error(
-            advice_text({utf8(input) + " holds no configuration to export",
+            advice_text({utf8_string(input) + " holds no configuration to export",
                          "The configuration list names no configuration or IR file.",
                          "Add the filters to the list, or export a .cfg or IR file directly.",
                          {}}));
@@ -90,17 +88,17 @@ int export_folder(const fs::path& input, const fs::path& folder) {
     bool created = false;
     try {
         const auto sources = load(input);
-        const auto folder_name =
-            utf8(folder.filename().empty() ? folder.parent_path().filename() : folder.filename());
+        const auto folder_name = utf8_string(
+            folder.filename().empty() ? folder.parent_path().filename() : folder.filename());
         const auto result = eapo::make_export(
-            sources,
-            {"Convolver filter for Equalizer APO, written by convolver-equalizer-apo " +
-                 std::string(CONVOLVER_VERSION_STRING),
-             "from " + utf8(input.filename()) + ". To use it, put this folder in Equalizer APO's",
-             "config folder and add this line to config.txt:",
-             "  Include: " + folder_name + '\\' + eapo::text_file_name});
+            sources, {"Convolver filter for Equalizer APO, written by convolver-equalizer-apo " +
+                          std::string(CONVOLVER_VERSION_STRING),
+                      "from " + utf8_string(input.filename()) +
+                          ". To use it, put this folder in Equalizer APO's",
+                      "config folder and add this line to config.txt:",
+                      "  Include: " + folder_name + '\\' + eapo::text_file_name});
         if (result.filters.empty())
-            throw std::runtime_error("nothing to export from " + utf8(input));
+            throw std::runtime_error("nothing to export from " + utf8_string(input));
         // Equalizer APO builds each IR path in a MAX_PATH buffer and plays a path
         // whose IR it cannot open unfiltered, so refuse names that would not fit
         // in its usual config folder.
@@ -118,14 +116,14 @@ int export_folder(const fs::path& input, const fs::path& folder) {
         std::error_code error;
         if (fs::symlink_status(folder, error).type() != fs::file_type::not_found)
             throw std::invalid_argument(
-                advice_text({utf8(folder) + " already exists",
+                advice_text({utf8_string(folder) + " already exists",
                              "convolver-equalizer-apo writes only to a new folder, so it never "
                              "replaces an export.",
                              "Choose another name, or remove the old folder first.",
                              {}}));
         if (!fs::create_directory(folder, error) || error)
             throw std::runtime_error(advice_text(
-                {"cannot create " + utf8(folder),
+                {"cannot create " + utf8_string(folder),
                  fs::is_directory(
                      folder.parent_path().empty() ? fs::path(".") : folder.parent_path(), error)
                      ? "Its parent folder exists, but this program could not write there."
@@ -141,8 +139,8 @@ int export_folder(const fs::path& input, const fs::path& folder) {
         }
         write_text(folder / eapo::text_file_name, result.text);
 
-        std::cout << "Created " << utf8(folder) << " with " << eapo::text_file_name << " and "
-                  << result.impulses.size()
+        std::cout << "Created " << utf8_string(folder) << " with " << eapo::text_file_name
+                  << " and " << result.impulses.size()
                   << (result.impulses.size() == 1 ? " impulse response" : " impulse responses")
                   << ".\n";
         for (std::size_t n = 0; n < result.filters.size(); ++n) {
