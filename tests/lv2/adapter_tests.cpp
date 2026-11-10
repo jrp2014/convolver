@@ -203,7 +203,7 @@ void bundle(host::World& world) {
         check(lilv_plugin_verify(p), uri + ": lilv_plugin_verify");
         const auto ni = static_cast<std::uint32_t>(layout.inputs);
         const auto no = static_cast<std::uint32_t>(layout.outputs);
-        check(lilv_plugin_get_num_ports(p) == lv2::notify_port(ni, no) + 1, uri + ": port count");
+        check(lilv_plugin_get_num_ports(p) == lv2::port_count(ni, no), uri + ": port count");
         const auto port = [&](std::uint32_t i) { return lilv_plugin_get_port_by_index(p, i); };
         const auto symbol = [&](std::uint32_t i) {
             return std::string(lilv_node_as_string(lilv_port_get_symbol(p, port(i))));
@@ -270,6 +270,48 @@ void bundle(host::World& world) {
                   uri + ": " + name + " asks for " + std::to_string(lv2::atom_buffer_bytes) +
                       " bytes");
             lilv_nodes_free(sizes);
+        }
+        // LV2-7: the settings, after the atom ports, with PLUG-10's ranges and
+        // defaults; the latency port reaches the largest Latency.
+        const auto range = [&](std::uint32_t i) {
+            LilvNode *def = nullptr, *min = nullptr, *max = nullptr;
+            lilv_port_get_range(p, port(i), &def, &min, &max);
+            const auto value = [](LilvNode* n) {
+                return n ? static_cast<double>(lilv_node_as_float(n)) : std::nan("");
+            };
+            const std::array<double, 3> r{value(def), value(min), value(max)};
+            for (auto* n : {def, min, max})
+                lilv_node_free(n);
+            return r;
+        };
+        check(range(lv2::latency_port)[2] == static_cast<double>(host_latencies.back()),
+              uri + ": the latency port reaches " + std::to_string(host_latencies.back()));
+        for (const auto& [index, name, expected] :
+             {std::tuple{lv2::gain_port(ni, no), "gain",
+                         std::array<double, 3>{0, min_gain_db, max_gain_db}},
+              std::tuple{lv2::mix_port(ni, no), "mix", std::array<double, 3>{100, 0, 100}},
+              std::tuple{lv2::latency_frames_port(ni, no), "latency_frames",
+                         std::array<double, 3>{static_cast<double>(default_host_latency),
+                                               static_cast<double>(host_latencies.front()),
+                                               static_cast<double>(host_latencies.back())}}}) {
+            check(symbol(index) == name && lilv_port_is_a(p, port(index), control) &&
+                      lilv_port_is_a(p, port(index), input) && range(index) == expected,
+                  uri + ": " + name + " is control input " + std::to_string(index) +
+                      " with PLUG-10's range and default");
+        }
+        {
+            LilvScalePoints* choices =
+                lilv_port_get_scale_points(p, port(lv2::latency_frames_port(ni, no)));
+            std::vector<double> values;
+            if (choices)
+                LILV_FOREACH(scale_points, i, choices) {
+                    values.push_back(lilv_node_as_float(
+                        lilv_scale_point_get_value(lilv_scale_points_get(choices, i))));
+                }
+            lilv_scale_points_free(choices);
+            std::sort(values.begin(), values.end());
+            check(values == std::vector<double>(host_latencies.begin(), host_latencies.end()),
+                  uri + ": the Latency choices are host_latencies");
         }
         LilvNodes* writable =
             lilv_world_find_nodes(w, lilv_plugin_get_uri(p), patch_writable, nullptr);
@@ -1848,6 +1890,108 @@ void path_state(host::World& world, const fs::path& work) {
 }
 } // namespace
 
+// --- Settings (LV2-7) ----------------------------------------------------------------
+// The Gain, Mix and Latency ports, with the scaling filters above (the
+// original plays the input at 0.5, B at 0.75) and a constant input of 1.
+bool close_to(float actual, double expected) {
+    return std::abs(actual - expected) <= 1e-4 * std::max(1.0, std::abs(expected));
+}
+void settings_ports(host::World& world, const fs::path& work) {
+    const auto files = worker_files(work);
+    const auto original = files.original.string(), b = files.b.string();
+    using host::Worker;
+    const auto from_db = [](double db) { return std::pow(10.0, db / 20); };
+    {
+        auto p = worker_instance(world, Worker::threaded);
+        p->activate();
+        p->set_filter(original);
+        settle(*p);
+        check(close_to(play_constant(*p, 4096).back(), .5),
+              "settings: the defaults play as before");
+        p->gain = -6;
+        check(close_to(play_constant(*p, 4096).back(), .5 * from_db(-6)),
+              "settings: Gain -6 dB scales the filtered signal");
+        p->gain = 1000;
+        check(close_to(play_constant(*p, 4096).back(), .5 * from_db(max_gain_db)),
+              "settings: Gain above its range plays at " + std::to_string(max_gain_db) + " dB");
+        p->gain = 0;
+        p->mix = 0;
+        check(close_to(play_constant(*p, 4096).back(), 1), "settings: Mix 0% plays the input");
+        p->mix = 50;
+        check(close_to(play_constant(*p, 4096).back(), .75),
+              "settings: Mix 50% plays half of each");
+        p->gain = -6;
+        check(close_to(play_constant(*p, 4096).back(), .5 + .25 * from_db(-6)),
+              "settings: Gain leaves Mix's dry share alone");
+        p->gain = 0;
+        p->mix = 100;
+        check(p->latency == 0, "settings: Latency 0 reports 0 frames");
+
+        // A new Latency while active: the worker builds the processor, the
+        // latency port reports it once it plays, and the audio has it.
+        p->latency_frames = 256;
+        settle(*p);
+        check(p->latency == 256, "settings: Latency 256 is reported once it plays");
+        check(p->log.contains(LV2_LOG__Note, "Latency changed from 0 to 256 frames"),
+              "settings: the log says the Latency changed");
+        auto out = play_constant(*p, 1024);
+        check(close_to(out[255], 0) && close_to(out[256], .5) && close_to(out.back(), .5),
+              "settings: after Latency 256 the audio is delayed by 256 frames");
+        // A new filter plays at the new Latency.
+        p->set_filter(b);
+        settle(*p);
+        check(p->latency == 256 && close_to(play_constant(*p, 4096).back(), .75),
+              "settings: a filter loaded after a Latency change plays at it");
+        // Values between the choices count as the nearest; rapid changes
+        // end at the last one.
+        p->latency_frames = 300;
+        settle(*p);
+        check(p->latency == 256, "settings: Latency 300 counts as 256");
+        for (const float frames : {64.f, 128.f, 2000.f}) {
+            p->latency_frames = frames;
+            p->run_empty();
+        }
+        settle(*p);
+        check(p->latency == 2048 && close_to(play_constant(*p, 8192).back(), .75),
+              "settings: after rapid Latency changes the last one (2000, so 2048) plays");
+        // Deactivated and activated again: the chosen settings stay.
+        p->gain = -6;
+        p->deactivate();
+        p->activate();
+        p->run_empty();
+        check(p->latency == 2048 && close_to(play_constant(*p, 8192).back(), .75 * from_db(-6)),
+              "settings: reactivation keeps Gain and Latency");
+    }
+    // Free-wheeling (work() inside run()): the new Latency plays from the next call.
+    {
+        auto p = worker_instance(world, Worker::synchronous);
+        p->activate();
+        p->set_filter(original);
+        settle(*p);
+        p->latency_frames = 128;
+        p->run_empty();
+        p->run_empty();
+        check(p->latency == 128, "settings: free-wheeling, Latency 128 plays from the next call");
+    }
+    // Without a worker: a new Latency waits for the next activation; one
+    // chosen before activation plays from the start.
+    {
+        auto p = worker_instance(world, Worker::none);
+        p->latency_frames = 1024;
+        p->activate();
+        p->run_empty();
+        check(p->latency == 1024, "settings: a Latency chosen before activation plays from it");
+        p->latency_frames = 512;
+        p->run_empty();
+        p->run_empty();
+        check(p->latency == 1024, "settings: without a worker, a new Latency waits");
+        p->deactivate();
+        p->activate();
+        p->run_empty();
+        check(p->latency == 512, "settings: without a worker, the next activation applies it");
+    }
+}
+
 int main(int argc, char** argv) {
     if (argc != 5) {
         std::cerr << "usage: " << argv[0]
@@ -1868,6 +2012,7 @@ int main(int argc, char** argv) {
         bundle(world);
         instantiation(world);
         worker_loads(world, work);
+        settings_ports(world, work);
         oversized_files(world, work);
         path_state(world, work);
         refused_first_loads(world, work);

@@ -179,6 +179,9 @@ Plugin::Plugin(World& world, const LilvPlugin* plugin, double rate, const Featur
     status_port_ = index("status");
     control_port_ = index("control");
     notify_port_ = index("notify");
+    gain_port_ = index("gain");
+    mix_port_ = index("mix");
+    latency_frames_port_ = index("latency_frames");
     control_.assign(lv2::atom_buffer_bytes / sizeof(std::uint64_t), 0);
     notify_.assign(lv2::atom_buffer_bytes / sizeof(std::uint64_t), 0);
     lilv_instance_connect_port(instance_, control_port_, control_.data());
@@ -196,6 +199,9 @@ Plugin::Plugin(World& world, const LilvPlugin* plugin, double rate, const Featur
     lilv_instance_connect_port(instance_, enabled_port_, &enabled);
     lilv_instance_connect_port(instance_, latency_port_, &latency);
     lilv_instance_connect_port(instance_, status_port_, &status);
+    lilv_instance_connect_port(instance_, gain_port_, &gain);
+    lilv_instance_connect_port(instance_, mix_port_, &mix);
+    lilv_instance_connect_port(instance_, latency_frames_port_, &latency_frames);
     scratch_.assign(inputs_.size() + outputs_.size(), 0.f);
     if (mode_ == Worker::threaded)
         thread_ = std::thread([this] {
