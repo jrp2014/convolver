@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Optional distribution, separate from the C++ library package and exports.
 # The package ships the VST3 plug-in, on macOS the Audio Unit too (PLUG-5,
-# AU-5), the CLI and the shared tools (PLUG-3 presets, HOST-4 Equalizer APO
+# AU-5), the LV2 bundle when it is built (LV2-5; Linux candidates), the CLI and the shared tools (PLUG-3 presets, HOST-4 Equalizer APO
 # export). convolver-vst3-preset stays a source-build alias.
 if(NOT TARGET convolver_vst3 OR NOT TARGET convolver_cli OR NOT TARGET convolver_preset_tool
    OR NOT TARGET convolver_equalizer_apo)
@@ -28,6 +28,12 @@ endif()
 set(convolver_packaged_plugins convolver_vst3)
 if(TARGET convolver_au)
     list(APPEND convolver_packaged_plugins convolver_au)
+endif()
+if(TARGET convolver_lv2)
+    list(APPEND convolver_packaged_plugins convolver_lv2)
+    # convolver-lv2.debug: the library is convolver.so, which differs from the
+    # VST3 plug-in's Convolver.so only in case.
+    convolver_keep_symbols(convolver_lv2 NAME convolver-lv2)
 endif()
 set_target_properties(${convolver_packaged_plugins} ${convolver_packaged_tools} PROPERTIES
     SKIP_BUILD_RPATH TRUE INSTALL_RPATH "" INSTALL_RPATH_USE_LINK_PATH FALSE)
@@ -66,6 +72,13 @@ if(TARGET convolver_au)
         RENAME Convolver-AU.txt COMPONENT PluginDistribution)
     install(FILES "${PROJECT_SOURCE_DIR}/plugins/au/GPL-3.0.txt" DESTINATION licenses
         COMPONENT PluginDistribution)
+endif()
+if(TARGET convolver_lv2)
+    # LV2/convolver.lv2: the library and its two Turtle files, as the build
+    # folder's bundle; users copy it to ~/.lv2 (docs/use/install.md).
+    get_target_property(lv2_library_dir convolver_lv2 LIBRARY_OUTPUT_DIRECTORY)
+    install(DIRECTORY "${lv2_library_dir}/" DESTINATION "LV2/${CONVOLVER_ID_LV2_BUNDLE}"
+        COMPONENT PluginDistribution USE_SOURCE_PERMISSIONS)
 endif()
 install(TARGETS ${convolver_packaged_tools} RUNTIME DESTINATION bin COMPONENT PluginDistribution)
 set(examples_dir "${CMAKE_CURRENT_BINARY_DIR}/plugin-presets/$<CONFIG>")

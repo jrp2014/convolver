@@ -172,7 +172,7 @@ class SymbolTests(unittest.TestCase):
 
     # Linux
 
-    def linux(self, ids=(b'\x11' * 20, b'\x44' * 20, b'\x22' * 20, b'\x33' * 20)):
+    def linux(self, ids=(b'\x11' * 20, b'\x44' * 20, b'\x22' * 20, b'\x33' * 20, b'\x55' * 20)):
         for (name, pattern), build_id in zip(symbols.TARGETS['Linux'], ids):
             binary_path = pattern.replace('*', 'x86_64-linux')
             debug = elf(build_id, debug_info=b'\1' * 32)
@@ -349,7 +349,7 @@ class SymbolTests(unittest.TestCase):
     @unittest.skipUnless(platform.system() == 'Linux' and shutil.which('objcopy'), 'needs Linux binutils')
     def test_real_elf(self):
         built = {}
-        for (name, pattern), value in zip(symbols.TARGETS['Linux'], (1, 2, 3, 4)):
+        for (name, pattern), value in zip(symbols.TARGETS['Linux'], (1, 2, 3, 4, 5)):
             binary = self.stage / pattern.replace('*', 'x86_64-linux')
             binary.parent.mkdir(parents=True, exist_ok=True)
             self.kept.mkdir(exist_ok=True)

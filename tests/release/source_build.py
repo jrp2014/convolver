@@ -16,7 +16,19 @@ from contract import load_policy, sha256, system_formats, with_records
 from sources import extract
 
 
-def run(source, sdk, prefix, backend, cmake, *, exclude_validator=False, license_dir=None, au_sdk=None, jobs=None):
+def run(
+    source,
+    sdk,
+    prefix,
+    backend,
+    cmake,
+    *,
+    exclude_validator=False,
+    license_dir=None,
+    au_sdk=None,
+    lv2_sdk=None,
+    jobs=None,
+):
     with tempfile.TemporaryDirectory(prefix='convolver-source-build-') as temporary:
         build = Path(temporary) / 'build'
         configure = [
@@ -37,6 +49,9 @@ def run(source, sdk, prefix, backend, cmake, *, exclude_validator=False, license
         if au_sdk:
             # AU-5: the macOS packages hold the Audio Unit too.
             configure += ['-DCONVOLVER_BUILD_AU=ON', '-DCONVOLVER_AU_SDK=' + str(au_sdk)]
+        if lv2_sdk:
+            # LV2-5: the Linux packages hold the LV2 plug-in too; its tests need lilv.
+            configure += ['-DCONVOLVER_BUILD_LV2=ON', '-DCONVOLVER_LV2_SDK=' + str(lv2_sdk)]
         if license_dir:
             configure += ['-DCONVOLVER_PACKAGE_PLUGINS=ON', '-DCONVOLVER_DISTRIBUTION_LICENSE_DIR=' + str(license_dir)]
         if exclude_validator:
@@ -75,6 +90,7 @@ if __name__ == '__main__':
         help='CONVOLVER_FFT_BACKEND; AUTO is Ooura, or Accelerate on macOS, for plug-in builds',
     )
     parser.add_argument('--au-sdk', type=Path, help='AudioUnitSDK, to build the Audio Unit too (macOS)')
+    parser.add_argument('--lv2-sdk', type=Path, help='lv2 source release, to build the LV2 plug-in too (Linux)')
     parser.add_argument('--cmake', default='cmake')
     parser.add_argument('--exclude-validator', action='store_true')
     add_jobs_option(parser)
@@ -97,7 +113,8 @@ if __name__ == '__main__':
                 load_policy(source / 'convolver/packaging/release-policy.json'), manifest['dependencies']
             )
             work = root / 'dependencies-build'
-            # The plug-ins this system's packages hold: VST3, and on macOS the Audio Unit.
+            # The plug-ins this system's packages hold: VST3, the Audio Unit on
+            # macOS and LV2 on Linux.
             formats = system_formats(policy, platform.system())
             sdk, prefix = build_dependencies(
                 policy,
@@ -110,6 +127,7 @@ if __name__ == '__main__':
                 jobs=args.jobs,
             )
             au_sdk = work / 'sources' / policy['dependencies']['audiounitsdk']['directory'] if 'au' in formats else None
+            lv2_sdk = work / 'sources' / policy['dependencies']['lv2']['directory'] if 'lv2' in formats else None
             run(
                 source / 'convolver',
                 sdk,
@@ -119,6 +137,7 @@ if __name__ == '__main__':
                 exclude_validator=args.exclude_validator,
                 license_dir=work / 'licenses',
                 au_sdk=au_sdk,
+                lv2_sdk=lv2_sdk,
                 jobs=args.jobs,
             )
     else:
@@ -132,5 +151,6 @@ if __name__ == '__main__':
             args.cmake,
             exclude_validator=args.exclude_validator,
             au_sdk=args.au_sdk,
+            lv2_sdk=args.lv2_sdk,
             jobs=args.jobs,
         )

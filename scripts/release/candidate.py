@@ -94,7 +94,7 @@ def build(archive, identifier, work, output, cmake, nsis=None, jobs=None):
         raise ValueError('candidate must be built on its target OS')
     deps = work / 'deps'
     # The plug-in formats this platform ships (the policy's "formats"): VST3
-    # everywhere, and the Audio Unit on macOS (AU-5).
+    # everywhere, the Audio Unit on macOS (AU-5) and LV2 on Linux (LV2-5).
     formats = candidate['formats']
     sdk, prefix = build_dependencies(
         policy,
@@ -133,6 +133,11 @@ def build(archive, identifier, work, output, cmake, nsis=None, jobs=None):
         # Accelerate (the defaults), so it links nothing beyond macOS.
         au_sdk = deps / 'sources' / policy['dependencies']['audiounitsdk']['directory']
         configure += ['-DCONVOLVER_BUILD_AU=ON', '-DCONVOLVER_AU_SDK=' + str(au_sdk)]
+    if 'lv2' in formats:
+        # The lv2 headers from the source archive (LV2-5), not the system's;
+        # the LV2 tests' host, lilv, is the build machine's (release.yml).
+        lv2_sdk = deps / 'sources' / policy['dependencies']['lv2']['directory']
+        configure += ['-DCONVOLVER_BUILD_LV2=ON', '-DCONVOLVER_LV2_SDK=' + str(lv2_sdk)]
     # Linux keeps CMake's default generator (Unix Makefiles), which someone
     # building the corresponding source gets; macOS uses Ninja, so the
     # candidates cover both (CI-10).

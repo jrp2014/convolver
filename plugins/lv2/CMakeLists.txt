@@ -2,8 +2,24 @@
 # The LV2 bundle (LV2-1, LV2-2): BUILD/lv2/convolver.lv2/ holds the plug-in library,
 # manifest.ttl and convolver.ttl, generated from plugins/identities.json.
 # Point LV2_PATH at BUILD/lv2 to try it in a host.
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(CONVOLVER_LV2 REQUIRED IMPORTED_TARGET lv2>=1.18)
+# The lv2 headers: from pkg-config, or (release candidates, LV2-5) from the
+# lv2 source release that the corresponding source archive carries.
+set(CONVOLVER_LV2_SDK "" CACHE PATH "lv2 source directory, instead of the lv2 package found by pkg-config")
+find_package(PkgConfig)
+add_library(convolver_lv2_headers INTERFACE)
+if(CONVOLVER_LV2_SDK)
+    if(NOT EXISTS "${CONVOLVER_LV2_SDK}/include/lv2/core/lv2.h")
+        message(FATAL_ERROR "Set CONVOLVER_LV2_SDK to an lv2 source directory (1.18 or later), "
+            "which holds include/lv2/core/lv2.h")
+    endif()
+    target_include_directories(convolver_lv2_headers SYSTEM INTERFACE "${CONVOLVER_LV2_SDK}/include")
+else()
+    if(NOT PkgConfig_FOUND)
+        message(FATAL_ERROR "The LV2 plug-in needs pkg-config to find the lv2 headers, or CONVOLVER_LV2_SDK")
+    endif()
+    pkg_check_modules(CONVOLVER_LV2 REQUIRED IMPORTED_TARGET lv2>=1.18)
+    target_link_libraries(convolver_lv2_headers INTERFACE PkgConfig::CONVOLVER_LV2)
+endif()
 find_package(Python3 3.8 REQUIRED COMPONENTS Interpreter)
 if(NOT TARGET Convolver::io)
     message(FATAL_ERROR "The LV2 plug-in loads filter files, so it needs CONVOLVER_BUILD_IO "
@@ -16,7 +32,7 @@ add_library(convolver_lv2 MODULE plugin.cpp)
 target_include_directories(convolver_lv2 PRIVATE "${PROJECT_SOURCE_DIR}/portable"
     "${Convolver_BINARY_DIR}/generated")
 target_link_libraries(convolver_lv2 PRIVATE Convolver::host Convolver::io convolver_filter_file
-    convolver_presets PkgConfig::CONVOLVER_LV2)
+    convolver_presets convolver_lv2_headers)
 target_compile_features(convolver_lv2 PRIVATE cxx_std_20)
 # "$<1:...>" keeps multi-configuration generators from adding a subfolder.
 set_target_properties(convolver_lv2 PROPERTIES PREFIX "" OUTPUT_NAME convolver
@@ -51,6 +67,9 @@ add_custom_target(convolver_lv2_ttl DEPENDS "${lv2_bundle_dir}/manifest.ttl" "${
 add_dependencies(convolver_lv2 convolver_lv2_ttl)
 
 if(CONVOLVER_BUILD_TESTS)
+    if(NOT PkgConfig_FOUND)
+        message(FATAL_ERROR "The LV2 tests need pkg-config and lilv")
+    endif()
     pkg_check_modules(CONVOLVER_LILV REQUIRED IMPORTED_TARGET lilv-0>=0.24)
     add_test(NAME lv2.exports COMMAND "${Python3_EXECUTABLE}"
         "${PROJECT_SOURCE_DIR}/tests/lv2/exports.py" "$<TARGET_FILE:convolver_lv2>")
@@ -74,7 +93,7 @@ if(CONVOLVER_BUILD_TESTS)
             target_include_directories(convolver_lv2_${name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
                 "${PROJECT_SOURCE_DIR}/portable" "${Convolver_BINARY_DIR}/generated")
             target_link_libraries(convolver_lv2_${name} PRIVATE Convolver::host Convolver::io
-                convolver_presets PkgConfig::CONVOLVER_LILV PkgConfig::CONVOLVER_LV2)
+                convolver_presets convolver_lv2_headers PkgConfig::CONVOLVER_LILV)
             convolver_sanitize(convolver_lv2_${name})
             if(name STREQUAL "lifecycle")
                 # The plug-in library must resolve operator new and

@@ -262,7 +262,8 @@ source and records exactly which releases it used.
 | `CONVOLVER_AU_SDK` | empty | AudioUnitSDK source folder |
 | `CONVOLVER_AU_FILE_READER` | AUDIOTOOLBOX | How the Audio Unit reads the filter files chosen in its window: `AUDIOTOOLBOX` (macOS's own) or `LIBSNDFILE` (as the tools and the other platforms read them; needs I/O, and the component then needs libsndfile wherever it runs); see [Audio Unit](#audio-unit) |
 | `CONVOLVER_BUILD_LV2` | OFF | LV2 adapter; see [LV2](#lv2) |
-| `CONVOLVER_PACKAGE_PLUGINS` | OFF | Stage the VST3 bundle, tools and examples for distribution |
+| `CONVOLVER_LV2_SDK` | empty | lv2 source folder whose `include/` holds the headers, in place of the `lv2` package that `pkg-config` finds; release candidates use the one in the corresponding source |
+| `CONVOLVER_PACKAGE_PLUGINS` | OFF | Stage the VST3 bundle, tools and examples for distribution, with the Audio Unit and LV2 bundle when they are built |
 | `CONVOLVER_DISTRIBUTION_LICENSE_DIR` | empty | Dependency notices from `build_dependencies.py`, for packaging |
 | `CONVOLVER_DEBUG_SYMBOLS` | OFF | Compile Release code with debug information and keep the packaged binaries' symbols in `symbols/` in the build folder, outside everything installed; release candidates set it ([debugging symbols](releasing.md#debugging-symbols)) |
 | `CONVOLVER_BUILD_FUZZERS` | OFF | Clang libFuzzer targets; requires I/O |
@@ -407,8 +408,9 @@ and other formats stay C++20.
 
 ### LV2
 
-Needs `pkg-config` and the `lv2` headers 1.18 or later; the tests also need
-`lilv` 0.24 or later. On Debian or Ubuntu:
+Needs `pkg-config` and the `lv2` headers 1.18 or later, or an lv2 source
+release named by `CONVOLVER_LV2_SDK`; the tests also need `lilv` 0.24 or
+later. On Debian or Ubuntu:
 
 ```sh
 sudo apt-get install pkg-config lv2-dev liblilv-dev lilv-utils
