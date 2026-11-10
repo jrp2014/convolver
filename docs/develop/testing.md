@@ -1435,7 +1435,7 @@ re-running until green. CI does not repeat failed tests automatically, as
 that would hide real races like the Audio Unit's lost stop. The causes found
 so far, from CI-22's survey of 1 November 2026 onwards, each with its fix, are
 [archived](../archive/reviews/2026-11-08-testing-guide-evidence.md#causes-of-intermittent-failures-found-to-6-november-2026).
-Two still apply to new work:
+Three still apply to new work:
 
 - A Windows build that fails now and then with "The process cannot access
   the file because it is being used by another process" (exit 32) in
@@ -1447,6 +1447,11 @@ Two still apply to new work:
 - A test that changes an environment variable (`setenv`) while a plug-in's
   worker may read it (`getenv`) races: set such variables once, before any
   unit exists, as the Audio Unit tests do with `CONVOLVER_LOG`.
+- A check that the reported value has arrived does not mean the plug-in's
+  queued work has finished: the Audio Unit reports a Latency before every
+  queued run is done. Before a step that depends on what runs next (a forced
+  allocation failure, a count of notifications), wait for the queue to
+  finish (`latency_settled()` in `tests/au/adapter_tests.cpp`).
 
 To check that two renders hold the same audio, compare the sample data
 exactly as stored and check the format, sample rate, channel count and frame count one

@@ -1100,6 +1100,11 @@ void latency_parameter() {
     never_fail = true;
     set_parameter(unit, au::latency_parameter, 3);
     require(reports(unit, 256), "Latency 256 before the allocation failures");
+    // Runs still queued from the concurrent choices above would otherwise
+    // meet the first forced failure and log it, and the loop's own run would
+    // then apply the change (seen under ThreadSanitizer on 10 November 2026).
+    require(latency_settled(unit),
+            "the Latency work before the allocation failures did not finish");
     bool completed = false;
     for (int k = 1; k <= 400 && !completed; ++k) {
         const auto before = std::lround(unit.seconds(kAudioUnitProperty_Latency) * 48000);
