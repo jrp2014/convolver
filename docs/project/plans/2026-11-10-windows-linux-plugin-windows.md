@@ -4,7 +4,9 @@
 For jrp, who chooses the route, and for whoever then builds VST3-12 (the
 Windows window) and VST3-13 (the Linux window). It revisits the choices of
 24 and 25 October 2026 with what the macOS window has since shown, compares
-the routes, and recommends an order. It changes no code, workflow or decision.
+the routes, and recommends an order. It changes no code or workflow. jrp chose
+the recommended route, C, on 10 November 2026
+([decision](../decisions.md#direction)).
 
 **In short:** whichever toolkit is chosen, two pieces of work come first: the
 Windows and Linux plug-in needs a sound-file reader, since without one a window
@@ -197,8 +199,8 @@ otherwise:
 
 ## Decisions for jrp
 
-1. **The route:** C (recommended), A as decided with both windows built, or
-   B.
+1. **The route:** C, chosen by jrp on 10 November 2026
+   ([decision](../decisions.md#direction)).
 2. **libsndfile inside the Windows and Linux plug-in**, rather than Media
    Foundation on Windows and nothing on Linux. It is already in the packages
    and their notices; the change is that the plug-in links it.
