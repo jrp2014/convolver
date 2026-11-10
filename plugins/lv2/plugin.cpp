@@ -1078,7 +1078,6 @@ void cleanup(LV2_Handle handle) {
         // JUCE's host still works what it queued, on the freed instance.
         // With `closing` set, such a call returns at once.
         wait_for_queued_latency(*p);
-        const std::lock_guard last(p->control); // A call the wait gave up on.
     } catch (...) {
     }
     delete p;

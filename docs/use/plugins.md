@@ -595,7 +595,9 @@ defaults play exactly as Convolver did before the settings existed.
 | **Latency** | 0, 64, 128, 256, 512, 1024, 2048 or 4096 frames | 0 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. At 0 Convolver adds no processing delay; any delay in the filter itself still plays. A larger value uses less processor time, most of all for short filters. It is the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
 
 - Gain and Mix changes fade over 1.3 ms (64 samples at 48 kHz, 128 at
-  96 kHz), so automating them does not click. Latency cannot be automated.
+  96 kHz), so automating them does not click. Latency cannot be automated,
+  except in LV2 hosts built on JUCE, which automate it anyway; each change
+  leaves a gap ([latency and tail](#latency-and-tail)).
 - The host saves the settings in the project and in presets it saves itself.
   A preset made by `convolver-preset` holds the filter only, so loading it
   leaves the settings as they are. In VST3 and the Audio Unit, the

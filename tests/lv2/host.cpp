@@ -326,7 +326,7 @@ std::size_t Plugin::free_before_queued_work() {
         deactivate();
     auto* handle = lilv_instance_get_handle(instance_);
     std::thread late([this, handle] {
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
         for (;;) {
             std::vector<std::byte> job;
             {

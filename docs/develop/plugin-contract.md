@@ -1001,7 +1001,10 @@ How each adapter meets the contract where its format differs:
   `plugins/lv2/plugin.cpp`). It is narrow because file and fault requests
   are not waited for: they follow a person's choice or a rare fault, and
   waiting for them would slow every host that drops queued work on closing,
-  as the specification lets it.
+  as the specification lets it. It is not a guarantee: JUCE runs one worker
+  thread for every LV2 instance in the process, so another plug-in's work
+  lasting over 100 ms can still leave a queued Latency request to run after
+  the instance is freed.
   It needs `urid:map`, uses `work:schedule` to load files, logs through
   `log:log` (otherwise standard error), and reads `bufsz:maxBlockLength` from
   `options` when given; without it, or for longer `run()` calls, it processes in
