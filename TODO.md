@@ -916,8 +916,12 @@ means a patched FFmpeg build with `--enable-gpl`.
   test takes the plug-in state chunk out of it and restores that through each
   adapter; the project itself is kept for reopening by hand in the host. Later
   builds must load every retained file and reproduce the expected audio after
-  the reported latency: bit-identical when the FFT backend, block size and
-  kernel set (AVX2+FMA or baseline, PERF-4) are unchanged, otherwise within the PLUG-2 oracle tolerance (1e-5 absolute). Never regenerate a retained file; a deliberate
+  the reported latency: bit-identical when the FFT backend, block size,
+  kernel set (AVX2+FMA or baseline, PERF-4), compiler and its version,
+  configuration and compiler flags are unchanged, otherwise within the PLUG-2
+  oracle tolerance (1e-5, scaled by the peak of a file louder than full
+  scale); a newer compiler may change the output within it
+  ([decision](docs/project/decisions.md#releases)). Never regenerate a retained file; a deliberate
   incompatibility is jrp's decision, recorded in the
   [decisions log](docs/project/decisions.md). The literal
   version-1 and version-2 state bytes in `native.state` stay as the first
@@ -925,6 +929,18 @@ means a patched FFmpeg build with `--enable-gpl`.
   [publication steps](docs/develop/releasing.md#publishing-an-unsigned-preview)
   when this is implemented. The four guarantees it protects are listed in
   [status](docs/project/status.md#compatibility-guarantees).
+  Progress (9 November 2026, PR #170): 0.13.2 is kept in
+  [`tests/upgrade/0.13.2/`](tests/upgrade/README.md): its 21 example presets
+  and their filters, byte for byte from the Linux ZIP (the same bytes as
+  macOS), with inputs and the audio its own CLI and VST3 plug-in rendered
+  (identical to each other). `upgrade.cli` and `vst3.upgrade` check every
+  later build; the capture step is in the publication steps. CI's GCC 15
+  build, with the same backend and kernels, differed from the release's
+  GCC 11 by up to 1.3e-7, so the criterion above now names the compiler,
+  configuration and flags too; the runner reports each check's largest
+  difference as a share of its bound. Remaining: a
+  REAPER project saved with 0.13.2, with its state chunk restored through
+  each adapter, and Audio Unit state from a release.
 - [ ] **DIAG-5 — Report clipping after a command-line render.** From the
   BruteFIR comparison (8 November 2026): BruteFIR has printed each output's
   count of overflowed samples and its peak by default since 0.99

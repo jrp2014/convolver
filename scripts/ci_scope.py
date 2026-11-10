@@ -46,7 +46,8 @@ from pathlib import Path, PurePosixPath
 
 # Pages whose commands the examples.first_use CTest entry runs as written
 # (tests/plugins/fixtures.py DOCUMENTED), and the archive and records that the
-# documentation CTest entry checks (tests/regression/documentation_regressions.py).
+# documentation CTest entry checks (tests/regression/documentation_regressions.py),
+# and the files kept from releases, which upgrade.cli hashes (COMPAT-1).
 TESTED = (
     'README.md',
     'examples/first-use/README.md',
@@ -54,6 +55,7 @@ TESTED = (
     'docs/historical/',
     'docs/review-2026-10/archive-documentation.json',
     'docs/review-2026-10/sourceforge-documentation-check.json',
+    'tests/upgrade/',
 )
 # Pages installed into the preview packages (cmake/ConvolverPluginPackaging.cmake).
 PACKAGED = (
