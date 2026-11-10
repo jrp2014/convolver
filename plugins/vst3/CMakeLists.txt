@@ -224,7 +224,15 @@ if(CONVOLVER_BUILD_IO)
         add_test(NAME vst3.preset COMMAND "${Python3_EXECUTABLE}"
             "${PROJECT_SOURCE_DIR}/tests/vst3/preset_tests.py"
             "$<TARGET_FILE:convolver_vst3_preset>" "$<TARGET_FILE:convolver_vst3_tests>" ${shared_preset_tool})
-        set_tests_properties(vst3.preset PROPERTIES LABELS "vst3;real-libraries" TIMEOUT 120)
+        # It runs the adapter tests twice: about 2 s in Release, 83 s under ASan
+        # and UBSan on a 4-CPU CI runner (CI-36), so sanitizer builds allow more.
+        if(CONVOLVER_SANITIZERS)
+            set(vst3_preset_timeout 300)
+        else()
+            set(vst3_preset_timeout 120)
+        endif()
+        set_tests_properties(vst3.preset PROPERTIES LABELS "vst3;real-libraries"
+            TIMEOUT ${vst3_preset_timeout})
         # PLUG-2: the shared harness, comparing with the oracle and the CLI renders
         # that examples.first_use leaves behind.
         if(TARGET convolver_cli AND CONVOLVER_BUILD_NATIVE)
