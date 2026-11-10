@@ -82,6 +82,13 @@ using namespace Steinberg;
 using namespace Steinberg::Vst;
 using namespace convolver::view;
 
+// oleacc.h declares these two but the Windows SDK's import libraries do not
+// define them (MinGW's do), so the window carries its own copies.
+constexpr CLSID access_services = {
+    0xb5f8350b, 0x0548, 0x48b1, {0xa6, 0xee, 0x88, 0xbd, 0x00, 0xb4, 0xa5, 0xe7}};
+constexpr MSAAPROPID accessible_name = {
+    0x608d3df8, 0x8128, 0x4aa7, {0xa4, 0x28, 0xf5, 0x5e, 0x49, 0x26, 0x72, 0x91}};
+
 // The layout, in units of 1/96 inch, as the macOS window's points
 // (the AppKit window VST3 and the Audio Unit share): a fixed width and a height that
 // fits the content, one column top to bottom in reading and Tab order, the
@@ -661,10 +668,10 @@ LRESULT Editor::handle(UINT message, WPARAM w, LPARAM l) {
         if (!named_.empty()) {
             Com com;
             IAccPropServices* services = nullptr;
-            if (SUCCEEDED(CoCreateInstance(CLSID_AccPropServices, nullptr, CLSCTX_INPROC_SERVER,
+            if (SUCCEEDED(CoCreateInstance(access_services, nullptr, CLSCTX_INPROC_SERVER,
                                            IID_IAccPropServices,
                                            reinterpret_cast<void**>(&services)))) {
-                MSAAPROPID name = PROPID_ACC_NAME;
+                MSAAPROPID name = accessible_name;
                 for (HWND control : named_)
                     services->ClearHwndProps(control, OBJID_CLIENT, CHILDID_SELF, &name, 1);
                 services->Release();
@@ -734,10 +741,10 @@ void Editor::name_for_screen_readers(HWND control, const std::wstring& name) {
         return;
     Com com;
     IAccPropServices* services = nullptr;
-    if (FAILED(CoCreateInstance(CLSID_AccPropServices, nullptr, CLSCTX_INPROC_SERVER,
+    if (FAILED(CoCreateInstance(access_services, nullptr, CLSCTX_INPROC_SERVER,
                                 IID_IAccPropServices, reinterpret_cast<void**>(&services))))
         return;
-    if (SUCCEEDED(services->SetHwndPropStr(control, OBJID_CLIENT, CHILDID_SELF, PROPID_ACC_NAME,
+    if (SUCCEEDED(services->SetHwndPropStr(control, OBJID_CLIENT, CHILDID_SELF, accessible_name,
                                            name.c_str())))
         named_.push_back(control);
     services->Release();

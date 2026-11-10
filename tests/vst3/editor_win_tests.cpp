@@ -137,8 +137,8 @@ std::wstring clipboard() {
 std::wstring spoken_name(HWND control) {
     IUIAutomation* automation = nullptr;
     std::wstring name;
-    if (FAILED(CoCreateInstance(CLSID_CUIAutomation, nullptr, CLSCTX_INPROC_SERVER,
-                                IID_IUIAutomation, reinterpret_cast<void**>(&automation))))
+    if (FAILED(CoCreateInstance(__uuidof(CUIAutomation), nullptr, CLSCTX_INPROC_SERVER,
+                                __uuidof(IUIAutomation), reinterpret_cast<void**>(&automation))))
         return L"(no UI Automation)";
     IUIAutomationElement* element = nullptr;
     if (SUCCEEDED(automation->ElementFromHandle(control, &element)) && element) {
