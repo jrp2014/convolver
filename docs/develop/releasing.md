@@ -254,7 +254,7 @@ mechanical part, but only as a draft: nothing is public until jrp presses
    to the [install guide](../use/install.md#unsigned-previews) at the tag,
    the known limitations (among them that the Windows and Linux plug-in has
    no window and was checked only automatically), how to
-   [report a problem](../use/troubleshooting.md#report-a-problem) (Copy
+   [report a problem](../use/report-a-problem.md) (Copy
    Diagnostics on macOS or the Convolver log elsewhere, the host and its
    version, how the filter was loaded, and whether playback, export or
    reopening is affected) and the responsiveness result. Finally it downloads

@@ -29,6 +29,24 @@ Until 1.0 the C++ API may change between minor versions.
   Add paired Ooura measurements and review portable FFT alternatives (FFT-2),
   including the real-time integration limits of PocketFFT and an isolated
   ordered-PFFFT Mac experiment. No production backend or default changes.
+- Tests (CI-36): the VST3 workflow runs its tests under sanitizers, as the
+  Audio Unit and LV2 workflows already did. The Linux FFTW job is now a
+  Debug build with ASan and UBSan running every `vst3.*` test it can (the
+  SDK validator and pluginval cannot load an instrumented bundle and keep
+  running on the Release jobs, so no job now loads an FFTW bundle in them),
+  and a new Debug build runs `vst3.adapter` under ThreadSanitizer with the
+  shipped Ooura backend; a step checks that the test is instrumented.
+  `vst3.preset` gets 300 s in sanitizer builds. Both passed on their first
+  run, with no reports. From the whole-project review of 9 November 2026.
+  No change to the plug-in
+  ([VST3 tests](docs/develop/testing.md#vst3-tests)).
+- Problem reports: a new page, [report a problem](docs/use/report-a-problem.md),
+  says what to collect on macOS, Windows and Linux (Copy Diagnostics, or
+  where the Convolver log is and how to attach or copy it) and how to keep
+  private paths out. A **Preview feedback** issue form asks what worked,
+  what was hard to follow and what is missing; the **Problem report** form
+  asks for the system and points Windows and Linux users to the log, and the
+  release notes link both. No change to the plug-ins or tools.
 
 ## [0.13.2] - 2026-11-09
 

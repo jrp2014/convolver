@@ -112,7 +112,7 @@ the file's name but not its folder.
 reopening, and an export or render of a few seconds sounds as the track did
 while playing. If the plug-in plays silence or the host does not list it,
 see [troubleshooting](troubleshooting.md#a-plug-in-plays-silence); to
-report a problem, see [report a problem](troubleshooting.md#report-a-problem).
+report a problem, see [report a problem](report-a-problem.md).
 
 ## Optional: load a preset
 
