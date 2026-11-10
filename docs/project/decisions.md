@@ -144,6 +144,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
 
 | Date | Decision | Explained in |
 | --- | --- | --- |
+| 10 November 2026 | LV2 version numbers double `VERSION`: `lv2:minorVersion` is 2 × (100 × MAJOR + MINOR) and `lv2:microVersion` is 2 × PATCH (0.13.6 is 26.12, 1.0.0 is 200.0), so every release is even, which LV2 reads as a release, and later versions are always higher | [LV2 versions](../develop/versioning.md#lv2-versions) |
 | 21 October 2026 | AU codes `aufx Conv CONV` | [Plug-in identities](../develop/plugin-identities.md) |
 | 22 October 2026 | LV2 URI scheme `https://github.com/jrp2014/convolver/lv2#discrete-N-M`, the eight fixed LV2 layouts, and `io.github.jrp2014.convolver.*` macOS identifiers | [Plug-in identities](../develop/plugin-identities.md) |
 | 22 October 2026 | Host state version 2 only marks a failed first load; everything else is still written as version 1 | [Plug-in identities](../develop/plugin-identities.md) |
