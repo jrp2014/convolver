@@ -12,6 +12,12 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Releases (LV2-5): the Linux preview package holds the LV2 plug-in,
+  `LV2/convolver.lv2`, built against the lv2 headers in the corresponding
+  source (new CMake option `CONVOLVER_LV2_SDK`) with its debugging symbols
+  kept. The candidate runs the LV2 tests, and the package checks, on CI and
+  on the clean machines, load its library and check its plug-ins against its
+  manifest. Linux only; no change to the plug-in itself.
 - Tests (COMPAT-1, in progress): the example presets of the published 0.13.2,
   with the audio its own CLI and VST3 plug-in rendered from them, are kept in
   `tests/upgrade/0.13.2/`. `upgrade.cli` and `vst3.upgrade` fail if a later

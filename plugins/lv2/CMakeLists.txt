@@ -54,6 +54,10 @@ elseif(UNIX)
         "${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
 endif()
 convolver_sanitize(convolver_lv2)
+# CONVOLVER_DEBUG_SYMBOLS (release candidates, LV2-5): convolver-lv2.debug, as
+# the library's name, convolver.so, differs from the VST3 plug-in's
+# Convolver.so only in case.
+convolver_keep_symbols(convolver_lv2 NAME convolver-lv2)
 
 add_custom_command(
     OUTPUT "${lv2_bundle_dir}/manifest.ttl" "${lv2_bundle_dir}/convolver.ttl"

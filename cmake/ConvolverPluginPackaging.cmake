@@ -30,10 +30,8 @@ if(TARGET convolver_au)
     list(APPEND convolver_packaged_plugins convolver_au)
 endif()
 if(TARGET convolver_lv2)
+    # plugins/lv2/CMakeLists.txt keeps its symbols (convolver-lv2.debug).
     list(APPEND convolver_packaged_plugins convolver_lv2)
-    # convolver-lv2.debug: the library is convolver.so, which differs from the
-    # VST3 plug-in's Convolver.so only in case.
-    convolver_keep_symbols(convolver_lv2 NAME convolver-lv2)
 endif()
 set_target_properties(${convolver_packaged_plugins} ${convolver_packaged_tools} PROPERTIES
     SKIP_BUILD_RPATH TRUE INSTALL_RPATH "" INSTALL_RPATH_USE_LINK_PATH FALSE)
