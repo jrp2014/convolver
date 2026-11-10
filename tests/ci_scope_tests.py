@@ -159,8 +159,8 @@ class Classification(unittest.TestCase):
         everything = set(ci_scope.WORKFLOWS)
         builds = everything - {'release'}
         # A format's own code runs its workflows; the candidates, which package
-        # the VST3 plug-in and the Audio Unit, build for it only on main or by
-        # hand (CI-34).
+        # the VST3 plug-in, the Audio Unit and LV2, build for it only on main or
+        # by hand (CI-34).
         self.assertEqual(runs(['plugins/au/effect.hpp', 'tests/au/harness_test.cpp', 'TODO.md']), {'au'})
         self.assertEqual(runs(['plugins/lv2/plugin.cpp']), {'lv2'})
         self.assertEqual(runs(['plugins/vst3/processor.cpp']), {'vst3'})
@@ -168,7 +168,8 @@ class Classification(unittest.TestCase):
         # What a format puts into its bundle builds the candidates too.
         self.assertEqual(runs(['plugins/au/Info.plist.in']), {'au', 'release'})
         self.assertEqual(runs(['plugins/vst3/CMakeLists.txt']), {'vst3', 'release'})
-        self.assertEqual(runs(['plugins/lv2/CMakeLists.txt']), {'lv2'})
+        self.assertEqual(runs(['plugins/lv2/CMakeLists.txt']), {'lv2', 'release'})
+        self.assertEqual(runs(['plugins/lv2/generate_ttl.py']), {'lv2', 'release'})
         # The macOS window, which both the VST3 plug-in and the Audio Unit show
         # (CI-26), and which the candidates package.
         self.assertEqual(runs(['plugins/editor/mac/setting_rows.mm']), {'vst3', 'au', 'release'})
@@ -236,7 +237,7 @@ class Classification(unittest.TestCase):
             'plugins/vst3/processor.cpp',
             'plugins/vst3/editor.mm',
             'plugins/au/effect.cpp',
-            'plugins/lv2/CMakeLists.txt',
+            'plugins/lv2/plugin.cpp',
             'tests/consumer/CMakeLists.txt',
             'tests/native/engine_tests.cpp',
             'tests/plugins/harness.hpp',
@@ -434,6 +435,7 @@ FORMAT_REFERENCES = {
         'cmake/ConvolverPluginPackaging.cmake': 'packages the LV2 bundle on Linux, in the candidates (CI-34)',
         'scripts/release/candidate.py': 'the candidates (CI-34: main, weekly, by hand)',
         'tests/release/source_build.py': 'a local check of the source archive; CI does not run it',
+        'tests/release/lv2_bundle.py': "imports generate_ttl.py in the candidates' package checks",
         'tests/repository_checks_tests.py': 'made-up paths in its own test repository',
         'tests/identities_tests.py': 'a comment naming an LV2 specification file',
     },

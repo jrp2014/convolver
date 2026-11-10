@@ -75,6 +75,9 @@ if(CONVOLVER_BUILD_TESTS)
         message(FATAL_ERROR "The LV2 tests need pkg-config and lilv")
     endif()
     pkg_check_modules(CONVOLVER_LILV REQUIRED IMPORTED_TARGET lilv-0>=0.24)
+    # LV2-5: VERSION as lv2:minorVersion and lv2:microVersion.
+    add_test(NAME lv2.version COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tests/lv2/version_tests.py")
+    set_tests_properties(lv2.version PROPERTIES LABELS lv2)
     add_test(NAME lv2.exports COMMAND "${Python3_EXECUTABLE}"
         "${PROJECT_SOURCE_DIR}/tests/lv2/exports.py" "$<TARGET_FILE:convolver_lv2>")
     set_tests_properties(lv2.exports PROPERTIES LABELS "lv2;real-libraries" SKIP_RETURN_CODE 77)

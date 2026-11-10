@@ -9,7 +9,8 @@ nothing beyond Python: `lv2_descriptor(i)` must return one plug-in per fixed
 layout in plugins/identities.json, under the URIs that manifest.ttl lists,
 and then NULL. This finds a library that the machine cannot load (a missing
 or too new system library) and a manifest that names plug-ins the library
-does not have. lilv's own reading of the Turtle is checked by lv2.adapter,
+does not have, and that each plug-in declares the LV2 version that VERSION
+maps to. lilv's own reading of the Turtle is checked by lv2.adapter,
 and lv2lint and pluginval check the bundle in the LV2 workflow.
 """
 
@@ -43,6 +44,16 @@ def check(bundle):
     listed = re.findall(r'^<(https:[^>]*)>$', manifest, re.MULTILINE)
     assert listed == expected, f'manifest.ttl lists {listed}, not the fixed layouts {expected}'
     assert f'lv2:binary <{libraries[0].name}>' in manifest, f'manifest.ttl does not name {libraries[0].name}'
+    # The version every plug-in declares (generate_ttl.lv2_version).
+    sys.path.insert(0, str((ROOT / 'plugins/lv2/generate_ttl.py').parent))
+    from generate_ttl import lv2_version
+
+    version = (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
+    minor, micro = lv2_version(*(int(part) for part in version.split('.')))
+    described = (bundle / 'convolver.ttl').read_text(encoding='utf-8')
+    for line in (f'lv2:minorVersion {minor} ;', f'lv2:microVersion {micro} ;'):
+        count = described.count(line)
+        assert count == len(expected), f'convolver.ttl has "{line}" {count} times, not once per plug-in ({version})'
     library = ctypes.CDLL(str(libraries[0]))
     lv2_descriptor = library.lv2_descriptor
     lv2_descriptor.argtypes = [ctypes.c_uint32]
@@ -54,7 +65,10 @@ def check(bundle):
             break
         found.append(descriptor.contents.URI.decode('utf-8'))
     assert found == expected, f'{libraries[0].name} describes {found}, not {expected}'
-    print(f'Loaded {libraries[0]}: its {len(found)} plug-ins match manifest.ttl and plugins/identities.json')
+    print(
+        f'Loaded {libraries[0]}: its {len(found)} plug-ins match manifest.ttl and plugins/identities.json, '
+        f'version {minor}.{micro} for {version}'
+    )
 
 
 if __name__ == '__main__':

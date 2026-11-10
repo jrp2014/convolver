@@ -633,7 +633,9 @@ LV2 (Linux first; also PipeWire system audio):
   ([editor plan](docs/archive/plans/2026-10-24-plugin-editor.md#per-format)).
 - [ ] **LV2-7 — Settings as control ports.** PLUG-10's gain, gain mode, mix
   and latency as control input ports after the existing ones, the latency
-  port following the chosen block size; port symbols for jrp to approve;
+  port following the chosen block size; port symbols `gain`, `mix` and
+  `latency_frames` ([decided](docs/project/decisions.md#plug-in-behaviour)),
+  in its own pull request after LV2-5;
   older sessions restored with defaults in Ardour, Carla and PipeWire
   `filter-chain`.
 

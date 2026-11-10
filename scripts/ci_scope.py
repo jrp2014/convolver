@@ -126,6 +126,8 @@ CANDIDATES = (
     'cmake/',
     'plugins/vst3/CMakeLists.txt',
     'plugins/au/CMakeLists.txt',
+    'plugins/lv2/CMakeLists.txt',  # LV2-5: the Linux package's LV2 bundle.
+    'plugins/lv2/generate_ttl.py',  # Writes its Turtle files.
     'VERSION',  # The packages' names.
     # Packaged or written into the bundles (cmake/ConvolverPluginPackaging.cmake).
     'COPYING',

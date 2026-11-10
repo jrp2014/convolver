@@ -52,6 +52,17 @@ Use `CHANGELOG.md` for noteworthy human-readable changes. It need not acquire an
 entry for every automatic patch. Do not edit archived release records or change
 plug-in IDs or serialized-state versions to match the package number.
 
+## LV2 versions
+
+LV2 plug-ins carry `lv2:minorVersion` and `lv2:microVersion` instead of a
+version string. LV2 has no major version, reads an odd minor or micro as a
+development version and minor 0 as experimental, and lilv loads the highest
+pair it finds. `plugins/lv2/generate_ttl.py` therefore doubles `VERSION`:
+minor is 2 × (100 × MAJOR + MINOR) and micro is 2 × PATCH, so 0.13.6 is
+26.12 and 1.0.0 is 200.0, above every 0.x. Every release is even and later
+versions are higher (`lv2.version`). A MINOR of 100 or more stops the build,
+since the rule would then need changing.
+
 ## Identifying a build
 
 `convolver --version` and the VST3 factory report, for example,
