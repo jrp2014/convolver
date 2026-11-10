@@ -194,6 +194,12 @@ class Plugin {
     // Deferred worker: forgets queued requests, as a host might on
     // deactivation (none of the hosts checked under LV2-8 does).
     void drop_queued_work();
+    // Deferred worker, as JUCE's LV2 host does: deactivates and frees the
+    // instance with requests still queued, while another thread works them
+    // shortly afterwards with the handle it had (answers are refused, as for
+    // a closed instance). Returns how many requests were left queued when
+    // cleanup() returned.
+    std::size_t free_before_queued_work();
     // Pauses the next work() call to reach `point`, through the plug-in's
     // test hook; wait_until_paused() returns once it has, resume() lets it go.
     void pause_at(lv2::WorkerPoint point);
@@ -217,6 +223,7 @@ class Plugin {
     void stop_worker();
     static LV2_Worker_Status schedule(LV2_Worker_Schedule_Handle, std::uint32_t, const void*);
     static LV2_Worker_Status respond(LV2_Worker_Respond_Handle, std::uint32_t, const void*);
+    static LV2_Worker_Status refuse(LV2_Worker_Respond_Handle, std::uint32_t, const void*);
     static void pause_hook(void*, lv2::WorkerPoint);
     World& world_;
     const LilvPlugin* plugin_;

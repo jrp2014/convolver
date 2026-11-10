@@ -991,7 +991,17 @@ How each adapter meets the contract where its format differs:
   output always reports the processor that plays. If the new one cannot be
   built, the old one keeps playing and the log says why; without a worker,
   the next activation builds it. The audio inside the old processor,
-  including a sounding tail, is dropped, as in the other formats.
+  including a sounding tail, is dropped, as in the other formats. One
+  Latency request is queued at a time; `work()` builds the newest Latency.
+  A narrow fix for one host family: JUCE's LV2 host (pluginval, and hosts
+  built on it) ignores `pprops:notAutomatic`, destroys the instance at every
+  `prepareToPlay`, and still runs work it queued after `cleanup()`, on the
+  freed instance. `cleanup()` therefore waits, up to 100 ms, for a queued
+  Latency request to be worked (`wait_for_queued_latency` in
+  `plugins/lv2/plugin.cpp`). It is narrow because file and fault requests
+  are not waited for: they follow a person's choice or a rare fault, and
+  waiting for them would slow every host that drops queued work on closing,
+  as the specification lets it.
   It needs `urid:map`, uses `work:schedule` to load files, logs through
   `log:log` (otherwise standard error), and reads `bufsz:maxBlockLength` from
   `options` when given; without it, or for longer `run()` calls, it processes in

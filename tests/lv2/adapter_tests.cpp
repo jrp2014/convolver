@@ -1989,6 +1989,27 @@ void settings_ports(host::World& world, const fs::path& work) {
         p->activate();
         p->run_empty();
         check(p->latency == 512, "settings: without a worker, the next activation applies it");
+    } // A queued Latency request: newer choices wait for it rather than queue
+    // their own, and it builds the newest one.
+    {
+        auto p = worker_instance(world, Worker::deferred);
+        p->activate();
+        p->run_empty();
+        for (const float frames : {64.f, 128.f, 256.f}) {
+            p->latency_frames = frames;
+            p->run_empty();
+        }
+        check(p->queued_work() == 1, "settings: Latency changes queue one request at a time");
+        p->run_deferred_work();
+        p->run_empty();
+        check(p->latency == 256, "settings: the queued request builds the newest Latency");
+        // As JUCE's host does: freed with the request still queued, which
+        // its worker then runs. cleanup() waits for it, so it finds the
+        // instance alive (the sanitizer build would catch a freed one).
+        p->latency_frames = 512;
+        p->run_empty();
+        check(p->queued_work() == 1 && p->free_before_queued_work() == 0,
+              "settings: cleanup() waits for work the host queued before freeing");
     }
 }
 

@@ -15,7 +15,8 @@
 //   restore() are never called at the same time as run() (the plug-in does not
 //   declare state:threadSafeRestore). They take the control lock.
 // - save() may run at the same time as run(). It takes the control lock and
-//   touches no port and nothing run() writes.
+//   touches no port, and nothing run() writes except atomics (retire()
+//   reads `handover`).
 //
 // Filters arrive two ways:
 // - Through state: the encoded host state under <base>state (convolver-preset
@@ -37,7 +38,15 @@
 // through `handover`, which run() takes at the start of its next call. The
 // control side keeps the processor run() may still be using (`retiring`)
 // until run() has taken the new one. Without a worker, a new Latency plays
-// from the next activation.
+// from the next activation. One Latency request waits at a time, and work()
+// builds the newest Latency, so automating it does not flood the worker.
+//
+// cleanup() waits for a queued Latency request (up to 100 ms): JUCE's LV2
+// host (pluginval, and hosts built on JUCE) runs queued work even after it
+// has destroyed the instance, and destroys it whenever the sample rate or
+// block size is set, so automating Latency there could crash. File and fault
+// requests are not waited for: they follow a person's choice or a rare
+// fault, and other hosts drop queued work when they close a plug-in.
 #include "plugin.hpp"
 #include "convolver/host.hpp"
 #include "convolver/io.hpp"
@@ -48,6 +57,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -68,6 +78,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace convolver::lv2 {
@@ -167,6 +178,9 @@ struct Instance {
     // A processor work() built for a new Latency, for run() to take (null
     // once taken). Owned by `host` meanwhile.
     std::atomic<HostProcessor*> handover{nullptr};
+    // Whether a Latency request waits for the worker (one at a time).
+    std::atomic<bool> latency_queued{false};
+    std::atomic<int> working{0}; // work() calls in progress.
     // The newest request: run() (patch:Set) and restore() count it.
     std::atomic<std::uint64_t> requested{0};
     // A request run() could not hand to the worker, for the next control
@@ -517,6 +531,7 @@ void activate_locked(Instance& p) {
     // A report the host dropped (some flush queued work on deactivation)
     // must not block later ones.
     p.fault_report_queued.store(false, std::memory_order_release);
+    p.latency_queued.store(false, std::memory_order_release);
     p.faults_reported.store(0, std::memory_order_relaxed);
     p.update_status();
 }
@@ -685,9 +700,26 @@ void apply_latency(Instance& p) noexcept {
     }
 }
 
+// Counts a work() call in progress, for cleanup().
+class WorkCall {
+  public:
+    explicit WorkCall(Instance& p) : p_(p) {
+        p_.working.fetch_add(1, std::memory_order_acq_rel);
+    }
+    ~WorkCall() {
+        p_.working.fetch_sub(1, std::memory_order_acq_rel);
+    }
+    WorkCall(const WorkCall&) = delete;
+    WorkCall& operator=(const WorkCall&) = delete;
+
+  private:
+    Instance& p_;
+};
+
 LV2_Worker_Status work(LV2_Handle handle, LV2_Worker_Respond_Function respond,
                        LV2_Worker_Respond_Handle target, std::uint32_t size, const void* data) {
     auto& p = *static_cast<Instance*>(handle);
+    const WorkCall call(p);
     Request r;
     if (size < sizeof r)
         return LV2_WORKER_ERR_UNKNOWN;
@@ -704,6 +736,8 @@ LV2_Worker_Status work(LV2_Handle handle, LV2_Worker_Respond_Function respond,
         return LV2_WORKER_SUCCESS;
     }
     if (r.kind == RequestKind::latency) { // LV2-7; no answer.
+        // Before the Latency is read, so a newer one asks again.
+        p.latency_queued.store(false, std::memory_order_release);
         try {
             std::lock_guard lock(p.control);
             p.retire();
@@ -930,15 +964,20 @@ void report_faults(Instance& p) {
 
 // LV2-7: asks the worker for a processor with a newly chosen Latency. Without
 // a worker, the next activation builds it; a full queue is tried again in the
-// next call.
+// next call. While a request waits, a newer Latency needs none of its own:
+// work() builds the newest.
 void request_latency(Instance& p) {
     const auto wanted = p.latency_wanted.load(std::memory_order_relaxed);
-    if (wanted == p.latency_scheduled || !p.schedule || !p.playing)
+    if (wanted == p.latency_scheduled || !p.schedule || !p.playing ||
+        p.latency_queued.load(std::memory_order_acquire))
         return;
+    p.latency_queued.store(true, std::memory_order_relaxed);
     Request r;
     r.kind = RequestKind::latency;
     if (p.schedule->schedule_work(p.schedule->handle, sizeof r, &r) == LV2_WORKER_SUCCESS)
         p.latency_scheduled = wanted;
+    else
+        p.latency_queued.store(false, std::memory_order_relaxed);
 }
 
 void run(LV2_Handle handle, std::uint32_t frames) {
@@ -1005,16 +1044,41 @@ void deactivate(LV2_Handle handle) {
     }
 }
 
+// Waits until the worker has worked a queued Latency request and no work()
+// call is in progress. Gives up after 100 ms of waiting for a request no
+// call has taken, as with a host that dropped its queue on deactivation,
+// which LV2 allows (JUCE's worker looks for work every millisecond). Without
+// the control lock, which work() takes.
+void wait_for_queued_latency(const Instance& p) noexcept {
+    using clock = std::chrono::steady_clock;
+    constexpr auto patience = std::chrono::milliseconds(100);
+    auto since = clock::now();
+    for (;;) {
+        // The flag first: work() counts itself before it clears it.
+        const bool queued = p.latency_queued.load(std::memory_order_acquire);
+        if (p.working.load(std::memory_order_acquire) > 0)
+            since = clock::now();
+        else if (!queued || clock::now() - since > patience)
+            return;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+}
+
 void cleanup(LV2_Handle handle) {
     auto* p = static_cast<Instance*>(handle);
     try {
-        // Lets a save() or work() already in progress finish first. LV2
-        // requires the host to stop calling work() before cleanup(): one
-        // that starts after this returns finds the instance freed.
-        std::lock_guard lock(p->control);
-        p->closing = true;
-        p->stopping.store(true, std::memory_order_relaxed);
-        p->drop_processors();
+        {
+            // Lets a save() or work() already in progress finish first.
+            std::lock_guard lock(p->control);
+            p->closing = true;
+            p->stopping.store(true, std::memory_order_relaxed);
+            p->drop_processors();
+        }
+        // LV2 requires the host to stop calling work() before cleanup(), but
+        // JUCE's host still works what it queued, on the freed instance.
+        // With `closing` set, such a call returns at once.
+        wait_for_queued_latency(*p);
+        const std::lock_guard last(p->control); // A call the wait gave up on.
     } catch (...) {
     }
     delete p;

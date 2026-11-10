@@ -598,7 +598,7 @@ defaults play exactly as Convolver did before the settings existed.
   96 kHz), so automating them does not click. Latency cannot be automated.
 - The host saves the settings in the project and in presets it saves itself.
   A preset made by `convolver-preset` holds the filter only, so loading it
-  leaves the settings as they are. The
+  leaves the settings as they are. In VST3 and the Audio Unit, the
   [Convolver log](#status-and-the-convolver-log) lists the settings each
   time the plug-in starts, and again when it restores saved settings (some
   hosts, GarageBand among them, start the plug-in before restoring the
@@ -624,8 +624,10 @@ defaults play exactly as Convolver did before the settings existed.
   another format.
 - **LV2 hosts** save the three controls in the session themselves, as they
   save `enabled`. A session saved before the controls existed opens at the
-  defaults. Without the host's worker thread, a new Latency plays only from
-  the next time the host starts the plug-in.
+  defaults. A new Latency plays a moment after you choose it, once the
+  host's worker thread has prepared it, and the latency output reports it
+  from then on. Without that thread, it plays only from the next time the
+  host starts the plug-in.
 - **VST3 hosts** mark Mix as the plug-in's dry/wet control where they have
   one. A new Latency plays at once, and Convolver tells the host the new
   delay. A
@@ -655,7 +657,8 @@ processor time, a larger Latency can save some. The host's delay
 compensation then keeps the tracks lined up, but it cannot remove the delay
 you hear when you monitor live input through the plug-in.
 
-A new Latency plays at once, and the host is told the new delay. Changing it during playback leaves a gap in the
+A new Latency plays at once (in LV2, a moment later, once the host's worker
+thread has prepared it), and the host is told the new delay. Changing it during playback leaves a gap in the
 sound, because Convolver starts again with the new size: the gap lasts the
 new latency plus the filter's own delay, which is short for most room
 correction filters but can be most of a second for a long linear-phase
