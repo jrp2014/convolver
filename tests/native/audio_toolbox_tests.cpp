@@ -252,7 +252,8 @@ void run(const fs::path& dir) {
     // refused by both: a RIFF size that counts a pad byte the file lacks,
     // and an unsized file cut off inside a frame. So are two unsized files
     // that Convolver's own check passes and no reader can decode: one whose
-    // format tag nothing knows, and one with no format chunk.
+    // format tag nothing knows, and one with no format chunk (which
+    // AudioToolbox opens, giving no rate: the reader's own check refuses it).
     constexpr std::uint32_t unknown_size = 0xffffffff;
     pcm24_layout(dir / "unpadded.wav", 5, 36 + 15, 15, "");
     pcm24_layout(dir / "unsized.wav", 4, unknown_size, unknown_size, "");
@@ -384,9 +385,10 @@ void run(const fs::path& dir) {
     // A file refused after it was opened is closed again (jrp's review: each
     // refused filter left a descriptor open). Twenty refusals of a WAV whose
     // header claims 800 kHz, counting the descriptors open before and after;
-    // then the same without sizes, which the reader opens another way, two
-    // unsized files that the system's reader itself refuses when opening
-    // them that way, and twenty loads of an unsized file that is read.
+    // then the same without sizes, which the reader opens another way, an
+    // unsized file that AudioToolbox itself refuses when opened that way
+    // (its format tag is unknown), and twenty loads of an unsized file that
+    // is read.
     for (const auto* name : {"pcm16.wav", "unsized.wav"}) {
         std::ifstream whole(dir / name, std::ios::binary);
         std::string bytes((std::istreambuf_iterator<char>(whole)), {});
@@ -415,23 +417,22 @@ void run(const fs::path& dir) {
             require(after_opening,
                     name + " is refused for its rate, after it was opened: '" + message + "'");
         }
-        for (const std::string name : {"unsized-unknown.wav", "unsized-no-format.wav"}) {
-            std::string message;
-            try {
-                reader.open(dir / name);
-            } catch (const std::exception& e) {
-                message = e.what();
-            }
-            if (i == 0)
-                std::cout << name << ": " << message << '\n';
-            require(message.find("cannot open audio input") != std::string::npos,
-                    name + " is refused by the reader that opened it: '" + message + "'");
+        std::string message;
+        try {
+            reader.open(dir / "unsized-unknown.wav");
+        } catch (const std::exception& e) {
+            message = e.what();
         }
+        if (i == 0)
+            std::cout << "unsized-unknown.wav: " << message << '\n';
+        // The message a status from AudioToolbox gets, not one of the reader's own checks.
+        require(message.find("cannot open audio input") != std::string::npos,
+                "unsized-unknown.wav is refused by AudioToolbox: '" + message + "'");
         require(load(dir / "unsized.wav", reader).paths.size() == 1, "unsized.wav loads again");
     }
     const auto after = open_descriptors();
-    std::cout << "fast.wav, fast-unsized.wav, unsized-unknown.wav and unsized-no-format.wav: "
-                 "refused 20 times, unsized.wav: read 20 times, open descriptors "
+    std::cout << "fast.wav, fast-unsized.wav and unsized-unknown.wav: refused 20 times, "
+                 "unsized.wav: read 20 times, open descriptors "
               << before << " then " << after << '\n';
     require(after <= before, "refused files leave descriptors open: " + std::to_string(before) +
                                  " before, " + std::to_string(after) + " after");

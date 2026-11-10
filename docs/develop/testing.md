@@ -284,7 +284,10 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   for a RIFF size that counts the missing padding byte, for an unsized file
   that stops inside a frame, and for two unsized files that pass
   Convolver's own check and no reader can decode (an unknown format tag,
-  and no format chunk).
+  and no format chunk; on 10 November 2026 at f0a82fe, on macOS 15.8.2 and
+  macOS 26, AudioToolbox refused the first itself, as `'fmt?'`, and opened
+  the second with a rate of 0, which the reader's own check then refused:
+  [job 129784936532](https://github.com/jrp2014/convolver/actions/runs/42802940716/job/129784936532)).
   The reader shows AudioToolbox an unsized file with its sizes filled in
   (`AudioFileOpenWithCallbacks`), because of what AudioToolbox did when left
   to open one itself, in PR #176: on 9 November 2026 at b1597a0 (macOS
@@ -296,7 +299,7 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   whole ([job 129764301771](https://github.com/jrp2014/convolver/actions/runs/42796865380/job/129764301771)).
   A WAV whose header claims 800 kHz,
   which the reader opens and then refuses, is refused 20 times, with and
-  without its sizes, as are the two unsized files that AudioToolbox itself
+  without its sizes, as is the unsized file that AudioToolbox itself
   refuses, and an unsized file is read 20 times, without
   leaving a file descriptor open (counted in `/dev/fd`).
 - `fuzz.replay.config_text`, `fuzz.replay.config_list`, `fuzz.replay.host_state`,
