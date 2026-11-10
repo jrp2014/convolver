@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <fstream>
 #include <future>
+#include <initializer_list>
 #include <iostream>
 #include <iterator>
 #include <limits>
@@ -1537,17 +1538,21 @@ void run(const fs::path& dir) {
         // With an odd number of bytes of audio, readers disagree where such
         // a file ends (macOS's reads a frame fewer than libsndfile), so it
         // is refused, and the message says why and what to do.
-        const auto odd = [&](const fs::path& p, const char* what) {
-            refused(p, what);
+        const auto says = [&](const fs::path& p, std::initializer_list<const char*> parts,
+                              const char* what) {
             std::string message;
             try {
                 AudioReader r(p);
             } catch (const std::exception& e) {
                 message = e.what();
             }
-            for (const char* part :
-                 {"never filled in", "odd number of bytes", "to a pipe", "Write the file again"})
+            for (const char* part : parts)
                 require(message.find(part) != std::string::npos, what);
+        };
+        const auto odd = [&](const fs::path& p, const char* what) {
+            refused(p, what);
+            says(p, {"never filled in", "odd number of bytes", "to a pipe", "Write the file again"},
+                 what);
         };
         text_file(dir / "unsized-odd.wav", layout(5, unknown, unknown, ""));
         odd(dir / "unsized-odd.wav", "an unsized file with an odd data length says so");
@@ -1568,6 +1573,18 @@ void run(const fs::path& dir) {
         text_file(dir / "unsized-riff-list.wav",
                   layout(4, unknown, 12, std::string("LIST\xff\xff\xff\xff", 8)));
         refused(dir / "unsized-riff-list.wav", "the same under an unfilled RIFF size");
+#ifndef _WIN32
+        // A file as long as an unfilled RIFF size says, 4 GiB, or longer: the
+        // size is then a size like any other, and libsndfile would read the
+        // audio only that far, so the file is refused, with its own advice.
+        // The file is sparse and takes no room, and the check reads only its
+        // headers. Not on Windows, where such a file is written out in full.
+        text_file(dir / "unsized-4gib.wav", layout(4, unknown, unknown, ""));
+        fs::resize_file(dir / "unsized-4gib.wav", (std::uintmax_t{1} << 32) + 8);
+        says(dir / "unsized-4gib.wav", {"never filled in", "4 GiB or longer", "to a pipe", "RF64"},
+             "an unsized file of 4 GiB or more is refused and says so");
+        fs::remove(dir / "unsized-4gib.wav");
+#endif
         text_file(dir / "zero-sizes.wav", layout(5, 0, 0, ""));
         refused(dir / "zero-sizes.wav", "sizes of zero with data after them are refused");
     }

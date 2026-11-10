@@ -388,19 +388,27 @@ the file is read to its end. FFmpeg leaves the sizes so when it writes a WAV
 to a pipe (`-f wav -`), because it cannot go back to the header. It leaves
 the same header when it is stopped before it finishes writing a file, and
 Convolver cannot tell the two apart: a file from an interrupted write is
-read as if it were complete, with the audio that reached it, unless it stops
-inside a frame. A filter loaded from such a file is shorter than the one
-intended, with no message, so if a write may have been interrupted, compare
-the frames that `--inspect` reports with the length you expect, or write the
-file again. To send audio through a pipe, use [RAW streams](#raw-streams).
+read as if it were complete, with the audio that reached it. Only PCM or
+float audio that stops inside a frame is refused. A filter loaded from such
+a file is shorter than the one intended, with no message, so if a write may
+have been interrupted, compare the frames that `--inspect` reports with the
+length you expect, or write the file again. To send audio through a pipe,
+use [RAW streams](#raw-streams).
 
-One file without sizes is refused: one whose audio is an odd number of bytes,
-which a mono 24-bit or 8-bit file with an odd number of frames is. Programs
-disagree about where such a file ends (macOS's own reader, which the plug-ins
-use on a Mac, drops its last sample), and a filter must not load shorter in
-one place than in another. Write the file again, to a file instead of a
-pipe. Given as `--input`, or named as an IR file in a configuration, it gets
-a message that says so. Chosen directly as the filter, here or in a plug-in,
+Two files without sizes are refused:
+
+- One whose audio is an odd number of bytes, which a mono 24-bit or 8-bit
+  file with an odd number of frames is. Programs disagree about where such a
+  file ends (macOS's own reader, which the plug-ins use on a Mac, drops its
+  last sample), and a filter must not load shorter in one place than in
+  another. Write the file again, to a file instead of a pipe.
+- One of 4 GiB or more. A WAV header cannot give a size that large, so
+  nothing says where the audio ends, and libsndfile would read the first
+  4 GiB and stop. Write the audio to a file in a format for long audio,
+  such as RF64 or W64, or send it as a RAW stream.
+
+Given as `--input`, or named as an IR file in a configuration, each gets a
+message that says so. Chosen directly as the filter, here or in a plug-in,
 it gets the general message for any file that cannot be read: that it is
 neither a configuration nor a sound file Convolver can read.
 

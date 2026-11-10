@@ -56,10 +56,12 @@ namespace {
 // FFmpeg writes it in the RIFF header and in 'data' first, and replaces it
 // only when it finishes writing to a file it can seek in.
 constexpr std::uint32_t unknown_size = 0xffffffff;
-// A WAV without sizes whose audio is an odd number of bytes: refused with
-// its own advice.
-struct OddUnsizedAudio : std::runtime_error {
-    using std::runtime_error::runtime_error;
+// A WAV without sizes that is refused all the same, with its own advice.
+struct UnsizedRefusal : std::runtime_error {
+    UnsizedRefusal(const char* what, const char* cause_text, const char* fix_text)
+        : std::runtime_error(what), cause(cause_text), fix(fix_text) {}
+    const char* cause;
+    const char* fix;
 };
 
 // libsndfile takes a WAV that ends early for a shorter one, so the chunk
@@ -76,11 +78,14 @@ struct OddUnsizedAudio : std::runtime_error {
 //   end of the file", and so does a 'data' size of unknown_size in such a
 //   file. A writer stopped half way (FFmpeg killed while writing to a file)
 //   leaves the same header, so that file is read as if it were whole; all
-//   that can be checked is that the audio ends on a whole frame. The audio
-//   must also be an even number of bytes: AudioToolbox drops the last byte
-//   of an odd one and reads a frame fewer than libsndfile
-//   (native.audio_toolbox, PR #176), and a filter must not load shorter in
-//   a Mac plug-in than on the command line.
+//   that can be checked is that PCM or float audio ends on a whole frame.
+//   Two such files are refused, each with its own advice. One has audio of
+//   an odd number of bytes: AudioToolbox drops the last byte and reads a
+//   frame fewer than libsndfile (native.audio_toolbox, PR #176), and a
+//   filter must not load shorter in a Mac plug-in than on the command line.
+//   The other is a file as long as the RIFF size says or longer, 4 GiB:
+//   there unknown_size is a size like any other, and libsndfile reads the
+//   audio only as far as it reaches.
 void check_wave(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary);
     std::array<unsigned char, 40> bytes{};
@@ -120,11 +125,24 @@ void check_wave(const std::filesystem::path& path) {
         } else if ((length & 1u) && chunk_end == end + 1) {
             chunk_end = end; // The last chunk, without its pad byte.
         }
+        if (!unsized && data && riff_size == unknown_size && length == unknown_size)
+            throw UnsizedRefusal(
+                "the sizes in its WAV header were never filled in and the file is 4 GiB or longer",
+                "The program that wrote it could not go back to the header: it wrote to a pipe "
+                "(as FFmpeg does with '-f wav -'), or it was stopped before it finished. A WAV "
+                "header cannot give a size of 4 GiB or more, so nothing says where the audio ends.",
+                "Write the audio to a file in a format for long audio, such as RF64 or W64, "
+                "or send it as a RAW stream.");
         if (chunk_end > end)
             throw std::runtime_error("truncated RIFF/WAVE chunk");
         if (unsized && data && (length & 1u))
-            throw OddUnsizedAudio("the sizes in its WAV header were never filled in and its "
-                                  "audio is an odd number of bytes");
+            throw UnsizedRefusal(
+                "the sizes in its WAV header were never filled in and its audio is an odd number "
+                "of bytes",
+                "The program that wrote it could not go back to the header: it wrote to a pipe "
+                "(as FFmpeg does with '-f wav -'), or it was stopped before it finished. "
+                "Programs disagree about where such audio ends, and some drop its last sample.",
+                "Write the file again, to a file instead of a pipe, and let the program finish.");
         if (data)
             data_sizes.push_back(length);
         if (format_chunk) {
@@ -155,16 +173,13 @@ void validate_wave(const std::filesystem::path& path) {
         check_wave(path);
     } catch (const std::runtime_error& e) {
         // One place turns the path into text, whichever advice follows.
-        const bool odd = dynamic_cast<const OddUnsizedAudio*>(&e) != nullptr;
-        throw std::runtime_error(advice_text(
-            {"cannot read sound file " + path.string() + ": " + e.what(),
-             odd ? "The program that wrote it could not go back to the header: it wrote to a pipe "
-                   "(as FFmpeg does with '-f wav -'), or it was stopped before it finished. "
-                   "Programs disagree about where such audio ends, and some drop its last sample."
-                 : "The file is damaged or incomplete, or is not a sound file.",
-             odd ? "Write the file again, to a file instead of a pipe, and let the program finish."
-                 : "Export it again from the program that made it.",
-             {}}));
+        const auto* unsized = dynamic_cast<const UnsizedRefusal*>(&e);
+        throw std::runtime_error(
+            advice_text({"cannot read sound file " + path.string() + ": " + e.what(),
+                         unsized ? unsized->cause
+                                 : "The file is damaged or incomplete, or is not a sound file.",
+                         unsized ? unsized->fix : "Export it again from the program that made it.",
+                         {}}));
     }
 }
 std::string sample_position(std::uint64_t frame, std::size_t channel, int sample_rate) {

@@ -167,7 +167,8 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   its RIFF size alone, gives every frame up to the end of the file, also
   when the file stops between two frames as an interrupted write leaves it;
   it is refused when it stops inside a frame, when its audio is an odd
-  number of bytes (with a message that names the cause and the fix), and
+  number of bytes or (a sparse file, not made on Windows) when it is 4 GiB
+  or longer, each with a message that names the cause and the fix, and
   when that size is on another chunk or under a RIFF size that was filled
   in (IO-11). POSIX-specific tests also exercise fragmented
   descriptors, borrowed descriptor ownership, broken pipes and injected WAV
@@ -272,8 +273,9 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   the same diagnostic code by both. For IO-10 and IO-11, the test first
   prints what each reader makes of every layout, then requires the same
   frames from both, to the last one, for a mono 24-bit WAV whose last odd
-  chunk lacks its padding byte, for sizes left at `0xFFFFFFFF` over an even
-  number of audio bytes, for a RIFF size left so over a real `data` size,
+  chunk lacks its padding byte, for sizes left at `0xFFFFFFFF` over 12 and
+  over 18 bytes of audio (even, the second no multiple of four), for a RIFF
+  size left so over a real `data` size,
   and for a stereo float file with the header FFmpeg writes to a pipe; and
   the same refusal code for a RIFF size that counts the missing padding
   byte, for unfilled sizes over an odd number of audio bytes, and for an
@@ -284,7 +286,12 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   ([run 42715853793](https://github.com/jrp2014/convolver/actions/runs/42715853793));
   at 840c452 it gave libsndfile's frames for unfilled sizes over an even
   number of bytes, including the FFmpeg header
-  ([job 129504519445](https://github.com/jrp2014/convolver/actions/runs/42718018388/job/129504519445)).
+  ([job 129504519445](https://github.com/jrp2014/convolver/actions/runs/42718018388/job/129504519445)),
+  and again on 10 November 2026 at ee3152f, on macOS 15.8.2
+  ([job 129754397229](https://github.com/jrp2014/convolver/actions/runs/42793979136/job/129754397229))
+  and on the `macos-26` image
+  ([job 129754319192](https://github.com/jrp2014/convolver/actions/runs/42793979313/job/129754319192)),
+  for 12 and 56 bytes of audio.
   A WAV whose header claims 800 kHz,
   which the reader opens and then refuses, is refused 20 times without
   leaving a file descriptor open (counted in `/dev/fd`).

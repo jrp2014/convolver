@@ -242,7 +242,8 @@ void run(const fs::path& dir) {
     // IO-10 and IO-11: layouts that break RIFF's rules, which both readers
     // take: a last chunk of odd length without its pad byte (Python's wave
     // module), and sizes a writer could not fill in (FFmpeg writing to a
-    // pipe), first in the smallest form and then with the header FFmpeg
+    // pipe), first in the smallest form, then with 18 bytes of audio, which
+    // is even but no multiple of four, and then with the header FFmpeg
     // writes. The same layouts cut short are refused by both: a RIFF size
     // that counts a pad byte the file lacks, and an unsized file cut off
     // inside a frame. So is an unsized file with an odd number of data
@@ -251,6 +252,7 @@ void run(const fs::path& dir) {
     constexpr std::uint32_t unknown_size = 0xffffffff;
     pcm24_layout(dir / "unpadded.wav", 5, 36 + 15, 15, "");
     pcm24_layout(dir / "unsized.wav", 4, unknown_size, unknown_size, "");
+    pcm24_layout(dir / "unsized-18.wav", 6, unknown_size, unknown_size, "");
     pcm24_layout(dir / "unsized-riff.wav", 4, unknown_size, 12, "LIST\4\0\0\0INFO"s);
     piped_float_layout(dir / "piped-float.wav", 7);
     pcm24_layout(dir / "counted-pad.wav", 5, 36 + 16, 15, "");
@@ -263,9 +265,9 @@ void run(const fs::path& dir) {
         std::size_t channels, frames; // No frames: refused.
     };
     const Layout layouts[] = {
-        {"unpadded.wav", 1, 5},         {"unsized.wav", 1, 4},     {"unsized-riff.wav", 1, 4},
-        {"piped-float.wav", 2, 7},      {"counted-pad.wav", 1, 0}, {"unsized-odd.wav", 1, 0},
-        {"unsized-riff-odd.wav", 1, 0}, {"unsized-cut.wav", 1, 0},
+        {"unpadded.wav", 1, 5},     {"unsized.wav", 1, 4},          {"unsized-18.wav", 1, 6},
+        {"unsized-riff.wav", 1, 4}, {"piped-float.wav", 2, 7},      {"counted-pad.wav", 1, 0},
+        {"unsized-odd.wav", 1, 0},  {"unsized-riff-odd.wav", 1, 0}, {"unsized-cut.wav", 1, 0},
     };
     // What each reader makes of every layout, printed before anything is
     // required, so that one failed run shows them all.

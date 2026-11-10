@@ -59,10 +59,14 @@ Until 1.0 the C++ API may change between minor versions.
   is still refused. The other has sizes that were never filled in, as FFmpeg
   writes a WAV to a pipe, and is read to the end of the file. FFmpeg stopped
   half way through writing a file leaves the same header, so that file is
-  now read as if it were complete, unless it stops inside a frame. A file
-  without sizes whose audio is an odd number of bytes is still refused,
-  with a message that says why, because macOS's reader would drop its last
-  sample ([input files](docs/use/command-line.md#input-files)). Found by the
+  now read as if it were complete, unless it is PCM or float audio that
+  stops inside a frame. Two files without sizes are still refused: one
+  whose audio is an odd number of bytes, because macOS's reader would drop
+  its last sample, and one of 4 GiB or more, where nothing says where the
+  audio ends. As `--input`, or as an IR file named in a configuration, each
+  gets a message that says why and what to do; chosen directly as the
+  filter it gets the general message
+  ([input files](docs/use/command-line.md#input-files)). Found by the
   project review of 9 November 2026; jrp chose to read files without sizes
   on 10 November 2026.
 
