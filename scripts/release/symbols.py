@@ -31,6 +31,8 @@ TARGETS = {
         ('convolver-cli.debug', 'bin/convolver'),
         ('convolver-preset.debug', 'bin/convolver-preset'),
         ('convolver-equalizer-apo.debug', 'bin/convolver-equalizer-apo'),
+        # The LV2 plug-in (LV2-5); its library is convolver.so.
+        ('convolver-lv2.debug', 'LV2/convolver.lv2/convolver.so'),
     ),
     'Darwin': (
         ('Convolver.dSYM', 'VST3/Convolver.vst3/Contents/MacOS/Convolver'),

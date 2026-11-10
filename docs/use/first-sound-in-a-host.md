@@ -20,7 +20,12 @@ You need a plug-in host that loads VST® 3, such as REAPER or Audacity
 Logic. On macOS both formats have the same window, and the VST3 plug-in on
 Windows has it too, so the steps are the same. On Linux the VST3 plug-in
 has no window yet, nor on Windows up to 0.13.2: use a
-[preset](#optional-load-a-preset) instead. Installing a plug-in does not
+[preset](#optional-load-a-preset) instead. On Linux the LV2 plug-in also
+works, in hosts such as Ardour: add the Convolver layout that matches the
+track (2→2 for stereo, [LV2 layouts](plugins.md#lv2-channel-layouts)) and
+pick the same `filter.cfg` with the file chooser of its **Filter**
+parameter ([LV2 filter files](plugins.md#lv2-filter-files)); its
+**Status** shows Active once the filter plays. Installing a plug-in does not
 filter an ordinary music player or everything the computer plays; for that
 on Windows, see the [Equalizer APO export](equalizer-apo.md).
 

@@ -1210,7 +1210,8 @@ void worker_loads(host::World& world, const fs::path& work) {
             {a, load_configuration(files.a)},
             {b, load_configuration(files.b)}};
         std::atomic<bool> done{false};
-        int inconsistent = 0, saves = 0;
+        std::atomic<int> saves{0};
+        int inconsistent = 0;
         std::thread saver([&] {
             while (!done.load()) {
                 const auto saved = p->save();
@@ -1224,6 +1225,11 @@ void worker_loads(host::World& world, const fs::path& work) {
                 ++saves;
             }
         });
+        // Start loading only once the saver is running: a busy machine may
+        // otherwise not schedule it until every load has finished (seen in
+        // the Linux candidate on 10 November 2026: 0 saves).
+        while (saves.load() == 0)
+            std::this_thread::yield();
         for (int k = 0; k < 30; ++k) {
             p->set_filter(k % 3 == 0 ? a : k % 3 == 1 ? b : original);
             play_constant(*p, 256);
@@ -1233,7 +1239,7 @@ void worker_loads(host::World& world, const fs::path& work) {
         saver.join();
         check(saves > 0 && inconsistent == 0,
               "saving during loads: " + std::to_string(inconsistent) + " of " +
-                  std::to_string(saves) + " saves mixed two loads");
+                  std::to_string(saves.load()) + " saves mixed two loads");
     }
 
     // Cleanup and deactivation with work outstanding.

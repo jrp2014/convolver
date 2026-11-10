@@ -51,6 +51,10 @@ CHANGES = (
         'code `unreadable-asset`.'
     ),
     (
+        'Linux packages include the LV2 plug-in, one plug-in for each channel layout, with its filter chosen with '
+        "the host's file chooser or an LV2 preset made with `convolver-preset`."
+    ),
+    (
         "In Audacity, a filter loaded from Convolver's window (Choose…, Recent or Reload) is now kept for exports "
         'and saved projects; checked by automated tests only, not yet in Audacity.'
     ),
@@ -131,7 +135,8 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
     paragraphs = [
         (
             f'**Unsigned developer preview.** Convolver {version} for {AUDIENCE}: the VST® 3 plug-in, on macOS the '
-            'Audio Unit, the `convolver` command-line tool, `convolver-preset` and `convolver-equalizer-apo`, with '
+            'Audio Unit, on Linux the LV2 plug-in, the `convolver` command-line tool, `convolver-preset` and '
+            '`convolver-equalizer-apo`, with '
             'example presets and the user guides. It is not signed with an Apple Developer ID or a Windows '
             f'code-signing certificate: read the [install guide]({docs}/install.md#unsigned-previews) before '
             'opening it.'
@@ -162,8 +167,13 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             "- On Linux the VST3 plug-in has no window yet. Load a filter from the host's preset menu "
             '(each example comes with a `.vstpreset`, and `convolver-preset` makes one from your own filter) and set '
             "Gain, Mix and Latency in the host's own controls "
-            f'([load a preset]({docs}/first-sound-in-a-host.md#optional-load-a-preset)). The LV2 plug-in comes with '
-            'a later preview; until then, build it from source.\n'
+            f'([load a preset]({docs}/first-sound-in-a-host.md#optional-load-a-preset)).\n'
+            '- The LV2 plug-in (Linux) is new in the previews. It has no window and no Gain, Mix or Latency yet: '
+            "choose a filter with the host's file chooser for its Filter parameter, where the host shows one, or "
+            f'load an LV2 preset made with `convolver-preset` ([plug-in presets]({docs}/presets.md)). Each channel '
+            'layout is '
+            'its own plug-in. It was checked only automatically, with lilv, lv2lint, pluginval and a headless '
+            'Ardour session.\n'
             '- The Windows window is new and has been checked only automatically, on Windows CI machines: it opens, '
             "and the plug-in validator's window tests pass. Nobody has tried it in a Windows host or with a screen "
             'reader yet.\n'

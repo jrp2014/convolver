@@ -1380,7 +1380,12 @@ SDK validation. The macOS candidates also build and package the Audio Unit:
 `macos_installer.py` installs the `.pkg` on the runner, compares every
 installed file with the ZIP, verifies both installed bundles' signatures,
 runs `auval -strict` on the installed component and uninstalls it
-([what a package holds](releasing.md#what-a-package-holds)). Windows also compiles a fixture installer and exercises
+([what a package holds](releasing.md#what-a-package-holds)). The Linux
+candidate also builds the LV2 plug-in against the lv2 headers in the
+archive, runs the `lv2.*` tests with the runner's lilv, and
+`package_smoke.py` loads the packaged LV2 library and checks its plug-ins
+and version against its Turtle files
+([`lv2_bundle.py`](../../tests/release/lv2_bundle.py)). Windows also compiles a fixture installer and exercises
 changed-directory upgrades and locked-file uninstall recovery. The Linux
 candidate is built with networking disabled, from the archive alone, with
 CMake's default generator (Unix Makefiles); the
@@ -1640,8 +1645,9 @@ what they are built from or hold (CI-34, approved by jrp on 8 November 2026):
 - files only the candidates' checks run or compile: `scripts/trademarks.py`,
   `tests/au/bundle_tests.py` and `tests/vst3/package_probe.cpp`;
 - the macOS window, `plugins/editor/`;
-- the build configuration: the top-level `CMakeLists.txt`, `cmake/`, the VST3
-  and Audio Unit `CMakeLists.txt` and `VERSION`;
+- the build configuration: the top-level `CMakeLists.txt`, `cmake/`, the
+  VST3, Audio Unit and LV2 `CMakeLists.txt`, the LV2 bundle's
+  `generate_ttl.py` and `VERSION`;
 - shipped dependencies: `portable/third_party/`, and `release-policy.json`,
   which names every other one.
 

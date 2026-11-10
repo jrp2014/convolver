@@ -40,6 +40,20 @@ FILTER = 'filter'
 ATOM_BUFFER_BYTES = 8192
 
 
+def lv2_version(major, minor, patch):
+    """VERSION's MAJOR.MINOR.PATCH as (lv2:minorVersion, lv2:microVersion) (LV2-5).
+
+    LV2 has no major version, reads an odd minor or micro as a development
+    version and minor 0 as experimental, and lilv loads the highest (minor,
+    micro) it finds. Doubling keeps every release even and in order:
+    minor = 2 x (100 x MAJOR + MINOR), micro = 2 x PATCH, so 0.13.6 is 26.12
+    and 1.0.0 is 200.0, above every 0.x.
+    """
+    if minor >= 100:
+        raise SystemExit(f'VERSION minor {minor} is 100 or more: the LV2 version mapping needs a new rule')
+    return 2 * (100 * major + minor), 2 * patch
+
+
 def turtle_string(text):
     if re.search(r'["\\\x00-\x1f]', text):
         raise SystemExit(f'not a plain Turtle string: {text!r}')
@@ -71,7 +85,7 @@ def plugin(base, layout, vendor, version):
     inputs, outputs = layout['inputs'], layout['outputs']
     if layout['input'] != 'discrete' or layout['output'] != 'discrete':
         raise SystemExit(f'{layout["id"]}: named layouts need port groups (not yet written)')
-    _, minor, micro = version
+    minor, micro = lv2_version(*version)
     status_points = ' ,\n'.join(f'\t\t\t[ rdfs:label "{label}" ; rdf:value {value} ]' for value, label in STATUS)
     control = [
         """\t[
