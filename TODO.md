@@ -1652,6 +1652,10 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **CI-36 — VST3 tests under sanitizers in CI.** 9 November 2026,
+  from the whole-project review: ASan and UBSan for the `vst3.*` tests,
+  ThreadSanitizer for `vst3.adapter`
+  ([VST3 tests](docs/develop/testing.md#vst3-tests)).
 - [x] **CI-35 — Prose edits to the first-use pages run Lint only.** 8
   November 2026, from jrp's question why a README link ran every workflow;
   [CI triggers](docs/develop/testing.md#documentation-only-pull-requests).

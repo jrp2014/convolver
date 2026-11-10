@@ -66,20 +66,18 @@ jobs:
       fail-fast: false
       matrix:
         # AUTO is what plug-in builds ship (Ooura, Accelerate on macOS);
-        # the FFTW job keeps the explicit override working. The core
-        # suite runs here only where no other job builds the same
+        # the sanitizer job below builds the explicit FFTW override and runs
+        # its in-process tests (no job loads an FFTW bundle in the validator
+        # or pluginval, since FFTW plug-ins are not distributed).
+        # The core suite runs here only where no other job builds the same
         # compiler, flags and backend: on Linux the native g++ jobs do,
-        # so those run the VST3 tests alone. macos-latest has a newer
+        # so this one runs the VST3 tests alone. macos-latest has a newer
         # Xcode than the Audio Unit job's macos-15, so it keeps the suite
         # (docs/develop/testing.md#which-configurations-run-which-tests).
         # A job that runs only the VST3 tests builds only what they run (CI-9).
         include:
           - os: ubuntu-latest
             fft: AUTO
-            tests: -L vst3
-            targets: --target convolver_vst3_suite
-          - os: ubuntu-latest
-            fft: FFTW
             tests: -L vst3
             targets: --target convolver_vst3_suite
           - os: macos-latest
@@ -321,6 +319,130 @@ jobs:
       - name: Explain a failure that may come from a new upstream release
         if: failure()
         shell: bash
+        run: python scripts/release/resolve.py explain-failure
+      # DIAG-1: a failed run keeps CTest's full output (sanitizer reports and
+      # lifecycle reproductions included), JUnit results and build identity.
+      - name: Collect test evidence
+        if: failure()
+        run: python scripts/ci_evidence.py test-evidence build-vst3
+      - name: Keep test evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-evidence-${{ github.job }}-${{ strategy.job-index }}-attempt-${{ github.run_attempt }}
+          path: test-evidence
+          retention-days: 14
+          if-no-files-found: ignore
+      # CI-22: a pass on re-run says so, so the earlier failure stays visible.
+      - name: Note a pass on re-run
+        if: success() && github.run_attempt != '1'
+        uses: ./.github/actions/note-retry
+
+  # CI-36: the VST3 tests in Debug builds with sanitizers, as the Audio Unit
+  # and LV2 workflows run theirs. The SDK's tools and pluginval are not
+  # instrumented, so they cannot load an instrumented bundle: the jobs above
+  # run them on Release builds. Clang, as in the native sanitizer job, which
+  # runs the core suite, so these run only VST3 tests; each entry builds
+  # just what its tests run.
+  sanitizers:
+    # Skipped with the sdk job when the scope job finds nothing to build.
+    needs: sdk
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Every vst3.* test the build can run, with FFTW, which keeps the
+          # explicit override working (the shipped plug-ins use Ooura). The
+          # adapter and its tests are instrumented, and the bundle links the
+          # instrumented core (docs/develop/build.md, CONVOLVER_SANITIZERS).
+          - name: VST3 tests (Debug, ASan and UBSan, FFTW)
+            configure: -DCONVOLVER_SANITIZERS=ON -DCONVOLVER_FFT_BACKEND=FFTW
+            targets: convolver_vst3_suite
+            tests: -L vst3
+            cache: vst3-asan-ubuntu-latest
+            tsan: false
+          # The processor replaced while process() holds it, and the messages
+          # between processor and controller: the adapter tests again under
+          # ThreadSanitizer, with the shipped backend. Everything, the SDK
+          # included, is instrumented, so the SDK's tools are not built.
+          - name: VST3 adapter tests (Debug, ThreadSanitizer)
+            configure: >-
+              -DCONVOLVER_VST3_RUNTIME_VALIDATION=OFF -DCMAKE_CXX_FLAGS=-fsanitize=thread
+              -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread -DCMAKE_MODULE_LINKER_FLAGS=-fsanitize=thread
+            targets: convolver_vst3_tests
+            tests: -R '^vst3\.adapter$'
+            cache: vst3-tsan-ubuntu-latest
+            tsan: true
+    env:
+      # Every race is reported, with both threads' stacks, and any report
+      # fails the test when it exits.
+      TSAN_OPTIONS: halt_on_error=0 second_deadlock_stack=1
+      CMAKE_C_COMPILER_LAUNCHER: ccache
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+    steps:
+      - uses: actions/checkout@v7
+      # Builds and tests use every CPU the runner has.
+      - uses: ./.github/actions/use-every-cpu
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v8
+        with:
+          name: vst3-sdk-lock
+          path: ${{ runner.temp }}/lock
+      # Resolved once by the sdk job (CI-7).
+      - name: Newest VST3 SDK
+        id: sdk
+        run: >-
+          python scripts/release/sources.py --lock "$RUNNER_TEMP/lock/vst3-sdk-lock.json" --fetch
+          --cache "$RUNNER_TEMP/downloads" --destination "$RUNNER_TEMP/sources"
+          --github-output "$GITHUB_OUTPUT"
+          vst3sdk vst3-base vst3-cmake vst3-pluginterfaces vst3-public-sdk
+      - name: Linux libraries
+        run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libsndfile1-dev
+      # Compiler cache: pull requests restore it; main and manual runs also
+      # save it (docs/develop/testing.md#compiler-cache).
+      - name: Compiler cache
+        uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d  # v1.2.24
+        with:
+          key: ${{ matrix.cache }}
+          max-size: 1G
+          save: ${{ github.event_name != 'pull_request' }}
+      # ThreadSanitizer cannot map its shadow memory with the kernel's default
+      # address-space randomisation on this image, so it is reduced first.
+      - name: Reduce address-space randomisation
+        if: matrix.tsan
+        run: sudo sysctl vm.mmap_rnd_bits=28
+      - name: Configure
+        run: >-
+          cmake -S . -B build-vst3 -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+          -DCMAKE_BUILD_TYPE=Debug -DCONVOLVER_BUILD_VST3=ON
+          "-DCONVOLVER_VST3_SDK=${{ steps.sdk.outputs.vst3sdk }}" -DCONVOLVER_LEGACY_TESTS=OFF
+          ${{ matrix.configure }}
+      - name: Build
+        run: cmake --build build-vst3 --target ${{ matrix.targets }}
+      # A run without instrumentation would pass without checking anything:
+      # the program must link the runtime (Clang links it statically, so that
+      # alone proves little) and the adapter's own code must call into it.
+      - name: Check that the test is instrumented for ThreadSanitizer
+        if: matrix.tsan
+        run: |
+          test_program=$(find build-vst3 -type f -perm -u+x -name convolver_vst3_tests | head -n 1)
+          test -n "$test_program"
+          nm "$test_program" | grep -c '__tsan_func_entry'
+          object=$(find build-vst3 -path '*convolver_vst3_tests.dir*' -name 'processor.cpp.o' | head -n 1)
+          test -n "$object"
+          nm "$object" | grep -c ' U __tsan_func_entry'
+      # A test renamed away from the selection fails rather than passing unrun.
+      - name: Test
+        run: >-
+          ctest --test-dir build-vst3 --output-on-failure --output-junit junit.xml
+          --no-tests=error ${{ matrix.tests }}
+      - name: Explain a failure that may come from a new upstream release
+        if: failure()
         run: python scripts/release/resolve.py explain-failure
       # DIAG-1: a failed run keeps CTest's full output (sanitizer reports and
       # lifecycle reproductions included), JUnit results and build identity.

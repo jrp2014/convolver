@@ -422,7 +422,9 @@ cases, including odd block sizes and both latency modes. See
 results for its older baseline `5df874e`; it is not current validation evidence.
 Consult the [native workflow](../../.github/workflows/regression.yml) and
 [VST3 workflow](../../.github/workflows/vst3.yml) for the configured matrix; a workflow
-file alone is not evidence that a job passed. The [LV2](../../.github/workflows/lv2.yml)
+file alone is not evidence that a job passed. The VST3 workflow also runs the
+VST3 tests in a Debug build with ASan and UBSan and `vst3.adapter` under
+ThreadSanitizer ([VST3 tests](#vst3-tests)). The [LV2](../../.github/workflows/lv2.yml)
 workflow installs the newest
 [format tools](build.md#supporting-libraries) and checks
 them on LV2's example plug-ins, then builds Convolver's bundle and runs the
@@ -712,6 +714,21 @@ limit, about −134 dB), not on a cut tail. `vst3.adapter` checks the tail with
 a margin instead. The validator, the adapter tests and the plug-in
 all use Steinberg's SDK code, so CI also loads the bundle in an independent
 host, pluginval.
+
+The [VST3 workflow](../../.github/workflows/vst3.yml) runs these tests in
+Release builds on Linux (Ooura), macOS and Windows, with the validator and
+pluginval. Its `sanitizers` job (CI-36) runs two Debug builds with Clang on
+Linux side by side: every `vst3.*` test the build can run with ASan and
+UBSan and the FFTW backend (the validator and pluginval cannot load an
+instrumented bundle, so they do not run there, and `vst3.load_timing` skips
+itself; no job loads an FFTW bundle in them, since FFTW plug-ins are not
+distributed), and `vst3.adapter` alone under ThreadSanitizer with the shipped
+Ooura backend, where `latency_while_playing()` and
+`latency_handover_waits()` replace the processor while another thread calls
+`process()`. Every report is printed and any report fails the test; a step
+first checks that the test program links the ThreadSanitizer runtime and
+that the adapter's compiled code calls into it, so an uninstrumented build
+cannot pass.
 
 ### pluginval
 
@@ -1561,7 +1578,7 @@ another job runs only its own format's tests. The CTest labels select them.
 | --- | --- | --- |
 | `repository` label: `versioning`, `identities`, `examples.fixtures`, `documentation` (no build option changes them) | Native full builds with Clang on Linux and macOS and with MSVC on Windows; the release candidates | Native g++, Ooura and Accelerate builds; VST3; Audio Unit |
 | `consumer` label: `packaging.consumer.*` (the CMake development package) | Every native build | VST3, Audio Unit and the release candidates (none of them ships that package; the candidates' ZIP has its own relocation and smoke tests) |
-| Core and CLI suite (`native.*`, `compatibility.corpus`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build, Audio Unit (Release Accelerate, Xcode on `macos-15`), VST3 on macOS (Release Accelerate, the newer Xcode on `macos-latest`), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates; `native.ffmpeg_pipe` only in native g++ Release on Linux, the one job that installs FFmpeg | VST3 on Linux (the same compiler, flags and image as native g++ Release with FFTW and with Ooura) |
+| Core and CLI suite (`native.*`, `compatibility.corpus`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build, Audio Unit (Release Accelerate, Xcode on `macos-15`), VST3 on macOS (Release Accelerate, the newer Xcode on `macos-latest`), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates; `native.ffmpeg_pipe` only in native g++ Release on Linux, the one job that installs FFmpeg | VST3 on Linux (Release with Ooura has the compiler, flags and image of native g++ Release; Debug with sanitizers and FFTW those of native Clang Debug) |
 | Format and release tests (`vst3.*`, `au.*`, `lv2.*`, `release.*`) | Their format's jobs and the candidates | — |
 
 CTest still runs a fixture's setup when a selected test needs it, so
@@ -1576,11 +1593,11 @@ format's whole test label, with the CLI for the `examples.first_use` fixture:
 
 | Target | Built by | Tests |
 | --- | --- | --- |
-| `convolver_vst3_suite` | VST3 on Linux | `ctest -L vst3` (with `CONVOLVER_PACKAGE_PLUGINS`, also what `release.stage` installs) |
+| `convolver_vst3_suite` | VST3 on Linux (Release, and Debug with ASan and UBSan) | `ctest -L vst3` (with `CONVOLVER_PACKAGE_PLUGINS`, also what `release.stage` installs) |
 | `convolver_au_suite` | Audio Unit with sanitizers | `ctest -L au` |
 | `convolver_lv2_tests` | LV2 with ASan and UBSan, and the upstream lilv check | `examples.first_use` and `lv2.*` |
 
-The LV2 and Audio Unit ThreadSanitizer jobs, the lv2lint bundle and the fuzz
+The LV2, Audio Unit and VST3 ThreadSanitizer jobs, the lv2lint bundle and the fuzz
 workflow name their few targets directly in the workflow; the other jobs build everything.
 A test whose program the target does not build fails (CTest reports "Could
 not find executable", a Python-driven test its own error), so a new plug-in
