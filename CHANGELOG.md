@@ -104,8 +104,6 @@ Until 1.0 the C++ API may change between minor versions.
   the UTF-8 path a window passes as UTF-8. One shared helper replaces the
   copies that did these conversions.
 
-### Fixed
-
 - VST3 (VST3-17): in a host that cannot be told the project changed
   (no `IComponentHandler2`, such as Audacity 4.0.2), a filter loaded from
   Convolver's window (Choose…, Recent, Reload or reloading when the file
