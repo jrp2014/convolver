@@ -35,6 +35,11 @@ CANDIDATE_WORKFLOW = '.github/workflows/release.yml'
 PREVIOUS_PREVIEW = '0.13.2'
 CHANGES = (
     (
+        "On Windows the VST3 plug-in has Convolver's window, as on macOS: choose, drop or reload a filter, set "
+        'Gain, Mix and Latency, and read the status and Copy Diagnostics there. The Windows and Linux plug-in '
+        'reads filter files with libsndfile, as the command-line tool does.'
+    ),
+    (
         'WAV files that other programs write and Convolver refused as cut short are now read: a last chunk '
         "without its padding byte, as Python's `wave` module writes mono 24-bit audio with an odd number of "
         'frames, and sizes that were never filled in, as FFmpeg writes to a pipe. Such a file of 4 GiB or more '
@@ -150,11 +155,14 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
         f"Each preview's changes are in the [changelog]({base}/blob/{tag}/CHANGELOG.md).",
         '## Known limitations',
         (
-            "- On Windows and Linux the VST3 plug-in has no window yet. Load a filter from the host's preset menu "
+            "- On Linux the VST3 plug-in has no window yet. Load a filter from the host's preset menu "
             '(each example comes with a `.vstpreset`, and `convolver-preset` makes one from your own filter) and set '
             "Gain, Mix and Latency in the host's own controls "
             f'([load a preset]({docs}/first-sound-in-a-host.md#optional-load-a-preset)). The LV2 plug-in comes with '
             'a later preview; until then, build it from source.\n'
+            '- The Windows window is new and has been checked only automatically, on Windows CI machines: it opens, '
+            "and the plug-in validator's window tests pass. Nobody has tried it in a Windows host or with a screen "
+            'reader yet.\n'
             '- Unsigned: macOS asks you to confirm that you want to open it, and Windows shows a SmartScreen '
             'warning.\n'
             '- Windows needs the Microsoft Visual C++ 2015-2022 x64 runtime, which most computers already have.\n'
@@ -178,10 +186,10 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
         ),
         '## Report a problem',
         (
-            "Copy Diagnostics from Convolver's window on macOS, or attach the Convolver log on Windows and Linux "
+            "Copy Diagnostics from Convolver's window on macOS and Windows, or attach the Convolver log on Linux "
             f'([where it is]({docs}/report-a-problem.md#2-collect-convolvers-messages)). '
             'Say which system, host and version you used, how you loaded the filter '
-            '(on macOS Choose…, Recent or Reload; anywhere a preset or a saved project), '
+            '(on macOS and Windows Choose…, Recent or Reload; anywhere a preset or a saved project), '
             'and whether the problem is in playback, export or reopening '
             f'([how to report]({docs}/report-a-problem.md)). '
             'To say what worked, what was hard to follow or what you missed, open a '

@@ -124,6 +124,8 @@ Processor::Processor() : tag_(next_tag()) {
     setControllerClass(controller_id);
 #ifdef __APPLE__
     files_ = &detail::audio_toolbox_files(); // As the Audio Unit reads them.
+#else
+    files_ = &detail::libsndfile_files(); // VST3-12: as the tools and LV2 read them.
 #endif
 }
 tresult PLUGIN_API Processor::initialize(FUnknown* context) {
@@ -381,9 +383,12 @@ HostReport Processor::report_locked() const {
     facts.tail_frames = tail_.load();
     facts.bypassed = shown_bypass_.load();
     facts.log_written = host_log_written();
-    facts.chooses_files = files_ != nullptr || test_file_reader != nullptr;
-    if (files_)
-        facts.file_reader = "macOS AudioToolbox";
+    facts.chooses_files = files_ != nullptr;
+#ifdef __APPLE__
+    facts.file_reader = "macOS AudioToolbox";
+#else
+    facts.file_reader = "libsndfile";
+#endif
     auto report = host_report(filter_, facts);
     // PLUG-22: saved state (no file path) of the filter the saved name
     // belongs to is named, in the fields and the text alike.
@@ -789,7 +794,7 @@ bool Processor::load_file(std::string_view chosen) {
         // for the rate and channels the host has proposed so far, and the
         // filter is checked again at activation, as for restored state.
         const auto host = known_layout().value_or(layout());
-        const auto* reader = files_ ? files_ : test_file_reader;
+        const auto* reader = files_;
         if (!reader) {
             filter_.reject(HostFailureKind::filter_file,
                            {"this build of Convolver cannot read filter files in the plug-in, so " +

@@ -50,10 +50,10 @@ def major_version(pluginval):
 def validate_command(major, plugin, extra, platform=sys.platform):
     """pluginval 2 has a `validate` command; pluginval 1 takes options and --validate.
 
-    The editor tests run only on macOS, the one system with a window so far
-    (VST3-11 and the Audio Unit; Windows and Linux follow in VST3-12 and VST3-13).
+    The editor tests run on macOS (VST3-11 and the Audio Unit) and Windows
+    (VST3-12), the systems with a window; Linux follows in VST3-13.
     """
-    gui = [] if platform == 'darwin' else ['--skip-gui-tests']
+    gui = [] if platform in ('darwin', 'win32') else ['--skip-gui-tests']
     options = ['--strictness-level', STRICTNESS, *gui, *extra]
     if major >= 2:
         return ['validate', *options, plugin]

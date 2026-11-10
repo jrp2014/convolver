@@ -384,6 +384,16 @@ cases.
   accents, no path with a line break, nothing left beside the list after
   it is replaced, a list with Windows line ends, Clear Menu, and no list
   with the log turned off.
+- `native.window_model`: what every system's window does (PLUG-34), from
+  real report fields: the content for each status (tone, symbol, message,
+  box, the fix's button with and without loading, the drop hint, the
+  filter's facts, Audio and reference lines) and with no report; the
+  Latency note; typed values (decimal comma, minus sign, a unit after the
+  number, clamping, refusing text that is not a finite number); Choose…
+  requests replaced, answered once and forgotten when the window closes;
+  the Recent menu's entries without missing files; and reloading when files
+  change only once a change has settled, not after `settle()`, and never
+  for a deleted file.
 - `native.state`: fixed version-1 wire fixture, the version-2 failed-load
   marker (and that every other state is still written as version 1), a
   version-3 fixture with settings, its round trips with a filter and a
@@ -736,13 +746,13 @@ second instance, with one sample more refused. And the window's messages
 (VST3-3): the report's fields, a fresh report on request after a Gain
 change, no request for the host to reread the parameters while the
 Status line stays the same, a chosen WAV accepted (the project marked changed, the status
-Active, the filter named and saved) or refused for its rate, an empty path,
-and a build with no file reader. The messages also go through a forwarding
+Active, the filter named and saved) or refused for its rate, and an empty
+path. The messages also go through a forwarding
 proxy and a deferring one, as a host may connect the components (VST3-15):
 the report, a new Latency (the host asked to restart only once the processor
 has it, and after three quick changes only for the last) and a chosen file accepted and refused (the project marked changed
-only for the accepted one). Where the build has no reader of its own
-(Linux and Windows), the test lends the processor libsndfile. PLUG-22's
+only for the accepted one). The plug-in reads the files with AudioToolbox on
+macOS and libsndfile on Linux and Windows (VST3-12). PLUG-22's
 `saved_filter_name()` checks the controller state: its format read back,
 and damaged, newer, over-long or empty-field states read as no name; an
 instance with no file saving an empty state; a file's name saved,
@@ -769,6 +779,24 @@ lines open, and `removed()`. With a 2→6 crossover on a six-channel bus
 (PLUG-22 and PLUG-23) it checks that Mix is dimmed with the mix note under
 it over three refreshes, while Gain stays enabled, and that Host channels
 names the ignored inputs.
+
+On Windows `vst3.editor` (`tests/vst3/editor_win_tests.cpp`, VST3-12) opens
+the Win32 window the same way, attached to a host window on the desktop, and
+works it through its controls as a user would: HWND only, not resizable,
+twice the width at a content scale of 2, the status and title, the trackbars
+and the Latency list, a Gain the host set, a typed value with a decimal
+comma and a key on the trackbar each one edit, a Latency choice, Bypass, a
+dropped WAV loaded and the project marked changed, Reload, a change reloaded
+on the second check (not with the box unticked, nor afterwards), Copy
+Diagnostics on the clipboard, the names UI Automation gives the controls
+(what Narrator and NVDA read), Tab from control to control, a resize request
+when the folded lines open, a refused file shown in its box with Choose…
+drawn as the fix, and `removed()`; then the same mix-note check as on macOS.
+It keeps two pictures of the window, `vst3-editor.bmp` and
+`vst3-editor-refused.bmp` in the build's `plugins/vst3` folder, which the VST3
+workflow keeps with the run. Under Wine, where a Linux session can run it
+cross-compiled with MinGW, it skips the UI Automation names, which Wine does
+not give.
 
 The SDK validator runs in default and extensive (`-e`) modes. Extensive mode
 pairs 15 speaker arrangements (the adapter must accept or refuse each cleanly)
@@ -809,9 +837,10 @@ add:
   (`pluginval validate` in pluginval 2, `--validate` in pluginval 1). Open
   and close, state save and restore, bus layouts, parameter fuzzing and
   thread safety, allocations during processing and oversized blocks, at
-  several sample rates and block sizes. On macOS its editor tests also open
-  Convolver's window (VST3-11) and change parameters while it is open;
-  elsewhere, with no window yet, the test passes `--skip-gui-tests`. `CONVOLVER_PLUGINVAL_ARGS`
+  several sample rates and block sizes. On macOS and Windows its editor
+  tests also open Convolver's window (VST3-11, VST3-12) and change
+  parameters while it is open; on Linux, with no window yet, the test passes
+  `--skip-gui-tests`. `CONVOLVER_PLUGINVAL_ARGS`
   adds options; CI adds `--rtcheck;relaxed` on macOS with pluginval 2, which
   can flag real-time-unsafe calls in process callbacks.
 - `vst3.pluginval.acceptance`: makes presets from a stereo impulse WAV (block

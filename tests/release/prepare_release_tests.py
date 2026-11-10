@@ -140,7 +140,9 @@ class PrepareReleaseTests(unittest.TestCase):
         # Each system's own checksum command, and what Windows and Linux lack.
         for words in ('shasum -a 256', 'Get-FileHash', 'sha256sum', 'SmartScreen', 'Visual C++'):
             self.assertIn(words, text)
-        self.assertIn('On Windows and Linux the VST3 plug-in has no window yet', text)
+        self.assertIn('On Linux the VST3 plug-in has no window yet', text)
+        # The Windows window (VST3-12) has only been checked on CI.
+        self.assertIn('Nobody has tried it in a Windows host', text)
         self.assertIn(
             f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/first-sound-in-a-host.md#optional-load-a-preset',
             text,
