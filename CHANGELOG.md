@@ -50,19 +50,21 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
-- WAV files (IO-10): a WAV file whose last chunk has an odd number of
-  bytes and no padding byte after it was refused as cut short, by the
-  command line and by the plug-ins, and as a filter was reported as
-  "neither a configuration nor a sound file". Python's `wave` module writes
-  mono 24-bit files with an odd number of frames this way, and other
-  programs read them. Such a file is now read whole; one whose header
-  counts the missing byte is still refused. A WAV whose sizes were never
-  filled in (FFmpeg writing to a pipe, or stopped half way) is still
-  refused, because the two cannot be told apart. As `--input`, or as an IR
-  file named in a configuration, the message now says that this is why and
-  what to do; chosen directly as the filter it still gets the general
-  message ([input files](docs/use/command-line.md#input-files)). Found by the
-  project review of 9 November 2026.
+- WAV files (IO-10, IO-11): two kinds of WAV file that other programs read
+  were refused as cut short, by the command line and by the plug-ins, and as
+  a filter were reported as "neither a configuration nor a sound file". Both
+  are now read. One has a last chunk with an odd number of bytes and no
+  padding byte after it, as Python's `wave` module writes mono 24-bit files
+  with an odd number of frames; a file whose header counts the missing byte
+  is still refused. The other has sizes that were never filled in, as FFmpeg
+  writes a WAV to a pipe, and is read to the end of the file. FFmpeg stopped
+  half way through writing a file leaves the same header, so that file is
+  now read as if it were complete, unless it stops inside a frame. A file
+  without sizes whose audio is an odd number of bytes is still refused,
+  with a message that says why, because macOS's reader would drop its last
+  sample ([input files](docs/use/command-line.md#input-files)). Found by the
+  project review of 9 November 2026; jrp chose to read files without sizes
+  on 10 November 2026.
 
 ## [0.13.2] - 2026-11-09
 

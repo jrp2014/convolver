@@ -1436,11 +1436,12 @@ void run(const fs::path& dir) {
         require(r.read(x) == 1 && x[0] == 1, "odd-sized RIFF chunk padding");
     }
     {
-        // IO-10: a layout that breaks RIFF's rules without being cut short,
-        // a last chunk of odd length without its pad byte, is read:
-        // libsndfile, FFmpeg and macOS's reader take it, and Python's wave
-        // module writes it. A mono 24-bit file whose frame n holds
-        // (n + 1) / 128.
+        // IO-10: two layouts that break RIFF's rules are read, because
+        // libsndfile, FFmpeg and macOS's reader take them and common writers
+        // produce them: a last chunk of odd length without its pad byte
+        // (Python's wave module), and sizes that were never filled in
+        // (FFmpeg writing to a pipe). A mono 24-bit file whose frame n
+        // holds (n + 1) / 128.
         const auto layout = [](std::size_t frames, std::uint32_t riff_size, std::uint32_t data_size,
                                const std::string& after_data) {
             std::string out = "RIFF";
@@ -1509,11 +1510,34 @@ void run(const fs::path& dir) {
         // An even chunk one byte past the RIFF size is not a missing pad byte.
         text_file(dir / "overrun.wav", layout(4, 36 + 11, 12, ""));
         refused(dir / "overrun.wav", "an even chunk that overruns the RIFF size is refused");
-        // Sizes never filled in stay refused, although other programs read
-        // such a file to its end: FFmpeg leaves them writing to a pipe, and
-        // also when it is stopped half way through writing a file, which
-        // cannot be told apart. The message says so, and what to do.
-        const auto unfilled = [&](const fs::path& p, const char* what) {
+        // Sizes never filled in, as FFmpeg writes WAV to a pipe: the audio
+        // runs to the end of the file (IO-11).
+        text_file(dir / "unsized.wav", layout(4, unknown, unknown, ""));
+        reads(dir / "unsized.wav", 4, "sizes a writer could not fill in");
+        // A real data size in such a file, and a chunk after the data.
+        text_file(dir / "unsized-riff.wav",
+                  layout(4, unknown, 12, std::string("LIST\4\0\0\0INFO", 12)));
+        reads(dir / "unsized-riff.wav", 4, "an unfilled RIFF size over a real data size");
+        // A writer stopped half way leaves the same header. Cut between two
+        // frames, its file cannot be told from a whole one, and is read as
+        // one: here six frames of which four reached the file.
+        {
+            auto stopped = layout(6, unknown, unknown, "");
+            stopped.resize(stopped.size() - 6);
+            text_file(dir / "unsized-stopped.wav", stopped);
+        }
+        reads(dir / "unsized-stopped.wav", 4, "an unsized file that stops between two frames");
+        // Cut inside a frame, it is refused.
+        {
+            auto cut = layout(4, unknown, unknown, "");
+            cut.resize(cut.size() - 2);
+            text_file(dir / "unsized-cut.wav", cut);
+        }
+        refused(dir / "unsized-cut.wav", "an unsized file cut off inside a frame is refused");
+        // With an odd number of bytes of audio, readers disagree where such
+        // a file ends (macOS's reads a frame fewer than libsndfile), so it
+        // is refused, and the message says why and what to do.
+        const auto odd = [&](const fs::path& p, const char* what) {
             refused(p, what);
             std::string message;
             try {
@@ -1521,27 +1545,29 @@ void run(const fs::path& dir) {
             } catch (const std::exception& e) {
                 message = e.what();
             }
-            require(message.find("never filled in") != std::string::npos &&
-                        message.find("to a pipe") != std::string::npos &&
-                        message.find("Write the file again") != std::string::npos,
-                    what);
+            for (const char* part :
+                 {"never filled in", "odd number of bytes", "to a pipe", "Write the file again"})
+                require(message.find(part) != std::string::npos, what);
         };
-        text_file(dir / "unsized.wav", layout(4, unknown, unknown, ""));
-        unfilled(dir / "unsized.wav", "a file whose sizes were never filled in says so");
         text_file(dir / "unsized-odd.wav", layout(5, unknown, unknown, ""));
-        unfilled(dir / "unsized-odd.wav", "such a file with an odd data length says so");
-        // A real data size under an unfilled RIFF size, and the reverse.
-        text_file(dir / "unsized-riff.wav",
-                  layout(4, unknown, 12, std::string("LIST\4\0\0\0INFO", 12)));
-        unfilled(dir / "unsized-riff.wav", "an unfilled RIFF size over a real data size says so");
+        odd(dir / "unsized-odd.wav", "an unsized file with an odd data length says so");
+        text_file(dir / "unsized-riff-odd.wav", layout(5, unknown, 15, ""));
+        odd(dir / "unsized-riff-odd.wav", "an odd real data size under an unfilled RIFF size");
+        text_file(dir / "unsized-riff-odd-padded.wav",
+                  layout(5, unknown, 15, std::string(1, '\0')));
+        odd(dir / "unsized-riff-odd-padded.wav", "the same with its pad byte");
+        // An unfilled data size under a RIFF size that was filled in is only
+        // a chunk that runs past the end, as is that size on another chunk,
+        // with or without a RIFF size. Sizes of zero, from which libsndfile
+        // reads no frames at all, are no better.
         text_file(dir / "unsized-data.wav", layout(5, 36 + 15, unknown, ""));
-        unfilled(dir / "unsized-data.wav", "an unfilled data size under a real RIFF size says so");
-        // The same size on another chunk is only a chunk that runs past the
-        // end, and sizes of zero, from which libsndfile reads no frames at
-        // all, are no better.
+        refused(dir / "unsized-data.wav", "an unfilled data size under a real RIFF size");
         text_file(dir / "unsized-list.wav",
                   layout(4, 36 + 12 + 8, 12, std::string("LIST\xff\xff\xff\xff", 8)));
         refused(dir / "unsized-list.wav", "a chunk after the data that overruns is refused");
+        text_file(dir / "unsized-riff-list.wav",
+                  layout(4, unknown, 12, std::string("LIST\xff\xff\xff\xff", 8)));
+        refused(dir / "unsized-riff-list.wav", "the same under an unfilled RIFF size");
         text_file(dir / "zero-sizes.wav", layout(5, 0, 0, ""));
         refused(dir / "zero-sizes.wav", "sizes of zero with data after them are refused");
     }

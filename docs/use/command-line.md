@@ -374,26 +374,35 @@ chunk runs past the size the header gives or past the end of the file, or
 when the samples end inside a frame. The plug-ins check the WAV files they
 load in the same way.
 
-One layout that breaks the format's rules is still read, because the file is
-whole and other programs both write and read it: the last chunk has an odd
-number of bytes and the padding byte that should follow it is missing.
-Python's `wave` module writes mono 24-bit files this way when the number of
-frames is odd. If the header counts a padding byte that the file does not
-have, the file was cut short, and it is refused.
+Two layouts that break the format's rules are still read, because other
+programs both write and read them.
 
-A WAV whose sizes were never filled in (they say `0xFFFFFFFF`) is refused,
-although some programs read such a file to its end. FFmpeg leaves the sizes
-so when it writes a WAV to a pipe (`-f wav -`), because it cannot go back to
-the header, and also when it is stopped before it finishes writing a file;
-Convolver cannot tell the two apart, so it cannot tell whether the audio is
-all there. Write the file again, to a file instead of a pipe, and let the
-program finish; to send audio through a pipe, use [RAW streams](#raw-streams).
+In the first, the last chunk has an odd number of bytes and the padding byte
+that should follow it is missing. Python's `wave` module writes mono 24-bit
+files this way when the number of frames is odd. The file is whole, and is
+read whole. If the header counts a padding byte that the file does not have,
+the file was cut short, and it is refused.
 
-For such a file given as `--input`, or named as an IR file in a
-configuration, the message says that the sizes were never filled in, and
-why. A file chosen directly as the filter, here or in a plug-in, gets the
-general message for any file that cannot be read: that it is neither a
-configuration nor a sound file Convolver can read.
+In the second, the sizes were never filled in (they say `0xFFFFFFFF`), and
+the file is read to its end. FFmpeg leaves the sizes so when it writes a WAV
+to a pipe (`-f wav -`), because it cannot go back to the header. It leaves
+the same header when it is stopped before it finishes writing a file, and
+Convolver cannot tell the two apart: a file from an interrupted write is
+read as if it were complete, with the audio that reached it, unless it stops
+inside a frame. A filter loaded from such a file is shorter than the one
+intended, with no message, so if a write may have been interrupted, compare
+the frames that `--inspect` reports with the length you expect, or write the
+file again. To send audio through a pipe, use [RAW streams](#raw-streams).
+
+One file without sizes is refused: one whose audio is an odd number of bytes,
+which a mono 24-bit or 8-bit file with an odd number of frames is. Programs
+disagree about where such a file ends (macOS's own reader, which the plug-ins
+use on a Mac, drops its last sample), and a filter must not load shorter in
+one place than in another. Write the file again, to a file instead of a
+pipe. Given as `--input`, or named as an IR file in a configuration, it gets
+a message that says so. Chosen directly as the filter, here or in a plug-in,
+it gets the general message for any file that cannot be read: that it is
+neither a configuration nor a sound file Convolver can read.
 
 Other containers, including RF64, get libsndfile's own checks; Convolver does
 not validate every codec libsndfile supports.

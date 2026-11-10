@@ -162,10 +162,14 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   truncation, RAW alignment, and which files libsndfile recognises as sound
   files (`sound_file_header`). A WAV whose last odd chunk lacks its padding
   byte gives every frame as a sound file and as a filter; a RIFF size that
-  counts the missing byte, an even chunk past the RIFF size and a size of
-  `0xFFFFFFFF` on a chunk after the data are refused; and RIFF or `data`
-  sizes left at `0xFFFFFFFF` are refused with a message that names the
-  cause and the fix (IO-10). POSIX-specific tests also exercise fragmented
+  counts the missing byte and an even chunk past the RIFF size are refused
+  (IO-10). A WAV whose RIFF and `data` sizes were left at `0xFFFFFFFF`, or
+  its RIFF size alone, gives every frame up to the end of the file, also
+  when the file stops between two frames as an interrupted write leaves it;
+  it is refused when it stops inside a frame, when its audio is an odd
+  number of bytes (with a message that names the cause and the fix), and
+  when that size is on another chunk or under a RIFF size that was filled
+  in (IO-11). POSIX-specific tests also exercise fragmented
   descriptors, borrowed descriptor ownership, broken pipes and injected WAV
   header-finalization errors. For integer output they check rounding and
   clipping endpoints for 8 to 32 bits, reproducibility and chunk independence,
@@ -219,10 +223,9 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   checksums are unchanged. Registered only when CMake finds `ffmpeg` and
   `ffprobe`; CI installs FFmpeg in the native g++ Release job on Linux,
   which fails if the test is missing. A WAV that FFmpeg wrote to a pipe,
-  whose sizes the test first checks are `0xFFFFFFFF`, is refused as
-  `--input` with the message that names the cause and the fix, and the same
-  audio written by FFmpeg to a file renders to the
-  same bytes as its source, with every frame (IO-10).
+  whose sizes the test first checks are `0xFFFFFFFF`, renders as `--input`
+  to the same bytes as the file it was copied from, with every frame
+  (IO-11).
 - `compatibility.corpus`: [generated configuration fixtures](../../tests/compatibility/README.md)
   rendered at block sizes 1, 3, 17 and 256 in both latency modes against an
   independent direct-convolution reference, then inspected to check the reported
@@ -266,18 +269,21 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   truncated, damaged, incomplete raw or wrong-rate filter, a float WAV holding
   a NaN, a double WAV holding 1e300 (infinite as a float), and a headerless
   `.pcm` chosen directly (starting like an MPEG frame) must be refused with
-  the same diagnostic code by both. For IO-10, a mono 24-bit WAV whose last
-  odd chunk lacks its padding byte must give the same five frames from
-  both, to the last one, and a RIFF size that counts the missing byte and
-  sizes left at `0xFFFFFFFF` must be refused with the same code. Evidence
-  from PR #176 on 9 November 2026, from two commits that let unfilled sizes
-  through the shared check and were not merged: at b1597a0 AudioToolbox
-  (macOS 15.8.2 and macOS 26) read five mono 24-bit frames, an odd number of
-  bytes, as four
+  the same diagnostic code by both. For IO-10 and IO-11, the test first
+  prints what each reader makes of every layout, then requires the same
+  frames from both, to the last one, for a mono 24-bit WAV whose last odd
+  chunk lacks its padding byte, for sizes left at `0xFFFFFFFF` over an even
+  number of audio bytes, for a RIFF size left so over a real `data` size,
+  and for a stereo float file with the header FFmpeg writes to a pipe; and
+  the same refusal code for a RIFF size that counts the missing padding
+  byte, for unfilled sizes over an odd number of audio bytes, and for an
+  unsized file that stops inside a frame. Evidence from PR #176 on 9
+  November 2026: at b1597a0, before the shared check refused it,
+  AudioToolbox (macOS 15.8.2 and macOS 26) read five mono 24-bit frames
+  with unfilled sizes, an odd number of bytes, as four
   ([run 42715853793](https://github.com/jrp2014/convolver/actions/runs/42715853793));
   at 840c452 it gave libsndfile's frames for unfilled sizes over an even
-  number of bytes, including a stereo float file with the header FFmpeg
-  writes to a pipe
+  number of bytes, including the FFmpeg header
   ([job 129504519445](https://github.com/jrp2014/convolver/actions/runs/42718018388/job/129504519445)).
   A WAV whose header claims 800 kHz,
   which the reader opens and then refuses, is refused 20 times without

@@ -108,7 +108,7 @@ the suggested one.
 | LV2 in a preview | **LV2-5** (jrp first decides how `VERSION` maps to LV2's version numbers), **LV2-3**, **LV2-4**, **LV2-7** | LV2 joins a preview once its own journeys are demonstrated |
 | A window fix from jrp's sessions | **PLUG-26** (choose a `.vstpreset` in the window) | From his file-loading review of 7 November 2026 |
 | Other configuration readers | **CFG-1**, then **CFG-2** | CFG-2 waits for CFG-1 to show which readers matter |
-| Only on request | **VST3-2** (switch filters from the host), **VST3-6** (replacing the old VST2 plug-in), **HOST-2** (CLAP), **LV2-6** (an LV2 window), **IO-11** (reading WAV files whose sizes were never filled in, which jrp decides) | Each needs a stated user need and acceptance tests first |
+| Only on request | **VST3-2** (switch filters from the host), **VST3-6** (replacing the old VST2 plug-in), **HOST-2** (CLAP), **LV2-6** (an LV2 window), **IO-12** (WAV files without sizes whose audio is an odd number of bytes) | Each needs a stated user need and acceptance tests first |
 | Measurements, then optimisation | **PERF-3** and **PERF-1** measure; then, only where PERF-3 shows a need, **FFT-2**, **VST3-5** and **PLUG-11** | PERF-3's resource budgets (callback tail latency, peak memory and preparation time while loading, replacing and resetting) decide whether further optimisation is worth doing. Its measurements, and PERF-1's reruns, change no shipped code, so they may go ahead during the freeze; the optimisation they might justify waits |
 
 ### 3. Parked and later
@@ -967,17 +967,17 @@ means a patched FFmpeg build with `--enable-gpl`.
   level or clipped elsewhere; rank 1 of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#1-a-filter-for-every-sample-rate),
   with EDGE-1. jrp decides whether Convolver resamples at all. Compare [libsamplerate](https://libsndfile.github.io/libsamplerate/)
   and other suitable implementations before choosing a dependency.
-- [ ] **IO-11 — Decide whether WAV files with unfilled sizes are read.**
-  From IO-10 (PR #176, 9 November 2026). A WAV whose RIFF and `data` sizes
-  were left at `0xFFFFFFFF` is refused, with a message that says why.
-  FFmpeg, libsndfile and (unless the audio is an odd number of bytes)
-  macOS's AudioToolbox read such a file to its end, and FFmpeg writes one
-  to a pipe; but FFmpeg stopped half way through writing a file leaves the
-  same header, and three of six such files loaded as complete when the
-  check let them through. jrp decides: keep refusing them, read them
-  everywhere, or read them as `--input` only. The evidence and the code
-  that read them are in PR #176 (commit 840c452) and
-  [testing](docs/develop/testing.md#native-production-tests).
+- [ ] **IO-12 — Read WAV files without sizes whose audio is an odd number of bytes.**
+  From IO-11 (PR #176, 10 November 2026). A WAV whose sizes were left at
+  `0xFFFFFFFF` is read to its end, except when its audio is an odd number
+  of bytes (mono 24-bit or 8-bit with an odd number of frames): macOS's
+  AudioToolbox drops the last byte of such a file and read five frames as
+  four, where libsndfile read five
+  ([testing](docs/develop/testing.md#native-production-tests)), so the shared
+  check refuses it for both readers, with a message. Reading it would need
+  the macOS reader to give AudioToolbox the file with its sizes filled in
+  (`AudioFileOpenWithCallbacks`), checked against libsndfile in
+  `native.audio_toolbox`. Only if a user meets it.
 - [ ] **ROBUST-1 — Longer fuzz and transition stress.** Keep discovered inputs as
   regressions. Measure worst callback times and exercise repeated filter changes;
   allocation guards and average throughput are not a deadline guarantee.
@@ -1679,11 +1679,17 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **IO-11 — WAV files with unfilled sizes are read.** 10 November
+  2026, PR #176. jrp chose to read them everywhere: a WAV whose sizes were
+  left at `0xFFFFFFFF` (FFmpeg writing to a pipe) is read to its end,
+  knowing that FFmpeg stopped half way leaves the same header and that its
+  file is read as if complete. One with an odd number of audio bytes is
+  still refused (IO-12)
+  ([input files](docs/use/command-line.md#input-files),
+  [decision](docs/project/decisions.md#identities-and-file-formats)).
 - [x] **IO-10 — WAV files that other programs read are refused.** 9
   November 2026, PR #176, from that day's project review: a WAV whose last
-  odd chunk lacks its padding byte (Python's `wave` module) is read whole.
-  One whose sizes were left at `0xFFFFFFFF` (FFmpeg writing to a pipe, or
-  stopped half way) stays refused, with a message that says why
+  odd chunk lacks its padding byte (Python's `wave` module) is read whole
   ([input files](docs/use/command-line.md#input-files),
   [decision](docs/project/decisions.md#identities-and-file-formats)).
 - [x] **CI-36 — VST3 tests under sanitizers in CI.** 9 November 2026,

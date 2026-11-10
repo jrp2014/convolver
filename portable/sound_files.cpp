@@ -56,27 +56,31 @@ namespace {
 // FFmpeg writes it in the RIFF header and in 'data' first, and replaces it
 // only when it finishes writing to a file it can seek in.
 constexpr std::uint32_t unknown_size = 0xffffffff;
-// A WAV whose sizes were never filled in: refused with its own advice.
-struct UnfilledSizes : std::runtime_error {
+// A WAV without sizes whose audio is an odd number of bytes: refused with
+// its own advice.
+struct OddUnsizedAudio : std::runtime_error {
     using std::runtime_error::runtime_error;
 };
 
 // libsndfile takes a WAV that ends early for a shorter one, so the chunk
-// layout is checked here first. IO-10: one layout that breaks the format's
-// rules without being cut short is accepted, because libsndfile, FFmpeg and
-// macOS's AudioToolbox read it whole and a common writer produces it: a last
-// chunk of odd length with no pad byte, ending exactly where the RIFF size
-// ends (Python's wave module writes mono 24-bit audio with an odd number of
-// frames so). The rule is narrow on purpose: a RIFF size that counts the pad
-// byte in a file that lacks it is a file cut short, and is refused, as is
-// every other mismatch.
-//
-// Sizes that were never filled in stay refused, although other programs
-// read such a file to its end: the same header is left by a writer that
-// was stopped half way (FFmpeg killed while writing to a file), which cannot
-// be told from a pipe's output saved whole, and AudioToolbox drops the last
-// byte of such a file when its audio is an odd number of bytes, reading a
-// frame fewer than libsndfile (native.audio_toolbox, PR #176).
+// layout is checked here first. IO-10: two layouts that break the format's
+// rules are accepted, because libsndfile, FFmpeg and macOS's AudioToolbox
+// read them and common writers produce them. Both rules are narrow on
+// purpose; every other mismatch is still refused.
+// - No pad byte after the last chunk: a chunk of odd length ending exactly
+//   where the RIFF size ends (Python's wave module writes mono 24-bit audio
+//   with an odd number of frames so). A RIFF size that counts the pad byte
+//   in a file that lacks it is a file cut short, and is refused.
+// - Sizes never filled in (IO-11, jrp's decision of 10 November 2026): a
+//   RIFF size of unknown_size that the file is too short for means "to the
+//   end of the file", and so does a 'data' size of unknown_size in such a
+//   file. A writer stopped half way (FFmpeg killed while writing to a file)
+//   leaves the same header, so that file is read as if it were whole; all
+//   that can be checked is that the audio ends on a whole frame. The audio
+//   must also be an even number of bytes: AudioToolbox drops the last byte
+//   of an odd one and reads a frame fewer than libsndfile
+//   (native.audio_toolbox, PR #176), and a filter must not load shorter in
+//   a Mac plug-in than on the command line.
 void check_wave(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary);
     std::array<unsigned char, 40> bytes{};
@@ -86,15 +90,16 @@ void check_wave(const std::filesystem::path& path) {
         std::string_view(reinterpret_cast<char*>(bytes.data() + 8), 4) != "WAVE")
         return;
     const auto riff_size = detail::read_le32(std::as_bytes(std::span(bytes)).subspan(4));
-    const std::uint64_t end = std::uint64_t(riff_size) + 8;
     const std::uint64_t file_size = std::filesystem::file_size(path);
-    if (riff_size == unknown_size && end > file_size)
-        throw UnfilledSizes("the sizes in its WAV header were never filled in");
+    std::uint64_t end = std::uint64_t(riff_size) + 8;
+    const bool unsized = riff_size == unknown_size && end > file_size;
+    if (unsized)
+        end = file_size;
     if (end < 12 || end > file_size)
         throw std::runtime_error("truncated or invalid RIFF/WAVE size");
     unsigned block_align = 0;
     bool pcm_or_float = false;
-    std::vector<std::uint32_t> data_sizes;
+    std::vector<std::uint64_t> data_sizes;
     std::uint64_t position = 12;
     std::size_t chunks = 0;
     while (position < end) {
@@ -104,21 +109,29 @@ void check_wave(const std::filesystem::path& path) {
         file.read(reinterpret_cast<char*>(bytes.data()), 8);
         if (!file)
             throw std::runtime_error("cannot read RIFF/WAVE chunk header");
-        const auto length = detail::read_le32(std::as_bytes(std::span(bytes)).subspan(4));
+        std::uint64_t length = detail::read_le32(std::as_bytes(std::span(bytes)).subspan(4));
         auto chunk_end = position + 8 + length + (length & 1u);
-        if ((length & 1u) && chunk_end == end + 1)
-            chunk_end = end; // The last chunk, without its pad byte.
+        // Compared before 'fmt ' below reuses the buffer.
         const auto tag = std::string_view(reinterpret_cast<char*>(bytes.data()), 4);
-        if (tag == "data" && length == unknown_size && chunk_end > end)
-            throw UnfilledSizes("the size of the audio in its WAV header was never filled in");
+        const bool data = tag == "data", format_chunk = tag == "fmt ";
+        if (unsized && data && length == unknown_size) {
+            length = end - position - 8;
+            chunk_end = end;
+        } else if ((length & 1u) && chunk_end == end + 1) {
+            chunk_end = end; // The last chunk, without its pad byte.
+        }
         if (chunk_end > end)
             throw std::runtime_error("truncated RIFF/WAVE chunk");
-        if (tag == "data")
+        if (unsized && data && (length & 1u))
+            throw OddUnsizedAudio("the sizes in its WAV header were never filled in and its "
+                                  "audio is an odd number of bytes");
+        if (data)
             data_sizes.push_back(length);
-        if (tag == "fmt ") {
+        if (format_chunk) {
             if (length < 16)
                 throw std::runtime_error("invalid WAV format chunk");
-            file.read(reinterpret_cast<char*>(bytes.data()), std::min<std::uint32_t>(length, 40));
+            file.read(reinterpret_cast<char*>(bytes.data()),
+                      static_cast<std::streamsize>(std::min<std::uint64_t>(length, 40)));
             if (!file)
                 throw std::runtime_error("cannot read WAV format");
             unsigned format = detail::read_le16(std::as_bytes(std::span(bytes)));
@@ -142,16 +155,14 @@ void validate_wave(const std::filesystem::path& path) {
         check_wave(path);
     } catch (const std::runtime_error& e) {
         // One place turns the path into text, whichever advice follows.
-        const bool unfilled = dynamic_cast<const UnfilledSizes*>(&e) != nullptr;
+        const bool odd = dynamic_cast<const OddUnsizedAudio*>(&e) != nullptr;
         throw std::runtime_error(advice_text(
             {"cannot read sound file " + path.string() + ": " + e.what(),
-             unfilled
-                 ? "The program that wrote it could not go back to the header: it wrote to a "
-                   "pipe (as FFmpeg does with '-f wav -'), or it was stopped before it finished. "
-                   "Convolver cannot tell how much audio the file should hold."
+             odd ? "The program that wrote it could not go back to the header: it wrote to a pipe "
+                   "(as FFmpeg does with '-f wav -'), or it was stopped before it finished. "
+                   "Programs disagree about where such audio ends, and some drop its last sample."
                  : "The file is damaged or incomplete, or is not a sound file.",
-             unfilled
-                 ? "Write the file again, to a file instead of a pipe, and let the program finish."
+             odd ? "Write the file again, to a file instead of a pipe, and let the program finish."
                  : "Export it again from the program that made it.",
              {}}));
     }
