@@ -91,7 +91,7 @@ class Handler final : public IComponentHandler, public IComponentHandler2 {
     }
     tresult PLUGIN_API setDirty(TBool state) override {
         dirty += state ? 1 : 0;
-        return kResultOk;
+        return dirty_result;
     }
     tresult PLUGIN_API requestOpenEditor(FIDString) override {
         return kNotImplemented;
@@ -105,7 +105,9 @@ class Handler final : public IComponentHandler, public IComponentHandler2 {
     tresult PLUGIN_API queryInterface(const TUID iid, void** obj) override {
         QUERY_INTERFACE(iid, obj, FUnknown::iid, IComponentHandler)
         QUERY_INTERFACE(iid, obj, IComponentHandler::iid, IComponentHandler)
-        QUERY_INTERFACE(iid, obj, IComponentHandler2::iid, IComponentHandler2)
+        if (offers_dirty) {
+            QUERY_INTERFACE(iid, obj, IComponentHandler2::iid, IComponentHandler2)
+        }
         *obj = nullptr;
         return kNoInterface;
     }
@@ -115,6 +117,10 @@ class Handler final : public IComponentHandler, public IComponentHandler2 {
     uint32 PLUGIN_API release() override {
         return 1;
     }
+    // False: a host without IComponentHandler2 (Audacity 4.0.2, VST3-17).
+    // Set before setComponentHandler, which asks for it once.
+    bool offers_dirty = true;
+    tresult dirty_result = kResultOk; // What setDirty answers.
     struct Edit {
         char kind;
         ParamID id;
@@ -2358,7 +2364,10 @@ void report_and_files() {
     write_wav(wrong, 44100, 1, 8);
     // Accepted: the filter plays, the report names the file, the host is told
     // the project changed, and the saved state holds the filter.
+    handler.edits.clear();
     require(c.load_file(good.string()) && handler.dirty == 1, "file not loaded");
+    // A host that hears setDirty is shown no edit (VST3-17 is for the others).
+    require(handler.edits.empty(), "a load reported an edit to a host that offers setDirty");
     report = c.report();
     require(field(report, "status name") == "Active" && field(report, "filter name") == "room.wav",
             "report after loading a file");
@@ -2384,6 +2393,92 @@ void report_and_files() {
                 !field(report, "filter note").empty(),
             "report after a refused file");
     require(!c.load_file(""), "an empty path accepted");
+    std::filesystem::remove_all(folder);
+    p.setActive(false);
+    p.disconnect(&c);
+    c.disconnect(&p);
+    c.terminate();
+    p.terminate();
+}
+// VST3-17: a host without IComponentHandler2 (Audacity 4.0.2) stores the
+// state only after the plug-in reports an edit, so an accepted file is
+// reported as one edit of Latency that keeps its value: begin, perform with
+// the current value, end. So is one for a host whose setDirty answers
+// anything but kResultOk. Nothing else changes: no other parameter, no
+// latency restart, no new Latency for the processor. A refused file reports
+// nothing.
+void load_without_set_dirty(bool offers_dirty) {
+    HostApplication context;
+    Handler handler;
+    handler.offers_dirty = offers_dirty;
+    handler.dirty_result = kResultFalse; // Used only when offered.
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk,
+            "no-dirty initialize");
+    require(p.connect(&c) == kResultOk && c.connect(&p) == kResultOk, "no-dirty connect");
+    SpeakerArrangement mono = SpeakerArr::kMono;
+    require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "no-dirty buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "no-dirty activate");
+    // A Latency other than the default, so "keeps its value" is checked
+    // against a value the user chose.
+    const auto latency = normalized_latency(1024);
+    require(c.setParamNormalized(latency_id, latency) == kResultOk, "no-dirty Latency");
+    const auto gain = c.getParamNormalized(gain_id), mix = c.getParamNormalized(mix_id),
+               bypass = c.getParamNormalized(bypass_id);
+    const auto folder = private_temp("convolver-vst3-no-dirty");
+    std::filesystem::create_directories(folder);
+    const auto good = folder / "room.wav", wrong = folder / "other rate.wav";
+    write_wav(good, 48000, 1, 8);
+    write_wav(wrong, 44100, 1, 8);
+    handler.edits.clear();
+    handler.restarts.clear();
+    require(c.load_file(good.string()) && handler.dirty == (offers_dirty ? 1 : 0),
+            "no-dirty file not loaded");
+    const bool one_gesture = handler.edits.size() == 3 && handler.edits[0].kind == 'b' &&
+                             handler.edits[1].kind == 'p' && handler.edits[2].kind == 'e' &&
+                             std::all_of(handler.edits.begin(), handler.edits.end(),
+                                         [](const Handler::Edit& e) { return e.id == latency_id; });
+    if (!one_gesture) {
+        std::string seen;
+        for (const auto& e : handler.edits)
+            seen += std::string(1, e.kind) + " " + std::to_string(e.id) + " " +
+                    std::to_string(e.value) + "; ";
+        require(false, ("an accepted file was not reported as one Latency edit: " + seen).c_str());
+    }
+    require(handler.edits[1].value == latency && c.getParamNormalized(latency_id) == latency,
+            "the reported Latency edit changed its value");
+    require(c.getParamNormalized(gain_id) == gain && c.getParamNormalized(mix_id) == mix &&
+                c.getParamNormalized(bypass_id) == bypass,
+            "loading a file changed Gain, Mix or Bypass");
+    require(handler.latency_restarts() == 0, "the reported edit asked for a latency restart");
+    // The state a host stores after that edit holds the file's filter.
+    MemoryStream saved;
+    require(p.getState(&saved) == kResultOk, "no-dirty save");
+    saved.seek(0, IBStream::kIBSeekSet, nullptr);
+    const auto state = read_state(&saved);
+    require(state.configuration && state.configuration->sample_rate == 48000,
+            "the state after the reported edit does not hold the file's filter");
+    // What a host does with the edit: it hands the value back, in
+    // setParamNormalized and in process(). Neither is a new Latency.
+    require(c.setParamNormalized(latency_id, handler.edits[1].value) == kResultOk &&
+                handler.latency_restarts() == 0,
+            "the edit's value handed back read as a new Latency");
+    ParameterChanges changes;
+    int32 index = 0;
+    changes.addParameterData(latency_id, index)->addPoint(0, latency, index);
+    ProcessData flush{};
+    flush.inputParameterChanges = &changes;
+    require(p.process(flush) == kResultOk, "no-dirty process");
+    require(p.getLatencySamples() == 1024, "the edit's value in process() changed the latency");
+    handler.edits.clear();
+    require(!c.load_file(wrong.string()) && handler.edits.empty(),
+            "a refused file reported an edit");
     std::filesystem::remove_all(folder);
     p.setActive(false);
     p.disconnect(&c);
@@ -2974,6 +3069,8 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"latency_while_playing", latency_while_playing},
         {"latency_handover_waits", latency_handover_waits},
         {"report_and_files", report_and_files},
+        {"load_without_set_dirty", [] { load_without_set_dirty(false); }},
+        {"load_with_failing_set_dirty", [] { load_without_set_dirty(true); }},
         {"saved_filter_name", saved_filter_name},
         {"messages_through_proxies", messages_through_proxies},
         {"settings_at_state_limit", settings_at_state_limit},

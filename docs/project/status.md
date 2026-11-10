@@ -230,8 +230,9 @@ jrp decided on 9 November 2026 to publish the second preview, a 0.13.x tag for
 macOS, Windows and Linux, without them too, and without check 9
 ([decision](decisions.md#releases)); they stay open as follow-up work, and
 its release notes say what was not checked. On 10 November 2026 he decided
-the same for a third preview, after PR #175 and with the Windows window,
-without waiting for VST3-17 ([decision](decisions.md#releases)). On 9 November 2026 he made the
+the same for a third preview, once the changes in flight are in
+(VST3-17 without a check in Audacity, the Windows window, LV2)
+([decision](decisions.md#releases)). On 9 November 2026 he made the
 published 0.13 preview (0.13.2) the baseline: the checks left and REL-3 run on
 its exact files, and the v0.12.8 results in the table below are records of
 that build, not passes for 0.13 ([decision](decisions.md#releases)).
@@ -283,10 +284,12 @@ than checked.
 - VST3-17: in Audacity 4.0.2 a filter loaded from Convolver's window
   (**Choose…**, **Recent**, **Reload** or reloading when the file changes,
   which share one path) plays, but the export and the saved project keep
-  whatever Audacity stored last: no filter, or an older one. jrp narrowed
-  the preview's Audacity support to Audacity's own preset menu
-  ([decision](decisions.md#plug-in-behaviour)); the guides and the release
-  notes say so, and check 4 verifies that route.
+  whatever Audacity stored last: no filter, or an older one, up to
+  v0.13.8. Fixed on main after v0.13.8
+  ([PR #177](https://github.com/jrp2014/convolver/pull/177)), not yet in a
+  published preview, and checked only by `vst3.adapter`: it merges without
+  an Audacity check ([decisions](decisions.md#plug-in-behaviour)), so the
+  preset menu stays the checked route and check 4 verifies it.
 - **Choose…** needs the filter's input count to match the host's exactly,
   while a preset needs only at least that many inputs, so in REAPER on a
   six-channel track the crossover's `filter.cfg` is refused through

@@ -91,7 +91,7 @@ passes for 0.13, since PERF-2 changed the engine
 | **COMPAT-1** | Keep presets, a REAPER project and expected audio made by 0.13.2, the baseline, with their own runner and the capture step in the publication steps | Tests and files only |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **HOST-4** | The check on a real Windows device, now that the Windows package ships `convolver-equalizer-apo` | A check; needs a Windows computer |
-| **VST3-17** | Known defect: in Audacity a filter chosen in the window plays but is missing from the export and the saved project. jrp narrowed Audacity to its preset menu, and the guides say so | Lost state, one of the freeze's exceptions: jrp brought the fix forward on 9 November 2026 ("Fix now"; [decision](docs/project/decisions.md#plug-in-behaviour)), replacing the earlier decision that it waits until after the preview |
+| **VST3-17** | Up to 0.13.8, in Audacity a filter chosen in the window plays but is missing from the export and the saved project. The fix (PR #177) is checked only by `vst3.adapter`; what remains is jrp's Audacity check, and until then the guides keep the preset menu as the checked route | Lost state, one of the freeze's exceptions: brought forward and merged without an Audacity check ([decisions](docs/project/decisions.md#plug-in-behaviour)) |
 | **PLUG-33** | Known limitation: **Choose…** needs the host's exact input count where a preset needs at least that many; the guides give the preset route | A runtime change; waits unless jrp brings it forward |
 
 ### 2. Decided or likely, after the freeze
@@ -1071,6 +1071,32 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   Audacity to presets for the first preview
   ([decisions](docs/project/decisions.md#plug-in-behaviour)): the item
   stays open for after the preview, or for Audacity's own fix.
+  Progress (9 November 2026): jrp chose to fix it now, despite the
+  runtime freeze, as lost state. Audacity 4.0.2's source
+  (`src/effects/vst/view/vstviewmodel.cpp`, `au3-vst3/VST3Wrapper.cpp`)
+  reads as though, while its vendor window is open, it stores the whole state,
+  both `getState` calls, within 100 ms of any `performEdit` when not
+  playing; it also stores it when playback stops and when the window
+  closes, so a check must export with the window open and without
+  playing after the choice, or it can pass without the fix. So after an
+  accepted file, a controller whose `setDirty` does not succeed (no
+  `IComponentHandler2`, or a host that answers otherwise) reports one edit
+  of Latency that keeps its value: not automatable, ignored by
+  `process()`, and `endEdit` in Audacity only marks the project unsaved
+  and amends its current undo state. No Gain or Mix edit is made, and a
+  host whose `setDirty` succeeds sees nothing new (`vst3.adapter` checks
+  all three cases). The independent review (PR #177) noted that Audacity
+  amends its undo state about 100 ms before it stores the new state, as
+  for any edit, so undoing a later action may bring back the previous
+  filter; worth one look in the host check. jrp chose on 10 November 2026
+  (decision card, "Merge #177 untested, then release") to merge the fix
+  without an Audacity check; the guides now say the window route should
+  work but is not yet checked in Audacity, and keep the preset menu as the
+  checked route. Remaining: jrp's Audacity check (project files
+  `vst3-17-audacity/`: Choose, export, save and reopen with no parameter
+  touched and the window open, with 0.13.2 as a control that fails), then
+  the guides drop the "not yet checked" wording; and a REAPER check that a
+  chosen file adds no Latency entry to its undo history.
 - [ ] **VST3-12 — Editor window on Windows.** The same window as a Win32 view
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.

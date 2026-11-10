@@ -441,8 +441,17 @@ separate processes, so each carries values, never pointers:
   records the refusal; its `ConvolverStatus` answer names the request and
   whether the file was accepted, and the controller then calls
   `setDirty(true)` for an accepted file, so the host marks the project
-  changed. Reading happens on the thread that delivered the message, never
-  in `process()`.
+  changed. When `setDirty` does not succeed (a host without
+  `IComponentHandler2`, such as Audacity 4.0.2), the controller instead
+  reports one edit of Latency that keeps its value (`beginEdit`,
+  `performEdit` with the current value, `endEdit`), so that such a host
+  stores the new state (VST3-17 in [TODO](../../TODO.md) has the Audacity
+  reasoning). Latency is used because it is not automatable and `process()`
+  ignores it (the controller sends a new Latency as a message, only when the
+  value changes), so neither the sound nor Gain, Mix or automation change.
+  It is a narrow fix: a host whose `setDirty` succeeds sees nothing new, and
+  the general fix is the host implementing `IComponentHandler2`. Reading
+  happens on the thread that delivered the message, never in `process()`.
 - A host may put a proxy between the two components
   ([`IConnectionPoint`](https://steinbergmedia.github.io/vst3_doc/vstinterfaces/classSteinberg_1_1Vst_1_1IConnectionPoint.html))
   that delivers a message after `sendMessage()` returns and answers

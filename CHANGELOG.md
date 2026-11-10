@@ -17,8 +17,9 @@ Until 1.0 the C++ API may change between minor versions.
   changelog; each preview's release-notes change updates the list
   ([publishing](docs/develop/releasing.md#publishing-an-unsigned-preview)).
   jrp decided on 10 November 2026 to publish a third preview, a 0.13.x tag,
-  without the checks left and without VST3-17's Audacity fix, whose check
-  is not run yet ([decision](docs/project/decisions.md#releases)).
+  without the checks left, once the changes in flight are in, VST3-17's
+  Audacity fix among them without a check in Audacity
+  ([decision](docs/project/decisions.md#releases)).
 - VST3 plug-in on Windows (VST3-12): Convolver's window, the same as on
   macOS, built from Windows' own controls: the status, why it is silent and
   what to change, Choose…, Recent and Reload, a dropped file, Gain, Mix and
@@ -128,6 +129,16 @@ Until 1.0 the C++ API may change between minor versions.
   whose extension holds such characters now loads; and the plug-ins read
   the UTF-8 path a window passes as UTF-8. One shared helper replaces the
   copies that did these conversions.
+
+- VST3 (VST3-17): in a host that cannot be told the project changed
+  (no `IComponentHandler2`, such as Audacity 4.0.2), a filter loaded from
+  Convolver's window (Choose…, Recent, Reload or reloading when the file
+  changes) is now reported as an edit of Latency that keeps its value, so
+  that such a host stores it for exports and saved projects. The sound,
+  Gain, Mix and automation do not change, and hosts that can be told see no
+  edit.
+  Checked by automated tests only, not yet in Audacity, so the guides keep
+  Audacity's preset menu as the checked route.
 
 ## [0.13.2] - 2026-11-09
 

@@ -51,6 +51,10 @@ CHANGES = (
         'code `unreadable-asset`.'
     ),
     (
+        "In Audacity, a filter loaded from Convolver's window (Choose…, Recent or Reload) is now kept for exports "
+        'and saved projects; checked by automated tests only, not yet in Audacity.'
+    ),
+    (
         'On Windows, a file whose name holds characters outside the system code page, such as Greek, Cyrillic '
         'or Chinese letters, is named correctly in messages, and a configuration naming such an IR file loads.'
     ),
@@ -178,8 +182,9 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'and removed itself. Nobody has used them in a host yet. '
             f'[Status]({base}/blob/{tag}/docs/project/status.md#checks-left-before-publication) lists what is open. '
             'Other hosts are untested.\n'
-            "- In Audacity, load filters from Audacity's own preset menu. A filter loaded from Convolver's window "
-            '(Choose…, Recent or Reload) plays there, but Audacity 4 does not keep it for exports or saved projects.\n'
+            "- In Audacity, Convolver's window (Choose…, Recent or Reload) should now keep the filter for exports and "
+            "saved projects, but this has been checked only by automated tests, not yet in Audacity. Audacity's own "
+            'preset menu is the route that has been checked.\n'
             '- Since 0.13, Latency starts at 0 frames. Some projects saved with 0.12.12 at its default of 256 frames '
             'open at 0; choose 256 again if you want its delay back '
             f'([projects from earlier versions]({docs}/plugins.md#settings)).'
