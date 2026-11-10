@@ -144,7 +144,8 @@ The first preview is macOS-only ([decisions](decisions.md#plug-in-behaviour)):
 the VST3 plug-in and the Audio Unit with the existing shared window and their
 Gain, Mix and Latency settings, the `convolver` CLI and the preset tool. The
 Windows and Linux windows, the other gain modes and the meters come in later
-previews, and LV2 joins one once its own journeys are demonstrated. The
+previews, and LV2 joins the Linux package once its packaging and settings
+are in (LV2-5, LV2-7; [decisions](decisions.md#releases)). The
 Windows and Linux packages, VST3 without a window and the tools, are
 published from the second preview, after an automated run on clean machines
 ([REL-9](../../TODO.md), [decisions](decisions.md#releases)). Until the

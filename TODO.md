@@ -105,7 +105,7 @@ the suggested one.
 | Group | Items | Note |
 | --- | --- | --- |
 | Later previews, as decided | **VST3-12** and **VST3-13** (the Windows and Linux windows); **PLUG-9**, **PLUG-10** and **AU-7** (the other gain modes and the meters) | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)). The 0.13.2 Windows and Linux packages use the host's own controls meanwhile |
-| LV2 in a preview | **LV2-5** (jrp first decides how `VERSION` maps to LV2's version numbers), **LV2-3**, **LV2-4**, **LV2-7** | LV2 joins a preview once its own journeys are demonstrated |
+| LV2 in a preview | **LV2-5** (packaging; jrp decides how `VERSION` maps to LV2's version numbers), then **LV2-7**; **LV2-3** and **LV2-4** after | LV2 joins the Linux package once LV2-5 and LV2-7 are in ([decision](docs/project/decisions.md#releases)) |
 | A window fix from jrp's sessions | **PLUG-26** (choose a `.vstpreset` in the window) | From his file-loading review of 7 November 2026 |
 | Other configuration readers | **CFG-1**, then **CFG-2** | CFG-2 waits for CFG-1 to show which readers matter |
 | Only on request | **VST3-2** (switch filters from the host), **VST3-6** (replacing the old VST2 plug-in), **HOST-2** (CLAP), **LV2-6** (an LV2 window) | Each needs a stated user need and acceptance tests first |
@@ -609,8 +609,9 @@ LV2 (Linux first; also PipeWire system audio):
 - [ ] **LV2-5 — Release bundles.** Linux tarball, then distro packages; macOS and
   Windows bundles under PLUG-5.
   Before the first release, jrp decides how `VERSION` maps to
-  `lv2:minorVersion` and `lv2:microVersion` (today MINOR and PATCH, set by
-  `plugins/lv2/generate_ttl.py`). LV2 treats an odd minor or micro as a
+  `lv2:minorVersion` and `lv2:microVersion` (set by
+  `plugins/lv2/generate_ttl.py`; MINOR and PATCH on `main`, doubled on the
+  LV2-5 pull request, [LV2 versions](docs/develop/versioning.md#lv2-versions)). LV2 treats an odd minor or micro as a
   development version and minor 0 as experimental, has no major, and lilv
   loads the highest (minor, micro) it finds, so 1.0.0 mapped this way would
   lose to an old 0.4.x left in `~/.lv2`. The mapping must keep increasing,
@@ -623,8 +624,10 @@ LV2 (Linux first; also PipeWire system audio):
   jrp's to decide; the archived
   [formats plan](docs/archive/plans/2026-10-21-plugin-formats.md#decisions-for-the-owner)
   recommended building them in CI and publishing once Linux has users.
-  Progress (10 November 2026): the Linux package's LV2 bundle is in progress
-  on the draft pull request titled LV2-5.
+  Progress (10 November 2026, PR #179): the Linux package holds
+  `LV2/convolver.lv2`, built against the lv2 headers in the corresponding
+  source and checked by the candidate's LV2 tests and the package checks;
+  the version mapping awaits jrp.
 - [ ] **LV2-6 — Editor report and UI (optional).** Only if Linux users show a
   need: generic UIs already offer the `filter` file chooser and the status
   port. The report as `patch:Set` atoms on the notify port, prepared in

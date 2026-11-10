@@ -97,7 +97,8 @@ def check_lv2(root):
     library loads and describes the plug-ins its manifest lists
     (lv2_bundle.py, in its own process, so nothing here keeps it loaded).
     Which packages must hold it is the release policy's "formats", checked by
-    verify_artifact.py."""
+    verify_artifact.py. A sanitizer build's library cannot be loaded into
+    this uninstrumented Python; no CI build packages one."""
     folder = root / 'LV2'
     if not folder.exists():
         return

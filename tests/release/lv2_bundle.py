@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Load a packaged LV2 bundle's library as a host does and check its plug-ins (LV2-5).
 
-Usage: lv2_bundle.py BUNDLE
+Usage: lv2_bundle.py BUNDLE [VERSION]
 
 The bundle must hold exactly the library, manifest.ttl and convolver.ttl.
 The library is opened with ctypes, not lilv, so that a clean machine needs
@@ -10,7 +10,9 @@ layout in plugins/identities.json, under the URIs that manifest.ttl lists,
 and then NULL. This finds a library that the machine cannot load (a missing
 or too new system library) and a manifest that names plug-ins the library
 does not have, and that each plug-in declares the LV2 version that VERSION
-maps to. lilv's own reading of the Turtle is checked by lv2.adapter,
+maps to: VERSION if given, otherwise the package's own VERSION.txt beside
+LV2/, never the checkout's (a publish dry run checks an older tag's
+package). lilv's own reading of the Turtle is checked by lv2.adapter,
 and lv2lint and pluginval check the bundle in the LV2 workflow.
 """
 
@@ -28,7 +30,15 @@ class Descriptor(ctypes.Structure):
     _fields_ = [('URI', ctypes.c_char_p)]
 
 
-def check(bundle):
+def package_version(bundle):
+    """X.Y.Z from the package's VERSION.txt (\"Convolver X.Y.Z\" on its first line)."""
+    first = (bundle.parents[1] / 'VERSION.txt').read_text(encoding='utf-8').splitlines()[0]
+    match = re.fullmatch(r'Convolver (\d+\.\d+\.\d+)', first.strip())
+    assert match, f'VERSION.txt does not start with "Convolver X.Y.Z": {first!r}'
+    return match.group(1)
+
+
+def check(bundle, version=None):
     bundle = Path(bundle).resolve()
     identities = json.loads((ROOT / 'plugins/identities.json').read_text(encoding='utf-8'))
     base = identities['lv2']['base_uri']
@@ -48,7 +58,7 @@ def check(bundle):
     sys.path.insert(0, str((ROOT / 'plugins/lv2/generate_ttl.py').parent))
     from generate_ttl import lv2_version
 
-    version = (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
+    version = version or package_version(bundle)
     minor, micro = lv2_version(*(int(part) for part in version.split('.')))
     described = (bundle / 'convolver.ttl').read_text(encoding='utf-8')
     for line in (f'lv2:minorVersion {minor} ;', f'lv2:microVersion {micro} ;'):
@@ -72,6 +82,6 @@ def check(bundle):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
+    if len(sys.argv) not in (2, 3):
         raise SystemExit(__doc__)
-    check(sys.argv[1])
+    check(*sys.argv[1:])

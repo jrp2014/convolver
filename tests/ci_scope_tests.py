@@ -436,6 +436,7 @@ FORMAT_REFERENCES = {
         'scripts/release/candidate.py': 'the candidates (CI-34: main, weekly, by hand)',
         'tests/release/source_build.py': 'a local check of the source archive; CI does not run it',
         'tests/release/lv2_bundle.py': "imports generate_ttl.py in the candidates' package checks",
+        '.github/workflows/publish.yml': 'a dry-run trigger path; runs only on its own paths and by hand from main',
         'tests/repository_checks_tests.py': 'made-up paths in its own test repository',
         'tests/identities_tests.py': 'a comment naming an LV2 specification file',
     },

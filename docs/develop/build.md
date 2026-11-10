@@ -594,6 +594,14 @@ package without it stops with an error. Add `--formats vst3 au` to the
 `-DCONVOLVER_BUILD_AU=ON -DCONVOLVER_AU_SDK="$PWD/build/deps/sources/AudioUnitSDK"`
 to the `cmake --preset` command.
 
+On Linux the package holds the LV2 plug-in too (LV2-5). Add
+`--formats vst3 lv2` to the `build_dependencies.py` command, so that it
+unpacks the lv2 headers and their notice, and add
+`-DCONVOLVER_BUILD_LV2=ON -DCONVOLVER_LV2_SDK="$PWD/build/deps/sources/lv2"`
+to the `cmake --preset` command; the LV2 tests need `pkg-config` and lilv
+([LV2](#lv2)). A package configured without it has no `LV2/` folder, which a
+candidate refuses.
+
 Use `$PWD` in PowerShell or
 absolute paths in cmd. `--latest` takes the newest release of each library
 and `--fetch` explicitly permits downloading them; `--lock FILE` instead
@@ -613,8 +621,10 @@ recorded ones again). Then
 rebuilds dependencies, core, tools and SDK from a fresh extraction without
 fetching, using exactly the releases its manifest records, and runs their tests (the CMake package consumers, which nothing
 shipped uses, run in native CI instead). It builds the plug-ins this system's
-packages hold, so on macOS the Audio Unit too. Its `--backend` defaults to `AUTO`, as above;
-`--sdk`, `--prefix` and `--backend` (and `--au-sdk` for the Audio Unit) also
+packages hold, so on macOS the Audio Unit too and on Linux the LV2 plug-in,
+whose tests need `pkg-config` and lilv. Its `--backend` defaults to `AUTO`, as above;
+`--sdk`, `--prefix` and `--backend` (and `--au-sdk` for the Audio Unit,
+`--lv2-sdk` for LV2) also
 check a fresh build against SDKs and dependencies you supply. A failed validator remains a release blocker.
 
 `build_dependencies.py`, `source_build.py` and `scripts/release/candidate.py`

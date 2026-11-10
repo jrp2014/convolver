@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Optional distribution, separate from the C++ library package and exports.
 # The package ships the VST3 plug-in, on macOS the Audio Unit too (PLUG-5,
-# AU-5), the LV2 bundle when it is built (LV2-5; Linux candidates), the CLI and the shared tools (PLUG-3 presets, HOST-4 Equalizer APO
+# AU-5), the LV2 bundle when it is built (LV2-5, Linux candidates), the CLI and the shared tools (PLUG-3 presets, HOST-4 Equalizer APO
 # export). convolver-vst3-preset stays a source-build alias.
 if(NOT TARGET convolver_vst3 OR NOT TARGET convolver_cli OR NOT TARGET convolver_preset_tool
    OR NOT TARGET convolver_equalizer_apo)

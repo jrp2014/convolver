@@ -104,8 +104,8 @@ tests (HOST-1, AU-4) or the independent walkthrough (REL-3).
 ### Debugging symbols
 
 Each candidate also uploads `symbols-<platform>`: the debugging symbols of the
-packaged binaries (the VST3 plug-in, the Audio Unit on macOS, the `convolver`
-CLI, `convolver-preset` and `convolver-equalizer-apo`), kept outside the
+packaged binaries (the VST3 plug-in, the Audio Unit on macOS, the LV2
+plug-in on Linux, the `convolver` CLI, `convolver-preset` and `convolver-equalizer-apo`), kept outside the
 package and its inventory
 (DIAG-1, jrp's review of 24 October 2026). The candidate build sets
 `CONVOLVER_DEBUG_SYMBOLS` ([build options](build.md#build-options)): Release
@@ -119,7 +119,9 @@ symbols are missing, empty, without debugging information or from another
 build. The artifact's `README.txt` lists the identity of each file. Both
 plug-ins' executables are called `Convolver`, so the Audio Unit's symbols are
 `Convolver-au.dSYM` (its DWARF file inside is still `Convolver`) and the
-VST3 plug-in's `Convolver.dSYM`; the CLI's are `convolver-cli.*`.
+VST3 plug-in's `Convolver.dSYM`; the CLI's are `convolver-cli.*`. The LV2
+library is `convolver.so`, which differs from the VST3 plug-in's
+`Convolver.so` only in case, so its symbols are `convolver-lv2.debug`.
 
 | Platform | Symbols | Matched by | Debugging information checked |
 | --- | --- | --- | --- |
