@@ -12,6 +12,12 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Releases (LV2-5): the Linux preview package holds the LV2 plug-in,
+  `LV2/convolver.lv2`, built against the lv2 headers in the corresponding
+  source (new CMake option `CONVOLVER_LV2_SDK`) with its debugging symbols
+  kept. The candidate runs the LV2 tests, and the package checks, on CI and
+  on the clean machines, load its library and check its plug-ins against its
+  manifest. Linux only; no change to the plug-in itself.
 - VST3 plug-in on Windows (VST3-12): Convolver's window, the same as on
   macOS, built from Windows' own controls: the status, why it is silent and
   what to change, Choose…, Recent and Reload, a dropped file, Gain, Mix and

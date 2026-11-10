@@ -32,6 +32,8 @@ name: Draft preview release
       - scripts/release/contract.py
       - tests/release/clean_machine.py
       - tests/release/package_smoke.py
+      - tests/release/lv2_bundle.py
+      - plugins/lv2/generate_ttl.py
       - tests/release/documentation_examples.py
       - scripts/release/candidate.py
       - scripts/release/installers.py

@@ -10,8 +10,7 @@ package or from your own build. Afterwards, follow
 - Copy the whole plug-in bundle (a folder, not just the file inside it) into a
   folder your host scans, then ask the host to rescan.
 - Preview packages contain the VST® 3 plug-in on macOS, Windows and Linux,
-  and the Audio Unit on macOS. For the LV2 plug-in (Linux), build from
-  source.
+  the Audio Unit on macOS and the LV2 plug-in on Linux.
 - Previews are not signed. On macOS, allow the installer once in
   **Privacy & Security**, or, from the ZIP archive, clear the download
   quarantine for the Convolver bundles only; on Windows, an installer shows a
@@ -20,7 +19,7 @@ package or from your own build. Afterwards, follow
 ## What a preview package contains
 
 `VST3/Convolver.vst3`, on macOS the Audio Unit `Components/Convolver.component`,
-the tools in `bin/` (`convolver`, `convolver-preset`
+on Linux the LV2 bundle `LV2/convolver.lv2`, the tools in `bin/` (`convolver`, `convolver-preset`
 and `convolver-equalizer-apo`), example filters and their presets in `presets/`, the first-use
 examples with presets made from them in `examples/first-use/`, these pages in
 `docs/use/` (start with `docs/use/README.md`) and licence notices in `licenses/`. Check the package's
@@ -61,11 +60,20 @@ auval -v aufx Conv CONV
 The unit appears as **Convolver: Convolver** among effects. Logic and
 GarageBand run the same check when they first see it.
 
-**LV2:** instead of copying, you can add the build folder to the host's search
-path, for example by starting the host with
+**LV2:** from the unpacked Linux package, copy the bundle for your account:
+
+```sh
+mkdir -p ~/.lv2
+cp -R LV2/convolver.lv2 ~/.lv2/
+```
+
+Replace any older `convolver.lv2` there rather than keeping both. With your
+own build, you can instead add the build folder to the host's search path,
+for example by starting the host with
 `LV2_PATH="$HOME/src/convolver/build/lv2:$HOME/.lv2:/usr/local/lib/lv2:/usr/lib/lv2"`.
-`lv2ls` lists what the host will see; Convolver appears once per channel
-layout ([LV2 layouts](plugins.md#lv2-channel-layouts)).
+`lv2ls` (in Debian's and Ubuntu's `lilv-utils`) lists what the host will
+see; Convolver appears once per channel layout
+([LV2 layouts](plugins.md#lv2-channel-layouts)).
 
 ## Unsigned previews
 

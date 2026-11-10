@@ -92,6 +92,21 @@ def check_audio_unit(root):
     )
 
 
+def check_lv2(root):
+    """LV2-5: a package that holds LV2/ (Linux) holds the bundle, whose
+    library loads and describes the plug-ins its manifest lists
+    (lv2_bundle.py, in its own process, so nothing here keeps it loaded).
+    Which packages must hold it is the release policy's "formats", checked by
+    verify_artifact.py. A sanitizer build's library cannot be loaded into
+    this uninstrumented Python; no CI build packages one."""
+    folder = root / 'LV2'
+    if not folder.exists():
+        return
+    bundles = sorted(folder.iterdir())
+    assert [p.name for p in bundles] == ['convolver.lv2'], f'LV2/ holds {[p.name for p in bundles]}'
+    subprocess.run([sys.executable, str(ROOT / 'tests/release/lv2_bundle.py'), str(bundles[0])], check=True)
+
+
 def check(root, validator=None, probe=None):
     root = Path(root).resolve()
     for name in (
@@ -111,6 +126,7 @@ def check(root, validator=None, probe=None):
     if platform.system() == 'Darwin':
         subprocess.run(['codesign', '--verify', '--deep', '--strict', str(root / 'VST3/Convolver.vst3')], check=True)
     check_audio_unit(root)
+    check_lv2(root)
     check_trademarks(root)
     cli, tool, exporter = (
         staged_tool(root, name) for name in ('convolver', 'convolver-preset', 'convolver-equalizer-apo')

@@ -66,7 +66,11 @@ every user guide in `docs/use/` with its images in `docs/use/images/`, licence
 notices in `licenses/` and `VERSION.txt`. The two macOS packages also hold the
 Audio Unit, `Components/Convolver.component` (AU-5), with its own notices
 inside it and in `licenses/` (`Convolver-AU.txt`, `GPL-3.0.txt`,
-`audiounitsdk.txt`). LV2 joins a later preview.
+`audiounitsdk.txt`). The Linux package also holds the LV2 bundle,
+`LV2/convolver.lv2` (LV2-5: the library and its two Turtle files), built
+against the lv2 headers in the corresponding source, with their notice
+`licenses/lv2.txt`; there is no Linux installer. The LV2 tests run in the
+Linux candidate with the build machine's lilv, which is not shipped.
 
 The macOS installer (`…-unsigned.pkg`) has three packages, each with a
 permanent receipt identity in
@@ -100,8 +104,8 @@ tests (HOST-1, AU-4) or the independent walkthrough (REL-3).
 ### Debugging symbols
 
 Each candidate also uploads `symbols-<platform>`: the debugging symbols of the
-packaged binaries (the VST3 plug-in, the Audio Unit on macOS, the `convolver`
-CLI, `convolver-preset` and `convolver-equalizer-apo`), kept outside the
+packaged binaries (the VST3 plug-in, the Audio Unit on macOS, the LV2
+plug-in on Linux, the `convolver` CLI, `convolver-preset` and `convolver-equalizer-apo`), kept outside the
 package and its inventory
 (DIAG-1, jrp's review of 24 October 2026). The candidate build sets
 `CONVOLVER_DEBUG_SYMBOLS` ([build options](build.md#build-options)): Release
@@ -115,7 +119,9 @@ symbols are missing, empty, without debugging information or from another
 build. The artifact's `README.txt` lists the identity of each file. Both
 plug-ins' executables are called `Convolver`, so the Audio Unit's symbols are
 `Convolver-au.dSYM` (its DWARF file inside is still `Convolver`) and the
-VST3 plug-in's `Convolver.dSYM`; the CLI's are `convolver-cli.*`.
+VST3 plug-in's `Convolver.dSYM`; the CLI's are `convolver-cli.*`. The LV2
+library is `convolver.so`, which differs from the VST3 plug-in's
+`Convolver.so` only in case, so its symbols are `convolver-lv2.debug`.
 
 | Platform | Symbols | Matched by | Debugging information checked |
 | --- | --- | --- | --- |
@@ -234,7 +240,9 @@ mechanical part, but only as a draft: nothing is public until jrp presses
    spaces and `ü`, runs `package_smoke.py` there without the build's SDK tools,
    and loads the VST3 library as a host does to list its factory's classes
    against [`identities.json`](../../plugins/identities.json) (no instance,
-   no audio); on Windows the installer is also run silently and must install
+   no audio); on Linux `package_smoke.py` also loads the LV2 library and
+   checks the plug-ins it describes against its `manifest.ttl` and
+   `identities.json` ([`lv2_bundle.py`](../../tests/release/lv2_bundle.py)); on Windows the installer is also run silently and must install
    exactly the ZIP's files, byte for byte, plus its uninstaller, the
    installed CLI renders a first-use example and the installed library
    loads, and the uninstaller must remove every file and registry key.

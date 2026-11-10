@@ -153,6 +153,12 @@ def inspect(root, candidate, policy):
         raise ValueError('missing Audio Unit binary: ' + component)
     if 'au' not in candidate['formats'] and (root / 'Components').exists():
         raise ValueError('an Audio Unit in a package whose platform does not ship one')
+    # LV2-5: the LV2 bundle is in the packages whose platform ships it, and only there.
+    lv2 = [name for name in records if name.startswith('LV2/convolver.lv2/')]
+    if 'lv2' in candidate['formats'] and len(lv2) != 1:
+        raise ValueError(f'expected one LV2 plug-in library in LV2/convolver.lv2/, found {lv2}')
+    if 'lv2' not in candidate['formats'] and (root / 'LV2').exists():
+        raise ValueError('an LV2 bundle in a package whose platform does not ship one')
     for tool in ('bin/convolver', 'bin/convolver-preset', 'bin/convolver-equalizer-apo'):
         if tool not in records and tool + '.exe' not in records:
             raise ValueError('missing tool binary: ' + tool)
@@ -228,6 +234,13 @@ def main():
                 component + 'Resources/licenses/GPL-3.0.txt',
                 component + 'Resources/licenses/AudioUnitSDK-LICENSE.txt',
                 component + '_CodeSignature/CodeResources',
+            )
+        if 'lv2' in candidate['formats']:
+            # LV2-5: the lv2 headers' ISC notice, and the bundle's Turtle files.
+            notices += (
+                'licenses/lv2.txt',
+                'LV2/convolver.lv2/manifest.ttl',
+                'LV2/convolver.lv2/convolver.ttl',
             )
         for required in (
             'licenses/Convolver.txt',

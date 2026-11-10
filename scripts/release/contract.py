@@ -99,7 +99,7 @@ def validate_policy(policy, source=None):
         if platform['status'] == 'tested' and not platform.get('evidence'):
             raise ValueError('tested platform requires evidence')
         # What each platform's package ships (PLUG-5): VST3 everywhere, the
-        # Audio Unit only on macOS; LV2 joins a later preview.
+        # Audio Unit only on macOS, LV2 on Linux (LV2-5).
         formats = platform.get('formats')
         if not isinstance(formats, list) or 'vst3' not in formats or not set(formats) <= PLUGIN_FORMATS:
             raise ValueError(f'{name}: formats must list the plug-in formats shipped, VST3 included')

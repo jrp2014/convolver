@@ -138,6 +138,15 @@ jobs:
         with:
           name: corresponding-source
           path: build/source
+      # LV2-5: the LV2 tests' host. The plug-in compiles against the lv2
+      # headers in the corresponding source; lilv only runs the tests and is
+      # not packaged.
+      - name: lilv for the LV2 tests
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pkg-config liblilv-dev
+          python scripts/release/resolve.py packages liblilv-dev liblilv-0-0
       - name: Fetch the newest installer compiler
         id: nsis
         if: runner.os == 'Windows'
