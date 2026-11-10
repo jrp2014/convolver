@@ -10,17 +10,23 @@
 #include "config_parse.hpp"
 #include "convolver/engine.hpp"
 #include "sound_files.hpp"
+#include "utf8.hpp"
 #include <AudioToolbox/AudioToolbox.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <algorithm>
+#include <cerrno>
 #include <cmath>
 #include <cstdint>
+#include <fcntl.h>
 #include <fstream>
 #include <limits>
+#include <memory>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <system_error>
+#include <unistd.h>
 #include <utility>
 #include <vector>
 
@@ -97,23 +103,92 @@ void require_file(const std::filesystem::path& path, const std::string& opening)
             opening + (path == "-" ? "standard input cannot be a filter" : missing(path)));
 }
 
+// IO-11: a WAV whose sizes were never filled in, as AudioToolbox is shown it:
+// the file's own bytes with the sizes its header should have had written
+// over the unfilled ones. Left to open such a file itself, AudioToolbox reads
+// its audio short of where libsndfile ends: five mono 24-bit frames as four
+// and six as five (native.audio_toolbox, PR #176, runs 42715853793 and
+// 42796865380). The calls are the ones Apple gives for a file the caller
+// reads (AudioFileOpenWithCallbacks, then ExtAudioFileWrapAudioFileID).
+struct SizedWave {
+    int descriptor = -1;
+    WaveSizes sizes;
+    SizedWave() = default;
+    SizedWave(const SizedWave&) = delete;
+    SizedWave& operator=(const SizedWave&) = delete;
+    ~SizedWave() {
+        if (descriptor >= 0)
+            ::close(descriptor);
+    }
+    // AudioFile_ReadProc: fewer bytes than asked for only at the end.
+    static OSStatus read(void* self, SInt64 position, UInt32 count, void* buffer, UInt32* actual) {
+        const auto& wave = *static_cast<const SizedWave*>(self);
+        auto* out = static_cast<unsigned char*>(buffer);
+        *actual = 0;
+        if (position < 0)
+            return kAudioFilePositionError;
+        UInt32 done = 0;
+        while (done < count) {
+            const auto got = ::pread(wave.descriptor, out + done, count - done,
+                                     static_cast<off_t>(position) + static_cast<off_t>(done));
+            if (got < 0 && errno == EINTR)
+                continue;
+            if (got < 0)
+                return kAudioFileUnspecifiedError;
+            if (got == 0)
+                break;
+            done += static_cast<UInt32>(got);
+        }
+        fill_in_sizes(wave.sizes, static_cast<std::uint64_t>(position),
+                      std::span<unsigned char>(out, done));
+        *actual = done;
+        return noErr;
+    }
+    // AudioFile_GetSizeProc: what the RIFF size, once filled in, says.
+    static SInt64 length(void* self) {
+        return SInt64{static_cast<const SizedWave*>(self)->sizes.riff_size} + 8;
+    }
+};
+
 // A file read through its header by ExtAudioFile, decoded to 32-bit floats.
 class ToolboxFile final : public SoundFile {
   public:
     explicit ToolboxFile(const std::filesystem::path& path) : path_(path) {
-        const auto opening = "cannot open audio input " + path.string() + ": ";
+        const auto opening = "cannot open audio input " + detail::utf8_string(path) + ": ";
         require_file(path, opening);
-        validate_wave(path);
-        const auto& native = path.native();
-        CFURLRef url = CFURLCreateFromFileSystemRepresentation(
-            kCFAllocatorDefault, reinterpret_cast<const UInt8*>(native.data()),
-            static_cast<CFIndex>(native.size()), false);
-        if (!url)
-            throw std::runtime_error(opening + "the path is not valid");
         // Held by file_ from here on, so every refusal below disposes of it
         // (jrp's review: a file refused after opening was left open).
-        const OSStatus opened = ExtAudioFileOpenURL(url, &file_.ref);
-        CFRelease(url);
+        OSStatus opened = noErr;
+        if (const auto sizes = validate_wave(path)) {
+            file_.wave = std::make_unique<SizedWave>();
+            file_.wave->sizes = *sizes;
+            file_.wave->descriptor = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
+            if (file_.wave->descriptor < 0) {
+                // The hint only where a sandbox can be the cause, as in missing().
+                const std::error_code error(errno, std::generic_category());
+                const bool denied = error == std::errc::permission_denied ||
+                                    error == std::errc::operation_not_permitted;
+                throw std::runtime_error(
+                    opening + error.message() +
+                    (denied ? std::string(" (") + sandbox_hint + ")" : std::string()));
+            }
+            opened = AudioFileOpenWithCallbacks(file_.wave.get(), &SizedWave::read, nullptr,
+                                                &SizedWave::length, nullptr, kAudioFileWAVEType,
+                                                &file_.audio_file);
+            if (opened != noErr)
+                file_.audio_file = nullptr;
+            else
+                opened = ExtAudioFileWrapAudioFileID(file_.audio_file, false, &file_.ref);
+        } else {
+            const auto& native = path.native();
+            CFURLRef url = CFURLCreateFromFileSystemRepresentation(
+                kCFAllocatorDefault, reinterpret_cast<const UInt8*>(native.data()),
+                static_cast<CFIndex>(native.size()), false);
+            if (!url)
+                throw std::runtime_error(opening + "the path is not valid");
+            opened = ExtAudioFileOpenURL(url, &file_.ref);
+            CFRelease(url);
+        }
         if (opened != noErr) {
             file_.ref = nullptr;
             throw std::runtime_error(opening + explain(opened));
@@ -125,15 +200,17 @@ class ToolboxFile final : public SoundFile {
             throw std::runtime_error(opening + explain(status));
         const double rate = format.mSampleRate;
         if (!(rate >= 1 && rate <= max_sample_rate) || rate != std::floor(rate))
-            throw std::runtime_error(
-                "unsupported audio input " + path.string() + ": the rate, " + std::to_string(rate) +
-                " Hz, is not a whole number of hertz from 1 to " + std::to_string(max_sample_rate));
+            throw std::runtime_error("unsupported audio input " + detail::utf8_string(path) +
+                                     ": the rate, " + std::to_string(rate) +
+                                     " Hz, is not a whole number of hertz from 1 to " +
+                                     std::to_string(max_sample_rate));
         info_ = {static_cast<int>(rate), format.mChannelsPerFrame};
         try {
             validate(info_);
         } catch (const std::invalid_argument& e) {
             // The file's own metadata is out of range: a data error, not a caller error.
-            throw std::runtime_error("unsupported audio input " + path.string() + ": " + e.what());
+            throw std::runtime_error("unsupported audio input " + detail::utf8_string(path) + ": " +
+                                     e.what());
         }
         AudioStreamBasicDescription client{};
         client.mSampleRate = rate;
@@ -186,9 +263,11 @@ class ToolboxFile final : public SoundFile {
         return frames;
     }
     void close() override {
-        if (const auto ref = std::exchange(file_.ref, nullptr))
-            if (const auto status = ExtAudioFileDispose(ref))
-                throw std::runtime_error("audio close failed: " + explain(status));
+        const auto ref = std::exchange(file_.ref, nullptr);
+        const OSStatus status = ref ? ExtAudioFileDispose(ref) : noErr;
+        file_.close_audio_file();
+        if (status != noErr)
+            throw std::runtime_error("audio close failed: " + explain(status));
     }
 
   private:
@@ -196,12 +275,23 @@ class ToolboxFile final : public SoundFile {
     // when the constructor throws after opening.
     struct Handle {
         ExtAudioFileRef ref = nullptr;
+        // Only for a WAV shown with its sizes filled in: the audio file that
+        // ref wraps and does not own, and what its callbacks read from.
+        AudioFileID audio_file = nullptr;
+        std::unique_ptr<SizedWave> wave;
         Handle() = default;
         Handle(const Handle&) = delete;
         Handle& operator=(const Handle&) = delete;
+        // After ref is disposed of, which may still read through it.
+        void close_audio_file() noexcept {
+            if (const auto id = std::exchange(audio_file, nullptr))
+                AudioFileClose(id);
+            wave.reset();
+        }
         ~Handle() {
             if (ref)
                 ExtAudioFileDispose(ref);
+            close_audio_file();
         }
     };
     Handle file_;
@@ -217,7 +307,7 @@ class RawFile final : public SoundFile {
     RawFile(const std::filesystem::path& path, RawSpec spec, RawEncoding encoding)
         : info_(spec), encoding_(encoding), width_(raw_sample_bytes(encoding.sample)), path_(path) {
         validate(spec);
-        const auto opening = "cannot open audio input " + path.string() + ": ";
+        const auto opening = "cannot open audio input " + detail::utf8_string(path) + ": ";
         require_file(path, opening);
         file_.open(path, std::ios::binary);
         if (!file_)
@@ -293,7 +383,7 @@ const SoundFiles& audio_toolbox_files() {
             // its samples for some other format and play noise as the filter
             // (the fourth review); libsndfile refuses such a file.
             if (raw_filter_name(path) && !recognised(path))
-                throw std::runtime_error("cannot open audio input " + path.string() +
+                throw std::runtime_error("cannot open audio input " + detail::utf8_string(path) +
                                          ": a headerless .pcm or .raw filter is read only when "
                                          "a .cfg names it, with its rate and channels");
             return std::make_unique<ToolboxFile>(path);

@@ -87,9 +87,6 @@ std::string about_filter(const std::string& prefix, const std::string& message,
         a.note += (a.note.empty() ? "" : " ") + note;
     return advice_text(a);
 }
-std::filesystem::path utf8_path(const std::string& text) {
-    return std::filesystem::path(std::u8string(text.begin(), text.end()));
-}
 #ifndef _WIN32
 bool drive_letter(const std::string& name) {
     return name.size() >= 2 && name[1] == ':' &&
@@ -496,7 +493,7 @@ Configuration configuration_graph(const ParsedConfiguration& parsed) {
 }
 
 bool raw_filter_name(const std::filesystem::path& path) {
-    auto extension = path.extension().string();
+    auto extension = utf8_string(path.extension());
     std::transform(extension.begin(), extension.end(), extension.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return extension == ".pcm" || extension == ".raw";
@@ -576,13 +573,11 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
                     about_filter("raw filter '" + path.ir.spelling + "': ", e.what(),
                                  "Raw filters are read as mono " + raw_encoding_name(raw_encoding) +
                                      "; --raw-filter-format chooses another sample type."));
-            // The file is there but the reader cannot read it (a codec its
-            // build lacks, for example): the path hint below would mislead. The code
-            // stays missing-asset on purpose: codes are stable, and
-            // tests/compatibility/cases.json relies on this mapping.
+            // The file is there but the reader cannot read it (damaged, or
+            // a codec its build lacks): the path hint below would mislead.
             if (!raw && std::filesystem::is_regular_file(resolved, ec))
                 throw ConfigurationError(
-                    "missing-asset", path.ir.location,
+                    "unreadable-asset", path.ir.location,
                     about_filter("filter '" + path.ir.spelling + "': ", e.what(), read_as_sound));
             // Includes a bare "-": standard input cannot be a filter.
             if (path.ir.spelling == "-")
@@ -685,12 +680,28 @@ Configuration decode_audio_filter(SoundFile& audio, std::size_t& budget,
     return cfg;
 }
 
+ConfigurationError refused_sound_file(const std::filesystem::path& path, std::string reason) {
+    // The reader writes "cannot read sound file PATH: why" or "cannot open
+    // audio input PATH" on the problem line.
+    const auto name = " " + utf8_string(path);
+    const auto end = std::min(reason.find('\n'), reason.size());
+    const auto at = reason.find(name);
+    if (at < end && (at + name.size() == end || reason[at + name.size()] == ':'))
+        reason.erase(at, name.size());
+    return ConfigurationError("unreadable-asset", {path, 0, 0}, std::move(reason));
+}
+
 Resolver::Sources Resolver::from(const SoundFiles& reader) {
     Sources files;
     files.open_audio = [&reader](const std::filesystem::path& p) -> std::unique_ptr<SoundFile> {
         try {
             return reader.open(p);
-        } catch (const std::exception&) {
+        } catch (const std::exception& e) {
+            // DIAG-6: a file with a container marker is very likely a sound
+            // file, so keep the reader's reason; visit() still tries it as
+            // text, since a list's first entry could start with "FORM".
+            if (header_marker(p) == HeaderMarker::container)
+                throw RefusedSoundFile(e.what());
             return nullptr; // Bounded text validation distinguishes configs from damaged audio.
         }
     };
@@ -757,9 +768,20 @@ bool Resolver::visit(const std::filesystem::path& path) {
             active.erase(path);
         }
     } pop{active_, resolved};
-    if (const auto audio = files_.open_audio(path))
+    std::unique_ptr<SoundFile> audio;
+    std::optional<std::string> refused;
+    try {
+        audio = files_.open_audio(path);
+    } catch (const RefusedSoundFile& e) {
+        refused = e.what();
+    }
+    if (audio)
         return visitor_({path, chain_, nullptr, audio.get()});
     const auto text = files_.read_text(path);
+    // DIAG-6: a refused sound file is reported with the reader's reason, not
+    // as text that is neither a configuration nor a sound file.
+    if (refused && not_configuration_text(text))
+        throw refused_sound_file(path, std::move(*refused));
     if (text.size() > max_total_text_bytes - text_bytes_)
         throw ConfigurationError(
             "limit", {path, 0, 0},

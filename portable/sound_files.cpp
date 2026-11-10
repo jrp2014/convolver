@@ -4,6 +4,7 @@
 #include "sound_files.hpp"
 #include "advice.hpp"
 #include "bytes.hpp"
+#include "utf8.hpp"
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -52,21 +53,61 @@ HeaderMarker header_marker(const std::filesystem::path& path) {
     return HeaderMarker::none;
 }
 namespace {
-void check_wave(const std::filesystem::path& path) {
+// A size a writer leaves when it cannot go back to fill in the real one:
+// FFmpeg writes it in the RIFF header and in 'data' first, and replaces it
+// only when it finishes writing to a file it can seek in.
+constexpr std::uint32_t unknown_size = 0xffffffff;
+// A WAV without sizes that is refused all the same, with its own advice.
+struct UnsizedRefusal : std::runtime_error {
+    UnsizedRefusal(const char* what, const char* cause_text, const char* fix_text)
+        : std::runtime_error(what), cause(cause_text), fix(fix_text) {}
+    const char* cause;
+    const char* fix;
+};
+
+// libsndfile takes a WAV that ends early for a shorter one, so the chunk
+// layout is checked here first. IO-10: two layouts that break the format's
+// rules are accepted, because libsndfile and FFmpeg read them and common
+// writers produce them; macOS's AudioToolbox reads the first, and the second
+// once it is shown the sizes. Both rules are narrow on purpose; every other
+// mismatch is still refused.
+// - No pad byte after the last chunk: a chunk of odd length ending exactly
+//   where the RIFF size ends (Python's wave module writes mono 24-bit audio
+//   with an odd number of frames so). A RIFF size that counts the pad byte
+//   in a file that lacks it is a file cut short, and is refused.
+// - Sizes never filled in (IO-11, jrp's decision of 10 November 2026): a
+//   RIFF size of unknown_size that the file is too short for means "to the
+//   end of the file", and so does a 'data' size of unknown_size in such a
+//   file. A writer stopped half way (FFmpeg killed while writing to a file)
+//   leaves the same header, so that file is read as if it were whole; all
+//   that can be checked is that PCM or float audio ends on a whole frame.
+//   The sizes the header should have given are returned, because
+//   AudioToolbox needs them (audio_toolbox.cpp). One such file is refused,
+//   with its own advice: a file as long as the RIFF size says or longer,
+//   4 GiB. There unknown_size is a size like any other, and libsndfile reads
+//   the audio only as far as it reaches.
+std::optional<WaveSizes> check_wave(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary);
     std::array<unsigned char, 40> bytes{};
     file.read(reinterpret_cast<char*>(bytes.data()), 12);
     if (file.gcount() != 12 ||
         std::string_view(reinterpret_cast<char*>(bytes.data()), 4) != "RIFF" ||
         std::string_view(reinterpret_cast<char*>(bytes.data() + 8), 4) != "WAVE")
-        return;
-    const std::uint64_t end =
-        std::uint64_t(detail::read_le32(std::as_bytes(std::span(bytes)).subspan(4))) + 8;
-    if (end < 12 || end > std::filesystem::file_size(path))
+        return std::nullopt;
+    const auto riff_size = detail::read_le32(std::as_bytes(std::span(bytes)).subspan(4));
+    const std::uint64_t file_size = std::filesystem::file_size(path);
+    std::uint64_t end = std::uint64_t(riff_size) + 8;
+    const bool unsized = riff_size == unknown_size && end > file_size;
+    WaveSizes sizes;
+    if (unsized) {
+        end = file_size;
+        sizes.riff_size = static_cast<std::uint32_t>(end - 8);
+    }
+    if (end < 12 || end > file_size)
         throw std::runtime_error("truncated or invalid RIFF/WAVE size");
     unsigned block_align = 0;
     bool pcm_or_float = false;
-    std::vector<std::uint32_t> data_sizes;
+    std::vector<std::uint64_t> data_sizes;
     std::uint64_t position = 12;
     std::size_t chunks = 0;
     while (position < end) {
@@ -76,17 +117,36 @@ void check_wave(const std::filesystem::path& path) {
         file.read(reinterpret_cast<char*>(bytes.data()), 8);
         if (!file)
             throw std::runtime_error("cannot read RIFF/WAVE chunk header");
-        const auto length = detail::read_le32(std::as_bytes(std::span(bytes)).subspan(4));
-        const auto chunk_end = position + 8 + length + (length & 1u);
+        std::uint64_t length = detail::read_le32(std::as_bytes(std::span(bytes)).subspan(4));
+        auto chunk_end = position + 8 + length + (length & 1u);
+        // Compared before 'fmt ' below reuses the buffer.
+        const auto tag = std::string_view(reinterpret_cast<char*>(bytes.data()), 4);
+        const bool data = tag == "data", format_chunk = tag == "fmt ";
+        if (unsized && data && length == unknown_size) {
+            length = end - position - 8;
+            chunk_end = end;
+            sizes.data_size_at = position + 4;
+            sizes.data_size = static_cast<std::uint32_t>(length);
+        } else if ((length & 1u) && chunk_end == end + 1) {
+            chunk_end = end; // The last chunk, without its pad byte.
+        }
+        if (!unsized && data && riff_size == unknown_size && length == unknown_size)
+            throw UnsizedRefusal(
+                "the sizes in its WAV header were never filled in and the file is 4 GiB or longer",
+                "The program that wrote it could not go back to the header: it wrote to a pipe "
+                "(as FFmpeg does with '-f wav -'), or it was stopped before it finished. A WAV "
+                "header cannot give a size of 4 GiB or more, so nothing says where the audio ends.",
+                "Write the audio to a file in a format for long audio, such as RF64 or W64, "
+                "or send it as a RAW stream.");
         if (chunk_end > end)
             throw std::runtime_error("truncated RIFF/WAVE chunk");
-        const auto tag = std::string_view(reinterpret_cast<char*>(bytes.data()), 4);
-        if (tag == "data")
+        if (data)
             data_sizes.push_back(length);
-        if (tag == "fmt ") {
+        if (format_chunk) {
             if (length < 16)
                 throw std::runtime_error("invalid WAV format chunk");
-            file.read(reinterpret_cast<char*>(bytes.data()), std::min<std::uint32_t>(length, 40));
+            file.read(reinterpret_cast<char*>(bytes.data()),
+                      static_cast<std::streamsize>(std::min<std::uint64_t>(length, 40)));
             if (!file)
                 throw std::runtime_error("cannot read WAV format");
             unsigned format = detail::read_le16(std::as_bytes(std::span(bytes)));
@@ -101,18 +161,34 @@ void check_wave(const std::filesystem::path& path) {
         for (const auto length : data_sizes)
             if (!block_align || length % block_align)
                 throw std::runtime_error("WAV data ends with an incomplete frame");
+    return unsized ? std::optional(sizes) : std::nullopt;
 }
 } // namespace
-void validate_wave(const std::filesystem::path& path) {
+void fill_in_sizes(const WaveSizes& sizes, std::uint64_t position,
+                   std::span<unsigned char> bytes) noexcept {
+    const auto put = [&](std::uint64_t at, std::uint32_t value) {
+        for (unsigned i = 0; i < 4; ++i)
+            if (at + i >= position && at + i - position < bytes.size())
+                bytes[static_cast<std::size_t>(at + i - position)] =
+                    static_cast<unsigned char>((value >> (8 * i)) & 0xffU);
+    };
+    put(4, sizes.riff_size);
+    if (sizes.data_size_at)
+        put(sizes.data_size_at, sizes.data_size);
+}
+std::optional<WaveSizes> validate_wave(const std::filesystem::path& path) {
     if (path == "-" || !std::filesystem::is_regular_file(path))
-        return;
+        return std::nullopt;
     try {
-        check_wave(path);
+        return check_wave(path);
     } catch (const std::runtime_error& e) {
+        // One place turns the path into text, whichever advice follows.
+        const auto* unsized = dynamic_cast<const UnsizedRefusal*>(&e);
         throw std::runtime_error(
-            advice_text({"cannot read sound file " + path.string() + ": " + e.what(),
-                         "The file is damaged or incomplete, or is not a sound file.",
-                         "Export it again from the program that made it.",
+            advice_text({"cannot read sound file " + detail::utf8_string(path) + ": " + e.what(),
+                         unsized ? unsized->cause
+                                 : "The file is damaged or incomplete, or is not a sound file.",
+                         unsized ? unsized->fix : "Export it again from the program that made it.",
                          {}}));
     }
 }
@@ -128,7 +204,7 @@ std::string invalid_sample_message(const std::filesystem::path& path, std::uint6
                                    std::optional<RawEncoding> raw) {
     const bool stream = path == "-";
     Advice a{std::string(stream ? "cannot read audio from standard input"
-                                : "cannot read sound file " + path.string()) +
+                                : "cannot read sound file " + detail::utf8_string(path)) +
                  ": invalid sample (not a number, or infinite) " +
                  sample_position(frame, channel, sample_rate),
              {},

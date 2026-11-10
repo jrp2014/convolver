@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 blank_issues_enabled: true
 contact_links:
+  - name: What to put in a report
+    url: https://github.com/jrp2014/convolver/blob/main/docs/use/report-a-problem.md
+    about: Where the Convolver log is on macOS, Windows and Linux, and what else helps.
   - name: Using Convolver
     url: https://github.com/jrp2014/convolver/blob/main/docs/use/README.md
     about: Install, load a filter and hear it; most questions are answered here.

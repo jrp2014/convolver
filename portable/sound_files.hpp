@@ -69,10 +69,24 @@ Configuration load_configuration(const std::filesystem::path&, const Configurati
 // sync, an Akai MPC 2000 marker), or neither. Only regular files are opened.
 enum class HeaderMarker { container, sample_like, none };
 HeaderMarker header_marker(const std::filesystem::path&);
+// IO-11: the sizes a WAV's header should have given, for a file whose writer
+// never filled them in (FFmpeg writing to a pipe leaves 0xFFFFFFFF).
+struct WaveSizes {
+    std::uint32_t riff_size = 0;    // The file's length less 8, at offset 4.
+    std::uint64_t data_size_at = 0; // Where the 'data' size is; 0 if it was given.
+    std::uint32_t data_size = 0;    // The audio's length in bytes, to go there.
+};
+// Writes those sizes over the unfilled ones in `bytes`, which were read from
+// the file at offset `position`: the file as its header should have been.
+// libsndfile reads such a file to its end unaided; AudioToolbox reads it
+// short unless it is shown the sizes (audio_toolbox.cpp).
+void fill_in_sizes(const WaveSizes&, std::uint64_t position,
+                   std::span<unsigned char> bytes) noexcept;
 // Rejects a RIFF/WAVE file whose chunks or data are truncated, which libsndfile
 // would accept with fewer frames, naming the file and damaged_file_advice.
-// Other files pass unchecked.
-void validate_wave(const std::filesystem::path&);
+// Other files pass unchecked. Returns the sizes of a WAV whose header never
+// got them, which is read to the end of the file.
+std::optional<WaveSizes> validate_wave(const std::filesystem::path&);
 // DIAG-1: what to do about a sound file that cannot be read because of its
 // content, added to the reason by both readers.
 inline constexpr std::string_view damaged_file_advice =

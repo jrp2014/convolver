@@ -44,7 +44,7 @@ struct FilterFileFailure {
         return carried ? &*carried : nullptr;
     }
 };
-// For a plug-in: the filter in `path` for `host`'s rate and channels, or none
+// For a plug-in: the filter in `path` (UTF-8) for `host`'s rate and channels, or none
 // with `failure` filled in. A readable file made for another rate or other
 // channels is classified as such (a list by rate only when no entry has the
 // host's rate); the message names the file and explains. `files`, when

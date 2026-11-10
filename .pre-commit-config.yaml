@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Preserve recovered source/documents and archived review evidence.
 exclude: >-
-  ^(archives/|historical/|source/|review/|docs/historical/|docs/archive/)
+  ^(archives/|historical/|source/|review/|docs/historical/|docs/archive/|tests/upgrade/[^/]+/)
 
 repos:
   - repo: https://github.com/ryanrhee/shellcheck-py

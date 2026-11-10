@@ -121,6 +121,29 @@ def audio(path):
     return struct.unpack(f'<{len(data) // 4}f', data)
 
 
+def piped_wav(d, frames):
+    """IO-11: a WAV that FFmpeg wrote to a pipe, where it cannot go back to
+    fill in the sizes, saved as a file. Convolver reads all of it: the render
+    has every frame and equals the render of the file it was copied from."""
+    source = CROSSOVER / 'input.wav'
+    piped = d / 'piped.wav'
+    piped.write_bytes(run([FFMPEG, '-v', 'error', '-i', str(source), '-c:a', 'pcm_f32le', '-f', 'wav', '-']))
+    header = piped.read_bytes()
+    riff_size = struct.unpack_from('<I', header, 4)[0]
+    data_size = struct.unpack_from('<I', header, header.index(b'data') + 4)[0]
+    assert riff_size == data_size == 0xFFFFFFFF, (
+        'FFmpeg no longer leaves the sizes of a piped WAV unfilled, so this test no longer covers that',
+        hex(riff_size),
+        hex(data_size),
+    )
+    render = [CONVOLVER, '--filter', str(CROSSOVER / 'filter.cfg'), '--output', '-', '--output-format', 'raw-float']
+    from_source = run([*render, '--input', str(source)])
+    from_piped = run([*render, '--input', str(piped)])
+    assert len(from_piped) == frames * 6 * 4, (len(from_piped) // 24, frames)
+    assert from_piped == from_source, 'the piped WAV rendered differently from its source'
+    print(f'WAV from an FFmpeg pipe (sizes {riff_size:#x}): all {frames} frames, as from its source')
+
+
 def main():
     channels, expected = wav_samples(CROSSOVER / 'expected.wav')
     _, source = wav_samples(CROSSOVER / 'input.wav')
@@ -156,7 +179,8 @@ def main():
         moved = streams(corrected(late, d / 'late-corrected.mkv'))[1]
         assert abs(float(moved['start_time'])) < 0.01, moved['start_time']
         assert len(audio(d / 'late-corrected.mkv')) == len(expected)
-    print('FFmpeg pipe: track selection, 2-in/6-out, frame count and tail, start time')
+        piped_wav(d, len(expected) // 6)
+    print('FFmpeg pipe: track selection, 2-in/6-out, frame count and tail, start time, a piped WAV')
     return 0
 
 

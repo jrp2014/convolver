@@ -83,6 +83,11 @@ UnfilteredSound unfiltered_sound(const HostSettings&, bool identity);
 // decimals as it takes (up to six) not to read as `low` or `high` when it is
 // neither ("99.96", not "100"). The window's sliders show the same text.
 std::string setting_text(double value, double low, double high);
+// Channel counts as the log, the status line and the window give them: "2
+// in, 6 out".
+inline std::string ports(std::size_t inputs, std::size_t outputs) {
+    return std::to_string(inputs) + " in, " + std::to_string(outputs) + " out";
+}
 // PLUG-10: the settings in words, such as "gain 0 dB, mix 100% wet, latency
 // 256 frames". Without a dry signal (`dry`, dry_signal_rule()) it says the
 // mix does not apply, and why.

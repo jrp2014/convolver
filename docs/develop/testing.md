@@ -58,6 +58,19 @@ misses all of that. Plug-in tests are built in their format's folder under
 `plugins/`; list each there in `convolver_sanitize()`, so that the sanitizer
 build compiles it, and the adapter code it holds, with ASan and UBSan.
 
+Write a test program's checks as cases, one function each, and run them
+with `run_cases()` from [`tests/native/cases.hpp`](../../tests/native/cases.hpp)
+(CI-37). A failed `require()` then fails its case, the runner prints the
+case's name and reason and goes on, and the program fails at the end, so one
+failure does not hide the next. Give `run_cases()` a function to undo what a
+failed case can leave set, such as an allocation guard. `native.engine`,
+`native.host`, `native.host_settings`, `native.host_report`,
+`native.denormals`, `native.io`, `native.utilities`, `native.filter_file`,
+`vst3.adapter` and `au.adapter` use it. The lifecycle tests and
+`lv2.adapter` count their failed sequences themselves; the other programs
+still stop at their first failure, which goes when one is next split into
+cases.
+
 - `native.fft`: independent direct DFT, canonical spectrum layout, DC/Nyquist,
   forward/inverse normalization and padded lengths.
 - `native.engine`: independent double time-domain oracle, real FFT backend, seeded
@@ -160,7 +173,20 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   and noise-shaping behavior,
   legacy parser/config lists, Windows/POSIX/mixed relative paths, signed zero, malformed input,
   truncation, RAW alignment, and which files libsndfile recognises as sound
-  files (`sound_file_header`). POSIX-specific tests also exercise fragmented
+  files (`sound_file_header`). A WAV whose last odd chunk lacks its padding
+  byte gives every frame as a sound file and as a filter; a RIFF size that
+  counts the missing byte and an even chunk past the RIFF size are refused
+  (IO-10). A WAV whose RIFF and `data` sizes were left at `0xFFFFFFFF`, or
+  its RIFF size alone, gives every frame up to the end of the file, also
+  when the file stops between two frames as an interrupted write leaves it;
+  an odd number of bytes of audio is read like an even one. Such a file is
+  refused when it stops inside a frame, when (a sparse file, not made on
+  Windows) it is 4 GiB or longer, with a message that names the cause and
+  the fix, and when that size is on another chunk or under a RIFF size that
+  was filled in. The sizes the check returns for such a file, written over
+  the unfilled ones in pieces of 1, 3 and 4096 bytes, give byte for byte
+  the file with its sizes, which is what macOS's reader is shown
+  (IO-11). POSIX-specific tests also exercise fragmented
   descriptors, borrowed descriptor ownership, broken pipes and injected WAV
   header-finalization errors. For integer output they check rounding and
   clipping endpoints for 8 to 32 bits, reproducibility and chunk independence,
@@ -180,7 +206,10 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   output; empty, exact and partial last blocks, gain/matrix routing, both latency
   modes, real RAW pipelines, protection against overwriting inputs/IRs/configs,
   the dither default by resolution, the advice on pointless or beaten dither and
-  shaping choices, and the errors for removed options.
+  shaping choices, and the errors for removed options. A mono 24-bit WAV of
+  five frames written by Python's `wave` module, which leaves out the final
+  padding byte (the test checks that it did), renders as a filter and as an
+  input (IO-10).
 - `native.inspection`: the inspection API's selection traversal, located and
   chained diagnostics, syntax-only null fields, all-entry validation after
   failures, raw filters (including AU files named `.raw` and `.pcm`, read
@@ -210,13 +239,22 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   time zero afterwards, as the guide warns (FFMPEG-1). The video packets'
   checksums are unchanged. Registered only when CMake finds `ffmpeg` and
   `ffprobe`; CI installs FFmpeg in the native g++ Release job on Linux,
-  which fails if the test is missing.
+  which fails if the test is missing. A WAV that FFmpeg wrote to a pipe,
+  whose sizes the test first checks are `0xFFFFFFFF`, renders as `--input`
+  to the same bytes as the file it was copied from, with every frame
+  (IO-11).
 - `compatibility.corpus`: [generated configuration fixtures](../../tests/compatibility/README.md)
   rendered at block sizes 1, 3, 17 and 256 in both latency modes against an
   independent direct-convolution reference, then inspected to check the reported
   selection, routes, delays and tail, and the `portable-paths` warnings, against
   the same expectations: routes, signed zero, delays, BOM/CRLF,
   relative/Windows/mixed/UTF-8 paths, list selection and diagnostics.
+- `upgrade.cli`: the [files kept from published releases](../../tests/upgrade/README.md)
+  (COMPAT-1), each filter rendered by this build's CLI at each recorded block
+  size and compared with the audio that release's own CLI rendered: within
+  1e-5 (times the peak for a file louder than full scale), and identical when
+  the compiler and its version, configuration, flags, FFT backend and CPU
+  kernels match the capture's. It also fails if a retained file changed.
 - `native.filter_file`: a filter file chosen in a plug-in and refused, through
   `read_filter_file()` and `HostFilter::reject()` as the Audio Unit and LV2
   use them. The short status text gives the refused file's own channels
@@ -248,8 +286,34 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   truncated, damaged, incomplete raw or wrong-rate filter, a float WAV holding
   a NaN, a double WAV holding 1e300 (infinite as a float), and a headerless
   `.pcm` chosen directly (starting like an MPEG frame) must be refused with
-  the same diagnostic code by both. A WAV whose header claims 800 kHz,
-  which the reader opens and then refuses, is refused 20 times without
+  the same diagnostic code by both. For IO-10 and IO-11, the test first
+  prints what each reader makes of every layout, then requires the same
+  frames from both, to the last one, for a mono 24-bit WAV whose last odd
+  chunk lacks its padding byte, for sizes left at `0xFFFFFFFF` over 12, 15
+  and 18 bytes of audio, for a RIFF size left so over a real `data` size
+  (even and odd), and for a stereo float file with the header FFmpeg writes
+  to a pipe, of 7 frames and of 100,000 (the only one long enough that
+  AudioToolbox reads it in more than one piece); and the same refusal code
+  for a RIFF size that counts the missing padding byte, for an unsized file
+  that stops inside a frame, and for two unsized files that pass
+  Convolver's own check and no reader can decode (an unknown format tag,
+  and no format chunk; on 10 November 2026 at f0a82fe, on macOS 15.8.2 and
+  macOS 26, AudioToolbox refused the first itself, as `'fmt?'`, and opened
+  the second with a rate of 0, which the reader's own check then refused:
+  [job 129784936532](https://github.com/jrp2014/convolver/actions/runs/42802940716/job/129784936532)).
+  The reader shows AudioToolbox an unsized file with its sizes filled in
+  (`AudioFileOpenWithCallbacks`), because of what AudioToolbox did when left
+  to open one itself, in PR #176: on 9 November 2026 at b1597a0 (macOS
+  15.8.2 and macOS 26) it read 15 bytes of mono 24-bit audio as four frames
+  where libsndfile read five
+  ([run 42715853793](https://github.com/jrp2014/convolver/actions/runs/42715853793)),
+  and on 10 November 2026 at 7b33360 it read 18 bytes as five frames for
+  six, while reading 12 bytes and the 56 bytes under the FFmpeg header
+  whole ([job 129764301771](https://github.com/jrp2014/convolver/actions/runs/42796865380/job/129764301771)).
+  A WAV whose header claims 800 kHz,
+  which the reader opens and then refuses, is refused 20 times, with and
+  without its sizes, as is the unsized file that AudioToolbox itself
+  refuses, and an unsized file is read 20 times, without
   leaving a file descriptor open (counted in `/dev/fd`).
 - `fuzz.replay.config_text`, `fuzz.replay.config_list`, `fuzz.replay.host_state`,
   `fuzz.replay.ir_file`: every committed [fuzz seed and regression input](../../tests/fuzz/README.md)
@@ -422,7 +486,9 @@ cases, including odd block sizes and both latency modes. See
 results for its older baseline `5df874e`; it is not current validation evidence.
 Consult the [native workflow](../../.github/workflows/regression.yml) and
 [VST3 workflow](../../.github/workflows/vst3.yml) for the configured matrix; a workflow
-file alone is not evidence that a job passed. The [LV2](../../.github/workflows/lv2.yml)
+file alone is not evidence that a job passed. The VST3 workflow also runs the
+VST3 tests in a Debug build with ASan and UBSan and `vst3.adapter` under
+ThreadSanitizer ([VST3 tests](#vst3-tests)). The [LV2](../../.github/workflows/lv2.yml)
 workflow installs the newest
 [format tools](build.md#supporting-libraries) and checks
 them on LV2's example plug-ins, then builds Convolver's bundle and runs the
@@ -639,6 +705,10 @@ deallocation guards, corrupted state, and presets after their source files are
 deleted. The SDK validator loads the actual bundle; separate tests call the
 real processor and controller SDK interfaces. `vst3.harness` runs the PLUG-2
 comparisons; since VST3-7 the adapter lists no known deviations.
+`vst3.upgrade` restores each preset kept from a published release
+(COMPAT-1) in the bundle, loaded from its file as a host loads it, and
+compares the render with the audio that release rendered, by the rule
+`upgrade.cli` uses; it runs where `vst3.validator` runs.
 
 `vst3.adapter` also checks the settings (VST3-4): the parameters' order,
 flags, ranges, value text and `kDryWetMix`, Gain and Mix in the audio,
@@ -712,6 +782,21 @@ limit, about −134 dB), not on a cut tail. `vst3.adapter` checks the tail with
 a margin instead. The validator, the adapter tests and the plug-in
 all use Steinberg's SDK code, so CI also loads the bundle in an independent
 host, pluginval.
+
+The [VST3 workflow](../../.github/workflows/vst3.yml) runs these tests in
+Release builds on Linux (Ooura), macOS and Windows, with the validator and
+pluginval. Its `sanitizers` job (CI-36) runs two Debug builds with Clang on
+Linux side by side: every `vst3.*` test the build can run with ASan and
+UBSan and the FFTW backend (the validator and pluginval cannot load an
+instrumented bundle, so they do not run there, and `vst3.load_timing` skips
+itself; no job loads an FFTW bundle in them, since FFTW plug-ins are not
+distributed), and `vst3.adapter` alone under ThreadSanitizer with the shipped
+Ooura backend, where `latency_while_playing()` and
+`latency_handover_waits()` replace the processor while another thread calls
+`process()`. Every report is printed and any report fails the test; a step
+first checks that the test program links the ThreadSanitizer runtime and
+that the adapter's compiled code calls into it, so an uninstrumented build
+cannot pass.
 
 ### pluginval
 
@@ -1350,7 +1435,7 @@ re-running until green. CI does not repeat failed tests automatically, as
 that would hide real races like the Audio Unit's lost stop. The causes found
 so far, from CI-22's survey of 1 November 2026 onwards, each with its fix, are
 [archived](../archive/reviews/2026-11-08-testing-guide-evidence.md#causes-of-intermittent-failures-found-to-6-november-2026).
-Two still apply to new work:
+Three still apply to new work:
 
 - A Windows build that fails now and then with "The process cannot access
   the file because it is being used by another process" (exit 32) in
@@ -1362,6 +1447,11 @@ Two still apply to new work:
 - A test that changes an environment variable (`setenv`) while a plug-in's
   worker may read it (`getenv`) races: set such variables once, before any
   unit exists, as the Audio Unit tests do with `CONVOLVER_LOG`.
+- A check that the reported value has arrived does not mean the plug-in's
+  queued work has finished: the Audio Unit reports a Latency before every
+  queued run is done. Before a step that depends on what runs next (a forced
+  allocation failure, a count of notifications), wait for the queue to
+  finish (`latency_settled()` in `tests/au/adapter_tests.cpp`).
 
 To check that two renders hold the same audio, compare the sample data
 exactly as stored and check the format, sample rate, channel count and frame count one
@@ -1440,6 +1530,8 @@ except:
   `<!-- first-use-example -->` changes (`examples.first_use` runs those
   commands; CI-35). Other edits to those three pages count as the
   documentation or packaged page each otherwise is;
+- Markdown under `tests/upgrade/`, which `upgrade.cli` and `vst3.upgrade`
+  read: the version folders hash their files, Markdown included (COMPAT-1);
 - pages copied into the preview packages, which also run the
   [candidate workflow](#plug-in-candidate-checks): everything under `docs/use/`,
   `examples/plugin-presets/README.md` and the Ooura `README.md`. A page in
@@ -1561,7 +1653,7 @@ another job runs only its own format's tests. The CTest labels select them.
 | --- | --- | --- |
 | `repository` label: `versioning`, `identities`, `examples.fixtures`, `documentation` (no build option changes them) | Native full builds with Clang on Linux and macOS and with MSVC on Windows; the release candidates | Native g++, Ooura and Accelerate builds; VST3; Audio Unit |
 | `consumer` label: `packaging.consumer.*` (the CMake development package) | Every native build | VST3, Audio Unit and the release candidates (none of them ships that package; the candidates' ZIP has its own relocation and smoke tests) |
-| Core and CLI suite (`native.*`, `compatibility.corpus`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build, Audio Unit (Release Accelerate, Xcode on `macos-15`), VST3 on macOS (Release Accelerate, the newer Xcode on `macos-latest`), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates; `native.ffmpeg_pipe` only in native g++ Release on Linux, the one job that installs FFmpeg | VST3 on Linux (the same compiler, flags and image as native g++ Release with FFTW and with Ooura) |
+| Core and CLI suite (`native.*`, `compatibility.corpus`, `upgrade.cli`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build, Audio Unit (Release Accelerate, Xcode on `macos-15`), VST3 on macOS (Release Accelerate, the newer Xcode on `macos-latest`), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates; `native.ffmpeg_pipe` only in native g++ Release on Linux, the one job that installs FFmpeg | VST3 on Linux (Release with Ooura has the compiler, flags and image of native g++ Release; Debug with sanitizers and FFTW those of native Clang Debug) |
 | Format and release tests (`vst3.*`, `au.*`, `lv2.*`, `release.*`) | Their format's jobs and the candidates | — |
 
 CTest still runs a fixture's setup when a selected test needs it, so
@@ -1576,11 +1668,11 @@ format's whole test label, with the CLI for the `examples.first_use` fixture:
 
 | Target | Built by | Tests |
 | --- | --- | --- |
-| `convolver_vst3_suite` | VST3 on Linux | `ctest -L vst3` (with `CONVOLVER_PACKAGE_PLUGINS`, also what `release.stage` installs) |
+| `convolver_vst3_suite` | VST3 on Linux (Release, and Debug with ASan and UBSan) | `ctest -L vst3` (with `CONVOLVER_PACKAGE_PLUGINS`, also what `release.stage` installs) |
 | `convolver_au_suite` | Audio Unit with sanitizers | `ctest -L au` |
 | `convolver_lv2_tests` | LV2 with ASan and UBSan, and the upstream lilv check | `examples.first_use` and `lv2.*` |
 
-The LV2 and Audio Unit ThreadSanitizer jobs, the lv2lint bundle and the fuzz
+The LV2, Audio Unit and VST3 ThreadSanitizer jobs, the lv2lint bundle and the fuzz
 workflow name their few targets directly in the workflow; the other jobs build everything.
 A test whose program the target does not build fails (CTest reports "Could
 not find executable", a Python-driven test its own error), so a new plug-in

@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "cases.hpp"
 #include "convolver/io.hpp"
+#include "sound_files.hpp"
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <chrono>
@@ -10,12 +13,14 @@
 #include <filesystem>
 #include <fstream>
 #include <future>
+#include <initializer_list>
 #include <iostream>
 #include <iterator>
 #include <limits>
 #include <new>
 #include <optional>
 #include <sndfile.h>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -1436,6 +1441,188 @@ void run(const fs::path& dir) {
         require(r.read(x) == 1 && x[0] == 1, "odd-sized RIFF chunk padding");
     }
     {
+        // IO-10: two layouts that break RIFF's rules are read, because
+        // libsndfile, FFmpeg and macOS's reader take them and common writers
+        // produce them: a last chunk of odd length without its pad byte
+        // (Python's wave module), and sizes that were never filled in
+        // (FFmpeg writing to a pipe). A mono 24-bit file whose frame n
+        // holds (n + 1) / 128.
+        const auto layout = [](std::size_t frames, std::uint32_t riff_size, std::uint32_t data_size,
+                               const std::string& after_data) {
+            std::string out = "RIFF";
+            const auto put = [&](std::uint32_t value, int bytes) {
+                for (int i = 0; i < bytes; ++i)
+                    out += static_cast<char>((value >> (8 * i)) & 0xffU);
+            };
+            put(riff_size, 4);
+            out += "WAVEfmt ";
+            put(16, 4);
+            put(1, 2); // PCM
+            put(1, 2);
+            put(48000, 4);
+            put(48000 * 3, 4);
+            put(3, 2);
+            put(24, 2);
+            out += "data";
+            put(data_size, 4);
+            for (std::size_t n = 0; n < frames; ++n)
+                put(static_cast<std::uint32_t>(n + 1) << 16, 3);
+            return out + after_data;
+        };
+        const auto reads = [&](const fs::path& p, std::size_t frames, const char* what) {
+            AudioReader r(p);
+            std::vector<float> x(frames + 3);
+            const auto got = r.read(x);
+            bool same = got == frames;
+            for (std::size_t n = 0; same && n < frames; ++n)
+                same = x[n] == static_cast<float>(n + 1) / 128;
+            require(same, what);
+            // As a filter too: it was reported as neither a configuration
+            // nor a sound file.
+            const auto c = load_configuration(p);
+            require(c.sample_rate == 48000 && c.paths.size() == 1 &&
+                        c.paths[0].impulse.size() == frames && c.paths[0].impulse[0] == 1.f / 128,
+                    what);
+        };
+        // Refused by the reader, and as a filter.
+        const auto refused = [&](const fs::path& p, const char* what) {
+            for (const bool filter : {false, true}) {
+                bool threw = false;
+                try {
+                    if (filter)
+                        load_configuration(p);
+                    else
+                        AudioReader r(p);
+                } catch (const std::exception&) {
+                    threw = true;
+                }
+                require(threw, what);
+            }
+        };
+        constexpr std::uint32_t unknown = 0xffffffff;
+        // Five frames are 15 bytes, so the data chunk needs a pad byte.
+        // Python's wave module leaves it out, of the file and of the RIFF size.
+        text_file(dir / "unpadded.wav", layout(5, 36 + 15, 15, ""));
+        reads(dir / "unpadded.wav", 5, "a last chunk without its pad byte");
+        text_file(dir / "padded.wav", layout(5, 36 + 16, 15, std::string(1, '\0')));
+        reads(dir / "padded.wav", 5, "a last chunk with its pad byte");
+        // The pad byte written but not counted.
+        text_file(dir / "uncounted-pad.wav", layout(5, 36 + 15, 15, std::string(1, '\0')));
+        reads(dir / "uncounted-pad.wav", 5, "a pad byte the RIFF size leaves out");
+        // Counted but not there: the file is one byte short of what it says.
+        text_file(dir / "counted-pad.wav", layout(5, 36 + 16, 15, ""));
+        refused(dir / "counted-pad.wav", "a file one pad byte short of its RIFF size is refused");
+        // An even chunk one byte past the RIFF size is not a missing pad byte.
+        text_file(dir / "overrun.wav", layout(4, 36 + 11, 12, ""));
+        refused(dir / "overrun.wav", "an even chunk that overruns the RIFF size is refused");
+        // Sizes never filled in, as FFmpeg writes WAV to a pipe: the audio
+        // runs to the end of the file (IO-11).
+        text_file(dir / "unsized.wav", layout(4, unknown, unknown, ""));
+        reads(dir / "unsized.wav", 4, "sizes a writer could not fill in");
+        // A real data size in such a file, and a chunk after the data.
+        text_file(dir / "unsized-riff.wav",
+                  layout(4, unknown, 12, std::string("LIST\4\0\0\0INFO", 12)));
+        reads(dir / "unsized-riff.wav", 4, "an unfilled RIFF size over a real data size");
+        // A writer stopped half way leaves the same header. Cut between two
+        // frames, its file cannot be told from a whole one, and is read as
+        // one: here six frames of which four reached the file.
+        {
+            auto stopped = layout(6, unknown, unknown, "");
+            stopped.resize(stopped.size() - 6);
+            text_file(dir / "unsized-stopped.wav", stopped);
+        }
+        reads(dir / "unsized-stopped.wav", 4, "an unsized file that stops between two frames");
+        // Cut inside a frame, it is refused.
+        {
+            auto cut = layout(4, unknown, unknown, "");
+            cut.resize(cut.size() - 2);
+            text_file(dir / "unsized-cut.wav", cut);
+        }
+        refused(dir / "unsized-cut.wav", "an unsized file cut off inside a frame is refused");
+        // An odd number of bytes of audio is read like any other: five
+        // frames, whichever size was left unfilled, with or without the pad
+        // byte a real data size calls for.
+        text_file(dir / "unsized-odd.wav", layout(5, unknown, unknown, ""));
+        reads(dir / "unsized-odd.wav", 5, "an unsized file with an odd data length");
+        text_file(dir / "unsized-riff-odd.wav", layout(5, unknown, 15, ""));
+        reads(dir / "unsized-riff-odd.wav", 5, "an odd real data size under an unfilled RIFF size");
+        text_file(dir / "unsized-riff-odd-padded.wav",
+                  layout(5, unknown, 15, std::string(1, '\0')));
+        reads(dir / "unsized-riff-odd-padded.wav", 5, "the same with its pad byte");
+        // What the check returns for such a file is what its header should
+        // have said: written over the unfilled sizes, in one piece or in
+        // pieces of any length from any offset, it gives the file a writer
+        // that could go back would have written. macOS's reader is shown the
+        // file so. A file with its sizes returns nothing.
+        {
+            const auto sized = [&](const fs::path& p, std::size_t step) {
+                const auto sizes = detail::validate_wave(p);
+                std::ifstream in(p, std::ios::binary);
+                std::string bytes((std::istreambuf_iterator<char>(in)), {});
+                if (!sizes)
+                    return std::string("has its sizes");
+                for (std::size_t at = 0; at < bytes.size(); at += step)
+                    detail::fill_in_sizes(
+                        *sizes, at,
+                        std::span(reinterpret_cast<unsigned char*>(bytes.data()) + at,
+                                  std::min(step, bytes.size() - at)));
+                return bytes;
+            };
+            for (const std::size_t step : {std::size_t{1}, std::size_t{3}, std::size_t{4096}}) {
+                require(sized(dir / "unsized-odd.wav", step) == layout(5, 36 + 15, 15, ""),
+                        "both sizes filled in");
+                require(sized(dir / "unsized.wav", step) == layout(4, 36 + 12, 12, ""),
+                        "both sizes filled in, even");
+                require(sized(dir / "unsized-riff.wav", step) ==
+                            layout(4, 36 + 12 + 12, 12, std::string("LIST\4\0\0\0INFO", 12)),
+                        "the RIFF size alone filled in");
+            }
+            require(sized(dir / "unpadded.wav", 1) == "has its sizes",
+                    "a sized file is left alone");
+        }
+        // What a refusal says, for the two below that are told apart.
+        const auto says = [&](const fs::path& p, std::initializer_list<const char*> parts,
+                              const char* what) {
+            std::string message;
+            try {
+                AudioReader r(p);
+            } catch (const std::exception& e) {
+                message = e.what();
+            }
+            for (const char* part : parts)
+                require(message.find(part) != std::string::npos, what);
+        };
+        // An unfilled data size under a RIFF size that was filled in is only
+        // a chunk that runs past the end, as is that size on another chunk,
+        // with or without a RIFF size. Sizes of zero, from which libsndfile
+        // reads no frames at all, are no better.
+        text_file(dir / "unsized-data.wav", layout(5, 36 + 15, unknown, ""));
+        refused(dir / "unsized-data.wav", "an unfilled data size under a real RIFF size");
+        // It is told that it is cut short, not that it is too long.
+        says(dir / "unsized-data.wav", {"truncated RIFF/WAVE chunk", "damaged or incomplete"},
+             "an unfilled data size under a real RIFF size is reported as cut short");
+        text_file(dir / "unsized-list.wav",
+                  layout(4, 36 + 12 + 8, 12, std::string("LIST\xff\xff\xff\xff", 8)));
+        refused(dir / "unsized-list.wav", "a chunk after the data that overruns is refused");
+        text_file(dir / "unsized-riff-list.wav",
+                  layout(4, unknown, 12, std::string("LIST\xff\xff\xff\xff", 8)));
+        refused(dir / "unsized-riff-list.wav", "the same under an unfilled RIFF size");
+#ifndef _WIN32
+        // A file as long as an unfilled RIFF size says, 4 GiB, or longer: the
+        // size is then a size like any other, and libsndfile would read the
+        // audio only that far, so the file is refused, with its own advice.
+        // The file is sparse and takes no room, and the check reads only its
+        // headers. Not on Windows, where such a file is written out in full.
+        text_file(dir / "unsized-4gib.wav", layout(4, unknown, unknown, ""));
+        fs::resize_file(dir / "unsized-4gib.wav", (std::uintmax_t{1} << 32) + 8);
+        says(dir / "unsized-4gib.wav", {"never filled in", "4 GiB or longer", "to a pipe", "RF64"},
+             "an unsized file of 4 GiB or more is refused and says so");
+        fs::remove(dir / "unsized-4gib.wav");
+#endif
+        text_file(dir / "zero-sizes.wav", layout(5, 0, 0, ""));
+        refused(dir / "zero-sizes.wav", "sizes of zero with data after them are refused");
+    }
+    {
         // Out-of-range metadata in a file is a data error (runtime_error), so list
         // traversal and inspection diagnose it instead of failing as a caller error.
         auto bytes = std::string(reinterpret_cast<const char*>(nan_wave), sizeof nan_wave);
@@ -1555,16 +1742,20 @@ int main() {
                       std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     try {
         fs::create_directory(dir);
-        run(dir);
-        speaker_tests(dir);
-        sound_file_header_tests(dir);
-        shared_filter_files(dir);
-        quantizer_memory_tests();
-        fs::remove_all(dir);
-        std::cout << "native I/O tests passed\n";
     } catch (const std::exception& e) {
-        fs::remove_all(dir);
         std::cerr << e.what() << '\n';
         return 1;
     }
+    const auto failed = convolver::test::run_cases({
+        {"run", [&] { run(dir); }},
+        {"speaker_tests", [&] { speaker_tests(dir); }},
+        {"sound_file_header_tests", [&] { sound_file_header_tests(dir); }},
+        {"shared_filter_files", [&] { shared_filter_files(dir); }},
+        {"quantizer_memory_tests", quantizer_memory_tests},
+    });
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    if (failed)
+        return 1;
+    std::cout << "native I/O tests passed\n";
 }

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "cases.hpp"
 #include "convolver/engine.hpp"
 #include "kernels.hpp"
 #include "oracle.hpp"
@@ -726,42 +727,60 @@ void kernels_agree() {
 }
 } // namespace
 int main() {
-    try {
-        // Oracle checks with the kernels this CPU selects, then with the baseline set.
-        const auto* selected = detail::kernels().name;
-        // The default layout, then small ones in which short filters reach
-        // every stage (PERF-2).
-        const detail::PartitionLayout small[] = {{4, 16, 2}, {2, 32, 4}, {8, 64, 4}};
-        for (const detail::PartitionLayout* layout :
-             {static_cast<const detail::PartitionLayout*>(nullptr), &small[0], &small[1],
-              &small[2]}) {
-            detail::force_partition_layout(layout);
-            for (bool baseline : {false, true}) {
-                detail::force_baseline_kernels(baseline);
-                oracle_group = "cases";
-                cases();
-                oracle_group = "shared_input_mixes";
-                shared_input_mixes();
-                oracle_group = "history_validity";
-                history_validity();
-                if (layout) {
-                    oracle_group = "layouts";
-                    layouts();
-                }
-            }
-        }
+    // Oracle checks with the kernels this CPU selects, then with the baseline set.
+    const auto* selected = detail::kernels().name;
+    // The default layout, then small ones in which short filters reach
+    // every stage (PERF-2).
+    static const detail::PartitionLayout small[] = {{4, 16, 2}, {2, 32, 4}, {8, 64, 4}};
+    const auto defaults = [] {
+        forbid_allocation = false;
         detail::force_partition_layout(nullptr);
         detail::force_baseline_kernels(false);
-        kernels_agree();
-        attenuation();
-        oracle_group = "invalid inputs";
-        invalid();
-        no_processing_allocation();
-        std::cout << "native engine tests passed (" << fft_backend_name() << ", " << selected
-                  << " kernels)\n";
-        report_oracle_errors();
-    } catch (const std::exception& e) {
-        std::cerr << e.what() << '\n';
+    };
+    std::vector<convolver::test::Case> list;
+    for (const detail::PartitionLayout* layout :
+         {static_cast<const detail::PartitionLayout*>(nullptr), &small[0], &small[1], &small[2]})
+        for (bool baseline : {false, true}) {
+            const auto where =
+                std::string(" (") + (baseline ? "baseline" : "selected") + " kernels, " +
+                (layout ? "layout " + std::to_string(layout->first) + "/" +
+                              std::to_string(layout->largest) + "/" + std::to_string(layout->growth)
+                        : "default layout") +
+                ")";
+            const auto oracle = [layout, baseline](const char* group, void (*test)()) {
+                return [=] {
+                    detail::force_partition_layout(layout);
+                    detail::force_baseline_kernels(baseline);
+                    oracle_group = group;
+                    test();
+                };
+            };
+            list.push_back({"cases" + where, oracle("cases", cases)});
+            list.push_back(
+                {"shared_input_mixes" + where, oracle("shared_input_mixes", shared_input_mixes)});
+            list.push_back(
+                {"history_validity" + where, oracle("history_validity", history_validity)});
+            if (layout)
+                list.push_back({"layouts" + where, oracle("layouts", layouts)});
+        }
+    const auto with_defaults = [&](void (*test)()) {
+        return [=] {
+            defaults();
+            test();
+        };
+    };
+    list.push_back({"kernels_agree", with_defaults(kernels_agree)});
+    list.push_back({"attenuation", with_defaults(attenuation)});
+    list.push_back({"invalid", [=] {
+                        defaults();
+                        oracle_group = "invalid inputs";
+                        invalid();
+                    }});
+    list.push_back({"no_processing_allocation", with_defaults(no_processing_allocation)});
+    const auto failed = convolver::test::run_cases(list, defaults);
+    report_oracle_errors();
+    if (failed)
         return 1;
-    }
+    std::cout << "native engine tests passed (" << fft_backend_name() << ", " << selected
+              << " kernels)\n";
 }

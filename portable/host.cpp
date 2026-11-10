@@ -751,9 +751,6 @@ std::string short_fault(const HostFaults& f) {
         return "the host passed buffers that do not match its setup.";
     return "invalid input samples (NaN or infinite) played as silence.";
 }
-std::string ports(std::size_t inputs, std::size_t outputs) {
-    return std::to_string(inputs) + " in, " + std::to_string(outputs) + " out";
-}
 // The short reason of a failure, completing "Silent: " or "Load failed, ...: ".
 std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& host) {
     switch (f.kind) {

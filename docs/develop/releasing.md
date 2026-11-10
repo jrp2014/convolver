@@ -254,7 +254,7 @@ mechanical part, but only as a draft: nothing is public until jrp presses
    to the [install guide](../use/install.md#unsigned-previews) at the tag,
    the known limitations (among them that the Windows and Linux plug-in has
    no window and was checked only automatically), how to
-   [report a problem](../use/troubleshooting.md#report-a-problem) (Copy
+   [report a problem](../use/report-a-problem.md) (Copy
    Diagnostics on macOS or the Convolver log elsewhere, the host and its
    version, how the filter was loaded, and whether playback, export or
    reopening is affected) and the responsiveness result. Finally it downloads
@@ -274,6 +274,17 @@ mechanical part, but only as a draft: nothing is public until jrp presses
    [changelog](../../CHANGELOG.md): a heading for the tag above the entries it
    contains. That pull request's merge bumps `VERSION` again, which is
    expected: the tag, not `main`, is what was published.
+7. Keep the release's files for later builds (COMPAT-1): on Linux x86-64,
+   download every published ZIP, unpack the Linux one, build
+   `convolver_vst3_render` (a VST3 build without sanitizers), and run
+   [`tests/upgrade/capture.py`](../../tests/upgrade/capture.py) with the
+   tag's version, commit and candidate run, as its docstring shows. It copies
+   the example presets, renders them with the package's own CLI and VST3
+   plug-in, and writes `tests/upgrade/X.Y.Z/` with each file's SHA-256; open
+   a pull request with that folder. Then save a REAPER project with the
+   released plug-in for the same folder (COMPAT-1 in [TODO](../../TODO.md)).
+   What the folder holds and how later builds are checked against it:
+   [files from released builds](../../tests/upgrade/README.md).
 
 Without the workflow (for example while it is being fixed), the same steps by
 hand: download `complete-preview-candidate`, run `sha256sum -c SHA256SUMS`,
