@@ -28,6 +28,28 @@ from promotion_gate import check
 PUBLISHED_PLATFORMS = ('macos-arm64', 'macos-x86_64', 'windows-x86_64', 'linux-x86_64')
 AUDIENCE = 'macOS 14 or later, Windows 11 and Linux (x86-64, glibc 2.35 or later)'
 CANDIDATE_WORKFLOW = '.github/workflows/release.yml'
+# The preview published before this one, and what changed for users since,
+# in their words; each preview's release-notes change updates both
+# (docs/develop/releasing.md#publishing-an-unsigned-preview). The changelog
+# holds every change.
+PREVIOUS_PREVIEW = '0.13.2'
+CHANGES = (
+    (
+        'WAV files that other programs write and Convolver refused as cut short are now read: a last chunk '
+        "without its padding byte, as Python's `wave` module writes mono 24-bit audio with an odd number of "
+        'frames, and sizes that were never filled in, as FFmpeg writes to a pipe. Such a file of 4 GiB or more '
+        'is still refused.'
+    ),
+    (
+        'A sound file that cannot be used as a filter is reported with the reason, for example a damaged header '
+        'or too many channels, instead of a general message. `convolver --inspect` gives such a file the new '
+        'code `unreadable-asset`.'
+    ),
+    (
+        'On Windows, a file whose name holds characters outside the system code page, such as Greek, Cyrillic '
+        'or Chinese letters, is named correctly in messages, and a configuration naming such an IR file loads.'
+    ),
+)
 TAG = re.compile(r'v(\d+\.\d+\.\d+)')
 DESCRIPTIONS = {
     'macos-arm64': 'macOS 14 or later, Apple silicon',
@@ -123,6 +145,8 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             f'- [Limits]({docs}/limits.md): what Convolver does not do.'
         ),
         '## What changed',
+        f'Since {PREVIOUS_PREVIEW}:',
+        '\n'.join(f'- {change}' for change in CHANGES),
         f"Each preview's changes are in the [changelog]({base}/blob/{tag}/CHANGELOG.md).",
         '## Known limitations',
         (
@@ -148,8 +172,8 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'Other hosts are untested.\n'
             "- In Audacity, load filters from Audacity's own preset menu. A filter loaded from Convolver's window "
             '(Choose…, Recent or Reload) plays there, but Audacity 4 does not keep it for exports or saved projects.\n'
-            '- Latency now starts at 0 frames. Some projects saved with 0.12.12 at its default of 256 frames open at '
-            '0; choose 256 again if you want its delay back '
+            '- Since 0.13, Latency starts at 0 frames. Some projects saved with 0.12.12 at its default of 256 frames '
+            'open at 0; choose 256 again if you want its delay back '
             f'([projects from earlier versions]({docs}/plugins.md#settings)).'
         ),
         '## Report a problem',

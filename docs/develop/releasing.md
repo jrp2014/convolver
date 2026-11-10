@@ -202,6 +202,13 @@ jrp; he first did it on 8 November 2026 (0.12.12). The "Draft preview release" w
 mechanical part, but only as a draft: nothing is public until jrp presses
 **Publish**.
 
+Before the tag, a pull request updates the release notes: `PREVIOUS_PREVIEW`
+and `CHANGES` in
+[`prepare_release.py`](../../scripts/release/prepare_release.py) name the
+preview published before and list, in a user's words, what changed since
+(the [changelog](../../CHANGELOG.md) holds every change), and any known
+limitation that no longer holds is removed. Its merge makes the tag.
+
 1. Run the "Plug-in distribution candidates" workflow by hand on the chosen tag
    (`vX.Y.Z`; the first preview comes from a 0.12.x tag): Actions, then
    "Run workflow", choosing the tag, or
@@ -249,8 +256,9 @@ mechanical part, but only as a draft: nothing is public until jrp presses
    (`Convolver-source.tar.gz`). The first preview held only the macOS files;
    Windows and Linux joined from the second
    ([decisions](../project/decisions.md#releases)). Its notes give
-   the SHA-256 of each attached file and each system's command to check it,
-   the run link, the source commit, links
+   what changed since the previous preview, the SHA-256 of each attached
+   file and each system's command to check it, the run link, the source
+   commit, links
    to the [install guide](../use/install.md#unsigned-previews) at the tag,
    the known limitations (among them that the Windows and Linux plug-in has
    no window and was checked only automatically), how to

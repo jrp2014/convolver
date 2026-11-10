@@ -62,7 +62,7 @@ previews before it ([decisions](docs/project/decisions.md#releases)), so the
 walkthrough uses published files, and its findings join the other preview
 feedback. The decision of 8 November kept the remaining host checks and
 REL-3 as gates for later previews; jrp waived them for the second preview
-too, so whether a third waits for them is his to decide. Finishing a
+too, and on 10 November 2026 for a third. Finishing a
 dependable product matters more than another substantial refactor: move
 code into shared layers only when two formats need the same behaviour (as
 with `HostFilter`), do not generalise host lifecycle or release machinery

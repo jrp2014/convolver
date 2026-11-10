@@ -161,6 +161,10 @@ class PrepareReleaseTests(unittest.TestCase):
         self.assertIn('Some projects saved with 0.12.12', text)
         self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/plugins.md#settings', text)
         self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/CHANGELOG.md', text)
+        # What changed since the previous preview, one line per change.
+        self.assertIn(f'Since {prepare_release.PREVIOUS_PREVIEW}:', text)
+        for change in prepare_release.CHANGES:
+            self.assertIn(f'- {change}\n', text)
         # How to report a problem, with what makes a report useful.
         self.assertIn('## Report a problem', text)
         self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/report-a-problem.md', text)
