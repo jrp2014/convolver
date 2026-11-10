@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "cases.hpp"
 #include "convolver/io.hpp"
 #include "sound_files.hpp"
 #include <algorithm>
@@ -1741,16 +1742,20 @@ int main() {
                       std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     try {
         fs::create_directory(dir);
-        run(dir);
-        speaker_tests(dir);
-        sound_file_header_tests(dir);
-        shared_filter_files(dir);
-        quantizer_memory_tests();
-        fs::remove_all(dir);
-        std::cout << "native I/O tests passed\n";
     } catch (const std::exception& e) {
-        fs::remove_all(dir);
         std::cerr << e.what() << '\n';
         return 1;
     }
+    const auto failed = convolver::test::run_cases({
+        {"run", [&] { run(dir); }},
+        {"speaker_tests", [&] { speaker_tests(dir); }},
+        {"sound_file_header_tests", [&] { sound_file_header_tests(dir); }},
+        {"shared_filter_files", [&] { shared_filter_files(dir); }},
+        {"quantizer_memory_tests", quantizer_memory_tests},
+    });
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    if (failed)
+        return 1;
+    std::cout << "native I/O tests passed\n";
 }

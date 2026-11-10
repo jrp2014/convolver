@@ -12,10 +12,6 @@
 #include <sstream>
 
 namespace convolver::detail {
-std::string utf8_string(const std::filesystem::path& path) {
-    const auto text = path.u8string();
-    return {text.begin(), text.end()};
-}
 ConfigurationError::ConfigurationError(std::string code, SourceLocation location,
                                        std::string reason)
     : std::runtime_error(reason), code_(std::move(code)), location_(std::move(location)),
@@ -195,6 +191,9 @@ struct Parser {
         return result;
     }
 };
+bool binary_byte(unsigned char c) noexcept {
+    return c == 0 || (c < 32 && c != '\n' && c != '\r' && c != '\t');
+}
 std::vector<Line> logical_lines(std::string_view text, const Parser& p) {
     if (text.size() > max_text_bytes)
         p.fail(0, 0,
@@ -203,7 +202,7 @@ std::vector<Line> logical_lines(std::string_view text, const Parser& p) {
                       "Check that this is the configuration and not another file.",
                       {}});
     for (unsigned char c : text)
-        if (c == 0 || (c < 32 && c != '\n' && c != '\r' && c != '\t'))
+        if (binary_byte(c))
             p.fail(0, 0,
                    Advice{"neither a configuration nor a sound file this Convolver can read",
                           "The file holds bytes that a text configuration cannot, and no sound "
@@ -244,6 +243,12 @@ std::vector<Line> logical_lines(std::string_view text, const Parser& p) {
     return result;
 }
 } // namespace
+
+bool not_configuration_text(std::string_view text) noexcept {
+    return text.size() > max_text_bytes || std::any_of(text.begin(), text.end(), [](char c) {
+               return binary_byte(static_cast<unsigned char>(c));
+           });
+}
 
 ParsedDocument parse_configuration_text(std::string_view text,
                                         const std::filesystem::path& source) {

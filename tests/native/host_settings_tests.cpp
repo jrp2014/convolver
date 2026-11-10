@@ -2,6 +2,7 @@
 // PLUG-10: HostProcessor's settings (gain and mix), checked against the
 // direct double-precision oracle, sample by sample through their ramps, and
 // without allocation on the audio thread.
+#include "cases.hpp"
 #include "convolver/host.hpp"
 #include "host_log.hpp"
 #include "oracle.hpp"
@@ -623,22 +624,22 @@ void diagnostics_follow_settings() {
 } // namespace
 
 int main() {
-    try {
-        defaults_unchanged();
-        gain_and_mix_against_oracle();
-        ramps();
-        ramps_follow_time();
-        ramp_endpoints();
-        unequal_mix();
-        latency_choices();
-        settings_text();
-        diagnostics_follow_settings();
-        std::printf("worst gain and mix oracle error %.3g of the output peak (%s)\n",
-                    worst_relative, worst_case.c_str());
-        std::cout << "host settings passed\n";
-    } catch (const std::exception& e) {
-        audio_thread = false;
-        std::cerr << e.what() << '\n';
+    const auto failed = convolver::test::run_cases(
+        {
+            {"defaults_unchanged", defaults_unchanged},
+            {"gain_and_mix_against_oracle", gain_and_mix_against_oracle},
+            {"ramps", ramps},
+            {"ramps_follow_time", ramps_follow_time},
+            {"ramp_endpoints", ramp_endpoints},
+            {"unequal_mix", unequal_mix},
+            {"latency_choices", latency_choices},
+            {"settings_text", settings_text},
+            {"diagnostics_follow_settings", diagnostics_follow_settings},
+        },
+        [] { audio_thread = false; });
+    std::printf("worst gain and mix oracle error %.3g of the output peak (%s)\n", worst_relative,
+                worst_case.c_str());
+    if (failed)
         return 1;
-    }
+    std::cout << "host settings passed\n";
 }

@@ -1,12 +1,19 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "fft.hpp"
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <iostream>
 #include <numbers>
 #include <stdexcept>
 #include <vector>
 
+// The transform length for a block of b frames: twice the block, rounded up
+// to a power of two of at least 4, as the engine asks for (twice a partition
+// block, PERF-2) and as Ooura and Accelerate need.
+std::size_t transform_length(std::size_t b) {
+    return std::max<std::size_t>(4, std::bit_ceil(2 * b));
+}
 void near(float actual, double expected) {
     if (!std::isfinite(actual) || std::abs(actual - expected) > 2e-5 * (1 + std::abs(expected)))
         throw std::runtime_error("FFT oracle mismatch");
@@ -20,9 +27,7 @@ int main() {
                 : std::vector{convolver::FftPlanning::estimate};
         for (auto mode : modes)
             for (std::size_t b : {1, 2, 3, 7, 8, 17, 64, 127}) {
-                const auto n = convolver::detail::fft_size(b);
-                if (n < 2 * b || n % 2)
-                    throw std::runtime_error("FFT length contract");
+                const auto n = transform_length(b);
                 // A time limit (FFTW only) must still yield a correct plan.
                 const bool limit = convolver::fft_supports_wisdom() && b % 2;
                 convolver::detail::RealFft fft(n, {mode, false, limit ? 0.05 : 0.0});
@@ -55,7 +60,7 @@ int main() {
         // Larger transforms take other code paths (Ooura recurses above 512 points).
         // Check a spread of bins against the direct DFT and the full round trip.
         for (std::size_t b : {300, 1024, 4096, 16384}) {
-            const auto n = convolver::detail::fft_size(b);
+            const auto n = transform_length(b);
             convolver::detail::RealFft fft(n);
             std::vector<float> input(n);
             for (std::size_t i = 0; i < n; ++i)

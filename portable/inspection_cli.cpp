@@ -3,6 +3,7 @@
 #include "advice.hpp"
 #include "convolver/io.hpp"
 #include "convolver_version.hpp"
+#include "utf8.hpp"
 #include <array>
 #include <charconv>
 #include <cstdio>
@@ -35,13 +36,8 @@ Exit status: 0 valid, 1 invalid or unreadable, 2 invalid usage.
 struct Usage : std::invalid_argument {
     using std::invalid_argument::invalid_argument;
 };
-std::string text(const std::filesystem::path& p) {
-    const auto s = p.generic_u8string();
-    return {s.begin(), s.end()};
-}
-std::filesystem::path utf8_path(const std::string& s) {
-    return std::filesystem::path(std::u8string(s.begin(), s.end()));
-}
+using detail::utf8_generic_string;
+using detail::utf8_path;
 // An integer from `least` (1 unless stated) to `limit`.
 std::size_t count(std::string_view s, std::size_t limit, const char* what, std::size_t least = 1) {
     std::size_t n = 0;
@@ -207,7 +203,7 @@ void position(Json& j, const SourcePosition& p) {
     if (p.file.empty())
         j.null();
     else
-        j.string(text(p.file));
+        j.string(utf8_generic_string(p.file));
     j.key("line");
     p.line ? j.number(p.line) : j.null();
     j.key("column");
@@ -253,7 +249,7 @@ void delays(Json& j, const std::vector<InspectedDelay>& ds) {
 void configuration(Json& j, const InspectedConfiguration& c) {
     j.open('{');
     j.key("file");
-    j.string(text(c.file));
+    j.string(utf8_generic_string(c.file));
     j.key("include_chain");
     positions(j, c.include_chain);
     j.key("kind");
@@ -290,7 +286,7 @@ void configuration(Json& j, const InspectedConfiguration& c) {
         if (p.resolved.empty())
             j.null();
         else
-            j.string(text(p.resolved));
+            j.string(utf8_generic_string(p.resolved));
         j.key("channel");
         j.number(p.ir_channel);
         j.key("sample_rate");
@@ -348,7 +344,7 @@ bool passes(const InspectionReport& r, bool warnings_as_errors) {
 std::string location(const SourcePosition& p) {
     if (p.file.empty())
         return {};
-    auto s = text(p.file);
+    auto s = utf8_generic_string(p.file);
     if (p.line)
         s += ':' + std::to_string(p.line) + (p.column ? ':' + std::to_string(p.column) : "");
     return s + ": ";
@@ -361,7 +357,7 @@ void print_diagnostics(const InspectionReport& r) {
         std::cerr << "convolver: " << severity(d.severity) << ": " << location(d.location)
                   << d.message.substr(0, newline) << " [" << d.code << ']';
         for (auto it = d.include_chain.rbegin(); it != d.include_chain.rend(); ++it)
-            std::cerr << "; included from " << text(it->file) << ':' << it->line;
+            std::cerr << "; included from " << utf8_generic_string(it->file) << ':' << it->line;
         for (auto at = newline; at != std::string::npos;) {
             const auto next = d.message.find('\n', at + 1);
             std::cerr << "\n  " << d.message.substr(at + 1, next - at - 1);
@@ -377,24 +373,24 @@ void print_report(const InspectionReport& r, bool validate, bool warnings_as_err
     auto& out = std::cout;
     const bool ok = passes(r, warnings_as_errors);
     if (validate) {
-        out << (ok ? "valid: " : "invalid: ") << text(r.path);
+        out << (ok ? "valid: " : "invalid: ") << utf8_generic_string(r.path);
         if (r.selected)
-            out << " (selected " << text(*r.selected) << ")";
+            out << " (selected " << utf8_generic_string(*r.selected) << ")";
         if (r.options.syntax_only)
             out << "; syntax only, IR files not checked";
         out << '\n';
         return;
     }
-    out << "Configuration: " << text(r.path) << '\n';
+    out << "Configuration: " << utf8_generic_string(r.path) << '\n';
     out << "Selection: " << r.selection_reason;
     if (r.selected)
-        out << " -> " << text(*r.selected);
+        out << " -> " << utf8_generic_string(*r.selected);
     out << '\n';
     for (const auto& s : r.traversal)
         if (s.outcome != "selected" && s.outcome != "validated")
-            out << "  " << s.outcome << ": " << text(s.file) << '\n';
+            out << "  " << s.outcome << ": " << utf8_generic_string(s.file) << '\n';
     for (const auto& c : r.configurations) {
-        out << '\n' << text(c.file) << (c.sound_file ? " (IR file)" : "") << '\n';
+        out << '\n' << utf8_generic_string(c.file) << (c.sound_file ? " (IR file)" : "") << '\n';
         out << "  " << c.sample_rate << " Hz, " << c.input_channels << " in, " << c.output_channels
             << " out, channel mask 0x" << std::hex << c.channel_mask << std::dec << '\n';
         auto delay_line = [&](const char* name, const std::vector<InspectedDelay>& ds) {
@@ -474,7 +470,7 @@ Json serialize_report(const InspectionReport& r, bool validate, bool warnings_as
     j.key("selection");
     j.open('{');
     j.key("path");
-    j.string(text(r.path));
+    j.string(utf8_generic_string(r.path));
     j.key("expected_sample_rate");
     r.options.expected_rate ? j.value(r.options.expected_rate) : j.null();
     j.key("expected_input_channels");
@@ -487,7 +483,7 @@ Json serialize_report(const InspectionReport& r, bool validate, bool warnings_as
     j.string(r.selection_reason);
     j.key("selected");
     if (r.selected)
-        j.string(text(*r.selected));
+        j.string(utf8_generic_string(*r.selected));
     else
         j.null();
     j.key("traversal");
@@ -495,7 +491,7 @@ Json serialize_report(const InspectionReport& r, bool validate, bool warnings_as
     for (const auto& s : r.traversal) {
         j.open('{');
         j.key("file");
-        j.string(text(s.file));
+        j.string(utf8_generic_string(s.file));
         j.key("include_chain");
         positions(j, s.include_chain);
         j.key("outcome");

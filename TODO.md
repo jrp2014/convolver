@@ -1701,6 +1701,22 @@ move to the archive.
   from the whole-project review: ASan and UBSan for the `vst3.*` tests,
   ThreadSanitizer for `vst3.adapter`
   ([VST3 tests](docs/develop/testing.md#vst3-tests)).
+- [x] **TIDY-1 — Remove small duplicated helpers.** 9 November 2026, from
+  the whole-project review of that day (M2; its `utf8_path` part is
+  DIAG-7): one copy each of `splitmix64`, `ports()` and the little-endian
+  helpers, the window's status numbers named, and the unused `fft_size()`
+  removed ([implementation map](docs/develop/architecture.md#components-and-source-of-truth)).
+- [x] **CI-37 — Test programs report every failing case.** 9 November
+  2026, from the whole-project review of that day: ten programs run their
+  cases through one shared runner
+  ([native production tests](docs/develop/testing.md#native-production-tests)).
+- [x] **DIAG-6 — Show the reader's reason when a sound file is refused as
+  a filter.** 9 November 2026, from the whole-project review of that day
+  ([filter files](docs/use/configuration.md#filter-files)).
+- [x] **DIAG-7 — File names as UTF-8 in messages and paths on Windows.** 9
+  November 2026, from the whole-project review of that day: one shared
+  helper, and a non-ANSI name loaded and refused on every system
+  ([invariants](docs/develop/architecture.md#invariants-to-preserve)).
 - [x] **CI-35 — Prose edits to the first-use pages run Lint only.** 8
   November 2026, from jrp's question why a README link ran every workflow;
   [CI triggers](docs/develop/testing.md#documentation-only-pull-requests).

@@ -10,6 +10,7 @@
 #include "config_parse.hpp"
 #include "convolver/engine.hpp"
 #include "sound_files.hpp"
+#include "utf8.hpp"
 #include <AudioToolbox/AudioToolbox.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <algorithm>
@@ -153,7 +154,7 @@ struct SizedWave {
 class ToolboxFile final : public SoundFile {
   public:
     explicit ToolboxFile(const std::filesystem::path& path) : path_(path) {
-        const auto opening = "cannot open audio input " + path.string() + ": ";
+        const auto opening = "cannot open audio input " + detail::utf8_string(path) + ": ";
         require_file(path, opening);
         // Held by file_ from here on, so every refusal below disposes of it
         // (jrp's review: a file refused after opening was left open).
@@ -199,15 +200,17 @@ class ToolboxFile final : public SoundFile {
             throw std::runtime_error(opening + explain(status));
         const double rate = format.mSampleRate;
         if (!(rate >= 1 && rate <= max_sample_rate) || rate != std::floor(rate))
-            throw std::runtime_error(
-                "unsupported audio input " + path.string() + ": the rate, " + std::to_string(rate) +
-                " Hz, is not a whole number of hertz from 1 to " + std::to_string(max_sample_rate));
+            throw std::runtime_error("unsupported audio input " + detail::utf8_string(path) +
+                                     ": the rate, " + std::to_string(rate) +
+                                     " Hz, is not a whole number of hertz from 1 to " +
+                                     std::to_string(max_sample_rate));
         info_ = {static_cast<int>(rate), format.mChannelsPerFrame};
         try {
             validate(info_);
         } catch (const std::invalid_argument& e) {
             // The file's own metadata is out of range: a data error, not a caller error.
-            throw std::runtime_error("unsupported audio input " + path.string() + ": " + e.what());
+            throw std::runtime_error("unsupported audio input " + detail::utf8_string(path) + ": " +
+                                     e.what());
         }
         AudioStreamBasicDescription client{};
         client.mSampleRate = rate;
@@ -304,7 +307,7 @@ class RawFile final : public SoundFile {
     RawFile(const std::filesystem::path& path, RawSpec spec, RawEncoding encoding)
         : info_(spec), encoding_(encoding), width_(raw_sample_bytes(encoding.sample)), path_(path) {
         validate(spec);
-        const auto opening = "cannot open audio input " + path.string() + ": ";
+        const auto opening = "cannot open audio input " + detail::utf8_string(path) + ": ";
         require_file(path, opening);
         file_.open(path, std::ios::binary);
         if (!file_)
@@ -380,7 +383,7 @@ const SoundFiles& audio_toolbox_files() {
             // its samples for some other format and play noise as the filter
             // (the fourth review); libsndfile refuses such a file.
             if (raw_filter_name(path) && !recognised(path))
-                throw std::runtime_error("cannot open audio input " + path.string() +
+                throw std::runtime_error("cannot open audio input " + detail::utf8_string(path) +
                                          ": a headerless .pcm or .raw filter is read only when "
                                          "a .cfg names it, with its rate and channels");
             return std::make_unique<ToolboxFile>(path);

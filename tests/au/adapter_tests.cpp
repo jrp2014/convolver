@@ -4,6 +4,7 @@
 // notifications, ClassInfo contents and .aupreset loading, foreign and
 // malformed presets, bypass as a property, the output silence flag, and no
 // allocation while rendering.
+#include "../native/cases.hpp"
 #include "au/au_host.hpp"
 #include <algorithm>
 #include <array>
@@ -1099,6 +1100,11 @@ void latency_parameter() {
     never_fail = true;
     set_parameter(unit, au::latency_parameter, 3);
     require(reports(unit, 256), "Latency 256 before the allocation failures");
+    // Runs still queued from the concurrent choices above would otherwise
+    // meet the first forced failure and log it, and the loop's own run would
+    // then apply the change (seen under ThreadSanitizer on 10 November 2026).
+    require(latency_settled(unit),
+            "the Latency work before the allocation failures did not finish");
     bool completed = false;
     for (int k = 1; k <= 400 && !completed; ++k) {
         const auto before = std::lround(unit.seconds(kAudioUnitProperty_Latency) * 48000);
@@ -1871,32 +1877,36 @@ int main(int argc, char** argv) {
     au::latency_closing_for_tests = closing_latency;
     if (argc == 3 && std::string(argv[1]) == "--end-abruptly")
         return log_then_end(argv[2]);
-    try {
-        channel_capabilities();
-        timing_in_seconds();
-        class_info();
-        rejected_presets();
-        bypass_property();
-        silence_flag();
-        no_allocation_while_rendering();
-        layout_probe_before_restore();
-        render_requires_initialization();
-        failed_initialization();
-        status_parameter();
-        settings_parameters();
-        latency_parameter();
-        listeners_on_main_thread();
-        latency_queue_lifetime();
-        latency_witness_per_unit();
-        latency_staged_closing();
-        bypass_while_latency_work_holds_lock();
-        settings_in_diagnostics();
-        wider_inputs();
-        std::cout << "Audio Unit adapter checks passed\n";
-        return 0;
-    } catch (const std::exception& e) {
-        counting = false;
-        std::cerr << e.what() << '\n';
+    const auto failed = convolver::test::run_cases(
+        {
+            {"channel_capabilities", channel_capabilities},
+            {"timing_in_seconds", timing_in_seconds},
+            {"class_info", class_info},
+            {"rejected_presets", rejected_presets},
+            {"bypass_property", bypass_property},
+            {"silence_flag", silence_flag},
+            {"no_allocation_while_rendering", no_allocation_while_rendering},
+            {"layout_probe_before_restore", layout_probe_before_restore},
+            {"render_requires_initialization", render_requires_initialization},
+            {"failed_initialization", failed_initialization},
+            {"status_parameter", status_parameter},
+            {"settings_parameters", settings_parameters},
+            {"latency_parameter", latency_parameter},
+            {"listeners_on_main_thread", listeners_on_main_thread},
+            {"latency_queue_lifetime", latency_queue_lifetime},
+            {"latency_witness_per_unit", latency_witness_per_unit},
+            {"latency_staged_closing", latency_staged_closing},
+            {"bypass_while_latency_work_holds_lock", bypass_while_latency_work_holds_lock},
+            {"settings_in_diagnostics", settings_in_diagnostics},
+            {"wider_inputs", wider_inputs},
+        },
+        [] {
+            counting = false;
+            never_fail = false;
+            fail_countdown = 0;
+        });
+    if (failed)
         return 1;
-    }
+    std::cout << "Audio Unit adapter checks passed\n";
+    return 0;
 }

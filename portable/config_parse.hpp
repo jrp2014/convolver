@@ -4,6 +4,7 @@
 #pragma once
 #include "convolver/io.hpp"
 #include "sound_files.hpp"
+#include "utf8.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -47,8 +48,6 @@ struct SourceLocation {
 };
 // One list entry that led to a nested file, outermost first.
 using IncludeChain = std::vector<SourceLocation>;
-
-std::string utf8_string(const std::filesystem::path&);
 
 // Expected configuration failures. what() is "FILE:LINE:COLUMN: PROBLEM" plus
 // "; included from LIST:LINE" for each enclosing list, innermost first, then
@@ -126,6 +125,10 @@ struct ParsedDocument {
 // Parse bounded configuration or list text. No filesystem or decoder access.
 // Throws ConfigurationError with the physical location of the first problem.
 ParsedDocument parse_configuration_text(std::string_view text, const std::filesystem::path& source);
+// Whether text cannot be a configuration: longer than max_text_bytes, or
+// holding a byte no configuration holds (NUL or another control character
+// but tab, CR and LF). parse_configuration_text() refuses such text.
+bool not_configuration_text(std::string_view text) noexcept;
 // Read at most max_text_bytes; throws ConfigurationError if unreadable/too large.
 std::string read_configuration_text(const std::filesystem::path&);
 
@@ -198,6 +201,15 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument&, Configuration& cfg
 // A sound file used directly: diagonal routing, decoded coefficients.
 Configuration decode_audio_filter(SoundFile&, std::size_t& budget, const SourceLocation&);
 
+// DIAG-6: the reader's reason for refusing a file that starts with a sound
+// file container's marker (header_marker()).
+struct RefusedSoundFile : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+// DIAG-6: the error for a sound file at `path` that the reader refused with
+// `reason`, code unreadable-asset. The location already names the file, so
+// the copy of its path in the reader's problem is left out.
+ConfigurationError refused_sound_file(const std::filesystem::path& path, std::string reason);
 // Walks a configuration, sound file or (nested) list in entry order, with the
 // historical limits and cycle detection, and hands each leaf to a visitor.
 class Resolver {
@@ -217,8 +229,11 @@ class Resolver {
 
     // Replaceable file access, for bounded in-memory fuzzing. open_audio is
     // required: it returns null for a file that is not a sound file (from()
-    // makes one for a reader). Other empty members use the filesystem and
-    // read_configuration_text.
+    // makes one for a reader). It may instead throw RefusedSoundFile for a
+    // file that starts like a sound file but that the reader refused; the
+    // file is then read as text, and if it cannot be a configuration the
+    // reader's reason is reported. Other empty members use the filesystem
+    // and read_configuration_text.
     struct Sources {
         std::function<std::unique_ptr<SoundFile>(const std::filesystem::path&)> open_audio;
         std::function<std::string(const std::filesystem::path&)> read_text;

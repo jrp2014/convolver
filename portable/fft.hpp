@@ -5,8 +5,7 @@
 #include <memory>
 
 namespace convolver::detail {
-// Internal callers validate 1 <= block <= 2^20 before these size calculations.
-std::size_t fft_size(std::size_t block) noexcept;
+// Internal callers validate the transform length before this size calculation.
 std::size_t fft_storage(std::size_t n) noexcept; // owned float buffer elements
 // Throws std::invalid_argument for options this backend cannot honour, as
 // RealFft would. The engine checks them even when a filter needs no
