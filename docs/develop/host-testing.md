@@ -260,9 +260,10 @@ Do this once. Run the commands in the extracted preview package folder.
    prompt was cancelled, so this folder is not yet confirmed in a test;
    copies in the user's `~/Library/Audio/Presets` folder were not how
    Audacity found presets. The first preview supports only this route in
-   Audacity ([decision](../project/decisions.md#plug-in-behaviour)): a
-   filter loaded with Convolver's **Choose…** plays but is not exported or
-   saved (VST3-17 in [TODO](../../TODO.md)), so it is no substitute.
+   Audacity ([decision](../project/decisions.md#plug-in-behaviour)): up to
+   0.13.2 a filter loaded with Convolver's **Choose…** played but was not
+   exported or saved, and the fix (VST3-17 in [TODO](../../TODO.md)) has
+   not been checked in Audacity yet, so it is no substitute.
 4. Have a stereo test file at 44.1 kHz and one at 48 kHz, with clear
    transients (a click track or spoken word). For the 48 kHz checks, the
    repository includes a [quiet stereo listening clip](../../examples/host-audio/README.md)
@@ -429,8 +430,12 @@ preparation and steps 2, 3 and 9 below include what it found.
    Choose 1024 frames for Latency and record whether Audacity restarts the
    effect at once or at the next playback, and whether the track stays in
    time. Record anything the window does differently from REAPER.
-   In Audacity 4.0.2 the filter chosen here is not kept for an export or a
-   saved project (VST3-17); step 10 checks the supported route instead.
+   Up to 0.13.2, Audacity 4.0.2 did not keep the filter chosen here for an
+   export or a saved project (VST3-17). The fix is not checked in Audacity
+   yet: export with this window still open and without playing after the
+   choice, since Audacity also stores the state when playback stops or the
+   window closes, which would hide the defect. Step 10 checks the preset
+   route.
 10. Your own filter through the preset menu, the route the first preview
     supports in Audacity. Make a preset from the stereo example and put it
     in the system folder, then restart Audacity:

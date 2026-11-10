@@ -128,12 +128,12 @@ the one list of what each way reads:
 `convolver-preset`, which reads an IR file, a `.cfg`, a configuration list
 or a Convolver `.vstpreset`, and lists the folders where hosts look for
 presets. A preset is needed where the plug-in has no window (the VST3
-plug-in on Linux, and on Windows up to 0.13.2), in an LV2 host with no file chooser, and in
-Audacity, where the previews support only Audacity's own preset menu:
-Audacity 4.0.2 does not keep a filter loaded in the window (with Choose…,
-Recent, Reload or reloading when the file changes) for exports or saved
-projects, which keep whatever Audacity stored last, possibly no filter or an
-older one ([in Audacity](first-sound-in-a-host.md#in-audacity)).
+plug-in on Linux, and on Windows up to 0.13.2), in an LV2 host with no file chooser, and is
+the checked route in Audacity: up to 0.13.2, Audacity 4.0.2 did not keep a
+filter loaded in the window (with Choose…, Recent, Reload or reloading when
+the file changes) for exports or saved projects. Later versions should keep
+it, checked so far only by automated tests, not in Audacity
+([in Audacity](first-sound-in-a-host.md#in-audacity)).
 
 The filter is prepared away from the audio, then installed. A filter loaded
 before any audio plays starts at once; one loaded during playback fades in
@@ -423,8 +423,10 @@ From the top, the window has:
   then saves the outcome: the filter that plays, with the failure noted.
   An accepted file also becomes the plug-in's current preset, named after the
   file, and Convolver tells the host the project has changed. What the
-  host does with that differs: most mark the project unsaved, and Audacity
-  4.0.2 does not store the change at all ([loading a filter](#loading-a-filter)).
+  host does with that differs: most mark the project unsaved. A host that
+  cannot be told (Audacity 4.0.2) is shown a change of Latency that keeps
+  its value instead, so that it stores the new filter; this has not been
+  checked in Audacity yet ([loading a filter](#loading-a-filter)).
   The
   file is read and the filter prepared before the window responds again,
   so a very long filter can make the window (and the host) pause for a
