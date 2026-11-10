@@ -96,8 +96,8 @@ from the filter.
    very start of the project. Make sure the clip has no fade in or out; some
    hosts add a short one to new clips (REAPER: select it, *Item properties*,
    set both fades to 0).
-3. Add Convolver to the track as an effect. On macOS its window opens and
-   shows the status; on Windows and Linux the host shows its generic controls,
+3. Add Convolver to the track as an effect. On macOS and Windows its window
+   opens and shows the status; on Linux the host shows its generic controls,
    with a read-only **Status**.
 4. Click **Choose…** in Convolver's window and pick
    `examples/first-use/stereo/filter.cfg`. The window shows 48000 Hz,

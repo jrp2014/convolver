@@ -13,12 +13,12 @@ window or for a host's preset library. You will make a preset from an IR or
 - You do not need a preset to use a filter. The ordinary way is to choose
   the IR file, `.cfg` or configuration list itself, from any folder, with
   **Choose…** in [Convolver's window](plugins.md#convolvers-window) (the
-  Audio Unit and the VST® 3 plug-in on macOS) or the host's file chooser
+  Audio Unit and the VST® 3 plug-in on macOS and Windows) or the host's file chooser
   (LV2, in hosts that show it), then save the project
   ([your first sound in a host](first-sound-in-a-host.md)).
 - A **preset** is the same filter in the host's preset format, loaded from
   the host's preset menu. You need one where the plug-in has no window (the
-  VST3 plug-in on Windows and Linux), in an LV2 host with no file chooser,
+  VST3 plug-in on Linux, and on Windows up to 0.13.2), in an LV2 host with no file chooser,
   or to keep filters in the host's preset library. `convolver-preset` makes
   one from an impulse response (IR), a [`.cfg`](configuration.md) or a
   configuration list.

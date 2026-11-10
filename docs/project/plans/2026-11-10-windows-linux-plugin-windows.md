@@ -73,7 +73,8 @@ macOS.
    plug-in in step. Linking libsndfile into the plug-in is a change to what
    ships inside it, so it is jrp's choice ([below](#decisions-for-jrp)).
 2. **The window's behaviour in shared C++** (proposed PLUG-34), in
-   `plugins/editor/common/` with no user-interface code: the rows and
+   `portable/window_model.hpp` (built into `Convolver::host` beside the
+   recent-files list) with no user-interface code: the rows and
    messages to show for a report and the text of each value, typed values,
    reset, the Choose… request token, the reload check (the logic of
    `file_watch.mm`, on `std::filesystem`), the Recent list, and when to read
@@ -227,7 +228,7 @@ otherwise:
 
 | Step | Item | Delivers | Checked by |
 | --- | --- | --- | --- |
-| 1 | **PLUG-34** (new) | The window's behaviour in `plugins/editor/common/`, used by the macOS window with no visible change | Its tests on every CI system; `vst3.editor` and `au.editor` unchanged |
+| 1 | **PLUG-34** (new) | The window's behaviour in `portable/window_model.hpp`, used by the macOS window with no visible change | Its tests on every CI system; `vst3.editor` and `au.editor` unchanged |
 | 2 | **VST3-12**, first part | libsndfile in the Windows and Linux plug-in; a filter loads through the controller there; the comments that tie the reader to the windows (`processor.hpp`, the VST3 `CMakeLists.txt`) updated | `vst3.adapter` loading files without `test_file_reader`; package and licence checks |
 | 3 | **VST3-12** | The Win32 window, with the user guide and release notes updated | A Windows CI test through UI Automation with a screenshot; pluginval with its editor tests; a tester in REAPER and one other Windows host |
 | 4, if asked | **VST3-13** | The VSTGUI window for Linux | `editorhost` under `xvfb-run` with a screenshot; clean-machine containers with the libraries; a tester in REAPER or Bitwig |
@@ -237,7 +238,8 @@ otherwise:
 1. **The route:** C, chosen by jrp on 10 November 2026
    ([decision](../decisions.md#direction)).
 2. **libsndfile inside the Windows and Linux plug-in**, rather than Media
-   Foundation on Windows and nothing on Linux. It is already in the packages
+   Foundation on Windows and nothing on Linux: chosen by jrp on 10 November
+   2026 ([decision](../decisions.md#licences-and-dependencies)). It is already in the packages
    and their notices; the change is that the plug-in links it. The trade-off:
    with libsndfile the Windows plug-in reads AIFF, CAF and raw files but not
    FLAC (as the packaged tool); with Media Foundation it reads FLAC (as the
