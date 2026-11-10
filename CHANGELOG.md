@@ -48,6 +48,29 @@ Until 1.0 the C++ API may change between minor versions.
   asks for the system and points Windows and Linux users to the log, and the
   release notes link both. No change to the plug-ins or tools.
 
+### Fixed
+
+- WAV files (IO-10, IO-11): two kinds of WAV file that other programs read
+  were refused as cut short, by the command line and by the plug-ins, and as
+  a filter were reported as "neither a configuration nor a sound file". Both
+  are now read. One has a last chunk with an odd number of bytes and no
+  padding byte after it, as Python's `wave` module writes mono 24-bit files
+  with an odd number of frames; a file whose header counts the missing byte
+  is still refused. The other has sizes that were never filled in, as FFmpeg
+  writes a WAV to a pipe, and is read to the end of the file. FFmpeg stopped
+  half way through writing a file leaves the same header, so that file is
+  now read as if it were complete, unless it is PCM or float audio that
+  stops inside a frame. A file without sizes of 4 GiB or more is still
+  refused, because nothing says where its audio ends. As `--input`, or as
+  an IR file named in a configuration, it gets a message that says why and
+  what to do; chosen directly as the filter it gets a general message that
+  does not give the reason. On a Mac the plug-ins read a file without sizes
+  as the command line does: macOS's own reader, left to open one, read some
+  of them a frame short, so it is shown the file with its sizes filled in
+  ([input files](docs/use/command-line.md#input-files)). Found by the
+  project review of 9 November 2026; jrp chose to read files without sizes
+  on 10 November 2026.
+
 ## [0.13.2] - 2026-11-09
 
 The second published preview: macOS, Windows and Linux, unsigned, with the

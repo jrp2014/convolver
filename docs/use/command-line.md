@@ -34,7 +34,7 @@ Contents:
   [output formats](#output-formats),
   [integer output and dither](#integer-formats-dither-and-noise-shaping),
   [speaker labels](#speaker-labels), [FLAC and Ogg](#flac-and-ogg),
-  [output safety](#output-safety)
+  [output safety](#output-safety), [input files](#input-files)
 - [RAW streams](#raw-streams) and [FFmpeg](#with-ffmpeg)
 - [Inspection and validation](#inspecting-and-validating-configurations)
 - [Comparing two files](#comparing-two-files)
@@ -358,6 +358,55 @@ from 0, channels from 1); an overflow with its time, frame and channel in the
 output, and what to lower. For headerless input the message names the sample
 type it was read as, since a wrong `--raw-format` is the usual cause.
 
+For output that can exceed 4 GiB, use an `rf64`, `w64`, `caf`, `flac` or `raw`
+format; `wav` and `aiff` stop with an error at their limit.
+
+### Input files
+
+The input, and every IR file, can be any sound file the installed libsndfile
+reads; which codecs that includes depends on how libsndfile was built.
+
+An ordinary WAV file is checked more strictly than libsndfile checks it,
+because libsndfile takes a WAV that was cut short for a shorter one. Convolver
+reads the sizes in the file's header and in each of its chunks (its named
+parts, such as the format and the audio data), and refuses the file when a
+chunk runs past the size the header gives or past the end of the file, or
+when the samples end inside a frame. The plug-ins check the WAV files they
+load in the same way.
+
+Two layouts that break the format's rules are still read, because other
+programs both write and read them.
+
+In the first, the last chunk has an odd number of bytes and the padding byte
+that should follow it is missing. Python's `wave` module writes mono 24-bit
+files this way when the number of frames is odd. The file is whole, and is
+read whole. If the header counts a padding byte that the file does not have,
+the file was cut short, and it is refused.
+
+In the second, the sizes were never filled in (they say `0xFFFFFFFF`), and
+the file is read to its end. FFmpeg leaves the sizes so when it writes a WAV
+to a pipe (`-f wav -`), because it cannot go back to the header. It leaves
+the same header when it is stopped before it finishes writing a file, and
+Convolver cannot tell the two apart: a file from an interrupted write is
+read as if it were complete, with the audio that reached it. Only PCM or
+float audio that stops inside a frame is refused. A filter loaded from such
+a file is shorter than the one intended, with no message, so if a write may
+have been interrupted, compare the frames that `--inspect` reports with the
+length you expect, or write the file again. To send audio through a pipe,
+use [RAW streams](#raw-streams).
+
+One file without sizes is refused: one of 4 GiB or more. A WAV header cannot
+give a size that large, so nothing says where the audio ends, and libsndfile
+would read the first 4 GiB and stop. Write the audio to a file in a format
+for long audio, such as RF64 or W64, or send it as a RAW stream. Given as
+`--input`, or named as an IR file in a configuration, the file gets a message
+that says so. Chosen directly as the filter, here or in a plug-in, it gets a
+general message that does not give this reason: that it is too large for a
+configuration.
+
+Other containers, including RF64, get libsndfile's own checks; Convolver does
+not validate every codec libsndfile supports.
+
 ## RAW streams
 
 Standard streams carry headerless samples, interleaved by frame, so no header
@@ -430,14 +479,6 @@ The new audio keeps the filter tail, so it can run past the video; add
 `-shortest` to cut it. It starts at time zero, so check sync for files whose
 audio starts late. FFmpeg has no built-in Convolver filter; this pipe is the way
 to use the two together.
-
-Ordinary RIFF/WAVE inputs receive extra chunk-boundary and PCM/float alignment
-validation, because libsndfile can otherwise silently accept truncation. Other
-input containers, including RF64, retain libsndfile's validation semantics; this
-is not a complete validator for every supported codec. Additional codecs depend
-on how the installed libsndfile was built. For output that can exceed 4 GiB,
-use an `rf64`, `w64`, `caf`, `flac` or `raw` format; `wav` and `aiff` stop with
-an error at their limit.
 
 ## Inspecting and validating configurations
 

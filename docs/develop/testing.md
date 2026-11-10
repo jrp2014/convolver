@@ -160,7 +160,20 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   and noise-shaping behavior,
   legacy parser/config lists, Windows/POSIX/mixed relative paths, signed zero, malformed input,
   truncation, RAW alignment, and which files libsndfile recognises as sound
-  files (`sound_file_header`). POSIX-specific tests also exercise fragmented
+  files (`sound_file_header`). A WAV whose last odd chunk lacks its padding
+  byte gives every frame as a sound file and as a filter; a RIFF size that
+  counts the missing byte and an even chunk past the RIFF size are refused
+  (IO-10). A WAV whose RIFF and `data` sizes were left at `0xFFFFFFFF`, or
+  its RIFF size alone, gives every frame up to the end of the file, also
+  when the file stops between two frames as an interrupted write leaves it;
+  an odd number of bytes of audio is read like an even one. Such a file is
+  refused when it stops inside a frame, when (a sparse file, not made on
+  Windows) it is 4 GiB or longer, with a message that names the cause and
+  the fix, and when that size is on another chunk or under a RIFF size that
+  was filled in. The sizes the check returns for such a file, written over
+  the unfilled ones in pieces of 1, 3 and 4096 bytes, give byte for byte
+  the file with its sizes, which is what macOS's reader is shown
+  (IO-11). POSIX-specific tests also exercise fragmented
   descriptors, borrowed descriptor ownership, broken pipes and injected WAV
   header-finalization errors. For integer output they check rounding and
   clipping endpoints for 8 to 32 bits, reproducibility and chunk independence,
@@ -180,7 +193,10 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   output; empty, exact and partial last blocks, gain/matrix routing, both latency
   modes, real RAW pipelines, protection against overwriting inputs/IRs/configs,
   the dither default by resolution, the advice on pointless or beaten dither and
-  shaping choices, and the errors for removed options.
+  shaping choices, and the errors for removed options. A mono 24-bit WAV of
+  five frames written by Python's `wave` module, which leaves out the final
+  padding byte (the test checks that it did), renders as a filter and as an
+  input (IO-10).
 - `native.inspection`: the inspection API's selection traversal, located and
   chained diagnostics, syntax-only null fields, all-entry validation after
   failures, raw filters (including AU files named `.raw` and `.pcm`, read
@@ -210,7 +226,10 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   time zero afterwards, as the guide warns (FFMPEG-1). The video packets'
   checksums are unchanged. Registered only when CMake finds `ffmpeg` and
   `ffprobe`; CI installs FFmpeg in the native g++ Release job on Linux,
-  which fails if the test is missing.
+  which fails if the test is missing. A WAV that FFmpeg wrote to a pipe,
+  whose sizes the test first checks are `0xFFFFFFFF`, renders as `--input`
+  to the same bytes as the file it was copied from, with every frame
+  (IO-11).
 - `compatibility.corpus`: [generated configuration fixtures](../../tests/compatibility/README.md)
   rendered at block sizes 1, 3, 17 and 256 in both latency modes against an
   independent direct-convolution reference, then inspected to check the reported
@@ -254,8 +273,34 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   truncated, damaged, incomplete raw or wrong-rate filter, a float WAV holding
   a NaN, a double WAV holding 1e300 (infinite as a float), and a headerless
   `.pcm` chosen directly (starting like an MPEG frame) must be refused with
-  the same diagnostic code by both. A WAV whose header claims 800 kHz,
-  which the reader opens and then refuses, is refused 20 times without
+  the same diagnostic code by both. For IO-10 and IO-11, the test first
+  prints what each reader makes of every layout, then requires the same
+  frames from both, to the last one, for a mono 24-bit WAV whose last odd
+  chunk lacks its padding byte, for sizes left at `0xFFFFFFFF` over 12, 15
+  and 18 bytes of audio, for a RIFF size left so over a real `data` size
+  (even and odd), and for a stereo float file with the header FFmpeg writes
+  to a pipe, of 7 frames and of 100,000 (the only one long enough that
+  AudioToolbox reads it in more than one piece); and the same refusal code
+  for a RIFF size that counts the missing padding byte, for an unsized file
+  that stops inside a frame, and for two unsized files that pass
+  Convolver's own check and no reader can decode (an unknown format tag,
+  and no format chunk; on 10 November 2026 at f0a82fe, on macOS 15.8.2 and
+  macOS 26, AudioToolbox refused the first itself, as `'fmt?'`, and opened
+  the second with a rate of 0, which the reader's own check then refused:
+  [job 129784936532](https://github.com/jrp2014/convolver/actions/runs/42802940716/job/129784936532)).
+  The reader shows AudioToolbox an unsized file with its sizes filled in
+  (`AudioFileOpenWithCallbacks`), because of what AudioToolbox did when left
+  to open one itself, in PR #176: on 9 November 2026 at b1597a0 (macOS
+  15.8.2 and macOS 26) it read 15 bytes of mono 24-bit audio as four frames
+  where libsndfile read five
+  ([run 42715853793](https://github.com/jrp2014/convolver/actions/runs/42715853793)),
+  and on 10 November 2026 at 7b33360 it read 18 bytes as five frames for
+  six, while reading 12 bytes and the 56 bytes under the FFmpeg header
+  whole ([job 129764301771](https://github.com/jrp2014/convolver/actions/runs/42796865380/job/129764301771)).
+  A WAV whose header claims 800 kHz,
+  which the reader opens and then refuses, is refused 20 times, with and
+  without its sizes, as is the unsized file that AudioToolbox itself
+  refuses, and an unsized file is read 20 times, without
   leaving a file descriptor open (counted in `/dev/fd`).
 - `fuzz.replay.config_text`, `fuzz.replay.config_list`, `fuzz.replay.host_state`,
   `fuzz.replay.ir_file`: every committed [fuzz seed and regression input](../../tests/fuzz/README.md)

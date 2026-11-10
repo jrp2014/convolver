@@ -1631,6 +1631,7 @@ with compatibility tests; linked IDs point to open work above.
 | Plug-in settings (gain, mix, latency) in VST3 and the Audio Unit, not yet LV2; a preset from `convolver-preset` carries the filter only, and a state moved between formats keeps the filter, not the settings | The same project can play at another gain, mix or latency in another format; LV2-7 adds the settings to LV2. | [Settings](docs/use/plugins.md#settings) |
 | Changing the Audio Unit's Latency during playback leaves a gap (the new latency plus the filter's own delay) and cuts a sounding tail | The new processor starts with no history; a crossfade would need both sizes running at once. Not automatable for this reason (PLUG-10). | [Latency and tail](docs/use/plugins.md#latency-and-tail) |
 | A host rate that is not a whole number of hertz (such as 48000 ÷ 1.001) plays silence in VST3 and is refused by the Audio Unit and LV2 | No filter is made for such a rate and nothing is resampled (VST3-9, decided by jrp). The Audio Unit and LV2 could accept it the same way when a host needs it. | [When a filter does not fit](docs/use/plugins.md#when-a-filter-does-not-fit) |
+| A WAV whose sizes were never filled in (`0xFFFFFFFF`, as FFmpeg writes to a pipe) is read to the end of the file, so one left by an interrupted write is read as if it were complete; only PCM or float audio that stops inside a frame is refused. Such a file of 4 GiB or more is refused | jrp's decision of 10 November 2026 (IO-11). A file of 4 GiB or more has no size a reader could use; RF64, W64 or a RAW stream carry long audio. | [Input files](docs/use/command-line.md#input-files) |
 | No IR resampling or automatic channel adaptation for direct sound-file filters | Rate/count mismatches fail; use an explicit configuration. IO-2 covers resampling. | [Configuration](docs/use/configuration.md) |
 | One VST3 input bus and one output bus, each 1–8 channels; a window on macOS only | Presets and generic host controls elsewhere; layouts are checked with a notice only; the Windows and Linux windows are VST3-12 and VST3-13, host switching VST3-2. | [VST3](docs/use/plugins.md#loading-a-filter) |
 | No promised migration of old VST2 project state | New VST3 identity; define a migration requirement before implementing one (VST3-6). | [VST3](docs/use/plugins.md#identities) |
@@ -1668,6 +1669,21 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **IO-11 — WAV files with unfilled sizes are read.** 10 November
+  2026, PR #176. jrp chose to read them everywhere: a WAV whose sizes were
+  left at `0xFFFFFFFF` (FFmpeg writing to a pipe) is read to its end,
+  knowing that FFmpeg stopped half way leaves the same header and that its
+  file is read as if complete. One of 4 GiB or more is still refused.
+  macOS's reader is shown such a file with its sizes filled in, because
+  left to open one it read 15 bytes of mono 24-bit audio as four frames
+  and 18 as five
+  ([input files](docs/use/command-line.md#input-files),
+  [decision](docs/project/decisions.md#identities-and-file-formats)).
+- [x] **IO-10 — WAV files that other programs read are refused.** 9
+  November 2026, PR #176, from that day's project review: a WAV whose last
+  odd chunk lacks its padding byte (Python's `wave` module) is read whole
+  ([input files](docs/use/command-line.md#input-files),
+  [decision](docs/project/decisions.md#identities-and-file-formats)).
 - [x] **CI-36 — VST3 tests under sanitizers in CI.** 9 November 2026,
   from the whole-project review: ASan and UBSan for the `vst3.*` tests,
   ThreadSanitizer for `vst3.adapter`

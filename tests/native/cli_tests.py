@@ -250,6 +250,38 @@ def failure_message_tests(d):
     assert floats(out)[0] == 1
 
 
+def other_writers_tests(d):
+    """IO-10: a WAV as Python's wave module writes it for mono 24-bit audio
+    with an odd number of frames (an odd data chunk with no pad byte) is
+    read whole, as the filter and as the input."""
+    taps = [4194304, -2097152, 0, 1048576, 524288]
+    odd = d / 'odd-24.wav'
+    with wave.open(str(odd), 'wb') as f:
+        f.setnchannels(1)
+        f.setsampwidth(3)
+        f.setframerate(48000)
+        f.writeframes(b''.join(struct.pack('<i', v)[:3] for v in taps))
+    size = odd.stat().st_size
+    assert size % 2 == 1 and struct.unpack_from('<I', odd.read_bytes(), 4)[0] == size - 8, (
+        "Python's wave module no longer leaves out the pad byte, so this test no longer covers that",
+        size,
+    )
+    other = d / 'odd-other.wav'
+    values = [12000, -6000, 3000, 1500, -750, 0, 375]
+    pcm(other, values)
+    out = d / 'odd-out.wav'
+    expected = [0.0] * (len(values) + len(taps) - 1)
+    for i, v in enumerate(values):
+        for j, w in enumerate(taps):
+            expected[i + j] += v / 32768 * w / 8388608
+    for filter_file, input_file in ((odd, other), (other, odd)):
+        call(['--filter', filter_file, '--input', input_file, '--output', out])
+        channels, rate, y = floats(out)
+        assert (channels, rate) == (1, 48000)
+        near(y, expected)
+        out.unlink()
+
+
 def integer_format_tests(d):
     """Dither, noise shaping, PCM8 and valid bits through the CLI."""
     ir = d / 'if-ir.wav'
@@ -1012,6 +1044,7 @@ def main():
         repeatability_tests(d)
         speaker_map_tests(d)
         container_tests(d)
+        other_writers_tests(d)
         failure_message_tests(d)
         # An option value spelled like an inspection flag is still a value.
         pcm(d / 'v-ir.wav', [16384])

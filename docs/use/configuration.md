@@ -104,6 +104,9 @@ An IR file can be any sound file libsndfile reads, such as WAV, RF64, W64,
 AIFF, CAF, FLAC or Ogg Vorbis. Its sample rate must be the configuration's. The
 [preview packages](install.md#what-a-preview-package-contains) read no FLAC or Ogg files;
 [FLAC and Ogg](command-line.md#flac-and-ogg) says how to work around that.
+A WAV file that was cut short is refused;
+[input files](command-line.md#input-files) says what is checked, and which
+file from an interrupted write cannot be told from a whole one.
 
 A filename ending in `.pcm` or `.raw` (in any letter case) is a raw filter,
 unless the file's content is a sound file: one that libsndfile recognises, or
