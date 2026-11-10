@@ -2408,8 +2408,6 @@ void report_and_files() {
 // latency restart, no new Latency for the processor. A refused file reports
 // nothing.
 void load_without_set_dirty(bool offers_dirty) {
-    (void)offers_dirty; // Unused in a build that cannot read files.
-#if defined(__APPLE__) || defined(CONVOLVER_VST3_TESTS_IO)
     HostApplication context;
     Handler handler;
     handler.offers_dirty = offers_dirty;
@@ -2438,10 +2436,6 @@ void load_without_set_dirty(bool offers_dirty) {
     const auto good = folder / "room.wav", wrong = folder / "other rate.wav";
     write_wav(good, 48000, 1, 8);
     write_wav(wrong, 44100, 1, 8);
-    const auto* reader = convolver::vst3::test_file_reader;
-#if defined(CONVOLVER_VST3_TESTS_IO) && !defined(__APPLE__)
-    convolver::vst3::test_file_reader = &convolver::detail::libsndfile_files();
-#endif
     handler.edits.clear();
     handler.restarts.clear();
     require(c.load_file(good.string()) && handler.dirty == (offers_dirty ? 1 : 0),
@@ -2485,14 +2479,12 @@ void load_without_set_dirty(bool offers_dirty) {
     handler.edits.clear();
     require(!c.load_file(wrong.string()) && handler.edits.empty(),
             "a refused file reported an edit");
-    convolver::vst3::test_file_reader = reader;
     std::filesystem::remove_all(folder);
     p.setActive(false);
     p.disconnect(&c);
     c.disconnect(&p);
     c.terminate();
     p.terminate();
-#endif
 }
 // PLUG-22: the controller state keeps the chosen file's name, which the
 // window shows again after the project is reopened, but only while the

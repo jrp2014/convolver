@@ -126,8 +126,8 @@ already holds one filter.
   Audacity. Up to 0.13.2 a filter loaded from Convolver's window (Choose…,
   Recent, Reload, or reloading when the file changes) played while you
   listened, but Audacity 4.0.2 did not keep it for exports or saved
-  projects; later versions fix this, checked so far only by automated
-  tests ([in Audacity](first-sound-in-a-host.md#in-audacity)). Audacity always runs Convolver with two channels, even on a
+  projects; later versions should keep it, checked so far only by
+  automated tests ([in Audacity](first-sound-in-a-host.md#in-audacity)). Audacity always runs Convolver with two channels, even on a
   mono track, so use a stereo (2-in, 2-out) filter, and set its playback
   rate to the filter's
   ([the rate a host plays at](plugins.md#status-and-the-convolver-log)).

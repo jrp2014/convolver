@@ -281,13 +281,12 @@ than checked.
 - VST3-17: in Audacity 4.0.2 a filter loaded from Convolver's window
   (**Choose…**, **Recent**, **Reload** or reloading when the file changes,
   which share one path) plays, but the export and the saved project keep
-  whatever Audacity stored last: no filter, or an older one. jrp narrowed
-  the preview's Audacity support to Audacity's own preset menu
-  ([decision](decisions.md#plug-in-behaviour)); the guides and the release
-  notes say so, and check 4 verifies that route. Fixed after 0.13.2
-  ([PR #177](https://github.com/jrp2014/convolver/pull/177)), checked only
-  by `vst3.adapter`: jrp chose on 10 November 2026 to merge it without an
-  Audacity check, so the preset menu stays the checked route until one.
+  whatever Audacity stored last: no filter, or an older one, up to
+  v0.13.8. Fixed on main after v0.13.8
+  ([PR #177](https://github.com/jrp2014/convolver/pull/177)), not yet in a
+  published preview, and checked only by `vst3.adapter`: it merges without
+  an Audacity check ([decisions](decisions.md#plug-in-behaviour)), so the
+  preset menu stays the checked route and check 4 verifies it.
 - **Choose…** needs the filter's input count to match the host's exactly,
   while a preset needs only at least that many inputs, so in REAPER on a
   six-channel track the crossover's `filter.cfg` is refused through

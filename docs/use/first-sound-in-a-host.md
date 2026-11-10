@@ -13,7 +13,7 @@ hollow) and `repeat-48000-stereo/filter.cfg` (each sound again a quarter of a
 second later), then save, close and reopen the project: the filter is still
 there. Your own IR file, `.cfg` or configuration list loads the same way,
 from any folder. Presets are an [optional route](#optional-load-a-preset),
-and the supported one [in Audacity](#in-audacity).
+and the checked one [in Audacity](#in-audacity).
 
 You need a plug-in host that loads VST® 3, such as REAPER or Audacity
 (version 4 or later), or one that loads Audio Units, such as GarageBand or
@@ -153,10 +153,11 @@ Audacity's own preset menu is the route checked in Audacity 4. Up to
 **Reload**, or reloading when the file changes) played while you listened,
 but Audacity 4.0.2 did not keep it for an export or a saved project: they
 kept whatever Audacity stored last, which may be no filter or an older one,
-so a wrong export could still sound plausible. Later versions fix this, but
-the fix has been checked only by automated tests, not yet in Audacity. If
-you load a filter from the window, export a few seconds and listen to the
-export before relying on it.
+so a wrong export could still sound plausible. Later versions should keep
+it, but this has been checked only by automated tests, not yet in Audacity.
+If you load a filter from the window, export a few seconds and check that
+the export has the filter you chose (for example by comparing it with
+`convolver --compare`, as in [check a stereo filter in a host](check-a-stereo-filter.md)).
 
 1. Set *Audio setup › Audio settings › Default sample rate*, and the
    project's rate, to the filter's rate. Audacity plays effects at the

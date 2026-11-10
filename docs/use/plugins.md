@@ -131,8 +131,8 @@ presets. A preset is needed where the plug-in has no window (the VST3
 plug-in on Linux, and on Windows up to 0.13.2), in an LV2 host with no file chooser, and is
 the checked route in Audacity: up to 0.13.2, Audacity 4.0.2 did not keep a
 filter loaded in the window (with Choose…, Recent, Reload or reloading when
-the file changes) for exports or saved projects. Later versions fix this,
-checked so far only by automated tests, not in Audacity
+the file changes) for exports or saved projects. Later versions should keep
+it, checked so far only by automated tests, not in Audacity
 ([in Audacity](first-sound-in-a-host.md#in-audacity)).
 
 The filter is prepared away from the audio, then installed. A filter loaded

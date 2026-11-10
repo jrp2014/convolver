@@ -91,7 +91,7 @@ passes for 0.13, since PERF-2 changed the engine
 | **COMPAT-1** | Keep presets, a REAPER project and expected audio made by 0.13.2, the baseline, with their own runner and the capture step in the publication steps | Tests and files only |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **HOST-4** | The check on a real Windows device, now that the Windows package ships `convolver-equalizer-apo` | A check; needs a Windows computer |
-| **VST3-17** | Known defect: in Audacity a filter chosen in the window plays but is missing from the export and the saved project. jrp narrowed Audacity to its preset menu, and the guides say so | Lost state, one of the freeze's exceptions: jrp brought the fix forward on 9 November 2026 ("Fix now"; [decision](docs/project/decisions.md#plug-in-behaviour)), replacing the earlier decision that it waits until after the preview |
+| **VST3-17** | Up to 0.13.8, in Audacity a filter chosen in the window plays but is missing from the export and the saved project. The fix (PR #177) is checked only by `vst3.adapter`; what remains is jrp's Audacity check, and until then the guides keep the preset menu as the checked route | Lost state, one of the freeze's exceptions: brought forward and merged without an Audacity check ([decisions](docs/project/decisions.md#plug-in-behaviour)) |
 | **PLUG-33** | Known limitation: **Choose…** needs the host's exact input count where a preset needs at least that many; the guides give the preset route | A runtime change; waits unless jrp brings it forward |
 
 ### 2. Decided or likely, after the freeze
