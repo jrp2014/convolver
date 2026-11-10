@@ -17,8 +17,8 @@ Until 1.0 the C++ API may change between minor versions.
   changelog; each preview's release-notes change updates the list
   ([publishing](docs/develop/releasing.md#publishing-an-unsigned-preview)).
   jrp decided on 10 November 2026 to publish a third preview, a 0.13.x tag,
-  without the checks left but after VST3-17's Audacity fix
-  ([decision](docs/project/decisions.md#releases)).
+  without the checks left and without VST3-17's Audacity fix, whose check
+  is not run yet ([decision](docs/project/decisions.md#releases)).
 - VST3 plug-in on Windows (VST3-12): Convolver's window, the same as on
   macOS, built from Windows' own controls: the status, why it is silent and
   what to change, Choose…, Recent and Reload, a dropped file, Gain, Mix and
