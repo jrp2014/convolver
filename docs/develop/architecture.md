@@ -48,11 +48,16 @@ from [`plugins/editor/mac/`](../../plugins/editor/mac/): the view and its
 layout in [`diagnostic_view.mm`](../../plugins/editor/mac/diagnostic_view.mm),
 its Gain, Mix and Latency rows and what the user does with them (dragging,
 reset, typing, choosing; AU-10) in
-[`setting_rows.mm`](../../plugins/editor/mac/setting_rows.mm), following the
-playing filter's files for Reload When the File Changes (AU-11) in
-[`file_watch.mm`](../../plugins/editor/mac/file_watch.mm), and the fonts,
+[`setting_rows.mm`](../../plugins/editor/mac/setting_rows.mm), and the fonts,
 labels and stack views both lay out with in
-[`view_layout.h`](../../plugins/editor/mac/view_layout.h). It knows no plug-in
+[`view_layout.h`](../../plugins/editor/mac/view_layout.h). What the window
+does, apart from drawing it (PLUG-34), is shared C++ that every system's
+window uses, in [`window_model.hpp`](../../portable/window_model.hpp), part
+of `Convolver::host`: what to show for a report (the status's tone and
+symbol, the message, the filter's facts, the Audio and reference lines, the
+drop hint and the fix's button), the Latency note, typed values, Choose…
+requests, the Recent menu's entries, and following the playing filter's
+files for Reload When the File Changes (AU-11). It knows no plug-in
 format: each format hands it blocks that read the report, the diagnostics
 and the settings, change a setting (with `begin` and `end` around a drag
 where the format marks gestures, as VST3's `beginEdit` and `endEdit` do),

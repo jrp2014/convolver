@@ -384,6 +384,16 @@ cases.
   accents, no path with a line break, nothing left beside the list after
   it is replaced, a list with Windows line ends, Clear Menu, and no list
   with the log turned off.
+- `native.window_model`: what every system's window does (PLUG-34), from
+  real report fields: the content for each status (tone, symbol, message,
+  box, the fix's button with and without loading, the drop hint, the
+  filter's facts, Audio and reference lines) and with no report; the
+  Latency note; typed values (decimal comma, minus sign, a unit after the
+  number, clamping, refusing text that is not a finite number); Choose…
+  requests replaced, answered once and forgotten when the window closes;
+  the Recent menu's entries without missing files; and reloading when files
+  change only once a change has settled, not after `settle()`, and never
+  for a deleted file.
 - `native.state`: fixed version-1 wire fixture, the version-2 failed-load
   marker (and that every other state is still written as version 1), a
   version-3 fixture with settings, its round trips with a filter and a

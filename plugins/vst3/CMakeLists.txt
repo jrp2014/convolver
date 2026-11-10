@@ -79,8 +79,7 @@ if(APPLE)
     string(REPLACE "." "_" vst3_class_version "${Convolver_VERSION}")
     set(mac_editor "${PROJECT_SOURCE_DIR}/plugins/editor/mac")
     set(vst3_editor_sources "${CMAKE_CURRENT_SOURCE_DIR}/editor.mm"
-        "${mac_editor}/diagnostic_view.mm" "${mac_editor}/setting_rows.mm"
-        "${mac_editor}/file_watch.mm")
+        "${mac_editor}/diagnostic_view.mm" "${mac_editor}/setting_rows.mm")
     set(vst3_view_classes "CONVOLVER_DIAGNOSTIC_VIEW=ConvolverVST3View_${vst3_class_version};CONVOLVER_SETTING_ROWS=ConvolverVST3SettingRows_${vst3_class_version}")
     set_source_files_properties(${vst3_editor_sources} PROPERTIES
         COMPILE_OPTIONS "-fobjc-arc;-Wall;-Wextra"

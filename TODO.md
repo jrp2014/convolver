@@ -594,13 +594,16 @@ LV2 (Linux first; also PipeWire system audio):
   freeze unless jrp brings it forward.
 - [ ] **PLUG-34 — The window's behaviour in shared code.** The
   first step of the [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md#what-comes-first)
-  for VST3-12 and VST3-13: which rows and messages show for a report, typed
-  values, reset, the Choose… request, the reload check, the Recent list and
-  when to read the report move from `plugins/editor/mac/` into C++ in
-  `plugins/editor/common/`, which the macOS window then calls. Done when the
-  shared part has tests on every CI system and `vst3.editor` and
-  `au.editor` pass unchanged. No visible change on macOS. Waits for the
-  freeze.
+  for VST3-12 and VST3-13: what to show for a report, typed values, the
+  Latency note, the Choose… request, the reload check and the Recent list
+  move from `plugins/editor/mac/` into C++ in `portable/window_model.hpp`
+  (part of `Convolver::host`, as the recent-files list is), which the macOS
+  window then calls. Done when the shared part has tests on every CI system
+  and `vst3.editor` and `au.editor` pass unchanged. No visible change on
+  macOS.
+  Progress (10 November 2026): the shared part and `native.window_model`
+  are written and the macOS window calls them; waiting for the macOS CI
+  run of `vst3.editor` and `au.editor`, which no Linux session can compile.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
