@@ -359,6 +359,26 @@ void window(const fs::path& picture) {
             "Latency choice: " + handler.kinds(latency_id));
     require(text(setting(shown, 2, win::value)) == L"adds 21.3 ms",
             "Latency note " + utf8(text(setting(shown, 2, win::value))));
+    // In the open list, the items the arrow keys pass are not choices (each
+    // would rebuild the engine), and Escape puts the list back.
+    handler.edits.clear();
+    SendMessageW(latency, CB_SHOWDROPDOWN, TRUE, 0);
+    require(SendMessageW(latency, CB_GETDROPPEDSTATE, 0, 0) != FALSE, "the Latency list opens");
+    SendMessageW(latency, CB_SETCURSEL, 4, 0);
+    const WPARAM latency_id_code =
+        MAKEWPARAM(win::settings + 2 * win::setting_stride + win::control, 0);
+    SendMessageW(shown, WM_COMMAND, latency_id_code | (CBN_SELCHANGE << 16),
+                 reinterpret_cast<LPARAM>(latency));
+    require(handler.edits.empty() && p.settings().latency == 1024,
+            "an item passed in the open Latency list was chosen: " + handler.kinds(latency_id));
+    SendMessageW(shown, WM_COMMAND, latency_id_code | (CBN_SELENDCANCEL << 16),
+                 reinterpret_cast<LPARAM>(latency));
+    require(SendMessageW(latency, CB_GETCURSEL, 0, 0) == 5,
+            "Escape did not put the Latency list back");
+    SendMessageW(latency, CB_SHOWDROPDOWN, FALSE, 0);
+    pump();
+    require(handler.edits.empty() && p.settings().latency == 1024,
+            "closing the Latency list changed it: " + handler.kinds(latency_id));
 
     // Bypass: a click is one edit, and the host's own bypass shows.
     HWND bypass = item(shown, win::bypass);
@@ -480,13 +500,51 @@ void window(const fs::path& picture) {
                                  picture.extension().string());
         keep_picture(host, refused);
     }
+    // The box keeps its tint when the system's settings change (a font,
+    // the colours, a DPI change make the fonts again).
+    const auto tinted = [&] {
+        HDC dc = GetDC(message);
+        SendMessageW(shown, WM_CTLCOLORSTATIC, reinterpret_cast<WPARAM>(dc),
+                     reinterpret_cast<LPARAM>(message));
+        const bool differs = GetBkColor(dc) != GetSysColor(COLOR_WINDOW);
+        ReleaseDC(message, dc);
+        return differs;
+    };
+    HIGHCONTRASTW contrast{};
+    contrast.cbSize = sizeof contrast;
+    const bool high = SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof contrast, &contrast, 0) &&
+                      (contrast.dwFlags & HCF_HIGHCONTRASTON);
+    if (!high) {
+        require(tinted(), "the problem's box is not tinted");
+        SendMessageW(shown, WM_SETTINGCHANGE, SPI_SETNONCLIENTMETRICS, 0);
+        SendMessageW(shown, WM_SYSCOLORCHANGE, 0, 0);
+        require(tinted(), "the problem's box lost its tint after a settings change");
+    }
 
     require(view->removed() == kResultOk &&
                 FindWindowExW(host, nullptr, win::window_class, nullptr) == nullptr,
             "remove");
+    // Attached again, the same view makes everything afresh: the Audio rows,
+    // the folded file lines, the problem in its box.
+    require(view->attached(host, kPlatformTypeHWND) == kResultOk, "attach again");
+    pump();
+    shown = FindWindowExW(host, nullptr, win::window_class, nullptr);
+    require(shown != nullptr && IsWindowVisible(shown), "no window when attached again");
+    HWND first_fact = item(shown, win::audio_rows + 1);
+    require(first_fact != nullptr && IsWindowVisible(first_fact) && !text(first_fact).empty(),
+            "no Audio rows when attached again");
+    require(!checked(item(shown, win::reference_toggle)) &&
+                !IsWindowVisible(item(shown, win::reference)),
+            "the file lines show while their box is unticked");
+    require(text(item(shown, win::status)) == L"Load failed" &&
+                IsWindowVisible(item(shown, win::message)),
+            "the problem is not shown when attached again");
+    // A host that destroys its window before removing the view.
+    DestroyWindow(host);
+    pump();
+    require(view->removed() == kResultOk, "remove after the host's window went");
     view->setFrame(nullptr);
     view->release();
-    DestroyWindow(host);
     std::error_code ignored;
     fs::remove_all(folder, ignored);
     convolver::forget_recent_files();

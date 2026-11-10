@@ -65,7 +65,9 @@ Until 1.0 the C++ API may change between minor versions.
   moved from the macOS window's Objective-C into shared C++
   (`portable/window_model.hpp`), so the coming Windows window behaves the
   same; `native.window_model` tests it on every system. The macOS window
-  looks and behaves as before.
+  looks and behaves as before, except in typed values nobody would type:
+  `0x10` now reads as 0 rather than 16, and `5e` is refused rather than
+  read as 5.
 - Source (TIDY-1, from the whole-project review of 9 November 2026): small
   helpers that existed in two or three copies now have one: the SplitMix64
   generator and the little-endian readers and writers in `bytes.hpp`, and

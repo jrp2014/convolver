@@ -309,6 +309,9 @@ class Editor final : public EditorView, public IPlugViewContentScaleSupport {
     void scale_to(double scale);
     void make_fonts();
     void delete_fonts();
+    void make_tint();
+    void close_window();
+    void forget_controls();
     int px(double units) const {
         return static_cast<int>(std::lround(units * scale_));
     }
@@ -354,6 +357,8 @@ class Editor final : public EditorView, public IPlugViewContentScaleSupport {
     HFONT body_ = nullptr, small_ = nullptr, heading_ = nullptr, strong_ = nullptr;
     HBRUSH background_ = nullptr, tint_ = nullptr;
     COLORREF tint_colour_ = 0;
+    COLORREF grey_ =
+        0; // Secondary text: the system's grey text colour when the controls were made.
     HDC measure_ = nullptr;
 
     HWND title_ = nullptr, bypass_ = nullptr, name_ = nullptr, status_ = nullptr;
@@ -443,9 +448,10 @@ Editor::Editor(Controller& controller) : EditorView(&controller) {
 Editor::~Editor() {
     stop_choosing();
     end_gesture();
-    if (hwnd_)
-        DestroyWindow(hwnd_);
+    close_window();
     delete_fonts();
+    if (tint_)
+        DeleteObject(tint_);
     if (measure_)
         DeleteDC(measure_);
     auto& s = shared();
@@ -490,7 +496,8 @@ tresult PLUGIN_API Editor::attached(void* parent, FIDString type) {
     if (!parent || isPlatformTypeSupported(type) != kResultTrue || !shared().window_class)
         return kResultFalse;
     if (hwnd_)
-        removed(); // A host that attaches again without removing first.
+        removed();     // A host that attaches again without removing first.
+    forget_controls(); // What a window the host closed first left behind.
     parent_ = static_cast<HWND>(parent);
     hwnd_ =
         CreateWindowExW(WS_EX_CONTROLPARENT | WS_EX_ACCEPTFILES, win::window_class, L"Convolver",
@@ -514,13 +521,51 @@ tresult PLUGIN_API Editor::removed() {
     // A file chosen for this window, or a drag it no longer sees, ends here.
     stop_choosing();
     end_gesture();
-    if (hwnd_) {
-        HWND window = hwnd_;
-        hwnd_ = nullptr;
-        DestroyWindow(window);
-    }
+    close_window();
     parent_ = nullptr;
     return EditorView::removed();
+}
+
+// The window and its controls go; the view stays, ready to be attached
+// again with everything made afresh.
+void Editor::close_window() {
+    if (!hwnd_)
+        return;
+    forget_controls();
+    HWND window = hwnd_;
+    hwnd_ = nullptr; // What the closing controls send no longer reaches the view.
+    DestroyWindow(window);
+}
+
+// Forgets what belonged to the window's controls: its timers, the names
+// given to screen readers, the Audio rows, the colours, what the controls
+// show and where the window paints.
+void Editor::forget_controls() {
+    if (hwnd_) {
+        KillTimer(hwnd_, win::refresh_timer);
+        KillTimer(hwnd_, win::files_timer);
+        KillTimer(hwnd_, win::copied_timer);
+    }
+    if (!named_.empty()) {
+        Com com;
+        IAccPropServices* services = nullptr;
+        if (SUCCEEDED(CoCreateInstance(access_services, nullptr, CLSCTX_INPROC_SERVER,
+                                       IID_IAccPropServices,
+                                       reinterpret_cast<void**>(&services)))) {
+            MSAAPROPID name = accessible_name;
+            for (HWND control : named_)
+                services->ClearHwndProps(control, OBJID_CLIENT, CHILDID_SELF, &name, 1);
+            services->Release();
+        }
+        named_.clear();
+    }
+    audio_.clear();
+    colours_.clear();
+    separators_.clear();
+    dot_ = {};
+    box_ = {};
+    reference_shown_ = false;
+    shown_.reset();
 }
 
 tresult PLUGIN_API Editor::setContentScaleFactor(ScaleFactor factor) {
@@ -540,9 +585,17 @@ LRESULT CALLBACK Editor::window_proc(HWND window, UINT message, WPARAM w, LPARAM
                           reinterpret_cast<LONG_PTR>(create->lpCreateParams));
     }
     auto* editor = reinterpret_cast<Editor*>(GetWindowLongPtrW(window, GWLP_USERDATA));
-    if (message == WM_NCDESTROY)
+    if (message == WM_NCDESTROY) {
         SetWindowLongPtrW(window, GWLP_USERDATA, 0);
-    if (!editor || editor->hwnd_ != window || message == WM_NCDESTROY)
+        // A host that destroyed its own window before removing the view:
+        // the view no longer has a window.
+        if (editor && editor->hwnd_ == window) {
+            editor->hwnd_ = nullptr;
+            editor->parent_ = nullptr;
+        }
+        return DefWindowProcW(window, message, w, l);
+    }
+    if (!editor || editor->hwnd_ != window)
         return DefWindowProcW(window, message, w, l);
     return editor->handle(message, w, l);
 }
@@ -580,11 +633,18 @@ LRESULT Editor::handle(UINT message, WPARAM w, LPARAM l) {
         scale_to(GetDpiForWindow(hwnd_) / 96.0);
         return 0;
     case WM_SETTINGCHANGE:
-    case WM_SYSCOLORCHANGE:
+    case WM_SYSCOLORCHANGE: {
         contrast_ = high_contrast();
+        const COLORREF grey = GetSysColor(COLOR_GRAYTEXT);
+        for (auto& entry : colours_)
+            if (entry.second == grey_)
+                entry.second = grey;
+        grey_ = grey;
+        make_tint();
         scale_to(GetDpiForWindow(hwnd_) / 96.0); // The message font may have changed too.
         InvalidateRect(hwnd_, nullptr, TRUE);
         return 0;
+    }
     case WM_CTLCOLORSTATIC:
     case WM_CTLCOLOREDIT:
     case WM_CTLCOLORBTN: {
@@ -661,23 +721,10 @@ LRESULT Editor::handle(UINT message, WPARAM w, LPARAM l) {
     case WM_LBUTTONDOWN:
         SetFocus(hwnd_); // A click beside the controls ends typing in a box.
         return 0;
-    case WM_DESTROY:
-        KillTimer(hwnd_, win::refresh_timer);
-        KillTimer(hwnd_, win::files_timer);
-        KillTimer(hwnd_, win::copied_timer);
-        if (!named_.empty()) {
-            Com com;
-            IAccPropServices* services = nullptr;
-            if (SUCCEEDED(CoCreateInstance(access_services, nullptr, CLSCTX_INPROC_SERVER,
-                                           IID_IAccPropServices,
-                                           reinterpret_cast<void**>(&services)))) {
-                MSAAPROPID name = accessible_name;
-                for (HWND control : named_)
-                    services->ClearHwndProps(control, OBJID_CLIENT, CHILDID_SELF, &name, 1);
-                services->Release();
-            }
-            named_.clear();
-        }
+    case WM_DESTROY: // Only when the host destroys its window first (removed() forgets first).
+        stop_choosing();
+        end_gesture();
+        forget_controls();
         return 0;
     default:
         break;
@@ -752,6 +799,7 @@ void Editor::name_for_screen_readers(HWND control, const std::wstring& name) {
 
 void Editor::create_controls() {
     Styles styles;
+    grey_ = GetSysColor(COLOR_GRAYTEXT);
     const DWORD label = SS_LEFT | SS_NOPREFIX;
     const DWORD shown = WS_VISIBLE;
     // Which instance this is, with Bypass at the end of the same line.
@@ -766,11 +814,11 @@ void Editor::create_controls() {
             make(L"STATIC", fact_names[i], label, win::fact_headings + static_cast<int>(i));
         fact_values_[i] =
             make(L"STATIC", L"", label | SS_ENDELLIPSIS, win::fact_values + static_cast<int>(i));
-        colours_[fact_headings_[i]] = GetSysColor(COLOR_GRAYTEXT);
+        colours_[fact_headings_[i]] = grey_;
         name_for_screen_readers(fact_values_[i], fact_names[i]);
     }
     filter_note_ = make(L"STATIC", L"", shown | label, win::filter_note);
-    colours_[filter_note_] = GetSysColor(COLOR_GRAYTEXT);
+    colours_[filter_note_] = grey_;
     // DIAG-2's message: read-only text the user can select and copy, in a
     // box tinted with the status colour when it states a problem.
     message_ =
@@ -778,7 +826,7 @@ void Editor::create_controls() {
     name_for_screen_readers(message_, L"What Convolver plays, why, and what to do");
     note_label_ = make(L"STATIC", L"Note:", SS_RIGHT | SS_NOPREFIX, win::note_label);
     note_ = make(L"STATIC", L"", label, win::note);
-    colours_[note_label_] = colours_[note_] = GetSysColor(COLOR_GRAYTEXT);
+    colours_[note_label_] = colours_[note_] = grey_;
     // Choose…, the recent files, Reload, and reloading when the file changes.
     choose_ = make(L"BUTTON", L"Choose\u2026", shown | WS_TABSTOP | BS_PUSHBUTTON, win::choose);
     name_for_screen_readers(choose_, L"Choose Filter");
@@ -801,7 +849,7 @@ void Editor::create_controls() {
             for (const auto& item : s.choices)
                 SendMessageW(s.control, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(item.c_str()));
             s.value = make(L"STATIC", L"", shown | label, id + win::value);
-            colours_[s.value] = GetSysColor(COLOR_GRAYTEXT);
+            colours_[s.value] = grey_;
         } else {
             s.control = make(TRACKBAR_CLASSW, L"", shown | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS,
                              id + win::control);
@@ -814,19 +862,19 @@ void Editor::create_controls() {
                            id + win::value);
             name_for_screen_readers(s.value, s.name);
             s.unit_label = make(L"STATIC", s.unit, shown | label, id + win::unit);
-            colours_[s.unit_label] = GetSysColor(COLOR_GRAYTEXT);
+            colours_[s.unit_label] = grey_;
             if (!s.low.empty()) {
                 s.low_label = make(L"STATIC", s.low, shown | label, id + win::low);
                 s.high_label =
                     make(L"STATIC", s.high, shown | SS_RIGHT | SS_NOPREFIX, id + win::high);
-                colours_[s.low_label] = colours_[s.high_label] = GetSysColor(COLOR_GRAYTEXT);
+                colours_[s.low_label] = colours_[s.high_label] = grey_;
             }
         }
         name_for_screen_readers(s.control, s.name);
     }
     if (mix_ != SIZE_MAX) {
         mix_note_ = make(L"STATIC", L"", label, win::mix_note);
-        colours_[mix_note_] = GetSysColor(COLOR_GRAYTEXT);
+        colours_[mix_note_] = grey_;
     }
     audio_heading_ = make(L"STATIC", L"Audio", shown | label, win::audio_heading);
     // The file, software and log lines, folded away, with Copy Diagnostics
@@ -883,17 +931,14 @@ void Editor::delete_fonts() {
             DeleteObject(*font);
         *font = nullptr;
     }
-    for (HBRUSH* brush : {&background_, &tint_}) {
-        if (*brush)
-            DeleteObject(*brush);
-        *brush = nullptr;
-    }
+    if (background_)
+        DeleteObject(background_);
+    background_ = nullptr;
 }
 
 // The system's message font at the window's DPI: the body text, a smaller
 // size for secondary text, a bold heading and a semibold status word.
 void Editor::make_fonts() {
-    delete_fonts();
     const UINT dpi = static_cast<UINT>(std::lround(96 * scale_));
     NONCLIENTMETRICSW metrics{};
     metrics.cbSize = sizeof metrics;
@@ -922,6 +967,8 @@ void Editor::scale_to(double scale) {
     scale_ = scale > 0 ? scale : 1;
     if (!hwnd_ && host_scale_)
         scale_ = *host_scale_;
+    // The old fonts stay until no control uses them.
+    const std::array<HGDIOBJ, 5> old{body_, small_, heading_, strong_, background_};
     make_fonts();
     if (hwnd_) {
         const auto font = [](HWND control, HFONT f) {
@@ -956,6 +1003,9 @@ void Editor::scale_to(double scale) {
             font(row.note, body_);
         }
     }
+    for (HGDIOBJ object : old)
+        if (object)
+            DeleteObject(object);
     const int height = arrange(hwnd_ != nullptr);
     if (!hwnd_) {
         rect = ViewRect(0, 0, px(width), height);
@@ -1277,13 +1327,7 @@ void Editor::show(const WindowContent& c) {
         colours_.erase(status_);
         break;
     }
-    // The box's tint: the status colour over the window's, faintly.
-    if (tint_)
-        DeleteObject(tint_);
-    const auto found = colours_.find(status_);
-    tint_colour_ = blend(found != colours_.end() ? found->second : GetSysColor(COLOR_GRAYTEXT),
-                         GetSysColor(COLOR_WINDOW), 0.08);
-    tint_ = CreateSolidBrush(tint_colour_);
+    make_tint();
     set_text(name_, wide(c.filter_name));
     set_text(filter_note_, wide(c.filter_note));
     const std::array<std::string, 4> facts{c.filter_rate, c.filter_channels, c.filter_length,
@@ -1310,7 +1354,7 @@ void Editor::show(const WindowContent& c) {
         if (applies)
             colours_.erase(mix.label);
         else
-            colours_[mix.label] = GetSysColor(COLOR_GRAYTEXT);
+            colours_[mix.label] = grey_;
     }
     set_text(reference_, reference_text(c.reference));
     rebuild_audio(c.audio);
@@ -1318,6 +1362,16 @@ void Editor::show(const WindowContent& c) {
     arrange(true);
     InvalidateRect(hwnd_, nullptr, TRUE);
     follow_size();
+}
+
+// The box's tint: the status colour over the window's, faintly.
+void Editor::make_tint() {
+    if (tint_)
+        DeleteObject(tint_);
+    const auto found = colours_.find(status_);
+    tint_colour_ =
+        blend(found != colours_.end() ? found->second : grey_, GetSysColor(COLOR_WINDOW), 0.08);
+    tint_ = CreateSolidBrush(tint_colour_);
 }
 
 // The Audio rows, made again when the facts change.
@@ -1339,7 +1393,7 @@ void Editor::rebuild_audio(const std::vector<AudioFact>& facts) {
         row.note = make(L"STATIC", L"", style, id + 2);
         for (HWND control : {row.label, row.value, row.note})
             SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(body_), FALSE);
-        colours_[row.label] = GetSysColor(COLOR_GRAYTEXT);
+        colours_[row.label] = grey_;
         audio_.push_back(row);
     }
     for (std::size_t i = 0; i < facts.size(); ++i) {
@@ -1350,7 +1404,7 @@ void Editor::rebuild_audio(const std::vector<AudioFact>& facts) {
         // too; another note in the secondary colour.
         set_text(audio_[i].note,
                  fact.note.empty() ? L"" : (fact.problem ? L"\u26A0 " : L"") + wide(fact.note));
-        colours_[audio_[i].note] = fact.problem ? RGB(196, 43, 28) : GetSysColor(COLOR_GRAYTEXT);
+        colours_[audio_[i].note] = fact.problem ? RGB(196, 43, 28) : grey_;
     }
 }
 
@@ -1485,8 +1539,20 @@ void Editor::command(int id, int code, HWND control) {
     // A setting's box or list.
     for (std::size_t i = 0; i < settings_.size(); ++i) {
         Setting& s = settings_[i];
-        if (s.list && control == s.control && code == CBN_SELCHANGE) {
+        // Latency changes when a choice is made: a click or Return in the
+        // open list, or an arrow key or the wheel on the closed one, not
+        // each item the arrow keys pass in the open list (each change
+        // rebuilds the engine); Escape in the open list puts it back.
+        if (s.list && control == s.control && code == CBN_SELENDCANCEL) {
+            read_settings();
+            return;
+        }
+        if (s.list && control == s.control &&
+            (code == CBN_SELENDOK ||
+             (code == CBN_SELCHANGE && !SendMessageW(control, CB_GETDROPPEDSTATE, 0, 0)))) {
             const auto index = SendMessageW(control, CB_GETCURSEL, 0, 0);
+            if (index >= 0 && plain(s) == static_cast<double>(index))
+                return; // The choice it already had.
             if (index >= 0)
                 set_value(i, static_cast<double>(index));
             refresh(); // The report says when a new Latency takes effect.

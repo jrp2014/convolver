@@ -251,7 +251,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     ChooseRequests choose_;            // The pending Choose… request.
     NSOpenPanel* panel_;               // Its dialog, while one is open.
     // Reload: the playing filter's file and the files it was read from
-    // (file_watch.h); timer ticks, for the checks.
+    // (FileWatch in window_model.hpp); timer ticks, for the checks.
     FileWatch watch_;
     unsigned ticks_;
 }
