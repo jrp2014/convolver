@@ -65,7 +65,7 @@ Until 1.0 the C++ API may change between minor versions.
   its last sample, and one of 4 GiB or more, where nothing says where the
   audio ends. As `--input`, or as an IR file named in a configuration, each
   gets a message that says why and what to do; chosen directly as the
-  filter it gets the general message
+  filter it gets a general message that does not give the reason
   ([input files](docs/use/command-line.md#input-files)). Found by the
   project review of 9 November 2026; jrp chose to read files without sizes
   on 10 November 2026.

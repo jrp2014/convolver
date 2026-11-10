@@ -409,8 +409,9 @@ Two files without sizes are refused:
 
 Given as `--input`, or named as an IR file in a configuration, each gets a
 message that says so. Chosen directly as the filter, here or in a plug-in,
-it gets the general message for any file that cannot be read: that it is
-neither a configuration nor a sound file Convolver can read.
+it gets a general message that does not give this reason: that the file is
+neither a configuration nor a sound file Convolver can read, or, when it is
+larger than 1 MiB, that it is too large for a configuration.
 
 Other containers, including RF64, get libsndfile's own checks; Convolver does
 not validate every codec libsndfile supports.

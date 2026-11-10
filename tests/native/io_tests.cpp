@@ -1567,6 +1567,9 @@ void run(const fs::path& dir) {
         // reads no frames at all, are no better.
         text_file(dir / "unsized-data.wav", layout(5, 36 + 15, unknown, ""));
         refused(dir / "unsized-data.wav", "an unfilled data size under a real RIFF size");
+        // It is told that it is cut short, not that it is too long.
+        says(dir / "unsized-data.wav", {"truncated RIFF/WAVE chunk", "damaged or incomplete"},
+             "an unfilled data size under a real RIFF size is reported as cut short");
         text_file(dir / "unsized-list.wav",
                   layout(4, 36 + 12 + 8, 12, std::string("LIST\xff\xff\xff\xff", 8)));
         refused(dir / "unsized-list.wav", "a chunk after the data that overruns is refused");
