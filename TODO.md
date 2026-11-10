@@ -1017,18 +1017,23 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   (`src/effects/vst/view/vstviewmodel.cpp`, `au3-vst3/VST3Wrapper.cpp`)
   reads as though, while its vendor window is open, it stores the whole state,
   both `getState` calls, within 100 ms of any `performEdit` when not
-  playing, and on the first check after playback stops when the edit came
-  during playback; it also stores it when the window closes. So after an
-  accepted file, a controller whose `setDirty` does not reach the host
-  (no `IComponentHandler2`) reports one edit of Latency that keeps its
-  value: not automatable, ignored by `process()`, and `endEdit` in
-  Audacity only marks the project unsaved and amends its current undo
-  state. No Gain or Mix edit is made, and hosts that offer `setDirty` see
-  nothing new (`vst3.adapter` checks both). Remaining: jrp's Audacity
-  check (Choose, export, save and reopen with no parameter touched, while
-  stopped and during playback) and a REAPER check that a chosen file adds
-  no Latency entry to its undo history; then the guides, release notes and
-  decision row lose the presets-only narrowing.
+  playing; it also stores it when playback stops and when the window
+  closes, so a check must export with the window open and without
+  playing after the choice, or it can pass without the fix. So after an
+  accepted file, a controller whose `setDirty` does not succeed (no
+  `IComponentHandler2`, or a host that answers otherwise) reports one edit
+  of Latency that keeps its value: not automatable, ignored by
+  `process()`, and `endEdit` in Audacity only marks the project unsaved
+  and amends its current undo state. No Gain or Mix edit is made, and a
+  host whose `setDirty` succeeds sees nothing new (`vst3.adapter` checks
+  all three cases). The independent review (PR #177) noted that Audacity
+  amends its undo state about 100 ms before it stores the new state, as
+  for any edit, so undoing a later action may bring back the previous
+  filter; worth one look in the host check. Remaining: jrp's Audacity
+  check (Choose, export, save and reopen with no parameter touched and the
+  window open, with 0.13.2 as a control that fails) and a REAPER check
+  that a chosen file adds no Latency entry to its undo history; then the
+  guides, release notes and decision row lose the presets-only narrowing.
 - [ ] **VST3-12 — Editor window on Windows.** The same window as a Win32 view
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.

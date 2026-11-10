@@ -90,7 +90,7 @@ class Handler final : public IComponentHandler, public IComponentHandler2 {
     }
     tresult PLUGIN_API setDirty(TBool state) override {
         dirty += state ? 1 : 0;
-        return kResultOk;
+        return dirty_result;
     }
     tresult PLUGIN_API requestOpenEditor(FIDString) override {
         return kNotImplemented;
@@ -119,6 +119,7 @@ class Handler final : public IComponentHandler, public IComponentHandler2 {
     // False: a host without IComponentHandler2 (Audacity 4.0.2, VST3-17).
     // Set before setComponentHandler, which asks for it once.
     bool offers_dirty = true;
+    tresult dirty_result = kResultOk; // What setDirty answers.
     struct Edit {
         char kind;
         ParamID id;
@@ -2414,14 +2415,17 @@ void report_and_files() {
 // VST3-17: a host without IComponentHandler2 (Audacity 4.0.2) stores the
 // state only after the plug-in reports an edit, so an accepted file is
 // reported as one edit of Latency that keeps its value: begin, perform with
-// the current value, end. Nothing else changes: no other parameter, no
+// the current value, end. So is one for a host whose setDirty answers
+// anything but kResultOk. Nothing else changes: no other parameter, no
 // latency restart, no new Latency for the processor. A refused file reports
 // nothing.
-void load_without_set_dirty() {
+void load_without_set_dirty(bool offers_dirty) {
+    (void)offers_dirty; // Unused in a build that cannot read files.
 #if defined(__APPLE__) || defined(CONVOLVER_VST3_TESTS_IO)
     HostApplication context;
     Handler handler;
-    handler.offers_dirty = false;
+    handler.offers_dirty = offers_dirty;
+    handler.dirty_result = kResultFalse; // Used only when offered.
     Processor p;
     Controller c;
     require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
@@ -2452,7 +2456,8 @@ void load_without_set_dirty() {
 #endif
     handler.edits.clear();
     handler.restarts.clear();
-    require(c.load_file(good.string()) && handler.dirty == 0, "no-dirty file not loaded");
+    require(c.load_file(good.string()) && handler.dirty == (offers_dirty ? 1 : 0),
+            "no-dirty file not loaded");
     const bool one_gesture = handler.edits.size() == 3 && handler.edits[0].kind == 'b' &&
                              handler.edits[1].kind == 'p' && handler.edits[2].kind == 'e' &&
                              std::all_of(handler.edits.begin(), handler.edits.end(),
@@ -3026,7 +3031,8 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         latency_while_playing();
         latency_handover_waits();
         report_and_files();
-        load_without_set_dirty();
+        load_without_set_dirty(false);
+        load_without_set_dirty(true);
         saved_filter_name();
         messages_through_proxies();
         settings_at_state_limit();
