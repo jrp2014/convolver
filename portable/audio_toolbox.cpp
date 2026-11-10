@@ -162,9 +162,15 @@ class ToolboxFile final : public SoundFile {
             file_.wave = std::make_unique<SizedWave>();
             file_.wave->sizes = *sizes;
             file_.wave->descriptor = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
-            if (file_.wave->descriptor < 0)
-                throw std::runtime_error(opening + std::generic_category().message(errno) + " (" +
-                                         sandbox_hint + ")");
+            if (file_.wave->descriptor < 0) {
+                // The hint only where a sandbox can be the cause, as in missing().
+                const std::error_code error(errno, std::generic_category());
+                const bool denied = error == std::errc::permission_denied ||
+                                    error == std::errc::operation_not_permitted;
+                throw std::runtime_error(
+                    opening + error.message() +
+                    (denied ? std::string(" (") + sandbox_hint + ")" : std::string()));
+            }
             opened = AudioFileOpenWithCallbacks(file_.wave.get(), &SizedWave::read, nullptr,
                                                 &SizedWave::length, nullptr, kAudioFileWAVEType,
                                                 &file_.audio_file);

@@ -66,9 +66,10 @@ struct UnsizedRefusal : std::runtime_error {
 
 // libsndfile takes a WAV that ends early for a shorter one, so the chunk
 // layout is checked here first. IO-10: two layouts that break the format's
-// rules are accepted, because libsndfile, FFmpeg and macOS's AudioToolbox
-// read them and common writers produce them. Both rules are narrow on
-// purpose; every other mismatch is still refused.
+// rules are accepted, because libsndfile and FFmpeg read them and common
+// writers produce them; macOS's AudioToolbox reads the first, and the second
+// once it is shown the sizes. Both rules are narrow on purpose; every other
+// mismatch is still refused.
 // - No pad byte after the last chunk: a chunk of odd length ending exactly
 //   where the RIFF size ends (Python's wave module writes mono 24-bit audio
 //   with an odd number of frames so). A RIFF size that counts the pad byte

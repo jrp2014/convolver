@@ -246,9 +246,13 @@ void run(const fs::path& dir) {
     // of mono 24-bit audio as four frames and 18 as five (PR #176), so the
     // reader shows it such a file with its sizes filled in; these are those
     // lengths, 12 bytes, a real data size (even and odd) under an unfilled
-    // RIFF size, and the header FFmpeg writes. The same layouts cut short
-    // are refused by both: a RIFF size that counts a pad byte the file
-    // lacks, and an unsized file cut off inside a frame.
+    // RIFF size, and the header FFmpeg writes, over 7 frames and over
+    // 100,000 (every other one is read in a single call; this one takes
+    // reads that start past the header). The same layouts cut short are
+    // refused by both: a RIFF size that counts a pad byte the file lacks,
+    // and an unsized file cut off inside a frame. So are two unsized files
+    // that Convolver's own check passes and no reader can decode: one whose
+    // format tag nothing knows, and one with no format chunk.
     constexpr std::uint32_t unknown_size = 0xffffffff;
     pcm24_layout(dir / "unpadded.wav", 5, 36 + 15, 15, "");
     pcm24_layout(dir / "unsized.wav", 4, unknown_size, unknown_size, "");
@@ -257,17 +261,27 @@ void run(const fs::path& dir) {
     pcm24_layout(dir / "unsized-riff.wav", 4, unknown_size, 12, "LIST\4\0\0\0INFO"s);
     pcm24_layout(dir / "unsized-riff-odd.wav", 5, unknown_size, 15, "");
     piped_float_layout(dir / "piped-float.wav", 7);
+    piped_float_layout(dir / "piped-long.wav", 100000);
     pcm24_layout(dir / "counted-pad.wav", 5, 36 + 16, 15, "");
     pcm24_layout(dir / "unsized-cut.wav", 4, unknown_size, unknown_size, "");
     fs::resize_file(dir / "unsized-cut.wav", fs::file_size(dir / "unsized-cut.wav") - 2);
+    {
+        std::ifstream whole(dir / "unsized.wav", std::ios::binary);
+        std::string bytes((std::istreambuf_iterator<char>(whole)), {});
+        bytes[20] = bytes[21] = '\x77'; // The format tag, at the WAV header's offset 20.
+        text_file(dir / "unsized-unknown.wav", bytes);
+        text_file(dir / "unsized-no-format.wav",
+                  bytes.substr(0, 12) + bytes.substr(36)); // 'data' follows 'WAVE'.
+    }
     struct Layout {
         const char* name;
         std::size_t channels, frames; // No frames: refused.
     };
     const Layout layouts[] = {
-        {"unpadded.wav", 1, 5},    {"unsized.wav", 1, 4},      {"unsized-odd.wav", 1, 5},
-        {"unsized-18.wav", 1, 6},  {"unsized-riff.wav", 1, 4}, {"unsized-riff-odd.wav", 1, 5},
-        {"piped-float.wav", 2, 7}, {"counted-pad.wav", 1, 0},  {"unsized-cut.wav", 1, 0},
+        {"unpadded.wav", 1, 5},    {"unsized.wav", 1, 4},         {"unsized-odd.wav", 1, 5},
+        {"unsized-18.wav", 1, 6},  {"unsized-riff.wav", 1, 4},    {"unsized-riff-odd.wav", 1, 5},
+        {"piped-float.wav", 2, 7}, {"piped-long.wav", 2, 100000}, {"counted-pad.wav", 1, 0},
+        {"unsized-cut.wav", 1, 0}, {"unsized-unknown.wav", 1, 0}, {"unsized-no-format.wav", 1, 0},
     };
     // What each reader makes of every layout, printed before anything is
     // required, so that one failed run shows them all.
@@ -370,8 +384,9 @@ void run(const fs::path& dir) {
     // A file refused after it was opened is closed again (jrp's review: each
     // refused filter left a descriptor open). Twenty refusals of a WAV whose
     // header claims 800 kHz, counting the descriptors open before and after;
-    // then the same without sizes, which the reader opens another way, and
-    // twenty loads of an unsized file that is read.
+    // then the same without sizes, which the reader opens another way, two
+    // unsized files that the system's reader itself refuses when opening
+    // them that way, and twenty loads of an unsized file that is read.
     for (const auto* name : {"pcm16.wav", "unsized.wav"}) {
         std::ifstream whole(dir / name, std::ios::binary);
         std::string bytes((std::istreambuf_iterator<char>(whole)), {});
@@ -400,11 +415,23 @@ void run(const fs::path& dir) {
             require(after_opening,
                     name + " is refused for its rate, after it was opened: '" + message + "'");
         }
+        for (const std::string name : {"unsized-unknown.wav", "unsized-no-format.wav"}) {
+            std::string message;
+            try {
+                reader.open(dir / name);
+            } catch (const std::exception& e) {
+                message = e.what();
+            }
+            if (i == 0)
+                std::cout << name << ": " << message << '\n';
+            require(message.find("cannot open audio input") != std::string::npos,
+                    name + " is refused by the reader that opened it: '" + message + "'");
+        }
         require(load(dir / "unsized.wav", reader).paths.size() == 1, "unsized.wav loads again");
     }
     const auto after = open_descriptors();
-    std::cout << "fast.wav and fast-unsized.wav: refused 20 times, unsized.wav: read 20 times, "
-                 "open descriptors "
+    std::cout << "fast.wav, fast-unsized.wav, unsized-unknown.wav and unsized-no-format.wav: "
+                 "refused 20 times, unsized.wav: read 20 times, open descriptors "
               << before << " then " << after << '\n';
     require(after <= before, "refused files leave descriptors open: " + std::to_string(before) +
                                  " before, " + std::to_string(after) + " after");
