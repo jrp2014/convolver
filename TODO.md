@@ -104,7 +104,7 @@ the suggested one.
 
 | Group | Items | Note |
 | --- | --- | --- |
-| Later previews, as decided | **PLUG-34**, then **VST3-12** (the Windows window); **VST3-13** (the Linux window) only once LV2 is in a Linux package and users ask; **PLUG-9**, **PLUG-10** and **AU-7** (the other gain modes and the meters) | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the windows' order is [decided](docs/project/decisions.md#direction) in the [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md). The 0.13.2 Windows and Linux packages use the host's own controls meanwhile |
+| Later previews, as decided | **VST3-12** (the Windows window, built: host and screen-reader checks left); **VST3-13** (the Linux window) only once LV2 is in a Linux package and users ask; **PLUG-9**, **PLUG-10** and **AU-7** (the other gain modes and the meters) | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the windows' order is [decided](docs/project/decisions.md#direction) in the [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md). The 0.13.2 Windows and Linux packages use the host's own controls meanwhile |
 | LV2 in a preview | **LV2-5** (jrp first decides how `VERSION` maps to LV2's version numbers), **LV2-3**, **LV2-4**, **LV2-7** | LV2 joins a preview once its own journeys are demonstrated |
 | A window fix from jrp's sessions | **PLUG-26** (choose a `.vstpreset` in the window) | From his file-loading review of 7 November 2026 |
 | Other configuration readers | **CFG-1**, then **CFG-2** | CFG-2 waits for CFG-1 to show which readers matter |
@@ -592,18 +592,6 @@ LV2 (Linux first; also PipeWire system audio):
   plug-in has a window, and the guides' preset fallback for the crossover
   is removed. No sound change for filters that load today. Waits for the
   freeze unless jrp brings it forward.
-- [ ] **PLUG-34 — The window's behaviour in shared code.** The
-  first step of the [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md#what-comes-first)
-  for VST3-12 and VST3-13: what to show for a report, typed values, the
-  Latency note, the Choose… request, the reload check and the Recent list
-  move from `plugins/editor/mac/` into C++ in `portable/window_model.hpp`
-  (part of `Convolver::host`, as the recent-files list is), which the macOS
-  window then calls. Done when the shared part has tests on every CI system
-  and `vst3.editor` and `au.editor` pass unchanged. No visible change on
-  macOS.
-  Progress (10 November 2026): the shared part and `native.window_model`
-  are written and the macOS window calls them; waiting for the macOS CI
-  run of `vst3.editor` and `au.editor`, which no Linux session can compile.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
@@ -1092,6 +1080,13 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   Built next among the windows, after PLUG-34; its first part gives the Windows
   and Linux plug-in a sound-file reader (libsndfile, if jrp agrees)
   ([decided](docs/project/decisions.md#direction); [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md#steps)).
+  Progress (10 November 2026, PR #181): the plug-in reads filter files with
+  libsndfile on Windows and Linux (pending jrp's choice of reader), and the
+  Win32 window is built (`plugins/vst3/editor_win.cpp`) with `vst3.editor`
+  on Windows and pluginval's editor tests there; it ran under Wine before
+  Windows CI. Left: a tester in REAPER and one other Windows host, and a
+  screen reader (NVDA or Narrator); the release notes' Windows window
+  limitation goes with the next preview's notes change.
 - [ ] **VST3-13 — Editor window on Linux.** The window in VSTGUI, for the
   Linux VST3 build only, as a stop-gap, driven by the
   host's `IRunLoop`; VSTGUI (BSD-3-Clause) and the libraries it links added
@@ -1685,6 +1680,12 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 
 Items finished since then are listed here, one line each, until the next
 move to the archive.
+
+- [x] **PLUG-34 — The window's behaviour in shared code.** 10 November
+  2026, PR #181: what the window shows and what a user's action means, in
+  `portable/window_model.hpp`, used by the macOS window with no visible
+  change and by the Windows one
+  ([implementation map](docs/develop/architecture.md#the-shared-macos-window)).
 
 - [x] **IO-11 — WAV files with unfilled sizes are read.** 10 November
   2026, PR #176. jrp chose to read them everywhere: a WAV whose sizes were

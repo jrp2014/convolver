@@ -15,17 +15,17 @@ does not fit. Installing is in [install](install.md); making presets is in
   for example 2 in and 6 out for a crossover.
 - You choose the filter file itself (an IR file, a `.cfg` or a
   configuration list) with **Choose…** in Convolver's window (the Audio
-  Unit and the VST3 plug-in on macOS) or with the host's file chooser
+  Unit, and the VST3 plug-in on macOS and Windows) or with the host's file chooser
   (LV2, in hosts that show it); a preset from the host's preset menu is
   the other way ([loading a filter](#loading-a-filter)). The host saves
   the filter inside your project. A read-only Status
   parameter says what is playing, and the
   [Convolver log](#status-and-the-convolver-log) says why a filter failed.
-  The Audio Unit and the VST3 plug-in on macOS also have a
+  The Audio Unit and the VST3 plug-in on macOS and Windows also have a
   [window](#convolvers-window) that shows the status, why it is silent and
   what to change, the filter and settings, what plays in plain words, with
-  Copy Diagnostics and Show Log; the VST3 plug-in on Windows and Linux and
-  the LV2 plug-in have no window yet.
+  Copy Diagnostics and Show Log; the VST3 plug-in on Linux and the LV2
+  plug-in have no window yet. (The Windows window is new since 0.13.2.)
 - Convolver adds no processing delay by default: the filtered sound comes
   out as the filter shapes it, with no wait for blocks of audio. (A filter
   can still delay the sound itself, with a delay in its impulse response or
@@ -119,7 +119,7 @@ the one list of what each way reads:
 
 | Way in | Plug-ins | Reads |
 | --- | --- | --- |
-| **Choose…**, or dropping the file, in [Convolver's window](#convolvers-window) | The Audio Unit, and the VST3 plug-in on macOS | An IR file, a `.cfg` or a configuration list, with exactly as many inputs as the host gives; not a preset file |
+| **Choose…**, or dropping the file, in [Convolver's window](#convolvers-window) | The Audio Unit, and the VST3 plug-in on macOS and Windows | An IR file, a `.cfg` or a configuration list, with exactly as many inputs as the host gives; not a preset file |
 | The host's file chooser for the **Filter** parameter | LV2, in hosts that show it ([LV2 filter files](#lv2-filter-files)) | An IR file, a `.cfg` or a configuration list, with the plug-in's own channel counts |
 | The host's preset menu ("Load Preset…" or its preset browser) | Every format | Convolver's preset in that format: `.vstpreset` (VST3), `.aupreset` (Audio Unit) or a `NAME.preset.lv2` folder (LV2), with at least its inputs ([channels](#channels)) |
 | A saved project | Every format | The filter and settings saved in it |
@@ -128,7 +128,7 @@ the one list of what each way reads:
 `convolver-preset`, which reads an IR file, a `.cfg`, a configuration list
 or a Convolver `.vstpreset`, and lists the folders where hosts look for
 presets. A preset is needed where the plug-in has no window (the VST3
-plug-in on Windows and Linux), in an LV2 host with no file chooser, and in
+plug-in on Linux, and on Windows up to 0.13.2), in an LV2 host with no file chooser, and in
 Audacity, where the previews support only Audacity's own preset menu:
 Audacity 4.0.2 does not keep a filter loaded in the window (with Choose…,
 Recent, Reload or reloading when the file changes) for exports or saved
@@ -336,14 +336,15 @@ start at the host's sample rate and when a save failed.
 
 ### Convolver's window
 
-The Audio Unit, and the VST3 plug-in on macOS, offer hosts a window of their
-own (`auval` lists the Audio Unit's as a Cocoa view). Hosts that show plug-in
+The Audio Unit, and the VST3 plug-in on macOS and Windows, offer hosts a
+window of their own (`auval` lists the Audio Unit's as a Cocoa view). Hosts that show plug-in
 views open it from the plug-in's slot; if a host shows its generic sliders
 instead, choose the plug-in's own view in the plug-in window, where the host
 offers the choice. GarageBand opens it from the plug-in's button in the
 track's Plug-ins area; REAPER and Audacity open the VST3 plug-in's window
 when you add the effect or click its name in the effects list. Both formats
-show the same window, with the differences listed after the description.
+show the same window, and the VST3 plug-in on Windows shows it too, with the
+differences listed after the description.
 From the top, the window has:
 
 - **A title line** with the Convolver version, the instance (`Audio Unit #2`,
@@ -525,8 +526,8 @@ window updates twice a second while it is on screen. While the host restores
 a project or preset on another thread, it shows the last report until the
 filter is ready.
 
-**In VST3** (VST3-11, macOS only so far) the window behaves as above,
-except:
+**In VST3** (VST3-11 on macOS, VST3-12 on Windows) the window behaves as
+above, except:
 
 - The title line names the instance as the log does (`VST3 #2`).
 - Dragging a Gain or Mix slider is one change for the host's undo and
@@ -550,6 +551,33 @@ except:
   asks the host to make its window fit; the user cannot resize it.
 - The software line names macOS AudioToolbox as the reader of filter files,
   as in the Audio Unit. Not yet tried in REAPER or Audacity (HOST-1).
+
+**On Windows** (VST3-12, new since 0.13.2) the VST3 window is built from
+Windows' own controls, with the same parts in the same order, and behaves
+as the VST3 window above, except:
+
+- Gain and Mix are trackbars: drag one, or use the arrow keys (1 dB or 1%
+  a step) and Page Up and Page Down (10). A drag is one change for the
+  host's undo; each key press is one change. There is no Option-click
+  reset: type the default (0 or 100) in the box.
+- Recent is a split button; either part opens the list. The file dialog is
+  Windows' own, and the host's window waits while it is open.
+- The status is a dot and a word, the dot filled in the status colour; the
+  word always says it. Text in the message and in the file, software and
+  log lines can be selected and copied; other labels cannot.
+- Tab and Shift+Tab move between the window's controls; some hosts take
+  keys for themselves first, which has not been tried yet.
+- Screen readers (Narrator, NVDA) read each control's name through UI
+  Automation, which CI checks; nobody has tried a screen reader with the
+  window yet. The window follows the screen's scaling, and uses only the
+  system's colours in high-contrast mode; it stays light in a dark host,
+  since Windows' standard controls have no dark style.
+- Show Log selects the log in File Explorer. The software line names
+  libsndfile as the reader of filter files: WAV, RF64, W64, AIFF, CAF and
+  headerless files named in a `.cfg`; the packages' reader does not
+  read FLAC.
+- Not yet tried in any host: CI opens it in a test host and keeps a picture
+  of it.
 
 ## Settings
 

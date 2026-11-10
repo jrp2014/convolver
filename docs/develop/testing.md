@@ -780,6 +780,24 @@ lines open, and `removed()`. With a 2→6 crossover on a six-channel bus
 it over three refreshes, while Gain stays enabled, and that Host channels
 names the ignored inputs.
 
+On Windows `vst3.editor` (`tests/vst3/editor_win_tests.cpp`, VST3-12) opens
+the Win32 window the same way, attached to a host window on the desktop, and
+works it through its controls as a user would: HWND only, not resizable,
+twice the width at a content scale of 2, the status and title, the trackbars
+and the Latency list, a Gain the host set, a typed value with a decimal
+comma and a key on the trackbar each one edit, a Latency choice, Bypass, a
+dropped WAV loaded and the project marked changed, Reload, a change reloaded
+on the second check (not with the box unticked, nor afterwards), Copy
+Diagnostics on the clipboard, the names UI Automation gives the controls
+(what Narrator and NVDA read), Tab from control to control, a resize request
+when the folded lines open, a refused file shown in its box with Choose…
+drawn as the fix, and `removed()`; then the same mix-note check as on macOS.
+It keeps two pictures of the window, `vst3-editor.bmp` and
+`vst3-editor-refused.bmp` in the build's `plugins/vst3` folder, which the VST3
+workflow keeps with the run. Under Wine, where a Linux session can run it
+cross-compiled with MinGW, it skips the UI Automation names, which Wine does
+not give.
+
 The SDK validator runs in default and extensive (`-e`) modes. Extensive mode
 pairs 15 speaker arrangements (the adapter must accept or refuse each cleanly)
 and adds automation patterns. The validator does not create three tests that
@@ -819,9 +837,10 @@ add:
   (`pluginval validate` in pluginval 2, `--validate` in pluginval 1). Open
   and close, state save and restore, bus layouts, parameter fuzzing and
   thread safety, allocations during processing and oversized blocks, at
-  several sample rates and block sizes. On macOS its editor tests also open
-  Convolver's window (VST3-11) and change parameters while it is open;
-  elsewhere, with no window yet, the test passes `--skip-gui-tests`. `CONVOLVER_PLUGINVAL_ARGS`
+  several sample rates and block sizes. On macOS and Windows its editor
+  tests also open Convolver's window (VST3-11, VST3-12) and change
+  parameters while it is open; on Linux, with no window yet, the test passes
+  `--skip-gui-tests`. `CONVOLVER_PLUGINVAL_ARGS`
   adds options; CI adds `--rtcheck;relaxed` on macOS with pluginval 2, which
   can flag real-time-unsafe calls in process callbacks.
 - `vst3.pluginval.acceptance`: makes presets from a stereo impulse WAV (block
