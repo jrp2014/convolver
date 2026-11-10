@@ -242,22 +242,22 @@ void run(const fs::path& dir) {
     // IO-10 and IO-11: layouts that break RIFF's rules, which both readers
     // take: a last chunk of odd length without its pad byte (Python's wave
     // module), and sizes a writer could not fill in (FFmpeg writing to a
-    // pipe), first in the smallest form, then with 18 bytes of audio, which
-    // is even but no multiple of four, and then with the header FFmpeg
-    // writes. The same layouts cut short are refused by both: a RIFF size
-    // that counts a pad byte the file lacks, and an unsized file cut off
-    // inside a frame. So is an unsized file with an odd number of data
-    // bytes, which AudioToolbox read a frame shorter than libsndfile before
-    // the shared check refused it (PR #176).
+    // pipe). AudioToolbox, left to open an unsized file itself, read 15 bytes
+    // of mono 24-bit audio as four frames and 18 as five (PR #176), so the
+    // reader shows it such a file with its sizes filled in; these are those
+    // lengths, 12 bytes, a real data size (even and odd) under an unfilled
+    // RIFF size, and the header FFmpeg writes. The same layouts cut short
+    // are refused by both: a RIFF size that counts a pad byte the file
+    // lacks, and an unsized file cut off inside a frame.
     constexpr std::uint32_t unknown_size = 0xffffffff;
     pcm24_layout(dir / "unpadded.wav", 5, 36 + 15, 15, "");
     pcm24_layout(dir / "unsized.wav", 4, unknown_size, unknown_size, "");
+    pcm24_layout(dir / "unsized-odd.wav", 5, unknown_size, unknown_size, "");
     pcm24_layout(dir / "unsized-18.wav", 6, unknown_size, unknown_size, "");
     pcm24_layout(dir / "unsized-riff.wav", 4, unknown_size, 12, "LIST\4\0\0\0INFO"s);
+    pcm24_layout(dir / "unsized-riff-odd.wav", 5, unknown_size, 15, "");
     piped_float_layout(dir / "piped-float.wav", 7);
     pcm24_layout(dir / "counted-pad.wav", 5, 36 + 16, 15, "");
-    pcm24_layout(dir / "unsized-odd.wav", 5, unknown_size, unknown_size, "");
-    pcm24_layout(dir / "unsized-riff-odd.wav", 5, unknown_size, 15, "");
     pcm24_layout(dir / "unsized-cut.wav", 4, unknown_size, unknown_size, "");
     fs::resize_file(dir / "unsized-cut.wav", fs::file_size(dir / "unsized-cut.wav") - 2);
     struct Layout {
@@ -265,9 +265,9 @@ void run(const fs::path& dir) {
         std::size_t channels, frames; // No frames: refused.
     };
     const Layout layouts[] = {
-        {"unpadded.wav", 1, 5},     {"unsized.wav", 1, 4},          {"unsized-18.wav", 1, 6},
-        {"unsized-riff.wav", 1, 4}, {"piped-float.wav", 2, 7},      {"counted-pad.wav", 1, 0},
-        {"unsized-odd.wav", 1, 0},  {"unsized-riff-odd.wav", 1, 0}, {"unsized-cut.wav", 1, 0},
+        {"unpadded.wav", 1, 5},    {"unsized.wav", 1, 4},      {"unsized-odd.wav", 1, 5},
+        {"unsized-18.wav", 1, 6},  {"unsized-riff.wav", 1, 4}, {"unsized-riff-odd.wav", 1, 5},
+        {"piped-float.wav", 2, 7}, {"counted-pad.wav", 1, 0},  {"unsized-cut.wav", 1, 0},
     };
     // What each reader makes of every layout, printed before anything is
     // required, so that one failed run shows them all.
@@ -369,14 +369,16 @@ void run(const fs::path& dir) {
     }
     // A file refused after it was opened is closed again (jrp's review: each
     // refused filter left a descriptor open). Twenty refusals of a WAV whose
-    // header claims 800 kHz, counting the descriptors open before and after.
-    {
-        std::ifstream whole(dir / "pcm16.wav", std::ios::binary);
+    // header claims 800 kHz, counting the descriptors open before and after;
+    // then the same without sizes, which the reader opens another way, and
+    // twenty loads of an unsized file that is read.
+    for (const auto* name : {"pcm16.wav", "unsized.wav"}) {
+        std::ifstream whole(dir / name, std::ios::binary);
         std::string bytes((std::istreambuf_iterator<char>(whole)), {});
         const std::uint32_t rate = 800000; // Little-endian, at the WAV header's offset 24.
         for (int b = 0; b < 4; ++b)
             bytes[24 + b] = static_cast<char>((rate >> (8 * b)) & 0xffU);
-        text_file(dir / "fast.wav", bytes);
+        text_file(dir / (name == "pcm16.wav"s ? "fast.wav" : "fast-unsized.wav"), bytes);
     }
     const auto open_descriptors = [] {
         std::size_t n = 0;
@@ -386,20 +388,24 @@ void run(const fs::path& dir) {
     };
     const auto before = open_descriptors();
     for (int i = 0; i < 20; ++i) {
-        std::string message;
-        try {
-            reader.open(dir / "fast.wav");
-        } catch (const std::exception& e) {
-            message = e.what();
+        for (const std::string name : {"fast.wav", "fast-unsized.wav"}) {
+            std::string message;
+            try {
+                reader.open(dir / name);
+            } catch (const std::exception& e) {
+                message = e.what();
+            }
+            // The rate is checked after the file is opened, the path that leaked.
+            const bool after_opening = message.find("800000") != std::string::npos;
+            require(after_opening,
+                    name + " is refused for its rate, after it was opened: '" + message + "'");
         }
-        // The rate is checked after ExtAudioFileOpenURL, the path that leaked.
-        const bool after_opening = message.find("800000") != std::string::npos;
-        require(after_opening,
-                "fast.wav is refused for its rate, after it was opened: '" + message + "'");
+        require(load(dir / "unsized.wav", reader).paths.size() == 1, "unsized.wav loads again");
     }
     const auto after = open_descriptors();
-    std::cout << "fast.wav: refused 20 times, open descriptors " << before << " then " << after
-              << '\n';
+    std::cout << "fast.wav and fast-unsized.wav: refused 20 times, unsized.wav: read 20 times, "
+                 "open descriptors "
+              << before << " then " << after << '\n';
     require(after <= before, "refused files leave descriptors open: " + std::to_string(before) +
                                  " before, " + std::to_string(after) + " after");
     // The reader's own message names the missing file.

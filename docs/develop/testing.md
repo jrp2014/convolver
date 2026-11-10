@@ -166,11 +166,14 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   (IO-10). A WAV whose RIFF and `data` sizes were left at `0xFFFFFFFF`, or
   its RIFF size alone, gives every frame up to the end of the file, also
   when the file stops between two frames as an interrupted write leaves it;
-  it is refused when it stops inside a frame, when its audio is an odd
-  number of bytes or (a sparse file, not made on Windows) when it is 4 GiB
-  or longer, each with a message that names the cause and the fix, and
-  when that size is on another chunk or under a RIFF size that was filled
-  in (IO-11). POSIX-specific tests also exercise fragmented
+  an odd number of bytes of audio is read like an even one. Such a file is
+  refused when it stops inside a frame, when (a sparse file, not made on
+  Windows) it is 4 GiB or longer, with a message that names the cause and
+  the fix, and when that size is on another chunk or under a RIFF size that
+  was filled in. The sizes the check returns for such a file, written over
+  the unfilled ones in pieces of 1, 3 and 4096 bytes, give byte for byte
+  the file with its sizes, which is what macOS's reader is shown
+  (IO-11). POSIX-specific tests also exercise fragmented
   descriptors, borrowed descriptor ownership, broken pipes and injected WAV
   header-finalization errors. For integer output they check rounding and
   clipping endpoints for 8 to 32 bits, reproducibility and chunk independence,
@@ -273,27 +276,23 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   the same diagnostic code by both. For IO-10 and IO-11, the test first
   prints what each reader makes of every layout, then requires the same
   frames from both, to the last one, for a mono 24-bit WAV whose last odd
-  chunk lacks its padding byte, for sizes left at `0xFFFFFFFF` over 12 and
-  over 18 bytes of audio (even, the second no multiple of four), for a RIFF
-  size left so over a real `data` size,
-  and for a stereo float file with the header FFmpeg writes to a pipe; and
-  the same refusal code for a RIFF size that counts the missing padding
-  byte, for unfilled sizes over an odd number of audio bytes, and for an
-  unsized file that stops inside a frame. Evidence from PR #176 on 9
-  November 2026: at b1597a0, before the shared check refused it,
-  AudioToolbox (macOS 15.8.2 and macOS 26) read five mono 24-bit frames
-  with unfilled sizes, an odd number of bytes, as four
-  ([run 42715853793](https://github.com/jrp2014/convolver/actions/runs/42715853793));
-  at 840c452 it gave libsndfile's frames for unfilled sizes over an even
-  number of bytes, including the FFmpeg header
-  ([job 129504519445](https://github.com/jrp2014/convolver/actions/runs/42718018388/job/129504519445)),
-  and again on 10 November 2026 at ee3152f, on macOS 15.8.2
-  ([job 129754397229](https://github.com/jrp2014/convolver/actions/runs/42793979136/job/129754397229))
-  and on the `macos-26` image
-  ([job 129754319192](https://github.com/jrp2014/convolver/actions/runs/42793979313/job/129754319192)),
-  for 12 and 56 bytes of audio.
+  chunk lacks its padding byte, for sizes left at `0xFFFFFFFF` over 12, 15
+  and 18 bytes of audio, for a RIFF size left so over a real `data` size
+  (even and odd), and for a stereo float file with the header FFmpeg writes
+  to a pipe; and the same refusal code for a RIFF size that counts the
+  missing padding byte and for an unsized file that stops inside a frame.
+  The reader shows AudioToolbox an unsized file with its sizes filled in
+  (`AudioFileOpenWithCallbacks`), because of what AudioToolbox did when left
+  to open one itself, in PR #176: on 9 November 2026 at b1597a0 (macOS
+  15.8.2 and macOS 26) it read 15 bytes of mono 24-bit audio as four frames
+  where libsndfile read five
+  ([run 42715853793](https://github.com/jrp2014/convolver/actions/runs/42715853793)),
+  and on 10 November 2026 at 7b33360 it read 18 bytes as five frames for
+  six, while reading 12 bytes and the 56 bytes under the FFmpeg header
+  whole ([job 129764301771](https://github.com/jrp2014/convolver/actions/runs/42796865380/job/129764301771)).
   A WAV whose header claims 800 kHz,
-  which the reader opens and then refuses, is refused 20 times without
+  which the reader opens and then refuses, is refused 20 times, with and
+  without its sizes, and an unsized file is read 20 times, without
   leaving a file descriptor open (counted in `/dev/fd`).
 - `fuzz.replay.config_text`, `fuzz.replay.config_list`, `fuzz.replay.host_state`,
   `fuzz.replay.ir_file`: every committed [fuzz seed and regression input](../../tests/fuzz/README.md)

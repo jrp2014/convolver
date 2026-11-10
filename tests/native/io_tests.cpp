@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/io.hpp"
+#include "sound_files.hpp"
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <chrono>
@@ -17,6 +19,7 @@
 #include <new>
 #include <optional>
 #include <sndfile.h>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -1535,9 +1538,48 @@ void run(const fs::path& dir) {
             text_file(dir / "unsized-cut.wav", cut);
         }
         refused(dir / "unsized-cut.wav", "an unsized file cut off inside a frame is refused");
-        // With an odd number of bytes of audio, readers disagree where such
-        // a file ends (macOS's reads a frame fewer than libsndfile), so it
-        // is refused, and the message says why and what to do.
+        // An odd number of bytes of audio is read like any other: five
+        // frames, whichever size was left unfilled, with or without the pad
+        // byte a real data size calls for.
+        text_file(dir / "unsized-odd.wav", layout(5, unknown, unknown, ""));
+        reads(dir / "unsized-odd.wav", 5, "an unsized file with an odd data length");
+        text_file(dir / "unsized-riff-odd.wav", layout(5, unknown, 15, ""));
+        reads(dir / "unsized-riff-odd.wav", 5, "an odd real data size under an unfilled RIFF size");
+        text_file(dir / "unsized-riff-odd-padded.wav",
+                  layout(5, unknown, 15, std::string(1, '\0')));
+        reads(dir / "unsized-riff-odd-padded.wav", 5, "the same with its pad byte");
+        // What the check returns for such a file is what its header should
+        // have said: written over the unfilled sizes, in one piece or in
+        // pieces of any length from any offset, it gives the file a writer
+        // that could go back would have written. macOS's reader is shown the
+        // file so. A file with its sizes returns nothing.
+        {
+            const auto sized = [&](const fs::path& p, std::size_t step) {
+                const auto sizes = detail::validate_wave(p);
+                std::ifstream in(p, std::ios::binary);
+                std::string bytes((std::istreambuf_iterator<char>(in)), {});
+                if (!sizes)
+                    return std::string("has its sizes");
+                for (std::size_t at = 0; at < bytes.size(); at += step)
+                    detail::fill_in_sizes(
+                        *sizes, at,
+                        std::span(reinterpret_cast<unsigned char*>(bytes.data()) + at,
+                                  std::min(step, bytes.size() - at)));
+                return bytes;
+            };
+            for (const std::size_t step : {std::size_t{1}, std::size_t{3}, std::size_t{4096}}) {
+                require(sized(dir / "unsized-odd.wav", step) == layout(5, 36 + 15, 15, ""),
+                        "both sizes filled in");
+                require(sized(dir / "unsized.wav", step) == layout(4, 36 + 12, 12, ""),
+                        "both sizes filled in, even");
+                require(sized(dir / "unsized-riff.wav", step) ==
+                            layout(4, 36 + 12 + 12, 12, std::string("LIST\4\0\0\0INFO", 12)),
+                        "the RIFF size alone filled in");
+            }
+            require(sized(dir / "unpadded.wav", 1) == "has its sizes",
+                    "a sized file is left alone");
+        }
+        // What a refusal says, for the two below that are told apart.
         const auto says = [&](const fs::path& p, std::initializer_list<const char*> parts,
                               const char* what) {
             std::string message;
@@ -1549,18 +1591,6 @@ void run(const fs::path& dir) {
             for (const char* part : parts)
                 require(message.find(part) != std::string::npos, what);
         };
-        const auto odd = [&](const fs::path& p, const char* what) {
-            refused(p, what);
-            says(p, {"never filled in", "odd number of bytes", "to a pipe", "Write the file again"},
-                 what);
-        };
-        text_file(dir / "unsized-odd.wav", layout(5, unknown, unknown, ""));
-        odd(dir / "unsized-odd.wav", "an unsized file with an odd data length says so");
-        text_file(dir / "unsized-riff-odd.wav", layout(5, unknown, 15, ""));
-        odd(dir / "unsized-riff-odd.wav", "an odd real data size under an unfilled RIFF size");
-        text_file(dir / "unsized-riff-odd-padded.wav",
-                  layout(5, unknown, 15, std::string(1, '\0')));
-        odd(dir / "unsized-riff-odd-padded.wav", "the same with its pad byte");
         // An unfilled data size under a RIFF size that was filled in is only
         // a chunk that runs past the end, as is that size on another chunk,
         // with or without a RIFF size. Sizes of zero, from which libsndfile

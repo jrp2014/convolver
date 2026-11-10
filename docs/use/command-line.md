@@ -395,23 +395,14 @@ have been interrupted, compare the frames that `--inspect` reports with the
 length you expect, or write the file again. To send audio through a pipe,
 use [RAW streams](#raw-streams).
 
-Two files without sizes are refused:
-
-- One whose audio is an odd number of bytes, which a mono 24-bit or 8-bit
-  file with an odd number of frames is. Programs disagree about where such a
-  file ends (macOS's own reader, which the plug-ins use on a Mac, drops its
-  last sample), and a filter must not load shorter in one place than in
-  another. Write the file again, to a file instead of a pipe.
-- One of 4 GiB or more. A WAV header cannot give a size that large, so
-  nothing says where the audio ends, and libsndfile would read the first
-  4 GiB and stop. Write the audio to a file in a format for long audio,
-  such as RF64 or W64, or send it as a RAW stream.
-
-Given as `--input`, or named as an IR file in a configuration, each gets a
-message that says so. Chosen directly as the filter, here or in a plug-in,
-it gets a general message that does not give this reason: that the file is
-neither a configuration nor a sound file Convolver can read, or, when it is
-larger than 1 MiB, that it is too large for a configuration.
+One file without sizes is refused: one of 4 GiB or more. A WAV header cannot
+give a size that large, so nothing says where the audio ends, and libsndfile
+would read the first 4 GiB and stop. Write the audio to a file in a format
+for long audio, such as RF64 or W64, or send it as a RAW stream. Given as
+`--input`, or named as an IR file in a configuration, the file gets a message
+that says so. Chosen directly as the filter, here or in a plug-in, it gets a
+general message that does not give this reason: that it is too large for a
+configuration.
 
 Other containers, including RF64, get libsndfile's own checks; Convolver does
 not validate every codec libsndfile supports.

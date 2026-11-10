@@ -79,27 +79,28 @@ struct UnsizedRefusal : std::runtime_error {
 //   file. A writer stopped half way (FFmpeg killed while writing to a file)
 //   leaves the same header, so that file is read as if it were whole; all
 //   that can be checked is that PCM or float audio ends on a whole frame.
-//   Two such files are refused, each with its own advice. One has audio of
-//   an odd number of bytes: AudioToolbox drops the last byte and reads a
-//   frame fewer than libsndfile (native.audio_toolbox, PR #176), and a
-//   filter must not load shorter in a Mac plug-in than on the command line.
-//   The other is a file as long as the RIFF size says or longer, 4 GiB:
-//   there unknown_size is a size like any other, and libsndfile reads the
-//   audio only as far as it reaches.
-void check_wave(const std::filesystem::path& path) {
+//   The sizes the header should have given are returned, because
+//   AudioToolbox needs them (audio_toolbox.cpp). One such file is refused,
+//   with its own advice: a file as long as the RIFF size says or longer,
+//   4 GiB. There unknown_size is a size like any other, and libsndfile reads
+//   the audio only as far as it reaches.
+std::optional<WaveSizes> check_wave(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary);
     std::array<unsigned char, 40> bytes{};
     file.read(reinterpret_cast<char*>(bytes.data()), 12);
     if (file.gcount() != 12 ||
         std::string_view(reinterpret_cast<char*>(bytes.data()), 4) != "RIFF" ||
         std::string_view(reinterpret_cast<char*>(bytes.data() + 8), 4) != "WAVE")
-        return;
+        return std::nullopt;
     const auto riff_size = detail::read_le32(std::as_bytes(std::span(bytes)).subspan(4));
     const std::uint64_t file_size = std::filesystem::file_size(path);
     std::uint64_t end = std::uint64_t(riff_size) + 8;
     const bool unsized = riff_size == unknown_size && end > file_size;
-    if (unsized)
+    WaveSizes sizes;
+    if (unsized) {
         end = file_size;
+        sizes.riff_size = static_cast<std::uint32_t>(end - 8);
+    }
     if (end < 12 || end > file_size)
         throw std::runtime_error("truncated or invalid RIFF/WAVE size");
     unsigned block_align = 0;
@@ -122,6 +123,8 @@ void check_wave(const std::filesystem::path& path) {
         if (unsized && data && length == unknown_size) {
             length = end - position - 8;
             chunk_end = end;
+            sizes.data_size_at = position + 4;
+            sizes.data_size = static_cast<std::uint32_t>(length);
         } else if ((length & 1u) && chunk_end == end + 1) {
             chunk_end = end; // The last chunk, without its pad byte.
         }
@@ -135,14 +138,6 @@ void check_wave(const std::filesystem::path& path) {
                 "or send it as a RAW stream.");
         if (chunk_end > end)
             throw std::runtime_error("truncated RIFF/WAVE chunk");
-        if (unsized && data && (length & 1u))
-            throw UnsizedRefusal(
-                "the sizes in its WAV header were never filled in and its audio is an odd number "
-                "of bytes",
-                "The program that wrote it could not go back to the header: it wrote to a pipe "
-                "(as FFmpeg does with '-f wav -'), or it was stopped before it finished. "
-                "Programs disagree about where such audio ends, and some drop its last sample.",
-                "Write the file again, to a file instead of a pipe, and let the program finish.");
         if (data)
             data_sizes.push_back(length);
         if (format_chunk) {
@@ -164,13 +159,26 @@ void check_wave(const std::filesystem::path& path) {
         for (const auto length : data_sizes)
             if (!block_align || length % block_align)
                 throw std::runtime_error("WAV data ends with an incomplete frame");
+    return unsized ? std::optional(sizes) : std::nullopt;
 }
 } // namespace
-void validate_wave(const std::filesystem::path& path) {
+void fill_in_sizes(const WaveSizes& sizes, std::uint64_t position,
+                   std::span<unsigned char> bytes) noexcept {
+    const auto put = [&](std::uint64_t at, std::uint32_t value) {
+        for (unsigned i = 0; i < 4; ++i)
+            if (at + i >= position && at + i - position < bytes.size())
+                bytes[static_cast<std::size_t>(at + i - position)] =
+                    static_cast<unsigned char>((value >> (8 * i)) & 0xffU);
+    };
+    put(4, sizes.riff_size);
+    if (sizes.data_size_at)
+        put(sizes.data_size_at, sizes.data_size);
+}
+std::optional<WaveSizes> validate_wave(const std::filesystem::path& path) {
     if (path == "-" || !std::filesystem::is_regular_file(path))
-        return;
+        return std::nullopt;
     try {
-        check_wave(path);
+        return check_wave(path);
     } catch (const std::runtime_error& e) {
         // One place turns the path into text, whichever advice follows.
         const auto* unsized = dynamic_cast<const UnsizedRefusal*>(&e);

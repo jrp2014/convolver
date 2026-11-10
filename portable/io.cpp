@@ -566,7 +566,7 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
             std::filesystem::file_size(path) % frame_bytes)
             throw std::runtime_error(detail::raw_incomplete_frame);
     } else
-        detail::validate_wave(path);
+        (void)detail::validate_wave(path); // libsndfile reads an unsized WAV to its end.
 #ifdef _WIN32
     // libsndfile 1.2.2's ReadFile path treats ERROR_BROKEN_PIPE (normal pipe
     // EOF) as an error. Use the CRT's EOF-aware byte reader for borrowed RAW
