@@ -95,7 +95,37 @@ Set aside again, for the reasons in the
 which still hold: a hand-drawn X11 view (no more accessible than VSTGUI, and
 every control ours), GTK or Qt inside a host (a second toolkit version in the
 host's process is a known crash cause), a web view, DPF (replaces our
-adapters) and JUCE (licence).
+adapters) and JUCE (licence); [JUCE and iPlug2](#juce-and-iplug2) are weighed
+below.
+
+### JUCE and iPlug2
+
+jrp asked on 10 November 2026 whether a framework such as JUCE or iPlug2
+would help. Both were checked against their current source that day.
+
+| | JUCE 8 | iPlug2 |
+| --- | --- | --- |
+| Licence | AGPLv3 or a paid commercial licence. AGPLv3 can be combined with our GPL-2.0-or-later code only under GPLv3 terms, so the packages would no longer be GPL-2.0 compatible: a licence change for jrp | WDL licence (permissive, zlib-like); compatible |
+| Screen readers | Yes on macOS and Windows (its own accessibility layer); none on Linux | None: controls are drawn (NanoVG or Skia) |
+| Formats | VST3, AU, AUv3, LV2, AAX, standalone | VST3, AU, AUv3, CLAP, AAX, web, standalone; no LV2 |
+| Linux file dialog | zenity or kdialog, like VSTGUI | Not offered |
+
+What a framework would save is the per-system window code: one window
+instead of AppKit plus Win32 (plus VSTGUI). What it costs is larger than that
+saving, because both own the whole plug-in, not only the window. Using either
+as intended means replacing our VST3, Audio Unit and LV2 adapters with its
+wrappers, then redoing the adapter contract and its lifecycle tests, and first
+proving that the wrappers keep Convolver's permanent class IDs, AU codes, LV2
+URIs and saved state, so that projects saved with 0.12 and 0.13 still open
+(COMPAT-1 checks exactly this). A JUCE window alone inside our own adapters is
+possible (a JUCE component attached to the host's window), but JUCE then also
+needs its message loop driven from each host's run loop, which its own
+wrappers do for it, and the licence question stays. Of the two, only JUCE
+would give accessible windows, and only behind the licence change; iPlug2 is
+no more accessible than VSTGUI and drops LV2. Neither changes the
+recommendation; they stay set aside, as in the
+[editor plan](../../archive/plans/2026-10-24-plugin-editor.md#framework-choice)
+and the formats decision of 21 October 2026.
 
 Rough sizes, once the shared behaviour is in place: the Win32 window about
 1,200 to 1,600 lines, since Win32 has no automatic layout; the VSTGUI window
