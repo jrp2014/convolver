@@ -105,14 +105,29 @@ endif()
 target_include_directories(convolver_vst3 PRIVATE "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable")
 # VST3-3: a filter file chosen in the window is read as convolver-preset reads
 # it (convolver_filter_file); on macOS its sound files with AudioToolbox, as
-# the Audio Unit reads them, so the bundle needs nothing beyond macOS. Other
-# systems have no reader until their windows (VST3-12, VST3-13).
+# the Audio Unit reads them, so the bundle needs nothing beyond macOS. VST3-12:
+# on Windows and Linux with libsndfile (Convolver::io), as the command-line
+# tool and the LV2 plug-in read them; the package builds link it statically.
 set(vst3_file_libraries convolver_filter_file)
 if(APPLE)
     list(APPEND vst3_file_libraries convolver_audio_toolbox)
+elseif(TARGET Convolver::io)
+    list(APPEND vst3_file_libraries Convolver::io)
+else()
+    message(FATAL_ERROR "The VST3 plug-in reads filter files chosen in its window, so on this "
+        "system it needs CONVOLVER_BUILD_IO (libsndfile)")
 endif()
 target_link_libraries(convolver_vst3 PRIVATE Convolver::host sdk ${vst3_file_libraries})
 add_dependencies(convolver_vst3 convolver_build_version)
+# VST3-12: on Linux the module exports only its entry points, as the LV2
+# library does, so the libsndfile built into a package cannot clash with a
+# host's or another plug-in's.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_options(convolver_vst3 PRIVATE
+        "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
+    set_property(TARGET convolver_vst3 APPEND PROPERTY LINK_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
+endif()
 target_include_directories(convolver_vst3 PRIVATE "${Convolver_BINARY_DIR}/generated")
 smtg_target_configure_version_file(convolver_vst3)
 if(APPLE)
@@ -128,12 +143,6 @@ if(CONVOLVER_BUILD_TESTS)
     target_link_libraries(convolver_vst3_tests PRIVATE Convolver::host sdk sdk_hosting
         ${vst3_file_libraries})
     convolver_vst3_editor(convolver_vst3_tests)
-    # Loading a file in the tests on systems without a reader: libsndfile, as
-    # the tools read files (test_file_reader in processor.hpp).
-    if(TARGET convolver_io)
-        target_link_libraries(convolver_vst3_tests PRIVATE convolver_io)
-        target_compile_definitions(convolver_vst3_tests PRIVATE CONVOLVER_VST3_TESTS_IO=1)
-    endif()
     if(APPLE)
         target_link_libraries(convolver_vst3_tests PRIVATE "-framework Cocoa")
     endif()
@@ -307,11 +316,6 @@ if(CONVOLVER_BUILD_IO)
             set_tests_properties(vst3.lifecycle PROPERTIES LABELS "vst3;real-libraries;plug7" TIMEOUT 300
                 COST 100)
             # The loading-responsiveness timings (TODO.md).
-            # The window's file needs a reader, as in convolver_vst3_tests.
-            if(TARGET convolver_io)
-                target_link_libraries(convolver_vst3_lifecycle PRIVATE convolver_io)
-                target_compile_definitions(convolver_vst3_lifecycle PRIVATE CONVOLVER_VST3_TESTS_IO=1)
-            endif()
             add_test(NAME vst3.load_timing COMMAND convolver_vst3_lifecycle --load-timing
                 "${PROJECT_BINARY_DIR}/vst3-load-timing")
             # Alone, so that other tests do not take its machine (RUN_SERIAL);

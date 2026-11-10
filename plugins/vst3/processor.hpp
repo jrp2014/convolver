@@ -83,11 +83,8 @@ std::string encode_report(const std::vector<std::pair<std::string, std::string>>
 // convolver-preset shares (PLUG-31).
 std::vector<std::pair<std::string, std::string>> decode_report(std::string_view);
 // How the plug-in reads the sound files a chosen filter file names: macOS's
-// AudioToolbox on macOS, as the Audio Unit does; none elsewhere until the
-// Windows and Linux windows (VST3-12, VST3-13), so a load is refused there.
-// For the tests only: a reader to use where the build has none. Set it only
-// while no processor is loading.
-inline const detail::SoundFiles* test_file_reader = nullptr;
+// AudioToolbox on macOS, as the Audio Unit does; libsndfile on Windows and
+// Linux, as the command-line tool and the LV2 plug-in do (VST3-12).
 // VST3-16, for tests: called before the processor for a new Latency is
 // built while active; throwing from it makes that preparation fail.
 inline void (*latency_preparation_for_tests)() = nullptr;
