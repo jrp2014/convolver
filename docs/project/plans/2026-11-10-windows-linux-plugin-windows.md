@@ -25,7 +25,7 @@ window](#the-linux-vstgui-window), [recommendation](#recommendation),
 - **The macOS window** (VST3 and the Audio Unit) is native AppKit in
   [`plugins/editor/mac/`](../../../plugins/editor/mac/) with the VST3 glue in
   [`plugins/vst3/editor.mm`](../../../plugins/vst3/editor.mm): about 2,100
-  lines (the view 1,079, the setting rows 356, the rest headers, layout, file
+  lines (the view about 1,080, the setting rows 356, the rest headers, layout, file
   watching and the VST3 glue), against the 400 to 700 the
   [editor plan](../../archive/plans/2026-10-24-plugin-editor.md#framework-choice)
   estimated per system. Everything it says about the filter and the audio
@@ -58,15 +58,20 @@ macOS.
 
 1. **A sound-file reader for the Windows and Linux plug-in.** Proposed:
    libsndfile linked into the plug-in, built as the packages already build it.
-   It reads what the command-line tool and LV2 read (WAV, AIFF, FLAC, W64,
-   raw and the rest), handles non-ASCII Windows paths already (`sf_wchar_open`
-   in [`portable/io.cpp`](../../../portable/io.cpp)), and is already in the
+   The plug-in then reads exactly what the command-line tool in the same
+   package reads: WAV, RF64, W64, AIFF, CAF and raw files, but no FLAC or Ogg,
+   since the packages build libsndfile without its external codecs
+   ([what a package reads](../../use/configuration.md)). It handles non-ASCII
+   Windows paths already (`sf_wchar_open` in
+   [`portable/io.cpp`](../../../portable/io.cpp)) and is already in the
    packages and their licence notices. Windows' own Media Foundation was
    considered, as AudioToolbox was chosen on macOS so that the Audio Unit links
-   nothing beyond the system: it reads fewer formats (no AIFF or raw files),
-   so a filter the command-line tool reads could be refused by the plug-in on
-   Windows only. Linking libsndfile into the plug-in is a change to what ships
-   inside it, so it is jrp's choice ([below](#decisions-for-jrp)).
+   nothing beyond the system. It reads FLAC, which the macOS window also reads,
+   but not AIFF, CAF or raw files, so a filter the command-line tool reads could
+   be refused by the plug-in on Windows only. Either way, Windows and macOS
+   would differ in one format family; libsndfile keeps each package's tool and
+   plug-in in step. Linking libsndfile into the plug-in is a change to what
+   ships inside it, so it is jrp's choice ([below](#decisions-for-jrp)).
 2. **The window's behaviour in shared C++** (proposed PLUG-34), in
    `plugins/editor/common/` with no user-interface code: the rows and
    messages to show for a report and the text of each value, typed values,
@@ -108,7 +113,7 @@ would help. Both were checked against their current source that day.
 | Licence | AGPLv3 or a paid commercial licence. AGPLv3 can be combined with our GPL-2.0-or-later code only under GPLv3 terms, so the packages would no longer be GPL-2.0 compatible: a licence change for jrp | WDL licence (permissive, zlib-like); compatible |
 | Screen readers | Yes on macOS and Windows (its own accessibility layer); none on Linux | None: controls are drawn (NanoVG or Skia) |
 | Formats | VST3, AU, AUv3, LV2, AAX, standalone | VST3, AU, AUv3, CLAP, AAX, web, standalone; no LV2 |
-| Linux file dialog | zenity or kdialog, like VSTGUI | Not offered |
+| Linux | Plug-ins and windows, with a file dialog through zenity or kdialog, like VSTGUI | No supported Linux plug-in builds |
 
 What a framework would save is the per-system window code: one window
 instead of AppKit plus Win32 (plus VSTGUI). What it costs is larger than that
@@ -223,7 +228,7 @@ otherwise:
 | Step | Item | Delivers | Checked by |
 | --- | --- | --- | --- |
 | 1 | **PLUG-34** (new) | The window's behaviour in `plugins/editor/common/`, used by the macOS window with no visible change | Its tests on every CI system; `vst3.editor` and `au.editor` unchanged |
-| 2 | **VST3-12**, first part | libsndfile in the Windows and Linux plug-in; a filter loads through the controller there | `vst3.adapter` loading files without `test_file_reader`; package and licence checks |
+| 2 | **VST3-12**, first part | libsndfile in the Windows and Linux plug-in; a filter loads through the controller there; the comments that tie the reader to the windows (`processor.hpp`, the VST3 `CMakeLists.txt`) updated | `vst3.adapter` loading files without `test_file_reader`; package and licence checks |
 | 3 | **VST3-12** | The Win32 window, with the user guide and release notes updated | A Windows CI test through UI Automation with a screenshot; pluginval with its editor tests; a tester in REAPER and one other Windows host |
 | 4, if asked | **VST3-13** | The VSTGUI window for Linux | `editorhost` under `xvfb-run` with a screenshot; clean-machine containers with the libraries; a tester in REAPER or Bitwig |
 
@@ -233,7 +238,10 @@ otherwise:
    ([decision](../decisions.md#direction)).
 2. **libsndfile inside the Windows and Linux plug-in**, rather than Media
    Foundation on Windows and nothing on Linux. It is already in the packages
-   and their notices; the change is that the plug-in links it.
+   and their notices; the change is that the plug-in links it. The trade-off:
+   with libsndfile the Windows plug-in reads AIFF, CAF and raw files but not
+   FLAC (as the packaged tool); with Media Foundation it reads FLAC (as the
+   macOS window does) but not AIFF, CAF or raw files.
 3. **Only if the Linux window is built:** whether the plug-in may link the
    desktop libraries directly (simpler; fails to load without them) or keep
    the window in a library loaded when it opens (loads anywhere; more work).

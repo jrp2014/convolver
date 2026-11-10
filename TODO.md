@@ -104,7 +104,7 @@ the suggested one.
 
 | Group | Items | Note |
 | --- | --- | --- |
-| Later previews, as decided | **PLUG-34**, then **VST3-12** (the Windows window); **VST3-13** (the Linux window) only once LV2 is in a Linux package and users ask; **PLUG-9**, **PLUG-10** and **AU-7** (the other gain modes and the meters) | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)). The 0.13.2 Windows and Linux packages use the host's own controls meanwhile |
+| Later previews, as decided | **PLUG-34**, then **VST3-12** (the Windows window); **VST3-13** (the Linux window) only once LV2 is in a Linux package and users ask; **PLUG-9**, **PLUG-10** and **AU-7** (the other gain modes and the meters) | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the windows' order is [decided](docs/project/decisions.md#direction) in the [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md). The 0.13.2 Windows and Linux packages use the host's own controls meanwhile |
 | LV2 in a preview | **LV2-5** (jrp first decides how `VERSION` maps to LV2's version numbers), **LV2-3**, **LV2-4**, **LV2-7** | LV2 joins a preview once its own journeys are demonstrated |
 | A window fix from jrp's sessions | **PLUG-26** (choose a `.vstpreset` in the window) | From his file-loading review of 7 November 2026 |
 | Other configuration readers | **CFG-1**, then **CFG-2** | CFG-2 waits for CFG-1 to show which readers matter |
@@ -1086,8 +1086,9 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.
   For a later preview: the first preview is macOS-only ([decided](docs/project/decisions.md#plug-in-behaviour)).
-  Built next among the windows, after PLUG-34, with libsndfile as its reader if jrp agrees
-  ([decided](docs/project/decisions.md#direction) 10 November 2026; [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md)).
+  Built next among the windows, after PLUG-34; its first part gives the Windows
+  and Linux plug-in a sound-file reader (libsndfile, if jrp agrees)
+  ([decided](docs/project/decisions.md#direction); [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md#steps)).
 - [ ] **VST3-13 — Editor window on Linux.** The window in VSTGUI, for the
   Linux VST3 build only, as a stop-gap, driven by the
   host's `IRunLoop`; VSTGUI (BSD-3-Clause) and the libraries it links added
@@ -1097,7 +1098,7 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   ([editor plan](docs/archive/plans/2026-10-24-plugin-editor.md#framework-choice)).
   For a later preview: the first preview is macOS-only ([decided](docs/project/decisions.md#plug-in-behaviour)).
   Waits until LV2 is in a Linux package and Linux VST3 users ask for a window
-  ([decided](docs/project/decisions.md#direction) 10 November 2026; [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md)).
+  ([decided](docs/project/decisions.md#direction); [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md)).
 Not relevant to a convolver unless the product changes: MIDI and note
 interfaces (`IMidiMapping2`, `IMidiLearn2`, note expression, MIDI 2.0
 articulations), `ITransportControl`, `IPrefetchableSupport`,
