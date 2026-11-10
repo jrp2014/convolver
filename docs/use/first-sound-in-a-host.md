@@ -29,8 +29,9 @@ on Windows, see the [Equalizer APO export](equalizer-apo.md).
 - The filter's sample rate must match the host's: Convolver does not
   resample. Audacity plays effects at its Default sample rate, which can
   differ from the rate it exports at.
-- **In Audacity**, load filters from Audacity's own preset menu, as
-  [In Audacity](#in-audacity) says, not from Convolver's window.
+- **In Audacity**, Audacity's own preset menu is the checked way to load
+  filters, as [In Audacity](#in-audacity) says; loading from Convolver's
+  window should now work but has not been checked in Audacity yet.
 - A file chosen in the window must have exactly as many inputs as the host
   gives the plug-in; a preset of the same filter only needs at least that
   many. Where a host gives more inputs, as REAPER does on a six-channel
@@ -147,12 +148,15 @@ choosing an entry from a list, and the folders where hosts look for presets.
 
 ## In Audacity
 
-The previews support Audacity 4 through Audacity's own preset menu
-only. A filter loaded from Convolver's window (**Choose…**, **Recent**,
-**Reload**, or reloading when the file changes) plays while you listen, but
-Audacity 4.0.2 does not keep it for an export or a saved project: they keep
-whatever Audacity stored last, which may be no filter or an older one, so a
-wrong export can still sound plausible.
+Audacity's own preset menu is the route checked in Audacity 4. Up to
+0.13.2, a filter loaded from Convolver's window (**Choose…**, **Recent**,
+**Reload**, or reloading when the file changes) played while you listened,
+but Audacity 4.0.2 did not keep it for an export or a saved project: they
+kept whatever Audacity stored last, which may be no filter or an older one,
+so a wrong export could still sound plausible. Later versions fix this, but
+the fix has been checked only by automated tests, not yet in Audacity. If
+you load a filter from the window, export a few seconds and listen to the
+export before relying on it.
 
 1. Set *Audio setup › Audio settings › Default sample rate*, and the
    project's rate, to the filter's rate. Audacity plays effects at the

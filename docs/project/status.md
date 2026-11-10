@@ -284,7 +284,10 @@ than checked.
   whatever Audacity stored last: no filter, or an older one. jrp narrowed
   the preview's Audacity support to Audacity's own preset menu
   ([decision](decisions.md#plug-in-behaviour)); the guides and the release
-  notes say so, and check 4 verifies that route.
+  notes say so, and check 4 verifies that route. Fixed after 0.13.2
+  ([PR #177](https://github.com/jrp2014/convolver/pull/177)), checked only
+  by `vst3.adapter`: jrp chose on 10 November 2026 to merge it without an
+  Audacity check, so the preset menu stays the checked route until one.
 - **Choose…** needs the filter's input count to match the host's exactly,
   while a preset needs only at least that many inputs, so in REAPER on a
   six-channel track the crossover's `filter.cfg` is refused through

@@ -129,8 +129,8 @@ Until 1.0 the C++ API may change between minor versions.
   that such a host stores it for exports and saved projects. The sound,
   Gain, Mix and automation do not change, and hosts that can be told see no
   edit.
-  Not yet checked in Audacity; until it is, the guides still say to load
-  filters there from Audacity's preset menu.
+  Checked by automated tests only, not yet in Audacity, so the guides keep
+  Audacity's preset menu as the checked route.
 
 ## [0.13.2] - 2026-11-09
 

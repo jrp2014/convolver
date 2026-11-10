@@ -1088,11 +1088,15 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   all three cases). The independent review (PR #177) noted that Audacity
   amends its undo state about 100 ms before it stores the new state, as
   for any edit, so undoing a later action may bring back the previous
-  filter; worth one look in the host check. Remaining: jrp's Audacity
-  check (Choose, export, save and reopen with no parameter touched and the
-  window open, with 0.13.2 as a control that fails) and a REAPER check
-  that a chosen file adds no Latency entry to its undo history; then the
-  guides, release notes and decision row lose the presets-only narrowing.
+  filter; worth one look in the host check. jrp chose on 10 November 2026
+  (decision card, "Merge #177 untested, then release") to merge the fix
+  without an Audacity check; the guides now say the window route should
+  work but is not yet checked in Audacity, and keep the preset menu as the
+  checked route. Remaining: jrp's Audacity check (project files
+  `vst3-17-audacity/`: Choose, export, save and reopen with no parameter
+  touched and the window open, with 0.13.2 as a control that fails), then
+  the guides drop the "not yet checked" wording; and a REAPER check that a
+  chosen file adds no Latency entry to its undo history.
 - [ ] **VST3-12 — Editor window on Windows.** The same window as a Win32 view
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.
