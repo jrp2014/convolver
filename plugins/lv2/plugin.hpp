@@ -10,7 +10,9 @@
 namespace convolver::lv2 {
 // Every layout has the three control ports first, then its audio inputs
 // (symbols in_1 ... in_N), then its audio outputs (out_1 ... out_M), then the
-// two atom ports for patch messages (symbols control and notify).
+// two atom ports for patch messages (symbols control and notify), then the
+// three settings ports (LV2-7: gain, mix and latency_frames), last so that
+// the earlier ports keep their numbers.
 inline constexpr std::uint32_t enabled_port = 0; // lv2:enabled: 1 processes, 0 bypasses.
 inline constexpr std::uint32_t latency_port = 1; // Output: the reported latency in frames.
 inline constexpr std::uint32_t status_port = 2;  // Output: one of the Status values.
@@ -22,6 +24,24 @@ constexpr std::uint32_t control_port(std::size_t inputs, std::size_t outputs) {
 // Output atom sequence: patch:Set naming the filter file that plays.
 constexpr std::uint32_t notify_port(std::size_t inputs, std::size_t outputs) {
     return control_port(inputs, outputs) + 1;
+}
+// LV2-7, PLUG-10's settings (docs/develop/plugin-contract.md#settings), as
+// control inputs. Gain in decibels (min_gain_db to max_gain_db, default 0).
+constexpr std::uint32_t gain_port(std::size_t inputs, std::size_t outputs) {
+    return notify_port(inputs, outputs) + 1;
+}
+// Mix in percent (0 to 100, default 100).
+constexpr std::uint32_t mix_port(std::size_t inputs, std::size_t outputs) {
+    return notify_port(inputs, outputs) + 2;
+}
+// Latency in frames, one of host_latencies (default 0); other values count as
+// the nearest of them. A change while active builds a new processor on the
+// worker thread, and the latency port reports it once it plays.
+constexpr std::uint32_t latency_frames_port(std::size_t inputs, std::size_t outputs) {
+    return notify_port(inputs, outputs) + 3;
+}
+constexpr std::uint32_t port_count(std::size_t inputs, std::size_t outputs) {
+    return latency_frames_port(inputs, outputs) + 1;
 }
 // Size the atom ports ask for (rsz:minimumSize): a patch message with the
 // longest path the plug-in accepts.
@@ -67,6 +87,9 @@ enum class WorkerPoint : int {
     // in progress) and is about to wait for it. Called without the lock; the
     // hook must return at once.
     deactivate_waits = 4,
+    // LV2-7: a processor with a new Latency is built; offering it to run()
+    // is next.
+    latency_built = 5,
 };
 struct TestWorkerAccess {
     // Sets or (with null) clears the pause hook, under the control lock.

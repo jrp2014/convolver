@@ -29,9 +29,8 @@ does not fit. Installing is in [install](install.md); making presets is in
 - Convolver adds no processing delay by default: the filtered sound comes
   out as the filter shapes it, with no wait for blocks of audio. (A filter
   can still delay the sound itself, with a delay in its impulse response or
-  the phase delay of its filtering.) The VST3 plug-in and the Audio Unit have [settings](#settings) for
-  the gain, the wet/dry mix and the latency; the LV2 plug-in does not have
-  them yet (it never adds processing delay).
+  the phase delay of its filtering.) Every format has [settings](#settings) for
+  the gain, the wet/dry mix and the latency.
 - A filter that does not fit the host's sample rate or channel counts never
   plays unfiltered audio in its place: a first filter that fails to load
   plays silence, even bypassed, and one that replaces a working filter is
@@ -55,14 +54,14 @@ Contents: [formats](#formats) · [channels](#channels) ·
 | | VST3 | Audio Unit (AU) | LV2 |
 | --- | --- | --- | --- |
 | Systems | Windows, macOS, Linux | macOS | Linux |
-| How to get it | Preview package, or build | Preview package (macOS), or build | Build from source |
+| How to get it | Preview package, or build | Preview package (macOS), or build | Preview package (Linux), or build |
 | Channel counts | Any pairing of 1 to 8 in and out | Any pairing of 1 to 8 in and out | [Fixed layouts](#lv2-channel-layouts) |
 | Preset file | `.vstpreset` | `.aupreset` | A `NAME.preset.lv2` folder |
 | Libraries it needs on macOS | None beyond macOS: Accelerate for the FFT, AudioToolbox to read the files chosen in its window | None beyond macOS: Accelerate for the FFT, AudioToolbox to read the files chosen in its window | Not on macOS |
 | Choose a `.cfg` or IR file directly | [On macOS](#convolvers-window), in its window | [Yes](#convolvers-window), in its window | [Yes](#lv2-filter-files) |
 | Where a failure is explained | The Status parameter and the [Convolver log](#status-and-the-convolver-log) | The Status parameter and the [Convolver log](#status-and-the-convolver-log), also in the macOS system log | The `status` output and the host's log |
 | Tail reported to the host | Yes | Yes, in seconds | No |
-| [Settings](#settings): gain, mix, latency | Yes | Yes | Not yet |
+| [Settings](#settings): gain, mix, latency | Yes | Yes | Yes, as control ports ([LV2 ports](#lv2-ports)) |
 | Licence | GPL-2.0-or-later | [GPL-3.0-or-later](#audio-unit-licence) | GPL-2.0-or-later |
 
 ## Channels
@@ -583,9 +582,10 @@ as the VST3 window above, except:
 
 ## Settings
 
-The VST3 plug-in and the Audio Unit have three settings, which hosts show
-with their other parameters and the Audio Unit's window shows as sliders and
-a menu (in GarageBand, the window replaces the generic controls). Their
+Every format has three settings, which hosts show with their other
+parameters (in LV2, as the controls `gain`, `mix` and `latency_frames`), and
+the Audio Unit's window shows as sliders and a menu (in GarageBand, the
+window replaces the generic controls). Their
 defaults play exactly as Convolver did before the settings existed.
 
 | Setting | Values | Default | What it does |
@@ -595,10 +595,12 @@ defaults play exactly as Convolver did before the settings existed.
 | **Latency** | 0, 64, 128, 256, 512, 1024, 2048 or 4096 frames | 0 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. At 0 Convolver adds no processing delay; any delay in the filter itself still plays. A larger value uses less processor time, most of all for short filters. It is the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
 
 - Gain and Mix changes fade over 1.3 ms (64 samples at 48 kHz, 128 at
-  96 kHz), so automating them does not click. Latency cannot be automated.
+  96 kHz), so automating them does not click. Latency cannot be automated,
+  except in LV2 hosts built on JUCE, which automate it anyway; each change
+  leaves a gap ([latency and tail](#latency-and-tail)).
 - The host saves the settings in the project and in presets it saves itself.
   A preset made by `convolver-preset` holds the filter only, so loading it
-  leaves the settings as they are. The
+  leaves the settings as they are. In VST3 and the Audio Unit, the
   [Convolver log](#status-and-the-convolver-log) lists the settings each
   time the plug-in starts, and again when it restores saved settings (some
   hosts, GarageBand among them, start the plug-in before restoring the
@@ -620,8 +622,14 @@ defaults play exactly as Convolver did before the settings existed.
 - **Settings and other formats.** Each format saves its settings its own
   way, so a filter moved between them (a VST3 preset opened as an Audio
   Unit, say) keeps the filter but not the settings: it plays at 0 dB, fully
-  wet, with no latency. The LV2 plug-in has no settings yet.
-  The same project can therefore sound different in another format.
+  wet, with no latency. The same project can therefore sound different in
+  another format.
+- **LV2 hosts** save the three controls in the session themselves, as they
+  save `enabled`. A session saved before the controls existed opens at the
+  defaults. A new Latency plays a moment after you choose it, once the
+  host's worker thread has prepared it, and the latency output reports it
+  from then on. Without that thread, it plays only from the next time the
+  host starts the plug-in.
 - **VST3 hosts** mark Mix as the plug-in's dry/wet control where they have
   one. A new Latency plays at once, and Convolver tells the host the new
   delay. A
@@ -636,9 +644,9 @@ Convolver adds no processing delay by default, whatever the host's
 buffer size: the engine sums a filter's first taps directly, so its output
 starts with the input. Delay that the filter itself contains (a delay in
 its impulse response, the phase delay of a crossover or a room
-correction) still plays, as it would in any convolver. In the VST3 plug-in and the Audio Unit the [Latency setting](#settings)
+correction) still plays, as it would in any convolver. The [Latency setting](#settings)
 can add one, from 64 to 4096 samples, and the plug-in reports it so the host
-can line the audio up; LV2 always uses none.
+can line the audio up.
 
 Zero added delay costs some processor time. On one Apple silicon Mac
 (November 2026), Latency 0 used about 16% more processor time than 256 for
@@ -651,7 +659,8 @@ processor time, a larger Latency can save some. The host's delay
 compensation then keeps the tracks lined up, but it cannot remove the delay
 you hear when you monitor live input through the plug-in.
 
-A new Latency plays at once, and the host is told the new delay. Changing it during playback leaves a gap in the
+A new Latency plays at once (in LV2, a moment later, once the host's worker
+thread has prepared it), and the host is told the new delay. Changing it during playback leaves a gap in the
 sound, because Convolver starts again with the new size: the gap lasts the
 new latency plus the filter's own delay, which is short for most room
 correction filters but can be most of a second for a long linear-phase
@@ -752,12 +761,15 @@ URIs are `https://github.com/jrp2014/convolver/lv2#discrete-N-M`.
 | Index | Symbol | Kind | Meaning |
 | --- | --- | --- | --- |
 | 0 | `enabled` | Control input | 1 processes, 0 bypasses (a 1.3 ms fade) |
-| 1 | `latency` | Control output | 0 samples |
+| 1 | `latency` | Control output | The latency that plays, in frames (the Latency setting) |
 | 2 | `status` | Control output | 0 Active, 1 No filter, 2 Load failed, 3 Loading, 4 Fault |
 | 3… | `in_1` … `in_N` | Audio input | Input channels in order |
 | then | `out_1` … `out_M` | Audio output | Output channels in order |
 | then | `control` | Atom input | The host sets or asks for the filter file |
-| last | `notify` | Atom output | Names the file that plays |
+| then | `notify` | Atom output | Names the file that plays |
+| then | `gain` | Control input | Gain, −100 to +24 dB (default 0) |
+| then | `mix` | Control input | Mix, 0 to 100% (default 100) |
+| last | `latency_frames` | Control input | Latency, one of 0, 64, 128, 256, 512, 1024, 2048 and 4096 frames (default 0); another value counts as the nearest |
 
 Load failed stays shown until a filter loads successfully, also after the
 host reactivates the plug-in; Loading is shown while the newest file choice

@@ -51,8 +51,9 @@ CHANGES = (
         'code `unreadable-asset`.'
     ),
     (
-        'Linux packages include the LV2 plug-in, one plug-in for each channel layout, with its filter chosen with '
-        "the host's file chooser or an LV2 preset made with `convolver-preset`."
+        'Linux packages include the LV2 plug-in: one plug-in for each channel layout, the filter chosen with the '
+        "host's file chooser or an LV2 preset made with `convolver-preset`, and Gain, Mix and Latency as host "
+        'controls.'
     ),
     (
         "In Audacity, a filter loaded from Convolver's window (Choose…, Recent or Reload) is now kept for exports "
@@ -168,10 +169,10 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             '(each example comes with a `.vstpreset`, and `convolver-preset` makes one from your own filter) and set '
             "Gain, Mix and Latency in the host's own controls "
             f'([load a preset]({docs}/first-sound-in-a-host.md#optional-load-a-preset)).\n'
-            '- The LV2 plug-in (Linux) is new in the previews. It has no window and no Gain, Mix or Latency yet: '
+            '- The LV2 plug-in (Linux) is new in the previews. It has no window: '
             "choose a filter with the host's file chooser for its Filter parameter, where the host shows one, or "
-            f'load an LV2 preset made with `convolver-preset` ([plug-in presets]({docs}/presets.md)). Each channel '
-            'layout is '
+            f'load an LV2 preset made with `convolver-preset` ([plug-in presets]({docs}/presets.md)), and set Gain, '
+            "Mix and Latency with the host's own controls. Each channel layout is "
             'its own plug-in. It was checked only automatically, with lilv, lv2lint, pluginval and a headless '
             'Ardour session.\n'
             '- The Windows window is new and has been checked only automatically, on Windows CI machines: it opens, '

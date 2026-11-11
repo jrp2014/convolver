@@ -606,7 +606,8 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
 - **Saved form:** each format's own way. The Audio Unit's parameters are
   saved by `AUBase::SaveState` in `ClassInfo` ("data"); VST3 saves them in
   host state version 3, written only when a setting differs from its
-  default (VST3-4, [host state](#host-state)); LV2 will add control ports (LV2-7). A preset from
+  default (VST3-4, [host state](#host-state)); LV2 has control ports, which
+  the host saves (LV2-7). A preset from
   `convolver-preset` carries the filter only, and a state moved between
   formats carries the filter but not the settings, as
   [how the plug-ins behave](../use/plugins.md#settings) tells users.
@@ -978,6 +979,35 @@ How each adapter meets the contract where its format differs:
   it reports and saves follows the installed filter. The design, with the full
   lifecycle, is in the archived formats plan's
   [worker and state lifecycle](../archive/plans/2026-10-21-plugin-formats.md#lv2-adapter-design).
+  Settings (LV2-7) are the control inputs `gain` (dB), `mix` (percent) and
+  `latency_frames` (an enumeration of `host_latencies`, `pprops:notAutomatic`
+  and `pprops:expensive`; another value counts as the nearest), after the
+  atom ports so the earlier ports keep their numbers. `run()` hands Gain and
+  Mix to the processor on every call. A new Latency while active is a worker
+  request: `work()` builds a processor with it under the lock, as activation
+  does, and offers it through an atomic pointer that `run()` takes at the
+  start of its next call; the control side keeps the processor `run()` may
+  still play until then, and frees it at its next call after. The `latency`
+  output always reports the processor that plays. If the new one cannot be
+  built, the old one keeps playing and the log says why; without a worker,
+  the next activation builds it. The audio inside the old processor,
+  including a sounding tail, is dropped, as in the other formats. One
+  Latency request is queued at a time; `work()` builds the newest Latency,
+  and one chosen after it read the control is asked for once it finishes.
+  A processor taken after `run()` refused a first load (the worker queue
+  full) is muted as the one it replaces was.
+  A narrow fix for one host family: JUCE's LV2 host (pluginval, and hosts
+  built on it) ignores `pprops:notAutomatic`, destroys the instance at every
+  `prepareToPlay`, and still runs work it queued after `cleanup()`, on the
+  freed instance. `cleanup()` therefore waits, up to 100 ms, for a queued
+  Latency request to be worked (`wait_for_queued_latency` in
+  `plugins/lv2/plugin.cpp`). It is narrow because file and fault requests
+  are not waited for: they follow a person's choice or a rare fault, and
+  waiting for them would slow every host that drops queued work on closing,
+  as the specification lets it. It is not a guarantee: JUCE runs one worker
+  thread for every LV2 instance in the process, so another plug-in's work
+  lasting over 100 ms can still leave a queued Latency request to run after
+  the instance is freed.
   It needs `urid:map`, uses `work:schedule` to load files, logs through
   `log:log` (otherwise standard error), and reads `bufsz:maxBlockLength` from
   `options` when given; without it, or for longer `run()` calls, it processes in

@@ -103,7 +103,7 @@ the suggested one.
 | Group | Items | Note |
 | --- | --- | --- |
 | Later previews, as decided | **VST3-12** (the Windows window, built: host and screen-reader checks left); **VST3-13** (the Linux window) only once LV2 is in a Linux package and users ask; **PLUG-9**, **PLUG-10** and **AU-7** (the other gain modes and the meters) | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the windows' order is [decided](docs/project/decisions.md#direction) in the [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md). The 0.13.2 Windows and Linux packages use the host's own controls meanwhile |
-| LV2 in a preview | **LV2-5** (packaging, PR #179), then **LV2-7**; **LV2-3** and **LV2-4** after | LV2 joins the Linux package once LV2-5 and LV2-7 are in ([decision](docs/project/decisions.md#releases)) |
+| LV2 in a preview | **LV2-3** and **LV2-4** (LV2-5 and LV2-7 are done) | LV2 is in the Linux package from the next preview ([decision](docs/project/decisions.md#releases)) |
 | A window fix from jrp's sessions | **PLUG-26** (choose a `.vstpreset` in the window) | From his file-loading review of 7 November 2026 |
 | Other configuration readers | **CFG-1**, then **CFG-2** | CFG-2 waits for CFG-1 to show which readers matter |
 | Only on request | **VST3-2** (switch filters from the host), **VST3-6** (replacing the old VST2 plug-in), **HOST-2** (CLAP), **LV2-6** (an LV2 window) | Each needs a stated user need and acceptance tests first |
@@ -624,13 +624,6 @@ LV2 (Linux first; also PipeWire system audio):
   `work()` and written allocation-free by `run()` (new property URIs for jrp
   to name), then an LV2 UI reusing the macOS and Windows views
   ([editor plan](docs/archive/plans/2026-10-24-plugin-editor.md#per-format)).
-- [ ] **LV2-7 — Settings as control ports.** PLUG-10's gain, gain mode, mix
-  and latency as control input ports after the existing ones, the latency
-  port following the chosen block size; port symbols `gain`, `mix` and
-  `latency_frames` ([decided](docs/project/decisions.md#plug-in-behaviour)),
-  in its own pull request after LV2-5;
-  older sessions restored with defaults in Ardour, Carla and PipeWire
-  `filter-chain`.
 
 AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 
@@ -1663,8 +1656,8 @@ with compatibility tests; linked IDs point to open work above.
 
 | Limitation | Current handling / follow-up | Authoritative detail |
 | --- | --- | --- |
-| Plug-in settings (gain, mix, latency) in VST3 and the Audio Unit, not yet LV2; a preset from `convolver-preset` carries the filter only, and a state moved between formats keeps the filter, not the settings | The same project can play at another gain, mix or latency in another format; LV2-7 adds the settings to LV2. | [Settings](docs/use/plugins.md#settings) |
-| Changing the Audio Unit's Latency during playback leaves a gap (the new latency plus the filter's own delay) and cuts a sounding tail | The new processor starts with no history; a crossfade would need both sizes running at once. Not automatable for this reason (PLUG-10). | [Latency and tail](docs/use/plugins.md#latency-and-tail) |
+| A preset from `convolver-preset` carries the filter only, not the plug-in settings (gain, mix, latency), and a state moved between formats keeps the filter, not the settings | The same project can play at another gain, mix or latency in another format. | [Settings](docs/use/plugins.md#settings) |
+| Changing the Audio Unit's or the LV2 plug-in's Latency during playback leaves a gap (the new latency plus the filter's own delay) and cuts a sounding tail | The new processor starts with no history; a crossfade would need both sizes running at once. Not automatable for this reason (PLUG-10), though JUCE-based LV2 hosts automate it anyway. | [Latency and tail](docs/use/plugins.md#latency-and-tail) |
 | A host rate that is not a whole number of hertz (such as 48000 ÷ 1.001) plays silence in VST3 and is refused by the Audio Unit and LV2 | No filter is made for such a rate and nothing is resampled (VST3-9, decided by jrp). The Audio Unit and LV2 could accept it the same way when a host needs it. | [When a filter does not fit](docs/use/plugins.md#when-a-filter-does-not-fit) |
 | A WAV whose sizes were never filled in (`0xFFFFFFFF`, as FFmpeg writes to a pipe) is read to the end of the file, so one left by an interrupted write is read as if it were complete; only PCM or float audio that stops inside a frame is refused. Such a file of 4 GiB or more is refused | jrp's decision of 10 November 2026 (IO-11). A file of 4 GiB or more has no size a reader could use; RF64, W64 or a RAW stream carry long audio. | [Input files](docs/use/command-line.md#input-files) |
 | No IR resampling or automatic channel adaptation for direct sound-file filters | Rate/count mismatches fail; use an explicit configuration. IO-2 covers resampling. | [Configuration](docs/use/configuration.md) |
@@ -1704,6 +1697,13 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **LV2-7 — Settings as control ports.** 10 November 2026, PR #182:
+  Gain, Mix and Latency as the control inputs `gain`, `mix` and
+  `latency_frames` after the atom ports; a new Latency while active is built
+  on the worker thread. Checked by `lv2.adapter`; older sessions in named
+  hosts were not opened, as jrp's decision for LV2 in the previews allows
+  ([LV2 ports](docs/use/plugins.md#lv2-ports),
+  [adapter contract](docs/develop/plugin-contract.md#format-notes)).
 - [x] **PLUG-34 — The window's behaviour in shared code.** 10 November
   2026, PR #181: what the window shows and what a user's action means, in
   `portable/window_model.hpp`, used by the macOS window with no visible

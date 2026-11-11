@@ -1081,7 +1081,13 @@ python3 tests/au/avaudioengine_tests.py build-au/convolver-preset
   with `work()` paused (through a second test-only extension) after
   preparation and after its last check while a newer request arrives, and a
   failed read overtaken the same way; restore with an answer outstanding;
-  teardown with work queued; deactivation and teardown at each pause point
+  teardown with work queued; the Gain, Mix and Latency ports (LV2-7: their
+  ranges, the sound at each, a new Latency through each kind of worker and
+  without one, one Latency request queued at a time, a value chosen again
+  after the worker read a newer one, a first load refused while a new
+  Latency is built, and teardown before a worker that, like JUCE's, still
+  runs a queued Latency request);
+  deactivation and teardown at each pause point
   (PLUG-21: `work()` held after reading, after preparation and after its
   last check while another thread deactivates, and released only once
   `deactivate()` has signalled, through the same test-only extension, that

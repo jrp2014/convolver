@@ -4,6 +4,7 @@
 #include "plugin.hpp"
 #include "presets.hpp"
 #include <array>
+#include <chrono>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -179,6 +180,9 @@ Plugin::Plugin(World& world, const LilvPlugin* plugin, double rate, const Featur
     status_port_ = index("status");
     control_port_ = index("control");
     notify_port_ = index("notify");
+    gain_port_ = index("gain");
+    mix_port_ = index("mix");
+    latency_frames_port_ = index("latency_frames");
     control_.assign(lv2::atom_buffer_bytes / sizeof(std::uint64_t), 0);
     notify_.assign(lv2::atom_buffer_bytes / sizeof(std::uint64_t), 0);
     lilv_instance_connect_port(instance_, control_port_, control_.data());
@@ -196,6 +200,9 @@ Plugin::Plugin(World& world, const LilvPlugin* plugin, double rate, const Featur
     lilv_instance_connect_port(instance_, enabled_port_, &enabled);
     lilv_instance_connect_port(instance_, latency_port_, &latency);
     lilv_instance_connect_port(instance_, status_port_, &status);
+    lilv_instance_connect_port(instance_, gain_port_, &gain);
+    lilv_instance_connect_port(instance_, mix_port_, &mix);
+    lilv_instance_connect_port(instance_, latency_frames_port_, &latency_frames);
     scratch_.assign(inputs_.size() + outputs_.size(), 0.f);
     if (mode_ == Worker::threaded)
         thread_ = std::thread([this] {
@@ -241,6 +248,10 @@ void Plugin::stop_worker() {
 LV2_Worker_Status Plugin::schedule(LV2_Worker_Schedule_Handle handle, std::uint32_t size,
                                    const void* data) {
     auto& h = *static_cast<Plugin*>(handle);
+    if (h.schedules_to_fail > 0) {
+        --h.schedules_to_fail;
+        return LV2_WORKER_ERR_NO_SPACE;
+    }
     if (h.scheduling_fails)
         return LV2_WORKER_ERR_NO_SPACE;
     if (h.mode_ == Worker::threaded || h.mode_ == Worker::deferred) {
@@ -310,6 +321,34 @@ std::size_t Plugin::queued_work() {
 void Plugin::drop_queued_work() {
     std::lock_guard lock(work_mutex_);
     jobs_.clear();
+}
+LV2_Worker_Status Plugin::refuse(LV2_Worker_Respond_Handle, std::uint32_t, const void*) {
+    return LV2_WORKER_ERR_UNKNOWN;
+}
+std::size_t Plugin::free_before_queued_work() {
+    if (active_)
+        deactivate();
+    auto* handle = lilv_instance_get_handle(instance_);
+    std::thread late([this, handle] {
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        for (;;) {
+            std::vector<std::byte> job;
+            {
+                std::lock_guard lock(work_mutex_);
+                if (jobs_.empty())
+                    return;
+                job = std::move(jobs_.front());
+                jobs_.pop_front();
+            }
+            worker_->work(handle, refuse, nullptr, static_cast<std::uint32_t>(job.size()),
+                          job.data());
+        }
+    });
+    lilv_instance_free(instance_);
+    instance_ = nullptr;
+    const auto left = queued_work();
+    late.join();
+    return left;
 }
 
 void Plugin::pause_hook(void* context, lv2::WorkerPoint point) {
