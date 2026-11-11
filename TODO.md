@@ -78,14 +78,14 @@ Checks of what the previews ship, which change no shipped code and so go
 ahead under the freeze, and the known defects users meet.
 [Checks left](docs/project/status.md#checks-left-before-publication) on the
 status page is the one list of the host steps that remain. They and REL-3
-run on the published 0.13.2 files, the baseline jrp chose on 9 November
-2026; the results recorded on 0.12.x builds are records of those builds, not
+run on the published 0.13.12 files, the baseline jrp chose on 11 November
+2026 in place of 0.13.2; the results recorded on 0.12.x builds are records of those builds, not
 passes for 0.13, since PERF-2 changed the engine
 ([decision](docs/project/decisions.md#releases)).
 
 | Item | What remains | Under the freeze |
 | --- | --- | --- |
-| **REL-3** | The independent walkthrough of the published 0.13.2 files; jrp chooses the tester | Goes ahead. A finding in the freeze's exceptions is fixed at once; the rest joins the preview feedback |
+| **REL-3** | The independent walkthrough of the published 0.13.12 files; jrp chooses the tester | Goes ahead. A finding in the freeze's exceptions is fixed at once; the rest joins the preview feedback |
 | **HOST-1**, **VST3-11** | REAPER and Audacity, status checks 1 to 4 | Host checks on jrp's Mac |
 | **AU-4**, **AU-6** | GarageBand, status checks 5 and 8 | Host checks on jrp's Mac |
 | **PERF-2** | Its focused REAPER and GarageBand session, status check 9; then the CPU indication beside the Latency menu and block sizes tuned on Apple silicon | The session goes ahead. The CPU indication changes the window and the tuning is optimisation, so both wait for the freeze to lift |
