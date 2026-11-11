@@ -141,6 +141,9 @@ class Plugin {
     void run_empty();
     // Control ports, read and written around run().
     float enabled = 1, latency = -1, status = -1;
+    // LV2-7's settings ports, at their defaults: Gain in decibels, Mix in
+    // percent and Latency in frames.
+    float gain = 0, mix = 100, latency_frames = 0;
     // The state interface, called directly with the property under <base>state.
     LV2_State_Status restore(std::span<const std::byte>, LV2_URID type);
     LV2_State_Status restore_empty(); // No properties at all.
@@ -181,6 +184,7 @@ class Plugin {
 
     // The worker. Scheduling can be made to fail (LV2_WORKER_ERR_NO_SPACE).
     bool scheduling_fails = false;
+    std::size_t schedules_to_fail = 0; // Fails only this many more requests.
     // Threaded worker: waits until the queue is empty and work() has returned.
     void wait_for_worker();
     // Deferred worker: calls work() on this thread for up to `count` queued
@@ -191,6 +195,12 @@ class Plugin {
     // Deferred worker: forgets queued requests, as a host might on
     // deactivation (none of the hosts checked under LV2-8 does).
     void drop_queued_work();
+    // Deferred worker, as JUCE's LV2 host does: deactivates and frees the
+    // instance with requests still queued, while another thread works them
+    // shortly afterwards with the handle it had (answers are refused, as for
+    // a closed instance). Returns how many requests were left queued when
+    // cleanup() returned.
+    std::size_t free_before_queued_work();
     // Pauses the next work() call to reach `point`, through the plug-in's
     // test hook; wait_until_paused() returns once it has, resume() lets it go.
     void pause_at(lv2::WorkerPoint point);
@@ -214,6 +224,7 @@ class Plugin {
     void stop_worker();
     static LV2_Worker_Status schedule(LV2_Worker_Schedule_Handle, std::uint32_t, const void*);
     static LV2_Worker_Status respond(LV2_Worker_Respond_Handle, std::uint32_t, const void*);
+    static LV2_Worker_Status refuse(LV2_Worker_Respond_Handle, std::uint32_t, const void*);
     static void pause_hook(void*, lv2::WorkerPoint);
     World& world_;
     const LilvPlugin* plugin_;
@@ -226,6 +237,7 @@ class Plugin {
     std::size_t paths_freed_ = 0, delivered_ = 0;
     std::uint32_t enabled_port_ = 0, latency_port_ = 0, status_port_ = 0;
     std::uint32_t control_port_ = 0, notify_port_ = 0;
+    std::uint32_t gain_port_ = 0, mix_port_ = 0, latency_frames_port_ = 0;
     // Atom buffers, 8-byte aligned.
     std::vector<std::uint64_t> control_, notify_;
     std::vector<std::pair<bool, std::pair<std::string, LV2_URID>>> messages_; // set?, path, type

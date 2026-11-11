@@ -5,17 +5,18 @@
 //
 // Threads, as the LV2 specifications define them:
 // - run(), connect_port() and the worker's work_response() are the audio
-//   thread. They never lock, allocate or do I/O: run() reads the bypass port
-//   and patch messages, writes the latency, status and notify ports, schedules
-//   worker requests (and a fault report, DIAG-1, for work() to log) and calls
-//   HostProcessor::process.
+//   thread. They never lock, allocate or do I/O: run() reads the bypass and
+//   settings ports and patch messages, writes the latency, status and notify
+//   ports, schedules worker requests (and a fault report, DIAG-1, for work()
+//   to log) and calls HostProcessor::process.
 // - work() runs on the host's worker thread, or inside run() when the host
 //   is free-wheeling. It takes the control lock.
 // - instantiate, activate, deactivate, cleanup and the state interface's
 //   restore() are never called at the same time as run() (the plug-in does not
 //   declare state:threadSafeRestore). They take the control lock.
 // - save() may run at the same time as run(). It takes the control lock and
-//   touches no port and nothing run() writes.
+//   touches no port, and nothing run() writes except atomics (retire()
+//   reads `handover`).
 //
 // Filters arrive two ways:
 // - Through state: the encoded host state under <base>state (convolver-preset
@@ -29,6 +30,23 @@
 //   Every request is answered, so the status port shows "loading" until the
 //   newest one has been, and patch:Set on the notify port names the file
 //   that plays.
+//
+// Settings (LV2-7, PLUG-10): run() hands the Gain and Mix ports to the
+// processor on every call, as the VST3 adapter does. A processor's latency
+// is fixed, so a new Latency while active asks the worker for a processor
+// built with it; work() builds it under the control lock and hands it over
+// through `handover`, which run() takes at the start of its next call. The
+// control side keeps the processor run() may still be using (`retiring`)
+// until run() has taken the new one. Without a worker, a new Latency plays
+// from the next activation. One Latency request waits at a time, and work()
+// builds the newest Latency, so automating it does not flood the worker.
+//
+// cleanup() waits for a queued Latency request (up to 100 ms): JUCE's LV2
+// host (pluginval, and hosts built on JUCE) runs queued work even after it
+// has destroyed the instance, and destroys it whenever the sample rate or
+// block size is set, so automating Latency there could crash. File and fault
+// requests are not waited for: they follow a person's choice or a rare
+// fault, and other hosts drop queued work when they close a plug-in.
 #include "plugin.hpp"
 #include "convolver/host.hpp"
 #include "convolver/io.hpp"
@@ -39,6 +57,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -59,6 +78,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace convolver::lv2 {
@@ -66,14 +86,35 @@ namespace {
 constexpr std::size_t max_channels = identity::max_channels;
 constexpr std::size_t layout_count = identity::fixed_layouts.size();
 static_assert(std::atomic<int>::is_always_lock_free && std::atomic<bool>::is_always_lock_free &&
-              std::atomic<std::uint64_t>::is_always_lock_free);
+              std::atomic<std::uint64_t>::is_always_lock_free &&
+              std::atomic<double>::is_always_lock_free &&
+              std::atomic<std::size_t>::is_always_lock_free &&
+              std::atomic<HostProcessor*>::is_always_lock_free);
 
-// What run() hands the worker; the host copies it. The path follows,
-// `length` bytes without a NUL.
+// The host latency nearest `frames` (the lower one of two as near), for a
+// Latency port value that is not one of them.
+std::size_t nearest_latency(float frames) noexcept {
+    std::size_t best = host_latencies.front();
+    for (const auto l : host_latencies)
+        if (std::abs(static_cast<double>(frames) - static_cast<double>(l)) <
+            std::abs(static_cast<double>(frames) - static_cast<double>(best)))
+            best = l;
+    return best;
+}
+
+// What run() hands the worker; the host copies it. A file request's path
+// follows, `length` bytes without a NUL.
+enum class RequestKind : std::uint32_t {
+    file = 0,    // Load a filter file (numbered from 1).
+    faults = 1,  // DIAG-1: log the faults run() saw; not answered.
+    latency = 2, // LV2-7: build a processor with the newest Latency; not answered.
+};
 struct Request {
     std::uint64_t generation = 0;
     std::uint32_t length = 0;
     std::uint32_t too_long = 0; // The path was longer than max_path_bytes and is left out.
+    RequestKind kind = RequestKind::file;
+    std::uint32_t pad = 0;
 };
 enum class Outcome : std::uint32_t { installed, superseded, failed };
 // What work() hands back to work_response(). The installed filter's path
@@ -101,6 +142,9 @@ struct Instance {
     const float* enabled = nullptr;
     float* latency = nullptr;
     float* status = nullptr;
+    const float* gain_in = nullptr;    // LV2-7: decibels.
+    const float* mix_in = nullptr;     // Percent.
+    const float* latency_in = nullptr; // Frames.
     std::array<const float*, max_channels> in{};
     std::array<float*, max_channels> out{};
     const LV2_Atom_Sequence* control_in = nullptr;
@@ -109,7 +153,12 @@ struct Instance {
     // Control side, under `control`.
     std::mutex control;
     HostFilter filter{max_channels};
-    std::unique_ptr<HostProcessor> host; // Exists while active.
+    // Exists while active: the newest processor, which control calls use.
+    // After a new Latency it may not play yet (run() has not taken it).
+    std::unique_ptr<HostProcessor> host;
+    // The processor before `host`, which run() may still play until it takes
+    // `handover`; freed once it has (retire()).
+    std::unique_ptr<HostProcessor> retiring;
     // The filter that plays: the request that installed it and its file
     // (empty when it came from state alone). Generations only increase.
     std::uint64_t installed = 0;
@@ -122,6 +171,20 @@ struct Instance {
     // Shared between the audio and control sides.
     std::atomic<int> shown{static_cast<int>(Status::no_filter)}; // Status of the record.
     std::atomic<bool> bypass{false}; // Last seen on the enabled port; applied at activation.
+    // LV2-7: the settings last seen on their ports, which a new processor
+    // starts with. The latency is the chosen one, which may not play yet.
+    std::atomic<double> gain_db{0}, mix{1};
+    std::atomic<std::size_t> latency_wanted{default_host_latency};
+    // A processor work() built for a new Latency, for run() to take (null
+    // once taken). Owned by `host` meanwhile.
+    std::atomic<HostProcessor*> handover{nullptr};
+    // The Latency the newest processor was built with, or last failed to be
+    // (not asked for again unless chosen again), and whether a Latency
+    // request waits for the worker (one at a time). work() sets the first
+    // before it clears the second.
+    std::atomic<std::size_t> latency_settled{default_host_latency};
+    std::atomic<bool> latency_queued{false};
+    std::atomic<int> working{0}; // work() calls in progress.
     // The newest request: run() (patch:Set) and restore() count it.
     std::atomic<std::uint64_t> requested{0};
     // A request run() could not hand to the worker, for the next control
@@ -147,13 +210,49 @@ struct Instance {
 
     // Audio side: run() and work_response(), and restore(), which never
     // runs at the same time as them.
-    std::uint64_t answered = 0;     // The newest request answered.
-    std::uint64_t refused_here = 0; // A request run() answered itself with "load failed".
-    std::uint64_t reported = 0;     // The installed generation the notify port last named.
+    HostProcessor* playing = nullptr; // What run() plays: `host` or `retiring`.
+    std::uint64_t answered = 0;       // The newest request answered.
+    std::uint64_t refused_here = 0;   // A request run() answered itself with "load failed".
+    std::uint64_t reported = 0;       // The installed generation the notify port last named.
     std::array<char, max_path_bytes> reported_path{};
     std::size_t reported_length = 0;
     bool notify = false; // Send patch:Set with the reported path at the end of run().
+    // run() muted the processor for a first load it refused, so a processor
+    // it takes later must be muted too while nothing is installed.
+    bool refused_mute = false;
 
+    HostSettings settings() const noexcept {
+        HostSettings s;
+        s.gain_db = gain_db.load(std::memory_order_relaxed);
+        s.mix = mix.load(std::memory_order_relaxed);
+        s.latency = latency_wanted.load(std::memory_order_relaxed);
+        return s;
+    }
+    // Control side: frees the processor run() played before `host`, once
+    // run() has taken `host` (so run() no longer uses it and never will).
+    void retire() noexcept {
+        if (retiring && !handover.load(std::memory_order_acquire))
+            retiring.reset();
+    }
+    // Control side: makes `next` the newest processor and offers it to run().
+    void stage(std::unique_ptr<HostProcessor> next) noexcept {
+        if (handover.exchange(next.get(), std::memory_order_acq_rel)) {
+            // run() never took the previous one, `host`, so it never played;
+            // run() still plays `retiring`.
+            host = std::move(next);
+        } else {
+            // run() plays `host`: the one before it is no longer used.
+            retiring = std::move(host);
+            host = std::move(next);
+        }
+    }
+    // Not at the same time as run(): no processor is offered or kept any more.
+    void drop_processors() noexcept {
+        handover.store(nullptr, std::memory_order_relaxed);
+        playing = nullptr;
+        retiring.reset();
+        host.reset();
+    }
     void update_status() noexcept {
         auto s = Status::no_filter;
         // A failure stays recorded until a later load succeeds (PLUG-8).
@@ -188,6 +287,13 @@ struct Instance {
     }
     // Never throws, so a line that cannot be built (out of memory) never
     // interrupts the state change it explains; the line is then dropped.
+    // A change that is not a problem (LV2-7: a new Latency plays).
+    void log_note(const std::string& message) noexcept {
+        try {
+            lv2_log_note(&logger, "Convolver: %s\n", message.c_str());
+        } catch (...) {
+        }
+    }
     void log_error(const std::string& message) noexcept {
         // Without the host's log feature this prints to stderr, which is
         // also where LV2 hosts send a plug-in's unlogged diagnostics. One
@@ -362,6 +468,26 @@ void connect_port(LV2_Handle handle, std::uint32_t port, void* data) {
         p.control_in = static_cast<const LV2_Atom_Sequence*>(data);
     else if (port == notify_port(ni, no))
         p.notify_out = static_cast<LV2_Atom_Sequence*>(data);
+    else if (port == gain_port(ni, no))
+        p.gain_in = static_cast<const float*>(data);
+    else if (port == mix_port(ni, no))
+        p.mix_in = static_cast<const float*>(data);
+    else if (port == latency_frames_port(ni, no))
+        p.latency_in = static_cast<const float*>(data);
+}
+
+// LV2-7: the settings ports' values, kept for the next processor. Called by
+// run() and by activate() (connect_port() may come before activate(), and a
+// host that restores a session sets the values before it runs).
+void read_settings(Instance& p) noexcept {
+    if (p.gain_in && std::isfinite(*p.gain_in))
+        p.gain_db.store(std::clamp(static_cast<double>(*p.gain_in), min_gain_db, max_gain_db),
+                        std::memory_order_relaxed);
+    if (p.mix_in && std::isfinite(*p.mix_in))
+        p.mix.store(std::clamp(static_cast<double>(*p.mix_in), 0.0, 100.0) / 100,
+                    std::memory_order_relaxed);
+    if (p.latency_in && std::isfinite(*p.latency_in))
+        p.latency_wanted.store(nearest_latency(*p.latency_in), std::memory_order_relaxed);
 }
 
 void record_activation_failure(Instance& p, const char* why) noexcept {
@@ -374,12 +500,14 @@ void record_activation_failure(Instance& p, const char* why) noexcept {
 void activate_locked(Instance& p) {
     p.record_dropped();
     p.log_faults(); // Before the processor that counted them goes.
-    p.host.reset();
+    p.drop_processors();
+    read_settings(p);
+    const auto settings = p.settings();
     try {
         // A fresh processor: the filter plays from the first frame, its tail
         // and history start afresh, and LV2's activate() is also its reset.
-        p.host = std::make_unique<HostProcessor>(p.filter.activate(p.layout), p.max_block,
-                                                 HostSettings{}, p.layout.inputs);
+        p.host = std::make_unique<HostProcessor>(p.filter.activate(p.layout), p.max_block, settings,
+                                                 p.layout.inputs);
     } catch (const std::exception& e) {
         record_activation_failure(p, e.what());
     } catch (...) {
@@ -390,7 +518,7 @@ void activate_locked(Instance& p) {
             // Nothing plays, not even a dry signal, as host_status() says of
             // a filter that could not be started.
             p.host = std::make_unique<HostProcessor>(unfiltered_playback(p.layout, true, false),
-                                                     p.max_block, HostSettings{}, p.layout.inputs);
+                                                     p.max_block, settings, p.layout.inputs);
         } catch (...) {
         }
         try { // error() builds the text, which needs memory (ROBUST-7).
@@ -402,10 +530,15 @@ void activate_locked(Instance& p) {
         p.host->set_bypass(p.bypass.load(std::memory_order_relaxed));
         p.host->reset(); // Start fully bypassed or fully wet, without a ramp.
     }
+    p.playing = p.host.get();
+    p.refused_mute = false;
+    // Not asked for again unless chosen again, even if it could not be built.
+    p.latency_settled.store(settings.latency, std::memory_order_relaxed);
     p.unfiltered.store(!p.filter.filter(), std::memory_order_release);
     // A report the host dropped (some flush queued work on deactivation)
     // must not block later ones.
     p.fault_report_queued.store(false, std::memory_order_release);
+    p.latency_queued.store(false, std::memory_order_release);
     p.faults_reported.store(0, std::memory_order_relaxed);
     p.update_status();
 }
@@ -521,16 +654,89 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
     return Outcome::installed;
 }
 
+// LV2-7, under the control lock: builds a processor with the newest Latency
+// and offers it to run(), as an activation builds one. The old one plays
+// until run() takes it; if the new one cannot be built, the old one keeps
+// playing and the log says why. The new processor starts without history, so
+// the sound pauses for the new latency plus the filter's own delay, as in the
+// other formats.
+void apply_latency(Instance& p) noexcept {
+    p.record_dropped();
+    const auto frames = p.latency_wanted.load(std::memory_order_relaxed);
+    if (!p.host) // Inactive: the next activation builds it.
+        return;
+    p.latency_settled.store(frames, std::memory_order_relaxed);
+    const auto before = p.host->latency_frames();
+    if (before == frames)
+        return;
+    p.log_faults(); // Before the processor that counted them goes.
+    std::string why;
+    bool changed = false;
+    try {
+        auto settings = p.settings();
+        settings.latency = frames;
+        auto next = std::make_unique<HostProcessor>(p.filter.activate(p.layout), p.max_block,
+                                                    settings, p.layout.inputs);
+        next->set_bypass(p.bypass.load(std::memory_order_relaxed));
+        next->reset();
+        pause_at(p, WorkerPoint::latency_built);
+        p.stage(std::move(next)); // Nothing below can fail.
+        changed = true;
+    } catch (const std::exception& e) {
+        try {
+            why = e.what();
+        } catch (...) {
+        }
+    } catch (...) {
+    }
+    if (!changed) {
+        // activate() started the fault count again for a new processor, so
+        // count from the running one's totals (logged above).
+        (void)p.filter.observe(p.host->faults());
+    }
+    p.update_status();
+    try { // Best effort: out of memory for the line changes nothing else.
+        if (changed)
+            p.log_note("Latency changed from " + std::to_string(before) + " to " +
+                       std::to_string(frames) +
+                       " frames; the sound paused briefly while the new processor started.");
+        else
+            p.log_error("Latency " + std::to_string(frames) +
+                        " frames could not be applied, so the plug-in keeps " +
+                        std::to_string(before) + " frames" +
+                        (why.empty() ? std::string(".") : ": " + why));
+    } catch (...) {
+    }
+}
+
+// Counts a work() call in progress, for cleanup().
+class WorkCall {
+  public:
+    explicit WorkCall(Instance& p) : p_(p) {
+        p_.working.fetch_add(1, std::memory_order_acq_rel);
+    }
+    ~WorkCall() {
+        p_.working.fetch_sub(1, std::memory_order_acq_rel);
+    }
+    WorkCall(const WorkCall&) = delete;
+    WorkCall& operator=(const WorkCall&) = delete;
+
+  private:
+    Instance& p_;
+};
+
 LV2_Worker_Status work(LV2_Handle handle, LV2_Worker_Respond_Function respond,
                        LV2_Worker_Respond_Handle target, std::uint32_t size, const void* data) {
     auto& p = *static_cast<Instance*>(handle);
+    const WorkCall call(p);
     Request r;
     if (size < sizeof r)
         return LV2_WORKER_ERR_UNKNOWN;
     std::memcpy(&r, data, sizeof r);
-    if (r.generation == 0) { // DIAG-1: run()'s fault report, not a request; no answer.
+    if (r.kind == RequestKind::faults) { // DIAG-1: run()'s fault report; no answer.
         try {
             std::lock_guard lock(p.control);
+            p.retire();
             if (!p.closing) // Faults counted since run() asked are covered too.
                 p.faults_reported.store(p.log_faults(), std::memory_order_relaxed);
         } catch (...) {
@@ -538,6 +744,20 @@ LV2_Worker_Status work(LV2_Handle handle, LV2_Worker_Respond_Function respond,
         p.fault_report_queued.store(false, std::memory_order_release);
         return LV2_WORKER_SUCCESS;
     }
+    if (r.kind == RequestKind::latency) { // LV2-7; no answer.
+        try {
+            std::lock_guard lock(p.control);
+            p.retire();
+            if (!p.closing)
+                apply_latency(p);
+        } catch (...) {
+        }
+        // After `latency_settled`: a Latency chosen meanwhile asks again.
+        p.latency_queued.store(false, std::memory_order_release);
+        return LV2_WORKER_SUCCESS;
+    }
+    if (r.kind != RequestKind::file || r.generation == 0)
+        return LV2_WORKER_ERR_UNKNOWN;
     // A damaged request is still answered, as a failure, so the status does
     // not stay at Loading.
     const bool damaged = size - sizeof r != r.length || r.length > max_path_bytes;
@@ -549,6 +769,7 @@ LV2_Worker_Status work(LV2_Handle handle, LV2_Worker_Respond_Function respond,
         std::lock_guard lock(p.control);
         if (p.closing)
             return LV2_WORKER_SUCCESS;
+        p.retire();
         const bool was_failed = p.filter.failed();
         try {
             const std::string path =
@@ -614,16 +835,18 @@ const LV2_Worker_Interface worker_interface{work, work_response, nullptr};
 void refuse_request(Instance& p, std::uint64_t generation, bool no_worker) {
     p.answered = p.refused_here = generation;
     p.dropped.store(generation << 1 | (no_worker ? 1 : 0), std::memory_order_release);
-    if (!p.host)
+    if (!p.playing)
         return;
     // The count first, then the flag: the worker clears the flag before it
     // publishes, so a filter it publishes after this sees the flag clear or
     // is newer than the count, and is never silenced. An unfiltered
     // configuration that restore() published and run() has not yet picked up
     // is silenced as well.
-    const auto published = p.host->publications();
-    if (p.unfiltered.load(std::memory_order_acquire))
-        p.host->mute(published);
+    const auto published = p.playing->publications();
+    if (p.unfiltered.load(std::memory_order_acquire)) {
+        p.playing->mute(published);
+        p.refused_mute = true;
+    }
 }
 
 void request_file(Instance& p, const LV2_Atom* value) {
@@ -717,7 +940,7 @@ void write_notification(Instance& p) {
 
 // The processor's fault total, while it exists.
 std::uint64_t fault_total(const Instance& p) {
-    return p.host ? p.host->faults().total() : 0;
+    return p.playing ? p.playing->faults().total() : 0;
 }
 
 Status shown_status(const Instance& p) {
@@ -727,7 +950,7 @@ Status shown_status(const Instance& p) {
         return Status::load_failed;
     const auto shown = static_cast<Status>(p.shown.load(std::memory_order_relaxed));
     // A load failure comes first, as host_status() orders them.
-    if (shown != Status::load_failed && p.host && p.host->faults_since_clear())
+    if (shown != Status::load_failed && p.playing && p.playing->faults_since_clear())
         return Status::fault;
     return shown;
 }
@@ -738,32 +961,72 @@ Status shown_status(const Instance& p) {
 void report_faults(Instance& p) {
     const auto total = fault_total(p);
     // Only for faults no report was scheduled for yet.
-    if (!p.schedule || !p.host || !p.host->faults_since_clear() ||
+    if (!p.schedule || !p.playing || !p.playing->faults_since_clear() ||
         total <= p.faults_reported.load(std::memory_order_relaxed) ||
         p.fault_report_queued.exchange(true, std::memory_order_acq_rel))
         return;
-    Request r; // Generation 0: requests are numbered from 1.
+    Request r;
+    r.kind = RequestKind::faults;
     if (p.schedule->schedule_work(p.schedule->handle, sizeof r, &r) == LV2_WORKER_SUCCESS)
         p.faults_reported.store(total, std::memory_order_relaxed);
     else
         p.fault_report_queued.store(false, std::memory_order_release);
 }
 
+// LV2-7: asks the worker for a processor with a newly chosen Latency. Without
+// a worker, the next activation builds it; a full queue is tried again in the
+// next call. While a request waits, a newer Latency needs none of its own:
+// work() builds the newest, and one chosen after it read the control asks
+// once it has finished.
+void request_latency(Instance& p) {
+    if (!p.schedule || !p.playing || p.latency_queued.load(std::memory_order_acquire))
+        return;
+    if (p.latency_wanted.load(std::memory_order_relaxed) ==
+        p.latency_settled.load(std::memory_order_relaxed))
+        return;
+    p.latency_queued.store(true, std::memory_order_relaxed);
+    Request r;
+    r.kind = RequestKind::latency;
+    if (p.schedule->schedule_work(p.schedule->handle, sizeof r, &r) != LV2_WORKER_SUCCESS)
+        p.latency_queued.store(false, std::memory_order_relaxed);
+}
+
 void run(LV2_Handle handle, std::uint32_t frames) {
     auto& p = *static_cast<Instance*>(handle);
     const auto ni = p.layout.inputs, no = p.layout.outputs;
+    // LV2-7: a processor built for a new Latency plays from this call on.
+    if (auto* next = p.handover.exchange(nullptr, std::memory_order_acq_rel)) {
+        // Built before a first load this callback's predecessors refused:
+        // silent like the one it replaces. The count first, then the flag,
+        // as in refuse_request: a filter the worker publishes into it is
+        // never silenced.
+        if (p.refused_mute) {
+            const auto published = next->publications();
+            if (p.unfiltered.load(std::memory_order_acquire))
+                next->mute(published);
+        }
+        p.playing = next;
+        // Its fault count starts at 0; a report already queued counts from it.
+        if (!p.fault_report_queued.load(std::memory_order_acquire))
+            p.faults_reported.store(0, std::memory_order_relaxed);
+    }
     read_messages(p);
+    read_settings(p);
+    request_latency(p);
+    auto* host = p.playing;
     if (p.latency)
-        *p.latency = static_cast<float>(p.host ? p.host->latency_frames() : default_host_latency);
+        *p.latency = static_cast<float>(host ? host->latency_frames() : default_host_latency);
     // lv2:enabled is 1 to process and 0 to bypass; anything else counts as on.
     const bool bypass = p.enabled && *p.enabled < .5f;
     p.bypass.store(bypass, std::memory_order_relaxed);
-    if (!p.host) {
+    if (!host) {
         for (std::size_t c = 0; c < no; ++c)
             if (p.out[c])
                 std::fill_n(p.out[c], frames, 0.f);
     } else {
-        p.host->set_bypass(bypass);
+        host->set_bypass(bypass);
+        host->set_gain_db(p.gain_db.load(std::memory_order_relaxed));
+        host->set_mix(p.mix.load(std::memory_order_relaxed));
         std::array<const float*, max_channels> in{};
         std::array<float*, max_channels> out{};
         for (std::size_t done = 0; done < frames;) {
@@ -772,7 +1035,7 @@ void run(LV2_Handle handle, std::uint32_t frames) {
                 in[c] = p.in[c] ? p.in[c] + done : nullptr;
             for (std::size_t c = 0; c < no; ++c)
                 out[c] = p.out[c] ? p.out[c] + done : nullptr;
-            if (!p.host->process(std::span(in).first(ni), std::span(out).first(no), n))
+            if (!host->process(std::span(in).first(ni), std::span(out).first(no), n))
                 for (std::size_t c = 0; c < no; ++c)
                     if (out[c])
                         std::fill_n(out[c], n, 0.f);
@@ -796,21 +1059,45 @@ void deactivate(LV2_Handle handle) {
         }
         p.record_dropped();
         p.log_faults();
-        p.host.reset();
+        p.drop_processors();
     } catch (...) {
+    }
+}
+
+// Waits until the worker has worked a queued Latency request and no work()
+// call is in progress. Gives up after 100 ms of waiting for a request no
+// call has taken, as with a host that dropped its queue on deactivation,
+// which LV2 allows (JUCE's worker looks for work every millisecond). Without
+// the control lock, which work() takes.
+void wait_for_queued_latency(const Instance& p) noexcept {
+    using clock = std::chrono::steady_clock;
+    constexpr auto patience = std::chrono::milliseconds(100);
+    auto since = clock::now();
+    for (;;) {
+        // The flag first: work() counts itself before it clears it.
+        const bool queued = p.latency_queued.load(std::memory_order_acquire);
+        if (p.working.load(std::memory_order_acquire) > 0)
+            since = clock::now();
+        else if (!queued || clock::now() - since > patience)
+            return;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 }
 
 void cleanup(LV2_Handle handle) {
     auto* p = static_cast<Instance*>(handle);
     try {
-        // Lets a save() or work() already in progress finish first. LV2
-        // requires the host to stop calling work() before cleanup(): one
-        // that starts after this returns finds the instance freed.
-        std::lock_guard lock(p->control);
-        p->closing = true;
-        p->stopping.store(true, std::memory_order_relaxed);
-        p->host.reset();
+        {
+            // Lets a save() or work() already in progress finish first.
+            std::lock_guard lock(p->control);
+            p->closing = true;
+            p->stopping.store(true, std::memory_order_relaxed);
+            p->drop_processors();
+        }
+        // LV2 requires the host to stop calling work() before cleanup(), but
+        // JUCE's host still works what it queued, on the freed instance.
+        // With `closing` set, such a call returns at once.
+        wait_for_queued_latency(*p);
     } catch (...) {
     }
     delete p;
@@ -868,12 +1155,14 @@ LV2_State_Status save(LV2_Handle handle, LV2_State_Store_Function store, LV2_Sta
     bool embedded = false; // The filter itself is stored.
     try {
         std::lock_guard lock(p.control);
+        p.retire();
         p.record_dropped();
         p.log_faults();
         HostState saved;
         saved.configuration = p.filter.filter();
         saved.failed = p.filter.failed(); // Reopening after a failed load stays silent.
-        // Bypass is the lv2:enabled port, which the host saves itself.
+        // Bypass is the lv2:enabled port and the settings are their ports
+        // (LV2-7), which the host saves itself.
         const auto bytes = encode_host_state(saved);
         if (p.host)
             p.host->collect();
@@ -967,6 +1256,7 @@ std::optional<std::string> read_path(Instance& p, const void* value, std::size_t
 
 LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retrieve,
                                 LV2_State_Handle state, const LV2_Feature* const* features) {
+    p.retire();
     p.record_dropped();
     p.log_faults(); // Explained under the filter that played; a load clears them.
     std::size_t state_size = 0, path_size = 0;
@@ -1040,6 +1330,7 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
         p.installed = generation;
         p.installed_path = std::move(kept_path);
         p.unfiltered.store(!p.filter.filter(), std::memory_order_release);
+        p.refused_mute = false; // What run() refused no longer counts.
         status = LV2_STATE_SUCCESS;
     } else {
         p.silence_failed_first_load(was_failed);

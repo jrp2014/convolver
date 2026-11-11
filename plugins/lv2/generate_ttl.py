@@ -6,7 +6,8 @@ Usage: generate_ttl.py IDENTITIES_JSON VERSION_FILE BINARY_NAME OUTPUT_DIRECTORY
 One plug-in per fixed layout in plugins/identities.json (PLUG-4), all from the
 same template. Port numbers match plugins/lv2/plugin.hpp: three control ports,
 then the audio inputs, then the audio outputs, then the control and notify
-atom ports. The lv2.adapter test reads the
+atom ports, then the Gain, Mix and Latency settings (LV2-7). The lv2.adapter
+test reads the
 result through lilv and checks it against the adapter.
 """
 
@@ -24,6 +25,7 @@ PREFIXES = """\
 @prefix lv2: <http://lv2plug.in/ns/lv2core#> .
 @prefix opts: <http://lv2plug.in/ns/ext/options#> .
 @prefix patch: <http://lv2plug.in/ns/ext/patch#> .
+@prefix pprops: <http://lv2plug.in/ns/ext/port-props#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix rsz: <http://lv2plug.in/ns/ext/resize-port#> .
@@ -38,6 +40,10 @@ STATUS = [(0, 'Active'), (1, 'No filter'), (2, 'Load failed'), (3, 'Loading'), (
 # The filter parameter's suffix and the atom ports' buffer size, as in plugin.hpp.
 FILTER = 'filter'
 ATOM_BUFFER_BYTES = 8192
+# PLUG-10's settings, as in convolver/host.hpp: the gain range in decibels and
+# the latencies in frames (host_latencies, 0 first and the default).
+GAIN_DB = (-100, 24)
+LATENCIES = [0, 64, 128, 256, 512, 1024, 2048, 4096]
 
 
 def lv2_version(major, minor, patch):
@@ -99,7 +105,7 @@ def plugin(base, layout, vendor, version):
 \t\tlv2:minimum 0 ;
 \t\tlv2:maximum 1
 \t]""",
-        """\t[
+        f"""\t[
 \t\ta lv2:ControlPort , lv2:OutputPort ;
 \t\tlv2:index 1 ;
 \t\tlv2:symbol "latency" ;
@@ -108,7 +114,7 @@ def plugin(base, layout, vendor, version):
 \t\tlv2:portProperty lv2:reportsLatency , lv2:integer ;
 \t\tunits:unit units:frame ;
 \t\tlv2:minimum 0 ;
-\t\tlv2:maximum 256
+\t\tlv2:maximum {LATENCIES[-1]}
 \t]""",
         f"""\t[
 \t\ta lv2:ControlPort , lv2:OutputPort ;
@@ -145,7 +151,47 @@ def plugin(base, layout, vendor, version):
 \t\tlv2:name "Notify"
 \t]""",
     ]
-    ports = ' ,\n'.join(control + audio_ports(layout, 3) + atoms)
+    first_setting = first_atom + 2
+    latency_points = ' ,\n'.join(f'\t\t\t[ rdfs:label "{frames} frames" ; rdf:value {frames} ]' for frames in LATENCIES)
+    settings = [
+        f"""\t[
+\t\ta lv2:ControlPort , lv2:InputPort ;
+\t\tlv2:index {first_setting} ;
+\t\tlv2:symbol "gain" ;
+\t\tlv2:name "Gain" ;
+\t\trdfs:comment "Scales the filtered signal." ;
+\t\tunits:unit units:db ;
+\t\tlv2:default 0 ;
+\t\tlv2:minimum {GAIN_DB[0]} ;
+\t\tlv2:maximum {GAIN_DB[1]}
+\t]""",
+        f"""\t[
+\t\ta lv2:ControlPort , lv2:InputPort ;
+\t\tlv2:index {first_setting + 1} ;
+\t\tlv2:symbol "mix" ;
+\t\tlv2:name "Mix" ;
+\t\trdfs:comment "The share of filtered sound; the rest is the input, delayed by the latency." ;
+\t\tunits:unit units:pc ;
+\t\tlv2:default 100 ;
+\t\tlv2:minimum 0 ;
+\t\tlv2:maximum 100
+\t]""",
+        f"""\t[
+\t\ta lv2:ControlPort , lv2:InputPort ;
+\t\tlv2:index {first_setting + 2} ;
+\t\tlv2:symbol "latency_frames" ;
+\t\tlv2:name "Latency" ;
+\t\trdfs:comment "Delay to add; a larger one can use less processor time. A change leaves a short gap." ;
+\t\tlv2:portProperty lv2:integer , lv2:enumeration , pprops:notAutomatic , pprops:expensive ;
+\t\tunits:unit units:frame ;
+\t\tlv2:default {LATENCIES[0]} ;
+\t\tlv2:minimum {LATENCIES[0]} ;
+\t\tlv2:maximum {LATENCIES[-1]} ;
+\t\tlv2:scalePoint
+{latency_points}
+\t]""",
+    ]
+    ports = ' ,\n'.join(control + audio_ports(layout, 3) + atoms + settings)
     name = turtle_string(f'{vendor["name"]} ({inputs} in, {outputs} out)')
     comment = turtle_string(
         'Applies the FIR filters of a Convolver configuration (.cfg) or impulse response '

@@ -12,6 +12,12 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- LV2 plug-in (LV2-7): Gain, Mix and Latency, as the control inputs `gain`
+  (dB), `mix` (%) and `latency_frames` (frames), after the existing ports so
+  those keep their numbers. They work as in the other formats; a new Latency
+  plays once the host's worker thread has built it, and the `latency` output
+  reports it from then on (its maximum is now 4096). Defaults leave the
+  sound unchanged. Sessions saved before open at the defaults.
 - Releases (LV2-5): the Linux preview package holds the LV2 plug-in,
   `LV2/convolver.lv2`, built against the lv2 headers in the corresponding
   source (new CMake option `CONVOLVER_LV2_SDK`) with its debugging symbols
