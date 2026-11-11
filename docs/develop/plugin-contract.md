@@ -992,7 +992,10 @@ How each adapter meets the contract where its format differs:
   built, the old one keeps playing and the log says why; without a worker,
   the next activation builds it. The audio inside the old processor,
   including a sounding tail, is dropped, as in the other formats. One
-  Latency request is queued at a time; `work()` builds the newest Latency.
+  Latency request is queued at a time; `work()` builds the newest Latency,
+  and one chosen after it read the control is asked for once it finishes.
+  A processor taken after `run()` refused a first load (the worker queue
+  full) is muted as the one it replaces was.
   A narrow fix for one host family: JUCE's LV2 host (pluginval, and hosts
   built on it) ignores `pprops:notAutomatic`, destroys the instance at every
   `prepareToPlay`, and still runs work it queued after `cleanup()`, on the

@@ -248,6 +248,10 @@ void Plugin::stop_worker() {
 LV2_Worker_Status Plugin::schedule(LV2_Worker_Schedule_Handle handle, std::uint32_t size,
                                    const void* data) {
     auto& h = *static_cast<Plugin*>(handle);
+    if (h.schedules_to_fail > 0) {
+        --h.schedules_to_fail;
+        return LV2_WORKER_ERR_NO_SPACE;
+    }
     if (h.scheduling_fails)
         return LV2_WORKER_ERR_NO_SPACE;
     if (h.mode_ == Worker::threaded || h.mode_ == Worker::deferred) {

@@ -178,7 +178,11 @@ struct Instance {
     // A processor work() built for a new Latency, for run() to take (null
     // once taken). Owned by `host` meanwhile.
     std::atomic<HostProcessor*> handover{nullptr};
-    // Whether a Latency request waits for the worker (one at a time).
+    // The Latency the newest processor was built with, or last failed to be
+    // (not asked for again unless chosen again), and whether a Latency
+    // request waits for the worker (one at a time). work() sets the first
+    // before it clears the second.
+    std::atomic<std::size_t> latency_settled{default_host_latency};
     std::atomic<bool> latency_queued{false};
     std::atomic<int> working{0}; // work() calls in progress.
     // The newest request: run() (patch:Set) and restore() count it.
@@ -206,14 +210,16 @@ struct Instance {
 
     // Audio side: run() and work_response(), and restore(), which never
     // runs at the same time as them.
-    HostProcessor* playing = nullptr;                     // What run() plays: `host` or `retiring`.
-    std::size_t latency_scheduled = default_host_latency; // The Latency last asked for.
-    std::uint64_t answered = 0;                           // The newest request answered.
-    std::uint64_t refused_here = 0; // A request run() answered itself with "load failed".
-    std::uint64_t reported = 0;     // The installed generation the notify port last named.
+    HostProcessor* playing = nullptr; // What run() plays: `host` or `retiring`.
+    std::uint64_t answered = 0;       // The newest request answered.
+    std::uint64_t refused_here = 0;   // A request run() answered itself with "load failed".
+    std::uint64_t reported = 0;       // The installed generation the notify port last named.
     std::array<char, max_path_bytes> reported_path{};
     std::size_t reported_length = 0;
     bool notify = false; // Send patch:Set with the reported path at the end of run().
+    // run() muted the processor for a first load it refused, so a processor
+    // it takes later must be muted too while nothing is installed.
+    bool refused_mute = false;
 
     HostSettings settings() const noexcept {
         HostSettings s;
@@ -525,8 +531,9 @@ void activate_locked(Instance& p) {
         p.host->reset(); // Start fully bypassed or fully wet, without a ramp.
     }
     p.playing = p.host.get();
+    p.refused_mute = false;
     // Not asked for again unless chosen again, even if it could not be built.
-    p.latency_scheduled = settings.latency;
+    p.latency_settled.store(settings.latency, std::memory_order_relaxed);
     p.unfiltered.store(!p.filter.filter(), std::memory_order_release);
     // A report the host dropped (some flush queued work on deactivation)
     // must not block later ones.
@@ -658,6 +665,7 @@ void apply_latency(Instance& p) noexcept {
     const auto frames = p.latency_wanted.load(std::memory_order_relaxed);
     if (!p.host) // Inactive: the next activation builds it.
         return;
+    p.latency_settled.store(frames, std::memory_order_relaxed);
     const auto before = p.host->latency_frames();
     if (before == frames)
         return;
@@ -671,6 +679,7 @@ void apply_latency(Instance& p) noexcept {
                                                     settings, p.layout.inputs);
         next->set_bypass(p.bypass.load(std::memory_order_relaxed));
         next->reset();
+        pause_at(p, WorkerPoint::latency_built);
         p.stage(std::move(next)); // Nothing below can fail.
         changed = true;
     } catch (const std::exception& e) {
@@ -736,8 +745,6 @@ LV2_Worker_Status work(LV2_Handle handle, LV2_Worker_Respond_Function respond,
         return LV2_WORKER_SUCCESS;
     }
     if (r.kind == RequestKind::latency) { // LV2-7; no answer.
-        // Before the Latency is read, so a newer one asks again.
-        p.latency_queued.store(false, std::memory_order_release);
         try {
             std::lock_guard lock(p.control);
             p.retire();
@@ -745,6 +752,8 @@ LV2_Worker_Status work(LV2_Handle handle, LV2_Worker_Respond_Function respond,
                 apply_latency(p);
         } catch (...) {
         }
+        // After `latency_settled`: a Latency chosen meanwhile asks again.
+        p.latency_queued.store(false, std::memory_order_release);
         return LV2_WORKER_SUCCESS;
     }
     if (r.kind != RequestKind::file || r.generation == 0)
@@ -834,8 +843,10 @@ void refuse_request(Instance& p, std::uint64_t generation, bool no_worker) {
     // configuration that restore() published and run() has not yet picked up
     // is silenced as well.
     const auto published = p.playing->publications();
-    if (p.unfiltered.load(std::memory_order_acquire))
+    if (p.unfiltered.load(std::memory_order_acquire)) {
         p.playing->mute(published);
+        p.refused_mute = true;
+    }
 }
 
 void request_file(Instance& p, const LV2_Atom* value) {
@@ -965,18 +976,18 @@ void report_faults(Instance& p) {
 // LV2-7: asks the worker for a processor with a newly chosen Latency. Without
 // a worker, the next activation builds it; a full queue is tried again in the
 // next call. While a request waits, a newer Latency needs none of its own:
-// work() builds the newest.
+// work() builds the newest, and one chosen after it read the control asks
+// once it has finished.
 void request_latency(Instance& p) {
-    const auto wanted = p.latency_wanted.load(std::memory_order_relaxed);
-    if (wanted == p.latency_scheduled || !p.schedule || !p.playing ||
-        p.latency_queued.load(std::memory_order_acquire))
+    if (!p.schedule || !p.playing || p.latency_queued.load(std::memory_order_acquire))
+        return;
+    if (p.latency_wanted.load(std::memory_order_relaxed) ==
+        p.latency_settled.load(std::memory_order_relaxed))
         return;
     p.latency_queued.store(true, std::memory_order_relaxed);
     Request r;
     r.kind = RequestKind::latency;
-    if (p.schedule->schedule_work(p.schedule->handle, sizeof r, &r) == LV2_WORKER_SUCCESS)
-        p.latency_scheduled = wanted;
-    else
+    if (p.schedule->schedule_work(p.schedule->handle, sizeof r, &r) != LV2_WORKER_SUCCESS)
         p.latency_queued.store(false, std::memory_order_relaxed);
 }
 
@@ -985,6 +996,10 @@ void run(LV2_Handle handle, std::uint32_t frames) {
     const auto ni = p.layout.inputs, no = p.layout.outputs;
     // LV2-7: a processor built for a new Latency plays from this call on.
     if (auto* next = p.handover.exchange(nullptr, std::memory_order_acq_rel)) {
+        // Built before a first load this callback's predecessors refused:
+        // silent like the one it replaces (the flag rule of refuse_request).
+        if (p.refused_mute && p.unfiltered.load(std::memory_order_acquire))
+            next->mute(next->publications());
         p.playing = next;
         // Its fault count starts at 0; a report already queued counts from it.
         if (!p.fault_report_queued.load(std::memory_order_acquire))

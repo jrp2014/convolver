@@ -184,6 +184,7 @@ class Plugin {
 
     // The worker. Scheduling can be made to fail (LV2_WORKER_ERR_NO_SPACE).
     bool scheduling_fails = false;
+    std::size_t schedules_to_fail = 0; // Fails only this many more requests.
     // Threaded worker: waits until the queue is empty and work() has returned.
     void wait_for_worker();
     // Deferred worker: calls work() on this thread for up to `count` queued

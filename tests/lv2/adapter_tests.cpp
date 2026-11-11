@@ -1951,6 +1951,9 @@ void settings_ports(host::World& world, const fs::path& work) {
             p->latency_frames = frames;
             p->run_empty();
         }
+        // The worker may build a value it read before the last change; the
+        // last one is then asked for once that request has finished.
+        settle(*p);
         settle(*p);
         check(p->latency == 2048 && close_to(play_constant(*p, 8192).back(), .75),
               "settings: after rapid Latency changes the last one (2000, so 2048) plays");
@@ -1989,7 +1992,29 @@ void settings_ports(host::World& world, const fs::path& work) {
         p->activate();
         p->run_empty();
         check(p->latency == 512, "settings: without a worker, the next activation applies it");
-    } // A queued Latency request: newer choices wait for it rather than queue
+    }
+    // A first load refused (the worker queue full) while the worker builds a
+    // new Latency: the processor it built stays silent too, as nothing is
+    // installed.
+    {
+        auto p = worker_instance(world, Worker::threaded);
+        p->activate();
+        p->run_empty();
+        p->pause_at(lv2::WorkerPoint::latency_built);
+        p->latency_frames = 256;
+        p->run_empty();
+        p->wait_until_paused();
+        p->schedules_to_fail = 1;
+        p->set_filter(original);
+        p->run_empty();
+        p->resume();
+        settle(*p);
+        const auto out = play_constant(*p, 2048);
+        check(p->latency == 256 && p->status == as_float(lv2::Status::load_failed) &&
+                  std::all_of(out.begin(), out.end(), [](float v) { return v == 0.f; }),
+              "settings: after a refused first load a new Latency plays silence");
+    }
+    // A queued Latency request: newer choices wait for it rather than queue
     // their own, and it builds the newest one.
     {
         auto p = worker_instance(world, Worker::deferred);
@@ -2003,10 +2028,24 @@ void settings_ports(host::World& world, const fs::path& work) {
         p->run_deferred_work();
         p->run_empty();
         check(p->latency == 256, "settings: the queued request builds the newest Latency");
+        // Back to a value asked for before the worker read the newer one:
+        // the processor it built has the newer one, so it is asked for again.
+        p->latency_frames = 512;
+        p->run_empty();
+        p->latency_frames = 1024;
+        p->run_empty();
+        p->run_deferred_work();
+        p->latency_frames = 512;
+        p->run_empty();
+        check(p->queued_work() == 1,
+              "settings: a Latency asked for before the newer one that was built is asked again");
+        p->run_deferred_work();
+        p->run_empty();
+        check(p->latency == 512, "settings: it plays once the worker has built it");
         // As JUCE's host does: freed with the request still queued, which
         // its worker then runs. cleanup() waits for it, so it finds the
         // instance alive (the sanitizer build would catch a freed one).
-        p->latency_frames = 512;
+        p->latency_frames = 2048;
         p->run_empty();
         check(p->queued_work() == 1 && p->free_before_queued_work() == 0,
               "settings: cleanup() waits for work the host queued before freeing");

@@ -87,6 +87,9 @@ enum class WorkerPoint : int {
     // in progress) and is about to wait for it. Called without the lock; the
     // hook must return at once.
     deactivate_waits = 4,
+    // LV2-7: a processor with a new Latency is built; offering it to run()
+    // is next.
+    latency_built = 5,
 };
 struct TestWorkerAccess {
     // Sets or (with null) clears the pause hook, under the control lock.
