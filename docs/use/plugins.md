@@ -25,7 +25,7 @@ does not fit. Installing is in [install](install.md); making presets is in
   [window](#convolvers-window) that shows the status, why it is silent and
   what to change, the filter and settings, what plays in plain words, with
   Copy Diagnostics and Show Log; the VST3 plug-in on Linux and the LV2
-  plug-in have no window yet. (The Windows window is new since 0.13.2.)
+  plug-in have no window yet. (The Windows window is new in 0.13.12.)
 - Convolver adds no processing delay by default: the filtered sound comes
   out as the filter shapes it, with no wait for blocks of audio. (A filter
   can still delay the sound itself, with a delay in its impulse response or
