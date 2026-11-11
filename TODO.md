@@ -92,6 +92,7 @@ passes for 0.13, since PERF-2 changed the engine
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **HOST-4** | The check on a real Windows device, now that the Windows package ships `convolver-equalizer-apo` | A check; needs a Windows computer |
 | **VST3-17** | Up to 0.13.8, in Audacity a filter chosen in the window plays but is missing from the export and the saved project. The fix (PR #177) is checked only by `vst3.adapter`; what remains is jrp's Audacity check, and until then the guides keep the preset menu as the checked route | Lost state, one of the freeze's exceptions: brought forward and merged without an Audacity check ([decisions](docs/project/decisions.md#plug-in-behaviour)) |
+| **PLUG-33** | Fixed in PR #184 apart from the list rule, which waits for jrp's decision | A known defect on the guides' main route, brought forward once the freeze lifted |
 
 ### 2. Decided or likely, after the freeze
 
@@ -566,6 +567,35 @@ LV2 (Linux first; also PipeWire system audio):
   queue. Done when each adapter's skip paths either follow that rule or
   are listed with why they are safe, with a held-lock test for each, as
   AU-16's. Waits for the freeze.
+- [ ] **PLUG-33 — A chosen file follows the same rules as a preset.**
+  Found in DOC-10's independent review (8 November 2026), now that the
+  guides lead with **Choose…**. Two places still treat a chosen file as the
+  second route. (1) `read_filter_file()` (`portable/filter_file.cpp`)
+  selects with the host's exact input count (`detail::matches()` in
+  `portable/config.cpp`), so a file chosen in the window needs exactly
+  the inputs the host gives, while a preset or
+  saved project needs only at least them (PLUG-23). On REAPER's
+  six-channel track, which gives the VST3 plug-in 6 inputs, choosing the
+  2→6 crossover's `filter.cfg` is refused, with a Fix that asks for 2
+  inputs; the preset of the same filter plays. The
+  [crossover check](docs/use/check-a-crossover-in-a-host.md#3-render-the-example-in-the-host)
+  and [channels](docs/use/plugins.md#channels) say to load the preset
+  there. A configuration list still needs a rule for which entry a wider
+  input bus selects. (2) With no filter, the Status text ends "Load a
+  Convolver preset." (`host_status()` in `portable/host.cpp`), where the
+  window's own Fix already names Choose…. Done when a chosen single filter
+  is accepted on a wider input bus by the PLUG-23 rule in VST3 and the
+  Audio Unit (adapter tests), list selection with a wider bus is decided
+  and tested, the No-filter Status names choosing a filter where the
+  plug-in has a window, and the guides' preset fallback for the crossover
+  is removed. No sound change for filters that load today. Waits for the
+  freeze unless jrp brings it forward.
+  Progress (11 November 2026, PR #184): a chosen single filter is accepted
+  on a wider input bus in every format (`read_filter_file()`), the No
+  filter Status names choosing a filter where there is a window, and the
+  guides' preset fallback is gone. Remaining: jrp's decision on the list
+  rule; PR #184 implements the recommended one (the exact entry first,
+  then the most inputs below the host's).
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
@@ -1673,14 +1703,6 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
-- [x] **PLUG-33 — A chosen file follows the same rules as a preset.**
-  11 November 2026, PR #184: a file chosen in a window or through LV2's
-  file parameter needs the host's outputs exactly and at least its inputs,
-  as a preset does; from a list, the exact entry first, then the one with
-  the most inputs below the host's; with no filter, Status names choosing
-  a filter where there is a window
-  ([wider input bus](docs/develop/plugin-contract.md#channel-layouts),
-  [channels](docs/use/plugins.md#channels)).
 - [x] **LV2-7 — Settings as control ports.** 10 November 2026, PR #182:
   Gain, Mix and Latency as the control inputs `gain`, `mix` and
   `latency_frames` after the atom ports; a new Latency while active is built

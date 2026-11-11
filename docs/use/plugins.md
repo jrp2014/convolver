@@ -120,8 +120,8 @@ the one list of what each way reads:
 
 | Way in | Plug-ins | Reads |
 | --- | --- | --- |
-| **Choose…**, or dropping the file, in [Convolver's window](#convolvers-window) | The Audio Unit, and the VST3 plug-in on macOS and Windows | An IR file, a `.cfg` or a configuration list, with exactly as many inputs as the host gives; not a preset file |
-| The host's file chooser for the **Filter** parameter | LV2, in hosts that show it ([LV2 filter files](#lv2-filter-files)) | An IR file, a `.cfg` or a configuration list, with the plug-in's own channel counts |
+| **Choose…**, or dropping the file, in [Convolver's window](#convolvers-window) | The Audio Unit, and the VST3 plug-in on macOS and Windows | An IR file, a `.cfg` or a configuration list, with at least its inputs ([channels](#channels)); not a preset file |
+| The host's file chooser for the **Filter** parameter | LV2, in hosts that show it ([LV2 filter files](#lv2-filter-files)) | An IR file, a `.cfg` or a configuration list, with at least its inputs ([channels](#channels)) |
 | The host's preset menu ("Load Preset…" or its preset browser) | Every format | Convolver's preset in that format: `.vstpreset` (VST3), `.aupreset` (Audio Unit) or a `NAME.preset.lv2` folder (LV2), with at least its inputs ([channels](#channels)) |
 | A saved project | Every format | The filter and settings saved in it |
 
@@ -150,7 +150,7 @@ host:
 | --- | --- |
 | No filter loaded yet, equal input and output counts | The input, unchanged (after the latency) |
 | No filter loaded yet, different counts | Silence |
-| The host gives more inputs than the filter needs, and the outputs match | A preset or saved project: the filter, reading the first inputs; the rest are ignored ([channels](#channels)). A file chosen in the window is refused: it needs exactly the host's inputs |
+| The host gives more inputs than the filter needs, and the outputs match | The filter, from a preset, a saved project or a chosen file, reading the first inputs; the rest are ignored ([channels](#channels)) |
 | The first filter does not fit, or its preset is damaged | Silence |
 | A new filter does not fit while another is playing | The working filter, unchanged; the project keeps saving it |
 | The filter is too large to save with the project | As for a filter that does not fit: silence for a first filter, otherwise the working filter |
@@ -789,8 +789,9 @@ The LV2 plug-in has one parameter, **Filter**
 LV2 file parameters, such as Ardour and Jalv, give it a file chooser: choose
 the IR file, `.cfg` or configuration list you would pass to the
 [command-line tool](command-line.md). The file is read for the plug-in's
-sample rate and channel counts, so a list chooses its entry exactly as the
-command-line tool does, and nothing is resampled.
+sample rate and channel counts, as a list's entry is chosen by the
+command-line tool, except that a filter with fewer inputs than the plug-in
+has also fits ([channels](#channels)); nothing is resampled.
 
 The file is loaded on the host's worker thread, so audio carries on
 meanwhile: the status port shows Loading, then Active once the new filter

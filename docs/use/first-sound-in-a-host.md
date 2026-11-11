@@ -37,10 +37,6 @@ on Windows, see the [Equalizer APO export](equalizer-apo.md).
 - **In Audacity**, Audacity's own preset menu is the checked way to load
   filters, as [In Audacity](#in-audacity) says; loading from Convolver's
   window should now work but has not been checked in Audacity yet.
-- A file chosen in the window must have exactly as many inputs as the host
-  gives the plug-in; a preset of the same filter only needs at least that
-  many. Where a host gives more inputs, as REAPER does on a six-channel
-  track, load the filter as a preset.
 - Changing **Latency** during playback leaves a short gap and cuts off a
   tail that is still sounding; hosts differ in when they line the audio up
   again ([latency and tail](plugins.md#latency-and-tail)).

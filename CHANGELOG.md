@@ -126,8 +126,11 @@ Until 1.0 the C++ API may change between minor versions.
   comes first, otherwise the entry for the host's rate and outputs with the
   most inputs below the host's. With no filter, Status says "Choose a filter
   or load a Convolver preset." where the plug-in has a window (macOS, and
-  VST3 on Windows). The crossover check no longer sends REAPER users to the
-  preset. Filters that loaded before load and sound the same.
+  VST3 on Windows); on Linux, where the VST3 plug-in has no window, the
+  Convolver log's advice no longer tells users to choose a file or drop one
+  on the window, and names the host's preset menu. The guides no longer send
+  REAPER users to the preset for the crossover. Filters that loaded before
+  load and sound the same.
 - WAV files (IO-10, IO-11): two kinds of WAV file that other programs read
   were refused as cut short, by the command line and by the plug-ins, and as
   a filter were reported as "neither a configuration nor a sound file". Both
