@@ -15,7 +15,7 @@ before corner and edge cases
 ([decision](docs/project/decisions.md#releases)). The
 [execution priorities](#execution-priorities) sort every open item into three
 groups: checks and known defects in the published previews, work decided
-or likely once the freeze lifts, and parked or later work. The next
+or likely now the freeze has lifted, and parked or later work. The next
 milestone is still an independent user running a published preview (REL-3).
 [Status](docs/project/status.md) shows what users can run now and the checks
 left, and [decisions](docs/project/decisions.md) what jrp has decided. Open
@@ -56,7 +56,7 @@ until the next triage.
 
 **Next milestone** (jrp's [guidance](docs/review-2026-10/release-readiness-guidance-2026-10-22.md),
 22 October 2026): an independent user installs and uses an exact preview
-package, following only the documentation (REL-3). jrp published both
+package, following only the documentation (REL-3). jrp published all three
 previews before it ([decisions](docs/project/decisions.md#releases)), so the
 walkthrough uses published files, and its findings join the other preview
 feedback. The decision of 8 November kept the remaining host checks and
@@ -103,8 +103,8 @@ the suggested one.
 
 | Group | Items | Note |
 | --- | --- | --- |
-| Later previews, as decided | **VST3-12** (the Windows window, built: host and screen-reader checks left); **VST3-13** (the Linux window) only once LV2 is in a Linux package and users ask; **PLUG-9**, **PLUG-10** and **AU-7** (the other gain modes and the meters) | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the windows' order is [decided](docs/project/decisions.md#direction) in the [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md). The 0.13.2 Windows and Linux packages use the host's own controls meanwhile |
-| LV2 in a preview | **LV2-3** and **LV2-4** (LV2-5 and LV2-7 are done) | LV2 is in the Linux package from the next preview ([decision](docs/project/decisions.md#releases)) |
+| Later previews, as decided | **VST3-12** (the Windows window, built: host and screen-reader checks left); **VST3-13** (the Linux window) only once LV2 is in a Linux package and users ask; **PLUG-9**, **PLUG-10** and **AU-7** (the other gain modes and the meters) | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the windows' order is [decided](docs/project/decisions.md#direction) in the [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md). The Linux packages use the host's own controls meanwhile; the Windows window shipped in 0.13.12, not yet tried in a host |
+| LV2 in a preview | **LV2-3** and **LV2-4** (LV2-5 and LV2-7 are done) | LV2 is in the Linux package since 0.13.12, not yet tried in a host ([decision](docs/project/decisions.md#releases)) |
 | A window fix from jrp's sessions | **PLUG-26** (choose a `.vstpreset` in the window) | From his file-loading review of 7 November 2026 |
 | Other configuration readers | **CFG-1**, then **CFG-2** | CFG-2 waits for CFG-1 to show which readers matter |
 | Only on request | **VST3-2** (switch filters from the host), **VST3-6** (replacing the old VST2 plug-in), **HOST-2** (CLAP), **LV2-6** (an LV2 window) | Each needs a stated user need and acceptance tests first |
@@ -170,7 +170,8 @@ is superseded.
   (PR #64). jrp set the repository description, topics, website and social
   preview, and the SourceForge project summary now points here (24 October
   2026); the old SourceForge website stays as it is. Remaining, at each
-  preview: the steps after publishing.
+  preview: the steps after publishing; for 0.13.12, which adds a format
+  (LV2), the community posts and the LV2 list proposal those steps name.
 - [ ] **HOST-1 — Named host matrix.** Record versions and results for Windows/macOS
   hosts: scan, load, preset/state restore, silence/tails, seek, variable callbacks,
   bypass, filter changes, multiple instances and unequal channel counts. SDK
@@ -931,7 +932,8 @@ means a patched FFmpeg build with `--enable-gpl`.
   configuration and flags too; the runner reports each check's largest
   difference as a share of its bound. Remaining: a
   REAPER project saved with 0.13.2, with its state chunk restored through
-  each adapter, and Audio Unit state from a release.
+  each adapter, Audio Unit state from a release, and the capture of the
+  published 0.13.12 (11 November 2026).
 - [ ] **DIAG-5 — Report clipping after a command-line render.** From the
   BruteFIR comparison (8 November 2026): BruteFIR has printed each output's
   count of overflowed samples and its peak by default since 0.99
@@ -1755,7 +1757,7 @@ move to the archive.
   ([publishing](docs/develop/releasing.md#publishing-an-unsigned-preview),
   [decision](docs/project/decisions.md#releases)). jrp published the first
   such preview, [0.13.2](https://github.com/jrp2014/convolver/releases/tag/v0.13.2), on 9 November 2026, and the
-next, [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), on 11 November 2026.
+  next, [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), on 11 November 2026.
 - [x] **REL-7 — Apply bounded preview acceptance.** 8 November 2026,
   PRs #156 and #159; jrp published [0.12.12](https://github.com/jrp2014/convolver/releases/tag/v0.12.12) without the remaining
   host checks and REL-3, which stay open under HOST-1, AU-4 and REL-3

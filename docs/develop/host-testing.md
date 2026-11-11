@@ -259,7 +259,7 @@ Do this once. Run the commands in the extracted preview package folder.
    In jrp's Audacity 4.0.2 session (7 November 2026) the administrator
    prompt was cancelled, so this folder is not yet confirmed in a test;
    copies in the user's `~/Library/Audio/Presets` folder were not how
-   Audacity found presets. The first preview supports only this route in
+   Audacity found presets. The previews support only this route in
    Audacity ([decision](../project/decisions.md#plug-in-behaviour)): up to
    0.13.2 a filter loaded with Convolver's **Choose…** played but was not
    exported or saved, and the fix (VST3-17 in [TODO](../../TODO.md)) has
