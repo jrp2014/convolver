@@ -6,8 +6,8 @@ to use or do instead.
 
 **In short:** Convolver applies filters you already have, at the sample rate
 and channel counts they were made for. It does not design filters, resample
-or play audio to a device by itself, and only its VST® 3 plug-in and Audio
-Unit on macOS have a window yet. Its packages are unsigned developer previews.
+or play audio to a device by itself, and its VST® 3 plug-in has a window on
+macOS and Windows only, as has the Audio Unit on macOS. Its packages are unsigned developer previews.
 
 | Convolver does not… | Instead |
 | --- | --- |
@@ -15,7 +15,7 @@ Unit on macOS have a window yet. Its packages are unsigned developer previews.
 | Resample a filter, or adapt its channel count | Make the filter at your audio's sample rate, or keep one per rate in a [configuration list](configuration.md#paths-and-configuration-lists); use a `.cfg` to apply a mono IR to several channels |
 | Play to or record from an audio device | Use a plug-in host, a pipe between programs ([RAW streams](command-line.md#raw-streams)) or, on Windows, [Equalizer APO](equalizer-apo.md) |
 | Filter everything a computer plays, by itself | On Windows, export to [Equalizer APO](equalizer-apo.md) |
-| Show a window or file chooser on Windows or Linux, or in LV2 (the VST3 plug-in and the Audio Unit have [one on macOS](plugins.md#convolvers-window)) | Load a [preset](presets.md); the host's own bypass switch works |
+| Show a window or file chooser in the VST3 plug-in on Linux, or in LV2 (the VST3 plug-in has [one on macOS and Windows](plugins.md#convolvers-window), as has the Audio Unit) | Load a [preset](presets.md); the host's own bypass switch works |
 | Handle more than 8 channels in a plug-in, or more than one input and one output | Use the [command-line tool](command-line.md), which takes up to 256 channels |
 | Offer every channel layout in LV2 | Use one of the [LV2 layouts](plugins.md#lv2-channel-layouts), or the VST® 3 or Audio Unit plug-in |
 | Open projects saved with the old Windows VST 2 plug-in | Load a preset made from the same `.cfg` |

@@ -99,8 +99,8 @@ body:
     attributes:
       label: Messages
       description: >-
-        macOS: press Copy Diagnostics in Convolver's window and paste it here.
-        Windows and Linux: drag the Convolver log file here, and paste the
+        macOS and Windows: press Copy Diagnostics in Convolver's window and
+        paste it here. Linux: drag the Convolver log file here, and paste the
         plug-in's Status text if the host shows it. Command-line tools: paste
         the command and its whole message. The log names file paths, which can
         include your user name; edit them out if you prefer.

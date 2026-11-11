@@ -85,7 +85,7 @@ show routing; they are not a crossover ready for real speakers.
    `examples/first-use/crossover/filter.cfg`. A chosen file must have
    exactly the inputs the host gives, while a preset needs only at least
    them, so where the host gives more inputs (REAPER gives the VST3 plug-in
-   6 on a six-channel track), and without the window (Windows and Linux),
+   6 on a six-channel track), and without the window (Linux),
    load `examples/first-use/crossover/first-use-crossover.vstpreset` from
    the host's preset menu instead (REAPER: the **+** button beside the
    preset menu, then the item that imports a VST preset file). Status reads

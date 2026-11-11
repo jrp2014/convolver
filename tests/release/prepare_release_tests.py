@@ -159,6 +159,7 @@ class PrepareReleaseTests(unittest.TestCase):
         self.assertNotIn('Audacity 4 does not keep it', text)
         # The fix is untested in Audacity, so the notes say so (jrp, 10 November 2026).
         self.assertIn('not yet in Audacity', text)
+        self.assertIn("Audacity's own preset menu is the route that has been checked", text)
         # The new engine was published without a host listening session (jrp, 9 November 2026),
         # and some older projects open at the new default Latency (PERF-2).
         self.assertIn('nobody has listened to it in a host yet', text)

@@ -36,14 +36,14 @@ PREVIOUS_PREVIEW = '0.13.2'
 CHANGES = (
     (
         "On Windows the VST3 plug-in has Convolver's window, as on macOS: choose, drop or reload a filter, set "
-        'Gain, Mix and Latency, and read the status and Copy Diagnostics there. The Windows and Linux plug-in '
-        'reads filter files with libsndfile, as the command-line tool does.'
+        'Gain, Mix and Latency, and read the status and Copy Diagnostics there. Choose… reads the same sound '
+        'files as the command-line tool (WAV, RF64, W64, AIFF, CAF).'
     ),
     (
         'WAV files that other programs write and Convolver refused as cut short are now read: a last chunk '
         "without its padding byte, as Python's `wave` module writes mono 24-bit audio with an odd number of "
-        'frames, and sizes that were never filled in, as FFmpeg writes to a pipe. Such a file of 4 GiB or more '
-        'is still refused.'
+        'frames, and sizes that were never filled in, as FFmpeg writes to a pipe. A file without sizes of 4 GiB '
+        'or more is still refused, and one that FFmpeg stopped writing half way is read as if it were complete.'
     ),
     (
         'A sound file that cannot be used as a filter is reported with the reason, for example a damaged header '
@@ -56,12 +56,17 @@ CHANGES = (
         'controls.'
     ),
     (
-        "In Audacity, a filter loaded from Convolver's window (Choose…, Recent or Reload) is now kept for exports "
-        'and saved projects; checked by automated tests only, not yet in Audacity.'
+        "In Audacity, a filter loaded from Convolver's window (Choose…, Recent or Reload) should now be kept for "
+        'exports and saved projects (see the known limitations).'
     ),
     (
         'On Windows, a file whose name holds characters outside the system code page, such as Greek, Cyrillic '
-        'or Chinese letters, is named correctly in messages, and a configuration naming such an IR file loads.'
+        'or Chinese letters, is named correctly in messages, and a configuration naming an IR file whose extension '
+        'holds such characters loads.'
+    ),
+    (
+        'A new guide to reporting a problem (linked below) says what to collect on each system, and a Preview '
+        'feedback form asks what worked and what did not.'
     ),
 )
 TAG = re.compile(r'v(\d+\.\d+\.\d+)')
@@ -205,7 +210,8 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             "Copy Diagnostics from Convolver's window on macOS and Windows, or attach the Convolver log on Linux "
             f'([where it is]({docs}/report-a-problem.md#2-collect-convolvers-messages)). '
             'Say which system, host and version you used, how you loaded the filter '
-            '(on macOS and Windows Choose…, Recent or Reload; anywhere a preset or a saved project), '
+            "(on macOS and Windows Choose…, Recent or Reload; in LV2 the host's file chooser; anywhere a preset or a "
+            'saved project), '
             'and whether the problem is in playback, export or reopening '
             f'([how to report]({docs}/report-a-problem.md)). '
             'To say what worked, what was hard to follow or what you missed, open a '
