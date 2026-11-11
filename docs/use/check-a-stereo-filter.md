@@ -102,8 +102,7 @@ from the filter.
 4. Click **Choose…** in Convolver's window and pick
    `examples/first-use/stereo/filter.cfg`. The window shows 48000 Hz,
    `2 in → 2 out` and Active, and Status reads
-   `Filter loaded: 48000 Hz, 2 in, 2 out.` Without the window (Windows and
-   Linux), load `examples/first-use/stereo/first-use-stereo.vstpreset` from
+   `Filter loaded: 48000 Hz, 2 in, 2 out.` Without the window (Linux), load `examples/first-use/stereo/first-use-stereo.vstpreset` from
    the host's preset menu instead (REAPER: the **+** button beside the
    preset menu, then the item that imports a VST preset file); the Status
    is the same.

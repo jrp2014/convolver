@@ -143,8 +143,8 @@ with the lifecycle regression fixed and the advertised workflows demonstrated.
 The first preview is macOS-only ([decisions](decisions.md#plug-in-behaviour)):
 the VST3 plug-in and the Audio Unit with the existing shared window and their
 Gain, Mix and Latency settings, the `convolver` CLI and the preset tool. The
-Windows and Linux windows, the other gain modes and the meters come in later
-previews. LV2 joined the Linux package with its packaging and settings
+Windows window followed after the second preview (VST3-12); the Linux
+window, the other gain modes and the meters come in later previews. LV2 joined the Linux package with its packaging and settings
 (LV2-5, LV2-7; [decisions](decisions.md#releases)). The
 Windows and Linux packages, VST3 without a window and the tools, are
 published from the second preview, after an automated run on clean machines
@@ -163,7 +163,7 @@ already met are below; those still open are the gates in
 | Lifecycle sequences checked against a reference model | Proposed with the milestone, so the next defect of this kind is caught | PLUG-7 | [PR #58](https://github.com/jrp2014/convolver/pull/58); `au.lifecycle` runs in macOS CI only |
 | The edge cases from jrp's review of 0.4.43 fixed | jrp's review | DIAG-1, ROBUST-4 | [PR #72](https://github.com/jrp2014/convolver/pull/72), [PR #73](https://github.com/jrp2014/convolver/pull/73), [PR #96](https://github.com/jrp2014/convolver/pull/96) |
 | The defects from jrp's later reviews fixed | jrp's reviews of `6920a45` and `276c7dc` | PLUG-12, ROBUST-3, PLUG-13 | [PR #91](https://github.com/jrp2014/convolver/pull/91), [PR #105](https://github.com/jrp2014/convolver/pull/105) |
-| Settings (Gain, Mix, Latency) and the shared macOS window implemented in VST3 and the Audio Unit, and checked in CI | jrp | PLUG-9, PLUG-10, VST3-3, VST3-4, AU-7 | Implemented and checked in CI (`vst3.editor`, `au.editor`, pluginval's editor tests); the window last redesigned in [PR #128](https://github.com/jrp2014/convolver/pull/128) (PLUG-22, 7 November 2026). Its host checks (VST3-11, AU-6) are gates 2 and 3 below. Later previews: the Windows and Linux windows (VST3-12, VST3-13), the other gain modes and the meters (PLUG-9, PLUG-10, AU-7) |
+| Settings (Gain, Mix, Latency) and the shared macOS window implemented in VST3 and the Audio Unit, and checked in CI | jrp | PLUG-9, PLUG-10, VST3-3, VST3-4, AU-7 | Implemented and checked in CI (`vst3.editor`, `au.editor`, pluginval's editor tests); the window last redesigned in [PR #128](https://github.com/jrp2014/convolver/pull/128) (PLUG-22, 7 November 2026). Its host checks (VST3-11, AU-6) are gates 2 and 3 below. The Windows window followed after the second preview (VST3-12); later previews: the Linux window (VST3-13), the other gain modes and the meters (PLUG-9, PLUG-10, AU-7) |
 | The Audio Unit validated by `auval` and pluginval, and in the package | jrp | AU-3, AU-5 | `auval -strict` and `au.editor` in CI; pluginval on the installed component in the Audio Unit workflow; the component in both macOS candidates since PR #115, with `auval -strict` after the `.pkg` installs it (first passed in candidates [run 42108659224](https://github.com/jrp2014/convolver/actions/runs/42108659224)). AU-3's ThreadSanitizer build is gate 4 below (done) |
 | Journeys written as steps, with the presets they need in the package | jrp's milestone | REL-2 | 6 November 2026: the stereo, 2→6 crossover and CLI journeys (table above) |
 
@@ -231,7 +231,10 @@ Check 6 (the final tag's candidate run) still runs before publication.
 jrp decided on 9 November 2026 to publish the second preview, a 0.13.x tag for
 macOS, Windows and Linux, without them too, and without check 9
 ([decision](decisions.md#releases)); they stay open as follow-up work, and
-its release notes say what was not checked. On 9 November 2026 he made the
+its release notes say what was not checked. On 10 November 2026 he decided
+the same for a third preview, once the changes in flight are in
+(VST3-17 without a check in Audacity, the Windows window, LV2; all merged
+by 0.13.11) ([decision](decisions.md#releases)). On 9 November 2026 he made the
 published 0.13 preview (0.13.2) the baseline: the checks left and REL-3 run on
 its exact files, and the v0.12.8 results in the table below are records of
 that build, not passes for 0.13 ([decision](decisions.md#releases)).

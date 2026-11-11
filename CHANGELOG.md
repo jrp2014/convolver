@@ -12,6 +12,14 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Releases: the draft release's notes list what changed for users since
+  the previous preview, 0.13.2 for the next one, before the link to this
+  changelog; each preview's release-notes change updates the list
+  ([publishing](docs/develop/releasing.md#publishing-an-unsigned-preview)).
+  jrp decided on 10 November 2026 to publish a third preview, a 0.13.x tag,
+  without the checks left, once the changes in flight are in, VST3-17's
+  Audacity fix among them without a check in Audacity
+  ([decision](docs/project/decisions.md#releases)).
 - LV2 plug-in (LV2-7): Gain, Mix and Latency, as the control inputs `gain`
   (dB), `mix` (%) and `latency_frames` (frames), after the existing ports so
   those keep their numbers. They work as in the other formats; a new Latency

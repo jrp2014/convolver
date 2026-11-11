@@ -140,7 +140,9 @@ class PrepareReleaseTests(unittest.TestCase):
         # Each system's own checksum command, and what Windows and Linux lack.
         for words in ('shasum -a 256', 'Get-FileHash', 'sha256sum', 'SmartScreen', 'Visual C++'):
             self.assertIn(words, text)
-        self.assertIn('On Windows and Linux the VST3 plug-in has no window yet', text)
+        self.assertIn('On Linux the VST3 plug-in has no window yet', text)
+        # The Windows window (VST3-12) has only been checked on CI.
+        self.assertIn('Nobody has tried it in a Windows host', text)
         self.assertIn(
             f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/first-sound-in-a-host.md#optional-load-a-preset',
             text,
@@ -155,12 +157,19 @@ class PrepareReleaseTests(unittest.TestCase):
         self.assertIn('Not yet checked: listening in any host', text)
         # VST3-17 is fixed; the release notes' changes list says what is checked.
         self.assertNotIn('Audacity 4 does not keep it', text)
+        # The fix is untested in Audacity, so the notes say so (jrp, 10 November 2026).
+        self.assertIn('not yet in Audacity', text)
+        self.assertIn("Audacity's own preset menu is the route that has been checked", text)
         # The new engine was published without a host listening session (jrp, 9 November 2026),
         # and some older projects open at the new default Latency (PERF-2).
         self.assertIn('nobody has listened to it in a host yet', text)
         self.assertIn('Some projects saved with 0.12.12', text)
         self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/plugins.md#settings', text)
         self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/CHANGELOG.md', text)
+        # What changed since the previous preview, one line per change.
+        self.assertIn(f'Since {prepare_release.PREVIOUS_PREVIEW}:', text)
+        for change in prepare_release.CHANGES:
+            self.assertIn(f'- {change}\n', text)
         # How to report a problem, with what makes a report useful.
         self.assertIn('## Report a problem', text)
         self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/report-a-problem.md', text)

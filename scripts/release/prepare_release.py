@@ -28,6 +28,47 @@ from promotion_gate import check
 PUBLISHED_PLATFORMS = ('macos-arm64', 'macos-x86_64', 'windows-x86_64', 'linux-x86_64')
 AUDIENCE = 'macOS 14 or later, Windows 11 and Linux (x86-64, glibc 2.35 or later)'
 CANDIDATE_WORKFLOW = '.github/workflows/release.yml'
+# The preview published before this one, and what changed for users since,
+# in their words; each preview's release-notes change updates both
+# (docs/develop/releasing.md#publishing-an-unsigned-preview). The changelog
+# holds every change.
+PREVIOUS_PREVIEW = '0.13.2'
+CHANGES = (
+    (
+        "On Windows the VST3 plug-in has Convolver's window, as on macOS: choose, drop or reload a filter, set "
+        'Gain, Mix and Latency, and read the status and Copy Diagnostics there. Choose… reads the same sound '
+        'files as the command-line tool (WAV, RF64, W64, AIFF, CAF).'
+    ),
+    (
+        'WAV files that other programs write and Convolver refused as cut short are now read: a last chunk '
+        "without its padding byte, as Python's `wave` module writes mono 24-bit audio with an odd number of "
+        'frames, and sizes that were never filled in, as FFmpeg writes to a pipe. A file without sizes of 4 GiB '
+        'or more is still refused, and one that FFmpeg stopped writing half way is read as if it were complete.'
+    ),
+    (
+        'A sound file that cannot be used as a filter is reported with the reason, for example a damaged header '
+        'or too many channels, instead of a general message. `convolver --inspect` gives such a file the new '
+        'code `unreadable-asset`.'
+    ),
+    (
+        'Linux packages include the LV2 plug-in: one plug-in for each channel layout, the filter chosen with the '
+        "host's file chooser or an LV2 preset made with `convolver-preset`, and Gain, Mix and Latency as host "
+        'controls.'
+    ),
+    (
+        "In Audacity, a filter loaded from Convolver's window (Choose…, Recent or Reload) should now be kept for "
+        'exports and saved projects (see the known limitations).'
+    ),
+    (
+        'On Windows, a file whose name holds characters outside the system code page, such as Greek, Cyrillic '
+        'or Chinese letters, is named correctly in messages, and a configuration naming an IR file whose extension '
+        'holds such characters loads.'
+    ),
+    (
+        'A new guide to reporting a problem (linked below) says what to collect on each system, and a Preview '
+        'feedback form asks what worked and what did not.'
+    ),
+)
 TAG = re.compile(r'v(\d+\.\d+\.\d+)')
 DESCRIPTIONS = {
     'macos-arm64': 'macOS 14 or later, Apple silicon',
@@ -124,10 +165,12 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             f'- [Limits]({docs}/limits.md): what Convolver does not do.'
         ),
         '## What changed',
+        f'Since {PREVIOUS_PREVIEW}:',
+        '\n'.join(f'- {change}' for change in CHANGES),
         f"Each preview's changes are in the [changelog]({base}/blob/{tag}/CHANGELOG.md).",
         '## Known limitations',
         (
-            "- On Windows and Linux the VST3 plug-in has no window yet. Load a filter from the host's preset menu "
+            "- On Linux the VST3 plug-in has no window yet. Load a filter from the host's preset menu "
             '(each example comes with a `.vstpreset`, and `convolver-preset` makes one from your own filter) and set '
             "Gain, Mix and Latency in the host's own controls "
             f'([load a preset]({docs}/first-sound-in-a-host.md#optional-load-a-preset)).\n'
@@ -137,6 +180,9 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             "Mix and Latency with the host's own controls. Each channel layout is "
             'its own plug-in. It was checked only automatically, with lilv, lv2lint, pluginval and a headless '
             'Ardour session.\n'
+            '- The Windows window is new and has been checked only automatically, on Windows CI machines: it opens, '
+            "and the plug-in validator's window tests pass. Nobody has tried it in a Windows host or with a screen "
+            'reader yet.\n'
             '- Unsigned: macOS asks you to confirm that you want to open it, and Windows shows a SmartScreen '
             'warning.\n'
             '- Windows needs the Microsoft Visual C++ 2015-2022 x64 runtime, which most computers already have.\n'
@@ -152,16 +198,20 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'and removed itself. Nobody has used them in a host yet. '
             f'[Status]({base}/blob/{tag}/docs/project/status.md#checks-left-before-publication) lists what is open. '
             'Other hosts are untested.\n'
-            '- Latency now starts at 0 frames. Some projects saved with 0.12.12 at its default of 256 frames open at '
-            '0; choose 256 again if you want its delay back '
+            "- In Audacity, Convolver's window (Choose…, Recent or Reload) should now keep the filter for exports and "
+            "saved projects, but this has been checked only by automated tests, not yet in Audacity. Audacity's own "
+            'preset menu is the route that has been checked.\n'
+            '- Since 0.13, Latency starts at 0 frames. Some projects saved with 0.12.12 at its default of 256 frames '
+            'open at 0; choose 256 again if you want its delay back '
             f'([projects from earlier versions]({docs}/plugins.md#settings)).'
         ),
         '## Report a problem',
         (
-            "Copy Diagnostics from Convolver's window on macOS, or attach the Convolver log on Windows and Linux "
+            "Copy Diagnostics from Convolver's window on macOS and Windows, or attach the Convolver log on Linux "
             f'([where it is]({docs}/report-a-problem.md#2-collect-convolvers-messages)). '
             'Say which system, host and version you used, how you loaded the filter '
-            '(on macOS Choose…, Recent or Reload; anywhere a preset or a saved project), '
+            "(on macOS and Windows Choose…, Recent or Reload; in LV2 the host's file chooser; anywhere a preset or a "
+            'saved project), '
             'and whether the problem is in playback, export or reopening '
             f'([how to report]({docs}/report-a-problem.md)). '
             'To say what worked, what was hard to follow or what you missed, open a '

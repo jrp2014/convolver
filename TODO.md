@@ -60,7 +60,7 @@ previews before it ([decisions](docs/project/decisions.md#releases)), so the
 walkthrough uses published files, and its findings join the other preview
 feedback. The decision of 8 November kept the remaining host checks and
 REL-3 as gates for later previews; jrp waived them for the second preview
-too, so whether a third waits for them is his to decide. Finishing a
+too, and on 10 November 2026 for a third. Finishing a
 dependable product matters more than another substantial refactor: move
 code into shared layers only when two formats need the same behaviour (as
 with `HostFilter`), do not generalise host lifecycle or release machinery
@@ -1661,7 +1661,7 @@ with compatibility tests; linked IDs point to open work above.
 | A host rate that is not a whole number of hertz (such as 48000 ÷ 1.001) plays silence in VST3 and is refused by the Audio Unit and LV2 | No filter is made for such a rate and nothing is resampled (VST3-9, decided by jrp). The Audio Unit and LV2 could accept it the same way when a host needs it. | [When a filter does not fit](docs/use/plugins.md#when-a-filter-does-not-fit) |
 | A WAV whose sizes were never filled in (`0xFFFFFFFF`, as FFmpeg writes to a pipe) is read to the end of the file, so one left by an interrupted write is read as if it were complete; only PCM or float audio that stops inside a frame is refused. Such a file of 4 GiB or more is refused | jrp's decision of 10 November 2026 (IO-11). A file of 4 GiB or more has no size a reader could use; RF64, W64 or a RAW stream carry long audio. | [Input files](docs/use/command-line.md#input-files) |
 | No IR resampling or automatic channel adaptation for direct sound-file filters | Rate/count mismatches fail; use an explicit configuration. IO-2 covers resampling. | [Configuration](docs/use/configuration.md) |
-| One VST3 input bus and one output bus, each 1–8 channels; a window on macOS only | Presets and generic host controls elsewhere; layouts are checked with a notice only; the Windows and Linux windows are VST3-12 and VST3-13, host switching VST3-2. | [VST3](docs/use/plugins.md#loading-a-filter) |
+| One VST3 input bus and one output bus, each 1–8 channels; a window on macOS and Windows only | Presets and generic host controls on Linux; layouts are checked with a notice only; the Linux window is VST3-13, host switching VST3-2. | [VST3](docs/use/plugins.md#loading-a-filter) |
 | No promised migration of old VST2 project state | New VST3 identity; define a migration requirement before implementing one (VST3-6). | [VST3](docs/use/plugins.md#identities) |
 | No built-in device application or clock management | CLI pipes need a producer/consumer; VST3 relies on its host. Standalone device support requires a separate design. | [Concepts](docs/use/concepts.md#files-and-continuous-streams) |
 | One FFT backend per binary; Ooura/Accelerate have no FFTW-style measured plans or wisdom | Intentional deployment choice. Assess alternatives under FFT-2; do not imply runtime fallback. | [FFT guide](docs/develop/fft-backends.md#selection-and-contract) |
