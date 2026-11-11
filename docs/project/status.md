@@ -24,7 +24,9 @@ the independent walkthrough, which stay open
 ([checks left](#checks-left-before-publication)). On 9 November 2026 he
 published the second, [Convolver 0.13.2](https://github.com/jrp2014/convolver/releases/tag/v0.13.2) for macOS, Windows
 and Linux, with the new audio engine (PERF-2) and without its host
-listening session (check 9). The command-line renderer, the preset tool, the Equalizer APO
+listening session (check 9). On 11 November 2026 he published the third,
+[Convolver 0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), which adds the VST3 window on Windows and
+the LV2 plug-in in the Linux package, neither yet tried in a host. The command-line renderer, the preset tool, the Equalizer APO
 export and the VST3, Audio Unit and LV2 plug-ins are implemented and tested
 automatically; VST3 and the Audio Unit have Gain, Mix and Latency and share
 one macOS window. jrp has run the VST3 plug-in in REAPER (6 to 8 November)
@@ -234,7 +236,8 @@ macOS, Windows and Linux, without them too, and without check 9
 its release notes say what was not checked. On 10 November 2026 he decided
 the same for a third preview, once the changes in flight are in
 (VST3-17 without a check in Audacity, the Windows window, LV2; all merged
-by 0.13.11) ([decision](decisions.md#releases)). On 9 November 2026 he made the
+by 0.13.11) ([decision](decisions.md#releases)); he published it,
+[0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), on 11 November 2026. On 9 November 2026 he made the
 published 0.13 preview (0.13.2) the baseline: the checks left and REL-3 run on
 its exact files, and the v0.12.8 results in the table below are records of
 that build, not passes for 0.13 ([decision](decisions.md#releases)).

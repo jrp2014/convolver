@@ -6,11 +6,12 @@ item. This is the shared backlog, not a promise that every idea will be
 implemented. Finished items are listed briefly under [done](#done); what they
 delivered is described in the guides and the [CHANGELOG](CHANGELOG.md).
 
-**In short:** jrp has published two unsigned previews: 0.12.12 for macOS
-(8 November 2026) and 0.13.2 for macOS, Windows and Linux, with the new audio
-engine (9 November 2026). Runtime changes are now frozen until feedback on
-the preview arrives; crashes, lost state, wrong audio, compatibility failures
-and dropouts are still fixed
+**In short:** jrp has published three unsigned previews: 0.12.12 for macOS
+(8 November 2026), 0.13.2 for macOS, Windows and Linux, with the new audio
+engine (9 November 2026), and [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), which adds the
+Windows VST3 window and the LV2 plug-in (11 November 2026). The runtime
+freeze of 9 November was lifted on 10 November; significant features come
+before corner and edge cases
 ([decision](docs/project/decisions.md#releases)). The
 [execution priorities](#execution-priorities) sort every open item into three
 groups: checks and known defects in the published previews, work decided
@@ -1753,7 +1754,8 @@ move to the archive.
   and Linux packages, after they run on clean machines
   ([publishing](docs/develop/releasing.md#publishing-an-unsigned-preview),
   [decision](docs/project/decisions.md#releases)). jrp published the first
-  such preview, [0.13.2](https://github.com/jrp2014/convolver/releases/tag/v0.13.2), on 9 November 2026.
+  such preview, [0.13.2](https://github.com/jrp2014/convolver/releases/tag/v0.13.2), on 9 November 2026, and the
+next, [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), on 11 November 2026.
 - [x] **REL-7 — Apply bounded preview acceptance.** 8 November 2026,
   PRs #156 and #159; jrp published [0.12.12](https://github.com/jrp2014/convolver/releases/tag/v0.12.12) without the remaining
   host checks and REL-3, which stay open under HOST-1, AU-4 and REL-3
