@@ -154,8 +154,8 @@ Audacity's own preset menu is the route checked in Audacity 4. Up to
 **Reload**, or reloading when the file changes) played while you listened,
 but Audacity 4.0.2 did not keep it for an export or a saved project: they
 kept whatever Audacity stored last, which may be no filter or an older one,
-so a wrong export could still sound plausible. Later versions should keep
-it, but this has been checked only by automated tests, not yet in Audacity.
+so a wrong export could still sound plausible. From 0.13.12 it should be
+kept, but this has been checked only by automated tests, not yet in Audacity.
 If you load a filter from the window, export a few seconds and check that
 the export has the filter you chose (for example by comparing it with
 `convolver --compare`, as in [check a stereo filter in a host](check-a-stereo-filter.md)).

@@ -24,7 +24,9 @@ the independent walkthrough, which stay open
 ([checks left](#checks-left-before-publication)). On 9 November 2026 he
 published the second, [Convolver 0.13.2](https://github.com/jrp2014/convolver/releases/tag/v0.13.2) for macOS, Windows
 and Linux, with the new audio engine (PERF-2) and without its host
-listening session (check 9). The command-line renderer, the preset tool, the Equalizer APO
+listening session (check 9). On 11 November 2026 he published the third,
+[Convolver 0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), which adds the VST3 window on Windows and
+the LV2 plug-in in the Linux package, neither yet tried in a host. The command-line renderer, the preset tool, the Equalizer APO
 export and the VST3, Audio Unit and LV2 plug-ins are implemented and tested
 automatically; VST3 and the Audio Unit have Gain, Mix and Latency and share
 one macOS window. jrp has run the VST3 plug-in in REAPER (6 to 8 November)
@@ -143,11 +145,12 @@ with the lifecycle regression fixed and the advertised workflows demonstrated.
 The first preview is macOS-only ([decisions](decisions.md#plug-in-behaviour)):
 the VST3 plug-in and the Audio Unit with the existing shared window and their
 Gain, Mix and Latency settings, the `convolver` CLI and the preset tool. The
-Windows window followed after the second preview (VST3-12); the Linux
+Windows window followed in the third, 0.13.12 (VST3-12); the Linux
 window, the other gain modes and the meters come in later previews. LV2 joined the Linux package with its packaging and settings
 (LV2-5, LV2-7; [decisions](decisions.md#releases)). The
-Windows and Linux packages, VST3 without a window and the tools, are
-published from the second preview, after an automated run on clean machines
+Windows and Linux packages are published from the second preview (VST3
+with the host's controls and the tools; from 0.13.12 the Windows VST3 has
+its window and the Linux package holds LV2), after an automated run on clean machines
 ([REL-9](../../TODO.md), [decisions](decisions.md#releases)). Until the
 first independent walkthrough, optional features and further hardening wait;
 crashes, lost state, wrong audio, ordinary compatibility failures and
@@ -163,14 +166,14 @@ already met are below; those still open are the gates in
 | Lifecycle sequences checked against a reference model | Proposed with the milestone, so the next defect of this kind is caught | PLUG-7 | [PR #58](https://github.com/jrp2014/convolver/pull/58); `au.lifecycle` runs in macOS CI only |
 | The edge cases from jrp's review of 0.4.43 fixed | jrp's review | DIAG-1, ROBUST-4 | [PR #72](https://github.com/jrp2014/convolver/pull/72), [PR #73](https://github.com/jrp2014/convolver/pull/73), [PR #96](https://github.com/jrp2014/convolver/pull/96) |
 | The defects from jrp's later reviews fixed | jrp's reviews of `6920a45` and `276c7dc` | PLUG-12, ROBUST-3, PLUG-13 | [PR #91](https://github.com/jrp2014/convolver/pull/91), [PR #105](https://github.com/jrp2014/convolver/pull/105) |
-| Settings (Gain, Mix, Latency) and the shared macOS window implemented in VST3 and the Audio Unit, and checked in CI | jrp | PLUG-9, PLUG-10, VST3-3, VST3-4, AU-7 | Implemented and checked in CI (`vst3.editor`, `au.editor`, pluginval's editor tests); the window last redesigned in [PR #128](https://github.com/jrp2014/convolver/pull/128) (PLUG-22, 7 November 2026). Its host checks (VST3-11, AU-6) are gates 2 and 3 below. The Windows window followed after the second preview (VST3-12); later previews: the Linux window (VST3-13), the other gain modes and the meters (PLUG-9, PLUG-10, AU-7) |
+| Settings (Gain, Mix, Latency) and the shared macOS window implemented in VST3 and the Audio Unit, and checked in CI | jrp | PLUG-9, PLUG-10, VST3-3, VST3-4, AU-7 | Implemented and checked in CI (`vst3.editor`, `au.editor`, pluginval's editor tests); the window last redesigned in [PR #128](https://github.com/jrp2014/convolver/pull/128) (PLUG-22, 7 November 2026). Its host checks (VST3-11, AU-6) are gates 2 and 3 below. The Windows window followed in 0.13.12 (VST3-12); later previews: the Linux window (VST3-13), the other gain modes and the meters (PLUG-9, PLUG-10, AU-7) |
 | The Audio Unit validated by `auval` and pluginval, and in the package | jrp | AU-3, AU-5 | `auval -strict` and `au.editor` in CI; pluginval on the installed component in the Audio Unit workflow; the component in both macOS candidates since PR #115, with `auval -strict` after the `.pkg` installs it (first passed in candidates [run 42108659224](https://github.com/jrp2014/convolver/actions/runs/42108659224)). AU-3's ThreadSanitizer build is gate 4 below (done) |
 | Journeys written as steps, with the presets they need in the package | jrp's milestone | REL-2 | 6 November 2026: the stereo, 2→6 crossover and CLI journeys (table above) |
 
 At publication, and before the next preview: COMPAT-1 keeps presets, a host
 project and expected audio from the published release, so later previews are
 tested against them. 0.13.2's presets and audio are kept; its REAPER project
-is not yet. Not part of this milestone, but tracked: signing and
+is not yet, and 0.13.12's capture is still to be made. Not part of this milestone, but tracked: signing and
 notarization (the production gate, REL-1 and PLUG-5), resource budgets and
 the wider supported workloads (PERF-3; the loading gate uses its own finite
 preview workloads), other `.cfg` readers
@@ -234,10 +237,13 @@ macOS, Windows and Linux, without them too, and without check 9
 its release notes say what was not checked. On 10 November 2026 he decided
 the same for a third preview, once the changes in flight are in
 (VST3-17 without a check in Audacity, the Windows window, LV2; all merged
-by 0.13.11) ([decision](decisions.md#releases)). On 9 November 2026 he made the
-published 0.13 preview (0.13.2) the baseline: the checks left and REL-3 run on
-its exact files, and the v0.12.8 results in the table below are records of
-that build, not passes for 0.13 ([decision](decisions.md#releases)).
+by 0.13.11) ([decision](decisions.md#releases)); he published it,
+[0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), on 11 November 2026. On 9 November 2026 he made the
+published 0.13 preview (0.13.2) the baseline, and on 11 November 2026 moved
+it to 0.13.12, which holds the Audacity fix, the Windows window and LV2: the
+checks left and REL-3 run on 0.13.12's exact files, and the v0.12.8 results
+in the table below are records of that build, not passes for 0.13
+([decision](decisions.md#releases)).
 
 This is the one list of what remains (REL-7), from jrp's direction of
 8 November 2026: finish the genuinely missing listening, host and

@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Convolver
 
-**Download:** [Convolver 0.13.2 for macOS, Windows and Linux](https://github.com/jrp2014/convolver/releases/tag/v0.13.2), an
+**Download:** [Convolver 0.13.12 for macOS, Windows and Linux](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), an
 unsigned developer preview; read [opening an unsigned preview](docs/use/install.md#unsigned-previews)
 first.
 
@@ -23,19 +23,20 @@ a configuration list naming several of them. Roon, JRiver and Audiolense use
 variants of the `.cfg` format ([other programs](docs/use/other-programs.md)).
 Coming from the old Windows Convolver? Your `.cfg` files may need a few
 edits ([how](docs/use/other-programs.md#configurations-from-the-old-windows-convolver)).
-Convolver is a developer preview: the latest, [0.13.2](https://github.com/jrp2014/convolver/releases/tag/v0.13.2), is an
-unsigned pre-release for macOS, Windows and Linux. In it the VST3 plug-in
-has no window on Windows and Linux; the Windows window has been built
-since, and is not yet in a published package. 0.13.2 was published before
-anyone listened to its new audio engine in a host and before an independent
-user's walkthrough, which are still to come ([status](docs/project/status.md)).
+Convolver is a developer preview: the latest, [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), is an
+unsigned pre-release for macOS, Windows and Linux. Its VST3 plug-in has a
+window on macOS and Windows and uses the host's controls on Linux, and the
+Linux package holds the LV2 plug-in. 0.13.12 was published before anyone
+listened to the new audio engine (since 0.13) or tried the Windows window
+or LV2 in a host, and before an independent user's walkthrough, which are
+still to come ([status](docs/project/status.md)).
 
 ## Start here
 
 | I want to… | Read |
 | --- | --- |
 | Use Convolver | [Using Convolver](docs/use/README.md), then [your first filter](docs/use/first-filter.md) |
-| Download the preview (macOS, Windows, Linux) | [0.13.2 pre-release](https://github.com/jrp2014/convolver/releases/tag/v0.13.2) |
+| Download the preview (macOS, Windows, Linux) | [0.13.12 pre-release](https://github.com/jrp2014/convolver/releases/tag/v0.13.12) |
 | Use the plug-ins | [Install](docs/use/install.md) and [your first sound in a host](docs/use/first-sound-in-a-host.md) |
 | Build it, embed it or change it | [Build from source](docs/develop/build.md), [library guide](docs/develop/library.md), [implementation map](docs/develop/architecture.md), [contributing](CONTRIBUTING.md) |
 | Find any page | [Documentation index](docs/README.md) |

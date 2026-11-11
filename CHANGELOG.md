@@ -12,6 +12,19 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Releases: jrp published Convolver 0.13.12, the third unsigned developer
+  preview, on 11 November 2026
+  ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.12)).
+
+## [0.13.12] - 2026-11-11
+
+The third published preview: macOS, Windows and Linux, unsigned, adding the
+VST3 window on Windows and the LV2 plug-in in the Linux package, published
+before either was tried in a host and before VST3-17's Audacity fix was
+checked in Audacity ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.12)).
+
+### Added
+
 - Releases: the draft release's notes list what changed for users since
   the previous preview, 0.13.2 for the next one, before the link to this
   changelog; each preview's release-notes change updates the list
@@ -2178,7 +2191,8 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.13.2...HEAD
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.13.12...HEAD
+[0.13.12]: https://github.com/jrp2014/convolver/releases/tag/v0.13.12
 [0.13.2]: https://github.com/jrp2014/convolver/releases/tag/v0.13.2
 [0.12.12]: https://github.com/jrp2014/convolver/releases/tag/v0.12.12
 [0.7.1]: https://github.com/jrp2014/convolver/compare/v0.7.0...v0.7.1
