@@ -45,7 +45,10 @@ struct FilterFileFailure {
     }
 };
 // For a plug-in: the filter in `path` (UTF-8) for `host`'s rate and channels, or none
-// with `failure` filled in. A readable file made for another rate or other
+// with `failure` filled in. As for a preset (PLUG-23), a filter needs the
+// host's outputs exactly and at least its inputs: an exact match comes first,
+// and otherwise the filter, or a list's entry, with the most inputs below the
+// host's is chosen (PLUG-33). A readable file made for another rate or other
 // channels is classified as such (a list by rate only when no entry has the
 // host's rate); the message names the file and explains. `files`, when
 // given, receives every file the accepted filter was read from (the file,

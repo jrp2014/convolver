@@ -2,6 +2,7 @@
 #include "../native/cases.hpp"
 #include "../plugins/test_log.hpp"
 #include "advice.hpp"
+#include "editor.hpp"
 #include "host_log.hpp"
 #include "pluginterfaces/vst/ivstattributes.h"
 #include "pluginterfaces/vst/vstpresetkeys.h"
@@ -1281,7 +1282,11 @@ void status_and_log() {
             std::lround(c.getParameterObject(status_id)->toPlain(c.getParamNormalized(status_id))));
     };
     require(p.connect(&c) == kResultOk && c.connect(&p) == kResultOk, "status connect");
-    require(shown() == "No filter loaded. Load a Convolver preset." &&
+    // PLUG-33: where the window chooses filter files (macOS and Windows),
+    // Status names that first; elsewhere only the preset route exists.
+    require(shown() == (convolver::vst3::has_editor()
+                            ? "No filter loaded. Choose a filter or load a Convolver preset."
+                            : "No filter loaded. Load a Convolver preset.") &&
                 status() == convolver::HostStatus::no_filter,
             "status before activation");
     // Other values read as their names (a host asking how a value would read).
@@ -2400,6 +2405,62 @@ void report_and_files() {
     c.terminate();
     p.terminate();
 }
+// PLUG-33: a file chosen in the window follows the rule a preset follows
+// (PLUG-23). REAPER gives the plug-in on a six-channel track 6 inputs and 6
+// outputs; the 2-in, 6-out crossover chosen there was refused with a Fix
+// asking for 2 inputs, though its preset played.
+void chosen_file_on_wider_bus() {
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk && p.connect(&c) == kResultOk &&
+                c.connect(&p) == kResultOk,
+            "wider bus: initialize");
+    SpeakerArrangement surround = SpeakerArr::k51;
+    require(p.setBusArrangements(&surround, 1, &surround, 1) == kResultOk, "wider bus: buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "wider bus: activate");
+    const auto folder = private_temp("convolver-vst3-wider");
+    std::filesystem::create_directories(folder);
+    write_wav(folder / "band.wav", 48000, 1, 8);
+    std::ofstream(folder / "filter.cfg")
+        << "48000 2 6 0\n0 0\n0 0 0 0 0 0\nband.wav\n0\n0\n0\nband.wav\n0\n1\n5\n";
+    std::ofstream(folder / "fewer outputs.cfg") << "48000 2 2 0\n0 0\n0 0\nband.wav\n0\n0\n0\n";
+    require(c.load_file((folder / "filter.cfg").string()),
+            "the crossover chosen on 6 inputs refused");
+    require(!p.failure(), "the chosen crossover left a failure");
+    const auto status = p.status();
+    require(status.status == convolver::HostStatus::active &&
+                status.text == "Filter loaded: 48000 Hz, 2 in, 6 out; plug-in inputs 3-6 ignored.",
+            ("status: " + status.text).c_str());
+    // Saved with its own counts, as the preset of the same filter is.
+    MemoryStream saved;
+    require(p.getState(&saved) == kResultOk, "wider bus: save");
+    saved.seek(0, IBStream::kIBSeekSet, nullptr);
+    const auto state = read_state(&saved);
+    require(state.configuration && state.configuration->input_channels == 2 &&
+                state.configuration->output_channels == 6,
+            "the chosen crossover saved with other channel counts");
+    // Outputs stay exact: a filter for 2 outputs is still refused, and the
+    // crossover keeps playing.
+    require(!c.load_file((folder / "fewer outputs.cfg").string()),
+            "a 2-out filter chosen on 6 outputs");
+    const auto f = p.failure();
+    require(f && f->kind == convolver::HostFailureKind::channels &&
+                p.status().text.find("previous filter kept") != std::string::npos,
+            ("the refused file: " + p.status().text).c_str());
+    std::filesystem::remove_all(folder);
+    p.setActive(false);
+    p.disconnect(&c);
+    c.disconnect(&p);
+    c.terminate();
+    p.terminate();
+}
 // VST3-17: a host without IComponentHandler2 (Audacity 4.0.2) stores the
 // state only after the plug-in reports an edit, so an accepted file is
 // reported as one edit of Latency that keeps its value: begin, perform with
@@ -3069,6 +3130,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"latency_while_playing", latency_while_playing},
         {"latency_handover_waits", latency_handover_waits},
         {"report_and_files", report_and_files},
+        {"chosen_file_on_wider_bus", chosen_file_on_wider_bus},
         {"load_without_set_dirty", [] { load_without_set_dirty(false); }},
         {"load_with_failing_set_dirty", [] { load_without_set_dirty(true); }},
         {"saved_filter_name", saved_filter_name},

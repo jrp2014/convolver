@@ -158,7 +158,8 @@ void Effect::update_status() noexcept {
         status_log_written_ = host_log_written();
         // Gain and Mix change what plays without a filter (PLUG-10).
         const bool bypassed = bypass_.load();
-        status_ = host_status(filter_, known_layout(), status_log_written_, settings(), bypassed);
+        status_ = host_status(filter_, known_layout(), status_log_written_, settings(), bypassed,
+                              true); // Choose Filter in the window.
         status_bypassed_ = bypassed;
         if (host_) // Render must not show Fault over a load failure.
             host_->hold_fault_signal(filter_.failure_shown());
@@ -174,8 +175,8 @@ void Effect::update_status() noexcept {
 // independent review).
 void Effect::refresh_status_text() noexcept {
     try {
-        auto line =
-            host_status(filter_, known_layout(), status_log_written_, settings(), bypass_.load());
+        auto line = host_status(filter_, known_layout(), status_log_written_, settings(),
+                                bypass_.load(), true);
         if (line.status == status_.status)
             status_.text = std::move(line.text);
     } catch (...) { // Out of memory: the previous text stays.

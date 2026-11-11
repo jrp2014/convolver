@@ -812,6 +812,33 @@ void files() {
             "a refused first file must leave the unit silent and say why: " +
                 text(report(empty)[@"explanation"]));
     empty.uninitialize();
+
+    // PLUG-33: a chosen file follows the rule a preset follows (PLUG-23):
+    // the 2-in, 6-out crossover chosen on 6 inputs and 6 outputs plays,
+    // reading inputs 1-2, and is saved with its own counts; a filter for
+    // other outputs is still refused.
+    const auto band = folder / "band.wav", crossover = folder / "filter.cfg",
+               fewer = folder / "fewer outputs.cfg";
+    write_wav(band, 48000, 1, 8);
+    std::ofstream(crossover)
+        << "48000 2 6 0\n0 0\n0 0 0 0 0 0\nband.wav\n0\n0\n0\nband.wav\n0\n1\n5\n";
+    std::ofstream(fewer) << "48000 2 2 0\n0 0\n0 0\nband.wav\n0\n0\n0\n";
+    Unit wide;
+    check(wide.configure(48000, 6, 6, 512), "6 to 6 formats");
+    check(wide.initialize(), "6 to 6 initialization");
+    check(choose(wide, crossover.string()), "the crossover chosen on 6 inputs");
+    const auto wide_report = report(wide);
+    require([wide_report[@"status name"] isEqualToString:@"Active"],
+            "the chosen crossover on 6 inputs: " + text(wide_report[@"explanation"]));
+    const auto wide_saved = wide.saved();
+    require(wide_saved.configuration && wide_saved.configuration->input_channels == 2 &&
+                wide_saved.configuration->output_channels == 6,
+            "the chosen crossover saved with other channel counts");
+    require(choose(wide, fewer.string()) != noErr, "a 2-out filter chosen on 6 outputs");
+    const auto still = wide.failure();
+    require(still.present && !still.silent && loaded_path(wide) == crossover.string(),
+            "the refused file replaced the crossover");
+    wide.uninitialize();
 }
 
 // TODO AU-6: a report read while a load holds the unit's control lock on

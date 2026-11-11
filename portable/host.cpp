@@ -835,7 +835,8 @@ const char* no_dry_reason(HostDrySignal rule) noexcept {
 }
 
 HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLayout>& host,
-                           bool log_written, const HostSettings& settings, bool bypassed) {
+                           bool log_written, const HostSettings& settings, bool bypassed,
+                           bool chooses_files) {
     const char* details =
         log_written ? " Details in the Convolver log." : " The log could not be written.";
     HostStatusLine line;
@@ -895,15 +896,16 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
         line.text = "Silent: an earlier load failed." + std::string(details);
     } else {
         line.status = HostStatus::no_filter;
+        const std::string load = chooses_files ? " Choose a filter or load a Convolver preset."
+                                               : " Load a Convolver preset.";
         if (!host)
-            line.text = "No filter loaded. Load a Convolver preset.";
+            line.text = "No filter loaded." + load;
         else if (!dry_known)
-            line.text = "No filter: silent, as inputs and outputs differ. Load a Convolver preset.";
+            line.text = "No filter: silent, as inputs and outputs differ." + load;
         else if (const auto sound = unfiltered_sound(settings, true); !sound.unchanged)
-            line.text = "No filter: audio passes at " + sound.level +
-                        " (Gain and Mix). Load a Convolver preset.";
+            line.text = "No filter: audio passes at " + sound.level + " (Gain and Mix)." + load;
         else
-            line.text = "No filter: audio passes unchanged. Load a Convolver preset.";
+            line.text = "No filter: audio passes unchanged." + load;
     }
     if (line.text.size() > max_status_text)
         line.text.resize(max_status_text);

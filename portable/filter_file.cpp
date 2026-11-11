@@ -40,6 +40,20 @@ Advice fractional_rate_refusal(const std::string& path, const HostLayout& host,
             "Set the host's project or audio device to " + made + ".",
             {}};
 }
+// PLUG-33: on a host with more inputs than any candidate for its rate and
+// outputs, the input count to read with: the most inputs below the host's
+// among the candidates for the host's rate and exact outputs, so a list's
+// entry that reads the most of the host's inputs plays (its first such entry
+// in list order, as the selection takes it), or 0 when none fits.
+std::size_t wider_bus_inputs(const std::vector<detail::SelectionCandidate>& candidates,
+                             const HostLayout& host) {
+    std::size_t inputs = 0;
+    for (const auto& c : candidates)
+        if (c.sample_rate == host.sample_rate && c.output_channels == host.outputs &&
+            c.input_channels > 0 && c.input_channels < host.inputs)
+            inputs = std::max(inputs, c.input_channels);
+    return inputs;
+}
 } // namespace
 
 HostState filter_file_state(const std::filesystem::path& path,
@@ -65,9 +79,27 @@ std::optional<HostState> read_filter_file(const std::string& path, const HostLay
         // Explained in the host's terms, not the command line's (jrp's
         // GarageBand run: the window advised omitting --output-channels).
         std::vector<std::filesystem::path> sources;
-        auto state = filter_file_state(detail::utf8_path(path),
-                                       {host.sample_rate, host.inputs, host.outputs}, reader,
-                                       nullptr, true, false, &sources);
+        const auto read = [&](std::size_t inputs) {
+            sources.clear();
+            return filter_file_state(detail::utf8_path(path),
+                                     {host.sample_rate, inputs, host.outputs}, reader, nullptr,
+                                     true, false, &sources);
+        };
+        HostState state;
+        try {
+            state = read(host.inputs);
+        } catch (const detail::NoMatch& e) {
+            // PLUG-33: a chosen file follows the rule a preset follows
+            // (PLUG-23, HostFilter::mismatch()): the host's outputs exactly
+            // and at least the filter's inputs. Nothing has the host's
+            // exact input count, so read again for the fewer inputs that
+            // fit (wider_bus_inputs()), or refuse as before.
+            const auto inputs =
+                host.fractional_rate == 0 ? wider_bus_inputs(*e.candidates, host) : 0;
+            if (inputs == 0)
+                throw;
+            state = read(inputs);
+        }
         // VST3-9: the selection used the whole part of a fractional rate;
         // a filter made for that whole part does not suit it either.
         if (host.fractional_rate != 0 && state.configuration) {

@@ -72,16 +72,18 @@ the [command-line tool](command-line.md) for wider filters.
 
 **More inputs than the filter needs.** A filter plays on its own number of
 outputs, exactly, and on at least its number of inputs: it reads the first
-ones and ignores the rest. (A file chosen in the window is the exception:
-it must have exactly as many inputs as the host gives, so on such a track
-load the filter as a preset.) Some hosts give a plug-in as many inputs as
+ones and ignores the rest, whether it comes from a preset, a saved project
+or a file chosen in the window. Some hosts give a plug-in as many inputs as
 outputs: REAPER gives the VST3 plug-in six inputs on a six-channel track, so a
 2→6 crossover reads inputs 1 and 2 and ignores 3 to 6. Status then ends with
 "plug-in inputs 3-6 ignored.", and the [Convolver log](#status-and-the-convolver-log)
 and the window's Host channels line say the same (`6 in, 6 out (inputs 3–6
 ignored)`). Make sure the source plays on
 the inputs the filter reads. A filter with more inputs than the host gives,
-or with a different number of outputs, is refused.
+or with a different number of outputs, is refused. From a configuration
+list, an entry with exactly the host's inputs comes first; otherwise the
+entry for the host's rate and outputs with the most inputs below the host's
+is chosen.
 
 Channels are numbered in the host's order, and the `.cfg` routes refer to them
 in that order. For VST3 the order follows the speaker arrangement: 5.1 is left,
@@ -223,7 +225,7 @@ example (some hosts show only the status name in the first column):
 | Status | Example text |
 | --- | --- |
 | Active | `Filter loaded: 48000 Hz, 2 in, 2 out.` |
-| No filter | `No filter: audio passes unchanged. Load a Convolver preset.` |
+| No filter | `No filter: audio passes unchanged. Choose a filter or load a Convolver preset.` (without a window, on Linux: `… Load a Convolver preset.`) |
 | Load failed (silence) | `Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in the Convolver log.` |
 | Load failed (previous filter kept) | `Load failed, previous filter kept: the filter has 2 in, 6 out, the host 2 in, 2 out. Details in the Convolver log.` |
 | Waiting | `Filter loaded: 44100 Hz, 2 in, 2 out; waiting for audio settings from the host.` |

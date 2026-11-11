@@ -292,13 +292,13 @@ than checked.
   published preview, and checked only by `vst3.adapter`: it merges without
   an Audacity check ([decisions](decisions.md#plug-in-behaviour)), so the
   preset menu stays the checked route and check 4 verifies it.
-- **Choose…** needs the filter's input count to match the host's exactly,
-  while a preset needs only at least that many inputs, so in REAPER on a
-  six-channel track the crossover's `filter.cfg` is refused through
-  **Choose…** and its preset plays. DOC-10
-  ([PR #157](https://github.com/jrp2014/convolver/pull/157)) documents the
-  preset route and parks the fix; it is a known limitation unless jrp has
-  it fixed, which would rerun the **Choose…** checks.
+- Up to v0.13.12, **Choose…** needed the filter's input count to match the
+  host's exactly, while a preset needs only at least that many inputs, so
+  in REAPER on a six-channel track the crossover's `filter.cfg` was refused
+  through **Choose…** and its preset played. Fixed on main after v0.13.12
+  (PLUG-33), not yet in a published preview and checked only by
+  `native.filter_file`, `vst3.adapter` and `au.editor`; the **Choose…**
+  checks on a six-channel track run on the next preview.
 - Fixed after the v0.12.8 checks, at jrp's request: in REAPER, after a
   refused preset, the heading changed from the playing filter's name to
   "Restored filter" (audio was right). The fix changes plug-in code after

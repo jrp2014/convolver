@@ -707,6 +707,14 @@ filter reads inputs 1–2.", and the window report's Channels fact says the
 same (`ignored_inputs()`). Outputs stay exact: a filter is never spread over,
 or cut to, other outputs.
 
+A file chosen in a window or through LV2's file parameter follows the same
+rule (PLUG-33, `read_filter_file()`): it is read for the host's exact
+counts first and, when nothing matches, for the most inputs below the
+host's among the single filter or list entries for the host's rate and
+outputs, so a list's exact entry always wins. The command line still
+selects exactly. With no filter, Status names choosing a filter before a
+preset where the plug-in has a window (`host_status()`'s `chooses_files`).
+
 ## Replacement and threads
 
 The host owns the audio device, clock and scheduling. Each callback supplies

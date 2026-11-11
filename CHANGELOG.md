@@ -116,6 +116,18 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Plug-ins (PLUG-33): a file chosen with **Choose…** (or dropped on the
+  window, or set through LV2's file parameter) follows the same channel rule
+  as a preset: the host's outputs exactly and at least the filter's inputs.
+  On REAPER's six-channel track, which gives the VST3 plug-in 6 inputs,
+  choosing the 2→6 crossover's `filter.cfg` was refused with a Fix asking
+  for 2 inputs while its preset played; it now plays, reading inputs 1 and
+  2. From a configuration list, an entry with exactly the host's inputs
+  comes first, otherwise the entry for the host's rate and outputs with the
+  most inputs below the host's. With no filter, Status says "Choose a filter
+  or load a Convolver preset." where the plug-in has a window (macOS, and
+  VST3 on Windows). The crossover check no longer sends REAPER users to the
+  preset. Filters that loaded before load and sound the same.
 - WAV files (IO-10, IO-11): two kinds of WAV file that other programs read
   were refused as cut short, by the command line and by the plug-ins, and as
   a filter were reported as "neither a configuration nor a sound file". Both

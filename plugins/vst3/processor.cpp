@@ -2,6 +2,7 @@
 #include "processor.hpp"
 #include "bytes.hpp"
 #include "convolver_sdk.hpp"
+#include "editor.hpp"
 #include "filter_file.hpp"
 #include "host_log.hpp"
 #include "pluginterfaces/base/ibstream.h"
@@ -365,9 +366,12 @@ void Processor::write_log() noexcept {
     for (const auto& [line, problem] : lines)
         host_log(tag_.c_str(), line, problem);
 }
+bool Processor::chooses_files() const noexcept {
+    return files_ != nullptr && has_editor();
+}
 HostStatusLine Processor::status_locked() const {
     return host_status(filter_, host_ ? std::optional(layout()) : known_layout(),
-                       host_log_written(), settings(), shown_bypass_.load());
+                       host_log_written(), settings(), shown_bypass_.load(), chooses_files());
 }
 HostStatusLine Processor::status() {
     std::lock_guard lock(control_);
@@ -383,7 +387,7 @@ HostReport Processor::report_locked() const {
     facts.tail_frames = tail_.load();
     facts.bypassed = shown_bypass_.load();
     facts.log_written = host_log_written();
-    facts.chooses_files = files_ != nullptr;
+    facts.chooses_files = chooses_files();
 #ifdef __APPLE__
     facts.file_reader = "macOS AudioToolbox";
 #else
