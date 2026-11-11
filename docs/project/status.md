@@ -296,7 +296,7 @@ than checked.
   host's exactly, while a preset needs only at least that many inputs, so
   in REAPER on a six-channel track the crossover's `filter.cfg` was refused
   through **Choose…** and its preset played. Fixed on main after v0.13.12
-  (PLUG-33), not yet in a published preview and checked only by
+  (PLUG-33, [PR #184](https://github.com/jrp2014/convolver/pull/184)), not yet in a published preview and checked only by
   `native.filter_file`, `vst3.adapter` and `au.editor`; the **Choose…**
   checks on a six-channel track run on the next preview.
 - Fixed after the v0.12.8 checks, at jrp's request: in REAPER, after a

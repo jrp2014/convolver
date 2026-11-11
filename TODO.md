@@ -1674,7 +1674,7 @@ Items finished since then are listed here, one line each, until the next
 move to the archive.
 
 - [x] **PLUG-33 — A chosen file follows the same rules as a preset.**
-  11 November 2026, PR #PRNUM: a file chosen in a window or through LV2's
+  11 November 2026, PR #184: a file chosen in a window or through LV2's
   file parameter needs the host's outputs exactly and at least its inputs,
   as a preset does; from a list, the exact entry first, then the one with
   the most inputs below the host's; with no filter, Status names choosing
