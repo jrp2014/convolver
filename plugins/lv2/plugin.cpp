@@ -997,9 +997,14 @@ void run(LV2_Handle handle, std::uint32_t frames) {
     // LV2-7: a processor built for a new Latency plays from this call on.
     if (auto* next = p.handover.exchange(nullptr, std::memory_order_acq_rel)) {
         // Built before a first load this callback's predecessors refused:
-        // silent like the one it replaces (the flag rule of refuse_request).
-        if (p.refused_mute && p.unfiltered.load(std::memory_order_acquire))
-            next->mute(next->publications());
+        // silent like the one it replaces. The count first, then the flag,
+        // as in refuse_request: a filter the worker publishes into it is
+        // never silenced.
+        if (p.refused_mute) {
+            const auto published = next->publications();
+            if (p.unfiltered.load(std::memory_order_acquire))
+                next->mute(published);
+        }
         p.playing = next;
         // Its fault count starts at 0; a report already queued counts from it.
         if (!p.fault_report_queued.load(std::memory_order_acquire))
@@ -1325,6 +1330,7 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
         p.installed = generation;
         p.installed_path = std::move(kept_path);
         p.unfiltered.store(!p.filter.filter(), std::memory_order_release);
+        p.refused_mute = false; // What run() refused no longer counts.
         status = LV2_STATE_SUCCESS;
     } else {
         p.silence_failed_first_load(was_failed);

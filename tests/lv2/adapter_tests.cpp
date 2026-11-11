@@ -2013,6 +2013,15 @@ void settings_ports(host::World& world, const fs::path& work) {
         check(p->latency == 256 && p->status == as_float(lv2::Status::load_failed) &&
                   std::all_of(out.begin(), out.end(), [](float v) { return v == 0.f; }),
               "settings: after a refused first load a new Latency plays silence");
+        // Reset by an empty state: plays dry again, at a new Latency too.
+        check(p->restore_empty() == LV2_STATE_SUCCESS, "settings: empty restore");
+        p->latency_frames = 512;
+        settle(*p);
+        settle(*p);
+        const auto dry = play_constant(*p, 2048);
+        check(p->latency == 512 && p->status == as_float(lv2::Status::no_filter) &&
+                  close_to(dry[511], 0) && close_to(dry.back(), 1),
+              "settings: after an empty restore a new Latency plays dry");
     }
     // A queued Latency request: newer choices wait for it rather than queue
     // their own, and it builds the newest one.
