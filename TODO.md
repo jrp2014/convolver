@@ -914,10 +914,14 @@ means a patched FFmpeg build with `--enable-gpl`.
   build, with the same backend and kernels, differed from the release's
   GCC 11 by up to 1.3e-7, so the criterion above now names the compiler,
   configuration and flags too; the runner reports each check's largest
-  difference as a share of its bound. Remaining: a
-  REAPER project saved with 0.13.2, with its state chunk restored through
-  each adapter, Audio Unit state from a release, and the capture of the
-  published 0.13.12 (11 November 2026).
+  difference as a share of its bound.
+  Progress (12 November 2026): the published 0.13.12 is kept in
+  `tests/upgrade/0.13.12/`, captured the same way from its Linux ZIP. Every
+  preset, filter, input and expected render is byte for byte the same as
+  0.13.2's, so 0.13.12 renders those presets exactly as 0.13.2 did; only
+  the manifest differs. Remaining: a REAPER project saved with 0.13.12, the
+  baseline since 11 November, with its state chunk restored through each
+  adapter, and Audio Unit state from a release.
 - [ ] **DIAG-5 — Report clipping after a command-line render.** From the
   BruteFIR comparison (8 November 2026): BruteFIR has printed each output's
   count of overflowed samples and its peak by default since 0.99

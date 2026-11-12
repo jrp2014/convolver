@@ -172,8 +172,8 @@ already met are below; those still open are the gates in
 
 At publication, and before the next preview: COMPAT-1 keeps presets, a host
 project and expected audio from the published release, so later previews are
-tested against them. 0.13.2's presets and audio are kept; its REAPER project
-is not yet, and 0.13.12's capture is still to be made. Not part of this milestone, but tracked: signing and
+tested against them. The presets and audio of 0.13.2 and 0.13.12 are kept (the
+same bytes in both); a REAPER project is not yet. Not part of this milestone, but tracked: signing and
 notarization (the production gate, REL-1 and PLUG-5), resource budgets and
 the wider supported workloads (PERF-3; the loading gate uses its own finite
 preview workloads), other `.cfg` readers
