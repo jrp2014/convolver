@@ -907,8 +907,9 @@ void Editor::create_controls() {
         };
         tip(bypass_, L"Lets the audio through without the filter, as the host's own bypass "
                      L"does; the host records the change like any other.");
-        tip(choose_, L"Loads an IR file, .cfg or configuration list as the filter; you can also "
-                     L"drop the file on this window. The project keeps the filter itself and its "
+        tip(choose_, L"Loads an IR file, .cfg, configuration list or Convolver .vstpreset as the "
+                     L"filter (a preset brings its Gain, Mix and Latency too); you can also drop "
+                     L"the file on this window. The project keeps the filter itself and its "
                      L"file's name, as a preset does, so moving the file later does not change "
                      L"it.");
         tip(recent_, L"Filter files loaded recently in a Convolver window, in any host.");
@@ -1640,7 +1641,9 @@ void Editor::choose_filter() {
     FILEOPENDIALOGOPTIONS options = 0;
     dialog->GetOptions(&options);
     dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST);
-    dialog->SetTitle(L"Choose an IR file, .cfg or configuration list to use as the filter");
+    dialog->SetTitle(
+        L"Choose an IR file, .cfg, configuration list or Convolver .vstpreset to use as "
+        L"the filter");
     dialog->SetOkButtonLabel(L"Load");
     dialog_ = dialog;
     addRef();

@@ -202,8 +202,12 @@ class Effect final : public ausdk::AUBase {
     // it is accepted. Returns whether it was.
     bool install(HostState next, const HostRequest&, const SavedSettings* saved,
                  bool settings_unreadable);
-    // AU-6: a filter file chosen in the window (load_property).
+    // AU-6: a filter file chosen in the window (load_property); PLUG-26: or
+    // a Convolver .vstpreset, whose settings apply too.
     OSStatus load_file(const std::string& path);
+    // Tells parameter listeners that Gain, Mix and Latency (and Status) may
+    // have new values, after a restored state or a chosen preset set them.
+    void settings_changed() noexcept;
     // RestoreState's checks and decoding, before anything changes: false
     // after recording why the state was refused (reject()).
     bool read_state(CFPropertyListRef, HostState& next, std::optional<SavedSettings>& saved,

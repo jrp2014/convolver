@@ -53,6 +53,20 @@ HostState read_vst3_preset(std::span<const std::byte>);
 // or the chunk is not a Convolver controller state. Call it after
 // read_vst3_preset accepted the same bytes.
 vst3::ControllerState read_vst3_filter_name(std::span<const std::byte>);
+// PLUG-26: a .vstpreset file as convolver-preset and the plug-in windows
+// read it (one reader, so a preset that converts also loads): the file's
+// bytes, at most max_vst3_preset_file_bytes, through read_vst3_preset, and
+// the filter file name its 'Cont' chunk keeps while that still names the
+// same filter (vst3_filter_name), or empty. Throws std::runtime_error (an
+// advice text naming the file) when the file cannot be opened or is too
+// large, and as read_vst3_preset (NewerHostState, std::invalid_argument)
+// when it is not a Convolver preset or is damaged.
+inline constexpr std::size_t max_vst3_preset_file_bytes = max_host_state_bytes + 4096;
+struct Vst3PresetFile {
+    HostState state;
+    std::string filter_name;
+};
+Vst3PresetFile read_vst3_preset_file(const std::filesystem::path&);
 
 // AU: an XML property list (.aupreset) that the host gives to ClassInfo.
 std::string au_preset(const HostState&, std::string_view name);

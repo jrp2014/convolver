@@ -97,7 +97,8 @@ void cases() {
              return r;
          },
          HostStatus::no_filter,
-         {"Fix: Choose an IR file, .cfg or configuration list", "load a Convolver preset"},
+         {"Fix: Choose an IR file, .cfg, configuration list or Convolver .vstpreset",
+          "load a Convolver preset"},
          {"Silent"}},
         {"empty, Gain -20 dB",
          [&] {

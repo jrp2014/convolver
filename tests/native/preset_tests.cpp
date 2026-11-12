@@ -6,6 +6,8 @@
 #include "presets.hpp"
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -188,6 +190,48 @@ int main() {
         for (std::size_t n = 0; n < with_name.size(); ++n)
             require(presets::read_vst3_filter_name(std::span(with_name).first(n)).name.empty(),
                     "a name from a truncated preset");
+
+        // PLUG-26: the file reader convolver-preset and the plug-in windows
+        // share: the preset's state, the name only while it names this
+        // filter, and a message naming the file when it cannot be read.
+        {
+            const auto folder = std::filesystem::temp_directory_path() / "convolver-preset-file";
+            std::filesystem::remove_all(folder);
+            std::filesystem::create_directories(folder);
+            const auto write = [&](const char* name, std::span<const std::byte> data) {
+                const auto path = folder / name;
+                std::ofstream(path, std::ios::binary)
+                    .write(reinterpret_cast<const char*>(data.data()),
+                           static_cast<std::streamsize>(data.size()));
+                return path;
+            };
+            auto read = presets::read_vst3_preset_file(write("named.vstpreset", with_name));
+            require(same(read.state, stereo) && read.filter_name == named.name,
+                    "preset file: state or name");
+            read = presets::read_vst3_preset_file(write("plain.vstpreset", file));
+            require(same(read.state, stereo) && read.filter_name.empty(),
+                    "preset file without a name");
+            // A name whose identity is another filter's is not kept.
+            auto other = named;
+            other.identity = std::string(16, '0');
+            read = presets::read_vst3_preset_file(
+                write("other.vstpreset", presets::vst3_preset(stereo, other)));
+            require(read.filter_name.empty(), "preset file: another filter's name kept");
+            const auto missing = rejects(
+                [&] { presets::read_vst3_preset_file(folder / "gone.vstpreset"); }, "no file");
+            require(missing.find("cannot open") != std::string::npos &&
+                        missing.find("gone.vstpreset") != std::string::npos &&
+                        missing.find("Fix: ") != std::string::npos,
+                    "missing preset file: " + missing);
+            const auto damaged = rejects(
+                [&] {
+                    presets::read_vst3_preset_file(
+                        write("damaged.vstpreset", std::span(with_name).first(60)));
+                },
+                "a damaged preset file");
+            require(!damaged.empty(), "damaged preset file");
+            std::filesystem::remove_all(folder);
+        }
 
         // AU: Apple's standard keys plus ours; the name is XML-escaped.
         const auto au = presets::au_preset(stereo, "Room <A&B>");

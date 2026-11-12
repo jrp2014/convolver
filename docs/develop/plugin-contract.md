@@ -306,14 +306,22 @@ format.
   restores a state on another thread; a file chosen in the window is
   loaded on the main thread itself, so the window waits for it. Property 64002 (read and write, a `CFString`)
   loads a filter file chosen in the window: the unit reads it with
-  `read_filter_file()` ([`filter_file.hpp`](../../portable/filter_file.hpp),
-  the step `convolver-preset` uses) and macOS's AudioToolbox rather than
-  libsndfile ([`audio_toolbox.cpp`](../../portable/audio_toolbox.cpp)), for
-  its current rate and channels, then
+  `read_chosen_file()` ([`chosen_file.hpp`](../../portable/chosen_file.hpp)):
+  a filter file through `read_filter_file()`
+  ([`filter_file.hpp`](../../portable/filter_file.hpp), the step
+  `convolver-preset` uses) and macOS's AudioToolbox rather than libsndfile
+  ([`audio_toolbox.cpp`](../../portable/audio_toolbox.cpp)), for its current
+  rate and channels, or a Convolver `.vstpreset` through the reader
+  `convolver-preset` uses for one (PLUG-26, `presets::read_vst3_preset_file()`),
+  then
   installs it through the same `HostFilter::load` as a state restore, with
   `HostRequest{HostFilterSource::file, path}`, so the failure rules,
   replacement and saving are unchanged and the saved state is the one the
-  tool writes. Setting it returns an error when the file was not loaded;
+  tool writes. A chosen `.vstpreset` that holds settings also sets Gain, Mix
+  and Latency, as a restored state's do (applied once the filter is
+  accepted, the Latency at once, and parameter listeners told); one without
+  them (from `convolver-preset`, or saved at the default settings, which a
+  state does not yet record: PLUG-35) leaves them. Setting it returns an error when the file was not loaded;
   reading it gives the path of this session's accepted file load. The file
   is read outside the control lock, on the thread that set the property
   (the host's main thread for the window); preparing the filter runs under
@@ -435,18 +443,34 @@ separate processes, so each carries values, never pointers:
   appear as they do in the Audio Unit's twice-a-second read. It looks for new
   faults at most every 10 seconds, as the Audio Unit does.
 - `ConvolverLoad` carries a chosen file's UTF-8 path and a request number.
-  The processor reads it with `read_filter_file()` for the current rate and
-  channels (macOS AudioToolbox, as the Audio Unit reads; builds with no
-  reader refuse it with a reason) and installs it as `setState` does, or
-  records the refusal; its `ConvolverStatus` answer names the request and
-  whether the file was accepted, and the controller then calls
+  The processor reads it with `read_chosen_file()` for the current rate and
+  channels (macOS AudioToolbox, as the Audio Unit reads; libsndfile on
+  Windows and Linux; builds with no reader refuse it with a reason) and
+  installs it as `setState` does, or records the refusal; its
+  `ConvolverStatus` answer names the request and whether the file was
+  accepted. PLUG-26: a chosen Convolver `.vstpreset` is read as
+  `convolver-preset` reads it, and when it holds settings its Gain, Mix and
+  Latency apply with its filter (its bypass flag does not: the host's
+  Bypass stays); the answer then carries them (`gain`, `mix`,
+  `latency frames`), and the controller reports each one that changes to the
+  host as an edit (`beginEdit`, `performEdit`, `endEdit`), so the host's
+  parameters and saved project agree with what plays, then asks for a
+  latency restart when Latency changed. They are three separate gestures:
+  a host writing automation records them, which its own preset menu never
+  does, and undoing one in the host changes that setting back, not the
+  filter. The host hands Gain and Mix back in
+  `process()` with the values the processor already has, and Latency to
+  `setParamNormalized` as no change. A preset without settings leaves them
+  (for one saved at the defaults, until PLUG-35).
+  The controller then calls
   `setDirty(true)` for an accepted file, so the host marks the project
   changed. When `setDirty` does not succeed (a host without
   `IComponentHandler2`, such as Audacity 4.0.2), the controller instead
   reports one edit of Latency that keeps its value (`beginEdit`,
   `performEdit` with the current value, `endEdit`), so that such a host
   stores the new state (VST3-17 in [TODO](../../TODO.md) has the Audacity
-  reasoning). Latency is used because it is not automatable and `process()`
+  reasoning), unless a chosen preset's settings were already reported as
+  edits. Latency is used because it is not automatable and `process()`
   ignores it (the controller sends a new Latency as a message, only when the
   value changes), so neither the sound nor Gain, Mix or automation change.
   It is a narrow fix: a host whose `setDirty` succeeds sees nothing new, and

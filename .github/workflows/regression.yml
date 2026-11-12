@@ -123,7 +123,7 @@ jobs:
             portable/dither_advice.cpp portable/io.cpp \
             portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/host_log.cpp portable/host_report.cpp \
             portable/recent_files.cpp portable/window_model.cpp \
-            portable/filter_file.cpp portable/state.cpp \
+            portable/filter_file.cpp portable/chosen_file.cpp portable/state.cpp \
             portable/presets.cpp portable/preset_main.cpp portable/equalizer_apo.cpp \
             portable/equalizer_apo_main.cpp
       - name: Linked versions
