@@ -5,6 +5,7 @@
 #include "pluginterfaces/base/ibstream.h"
 #include "processor.hpp"
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <mutex>
 #include <optional>
@@ -156,6 +157,17 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     attributes->getInt("load request", load_request);
     attributes->getInt("accepted", load_accepted);
     attributes->getInt("latency request", latency_request);
+    // PLUG-26: the settings an accepted .vstpreset applied, which the
+    // processor already plays.
+    double preset_gain = 0, preset_mix = 0;
+    int64 preset_latency = -1;
+    const bool preset_settings =
+        load_request && load_accepted && attributes->getFloat("gain", preset_gain) == kResultOk &&
+        attributes->getFloat("mix", preset_mix) == kResultOk &&
+        attributes->getInt("latency frames", preset_latency) == kResultOk &&
+        std::isfinite(preset_gain) && std::isfinite(preset_mix) &&
+        std::find(host_latencies.begin(), host_latencies.end(), preset_latency) !=
+            host_latencies.end();
     std::string text, report_text, format;
     std::vector<std::pair<std::string, std::string>> report;
     try {
@@ -220,9 +232,37 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         if (componentHandler)
             componentHandler->restartComponent(kParamValuesChanged);
     }
+    // PLUG-26: a chosen preset's Gain, Mix and Latency, which the processor
+    // already plays, reach the host as the user's edits would, one gesture
+    // each for those that change, so the host's parameters and the state
+    // it saves agree with what plays. Where the host is writing automation,
+    // they are recorded as edits would be. The host hands Gain and Mix
+    // back in process() with the values the processor has; Latency in
+    // process() is ignored, and handed back to setParamNormalized it is no
+    // change, so no latency_message follows. A changed Latency asks for the
+    // restart below, as a restored one does (setComponentState).
+    bool edited = false;
+    if (preset_settings) {
+        const auto report_edit = [&](ParamID id, ParamValue value) {
+            if (getParamNormalized(id) == value)
+                return;
+            EditController::setParamNormalized(id, value);
+            beginEdit(id);
+            performEdit(id, getParamNormalized(id));
+            endEdit(id);
+            edited = true;
+        };
+        const auto before = latency_frames(getParamNormalized(latency_id));
+        report_edit(gain_id, normalized_gain(preset_gain));
+        report_edit(mix_id, std::clamp(preset_mix, 0.0, 1.0));
+        report_edit(latency_id, normalized_latency(static_cast<std::size_t>(preset_latency)));
+        if (latency_frames(getParamNormalized(latency_id)) != before)
+            restart = true;
+    }
     // The component state now holds the file's filter: the host saves it
-    // only if it knows the project changed.
-    if (load_request && load_accepted && setDirty(true) != kResultOk) {
+    // only if it knows the project changed. Edits reported for a preset's
+    // settings tell a host without setDirty already.
+    if (load_request && load_accepted && setDirty(true) != kResultOk && !edited) {
         // VST3-17, a narrow fix: setDirty did not succeed, so the host may
         // not know the state changed. Audacity 4.0.2 offers no
         // IComponentHandler2 and, while the window stays open and playback

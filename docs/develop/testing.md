@@ -412,7 +412,10 @@ cases.
   layouts without an LV2 plug-in, unusable preset names), and the filter's
   name in a `.vstpreset` (PLUG-31): the `Cont` chunk's place, its identity
   after the state is decoded, names left out rather than stored badly, and
-  damaged or truncated name chunks read as no name.
+  damaged or truncated name chunks read as no name. PLUG-26's file reader,
+  `read_vst3_preset_file()`, which `convolver-preset` and the plug-in
+  windows share: a preset's state and kept name, another filter's name not
+  kept, a missing file explained with a Fix, and a damaged file refused.
 - `plugins.presets`: `convolver-preset` writes the 2→6 crossover fixture as all
   three formats in one run and reads each back without Convolver's code: the
   `.vstpreset` by its documented layout, the `.aupreset` with Python's
@@ -747,7 +750,18 @@ second instance, with one sample more refused. And the window's messages
 change, no request for the host to reread the parameters while the
 Status line stays the same, a chosen WAV accepted (the project marked changed, the status
 Active, the filter named and saved) or refused for its rate, and an empty
-path. The messages also go through a forwarding
+path. PLUG-26's `chosen_preset()`, with a host that offers `setDirty` and one
+that does not (Audacity 4.0.2): a chosen `.vstpreset` plays its filter and
+its Gain, Mix and Latency, the controller's parameters agree, each changed
+setting is reported as one `beginEdit`/`performEdit`/`endEdit` gesture with
+one latency restart, the saved state is the preset's, and the values the host
+hands back change nothing; choosing it again reports no settings edit (only
+VST3-17's Latency edit for a host without `setDirty`); a preset without
+settings leaves them; another plug-in's preset, a damaged one, one with no
+filter, a missing file and a preset for another rate are refused, changing
+neither the filter nor the settings. `chosen_preset_before_activation()`
+chooses one before the host activates the plug-in: the settings are stored
+and reported, and the first activation plays its Latency. The messages also go through a forwarding
 proxy and a deferring one, as a host may connect the components (VST3-15):
 the report, a new Latency (the host asked to restart only once the processor
 has it, and after three quick changes only for the last) and a chosen file accepted and refused (the project marked changed
@@ -920,7 +934,11 @@ Five CTest tests run when the adapter is built (label `au`):
   allocation the worker makes for a change (the reported latency always
   matches the audio, and a change that plays is never logged as failed),
   and saving and restoring it, also after the unit has started
-  (GarageBand's order). Where a check needs the Latency work to have
+  (GarageBand's order). PLUG-26's `chosen_preset()`: a `.vstpreset` chosen
+  through the window's property 64002 sets its filter and its Gain, Mix and
+  Latency, one without settings leaves them, and another plug-in's preset, a
+  damaged one and one with no filter are refused with a Fix, changing
+  neither. Where a check needs the Latency work to have
   finished (no second notification for an unchanged choice; the log line
   after an allocation failure), it waits for a completion witness rather
   than a fixed time (AU-14, from jrp's reviews of `db54160` and `5f47ecb`):

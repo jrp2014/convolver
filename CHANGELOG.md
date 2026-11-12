@@ -21,6 +21,19 @@ Until 1.0 the C++ API may change between minor versions.
 - Releases: jrp published Convolver 0.13.12, the third unsigned developer
   preview, on 11 November 2026
   ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.12)).
+- Plug-ins (PLUG-26): **Choose…** and dropping a file in Convolver's window
+  (the Audio Unit, and the VST3 plug-in on macOS and Windows) also open a
+  Convolver `.vstpreset` from any folder, so a preset no longer has to be
+  installed or imported through the host first (Audacity 4's preset menu
+  cannot import one). Its filter loads as from the host's preset menu, with
+  the Gain, Mix and Latency saved in it; the host's controls and saved
+  project show them. A preset from `convolver-preset`, which holds only a
+  filter, leaves them as they are; so, until a later version records
+  settings at their defaults, does a preset a host saved at 0 dB, 100% and
+  0 frames. Another plug-in's preset or a damaged
+  file is refused with a message saying what to choose instead. Not yet
+  tried in a host
+  ([a preset in the window](docs/use/plugins.md#a-preset-in-the-window)).
 - Documentation: [system-wide filtering with PipeWire](docs/use/pipewire.md)
   sets up a Room correction device on Linux that runs the LV2 plug-in in
   PipeWire's `filter-chain`, with a filter per sample rate from a

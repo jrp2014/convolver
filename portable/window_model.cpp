@@ -157,8 +157,9 @@ WindowContent window_content(const ReportFields* report, bool can_load) {
         c.filter_files = field(r, "filter files");
     }
     if (can_load)
-        c.filter_note = c.filter_note.empty() ? "Or drop an IR file or .cfg on this window."
-                                              : c.filter_note + " Or drop a file on this window.";
+        c.filter_note = c.filter_note.empty()
+                            ? "Or drop an IR file, .cfg or .vstpreset on this window."
+                            : c.filter_note + " Or drop a file on this window.";
     return c;
 }
 

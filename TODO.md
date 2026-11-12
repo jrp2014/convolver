@@ -104,7 +104,7 @@ the suggested one.
 | --- | --- | --- |
 | Later previews, as decided | **VST3-12** (the Windows window, built: host and screen-reader checks left); **VST3-13** (the Linux window) only once LV2 is in a Linux package and users ask; **PLUG-9**, **PLUG-10** and **AU-7** (the other gain modes and the meters) | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the windows' order is [decided](docs/project/decisions.md#direction) in the [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md). The Linux packages use the host's own controls meanwhile; the Windows window shipped in 0.13.12, not yet tried in a host |
 | LV2 in a preview | **LV2-3** and **LV2-4** (LV2-5 and LV2-7 are done) | LV2 is in the Linux package since 0.13.12; a source build was tried in PipeWire 1.6.8 on virtual devices, not yet in a desktop host ([decision](docs/project/decisions.md#releases)) |
-| A window fix from jrp's sessions | **PLUG-26** (choose a `.vstpreset` in the window) | From his file-loading review of 7 November 2026 |
+| A window follow-up | **PLUG-35** (presets saved at the default settings carry them) | jrp's decision of 12 November 2026 on PLUG-26 |
 | Other configuration readers | **CFG-1**, then **CFG-2** | CFG-2 waits for CFG-1 to show which readers matter |
 | Only on request | **VST3-2** (switch filters from the host), **VST3-6** (replacing the old VST2 plug-in), **HOST-2** (CLAP), **LV2-6** (an LV2 window) | Each needs a stated user need and acceptance tests first |
 | Measurements, then optimisation | **PERF-3** and **PERF-1** measure; then, only where PERF-3 shows a need, **FFT-2**, **VST3-5** and **PLUG-11** | PERF-3's resource budgets (callback tail latency, peak memory and preparation time while loading, replacing and resetting) decide whether further optimisation is worth doing. Its measurements, and PERF-1's reruns, change no shipped code, so they may go ahead during the freeze; the optimisation they might justify waits |
@@ -489,29 +489,24 @@ LV2 (Linux first; also PipeWire system audio):
   refusal carries the agreed line, in the window, Status details and the
   log, and the message tests cover it. Diagnostic text only, no sound
   change; waits for the freeze unless jrp brings it forward.
-- [ ] **PLUG-26 — Choose a `.vstpreset` in the window.** From jrp's
-  [file-loading review](docs/archive/reviews/2026-11-07-file-loading-review.md)
-  (posted 8 November 2026, with the Audacity session): the
-  window's **Choose…** and drop read IR files, `.cfg` files and
-  configuration lists (`read_filter_file()`), but not the self-contained
-  `.vstpreset` files the package ships, which only the host's preset menu
-  and `convolver-preset` (`presets::read_vst3_preset()`) read. So a user
-  has to learn each host's preset importer and folders, and Audacity 4's
-  importer does not read `.vstpreset` at all. Let Choose… and drop in the
-  macOS window (VST3 and the Audio Unit) also read Convolver's
-  `.vstpreset`, through one input reader shared with `convolver-preset`,
-  reusing its decoder and identity and size checks; `.cfg` files, nested
-  lists and their relative paths work as today. No `.aupreset` or LV2
-  reader only for symmetry. Choosing a preset loads its Gain, Mix and
-  Latency too, as the host's own preset menu does; a preset made by
-  `convolver-preset`, which holds only a filter, leaves the current
-  settings as they are ([decided](docs/project/decisions.md#plug-in-behaviour)).
-  Done
-  when the same file loads from any user folder in VST3 and the Audio Unit
-  with no installation, conversion or administrator step, saving and
-  reopening reproduces the CLI's output, and another plug-in's preset or a
-  damaged file is refused with a message saying what to do. Waits for the
-  freeze unless jrp brings it forward.
+- [ ] **PLUG-35 — Saved state records the settings at their defaults.**
+  From PLUG-26 (jrp's decision of 12 November 2026): the VST3 plug-in
+  writes host state version 3 only when a setting differs from its default,
+  so a `.vstpreset` a host saved at 0 dB, 100% and 0 frames holds no
+  settings, and choosing it in the window leaves the current Gain, Mix and
+  Latency, as a filter-only preset from `convolver-preset` does, while the
+  host's preset menu resets them. Make the VST3 component state record its
+  settings whenever the plug-in saves them, defaults included, so that a
+  preset saved afterwards loads them in full; `convolver-preset` keeps
+  writing filter-only presets. Check what this costs: every saved project
+  and preset then uses version 3 (every published preview reads it, since
+  VST3-4 came before the first), the byte-for-byte tests that expect
+  version 1 at the defaults (`vst3.preset_format`, `upgrade.cli`, the
+  release presets) and the [host state](docs/develop/plugin-contract.md#host-state)
+  rule "encoders write version 1 whenever nothing new is recorded". Done
+  when a host-saved preset at the defaults, chosen in the window, resets
+  Gain, Mix and Latency to them, older presets and projects load as before,
+  and the guides drop the limitation.
 - [ ] **PLUG-27 — Read a chosen filter before the host's audio settings
   are known.** From the same review: before the host has started audio,
   the VST3 plug-in reads a chosen file for the rate and channels the host
@@ -1688,6 +1683,16 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **PLUG-26 — Choose a `.vstpreset` in the window.** 12 November
+  2026, PR #185: Choose… and dropping a file in the VST3 and Audio Unit
+  windows also open a Convolver `.vstpreset`, read as `convolver-preset`
+  reads it, with the Gain, Mix and Latency it holds reported to the host
+  ([decision](docs/project/decisions.md#plug-in-behaviour)); another
+  plug-in's preset or a damaged one is refused with a fix. Checked by
+  `vst3.adapter` and, on macOS, `au.adapter`; not yet tried in a host
+  ([a preset in the window](docs/use/plugins.md#a-preset-in-the-window)).
+  A preset a host saved at the default settings still leaves them, until
+  PLUG-35.
 - [x] **PLUG-33 — A chosen file follows the same rules as a preset.**
   12 November 2026, PR #184: a file chosen in a window or through LV2's
   file parameter needs the host's outputs exactly and at least its inputs,

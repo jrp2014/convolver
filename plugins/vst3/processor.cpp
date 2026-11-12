@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "processor.hpp"
 #include "bytes.hpp"
+#include "chosen_file.hpp"
 #include "convolver_sdk.hpp"
 #include "editor.hpp"
-#include "filter_file.hpp"
 #include "host_log.hpp"
 #include "pluginterfaces/base/ibstream.h"
 #include "pluginterfaces/vst/ivstattributes.h"
@@ -432,6 +432,11 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
         if (answer.load_request) {
             attributes->setInt("load request", answer.load_request);
             attributes->setInt("accepted", answer.accepted ? 1 : 0);
+            if (answer.accepted && answer.settings) {
+                attributes->setFloat("gain", answer.settings->gain_db);
+                attributes->setFloat("mix", answer.settings->mix);
+                attributes->setInt("latency frames", static_cast<int64>(answer.settings->latency));
+            }
         }
         if (answer.latency_request)
             attributes->setInt("latency request", answer.latency_request);
@@ -473,9 +478,10 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
             return kInvalidArgument;
         int64 request = 0;
         attributes->getInt("request", request);
-        const bool accepted = load_file({static_cast<const char*>(data), size});
+        std::optional<HostSettings> settings;
+        const bool accepted = load_file({static_cast<const char*>(data), size}, settings);
         write_log();
-        send_status({.load_request = request, .accepted = accepted});
+        send_status({.load_request = request, .accepted = accepted, .settings = settings});
         return accepted ? kResultOk : kResultFalse;
     }
     if (id == report_message) {
@@ -722,8 +728,10 @@ void Processor::install(HostState next, const HostRequest& request, Origin origi
     const auto host = host_ ? std::optional(layout()) : known_layout();
     const bool bypass = next.bypass;
     // VST3-4: the state's settings, or the defaults for a state without
-    // them (an older state, or a preset from convolver-preset).
+    // them (an older state, or a preset from convolver-preset). PLUG-26: a
+    // chosen .vstpreset's settings apply only when it holds them.
     const auto saved = next.settings.value_or(HostSettings{});
+    const bool chosen_settings = origin == Origin::chosen_file && next.settings.has_value();
     // The inactive tail is worked out before anything changes: it needs
     // memory, and a request that runs out is rejected whole (PLUG-7).
     uint32 inactive_tail = 0;
@@ -748,6 +756,8 @@ void Processor::install(HostState next, const HostRequest& request, Origin origi
     if (restore) {
         bypass_.store(bypass);
         shown_bypass_.store(bypass);
+    }
+    if (restore || chosen_settings) {
         gain_db_.store(saved.gain_db);
         mix_.store(saved.mix);
         choose_latency(saved.latency);
@@ -756,6 +766,10 @@ void Processor::install(HostState next, const HostRequest& request, Origin origi
     try {            // Accepted: nothing here may turn that into a rejection.
         // A restored failed load says why it plays silence.
         auto line = loaded_line(filter_, host);
+        if (chosen_settings) // PLUG-26, as the Audio Unit says it.
+            line += " Settings from the preset: " +
+                    settings_words(settings(), dry_signal_rule(filter_, host.value_or(layout()))) +
+                    ".";
         const auto& f = filter_.failure();
         const bool kept = check == HostLoadCheck::keep_until_suited;
         if (kept && host && f && f->silent && filter_.filter())
@@ -787,7 +801,8 @@ void Processor::refused(bool was_failed) noexcept {
     } catch (...) { // Out of memory for the line: it is dropped.
     }
 }
-bool Processor::load_file(std::string_view chosen) {
+bool Processor::load_file(std::string_view chosen, std::optional<HostSettings>& settings) {
+    settings.reset();
     std::lock_guard lock(control_);
     observe_faults();
     const bool was_failed = filter_.failed();
@@ -812,13 +827,16 @@ bool Processor::load_file(std::string_view chosen) {
         }
         FilterFileFailure why;
         // The files it was read from, so the window can reload it (VST3-11).
+        // PLUG-26: a Convolver .vstpreset too.
         auto next =
-            read_filter_file(path, host, *reader, why, &request.files, &request.wider_entry);
+            read_chosen_file(path, host, *reader, why, &request.files, &request.wider_entry);
         if (!next) {
             filter_.reject(why.kind, why.message, request, why.filter());
             throw std::runtime_error("refused");
         }
+        const auto chosen = next->settings;
         install(std::move(*next), request, Origin::chosen_file);
+        settings = chosen;
     } catch (...) {
         refused(was_failed);
         return false;

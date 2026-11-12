@@ -117,11 +117,11 @@ if(CONVOLVER_SDK_STRIP)
 endif()
 target_include_directories(convolver_vst3 PRIVATE "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable")
 # VST3-3: a filter file chosen in the window is read as convolver-preset reads
-# it (convolver_filter_file); on macOS its sound files with AudioToolbox, as
+# it (convolver_filter_file; PLUG-26: a .vstpreset too, convolver_chosen_file); on macOS its sound files with AudioToolbox, as
 # the Audio Unit reads them, so the bundle needs nothing beyond macOS. VST3-12:
 # on Windows and Linux with libsndfile (Convolver::io), as the command-line
 # tool and the LV2 plug-in read them; the package builds link it statically.
-set(vst3_file_libraries convolver_filter_file)
+set(vst3_file_libraries convolver_chosen_file)
 if(APPLE)
     list(APPEND vst3_file_libraries convolver_audio_toolbox)
 elseif(TARGET Convolver::io)
