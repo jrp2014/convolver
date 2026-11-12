@@ -531,8 +531,9 @@ the one already playing still replaces it (VST3 `setState` and a
 `.vstpreset` chosen in the window, AU `RestoreState`, LV2 `restore`), so a
 preset that changes only Gain restarts the filter's history and cuts a
 sounding tail. Found by
-reading the code on 12 November 2026, not reproduced in a host; listed in
-TODO's [limitations](../../TODO.md#documented-limitations).
+reading the code on 12 November 2026 and reproduced by the PLUG-2
+harness's `same-filter-restore` case, a known deviation in every format
+until PLUG-38 fixes it; not yet reproduced in a host.
 
 ## Initial restoration and live replacement
 

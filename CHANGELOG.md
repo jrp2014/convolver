@@ -66,10 +66,13 @@ Until 1.0 the C++ API may change between minor versions.
   and crossfaded; only a different Latency or host configuration builds new
   processing; saving leaves playback alone. `native.host_settings` now
   checks that a Gain and Mix change keeps a long filter's history, latency
-  and tail (`settings_keep_history`). One place does not follow the rule
-  yet, found by reading the code: restored state or a chosen preset holding
-  the filter already playing still replaces it, listed in TODO's
-  limitations. No behaviour changes.
+  and tail (`settings_keep_history`). History is kept for changes during
+  playback; a session restored after a host reset starts clean. One place
+  does not follow the rule yet: during playback, restored state or a chosen
+  preset holding the filter already playing still replaces it, so a preset
+  change that alters only Gain cuts a sounding tail. The plug-in harness's
+  new `same-filter-restore` case reproduces it in every format, listed as a
+  known deviation until PLUG-38 fixes it. No behaviour changes.
 
 ### Fixed
 

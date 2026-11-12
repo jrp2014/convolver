@@ -92,6 +92,7 @@ passes for 0.13, since PERF-2 changed the engine
 | **COMPAT-1** | Keep presets, a REAPER project and expected audio from the published previews (0.13.2's and 0.13.12's presets and audio are kept; the REAPER project is owed from 0.13.12, the baseline), with their own runner and the capture step in the publication steps | Tests and files only |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **HOST-4** | The check on a real Windows device, now that the Windows package ships `convolver-equalizer-apo` | A check; needs a Windows computer |
+| **PLUG-38** | During playback, restored state holding the filter already playing replaces it, so a preset change or undo that changes only Gain cuts a sounding tail; reproduced by the plug-in harness on 12 November 2026, not yet in a host | Wrong audio in ordinary preset changes: a small, bounded fix (jrp, 12 November 2026) that does not hold up the host sessions |
 | **VST3-17** | In 0.13.2 and earlier, in Audacity a filter chosen in the window plays but is missing from the export and the saved project. The fix (PR #177) is published in 0.13.12 and checked only by `vst3.adapter`; what remains is jrp's Audacity check on 0.13.12 (status check 10), and until then the guides keep the preset menu as the checked route | Lost state, one of the freeze's exceptions: brought forward and merged without an Audacity check ([decisions](docs/project/decisions.md#plug-in-behaviour)) |
 
 ### 2. Decided or likely, after the freeze
@@ -568,6 +569,32 @@ LV2 (Linux first; also PipeWire system audio):
   defect; the expected result must not come from production decision
   functions. Any unclear rule goes to jrp. Parked until after REL-3 (jrp,
   12 November 2026).
+- [ ] **PLUG-38 — Restoring the playing filter keeps its history.** Found
+  by reading the code on 12 November 2026 and reproduced the same day by
+  the PLUG-2 harness's `same-filter-restore` case (a known deviation in
+  every format until this is fixed): during playback, VST3 `setState` and a
+  `.vstpreset` chosen in the window, AU `RestoreState` and LV2 `restore`
+  replace the filter even when restored state holds the one already
+  playing, so a preset change or undo that changes only Gain starts fresh
+  history and drops a sounding tail after the 5.33 ms crossfade: in
+  `lv2.harness` and `vst3.harness` (Linux, sanitizer build, 12 November
+  2026), from 300 frames after the restore each fixture's tail, peaking at
+  0.15 to 0.27, played as exact silence. Not yet reproduced in a host. jrp's terms (12 November 2026): a settings-only
+  change during continuous playback keeps history, also when it arrives
+  inside a preset; initial restoration and an explicit host reset start
+  clean, and reopening a project keeps nothing from the previous session;
+  a real filter or Latency change replaces as now. **Done when** an
+  accepted restore whose complete filter configuration (compared in full;
+  the filter hash may pick candidates but does not prove equality, and a
+  file name proves nothing), processing layout and Latency are unchanged,
+  with a healthy playing processor, keeps the filter and applies the
+  settings through their usual ramps, while saved state, the filter's name
+  and the notifications still update; the harness's known deviations are
+  removed; a VST3 test excites a long tail, stops the input, restores the
+  same filter with only Gain changed and matches the uninterrupted tail
+  with the Gain ramp; and the `reset` case still shows a reset clearing
+  history. A bounded correction, not a redesign, and it does not hold up
+  the host sessions.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
@@ -1659,7 +1686,7 @@ with compatibility tests; linked IDs point to open work above.
 | One FFT backend per binary; Ooura/Accelerate have no FFTW-style measured plans or wisdom | Intentional deployment choice. Assess alternatives under FFT-2; do not imply runtime fallback. | [FFT guide](docs/develop/fft-backends.md#selection-and-contract) |
 | FFTW wisdom is CPU/build/size-sensitive and process-global | Retune when relevant inputs change; external planner users must coordinate. A successful import does not prove optimality. | [Planning](docs/use/command-line.md#fftw-plan-tuning) |
 | Core processing uses interleaved float buffers that must not overlap | Use `HostProcessor` for planar/in-place float/double host buffers; internal DSP remains float. | [Engine API](docs/develop/library.md#engine-api) |
-| During playback, restored state or a chosen preset whose filter is the one already playing replaces it anyway, so a preset that changes only Gain restarts the filter's history and cuts a sounding tail | Against the [change-scope rule](docs/develop/plugin-contract.md#scope-of-each-change); found by reading the code on 12 November 2026, not reproduced in a host. Fix it when the loading path next changes, by the rule not to surprise the user: first check what the leading IR reverbs do when a preset keeps the IR, then, during playback only, keep the playing filter when the new one is identical and apply only the settings, unless they show users expect a restart. A session restored after a host reset or reactivation keeps starting from empty history (jrp, 12 November 2026). | [Scope of each change](docs/develop/plugin-contract.md#scope-of-each-change) |
+| During playback, restored state or a chosen preset whose filter is the one already playing replaces it anyway, so a preset change or undo that changes only Gain restarts the filter's history and cuts a sounding tail | Against the [change-scope rule](docs/develop/plugin-contract.md#scope-of-each-change); reproduced by the plug-in harness, not yet in a host. PLUG-38 fixes it. A session restored after a host reset or reactivation keeps starting from empty history (jrp, 12 November 2026). | [Scope of each change](docs/develop/plugin-contract.md#scope-of-each-change) |
 | Latency and filter replacement are not instantaneous | Core latency is B; the plug-ins' default is 0 frames (PERF-2); a larger Latency adds its delay. Replacement starts with fresh history and warms/crossfades; reset work scales with the block buffers and delay lines, not the filter length (PERF-5). | [Replacement](docs/develop/plugin-contract.md#replacement-and-threads) |
 | Callback safety has a defined thread contract | One audio thread per instance; serialized control calls; teardown requires stopped audio. Stress/deadline evidence remains ROBUST-1. | [Implementation invariants](docs/develop/architecture.md#invariants-to-preserve) |
 | Resource limits cap channels, paths, delays, text, IRs and state | Intentional bounds; assess any increase with memory/overflow tests. | [Core limits](docs/develop/library.md#resource-limits), [tests](docs/develop/testing.md) |

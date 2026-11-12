@@ -97,12 +97,14 @@ int main(int argc, char** argv) {
         return 2;
     }
     try {
-        // The adapter follows the shared adapter contract, so no case is a
-        // known deviation. Restore-before-setup cases are skipped: LV2 knows
-        // its rate and channels from instantiation. Tail checks are skipped:
-        // LV2 core cannot report one.
+        // The adapter follows the shared adapter contract apart from
+        // PLUG-38, the one known deviation. Restore-before-setup cases are
+        // skipped: LV2 knows its rate and channels from instantiation. Tail
+        // checks are skipped: LV2 core cannot report one.
         Lv2 adapter(argv[1]);
-        return test::run(adapter, argv[2]);
+        test::Options options;
+        options.known_deviations = test::same_filter_restore_deviations();
+        return test::run(adapter, argv[2], options);
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';
         return 1;
