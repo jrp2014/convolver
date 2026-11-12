@@ -19,8 +19,8 @@ Until 1.0 the C++ API may change between minor versions.
   sets up a Room correction device on Linux that runs the LV2 plug-in in
   PipeWire's `filter-chain`, with a filter per sample rate from a
   configuration list, and says what Convolver adds over PipeWire's own
-  convolver. It needs PipeWire 1.6 or later: earlier versions start the
-  plug-in without its filter (LV2-4, in part).
+  convolver. It needs PipeWire 1.6.2 or later: versions before 1.6 start
+  the plug-in without its filter (LV2-4, in part).
 
 ### Fixed
 

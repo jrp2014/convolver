@@ -13,9 +13,10 @@ PipeWire that runs the Convolver LV2 plug-in.
 - PipeWire's `filter-chain` module can run the Convolver LV2 plug-in as a
   virtual output device. Whatever plays to that device is filtered, then
   played on your real device.
-- It needs **PipeWire 1.6 or later with its LV2 support**. Older versions
-  start the plug-in without a filter, so audio passes unfiltered. Ubuntu
-  24.04's PipeWire (1.0) has no LV2 support at all.
+- It needs **PipeWire 1.6.2 or later with its LV2 support**. Versions
+  before 1.6 start the plug-in without a filter: audio passes unfiltered, or
+  is silent for a layout with more outputs than inputs. Ubuntu 24.04's
+  PipeWire (1.0) has no LV2 support at all.
 - You write one small configuration file naming the plug-in's channel layout
   and your filter: an IR file, a `.cfg` or a configuration list.
 - The filter is read for the rate PipeWire runs at, 48 kHz unless you allow
@@ -39,8 +40,9 @@ Contents: [check your PipeWire](#check-your-pipewire) ·
 pipewire --version
 ```
 
-The version must be 1.6 or later; earlier versions ignore the filter setting
-below. PipeWire's LV2 support is often a separate package: on Ubuntu 26.04,
+The version must be 1.6.2 or later: versions before 1.6 ignore the filter
+setting below, and 1.6.2 fixed how PipeWire sets an LV2 plug-in's controls.
+PipeWire's LV2 support is often a separate package: on Ubuntu 26.04,
 which has PipeWire 1.6, it is `libspa-0.2-modules-extra`. Then install the Convolver bundle in
 `~/.lv2/` as described in [install](install.md). PipeWire runs as a service,
 so it finds plug-ins only in the usual LV2 folders, not through an `LV2_PATH`
@@ -85,8 +87,8 @@ set in a terminal.
    For more outputs, list one position per output in `playback.props`, in
    the filter's output order, such as `[ FL FR FC LFE RL RR ]` for
    `discrete-2-6`. To send the result to one particular device, add
-   `target.object = "<device name>"` to `playback.props` (`wpctl status`
-   and `pw-cli ls Node` list the names).
+   `target.object = "<device name>"` to `playback.props`; the name is the
+   `node.name` that `pw-cli ls Node` or `wpctl inspect <id>` shows.
 3. Restart PipeWire:
 
    ```sh
@@ -100,9 +102,11 @@ set in a terminal.
 sound clearly (a test configuration that silences one side, for example), the
 change is heard at once. Turn the volume down first if the filter adds gain.
 
-PipeWire reads the filter file when it starts the filter: at the first
-sound after a restart and again when it changes rate. After editing the file,
-restart PipeWire so the change is heard.
+PipeWire reads the filter file each time it starts the device: when sound
+begins after the device has been idle for a few seconds, and when PipeWire
+changes rate. An edited file is therefore heard after the next pause, and
+keep the file where the configuration says: if it is moved or broken, the
+device is silent from the next start.
 
 ## Choose a filter for each rate
 
@@ -122,9 +126,10 @@ The plug-in chooses the entry for PipeWire's rate and the layout's channels,
 as in any host ([loading a filter](plugins.md#loading-a-filter)). A rate no
 entry has plays silence.
 
-The [Settings](plugins.md#settings) (Gain, Mix and Latency) can be set in the
-node's `control` section, for example `control = { gain = -6.0 }` beside
-`config`.
+The [Settings](plugins.md#settings) can be set in the node's `control`
+section beside `config`, named by their port symbols: `gain` in dB, `mix` in
+percent and `latency_frames` in frames, for example
+`control = { gain = -6.0 }`.
 
 ## Compared with PipeWire's own convolver
 
@@ -135,11 +140,11 @@ the simpler choice. Convolver adds:
 
 - **The filters you already have.** The `.cfg` files and configuration lists
   that Roon, JRiver, Audiolense and the old Windows Convolver use
-  ([other programs](other-programs.md)), with their routes, gains and delays.
+  ([other programs](other-programs.md)), with the routes, gains and input
+  and output delays they hold, used as they are.
 - **Routing in one place.** Any input to any output with its own gain or
   inversion, which with the built-in filter means one filter per path and
   hand-written mixer links.
-- **Delays** per input and per output, as the configuration gives them.
 - **The filter made for each rate.** A list's entry for each rate plays as it
   was designed, never a resampled IR; a rate with no entry is silent, not
   played with another rate's filter.
@@ -155,7 +160,8 @@ the simpler choice. Convolver adds:
 - **The device plays, but unfiltered.** PipeWire is older than 1.6 and did
   not pass the filter to the plug-in. Upgrade PipeWire.
 - **Silence.** The filter does not fit PipeWire's rate or the layout's
-  channel counts. PipeWire writes Convolver's explanation to its log only
+  channel counts, the file has moved, or, with a layout that has more
+  outputs than inputs, PipeWire is older than 1.6. PipeWire writes Convolver's explanation to its log only
   at the *info* level. Raise the level, play again and read the log:
 
   ```sh

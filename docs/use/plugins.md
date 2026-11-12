@@ -826,7 +826,7 @@ when the host supports that, so the folder can move). Reopening uses the saved
 filter, so the session sounds the same after the file changes or disappears;
 only if the saved filter cannot be used does it load the file again.
 
-**PipeWire.** PipeWire's `filter-chain` (1.6 or later) starts the plug-in
+**PipeWire.** PipeWire's `filter-chain` (1.6.2 or later) starts the plug-in
 with a file path alone, which is how to filter everything a Linux computer
 plays ([system-wide filtering with PipeWire](pipewire.md)).
 

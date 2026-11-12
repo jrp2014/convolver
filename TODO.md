@@ -103,7 +103,7 @@ the suggested one.
 | Group | Items | Note |
 | --- | --- | --- |
 | Later previews, as decided | **VST3-12** (the Windows window, built: host and screen-reader checks left); **VST3-13** (the Linux window) only once LV2 is in a Linux package and users ask; **PLUG-9**, **PLUG-10** and **AU-7** (the other gain modes and the meters) | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the windows' order is [decided](docs/project/decisions.md#direction) in the [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md). The Linux packages use the host's own controls meanwhile; the Windows window shipped in 0.13.12, not yet tried in a host |
-| LV2 in a preview | **LV2-3** and **LV2-4** (LV2-5 and LV2-7 are done) | LV2 is in the Linux package since 0.13.12; tried in PipeWire 1.6.8 on virtual devices, not yet in a desktop host ([decision](docs/project/decisions.md#releases)) |
+| LV2 in a preview | **LV2-3** and **LV2-4** (LV2-5 and LV2-7 are done) | LV2 is in the Linux package since 0.13.12; a source build was tried in PipeWire 1.6.8 on virtual devices, not yet in a desktop host ([decision](docs/project/decisions.md#releases)) |
 | A window fix from jrp's sessions | **PLUG-26** (choose a `.vstpreset` in the window) | From his file-loading review of 7 November 2026 |
 | Other configuration readers | **CFG-1**, then **CFG-2** | CFG-2 waits for CFG-1 to show which readers matter |
 | Only on request | **VST3-2** (switch filters from the host), **VST3-6** (replacing the old VST2 plug-in), **HOST-2** (CLAP), **LV2-6** (an LV2 window) | Each needs a stated user need and acceptance tests first |
@@ -587,7 +587,9 @@ LV2 (Linux first; also PipeWire system audio):
   Convolver adds over PipeWire's own convolver; PipeWire 1.6.8 results in the
   [LV2 host matrix](docs/develop/host-testing.md#lv2-hosts) (PipeWire before
   1.6 cannot pass the plug-in a filter). Jalv, Carla, REAPER and Qtractor
-  results remain, and PipeWire on a desktop with a real sound card.
+  results remain, and PipeWire on a desktop with a real sound card through
+  its systemd user service (the `systemctl` restart, `journalctl` log and
+  `~/.lv2` lookup in the guide were not exercised).
 - [ ] **LV2-5 — Release bundles.** Linux tarball, then distro packages; macOS and
   Windows bundles under PLUG-5.
   `VERSION` maps to `lv2:minorVersion` and `lv2:microVersion` by doubling
