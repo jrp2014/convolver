@@ -15,6 +15,12 @@ Until 1.0 the C++ API may change between minor versions.
 - Releases: jrp published Convolver 0.13.12, the third unsigned developer
   preview, on 11 November 2026
   ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.12)).
+- Documentation: [system-wide filtering with PipeWire](docs/use/pipewire.md)
+  sets up a Room correction device on Linux that runs the LV2 plug-in in
+  PipeWire's `filter-chain`, with a filter per sample rate from a
+  configuration list, and says what Convolver adds over PipeWire's own
+  convolver. It needs PipeWire 1.6.2 or later: versions before 1.6 start
+  the plug-in without its filter (LV2-4, in part).
 
 ### Fixed
 
