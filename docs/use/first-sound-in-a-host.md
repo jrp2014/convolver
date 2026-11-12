@@ -178,8 +178,9 @@ the export has the filter you chose (for example by comparing it with
    sudo cp presets/*-stereo/*-stereo.vstpreset /Library/Audio/Presets/Convolver/Convolver/
    ```
 
-   Or skip the copying: with Convolver's window open (step 3), choose the
-   `.vstpreset` from any folder with **Choose…**
+   Or skip the copying: in step 3, instead of the preset menu, open
+   Convolver's window (*Use vendor UI*) and choose the `.vstpreset` from
+   any folder with **Choose…**
    ([a preset in the window](plugins.md#a-preset-in-the-window)). This is
    not yet checked in Audacity, and the window's export check above
    applies.

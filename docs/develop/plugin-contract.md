@@ -454,8 +454,11 @@ separate processes, so each carries values, never pointers:
   Bypass stays); the answer then carries them (`gain`, `mix`,
   `latency frames`), and the controller reports each one that changes to the
   host as an edit (`beginEdit`, `performEdit`, `endEdit`), so the host's
-  parameters, undo and saved project agree with what plays, then asks for a
-  latency restart when Latency changed. The host hands Gain and Mix back in
+  parameters and saved project agree with what plays, then asks for a
+  latency restart when Latency changed. They are three separate gestures:
+  a host writing automation records them, which its own preset menu never
+  does, and undoing one in the host changes that setting back, not the
+  filter. The host hands Gain and Mix back in
   `process()` with the values the processor already has, and Latency to
   `setParamNormalized` as no change. A preset without settings leaves them.
   The controller then calls

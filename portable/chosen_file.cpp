@@ -4,6 +4,7 @@
 #include "presets.hpp"
 #include "utf8.hpp"
 #include <exception>
+#include <filesystem>
 #include <stdexcept>
 #include <utility>
 
@@ -19,7 +20,14 @@ std::optional<HostState> read_chosen_file(const std::string& path, const HostLay
                                           FilterFileFailure& failure,
                                           std::vector<std::string>* files,
                                           std::string* wider_entry) {
-    const auto file = detail::utf8_path(path);
+    std::filesystem::path file;
+    try {
+        file = detail::utf8_path(path);
+    } catch (const std::exception&) {
+        // Not a name this system can use (a damaged Recent entry):
+        // read_filter_file() refuses it with its explanation.
+        return read_filter_file(path, host, reader, failure, files, wider_entry);
+    }
     if (presets::format_for(file) != presets::Format::vst3)
         return read_filter_file(path, host, reader, failure, files, wider_entry);
     if (files)
@@ -46,6 +54,12 @@ std::optional<HostState> read_chosen_file(const std::string& path, const HostLay
     } catch (const std::exception& e) { // Cannot be opened, too large, or out of memory.
         failure.kind = HostFailureKind::filter_file;
         failure.message = detail::parse_advice(e.what());
+        // Too large, or out of memory: name the file and say what to do.
+        if (failure.message.fix.empty()) {
+            if (failure.message.problem.find(path) == std::string::npos)
+                failure.message.problem = path + ": " + failure.message.problem;
+            failure.message.fix = use_instead;
+        }
         return std::nullopt;
     }
     if (!state.configuration) {

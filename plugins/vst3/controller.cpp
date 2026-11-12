@@ -234,8 +234,9 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     }
     // PLUG-26: a chosen preset's Gain, Mix and Latency, which the processor
     // already plays, reach the host as the user's edits would, one gesture
-    // each for those that change, so the host's parameters, its undo and
-    // the state it saves agree with what plays. The host hands Gain and Mix
+    // each for those that change, so the host's parameters and the state
+    // it saves agree with what plays. Where the host is writing automation,
+    // they are recorded as edits would be. The host hands Gain and Mix
     // back in process() with the values the processor has; Latency in
     // process() is ignored, and handed back to setParamNormalized it is no
     // change, so no latency_message follows. A changed Latency asks for the

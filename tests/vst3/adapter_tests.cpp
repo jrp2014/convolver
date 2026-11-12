@@ -2586,6 +2586,19 @@ void chosen_preset(bool offers_dirty) {
                 p.getLatencySamples() == 512,
             "chosen preset: the host's values changed the settings");
 
+    // The same preset again: its settings change nothing, so no settings
+    // edit is reported, and a host without setDirty still hears VST3-17's
+    // Latency edit that keeps its value.
+    handler.edits.clear();
+    handler.restarts.clear();
+    require(c.load_file(hall_path) && p.settings().latency == 512,
+            "the same preset again: refused");
+    require(offers_dirty ? handler.edits.empty() : gestures() == std::vector<ParamID>{latency_id},
+            "the same preset again: unexpected edits");
+    require(offers_dirty || handler.edits[1].value == normalized_latency(512),
+            "the same preset again: VST3-17's edit changed Latency");
+    require(handler.latency_restarts() == 0, "the same preset again: a latency restart");
+
     // A preset from convolver-preset holds no settings: they stay.
     const auto plain_path =
         write("plain.VSTPRESET", convolver::presets::vst3_preset(filter(48000, .25f)));
@@ -2644,6 +2657,56 @@ void chosen_preset(bool offers_dirty) {
     slow.settings = convolver::HostSettings{3, 1, 64};
     refused(write("slow.vstpreset", convolver::presets::vst3_preset(slow)),
             convolver::HostFailureKind::sample_rate, "", "a 44.1 kHz preset at 48 kHz");
+    std::filesystem::remove_all(folder);
+    p.setActive(false);
+    p.disconnect(&c);
+    c.disconnect(&p);
+    c.terminate();
+    p.terminate();
+}
+// PLUG-26: a preset chosen before the host has activated the plug-in (as
+// when a project opens with the window): its settings are stored and
+// reported, and its Latency is the one the first activation plays.
+void chosen_preset_before_activation() {
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk && p.connect(&c) == kResultOk &&
+                c.connect(&p) == kResultOk,
+            "inactive preset: initialize");
+    SpeakerArrangement mono = SpeakerArr::kMono;
+    require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "inactive preset: buses");
+    const auto folder = private_temp("convolver-vst3-inactive-preset");
+    std::filesystem::create_directories(folder);
+    convolver::HostState hall;
+    hall.configuration = convolver::Configuration{48000, 1, 1, 0, {}, {}, {}};
+    hall.configuration->paths.push_back({{.5f, .25f}, {{0, 1}}, {{0, 1}}});
+    hall.settings = convolver::HostSettings{-6, .5, 1024};
+    const auto path = (folder / "hall.vstpreset").string();
+    {
+        const auto bytes = convolver::presets::vst3_preset(hall);
+        std::ofstream(path, std::ios::binary)
+            .write(reinterpret_cast<const char*>(bytes.data()),
+                   static_cast<std::streamsize>(bytes.size()));
+    }
+    handler.edits.clear();
+    handler.restarts.clear();
+    require(c.load_file(path) && !p.failure(), "inactive preset: refused");
+    require(p.settings() == *hall.settings, "inactive preset: settings not stored");
+    require(c.getParamNormalized(gain_id) == normalized_gain(-6) &&
+                c.getParamNormalized(mix_id) == .5 &&
+                c.getParamNormalized(latency_id) == normalized_latency(1024) &&
+                handler.edits.size() == 9 && handler.latency_restarts() == 1,
+            "inactive preset: the settings were not reported to the host");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "inactive preset: activate");
+    require(p.getLatencySamples() == 1024 && p.status().status == convolver::HostStatus::active,
+            "inactive preset: the first activation does not play the preset's Latency");
     std::filesystem::remove_all(folder);
     p.setActive(false);
     p.disconnect(&c);
@@ -3323,6 +3386,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"chosen_file_on_wider_bus", chosen_file_on_wider_bus},
         {"chosen_preset", [] { chosen_preset(true); }},
         {"chosen_preset_without_set_dirty", [] { chosen_preset(false); }},
+        {"chosen_preset_before_activation", chosen_preset_before_activation},
         {"load_without_set_dirty", [] { load_without_set_dirty(false); }},
         {"load_with_failing_set_dirty", [] { load_without_set_dirty(true); }},
         {"saved_filter_name", saved_filter_name},

@@ -141,7 +141,9 @@ settings (0 dB, 100%, 0 frames), since Convolver's saved state does not
 record defaults. Bypass stays as the host has it. Another plug-in's preset,
 a damaged file or a preset saved with no filter is refused, and the
 message says what to choose instead. The window then names the filter
-after the preset file, and **Reload** reads the preset again.
+after the preset file. **Reload**, and **Reload when the file changes**,
+read the preset again, which sets Gain, Mix and Latency back to the
+preset's, as choosing it again would.
 
 [Plug-in presets](presets.md) shows how to make a preset with
 `convolver-preset`, which reads an IR file, a `.cfg`, a configuration list
