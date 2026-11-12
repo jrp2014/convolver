@@ -258,7 +258,8 @@ processing, while keeping every platform building and behaving alike
 ([decided](../project/decisions.md#direction) by jrp). In use now:
 Accelerate's FFT on macOS, AVX2 and FMA kernels chosen at run time on
 x86-64 (PERF-4), and the processor's flush-to-zero controls while
-processing (PERF-15). Candidates are benchmarked in EDGE-10: real-time
+processing (PERF-15). EDGE-10 lists candidates, each investigated only when
+a measured limitation justifies it ([decided](../project/decisions.md#direction)): real-time
 helper threads through Apple's audio workgroups and Windows MMCSS, Grand
 Central Dispatch, OpenMP where it causes no cross-platform incompatibility,
 and AArch64 kernels. Each platform-specific path:

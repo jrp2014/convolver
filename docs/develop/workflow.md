@@ -42,8 +42,8 @@ repository; recording a review's or a host test's results in it is a change.
   Fixing the findings is a change, started only when the person asks for it.
 - **Local host testing** is steps jrp runs in a host on his own computer.
   Write the steps, then record what jrp reports as dated evidence where the
-  task says (a pull request, the TODO item's `Progress` line, or a host
-  record). Record a result as it was observed, including a step that did
+  task says (a pull request or a host record, linked from the TODO item's
+  **Remains**). Record a result as it was observed, including a step that did
   not work; do not turn it into a new sequence of host operations nobody
   has tried ([while working](#while-working)). A fix the testing calls for
   is a separate change.
@@ -56,7 +56,7 @@ repository; recording a review's or a host test's results in it is a change.
 1. Choose from the [execution priorities](../../TODO.md#execution-priorities).
    Check that the item's dependencies are done.
 2. Check that nobody has claimed it. Search the open pull requests for the ID
-   (for example `PLUG-2`), and read the item's `Progress` lines in TODO.
+   (for example `PLUG-2`), and read what the item in TODO says remains.
    If someone has, pick it up (see below) or choose something else.
 3. Read the item, the plan section it links to, the
    [implementation map](architecture.md) and the guide that owns the
@@ -120,7 +120,7 @@ Whenever you stop, even part-way:
    file, a local experiment, another item's fix): keep it uncommitted, or
    give it its own branch.
 2. Replace the handoff note in the pull request description (below).
-3. If a partial merge is useful, add a `Progress` line to the TODO item
+3. If a partial merge is useful, rewrite what the TODO item says remains
    ([recording progress](#recording-progress-in-todo)).
 
 The pull request description holds one handoff note, kept current. Replace it
@@ -186,8 +186,8 @@ checklist says so:
   the [index](../README.md); user-visible changes and every finished TODO
   item, contributor-only ones included, are in the
   [CHANGELOG](../../CHANGELOG.md) under its ID.
-- **TODO:** the item is ticked with its evidence, or has a `Progress` line for
-  what remains. A plan that is now fully implemented, or superseded,
+- **TODO:** the item is ticked with its evidence, or says what remains,
+  what would justify it and when it is done. A plan that is now fully implemented, or superseded,
   moves to [`archive/plans/`](../archive/plans/README.md)
   ([rule](documentation.md#current-claims-and-dated-evidence)).
 - **Reviewed:** an [independent review](#independent-review) has been done and
@@ -292,15 +292,18 @@ approve or merge; jrp does that.
 ## Recording progress in TODO
 
 Each item in [TODO](../../TODO.md) has a stable ID. Do not reuse or renumber IDs;
-add new ones after the highest in their group. While an item is partly done,
-add one line under it per merged pull request:
+add new ones after the highest in their group. An open item says what
+remains, what would justify doing it and what counts as finished
+(**Remains**, **Worth doing when**, **Done when**), with what is already
+built in a sentence that names its pull requests. When a pull request
+advances an item, rewrite those parts in place rather than adding a
+narrative of the work: the pull request, its records and the CHANGELOG
+keep the evidence (jrp, 12 November 2026, DOC-14). The longer
+`Progress (date, PR #N): …` lines of the items DOC-14 rewrote were moved
+to [`docs/archive/todo/`](../archive/todo/README.md); the few left in other
+items go the same way when those items next change.
 
-```text
-  Progress (21 October 2026, PR #31): mono and stereo cases run for VST3;
-  2→6 and the lifecycle cases remain.
-```
-
-These lines are the one home for an item's progress. The
+The item is the one home for its open work. The
 [status page](../project/status.md) gives only each feature's level and
 each milestone condition's status in a sentence, names what remains and
 links the item. Update status in the same pull request when a gate, feature

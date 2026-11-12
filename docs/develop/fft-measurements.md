@@ -827,7 +827,7 @@ slower for 64k), so compare ratios within one table only.
 
 Not measured here: Apple Silicon (AppleClang, Accelerate), where Clang's
 default target is already the M1 and NEON is always used, and MSVC on Windows.
-Rerun cases 10 to 18 there before choosing other flags for those builds (PERF-1).
+Rerun cases 10 to 18 there before choosing other flags for those builds (PERF-3).
 
 ## Startup, reset and filter loading
 

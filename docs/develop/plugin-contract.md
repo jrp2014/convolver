@@ -34,7 +34,8 @@ and are maintained here.
   prepared elsewhere and handed over.
 - Each change does only the work it needs: a new gain ramps on the playing
   filter, and only a different filter or Latency prepares new processing
-  ([scope of each change](#scope-of-each-change)).
+  ([scope of each change](#scope-of-each-change)); not yet for restored
+  state holding the filter already playing (PLUG-38).
 
 These rules hold for VST3, LV2 and AU alike. Each adapter's tests check them
 through the [PLUG-2 harness](testing.md#plug-in-comparisons-plug-2), and a
