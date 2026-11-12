@@ -507,6 +507,8 @@ LV2 (Linux first; also PipeWire system audio):
   when a host-saved preset at the defaults, chosen in the window, resets
   Gain, Mix and Latency to them, older presets and projects load as before,
   and the guides drop the limitation.
+  Until then, the release notes of each preview that holds PLUG-26 list
+  the limitation (the first is the preview after 0.13.12).
 - [ ] **PLUG-27 — Read a chosen filter before the host's audio settings
   are known.** From the same review: before the host has started audio,
   the VST3 plug-in reads a chosen file for the rate and channels the host
