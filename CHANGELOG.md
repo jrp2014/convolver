@@ -28,6 +28,12 @@ Until 1.0 the C++ API may change between minor versions.
   file is refused with a message saying what to choose instead. Not yet
   tried in a host
   ([a preset in the window](docs/use/plugins.md#a-preset-in-the-window)).
+- Documentation: [system-wide filtering with PipeWire](docs/use/pipewire.md)
+  sets up a Room correction device on Linux that runs the LV2 plug-in in
+  PipeWire's `filter-chain`, with a filter per sample rate from a
+  configuration list, and says what Convolver adds over PipeWire's own
+  convolver. It needs PipeWire 1.6.2 or later: versions before 1.6 start
+  the plug-in without its filter (LV2-4, in part).
 
 ### Fixed
 

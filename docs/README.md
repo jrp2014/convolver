@@ -53,6 +53,7 @@ These pages are in `docs/use/` and are shipped in preview packages.
 | [Install](use/install.md) | How-to | Preview packages and source builds, for every plug-in format and system; unsigned previews |
 | [Plug-in presets](use/presets.md) | How-to | `convolver-preset`: VST3, AU and LV2 presets from one filter, conversion, messages |
 | [Equalizer APO export](use/equalizer-apo.md) | How-to | `convolver-equalizer-apo`: system-wide filtering on Windows, how a filter is chosen, installation and troubleshooting |
+| [System-wide filtering with PipeWire](use/pipewire.md) | How-to | The LV2 plug-in in PipeWire's `filter-chain` on Linux: the PipeWire version it needs, the configuration, a filter per rate, what it adds over PipeWire's own convolver |
 | [Other programs](use/other-programs.md) | How-to | Path portability, what other programs read, configurations from the old Windows Convolver |
 | [Troubleshooting](use/troubleshooting.md) | How-to | Symptoms, causes and fixes for plug-ins, configurations and tools |
 | [Report a problem](use/report-a-problem.md) | How-to | What to collect on macOS, Windows and Linux, and the GitHub issue forms for problems and preview feedback |

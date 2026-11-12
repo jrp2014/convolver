@@ -73,7 +73,8 @@ for example by starting the host with
 `LV2_PATH="$HOME/src/convolver/build/lv2:$HOME/.lv2:/usr/local/lib/lv2:/usr/lib/lv2"`.
 `lv2ls` (in Debian's and Ubuntu's `lilv-utils`) lists what the host will
 see; Convolver appears once per channel layout
-([LV2 layouts](plugins.md#lv2-channel-layouts)).
+([LV2 layouts](plugins.md#lv2-channel-layouts)). To filter everything the
+computer plays, continue with [PipeWire](pipewire.md).
 
 ## Unsigned previews
 
