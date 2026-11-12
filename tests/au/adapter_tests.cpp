@@ -16,6 +16,7 @@
 #include <csignal>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <future>
 #include <iostream>
 #include <limits>
@@ -27,6 +28,7 @@
 #include <pthread.h>
 #include <string>
 #include <thread>
+#include <unistd.h>
 #include <vector>
 
 namespace {
@@ -771,6 +773,8 @@ float steady_output(Unit& unit, int blocks) {
         check(render(unit, b, 512, false, silent), "settings render");
     return b.out[0].back();
 }
+std::string value_name(Unit& unit, AudioUnitParameterID id, AudioUnitParameterValue value);
+
 void settings_parameters() {
     struct Expected {
         AudioUnitParameterID id;
@@ -815,6 +819,38 @@ void settings_parameters() {
     require(std::abs(steady_output(unit, 2) - .25 * gain) < 1e-5, "Gain not applied");
     set_parameter(unit, au::mix_parameter, 50);
     require(std::abs(steady_output(unit, 2) - (.5 * .25 * gain + .25)) < 1e-5, "Mix not applied");
+    // PLUG-10: Gain mode, a non-real-time menu. No clipping and Estimate
+    // play the filter's own figure (6 dB for one tap of 0.5, so the wet
+    // share is .5), Estimate once the unit's queue has found it; Set plays
+    // Gain again.
+    {
+        AudioUnitParameterInfo info{};
+        UInt32 size = sizeof info;
+        check(AudioUnitGetProperty(unit.get(), kAudioUnitProperty_ParameterInfo,
+                                   kAudioUnitScope_Global, au::gain_mode_parameter, &info, &size),
+              "Gain mode parameter info");
+        require(info.unit == kAudioUnitParameterUnit_Indexed && info.minValue == 0 &&
+                    info.maxValue == 2 && info.defaultValue == 0 &&
+                    (info.flags & kAudioUnitParameterFlag_IsWritable) &&
+                    (info.flags & kAudioUnitParameterFlag_ValuesHaveStrings) &&
+                    (info.flags & kAudioUnitParameterFlag_NonRealTime),
+                "Gain mode is not an indexed, non-real-time parameter from 0 to 2, default 0");
+        if (info.flags & kAudioUnitParameterFlag_CFNameRelease)
+            CFRelease(info.cfNameString);
+        require(value_name(unit, au::gain_mode_parameter, 1) == "Estimate" &&
+                    value_name(unit, au::gain_mode_parameter, 2) == "No clipping",
+                "Gain mode names: " + value_name(unit, au::gain_mode_parameter, 2));
+        const auto plays = [&](double expected) {
+            return eventually([&] { return std::abs(steady_output(unit, 2) - expected) < 1e-4; });
+        };
+        set_parameter(unit, au::gain_mode_parameter, 2);
+        require(plays(.5 * .5 + .25), "No clipping does not play the filter's figure");
+        set_parameter(unit, au::gain_mode_parameter, 1.4f); // Rounded to Estimate.
+        require(parameter(unit, au::gain_mode_parameter) == 1 && plays(.5 * .5 + .25),
+                "Estimate does not play the filter's figure");
+        set_parameter(unit, au::gain_mode_parameter, 0);
+        require(plays(.5 * .25 * gain + .25), "Set does not play Gain again");
+    }
 
     // Saved with ClassInfo, restored into a new instance before it is
     // initialized, and applied when it is. The log line for the restore lists
@@ -1336,6 +1372,81 @@ void wider_inputs() {
     }
 }
 
+// PLUG-26: a Convolver .vstpreset chosen in the window (load_property) loads
+// its filter with the Gain, Mix and Latency it holds, as the host's preset
+// menu brings them (jrp, 8 November 2026); one without settings (from
+// convolver-preset) leaves them; another plug-in's preset, a damaged one and
+// one with no filter are refused, saying what to do, and change nothing.
+void chosen_preset() {
+    const auto folder = std::filesystem::temp_directory_path() /
+                        ("convolver-au-chosen-preset-" + std::to_string(::getpid()));
+    std::filesystem::remove_all(folder);
+    std::filesystem::create_directories(folder);
+    const auto write = [&](const char* name, const std::vector<std::byte>& bytes) {
+        const auto path = folder / name;
+        std::ofstream out(path, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
+        require(static_cast<bool>(out), "chosen preset: could not write a preset");
+        return path.string();
+    };
+    const auto choose = [](Unit& unit, const std::string& path) {
+        const auto value = CFStringCreateWithBytes(
+            nullptr, reinterpret_cast<const UInt8*>(path.data()), static_cast<CFIndex>(path.size()),
+            kCFStringEncodingUTF8, false);
+        check(value ? noErr : -1, "file path string");
+        const auto status = AudioUnitSetProperty(unit.get(), au::load_property,
+                                                 kAudioUnitScope_Global, 0, &value, sizeof value);
+        CFRelease(value);
+        return status == noErr;
+    };
+    Unit unit;
+    check(unit.configure(48000, 2, 2, 512), "formats");
+    check(unit.initialize(), "initialization");
+    auto hall = state_of(stereo(48000, 50));
+    hall.settings = HostSettings{-6, .5, 512};
+    require(choose(unit, write("hall.vstpreset", presets::vst3_preset(hall))),
+            "a chosen Convolver preset was refused");
+    require(!unit.failure().present, "a chosen preset left a failure");
+    // Latency 512 frames is position 4 of the menu.
+    const auto settings_kept = [&](const std::string& what) {
+        require(parameter(unit, au::gain_parameter) == -6 &&
+                    parameter(unit, au::mix_parameter) == 50 &&
+                    parameter(unit, au::latency_parameter) == 4,
+                what + ": Gain, Mix and Latency are not the preset's");
+    };
+    settings_kept("a chosen preset");
+    require(encode_host_state(unit.saved()) == encode_host_state(state_of(stereo(48000, 50))),
+            "a chosen preset: the saved filter is not the preset's");
+    const auto plain = state_of(stereo(48000, 80));
+    require(choose(unit, write("plain.VSTPRESET", presets::vst3_preset(plain))),
+            "a preset without settings was refused");
+    settings_kept("a preset without settings");
+    const auto keep = encode_host_state(plain);
+    require(encode_host_state(unit.saved()) == keep,
+            "a preset without settings: the saved filter is not the preset's");
+    const auto refused = [&](const std::string& path, const char* says, const std::string& what) {
+        require(!choose(unit, path), what + " was accepted");
+        const auto f = unit.failure();
+        const std::string message = f.message;
+        require(f.present && f.kind == static_cast<UInt32>(HostFailureKind::state_unreadable) &&
+                    message.find(says) != std::string::npos &&
+                    message.find("Fix: ") != std::string::npos,
+                what + " not refused as it should be: " + message);
+        require(encode_host_state(unit.saved()) == keep, what + " replaced the running filter");
+        settings_kept(what);
+    };
+    auto foreign = presets::vst3_preset(hall);
+    foreign[8] = static_cast<std::byte>(foreign[8] == std::byte{'0'} ? '1' : '0');
+    refused(write("other.vstpreset", foreign), "another plug-in", "another plug-in's preset");
+    auto damaged = presets::vst3_preset(hall);
+    damaged.resize(60);
+    refused(write("damaged.vstpreset", damaged), "damaged.vstpreset", "a damaged preset");
+    refused(write("empty.vstpreset", presets::vst3_preset({})), "holds no filter",
+            "a preset with no filter");
+    std::filesystem::remove_all(folder);
+}
+
 // jrp's review of 0.5.5, reproduced through the Audio Unit API: with no
 // filter at Gain -20 dB an input of 0.5 played as 0.05 while Status said
 // "audio passes unchanged", and after a refused first load at Mix 50% it
@@ -1410,10 +1521,10 @@ void status_parameter() {
                                &size),
           "parameter list");
     // AU-7: the settings first, as generic views list them, then Status.
-    require(size == 4 * sizeof(AudioUnitParameterID) && ids[0] == au::gain_parameter &&
-                ids[1] == au::mix_parameter && ids[2] == au::latency_parameter &&
-                ids[3] == au::status_parameter,
-            "the parameters should be Gain, Mix, Latency and Status");
+    require(size == 5 * sizeof(AudioUnitParameterID) && ids[0] == au::gain_parameter &&
+                ids[1] == au::gain_mode_parameter && ids[2] == au::mix_parameter &&
+                ids[3] == au::latency_parameter && ids[4] == au::status_parameter,
+            "the parameters should be Gain, Gain mode, Mix, Latency and Status");
     AudioUnitParameterInfo info{};
     size = sizeof info;
     check(AudioUnitGetProperty(au, kAudioUnitProperty_ParameterInfo, kAudioUnitScope_Global,
@@ -1900,6 +2011,7 @@ int main(int argc, char** argv) {
             {"bypass_while_latency_work_holds_lock", bypass_while_latency_work_holds_lock},
             {"settings_in_diagnostics", settings_in_diagnostics},
             {"wider_inputs", wider_inputs},
+            {"chosen_preset", chosen_preset},
         },
         [] {
             counting = false;

@@ -58,8 +58,8 @@ std::string short_problem(std::string problem, const HostFailure& failure) {
 // What the window says to do with no filter loaded.
 std::string load_fix(bool chooses_files) {
     return chooses_files
-               ? "Choose an IR file, .cfg or configuration list (or drop one on this window), or "
-                 "load a Convolver preset from the host's preset menu."
+               ? "Choose an IR file, .cfg, configuration list or Convolver .vstpreset (or drop "
+                 "one on this window), or load a Convolver preset from the host's preset menu."
                : "Load a Convolver preset from the host's preset menu (convolver-preset makes "
                  "one from an IR file, .cfg or configuration list).";
 }

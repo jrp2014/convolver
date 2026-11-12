@@ -229,6 +229,12 @@ if(CONVOLVER_BUILD_NATIVE)
     target_include_directories(convolver_filter_file PUBLIC portable)
     target_link_libraries(convolver_filter_file PUBLIC Convolver::host convolver_configuration)
     list(APPEND native_targets convolver_filter_file)
+    # PLUG-26: a file chosen in a plug-in window, a filter file or a Convolver
+    # .vstpreset; for the adapters with windows (VST3, Audio Unit), not LV2.
+    add_library(convolver_chosen_file STATIC portable/chosen_file.cpp)
+    set_target_properties(convolver_chosen_file PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_link_libraries(convolver_chosen_file PUBLIC convolver_filter_file convolver_presets)
+    list(APPEND native_targets convolver_chosen_file)
     if(APPLE)
         # macOS's own sound-file reader, for the Audio Unit (AU-6).
         add_library(convolver_audio_toolbox STATIC portable/audio_toolbox.cpp)

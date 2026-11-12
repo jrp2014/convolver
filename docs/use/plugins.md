@@ -15,7 +15,8 @@ does not fit. Installing is in [install](install.md); making presets is in
   for example 2 in and 6 out for a crossover.
 - You choose the filter file itself (an IR file, a `.cfg` or a
   configuration list) with **Choose…** in Convolver's window (the Audio
-  Unit, and the VST3 plug-in on macOS and Windows) or with the host's file chooser
+  Unit, and the VST3 plug-in on macOS and Windows), which also opens a
+  Convolver `.vstpreset`, or with the host's file chooser
   (LV2, in hosts that show it); a preset from the host's preset menu is
   the other way ([loading a filter](#loading-a-filter)). The host saves
   the filter inside your project. A read-only Status
@@ -121,10 +122,31 @@ the one list of what each way reads:
 
 | Way in | Plug-ins | Reads |
 | --- | --- | --- |
-| **Choose…**, or dropping the file, in [Convolver's window](#convolvers-window) | The Audio Unit, and the VST3 plug-in on macOS and Windows | An IR file, a `.cfg` or a configuration list, with at least its inputs ([channels](#channels)); not a preset file |
+| **Choose…**, or dropping the file, in [Convolver's window](#convolvers-window) | The Audio Unit, and the VST3 plug-in on macOS and Windows | An IR file, a `.cfg` or a configuration list, or a Convolver `.vstpreset` ([a preset in the window](#a-preset-in-the-window)), with at least its inputs ([channels](#channels)); not an `.aupreset` or LV2 preset |
 | The host's file chooser for the **Filter** parameter | LV2, in hosts that show it ([LV2 filter files](#lv2-filter-files)) | An IR file, a `.cfg` or a configuration list, with at least its inputs ([channels](#channels)) |
 | The host's preset menu ("Load Preset…" or its preset browser) | Every format | Convolver's preset in that format: `.vstpreset` (VST3), `.aupreset` (Audio Unit) or a `NAME.preset.lv2` folder (LV2), with at least its inputs ([channels](#channels)) |
 | A saved project | Every format | The filter and settings saved in it |
+
+### A preset in the window
+
+**Choose…** and dropping a file in Convolver's window also open a Convolver
+`.vstpreset`, in the Audio Unit as well as the VST3 plug-in, from any
+folder: nothing has to be installed or imported first. It loads as the
+host's preset menu loads it. Its filter must suit the host's rate and
+channels as any preset's must, and the Gain, Gain mode, Mix and Latency
+saved in it apply too; the host is told, so its controls and the saved project show
+them. A preset made by `convolver-preset` holds only a filter and leaves
+the settings as they are. For now, so does a preset a host saved
+at the default settings (0 dB, 100%, 0 frames), since Convolver's saved
+state does not yet record settings at their defaults; the host's own
+preset menu resets them to the defaults instead. A later version will
+record them, so that presets saved from then on load their settings in full
+(PLUG-35 in [TODO](../../TODO.md)). Bypass stays as the host has it. Another plug-in's preset,
+a damaged file or a preset saved with no filter is refused, and the
+message says what to choose instead. The window then names the filter
+after the preset file. **Reload**, and **Reload when the file changes**,
+read the preset again, which sets the settings back to the
+preset's, as choosing it again would.
 
 [Plug-in presets](presets.md) shows how to make a preset with
 `convolver-preset`, which reads an IR file, a `.cfg`, a configuration list
@@ -407,8 +429,9 @@ From the top, the window has:
   With no filter, Fix says what to load, and Choose… is highlighted.
 - **Choose…**, **Recent**, **Reload** and **Reload when the file changes**,
   on one row under the message.
-  Choose… opens the file dialog for an IR file, a `.cfg` or a
-  configuration list; dropping the file anywhere on the
+  Choose… opens the file dialog for an IR file, a `.cfg`, a
+  configuration list or a Convolver `.vstpreset`
+  ([a preset in the window](#a-preset-in-the-window)); dropping the file anywhere on the
   window does the same. The Audio Unit reads sound files with macOS's own reader, so
   it needs nothing installed beside it: WAV, AIFF, CAF, W64, RF64, FLAC and
   the other formats macOS reads, and headerless `.pcm` or `.raw` filters

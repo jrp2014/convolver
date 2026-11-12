@@ -9,12 +9,11 @@
 #include "utf8.hpp"
 #include <charconv>
 #include <cstddef>
-#include <fstream>
 #include <iostream>
-#include <iterator>
 #include <stdexcept>
 #include <string>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -80,30 +79,6 @@ std::string default_name(const fs::path& output) {
         stem = stem.stem();
     return utf8_string(stem);
 }
-std::vector<std::byte> read_file(const fs::path& path) {
-    // A preset is at most the state limit plus its small containers.
-    constexpr auto limit = convolver::max_host_state_bytes + 4096;
-    std::error_code error;
-    if (const auto size = fs::file_size(path, error); !error && size > limit)
-        throw std::runtime_error(utf8_string(path) + " is too large to be a Convolver preset");
-    std::ifstream file(path, std::ios::binary);
-    if (!file)
-        throw std::runtime_error(advice_text(
-            {"cannot open " + utf8_string(path),
-             fs::exists(path, error) ? "The file is there, but this program may not read it."
-                                     : "There is no file at that path.",
-             fs::exists(path, error) ? "Check the file's permissions."
-                                     : "Check the name and folder (letter case counts on Linux "
-                                       "and on case-sensitive macOS volumes).",
-             {}}));
-    std::vector<char> text((std::istreambuf_iterator<char>(file)),
-                           std::istreambuf_iterator<char>());
-    if (text.size() > limit)
-        throw std::runtime_error(utf8_string(path) + " is too large to be a Convolver preset");
-    const auto* bytes = reinterpret_cast<const std::byte*>(text.data());
-    return {bytes, bytes + text.size()};
-}
-
 int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
                  const convolver::ConfigurationSelection& selection, bool selected,
                  std::string name) {
@@ -139,15 +114,10 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
                      "Leave out those options, or make the preset from the configuration list.",
                      {}}));
             try {
-                const auto bytes = read_file(input);
-                state = convolver::presets::read_vst3_preset(bytes);
-                // The converted preset keeps the name only while it still
-                // names this filter, as the plug-in shows it.
-                const auto kept = convolver::presets::read_vst3_filter_name(bytes);
-                if (!kept.identity.empty() &&
-                    convolver::presets::vst3_filter_name(state, kept.name).identity ==
-                        kept.identity)
-                    filter_file_name = kept.name;
+                // PLUG-26: the reader the plug-in windows use for a chosen preset.
+                auto read = convolver::presets::read_vst3_preset_file(input);
+                state = std::move(read.state);
+                filter_file_name = std::move(read.filter_name);
             } catch (const std::invalid_argument& e) {
                 throw std::invalid_argument(advice_text(
                     {utf8_string(input) + ": " + advice_problem(e.what()),
