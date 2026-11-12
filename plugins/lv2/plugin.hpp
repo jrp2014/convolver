@@ -42,8 +42,8 @@ constexpr std::uint32_t latency_frames_port(std::size_t inputs, std::size_t outp
 }
 // PLUG-10: the Gain mode, a GainMode (0 Set, 1 Estimate, 2 No clipping;
 // default 0); other values count as the nearest. Estimate's figure is found
-// on the worker thread when the mode is chosen, or at activation, and the
-// filter with it is published; until then Estimate plays No clipping's.
+// on the worker thread when the mode is chosen, and given to the playing
+// filter in place, or at activation; until then Estimate plays No clipping's.
 constexpr std::uint32_t gain_mode_port(std::size_t inputs, std::size_t outputs) {
     return notify_port(inputs, outputs) + 4;
 }

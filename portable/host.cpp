@@ -1052,7 +1052,9 @@ struct HostProcessor::Impl {
             set_gains(gains);
         }
         // Control thread; the audio thread reads them (relaxed: each figure
-        // stands alone, and the ramp hides when it is seen).
+        // stands alone, and the ramp hides when it is seen). A block that
+        // reads a figure and its flag from different calls only sets a ramp
+        // target, which the next block corrects.
         void set_gains(const FilterGains& gains) noexcept {
             const auto place = [&](GainMode mode, const std::optional<double>& db) {
                 const auto i = static_cast<std::size_t>(mode);

@@ -240,7 +240,8 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     void choose_latency(std::size_t frames) noexcept;
     // PLUG-10, under control_: a Gain mode chosen in the controller or
     // restored. Estimate finds the filter's estimate first if it has none
-    // (HostFilter::estimate) and, while active, publishes the filter with it.
+    // (HostFilter::estimate) and, while active, gives it to the playing filter
+    // in place (HostProcessor::update_gains).
     // If finding it fails, Estimate plays the no-clipping figure and the log
     // says why. Never throws.
     void choose_gain_mode(GainMode) noexcept;

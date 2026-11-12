@@ -290,8 +290,8 @@ class Effect final : public ausdk::AUBase {
     // (AU-16).
     // PLUG-10: a new Gain mode wakes the queue with its own bit
     // (gain_mode_wake): the run finds the filter's estimate if Estimate
-    // needs it (HostFilter::estimate), publishes the filter with it and logs
-    // the mode.
+    // needs it (HostFilter::estimate), gives it to the playing filter in
+    // place (HostProcessor::update_gains) and logs the mode.
     static constexpr std::uintptr_t latency_wake = 1, status_wake = 2, gain_mode_wake = 4;
     void request_latency() noexcept {
         wake(latency_wake);

@@ -120,7 +120,7 @@ NSDictionary<NSString*, id>* choice(AudioUnit unit, AudioUnitParameterID paramet
             choice(unit, convolver::identity::au_gain_mode_parameter_id, @"Gain mode",
                    @"Which gain plays. Set: the Gain setting. Estimate: the filter's own estimate, "
                    @"from noise played through it, as convolver --gain-db auto finds. No "
-                   @"clipping: turned down so that no input within full scale can clip, as "
+                   @"clipping: the gain at which no input within full scale can clip, as "
                    @"convolver --gain-db no-clip; it is not a limiter, so input above full scale "
                    @"still can. Each filter plays at its own figure; the Gain setting is kept "
                    @"for Set.")) {

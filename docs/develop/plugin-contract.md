@@ -685,8 +685,8 @@ the plan's Gain modes (12 November 2026); its meters follow later
   percent) and Latency (1004, an index into `host_latencies` with value names
   such as "256 frames", also non-real-time), listed before Status. Render
   plays the Gain mode parameter's value; a new one wakes the Latency queue
-  with its own bit, and the run finds Estimate's figure, publishes the filter
-  with it and logs the mode. `RestoreState` restores the mode with the other
+  with its own bit, and the run finds Estimate's figure, gives it to the
+  playing filter (`update_gains()`) and logs the mode. `RestoreState` restores the mode with the other
   parameters, and state saved before the mode existed restores Set. Values a host writes are stored within their ranges
   (Latency rounded to a whole index), and Render hands Gain and Mix to the
   processor on every call. `Initialize` builds the processor with the chosen
@@ -1093,8 +1093,8 @@ How each adapter meets the contract where its format differs:
   (PLUG-10, an enumeration of the three modes, also not automatic and
   expensive). `run()` hands Gain, Mix and the Gain mode to the processor on
   every call. A new Gain mode is a worker request, one queued at a time as
-  for Latency: `work()` finds Estimate's figure and publishes the filter
-  with it; `activate()` does the same for a mode chosen while inactive, so a
+  for Latency: `work()` finds Estimate's figure and gives it to the playing
+  filter (`update_gains()`); `activate()` finds it for a mode chosen while inactive, so a
   restored session plays the estimate from its first frame. Without a
   worker, Estimate plays the bound until the next activation. A new Latency while active is a worker
   request: `work()` builds a processor with it under the lock, as activation

@@ -811,39 +811,53 @@ void gain_modes() {
 // PLUG-10: choosing Estimate while a filter plays changes its gain in place.
 // jrp's review: replacing the processor's filter to carry the estimate lost
 // the engine's history, so a filter with a quarter-second delay fell silent
-// for about 245 ms. Here the delayed tap plays a steady 1 (its bound, +6 dB),
-// and Estimate must ramp to its estimate without any gap.
+// for about 245 ms. Here a 64-tap average delayed by 0.25 s plays a steady 1
+// at its bound (0 dB: its taps sum to 1); its estimate is about +10.4 dB, so
+// Estimate must ramp up to it without any gap. A figure that never reached
+// the processor would stay at 1; a replacement would fall to 0.
 void estimate_keeps_history() {
     Configuration c{48000, 1, 1, 0, {}, {}, {}};
-    std::vector<float> delayed(12001, 0.f); // 0.25 s at 48 kHz.
-    delayed.back() = .5f;
+    std::vector<float> delayed(12000, 0.f); // 0.25 s at 48 kHz.
+    delayed.resize(12064, 1.f / 64);
     c.paths.push_back({delayed, {{0, 1}}, {{0, 1}}});
     HostFilter filter;
     std::optional<HostPlayback> installed;
     filter.load(HostState{c}, HostLayout{48000, 1, 1},
                 [&](const HostPlayback& p) { installed = p; });
-    require(installed && !installed->gains.estimate_db, "the delayed filter did not load");
+    require(installed && !installed->gains.estimate_db && installed->gains.no_clipping_db &&
+                std::abs(*installed->gains.no_clipping_db) < 1e-6,
+            "the delayed average did not load with a 0 dB bound");
     HostSettings s{0, 1, 0, GainMode::estimate};
     HostProcessor host(*installed, 64, s);
     const auto steady = play(host, std::vector<float>(13000, 1.f), 1, 1, 64);
     require(std::abs(steady.back() - 1) < 1e-5,
-            "the bound should play the delayed tap at 1: " + std::to_string(steady.back()));
+            "the bound should play the delayed average at 1: " + std::to_string(steady.back()));
     require(filter.estimate(true, [&](const FilterGains& g) { host.update_gains(g); }),
             "Estimate should find the delayed filter's estimate");
+    const auto estimate_db = *filter.gains().estimate_db;
+    require(estimate_db > 6, "the average's estimate should be well above its bound: " +
+                                 std::to_string(estimate_db) + " dB");
+    const float target = std::pow(10.f, static_cast<float>(estimate_db) / 20);
     const auto after = play(host, std::vector<float>(4000, 1.f), 1, 1, 64);
-    const float target = .5f * std::pow(10.f, static_cast<float>(*filter.gains().estimate_db) / 20);
-    float lowest = after[0];
-    std::size_t at = 0;
     for (std::size_t t = 0; t < after.size(); ++t)
-        if (after[t] < lowest) {
-            lowest = after[t];
-            at = t;
-        }
-    require(lowest >= std::min(1.f, target) - 1e-5f,
-            "choosing Estimate interrupted the filter: " + std::to_string(lowest) + " at frame " +
-                std::to_string(at) + " (between 1 and " + std::to_string(target) + " expected)");
-    require(std::abs(after.back() - target) < 1e-5,
-            "Estimate should end at the filter's estimate: " + std::to_string(after.back()));
+        require(after[t] >= 1 - 1e-5f && after[t] <= target + 1e-4f,
+                "choosing Estimate interrupted the filter: " + std::to_string(after[t]) +
+                    " at frame " + std::to_string(t) + " (1 to " + std::to_string(target) +
+                    " expected)");
+    require(std::abs(after.back() - target) < 1e-4f,
+            "Estimate should end at the filter's estimate: " + std::to_string(after.back()) +
+                ", not " + std::to_string(target));
+    // A filter published but not yet playing gets the figures too: the
+    // newest publication is the one update_gains() changes.
+    HostSettings bound_only{0, 1, 0, GainMode::estimate};
+    HostProcessor fresh(*installed, 64, bound_only);
+    play(fresh, std::vector<float>(640, 1.f), 1, 1, 64);
+    fresh.replace(*installed); // Bound only, adopted at the next call.
+    fresh.update_gains(filter.gains());
+    const auto replaced = play(fresh, std::vector<float>(13000, 1.f), 1, 1, 64);
+    require(std::abs(replaced.back() - target) < 1e-4f,
+            "a pending filter should play the figures given before it was adopted: " +
+                std::to_string(replaced.back()));
 }
 
 // PLUG-10: HostFilter finds the noise estimate only while estimating, and

@@ -675,9 +675,9 @@ class HostProcessor {
     // is absent plays silence in that mode. During a replacement each filter
     // plays at its own figure, so the crossfade covers the change.
     void set_gain_mode(GainMode) noexcept;
-    // PLUG-10, control thread, serialized with replace(): new figures for the
-    // filter published last (or built with), such as its noise estimate found
-    // after it was published. Its engine keeps playing with its history, so
+    // PLUG-10, control thread, serialized with replace() and publish(): new
+    // figures for the filter published last (or built with), such as its
+    // noise estimate found after it was published. Its engine keeps playing with its history, so
     // nothing is interrupted; the gain ramps like a Gain change. Does not
     // allocate or block.
     void update_gains(const FilterGains&) noexcept;
