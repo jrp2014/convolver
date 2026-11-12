@@ -306,7 +306,7 @@ each milestone condition's status in a sentence, names what remains and
 links the item. Update status in the same pull request when a gate, feature
 readiness or scope changes; internal progress alone belongs in TODO rather
 than another retelling in status (DOC-6). During preview qualification use the
-[acceptance plan](../project/plans/2026-11-08-preview-acceptance.md#3-decide-whether-a-finding-blocks-the-preview)
+[acceptance plan](releasing.md#what-blocks-a-preview)
 to distinguish blocking findings from deferred suggestions. Report audio,
 safety, state retention, host behaviour and required-gate failures first;
 group non-blocking prose suggestions without hiding consequential errors in

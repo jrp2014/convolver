@@ -1,26 +1,41 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Finish and qualify the first preview
 
+> **Archived 12 November 2026 as superseded.** This plan set out how the
+> first (0.12) preview would be qualified; REL-7, which applied it, was done
+> on 8 November 2026. Three previews have been published (0.12.12, 0.13.2
+> and 0.13.12), each with the checks left open that the
+> [decisions log](../../project/decisions.md#releases) records. Its lasting
+> rules, the fixed candidate, how a finding is classified, retesting in
+> proportion and the stop rule, are now in
+> [releasing: what blocks a preview](../../develop/releasing.md#what-blocks-a-preview);
+> the gates and their results are on the [status page](../../project/status.md);
+> the deferred work in section 6 is in [TODO](../../../TODO.md#execution-priorities);
+> the review and record-keeping rules in section 5 are in the
+> [workflow guide](../../develop/workflow.md#recording-progress-in-todo),
+> and its contract table and test mapping, never done, are PLUG-36. The
+> text below is unchanged apart from relative links.
+
 For maintainers and testers: a bounded plan for demonstrating that the existing
 macOS preview works, recording its limits and handing it to an independent user.
 
 **In short:** hold one candidate still, complete the agreed journeys and release
 gates, fix blocking defects, then stop expanding the test scope. Keep useful
-regression coverage. CI scheduling is a [separate proposal](2026-11-08-ci-scheduling.md),
+regression coverage. CI scheduling is a [separate proposal](../../project/plans/2026-11-08-ci-scheduling.md),
 not a prerequisite for this walkthrough.
 
 The scope is the existing 0.12-series macOS preview: VST3 and Audio Unit with
 the shared window, CLI and preset tool. This plan changes neither the audio
-contract nor the package contents. [Status](../status.md#what-still-blocks-the-first-preview)
+contract nor the package contents. [Status](../../project/status.md#what-still-blocks-the-first-preview)
 owns the current gate results; [TODO](../../../TODO.md) owns progress and deferred
-items. The [decisions log](../decisions.md#releases) records the owner's direction.
+items. The [decisions log](../../project/decisions.md#releases) records the owner's direction.
 REL-7 tracks applying this plan, not another implementation milestone.
 
 ## 1. Fix the candidate and the test boundary
 
 - [ ] Check the gate summary for outstanding fixes before selecting the final
   candidate. VST3-16's fix and its
-  [REAPER acceptance](../../archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md)
+  [REAPER acceptance](../reviews/2026-11-08-vst3-16-reaper-acceptance.md)
   are already recorded; do not reopen that fix-specific gate merely to
   apply this plan. Keep performance experiments and optional window changes
   on their own branches; do not include them to fill time while testing.
@@ -150,6 +165,6 @@ the contract or test harness is not a new preview gate.
 | Additional gain modes, meters and convenience changes | PLUG-9, PLUG-10, AU-7; relevant open TODO items | After qualification; prioritise actual user difficulty |
 | Speculative allocation-failure hardening and extreme combinations | ROBUST-1 and relevant open TODO items | A reproduction, credible severe code path or evidence from normal workloads justifies it |
 | Broad concurrency architecture changes | Relevant AU/host items | ThreadSanitizer or a reproduction identifies a remaining ownership problem; no rewrite based on historical counts alone |
-| CI scheduling reductions | CI-34, [separate proposal](2026-11-08-ci-scheduling.md) | A dedicated PR demonstrates preserved coverage and faster feedback; it does not hold up the preview |
+| CI scheduling reductions | CI-34, [separate proposal](../../project/plans/2026-11-08-ci-scheduling.md) | A dedicated PR demonstrates preserved coverage and faster feedback; it does not hold up the preview |
 
 No tests, tolerances, validators or release gates are removed by this plan.

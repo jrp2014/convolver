@@ -50,7 +50,7 @@ after the second preview on 9 November, can go ahead again now that
 previews are out, with significant features before corner and edge cases.
 Crashes, lost state, wrong audio, compatibility failures and dropouts are
 still fixed at once, with a regression test where practical
-([preview acceptance](docs/project/plans/2026-11-08-preview-acceptance.md#3-decide-whether-a-finding-blocks-the-preview)).
+([preview acceptance](docs/develop/releasing.md#what-blocks-a-preview)).
 The sections below were ordered under the freeze, and their order stands
 until the next triage.
 
@@ -565,6 +565,19 @@ LV2 (Linux first; also PipeWire system audio):
   queue. Done when each adapter's skip paths either follow that rule or
   are listed with why they are safe, with a held-lock test for each, as
   AU-16's. Waits for the freeze.
+- [ ] **PLUG-36 — The loading-and-failure table covers each transition.**
+  Left open by the first-preview acceptance plan (section 5, archived
+  12 November 2026; jrp's 8 November priority: extend the contract and the
+  existing lifecycle tests, no new framework). The
+  [table](docs/develop/plugin-contract.md#loading-and-failure) names three
+  situations; extend it to the empty, active, kept-but-unsuited and failed
+  states against load, restore, rate and bus changes, bypass, Mix and
+  processing faults, saying for each what plays, what is saved and what
+  Status reports, with channel safety kept apart from which message wins.
+  Map each row to its test in `tests/plugins/lifecycle.cpp` or a format's
+  adapter test, and add a test only for a missing rule or a reproduced
+  defect; the expected result must not come from production decision
+  functions. Any unclear rule goes to jrp.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
@@ -1024,7 +1037,7 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   nothing. Presets from Audacity's own menu worked (7 November), since
   Audacity loads that state itself. Wrong audio in a required journey, so
   a preview blocker under the
-  [acceptance plan](docs/project/plans/2026-11-08-preview-acceptance.md#3-decide-whether-a-finding-blocks-the-preview)
+  [acceptance plan](docs/develop/releasing.md#what-blocks-a-preview)
   unless jrp narrows it. The workaround proposed: after an accepted load,
   the controller makes a gesture that changes no value (`beginEdit`,
   `performEdit` with the current value, `endEdit`) so such hosts store the
