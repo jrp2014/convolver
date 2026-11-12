@@ -24,10 +24,10 @@ enum Control : int {
     recent,
     reload,
     watch,
-    // The settings: Gain, Mix and Latency, each with setting_stride
-    // identifiers from settings + setting_stride * i: its label, its
-    // trackbar or list, its value (a typed box, or the time a Latency adds),
-    // its unit, and Mix's Dry and Wet.
+    // The settings: Gain, Gain mode, Mix and Latency, each with
+    // setting_stride identifiers from settings + setting_stride * i: its
+    // label, its trackbar or list, its value (a typed box, the gain the Gain
+    // mode plays or the time a Latency adds), its unit, and Mix's Dry and Wet.
     settings = 200,
     mix_note = 290,
     audio_heading = 300,

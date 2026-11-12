@@ -745,8 +745,11 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
         coloured(c.tone) ? status_colour(c.tone) : [NSColor secondaryLabelColor];
     logPath_ = c.log_path.empty() ? nil : ns(c.log_path);
     // The Latency row shows the time a choice adds at the host's rate, and
-    // whether the chosen Latency is in use yet.
-    [settings_ readWithSampleRate:c.sample_rate latencyWaits:c.latency_waits];
+    // whether the chosen Latency is in use yet; the Gain mode row, the gain
+    // it plays (PLUG-10).
+    [settings_ readWithSampleRate:c.sample_rate
+                     latencyWaits:c.latency_waits
+                         gainNote:ns(c.gain_note)];
     _logButton.enabled = logPath_.length > 0;
     [self readBypass];
     watch_.follow(c.filter_path, c.filter_files);

@@ -314,14 +314,38 @@ void window(const fs::path& picture) {
             "title " + utf8(text(item(shown, win::title))));
     HWND gain = setting(shown, 0, win::control);
     HWND gain_box = setting(shown, 0, win::value);
-    HWND latency = setting(shown, 2, win::control);
+    HWND latency = setting(shown, 3, win::control);
     wchar_t kind[64] = {};
     GetClassNameW(gain, kind, 64);
     require(std::wstring(kind) == TRACKBAR_CLASSW && SendMessageW(latency, CB_GETCOUNT, 0, 0) == 8,
             "settings rows");
-    require(text(setting(shown, 1, win::low)) == L"Dry" &&
-                text(setting(shown, 1, win::high)) == L"Wet",
+    require(text(setting(shown, 2, win::low)) == L"Dry" &&
+                text(setting(shown, 2, win::high)) == L"Wet",
             "Mix's ends");
+    // PLUG-10: the Gain mode list, with what the mode plays beside it.
+    HWND mode = setting(shown, 1, win::control);
+    require(SendMessageW(mode, CB_GETCOUNT, 0, 0) == 3 &&
+                SendMessageW(mode, CB_GETCURSEL, 0, 0) == 0 &&
+                text(setting(shown, 1, win::value)).empty(),
+            "Gain mode row");
+    handler.edits.clear();
+    SendMessageW(mode, CB_SETCURSEL, 2, 0);
+    SendMessageW(shown, WM_COMMAND,
+                 MAKEWPARAM(win::settings + win::setting_stride + win::control, CBN_SELCHANGE),
+                 reinterpret_cast<LPARAM>(mode));
+    pump();
+    tick(shown, win::refresh_timer);
+    require(handler.kinds(gain_mode_id) == "bpe" &&
+                p.settings().gain_mode == convolver::GainMode::no_clipping &&
+                text(setting(shown, 1, win::value)) == L"each filter plays at its own figure",
+            "Gain mode choice: " + handler.kinds(gain_mode_id) + ", " +
+                utf8(text(setting(shown, 1, win::value))));
+    SendMessageW(mode, CB_SETCURSEL, 0, 0);
+    SendMessageW(shown, WM_COMMAND,
+                 MAKEWPARAM(win::settings + win::setting_stride + win::control, CBN_SELCHANGE),
+                 reinterpret_cast<LPARAM>(mode));
+    pump();
+    require(p.settings().gain_mode == convolver::GainMode::set, "Gain mode back to Set");
 
     // A Gain the host set shows in the window.
     c.setParamNormalized(gain_id, normalized_gain(-6));
@@ -351,14 +375,14 @@ void window(const fs::path& picture) {
     handler.edits.clear();
     SendMessageW(latency, CB_SETCURSEL, 5, 0);
     SendMessageW(shown, WM_COMMAND,
-                 MAKEWPARAM(win::settings + 2 * win::setting_stride + win::control, CBN_SELCHANGE),
+                 MAKEWPARAM(win::settings + 3 * win::setting_stride + win::control, CBN_SELCHANGE),
                  reinterpret_cast<LPARAM>(latency));
     pump();
     require(handler.kinds(latency_id) == "bpe" && p.settings().latency == 1024 &&
                 p.getLatencySamples() == 1024 && handler.latency_restarts == 1,
             "Latency choice: " + handler.kinds(latency_id));
-    require(text(setting(shown, 2, win::value)) == L"adds 21.3 ms",
-            "Latency note " + utf8(text(setting(shown, 2, win::value))));
+    require(text(setting(shown, 3, win::value)) == L"adds 21.3 ms",
+            "Latency note " + utf8(text(setting(shown, 3, win::value))));
     // In the open list, the items the arrow keys pass are not choices (each
     // would rebuild the engine), and Escape puts the list back.
     handler.edits.clear();
@@ -366,7 +390,7 @@ void window(const fs::path& picture) {
     require(SendMessageW(latency, CB_GETDROPPEDSTATE, 0, 0) != FALSE, "the Latency list opens");
     SendMessageW(latency, CB_SETCURSEL, 4, 0);
     const WPARAM latency_id_code =
-        MAKEWPARAM(win::settings + 2 * win::setting_stride + win::control, 0);
+        MAKEWPARAM(win::settings + 3 * win::setting_stride + win::control, 0);
     SendMessageW(shown, WM_COMMAND, latency_id_code | (CBN_SELCHANGE << 16),
                  reinterpret_cast<LPARAM>(latency));
     require(handler.edits.empty() && p.settings().latency == 1024,
@@ -597,8 +621,8 @@ void mix_note() {
         HWND note = item(shown, win::mix_note);
         require(text(item(shown, win::status)) == L"Active" && IsWindowVisible(note) &&
                     text(note).find(L"Mix has no effect") != std::wstring::npos &&
-                    !IsWindowEnabled(setting(shown, 1, win::control)) &&
-                    !IsWindowEnabled(setting(shown, 1, win::value)) &&
+                    !IsWindowEnabled(setting(shown, 2, win::control)) &&
+                    !IsWindowEnabled(setting(shown, 2, win::value)) &&
                     IsWindowEnabled(setting(shown, 0, win::control)),
                 "Mix not dimmed with a note, refresh " + std::to_string(i) + ": " +
                     utf8(text(note)));

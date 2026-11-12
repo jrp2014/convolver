@@ -444,15 +444,15 @@ void window() {
                 mix.minValue == 0 && mix.maxValue == 100 && mix.doubleValue == 100,
             "slider ranges or values");
     // PLUG-23: equal counts have a dry signal, so Mix applies and no note.
-    require(mix.enabled && view.settingValues[1].enabled && view.mixNoteField.superview.hidden &&
+    require(mix.enabled && view.settingValues[2].enabled && view.mixNoteField.superview.hidden &&
                 view.mixNoteField.stringValue.length == 0,
             "a mix note with a dry signal");
     require([view.settingValues[0].stringValue isEqualToString:@"0"] &&
-                [view.settingValues[1].stringValue isEqualToString:@"100"] &&
-                view.settingValues[0].editable && view.settingValues[1].editable &&
+                [view.settingValues[2].stringValue isEqualToString:@"100"] &&
+                view.settingValues[0].editable && view.settingValues[2].editable &&
                 [view.settingValues[0].accessibilityLabel isEqualToString:@"Gain"],
             "setting values " + text(view.settingValues[0].stringValue) + ", " +
-                text(view.settingValues[1].stringValue));
+                text(view.settingValues[2].stringValue));
     require([gain.accessibilityLabel isEqualToString:@"Gain"], "Gain slider label");
     gain.doubleValue = -12;
     [gain sendAction:gain.action to:gain.target];
@@ -572,7 +572,7 @@ void window() {
     check(AudioUnitSetParameter(unit.get(), au::mix_parameter, kAudioUnitScope_Global, 0, 50, 0),
           "Mix from the host");
     [view refresh];
-    require(mix.doubleValue == 50 && [view.settingValues[1].stringValue isEqualToString:@"50"],
+    require(mix.doubleValue == 50 && [view.settingValues[2].stringValue isEqualToString:@"50"],
             "the Mix slider did not follow the host");
     require([mix.accessibilityValueDescription isEqualToString:@"50% wet"],
             "Mix slider's VoiceOver value: " + text(mix.accessibilityValueDescription));
@@ -583,8 +583,8 @@ void window() {
         AudioUnitSetParameter(unit.get(), au::mix_parameter, kAudioUnitScope_Global, 0, 99.96f, 0),
         "Mix near 100");
     [view refresh];
-    require([view.settingValues[1].stringValue hasPrefix:@"99.9"],
-            "Mix near 100 reads " + text(view.settingValues[1].stringValue));
+    require([view.settingValues[2].stringValue hasPrefix:@"99.9"],
+            "Mix near 100 reads " + text(view.settingValues[2].stringValue));
     check(AudioUnitSetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, 0, 0),
           "Gain back");
     check(AudioUnitSetParameter(unit.get(), au::mix_parameter, kAudioUnitScope_Global, 0, 100, 0),
@@ -598,18 +598,18 @@ void window() {
     const auto shows = [&](NSString* time) {
         for (int i = 0; i < 500; ++i) {
             [view refresh];
-            if ([view.settingValues[2].stringValue isEqualToString:time])
+            if ([view.settingValues[3].stringValue isEqualToString:time])
                 return true;
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
         return false;
     };
-    NSPopUpButton* latency = view.settingMenus[0];
+    NSPopUpButton* latency = view.settingMenus[1];
     require(latency.numberOfItems == 8 && [latency.itemTitles[0] isEqualToString:@"0 frames"] &&
                 [latency.itemTitles[7] isEqualToString:@"4096 frames"] &&
                 latency.indexOfSelectedItem == 0 &&
                 [latency.accessibilityLabel isEqualToString:@"Latency"] &&
-                [view.settingValues[2].stringValue isEqualToString:@""],
+                [view.settingValues[3].stringValue isEqualToString:@""],
             "Latency menu: " + text([latency.itemTitles componentsJoinedByString:@", "]));
     [latency selectItemAtIndex:4];
     [latency sendAction:latency.action to:latency.target];
@@ -618,7 +618,7 @@ void window() {
     require(now == 4, "the Latency menu did not set Latency: " + std::to_string(now));
     require(shows(@"adds 11.6 ms") && !contains(view.explanationView.string, "is chosen"),
             "the window does not show the new Latency in use:\n" +
-                text(view.explanationView.string) + "\n" + text(view.settingValues[2].stringValue));
+                text(view.explanationView.string) + "\n" + text(view.settingValues[3].stringValue));
     check(AudioUnitSetParameter(unit.get(), au::latency_parameter, kAudioUnitScope_Global, 0, 3, 0),
           "Latency from the host");
     require(shows(@"adds 5.8 ms") && latency.indexOfSelectedItem == 3 &&

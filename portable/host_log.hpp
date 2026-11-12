@@ -90,8 +90,23 @@ inline std::string ports(std::size_t inputs, std::size_t outputs) {
 }
 // PLUG-10: the settings in words, such as "gain 0 dB, mix 100% wet, latency
 // 256 frames". Without a dry signal (`dry`, dry_signal_rule()) it says the
-// mix does not apply, and why.
-std::string settings_words(const HostSettings&, HostDrySignal dry);
+// mix does not apply, and why. The gain is gain_words() for `gains`.
+std::string settings_words(const HostSettings&, HostDrySignal dry,
+                           const FilterGains* gains = nullptr);
+// PLUG-10: the gain that plays: "gain -6 dB" in Set mode, "gain -12.3 dB
+// (Estimate)" in the others, with the filter's figure from `gains`, and what
+// plays when that figure is unavailable. Without `gains`, the mode alone
+// ("gain by Estimate").
+std::string gain_words(const HostSettings&, const FilterGains* gains);
+// PLUG-10: logged when the Gain mode changes: the new mode and the gain it
+// plays for the filter (`has_filter`), and `why` the estimate could not be
+// found, when it could not.
+std::string gain_mode_line(const HostSettings&, const FilterGains&, bool has_filter,
+                           const std::string& why = {});
+// PLUG-10: beside the window's Gain mode menu, briefly, empty in Set mode:
+// the gain the mode plays for the filter ("-12.3 dB for this filter"), and
+// what plays when that figure is unavailable.
+std::string gain_note(const HostSettings&, const FilterGains&, bool has_filter);
 // What plays under `host` and why, in full: the silent failure (with what
 // Mix's dry share still lets through), the filter with any speaker notice,
 // or what passes with no filter. The part of started_line() after the

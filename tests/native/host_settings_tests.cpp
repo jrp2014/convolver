@@ -396,6 +396,44 @@ void settings_text() {
                 "gain -6 dB, mix 100% wet (inputs and outputs differ, so there is no dry "
                 "signal), latency 1024 frames",
             "settings words for unequal counts: " + settings_words(s, HostDrySignal::host_counts));
+    // PLUG-10: the Gain mode's words, with the figure each filter plays.
+    {
+        HostSettings mode{-6, 1, 0, GainMode::estimate};
+        const FilterGains both{-12.34, -6.02, false}, unestimated{std::nullopt, -6.02, false},
+            too_loud{std::nullopt, -6.02, true}, none{std::nullopt, std::nullopt, true};
+        for (const auto& [gains, words, note] :
+             {std::tuple{&both, "gain -12.3 dB (Estimate)", "-12.3 dB for this filter"},
+              std::tuple{&unestimated,
+                         "gain -6 dB (No clipping, until the filter's Estimate is found)",
+                         "-6 dB (No clipping until estimated)"},
+              std::tuple{&too_loud,
+                         "gain -6 dB (No clipping: the filter is too loud for an Estimate)",
+                         "-6 dB (No clipping: too loud to estimate)"},
+              std::tuple{&none,
+                         "gain by Estimate: silence, as the filter's peak is too large for a "
+                         "no-clipping figure",
+                         "silence: no figure for this filter"}}) {
+            require(gain_words(mode, gains) == words, "gain words: " + gain_words(mode, gains));
+            require(gain_note(mode, *gains, true) == note,
+                    "gain note: " + gain_note(mode, *gains, true));
+        }
+        require(gain_words(mode, nullptr) == "gain by Estimate" &&
+                    gain_note(mode, both, false) == "each filter plays at its own figure",
+                "gain words without a filter");
+        mode.gain_mode = GainMode::no_clipping;
+        require(settings_words(mode, HostDrySignal::present, &both) ==
+                    "gain -6 dB (No clipping), mix 100% wet, latency 0 frames",
+                "settings words in No clipping: " +
+                    settings_words(mode, HostDrySignal::present, &both));
+        require(gain_mode_line(mode, both, true) == "Gain mode set to No clipping: gain -6 dB (No "
+                                                    "clipping).",
+                "gain mode line: " + gain_mode_line(mode, both, true));
+        mode.gain_mode = GainMode::set;
+        require(gain_note(mode, both, true).empty() &&
+                    gain_mode_line(mode, both, true) ==
+                        "Gain mode set to Set: gain -6 dB, the Gain setting.",
+                "Set mode words: " + gain_mode_line(mode, both, true));
+    }
     // GarageBand's sliders give values like these (jrp's run of AU-6).
     for (const auto& [settings, words] :
          {std::pair{HostSettings{-75.967, .561413}, "gain -76 dB, mix 56.1% wet"},

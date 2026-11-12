@@ -293,7 +293,9 @@ void bundle(host::World& world) {
               std::tuple{lv2::latency_frames_port(ni, no), "latency_frames",
                          std::array<double, 3>{static_cast<double>(default_host_latency),
                                                static_cast<double>(host_latencies.front()),
-                                               static_cast<double>(host_latencies.back())}}}) {
+                                               static_cast<double>(host_latencies.back())}},
+              std::tuple{lv2::gain_mode_port(ni, no), "gain_mode",
+                         std::array<double, 3>{0, 0, gain_mode_count - 1.0}}}) {
             check(symbol(index) == name && lilv_port_is_a(p, port(index), control) &&
                       lilv_port_is_a(p, port(index), input) && range(index) == expected,
                   uri + ": " + name + " is control input " + std::to_string(index) +
@@ -1964,6 +1966,45 @@ void settings_ports(host::World& world, const fs::path& work) {
         p->run_empty();
         check(p->latency == 2048 && close_to(play_constant(*p, 8192).back(), .75 * from_db(-6)),
               "settings: reactivation keeps Gain and Latency");
+    }
+    // PLUG-10: the Gain mode. The filter is one tap of 0.5, so both
+    // No clipping and Estimate play it at 6 dB, and a constant input of 1
+    // comes out at 1; the Gain setting is kept for Set.
+    {
+        auto p = worker_instance(world, Worker::threaded);
+        p->gain = -6;
+        p->gain_mode = 2;
+        p->activate();
+        p->set_filter(original);
+        settle(*p);
+        check(close_to(play_constant(*p, 4096).back(), 1),
+              "settings: No clipping plays the filter's figure");
+        p->gain_mode = 1;
+        settle(*p);
+        check(close_to(play_constant(*p, 4096).back(), 1),
+              "settings: Estimate plays the filter's figure");
+        check(p->log.contains(LV2_LOG__Note, "Gain mode set to Estimate: gain 6 dB (Estimate)."),
+              "settings: the log says the Gain mode changed");
+        p->gain_mode = 0;
+        settle(*p);
+        check(close_to(play_constant(*p, 4096).back(), .5 * from_db(-6)),
+              "settings: Set plays the Gain setting again");
+        // Any other value counts as the nearest mode.
+        p->gain_mode = 7;
+        settle(*p);
+        check(close_to(play_constant(*p, 4096).back(), 1),
+              "settings: a Gain mode above the last counts as No clipping");
+        // Chosen while inactive: the activation finds Estimate's figure.
+        p->deactivate();
+        p->gain_mode = 1;
+        p->activate();
+        check(close_to(play_constant(*p, 4096).back(), 1),
+              "settings: Estimate chosen while inactive plays from the activation");
+        // A filter loaded in Estimate plays at its own figure.
+        p->set_filter(b);
+        settle(*p);
+        check(close_to(play_constant(*p, 4096).back(), 1),
+              "settings: a filter loaded in Estimate plays at its own figure");
     }
     // Free-wheeling (work() inside run()): the new Latency plays from the next call.
     {

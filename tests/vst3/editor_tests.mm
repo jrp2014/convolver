@@ -93,10 +93,28 @@ void window() {
             "status " + text(shown.statusField.stringValue));
     require([shown.titleField.stringValue rangeOfString:@"VST3 #"].location != NSNotFound,
             "title " + text(shown.titleField.stringValue));
-    require(shown.settingSliders.count == 2 && shown.settingMenus.count == 1 &&
-                shown.settingMenus[0].numberOfItems == 8 &&
-                [shown.settingMenus[0].titleOfSelectedItem isEqualToString:@"0 frames"],
+    require(shown.settingSliders.count == 2 && shown.settingMenus.count == 2 &&
+                shown.settingMenus[1].numberOfItems == 8 &&
+                [shown.settingMenus[1].titleOfSelectedItem isEqualToString:@"0 frames"],
             "settings rows");
+    // PLUG-10: the Gain mode menu, with what the mode plays beside it.
+    NSPopUpButton* mode = shown.settingMenus[0];
+    require(mode.numberOfItems == 3 && [mode.titleOfSelectedItem isEqualToString:@"Set"] &&
+                shown.settingValues[1].stringValue.length == 0,
+            "Gain mode row " + text(shown.settingValues[1].stringValue));
+    handler.edits.clear();
+    [mode selectItemAtIndex:2];
+    [mode sendAction:mode.action to:mode.target];
+    [shown refresh];
+    require(handler.kinds(gain_mode_id) == "bpe" &&
+                p.settings().gain_mode == convolver::GainMode::no_clipping &&
+                [shown.settingValues[1].stringValue
+                    isEqualToString:@"each filter plays at its own figure"],
+            "Gain mode choice: " + handler.kinds(gain_mode_id) + ", " +
+                text(shown.settingValues[1].stringValue));
+    [mode selectItemAtIndex:0];
+    [mode sendAction:mode.action to:mode.target];
+    require(p.settings().gain_mode == convolver::GainMode::set, "Gain mode back to Set");
 
     // A Gain the host set shows in the window; Option-click's reset is one
     // edit of the parameter, as the SDK asks of an editor.
@@ -116,15 +134,15 @@ void window() {
     // and reports it, the host is asked to restart, and the window shows the
     // time it adds.
     handler.edits.clear();
-    NSPopUpButton* latency = shown.settingMenus[0];
+    NSPopUpButton* latency = shown.settingMenus[1];
     [latency selectItemAtIndex:5];
     [latency sendAction:latency.action to:latency.target];
     require(handler.kinds(latency_id) == "bpe" && p.settings().latency == 1024 &&
                 p.getLatencySamples() == 1024 && handler.latency_restarts == 1,
             "Latency choice: " + handler.kinds(latency_id));
     [shown refresh];
-    require([shown.settingValues[2].stringValue isEqualToString:@"adds 21.3 ms"],
-            "Latency note " + text(shown.settingValues[2].stringValue));
+    require([shown.settingValues[3].stringValue isEqualToString:@"adds 21.3 ms"],
+            "Latency note " + text(shown.settingValues[3].stringValue));
     // A choice whose processor cannot be built is not in use yet; the next
     // activation builds it.
     latency_preparation_for_tests = [] { throw std::runtime_error("test"); };
@@ -135,15 +153,15 @@ void window() {
                 handler.latency_restarts == 2,
             "failed Latency choice");
     [shown refresh];
-    require([shown.settingValues[2].stringValue rangeOfString:@"not in use yet"].location !=
+    require([shown.settingValues[3].stringValue rangeOfString:@"not in use yet"].location !=
                 NSNotFound,
-            "Latency note after a failed choice " + text(shown.settingValues[2].stringValue));
+            "Latency note after a failed choice " + text(shown.settingValues[3].stringValue));
     require(p.setActive(false) == kResultOk && p.setActive(true) == kResultOk &&
                 p.getLatencySamples() == 2048,
             "restart");
     [shown refresh];
-    require([shown.settingValues[2].stringValue isEqualToString:@"adds 42.7 ms"],
-            "Latency note after the restart " + text(shown.settingValues[2].stringValue));
+    require([shown.settingValues[3].stringValue isEqualToString:@"adds 42.7 ms"],
+            "Latency note after the restart " + text(shown.settingValues[3].stringValue));
 
     // Bypass: a click is one edit of the bypass parameter, and the host's
     // own bypass shows in the checkbox.
@@ -344,7 +362,7 @@ void mix_note() {
                     !shown.mixNoteField.superview.hidden &&
                     [shown.mixNoteField.stringValue rangeOfString:@"Mix has no effect"].location !=
                         NSNotFound &&
-                    !shown.settingSliders[1].enabled && !shown.settingValues[1].enabled &&
+                    !shown.settingSliders[1].enabled && !shown.settingValues[2].enabled &&
                     shown.settingSliders[0].enabled,
                 "Mix not dimmed with a note, refresh " + std::to_string(i) + ": " +
                     text(shown.mixNoteField.stringValue));

@@ -150,6 +150,7 @@ WindowContent window_content(const ReportFields* report, bool can_load) {
         c.audio = audio_facts(field(r, "audio"));
         c.reference = reference_lines(field(r, "reference"));
         c.mix_note = field(r, "mix note");
+        c.gain_note = field(r, "gain note");
         c.sample_rate = std::atoi(field(r, "sample rate").c_str());
         c.latency_waits = field(r, "latency waits") == "yes";
         c.log_path = field(r, "log path");

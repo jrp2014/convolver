@@ -654,8 +654,8 @@ std::optional<HostPlayback> HostFilter::estimate(bool on) {
     auto playback = filter_playback(*filter_);
     playback.gains = gains;
     gains_ = gains; // After everything that may throw.
-    if (activation_failure_)
-        return std::nullopt; // It does not suit the host: silence plays.
+    if (activation_failure_ || failed_)
+        return std::nullopt; // It does not suit the host, or failed: silence plays.
     return playback;
 }
 

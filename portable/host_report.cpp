@@ -409,7 +409,9 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
     // and a failed load with no filter kept has no dry signal whatever the
     // host (jrp, 7 November 2026), as Status says.
     const auto dry = host ? dry_signal_rule(filter, *host) : dry_signal_before_host(filter);
-    r.settings = settings_words(facts.settings, dry);
+    const auto* gains = filter.filter() ? &filter.gains() : nullptr;
+    r.settings = settings_words(facts.settings, dry, gains);
+    r.gain_note = gain_note(facts.settings, filter.gains(), gains != nullptr);
     if (dry != HostDrySignal::present) { // PLUG-23 (dry_signal_rule()).
         r.mix_note = std::string(no_dry_reason(dry)) +
                      ", so there is no dry signal: Mix has no effect, and bypass plays silence.";
@@ -498,6 +500,7 @@ std::vector<std::pair<std::string, std::string>> report_fields(const HostReport&
             {"sample rate", r.sample_rate ? std::to_string(r.sample_rate) : std::string()},
             {"latency waits", r.latency_waits ? "yes" : "no"},
             {"mix note", r.mix_note},
+            {"gain note", r.gain_note},
             {"audio", audio},
             {"reference", reference},
             {"log path", r.log_path},

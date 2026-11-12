@@ -1261,7 +1261,7 @@ void status_and_log() {
     require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk,
             "status initialize");
     ParameterInfo info{};
-    require(c.getParameterCount() == 5 && c.getParameterInfo(4, info) == kResultOk &&
+    require(c.getParameterCount() == 6 && c.getParameterInfo(5, info) == kResultOk &&
                 info.id == status_id && (info.flags & ParameterInfo::kIsReadOnly) &&
                 (info.flags & ParameterInfo::kIsList) &&
                 !(info.flags & ParameterInfo::kCanAutomate) && info.stepCount == 5,
@@ -1805,9 +1805,10 @@ void settings_parameters() {
     require(c.setComponentHandler(&handler) == kResultOk, "settings handler");
     require(p.connect(&c) == kResultOk && c.connect(&p) == kResultOk, "settings connect");
     // The settings first, then Bypass and Status, with their IDs and flags.
-    const std::array<ParamID, 5> order{gain_id, mix_id, latency_id, bypass_id, status_id};
-    require(c.getParameterCount() == 5, "settings parameter count");
-    for (int32 i = 0; i < 5; ++i) {
+    const std::array<ParamID, 6> order{gain_id,    gain_mode_id, mix_id,
+                                       latency_id, bypass_id,    status_id};
+    require(c.getParameterCount() == 6, "settings parameter count");
+    for (int32 i = 0; i < 6; ++i) {
         ParameterInfo info{};
         require(c.getParameterInfo(i, info) == kResultOk && info.id == order[i],
                 "settings parameter order");
@@ -1824,6 +1825,10 @@ void settings_parameters() {
                 "Gain near 0 dB from a float host");
         if (info.id == mix_id)
             require(automatable && info.defaultNormalizedValue == 1, "Mix parameter");
+        if (info.id == gain_mode_id)
+            require(!automatable && (info.flags & ParameterInfo::kIsList) && info.stepCount == 2 &&
+                        gain_mode(info.defaultNormalizedValue) == convolver::GainMode::set,
+                    "Gain mode parameter");
         if (info.id == latency_id)
             require(!automatable && (info.flags & ParameterInfo::kIsList) && info.stepCount == 7 &&
                         latency_frames(info.defaultNormalizedValue) == 0,
@@ -1838,7 +1843,9 @@ void settings_parameters() {
         return ascii;
     };
     require(text(gain_id, normalized_gain(-6.5)) == "-6.5" && text(mix_id, .25) == "25" &&
-                text(latency_id, normalized_latency(1024)) == "1024 frames",
+                text(latency_id, normalized_latency(1024)) == "1024 frames" &&
+                text(gain_mode_id, normalized_gain_mode(convolver::GainMode::no_clipping)) ==
+                    "No clipping",
             "settings value text");
     // Hosts find the wet/dry mix by its function name.
     IParameterFunctionName* function = nullptr;
@@ -2072,6 +2079,161 @@ void settings_parameters() {
                 "an earlier project's Latency changed in the controller");
     }
     handler.on_restart = nullptr;
+    p.setProcessing(false);
+    p.setActive(false);
+    p.disconnect(&c);
+    c.disconnect(&p);
+    c.terminate();
+    p.terminate();
+}
+// PLUG-10: the Gain mode. Estimate and No clipping play the filter's own
+// figure, found on the control side when the mode is chosen (Estimate) or
+// as the filter loads, and the mode travels in host state version 4.
+void gain_modes() {
+    using convolver::GainMode;
+    const auto contains = [](const std::string& text, const char* part) {
+        return text.find(part) != std::string::npos;
+    };
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk && p.connect(&c) == kResultOk &&
+                c.connect(&p) == kResultOk,
+            "gain modes initialize");
+    SpeakerArrangement mono = SpeakerArr::kMono;
+    require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "gain modes buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    // 64 taps of 1/64: a constant input of 1 comes out at 1 times the gain.
+    // The no-clipping figure is 0 dB; the noise estimate is well above it.
+    convolver::HostState two;
+    two.configuration = convolver::Configuration{
+        48000, 1, 1, 0, {}, {}, {{std::vector<float>(64, 1.f / 64), {{0, 1}}, {{0, 1}}}}};
+    const auto figures = convolver::filter_gains(*two.configuration);
+    require(figures.estimate_db && figures.no_clipping_db && *figures.estimate_db > 3 &&
+                std::abs(*figures.no_clipping_db) < 1e-6,
+            "gain modes figures");
+    const auto level = [](double db) { return static_cast<float>(std::pow(10.0, db / 20)); };
+    MemoryStream state;
+    require(write_state(&state, two), "gain modes state");
+    state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&state) == kResultOk, "gain modes restore");
+    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk &&
+                p.setProcessing(true) == kResultOk,
+            "gain modes activate");
+    std::array<float, 512> in{}, out{};
+    float* ins[] = {in.data()};
+    float* outs[] = {out.data()};
+    AudioBusBuffers input{}, output{};
+    input.numChannels = output.numChannels = 1;
+    input.channelBuffers32 = ins;
+    output.channelBuffers32 = outs;
+    ProcessData d{};
+    d.symbolicSampleSize = kSample32;
+    d.numInputs = d.numOutputs = 1;
+    d.inputs = &input;
+    d.outputs = &output;
+    d.numSamples = 512;
+    in.fill(1);
+    // Past a replacement's warm-up block and crossfade, and the gain ramp.
+    const auto settle = [&] {
+        for (int b = 0; b < 4; ++b)
+            require(p.process(d) == kResultOk, "gain modes process");
+        return out[511];
+    };
+    const auto choose = [&](GainMode mode) {
+        return c.setParamNormalized(gain_mode_id, normalized_gain_mode(mode)) == kResultOk &&
+               p.settings().gain_mode == mode;
+    };
+    // The Gain setting is kept while another mode plays.
+    c.setParamNormalized(gain_id, normalized_gain(-6));
+    ParameterChanges gain;
+    int32 index = 0;
+    gain.addParameterData(gain_id, index)->addPoint(0, normalized_gain(-6), index);
+    d.inputParameterChanges = &gain;
+    require(p.process(d) == kResultOk, "gain modes Gain");
+    d.inputParameterChanges = nullptr;
+    require(std::abs(settle() - level(-6)) < 1e-5, "Set mode does not play the Gain setting");
+    {
+        const convolver::test_log::LogSince log(process_log);
+        require(choose(GainMode::no_clipping) && std::abs(settle() - 1) < 1e-5,
+                "No clipping does not play the filter's no-clipping figure");
+        require(contains(log.text(), "Gain mode set to No clipping: gain 0 dB (No clipping)."),
+                "No clipping not logged");
+    }
+    {
+        const convolver::test_log::LogSince log(process_log);
+        require(choose(GainMode::estimate), "Estimate not chosen");
+        require(std::abs(settle() - level(*figures.estimate_db)) < 1e-4,
+                "Estimate does not play the filter's estimate");
+        require(contains(log.text(), "Gain mode set to Estimate: gain ") &&
+                    contains(log.text(), " dB (Estimate)."),
+                "Estimate not logged");
+    }
+    const auto version = [](MemoryStream& s) {
+        std::array<unsigned char, 12> head{};
+        int32 got = 0;
+        s.seek(0, IBStream::kIBSeekSet, nullptr);
+        s.read(head.data(), 12, &got);
+        s.seek(0, IBStream::kIBSeekSet, nullptr);
+        return got == 12 ? head[8] : 0;
+    };
+    MemoryStream saved;
+    require(p.getState(&saved) == kResultOk && version(saved) == 4,
+            "a Gain mode not saved as state version 4");
+    {
+        const auto restored = read_state(&saved);
+        require(restored.settings && restored.settings->gain_mode == GainMode::estimate &&
+                    std::abs(restored.settings->gain_db + 6) < 1e-9,
+                "saved Gain mode");
+    }
+    // The controller reads the mode from the state without sending it back.
+    {
+        Controller other;
+        require(other.initialize(&context) == kResultOk, "gain modes second controller");
+        saved.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(other.setComponentState(&saved) == kResultOk &&
+                    gain_mode(other.getParamNormalized(gain_mode_id)) == GainMode::estimate,
+                "controller did not read the Gain mode");
+        other.terminate();
+    }
+    // A new instance restoring the state plays the estimate from its first
+    // block, found as the state loaded.
+    {
+        Processor fresh;
+        require(fresh.initialize(&context) == kResultOk &&
+                    fresh.setBusArrangements(&mono, 1, &mono, 1) == kResultOk,
+                "gain modes fresh processor");
+        fresh.activateBus(kAudio, kInput, 0, true);
+        fresh.activateBus(kAudio, kOutput, 0, true);
+        saved.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(fresh.setState(&saved) == kResultOk &&
+                    fresh.settings().gain_mode == GainMode::estimate,
+                "restore a Gain mode");
+        require(fresh.setupProcessing(setup) == kResultOk && fresh.setActive(true) == kResultOk &&
+                    fresh.setProcessing(true) == kResultOk,
+                "gain modes fresh activate");
+        require(fresh.process(d) == kResultOk && fresh.process(d) == kResultOk &&
+                    std::abs(out[511] - level(*figures.estimate_db)) < 1e-4,
+                "a restored Estimate does not play the estimate at once");
+        fresh.setProcessing(false);
+        fresh.setActive(false);
+        fresh.terminate();
+    }
+    // A state without a mode brings Set back, at the state's Gain.
+    state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&state) == kResultOk && p.settings().gain_mode == GainMode::set &&
+                std::abs(settle() - 1) < 1e-5,
+            "an older state kept the Gain mode");
+    // Back in Set, the setting plays, and a state at the defaults is version 1.
+    require(choose(GainMode::no_clipping) && choose(GainMode::set) && std::abs(settle() - 1) < 1e-5,
+            "Set after the other modes");
+    MemoryStream plain;
+    require(p.getState(&plain) == kResultOk && version(plain) == 1,
+            "Set at the defaults not saved as state version 1");
     p.setProcessing(false);
     p.setActive(false);
     p.disconnect(&c);
@@ -3142,6 +3304,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"fractional_rates", fractional_rates},
         {"controller_conversions", controller_conversions},
         {"settings_parameters", settings_parameters},
+        {"gain_modes", gain_modes},
         {"latency_while_playing", latency_while_playing},
         {"latency_handover_waits", latency_handover_waits},
         {"report_and_files", report_and_files},

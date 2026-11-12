@@ -227,8 +227,63 @@ std::string setting_text(double value, double low, double high) {
     return out;
 }
 
-std::string settings_words(const HostSettings& s, HostDrySignal dry) {
-    const auto gain = "gain " + setting_text(s.gain_db, min_gain_db, max_gain_db) + " dB";
+namespace {
+// A filter's figure in decibels, as setting_text() writes it; figures are
+// not limited to the Gain setting's range.
+std::string figure_text(double db) {
+    return setting_text(db, -1e9, 1e9) + " dB";
+}
+} // namespace
+
+std::string gain_words(const HostSettings& s, const FilterGains* gains) {
+    if (s.gain_mode == GainMode::set)
+        return "gain " + setting_text(s.gain_db, min_gain_db, max_gain_db) + " dB";
+    const std::string mode = gain_mode_name(s.gain_mode);
+    if (!gains)
+        return "gain by " + mode;
+    const auto played = applied_gain_db(s, *gains);
+    if (!played)
+        return "gain by " + mode +
+               ": silence, as the filter's peak is too large for a no-clipping figure";
+    if (s.gain_mode == GainMode::estimate && !gains->estimate_db)
+        return "gain " + figure_text(*played) +
+               (gains->estimate_failed ? " (No clipping: the filter is too loud for an Estimate)"
+                                       : " (No clipping, until the filter's Estimate is found)");
+    return "gain " + figure_text(*played) + " (" + mode + ")";
+}
+
+std::string gain_mode_line(const HostSettings& s, const FilterGains& gains, bool has_filter,
+                           const std::string& why) {
+    auto line = std::string("Gain mode set to ") + gain_mode_name(s.gain_mode);
+    if (s.gain_mode == GainMode::set)
+        line += ": " + gain_words(s, &gains) + ", the Gain setting.";
+    else if (!has_filter)
+        line += ". No filter is loaded; a filter loaded plays at its own figure.";
+    else
+        line += ": " + gain_words(s, &gains) + ".";
+    if (!why.empty())
+        line += " The filter's estimate could not be found (" + detail::advice_problem(why) +
+                "); choose Estimate again to retry.";
+    return line;
+}
+
+std::string gain_note(const HostSettings& s, const FilterGains& gains, bool has_filter) {
+    if (s.gain_mode == GainMode::set)
+        return {};
+    if (!has_filter)
+        return "each filter plays at its own figure";
+    const auto played = applied_gain_db(s, gains);
+    if (!played)
+        return "silence: no figure for this filter";
+    if (s.gain_mode == GainMode::estimate && !gains.estimate_db)
+        return figure_text(*played) + (gains.estimate_failed
+                                           ? " (No clipping: too loud to estimate)"
+                                           : " (No clipping until estimated)");
+    return figure_text(*played) + " for this filter";
+}
+
+std::string settings_words(const HostSettings& s, HostDrySignal dry, const FilterGains* gains) {
+    const auto gain = gain_words(s, gains);
     const auto latency = ", latency " + std::to_string(s.latency) + " frames";
     if (dry != HostDrySignal::present)
         return gain + ", mix 100% wet (" + no_dry_reason(dry) + ", so there is no dry signal)" +
@@ -291,7 +346,10 @@ std::string started_line(const HostFilter& filter, const HostLayout& host, std::
                 ", blocks of up to " + std::to_string(max_frames) + " frames. " +
                 playing_words(filter, host, settings ? *settings : HostSettings{});
     if (settings)
-        line += " Settings: " + settings_words(*settings, dry_signal_rule(filter, host)) + ".";
+        line += " Settings: " +
+                settings_words(*settings, dry_signal_rule(filter, host),
+                               filter.filter() ? &filter.gains() : nullptr) +
+                ".";
     return line;
 }
 

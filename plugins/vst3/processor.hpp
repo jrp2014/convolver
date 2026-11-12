@@ -115,6 +115,16 @@ inline constexpr Steinberg::Vst::ParamID gain_id = identity::vst3_gain_parameter
 inline constexpr Steinberg::Vst::ParamID mix_id = identity::vst3_mix_parameter_id;
 inline constexpr Steinberg::Vst::ParamID latency_id = identity::vst3_latency_parameter_id;
 inline constexpr const char* latency_message = "ConvolverLatency";
+// PLUG-10: Gain mode (Set, Estimate or No clipping) is a list, not
+// automatable, as Latency: Estimate may filter noise for a long filter
+// before it can play, which the audio thread must not do. The controller
+// passes a new choice to the processor in a gain_mode_message ("mode", the
+// GainMode as an integer); the processor finds the estimate if it needs it,
+// publishes the filter with it (the crossfade covers the change) and then
+// plays the new mode. Saved in the component state (host state version 4
+// when not Set).
+inline constexpr Steinberg::Vst::ParamID gain_mode_id = identity::vst3_gain_mode_parameter_id;
+inline constexpr const char* gain_mode_message = "ConvolverGainMode";
 // PLUG-22: the controller's bypass_message ("bypass": 0 or 1) when the host
 // or the window changes Bypass, so the Status reads Bypassed at once rather
 // than when the audio thread next sees the change.
@@ -131,6 +141,8 @@ double gain_db(Steinberg::Vst::ParamValue) noexcept;
 Steinberg::Vst::ParamValue normalized_gain(double gain_db) noexcept;
 std::size_t latency_frames(Steinberg::Vst::ParamValue) noexcept;
 Steinberg::Vst::ParamValue normalized_latency(std::size_t frames) noexcept;
+GainMode gain_mode(Steinberg::Vst::ParamValue) noexcept;
+Steinberg::Vst::ParamValue normalized_gain_mode(GainMode) noexcept;
 // One input and one output bus, each with 1 to 8 channels (counts may differ).
 inline constexpr int min_bus_channels = identity::min_channels;
 inline constexpr int max_bus_channels = identity::max_channels;
@@ -172,8 +184,8 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     Steinberg::tresult PLUGIN_API setState(Steinberg::IBStream*) override;
     Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream*) override;
     Steinberg::tresult PLUGIN_API connect(Steinberg::Vst::IConnectionPoint*) override;
-    // The controller's faults_message, latency_message, report_message and
-    // load_message.
+    // The controller's faults_message, latency_message, gain_mode_message,
+    // report_message and load_message.
     Steinberg::tresult PLUGIN_API notify(Steinberg::Vst::IMessage*) override;
     // The filter's advisory notice (HostFilter::notice), for example output
     // speakers that differ from the host's arrangement; logged when it changes.
@@ -222,6 +234,12 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // (VST3-16); if it cannot be built, the running one keeps playing and the
     // log says why. Never throws.
     void choose_latency(std::size_t frames) noexcept;
+    // PLUG-10, under control_: a Gain mode chosen in the controller or
+    // restored. Estimate finds the filter's estimate first if it has none
+    // (HostFilter::estimate) and, while active, publishes the filter with it.
+    // If finding it fails, Estimate plays the no-clipping figure and the log
+    // says why. Never throws.
+    void choose_gain_mode(GainMode) noexcept;
     // VST3-16: the processor the audio thread plays. Under control_,
     // install_processor() makes `next` the one played and returns the
     // previous one; release_processor() then waits until process() or
@@ -296,6 +314,8 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // restored), and the chosen Latency in frames.
     std::atomic<double> gain_db_{0}, mix_{1};
     std::atomic<std::size_t> latency_{default_host_latency};
+    // PLUG-10: the Gain mode the audio thread plays (choose_gain_mode()).
+    std::atomic<GainMode> gain_mode_{GainMode::set};
     // The running processor's latency; `inactive` while inactive (0 is a
     // latency since PERF-2).
     static constexpr std::size_t inactive = std::numeric_limits<std::size_t>::max();

@@ -24,6 +24,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     NSInteger gesture_;  // The setting whose edit is open (its begin called), or -1.
     int sampleRate_;     // The host's, for the Latency row; 0 before it starts.
     BOOL latencyWaits_;  // The chosen Latency is not in use yet.
+    NSString* gainNote_; // PLUG-10: what the Gain mode plays (the report's gain note).
 }
 
 - (instancetype)initWithSettings:(NSArray<NSDictionary<NSString*, id>*>*)settings
@@ -48,7 +49,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
         NSTextField* value = nil;
         NSArray<NSString*>* choices = setting[@"choices"];
         if ([choices isKindOfClass:[NSArray class]]) {
-            // A choice from a list (Latency): the item's index is the value.
+            // A choice from a list (Gain mode, Latency): the item's index is the value.
             NSPopUpButton* menu = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:NO];
             [menu addItemsWithTitles:choices];
             menu.target = self;
@@ -164,7 +165,9 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
         const auto index = static_cast<NSInteger>(std::lround(value));
         if (index >= 0 && index < menu.numberOfItems && menu.indexOfSelectedItem != index)
             [menu selectItemAtIndex:index];
-        _values[i].stringValue = [self latencyNote:menu];
+        // PLUG-10: the Gain mode's menu shows the gain it plays instead.
+        _values[i].stringValue =
+            [settings_[i][@"note"] isEqual:@"gain"] ? (gainNote_ ?: @"") : [self latencyNote:menu];
         return;
     }
     NSString* number = [self number:value of:settings_[i]];
@@ -310,9 +313,12 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
 
 // A drag ends when no mouse button is down (jrp's review: a button held
 // anywhere else must not freeze the sliders).
-- (void)readWithSampleRate:(int)sampleRate latencyWaits:(BOOL)latencyWaits {
+- (void)readWithSampleRate:(int)sampleRate
+              latencyWaits:(BOOL)latencyWaits
+                  gainNote:(NSString*)gainNote {
     sampleRate_ = sampleRate;
     latencyWaits_ = latencyWaits;
+    gainNote_ = [gainNote copy];
     if (dragging_ >= 0 && [NSEvent pressedMouseButtons] == 0) {
         dragging_ = -1; // The drag ended without a final action.
         [self endGesture];

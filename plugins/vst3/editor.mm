@@ -89,7 +89,7 @@ NSDictionary<NSString*, id>* setting(const SharedLink& link, ParamID tag, NSStri
     };
 }
 
-// A setting chosen from a list (Latency) as the window's menu: the item
+// A setting chosen from a list (Gain mode, Latency) as the window's menu: the item
 // names the controller gives, the value an item's index.
 NSDictionary<NSString*, id>* choice(const SharedLink& link, ParamID tag, NSString* name,
                                     NSString* tip) {
@@ -163,6 +163,18 @@ Editor::Editor(Controller& controller) : EditorView(&controller), link_(std::mak
     NSMutableArray<NSDictionary<NSString*, id>*>* settings = [NSMutableArray array];
     if (NSDictionary<NSString*, id>* gain = setting(link_, gain_id, @"Gain", @" dB"))
         [settings addObject:gain];
+    // PLUG-10: beside the menu, the gain the mode plays (the report's gain note).
+    if (NSDictionary<NSString*, id>* mode =
+            choice(link_, gain_mode_id, @"Gain mode",
+                   @"Which gain plays. Set: the Gain setting. Estimate: the filter's own estimate, "
+                   @"from noise played through it, as convolver --gain-db auto finds. No "
+                   @"clipping: the most the filter can amplify any input, so it can never clip, "
+                   @"as convolver --gain-db no-clip. Each filter plays at its own figure; the "
+                   @"Gain setting is kept for Set.")) {
+        NSMutableDictionary<NSString*, id>* noted = [mode mutableCopy];
+        noted[@"note"] = @"gain";
+        [settings addObject:noted];
+    }
     if (NSDictionary<NSString*, id>* mix = setting(link_, mix_id, @"Mix", @"% wet")) {
         NSMutableDictionary<NSString*, id>* ends = [mix mutableCopy];
         ends[@"low"] = @"Dry"; // As reverbs label a wet/dry slider.

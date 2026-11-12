@@ -11,8 +11,8 @@ namespace convolver::lv2 {
 // Every layout has the three control ports first, then its audio inputs
 // (symbols in_1 ... in_N), then its audio outputs (out_1 ... out_M), then the
 // two atom ports for patch messages (symbols control and notify), then the
-// three settings ports (LV2-7: gain, mix and latency_frames), last so that
-// the earlier ports keep their numbers.
+// settings ports (LV2-7: gain, mix and latency_frames; PLUG-10: gain_mode),
+// each added last so that the earlier ports keep their numbers.
 inline constexpr std::uint32_t enabled_port = 0; // lv2:enabled: 1 processes, 0 bypasses.
 inline constexpr std::uint32_t latency_port = 1; // Output: the reported latency in frames.
 inline constexpr std::uint32_t status_port = 2;  // Output: one of the Status values.
@@ -40,8 +40,15 @@ constexpr std::uint32_t mix_port(std::size_t inputs, std::size_t outputs) {
 constexpr std::uint32_t latency_frames_port(std::size_t inputs, std::size_t outputs) {
     return notify_port(inputs, outputs) + 3;
 }
+// PLUG-10: the Gain mode, a GainMode (0 Set, 1 Estimate, 2 No clipping;
+// default 0); other values count as the nearest. Estimate's figure is found
+// on the worker thread when the mode is chosen, or at activation, and the
+// filter with it is published; until then Estimate plays No clipping's.
+constexpr std::uint32_t gain_mode_port(std::size_t inputs, std::size_t outputs) {
+    return notify_port(inputs, outputs) + 4;
+}
 constexpr std::uint32_t port_count(std::size_t inputs, std::size_t outputs) {
-    return latency_frames_port(inputs, outputs) + 1;
+    return gain_mode_port(inputs, outputs) + 1;
 }
 // Size the atom ports ask for (rsz:minimumSize): a patch message with the
 // longest path the plug-in accepts.

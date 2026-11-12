@@ -383,6 +383,12 @@ class HostFilter {
     bool estimating() const noexcept {
         return estimating_;
     }
+    // Sets estimating() alone, for an adapter about to restore state that
+    // has Estimate chosen: the state's filter gets its estimate as it loads,
+    // and the filter it replaces none.
+    void set_estimating(bool on) noexcept {
+        estimating_ = on;
+    }
     // PLUG-22: configuration_identity() of filter(), found when it was
     // accepted, so a report never computes it; 0 without one.
     std::uint64_t filter_identity() const noexcept {

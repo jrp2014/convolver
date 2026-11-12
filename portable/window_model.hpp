@@ -70,6 +70,9 @@ struct WindowContent {
     std::vector<ReferenceLine> reference;
     // PLUG-23: why Mix has no effect; empty while it applies.
     std::string mix_note;
+    // PLUG-10: beside the Gain mode menu, the gain the mode plays; empty in
+    // Set mode.
+    std::string gain_note;
     int sample_rate = 0; // The host's, for the Latency row; 0 before it starts.
     bool latency_waits = false;
     std::string log_path;

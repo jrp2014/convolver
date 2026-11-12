@@ -115,6 +115,18 @@ NSDictionary<NSString*, id>* choice(AudioUnit unit, AudioUnitParameterID paramet
     if (NSDictionary<NSString*, id>* gain =
             setting(unit, convolver::identity::au_gain_parameter_id, @"Gain", @" dB"))
         [settings addObject:gain];
+    // PLUG-10: beside the menu, the gain the mode plays (the report's gain note).
+    if (NSDictionary<NSString*, id>* mode =
+            choice(unit, convolver::identity::au_gain_mode_parameter_id, @"Gain mode",
+                   @"Which gain plays. Set: the Gain setting. Estimate: the filter's own estimate, "
+                   @"from noise played through it, as convolver --gain-db auto finds. No "
+                   @"clipping: the most the filter can amplify any input, so it can never clip, "
+                   @"as convolver --gain-db no-clip. Each filter plays at its own figure; the "
+                   @"Gain setting is kept for Set.")) {
+        NSMutableDictionary<NSString*, id>* noted = [mode mutableCopy];
+        noted[@"note"] = @"gain";
+        [settings addObject:noted];
+    }
     if (NSDictionary<NSString*, id>* mix =
             setting(unit, convolver::identity::au_mix_parameter_id, @"Mix", @"% wet")) {
         NSMutableDictionary<NSString*, id>* ends = [mix mutableCopy];

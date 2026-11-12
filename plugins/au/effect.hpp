@@ -8,9 +8,11 @@
 #include "host_report.hpp"
 #include "view_properties.hpp"
 #include <AudioUnitSDK/AUBase.h>
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -37,7 +39,21 @@ inline constexpr AudioUnitParameterID status_parameter = identity::au_status_par
 inline constexpr AudioUnitParameterID gain_parameter = identity::au_gain_parameter_id;
 inline constexpr AudioUnitParameterID mix_parameter = identity::au_mix_parameter_id;
 inline constexpr AudioUnitParameterID latency_parameter = identity::au_latency_parameter_id;
+// PLUG-10: Gain mode, an index of GainMode (Set, Estimate, No clipping), ID
+// 1002 (jrp, 12 November 2026). Applied on the Latency queue, as Latency is
+// (request_gain_mode()), since Estimate may need time to find the filter's
+// figure; Render plays the mode it holds.
+inline constexpr AudioUnitParameterID gain_mode_parameter = identity::au_gain_mode_parameter_id;
 inline constexpr AudioUnitParameterValue default_latency_index = 0;
+// A Gain mode value (an index) as a GainMode: rounded, within range, and Set
+// if it is not a number.
+inline GainMode gain_mode_at(AudioUnitParameterValue value) noexcept {
+    if (std::isnan(value))
+        return GainMode::set;
+    const auto last = static_cast<AudioUnitParameterValue>(gain_mode_count - 1);
+    return static_cast<GainMode>(
+        static_cast<int>(std::clamp<AudioUnitParameterValue>(std::round(value), 0, last)));
+}
 static_assert(host_latencies[0] == default_host_latency);
 // PERF-2: SaveState also writes the Latency in frames under this ClassInfo
 // key, so that a later change to the menu cannot change a saved Latency.
@@ -46,8 +62,8 @@ static_assert(host_latencies[0] == default_host_latency);
 inline constexpr std::string_view latency_frames_key = "convolver-latency-frames";
 // The global parameters in the order GetParameterList gives them, which
 // RestoreState also notifies.
-inline constexpr std::array<AudioUnitParameterID, 4> parameter_order{
-    gain_parameter, mix_parameter, latency_parameter, status_parameter};
+inline constexpr std::array<AudioUnitParameterID, 5> parameter_order{
+    gain_parameter, gain_mode_parameter, mix_parameter, latency_parameter, status_parameter};
 
 // For the tests only, never offered to hosts as a feature: a custom global
 // property (custom IDs start at 64000) giving the PLUG-8 failure record, which
@@ -268,9 +284,16 @@ class Effect final : public ausdk::AUBase {
     // its own bit of the source's data (request_status()), and such a run
     // only shows the bypass in the Status: it does not touch the Latency
     // (AU-16).
-    static constexpr std::uintptr_t latency_wake = 1, status_wake = 2;
+    // PLUG-10: a new Gain mode wakes the queue with its own bit
+    // (gain_mode_wake): the run finds the filter's estimate if Estimate
+    // needs it (HostFilter::estimate), publishes the filter with it and logs
+    // the mode.
+    static constexpr std::uintptr_t latency_wake = 1, status_wake = 2, gain_mode_wake = 4;
     void request_latency() noexcept {
         wake(latency_wake);
+    }
+    void request_gain_mode() noexcept {
+        wake(gain_mode_wake);
     }
     void request_status() noexcept {
         wake(status_wake);
@@ -298,6 +321,8 @@ class Effect final : public ausdk::AUBase {
     std::atomic<bool> reset_requested_{false};
     std::atomic<std::size_t> tail_{0};
     std::atomic<std::size_t> latency_{default_host_latency}; // In frames; see GetLatency.
+    // PLUG-10, under control_: the Gain mode the queue last applied and logged.
+    GainMode applied_gain_mode_ = GainMode::set;
     // The rate and channels of the current or last initialization, whether
     // it has rendered, and the last initialization that did. Uninitialized,
     // the host's configuration counts as known only while it still matches

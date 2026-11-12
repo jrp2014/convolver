@@ -186,6 +186,8 @@ Effect::Effect(AudioComponentInstance instance)
     Globals()->SetParameter(mix_parameter,
                             static_cast<AudioUnitParameterValue>(100 * defaults.mix));
     Globals()->SetParameter(latency_parameter, default_latency_index);
+    Globals()->SetParameter(gain_mode_parameter,
+                            static_cast<AudioUnitParameterValue>(defaults.gain_mode));
     main_notices_ = std::make_unique<MainNotices>(*this);
     latency_queue_ = std::make_unique<LatencyQueue>(*this);
 }
@@ -390,8 +392,8 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
         hook(GetComponentInstance());
     // Before the settings are read: the requests this run is sure to see.
     const auto seen = latency_requests_.load();
-    std::string message, faults, bypass_faults;
-    bool changed = false, problem = false, bypass_shown = false;
+    std::string message, faults, bypass_faults, mode_message;
+    bool changed = false, problem = false, bypass_shown = false, mode_problem = false;
     std::unique_ptr<HostProcessor> previous;
     {
         std::lock_guard lock(control_);
@@ -455,6 +457,34 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
             }
             update_status();
         }
+        // PLUG-10: a new Gain mode. Estimate's figure is found here, off the
+        // audio thread, and the filter with it is published: Render, which
+        // plays the parameter's mode, crossfades to it. Until then Estimate
+        // plays the no-clipping figure.
+        const bool estimate = current.gain_mode == GainMode::estimate;
+        if ((wakes & gain_mode_wake) &&
+            (current.gain_mode != applied_gain_mode_ || filter_.estimating() != estimate)) {
+            std::string why;
+            try {
+                if (auto playback = filter_.estimate(estimate); playback && host_)
+                    host_->replace(*playback);
+            } catch (const std::exception& e) {
+                try {
+                    why = e.what();
+                } catch (...) {
+                }
+            } catch (...) {
+            }
+            applied_gain_mode_ = current.gain_mode;
+            try { // Best effort: out of memory for the message changes nothing else.
+                mode_message =
+                    gain_mode_line(current, filter_.gains(), filter_.filter().has_value(), why);
+                mode_problem = !why.empty() ||
+                               (filter_.filter() && !applied_gain_db(current, filter_.gains()));
+            } catch (...) {
+            }
+            update_status();
+        }
         // AU-16: a bypass switched while another call held the lock
         // (SetProperty) is shown here, with Render's faults explained first
         // as SetProperty does. Not needed when the update above read it.
@@ -471,13 +501,14 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
     log_faults(faults);
     log_faults(bypass_faults);
     log(message, problem);
+    log(mode_message, mode_problem);
     if (changed) {
         try {
             timing_changed();
         } catch (...) {
         }
     }
-    if (!message.empty() || problem || bypass_shown)
+    if (!message.empty() || problem || bypass_shown || !mode_message.empty())
         notify_status();
     // Finished: the tests' witness (AU-14).
     if (const auto hook = latency_progress_for_tests)
@@ -555,6 +586,7 @@ OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp&
     host->set_bypass(bypass_.load(std::memory_order_relaxed));
     // AU-7: Gain and Mix, ramped by the processor.
     host->set_gain_db(Globals()->GetParameterRT(gain_parameter));
+    host->set_gain_mode(gain_mode_at(Globals()->GetParameterRT(gain_mode_parameter)));
     host->set_mix(Globals()->GetParameterRT(mix_parameter) / 100.0);
     processed = host->process(std::span(in).first(inputs), std::span(out).first(outputs), frames);
     // DIAG-1: a new processing fault shows as Status Fault at once, with no

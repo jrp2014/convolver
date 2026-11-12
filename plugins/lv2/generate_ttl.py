@@ -44,6 +44,8 @@ ATOM_BUFFER_BYTES = 8192
 # the latencies in frames (host_latencies, 0 first and the default).
 GAIN_DB = (-100, 24)
 LATENCIES = [0, 64, 128, 256, 512, 1024, 2048, 4096]
+# PLUG-10's Gain modes, as in convolver/host.hpp's GainMode and gain_mode_name.
+GAIN_MODES = [(0, 'Set'), (1, 'Estimate'), (2, 'No clipping')]
 
 
 def lv2_version(major, minor, patch):
@@ -153,6 +155,7 @@ def plugin(base, layout, vendor, version):
     ]
     first_setting = first_atom + 2
     latency_points = ' ,\n'.join(f'\t\t\t[ rdfs:label "{frames} frames" ; rdf:value {frames} ]' for frames in LATENCIES)
+    mode_points = ' ,\n'.join(f'\t\t\t[ rdfs:label "{name}" ; rdf:value {value} ]' for value, name in GAIN_MODES)
     settings = [
         f"""\t[
 \t\ta lv2:ControlPort , lv2:InputPort ;
@@ -189,6 +192,21 @@ def plugin(base, layout, vendor, version):
 \t\tlv2:maximum {LATENCIES[-1]} ;
 \t\tlv2:scalePoint
 {latency_points}
+\t]""",
+        # PLUG-10, appended last so that the earlier ports keep their numbers
+        # (jrp, 12 November 2026).
+        f"""\t[
+\t\ta lv2:ControlPort , lv2:InputPort ;
+\t\tlv2:index {first_setting + 3} ;
+\t\tlv2:symbol "gain_mode" ;
+\t\tlv2:name "Gain mode" ;
+\t\trdfs:comment "Which gain plays: Set plays Gain; Estimate and No clipping play the filter's own figure." ;
+\t\tlv2:portProperty lv2:integer , lv2:enumeration , pprops:notAutomatic , pprops:expensive ;
+\t\tlv2:default {GAIN_MODES[0][0]} ;
+\t\tlv2:minimum {GAIN_MODES[0][0]} ;
+\t\tlv2:maximum {GAIN_MODES[-1][0]} ;
+\t\tlv2:scalePoint
+{mode_points}
 \t]""",
     ]
     ports = ' ,\n'.join(control + audio_ports(layout, 3) + atoms + settings)
