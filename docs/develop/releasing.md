@@ -22,6 +22,7 @@ find it.
 Contents: [candidates](#candidates) ·
 [what a package holds](#what-a-package-holds) ·
 [responsiveness qualification](#responsiveness-qualification) ·
+[what blocks a preview](#what-blocks-a-preview) ·
 [publishing an unsigned preview](#publishing-an-unsigned-preview) ·
 [after publishing](#after-publishing-make-it-findable) ·
 [production gates](#production-gates) ·
@@ -199,6 +200,63 @@ whoever he names) qualifies it on a named machine (REL-6 in
    release evidence. State the result in the pre-release notes: qualified,
    naming the machine, or not qualified, naming the entries that did not
    pass.
+
+## What blocks a preview
+
+How a preview is qualified, from the bounded plan jrp chose on 8 November
+2026 ([decision](../project/decisions.md#releases); the
+[original plan](../archive/plans/2026-11-08-preview-acceptance.md) is
+archived). The [status page](../project/status.md) owns which gates are open
+and their results; this section owns how a finding is judged and when
+testing stops. A required gate is waived only by an explicit decision of
+jrp's.
+
+**One fixed candidate.** Choose the candidate after the blocking fixes merge,
+and record its version, source commit, CI run, package SHA-256, host
+versions, system and architecture with the results. A pull request's
+artifact is built from its merge commit, which may differ from its head:
+record both when using one for a fix-specific retest. Keep the tested
+binaries, presets and guide together; do not silently replace a tested
+binary with a newer build, or treat an earlier result as evidence for a
+later package. A fix-specific retest shows that the defect is fixed on its
+candidate; it does not close the other host checks.
+
+**Classify a finding by its consequence** for the promised use, not by how
+unusual its trigger is. Every finding needs a reproduction or a concrete
+code path, the expected and actual behaviour, and the version affected.
+
+| Class | Examples | Action |
+| --- | --- | --- |
+| Blocking | Crash or hang; lost saved state; unsafe crossover output; wrong audio or latency compensation; a required journey that cannot be installed or completed; a misleading status that prevents safe recovery; a broken required accessibility or qualification step | Fix narrowly, with a regression test where practical, then retest the affected journey. Record the new candidate and the gates left |
+| Deferred limitation | More host and version combinations; cosmetic inconsistencies that neither hide a failure nor prevent use; convenience features; speculative failure-path expansion; broader performance workloads | Record it in TODO with its impact, any workaround and what would make it worth revisiting, and describe a limit users meet in the owning guide. No immediate pull request |
+| Evidence missing | A tool could not operate a control; audio was not heard; a timing run was not qualified; an observation has no reproducible explanation yet | Mark it unverified. For a required gate, get the evidence or ask jrp for a scope decision; otherwise defer. Missing evidence is never a pass |
+
+A rare route to a crash, lost state or unsafe output still blocks. The
+existing out-of-memory protections and regression tests stay; what waits is
+speculative additions, not known consequential defects. Wrong installation,
+recovery or routing instructions are behaviour problems, not cosmetic prose.
+
+**Retest in proportion to what changed.**
+
+- Capture each blocking fix's host call order or failing input in the
+  smallest existing adapter or lifecycle regression that reproduces it.
+  Window focus and accessibility defects need editor or host checks, not an
+  artificial lifecycle case.
+- During development, run the focused host retest and the applicable
+  automated checks. Do not repeat every manual journey for each intermediate
+  commit, or for a change confined to project notes that are not shipped.
+- On the final candidate, before the independent walkthrough, run the
+  required journeys, including steps that passed on earlier binaries. After
+  a fix that changes the candidate, record which results no longer apply and
+  repeat the required checks; never relabel older evidence.
+- A further ordinary-use failure reopens the affected gate; an unrelated
+  suggestion does not reopen them all.
+
+**Stop rule.** Once the gates and the required host steps pass, no blocker
+is unresolved and the deferred limitations are recorded, the preview is
+ready for jrp's publication decision. Optional checks that were not run stay
+explicitly unverified. Do not add host permutations, or require another
+general review, only because further cases can be imagined.
 
 ## Publishing an unsigned preview
 

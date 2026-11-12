@@ -50,7 +50,7 @@ after the second preview on 9 November, can go ahead again now that
 previews are out, with significant features before corner and edge cases.
 Crashes, lost state, wrong audio, compatibility failures and dropouts are
 still fixed at once, with a regression test where practical
-([preview acceptance](docs/project/plans/2026-11-08-preview-acceptance.md#3-decide-whether-a-finding-blocks-the-preview)).
+([preview acceptance](docs/develop/releasing.md#what-blocks-a-preview)).
 The sections below were ordered under the freeze, and their order stands
 until the next triage.
 
@@ -112,7 +112,7 @@ the suggested one.
 
 | Group | Items | Note |
 | --- | --- | --- |
-| Parked by jrp until after REL-3 | **ROBUST-1**, **ROBUST-8**, **PLUG-25**, **PLUG-27**, **PLUG-29**, **PLUG-30**, **HOST-6**, **CFG-3**, **DIAG-5**, **CI-32**; **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19**; and **CI-34** apart from its first step (done) | jrp, 8 November 2026: "park any non-essential corner or edge case robustness tests", and "Park both" for the items and CI-34's narrowing ([decision](docs/project/decisions.md#releases)); CI-34's remaining steps wait for his go-ahead. No existing test is removed, and a reproduced crash, lost state, unsafe output or wrong audio reopens one at once |
+| Parked by jrp until after REL-3 | **ROBUST-1**, **ROBUST-8**, **PLUG-25**, **PLUG-27**, **PLUG-29**, **PLUG-30**, **PLUG-36**, **HOST-6**, **CFG-3**, **DIAG-5**, **CI-32**; **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19**; and **CI-34** apart from its first step (done) | jrp, 8 November 2026: "park any non-essential corner or edge case robustness tests", and "Park both"; PLUG-36 on 12 November 2026 ("park until after REL-3") for the items and CI-34's narrowing ([decision](docs/project/decisions.md#releases)); CI-34's remaining steps wait for his go-ahead. No existing test is removed, and a reproduced crash, lost state, unsafe output or wrong audio reopens one at once |
 | The production gate | **REL-1**, **PLUG-5**, **AU-5**: Developer ID signing and notarization on macOS, Authenticode on Windows, verified minimum OS and CPU versions, the final licence and corresponding-source review; **PLUG-20** (the VST logo in the window, optional) | The previews are unsigned by decision ([releasing](docs/develop/releasing.md#production-gates)). Planning it changes nothing shipped |
 | Edges over other convolvers | First the limitations users cite: **EDGE-1** with **IO-2**, **EDGE-11** on PERF-3's long-reverb workloads, then **EDGE-10**, **EDGE-3** and **EDGE-13**; then **EDGE-12**, **EDGE-9**, **EDGE-2**, **EDGE-4** and **EDGE-5**; then **EDGE-6** to **EDGE-8**; **EDGE-14** and **EDGE-15** | jrp's goal (6 November 2026): be better than the most popular reverb plug-ins, in the ranked order of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build), keeping its non-negotiables; each starts with the owner's decision its plan row names. Waits for REL-3 unless jrp lifts the freeze; feedback that asks for one of them (sample rates, true stereo, a filter's own delay, an output ceiling) moves it up |
 | Supporting work | **IO-1** (large files) | Take it up when a reproducible defect or a user need calls for it |
@@ -554,6 +554,20 @@ LV2 (Linux first; also PipeWire system audio):
   queue. Done when each adapter's skip paths either follow that rule or
   are listed with why they are safe, with a held-lock test for each, as
   AU-16's. Waits for the freeze.
+- [ ] **PLUG-36 — The loading-and-failure table covers each transition.**
+  Left open by the first-preview acceptance plan (section 5, archived
+  12 November 2026; jrp's 8 November priority: extend the contract and the
+  existing lifecycle tests, no new framework). The
+  [table](docs/develop/plugin-contract.md#loading-and-failure) names three
+  situations; extend it to the empty, active, kept-but-unsuited and failed
+  states against load, restore, rate and bus changes, bypass, Mix and
+  processing faults, saying for each what plays, what is saved and what
+  Status reports, with channel safety kept apart from which message wins.
+  Map each row to its test in `tests/plugins/lifecycle.cpp` or a format's
+  adapter test, and add a test only for a missing rule or a reproduced
+  defect; the expected result must not come from production decision
+  functions. Any unclear rule goes to jrp. Parked until after REL-3 (jrp,
+  12 November 2026).
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
@@ -1014,7 +1028,7 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   nothing. Presets from Audacity's own menu worked (7 November), since
   Audacity loads that state itself. Wrong audio in a required journey, so
   a preview blocker under the
-  [acceptance plan](docs/project/plans/2026-11-08-preview-acceptance.md#3-decide-whether-a-finding-blocks-the-preview)
+  [acceptance plan](docs/develop/releasing.md#what-blocks-a-preview)
   unless jrp narrows it. The workaround proposed: after an accepted load,
   the controller makes a gesture that changes no value (`beginEdit`,
   `performEdit` with the current value, `endEdit`) so such hosts store the

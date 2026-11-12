@@ -5,7 +5,7 @@ For CI maintainers: a separate, proposed workstream (CI-34) to reduce duplicated
 builds and queueing while preserving the tests that protect Convolver.
 
 **In short:** implement scheduling changes only in a dedicated PR. The
-[preview acceptance plan](2026-11-08-preview-acceptance.md) proceeds independently.
+[preview acceptance plan](../../archive/plans/2026-11-08-preview-acceptance.md), now archived, went ahead independently.
 This page changes no workflow and authorises no test removal or weaker threshold.
 The first step is done: since 8 November 2026 a pull request builds the
 candidates only when it changes what they are built from or hold
