@@ -632,10 +632,11 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   beside it is for a later preview (PLUG-10).
 - **Saved form:** each format's own way. The Audio Unit's parameters are
   saved by `AUBase::SaveState` in `ClassInfo` ("data"); VST3 saves them in
-  host state version 3, written only when a setting differs from its
-  default (VST3-4, [host state](#host-state)); LV2 has control ports, which
-  the host saves (LV2-7). A preset from
-  `convolver-preset` carries the filter only, and a state moved between
+  host state version 3, defaults included since PLUG-35 (VST3-4,
+  [host state](#host-state)); LV2 has control ports, which the host saves
+  (LV2-7). A preset `convolver-preset` makes from a filter carries the
+  filter only (one it converts from a host's `.vstpreset` keeps that
+  preset's settings), and a state moved between
   formats carries the filter but not the settings, as
   [how the plug-ins behave](../use/plugins.md#settings) tells users.
 - **Audio Unit (AU-7).** Global parameters Gain (0, decibels), Mix (1003,
@@ -844,9 +845,12 @@ filter and ignore its settings, which they save their own way: the Audio
 Unit as parameter values under `data`, plus its Latency in frames under
 `convolver-latency-frames` since PERF-2 (see [settings](#settings)).
 Decoders read all three; encoders write version 1 whenever nothing new is recorded
-(every state without settings: `convolver-preset`'s presets and the Audio
-Unit's and LV2's states), so older builds still read those presets. Every
-published preview reads version 3, since VST3-4 came before the first. How each format stores it (the
+(every state without settings: the presets `convolver-preset` makes from a
+filter and the Audio Unit's and LV2's states), so older builds still read
+those presets. Every published preview reads version 3, since VST3-4 came
+before the first, except that 0.12.12, from before PERF-2 added Latency 0,
+refuses a version-3 state with Latency 0 as damaged: since PLUG-35 that is
+every VST3 project and preset saved at the defaults. How each format stores it (the
 `.vstpreset` chunk, the AU `convolver-state` key, the LV2 state property) is in
 [preset files](#preset-files).
 

@@ -89,10 +89,10 @@ passes for 0.13, since PERF-2 changed the engine
 | **HOST-1**, **VST3-11** | REAPER and Audacity, status checks 1 to 4 | Host checks on jrp's Mac |
 | **AU-4**, **AU-6** | GarageBand, status checks 5 and 8 | Host checks on jrp's Mac |
 | **PERF-2** | Its focused REAPER and GarageBand session, status check 9; then the CPU indication beside the Latency menu and block sizes tuned on Apple silicon | The session goes ahead. The CPU indication changes the window and the tuning is optimisation, so both wait for the freeze to lift |
-| **COMPAT-1** | Keep presets, a REAPER project and expected audio made by 0.13.2, the baseline, with their own runner and the capture step in the publication steps | Tests and files only |
+| **COMPAT-1** | Keep presets, a REAPER project and expected audio from the published previews (0.13.2's and 0.13.12's presets and audio are kept; the REAPER project is owed from 0.13.12, the baseline), with their own runner and the capture step in the publication steps | Tests and files only |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **HOST-4** | The check on a real Windows device, now that the Windows package ships `convolver-equalizer-apo` | A check; needs a Windows computer |
-| **VST3-17** | Up to 0.13.8, in Audacity a filter chosen in the window plays but is missing from the export and the saved project. The fix (PR #177) is checked only by `vst3.adapter`; what remains is jrp's Audacity check, and until then the guides keep the preset menu as the checked route | Lost state, one of the freeze's exceptions: brought forward and merged without an Audacity check ([decisions](docs/project/decisions.md#plug-in-behaviour)) |
+| **VST3-17** | In 0.13.2 and earlier, in Audacity a filter chosen in the window plays but is missing from the export and the saved project. The fix (PR #177) is published in 0.13.12 and checked only by `vst3.adapter`; what remains is jrp's Audacity check on 0.13.12 (status check 10), and until then the guides keep the preset menu as the checked route | Lost state, one of the freeze's exceptions: brought forward and merged without an Audacity check ([decisions](docs/project/decisions.md#plug-in-behaviour)) |
 
 ### 2. Decided or likely, after the freeze
 
@@ -890,10 +890,14 @@ means a patched FFmpeg build with `--enable-gpl`.
   build, with the same backend and kernels, differed from the release's
   GCC 11 by up to 1.3e-7, so the criterion above now names the compiler,
   configuration and flags too; the runner reports each check's largest
-  difference as a share of its bound. Remaining: a
-  REAPER project saved with 0.13.2, with its state chunk restored through
-  each adapter, Audio Unit state from a release, and the capture of the
-  published 0.13.12 (11 November 2026).
+  difference as a share of its bound.
+  Progress (12 November 2026, PR #187): the published 0.13.12 is kept in
+  `tests/upgrade/0.13.12/`, captured the same way from its Linux ZIP. Every
+  preset, filter, input and expected render is byte for byte the same as
+  0.13.2's, so 0.13.12 renders those presets exactly as 0.13.2 did; only
+  the manifest differs. Remaining: a REAPER project saved with 0.13.12, the
+  baseline since 11 November, with its state chunk restored through each
+  adapter, and Audio Unit state from a release.
 - [ ] **DIAG-5 — Report clipping after a command-line render.** From the
   BruteFIR comparison (8 November 2026): BruteFIR has printed each output's
   count of overflowed samples and its peak by default since 0.99
@@ -1663,13 +1667,15 @@ move to the archive.
 - [x] **PLUG-35 — Saved state records the settings at their defaults.**
   12 November 2026, PR #189: the VST3 plug-in's component state records
   Gain, Mix and Latency whenever it saves them, defaults included (host
-  state version 3, which every published preview reads), so a
+  state version 3), so a
   `.vstpreset` a host saves at 0 dB, 100% and 0 frames resets them when
   chosen in the window, as the host's preset menu does
   ([decision](docs/project/decisions.md#plug-in-behaviour)).
-  `convolver-preset`, the Audio Unit and LV2 still write version 1, and
-  older presets and projects load as before; one saved at the defaults by
-  an earlier version still leaves the settings. Checked by `native.state`
+  Presets `convolver-preset` makes from a filter, and the Audio Unit's and
+  LV2's states, still write version 1, and older presets and projects load
+  as before; one saved at the defaults by an earlier version still leaves
+  the settings. Cost: 0.12.12, the first preview, refuses a project saved
+  at Latency 0 (now every one at the defaults) as damaged. Checked by `native.state`
   and `vst3.adapter`; not yet tried in a host.
 - [x] **PLUG-26 — Choose a `.vstpreset` in the window.** 12 November
   2026, PR #185: Choose… and dropping a file in the VST3 and Audio Unit

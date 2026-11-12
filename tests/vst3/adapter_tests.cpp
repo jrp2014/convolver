@@ -1794,7 +1794,7 @@ void output_silence_flags_64() {
 // VST3-8: the Bypass text converts both ways, and the controller's own
 // state calls succeed (it keeps no state, so they store and read nothing).
 // VST3-4: Gain, Mix and Latency as parameters, applied by the processor,
-// saved in the component state (version 3 only when not at the defaults), and
+// saved in the component state (version 3, defaults included: PLUG-35), and
 // a new Latency reported to the host with kLatencyChanged.
 void settings_parameters() {
     HostApplication context;

@@ -12,6 +12,12 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Tests (COMPAT-1, in progress): the example presets of the published
+  0.13.12 and the audio its own CLI and VST3 plug-in rendered from them are
+  kept in `tests/upgrade/0.13.12/`, beside 0.13.2's; `upgrade.cli` and
+  `vst3.upgrade` check later builds against both. Every preset, filter,
+  input and expected render matches 0.13.2's byte for byte, so 0.13.12 renders those presets exactly as
+  0.13.2 did.
 - Releases: jrp published Convolver 0.13.12, the third unsigned developer
   preview, on 11 November 2026
   ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.12)).
@@ -40,10 +46,11 @@ Until 1.0 the C++ API may change between minor versions.
   0 dB, 100% and 0 frames sets them back to the defaults when chosen in the
   window, as it does from the host's preset menu; before, it left the
   current settings as a filter-only preset does. Presets saved at the
-  defaults by earlier versions still do. Presets from `convolver-preset`
-  still hold only the filter. Every published preview opens the projects
-  and presets saved now; a build from before the settings existed refuses
-  them as newer.
+  defaults by earlier versions still leave the current settings, and
+  presets `convolver-preset` makes from a filter still hold only the
+  filter. Projects and presets saved now open in every published preview
+  from 0.13 on; the first preview, 0.12.12, refuses those at Latency 0 (the
+  default) as damaged.
 - Plug-ins (PLUG-33): a file chosen with **Choose…** (or dropped on the
   window, or set through LV2's file parameter) follows the same channel rule
   as a preset: the host's outputs exactly and at least the filter's inputs.

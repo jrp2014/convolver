@@ -482,11 +482,8 @@ preparation and steps 2, 3 and 9 below include what it found.
    effect at once or at the next playback, and whether the track stays in
    time. Record anything the window does differently from REAPER.
    Up to 0.13.2, Audacity 4.0.2 did not keep the filter chosen here for an
-   export or a saved project (VST3-17). The fix is not checked in Audacity
-   yet: export with this window still open and without playing after the
-   choice, since Audacity also stores the state when playback stops or the
-   window closes, which would hide the defect. Step 10 checks the preset
-   route.
+   export or a saved project (VST3-17); step 11 checks the fix in 0.13.12.
+   Step 10 checks the preset route.
 10. Your own filter through the preset menu, the route the first preview
     supports in Audacity. Make a preset from the stereo example and put it
     in the system folder, then restart Audacity:
@@ -503,6 +500,17 @@ preparation and steps 2, 3 and 9 below include what it found.
     export.wav examples/first-use/stereo/expected.wav`. Save the project,
     quit, reopen it, export again and compare again. Both comparisons must
     pass. Remove `own-filter.vstpreset` from the folder afterwards.
+11. A filter chosen in the window (VST3-17, fixed in 0.13.12 and not yet
+    checked in Audacity). Import `examples/first-use/stereo/input.wav` into
+    a new 48000 Hz project and add Convolver as a real-time effect with
+    *Use vendor UI* on. With **Choose…**, pick
+    `examples/first-use/stereo/filter.cfg` and touch no setting. Without
+    playing, and with the window still open (Audacity also stores the state
+    when playback stops or the window closes, which would hide the defect),
+    export the whole project (stereo, 48000 Hz, 32-bit float WAV) and run
+    `./bin/convolver --compare export.wav examples/first-use/stereo/expected.wav`.
+    Save the project, quit, reopen it, export again and compare again. Both
+    comparisons must pass.
 
 ### GarageBand (Audio Unit)
 

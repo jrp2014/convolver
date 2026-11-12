@@ -662,9 +662,10 @@ defaults play exactly as Convolver did before the settings existed.
   delay. A
   project saves its settings even at the defaults, so it reopens with them
   whatever later versions choose as their defaults. Every published
-  Convolver preview reads them; a build from before the settings existed
-  refuses such a project as a newer state, plays silence and says so in the
-  log.
+  Convolver preview from 0.13 on reads them. The first preview, 0.12.12,
+  had no Latency 0, so it refuses a project saved at Latency 0 (the
+  default) as damaged, plays silence and says so in the log; a build from
+  before the settings existed refuses any such project as a newer state.
 
 ## Latency and tail
 

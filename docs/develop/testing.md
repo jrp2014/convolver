@@ -395,7 +395,8 @@ cases.
   change only once a change has settled, not after `settle()`, and never
   for a deleted file.
 - `native.state`: fixed version-1 wire fixture, the version-2 failed-load
-  marker (and that every other state is still written as version 1), a
+  marker (and that every other state without settings is still written as
+  version 1), a
   version-3 fixture with settings, its round trips with a filter and a
   failed load, default settings written as version 3 and round-tripped
   (PLUG-35) while a state without settings stays version 1 or 2, and
