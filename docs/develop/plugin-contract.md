@@ -321,7 +321,7 @@ format.
   and Latency, as a restored state's do (applied once the filter is
   accepted, the Latency at once, and parameter listeners told); one without
   them (from `convolver-preset`, or saved at the default settings, which a
-  state does not record) leaves them. Setting it returns an error when the file was not loaded;
+  state does not yet record: PLUG-35) leaves them. Setting it returns an error when the file was not loaded;
   reading it gives the path of this session's accepted file load. The file
   is read outside the control lock, on the thread that set the property
   (the host's main thread for the window); preparing the filter runs under
@@ -460,7 +460,8 @@ separate processes, so each carries values, never pointers:
   does, and undoing one in the host changes that setting back, not the
   filter. The host hands Gain and Mix back in
   `process()` with the values the processor already has, and Latency to
-  `setParamNormalized` as no change. A preset without settings leaves them.
+  `setParamNormalized` as no change. A preset without settings leaves them
+  (for one saved at the defaults, until PLUG-35).
   The controller then calls
   `setDirty(true)` for an accepted file, so the host marks the project
   changed. When `setDirty` does not succeed (a host without

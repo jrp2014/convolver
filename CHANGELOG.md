@@ -22,7 +22,9 @@ Until 1.0 the C++ API may change between minor versions.
   cannot import one). Its filter loads as from the host's preset menu, with
   the Gain, Mix and Latency saved in it; the host's controls and saved
   project show them. A preset from `convolver-preset`, which holds only a
-  filter, leaves them as they are. Another plug-in's preset or a damaged
+  filter, leaves them as they are; so, until a later version records
+  settings at their defaults, does a preset a host saved at 0 dB, 100% and
+  0 frames. Another plug-in's preset or a damaged
   file is refused with a message saying what to choose instead. Not yet
   tried in a host
   ([a preset in the window](docs/use/plugins.md#a-preset-in-the-window)).

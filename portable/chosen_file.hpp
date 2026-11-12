@@ -15,9 +15,9 @@ namespace convolver {
 // As read_filter_file(), and for a .vstpreset (by its name's ending, in any
 // letter case): its filter, with the Gain, Mix and Latency it holds in
 // HostState::settings for the adapter to apply when the filter is accepted
-// (none in a preset from convolver-preset or one saved at the default
-// settings, so the current ones stay). Its bypass flag is cleared: the host's
-// Bypass stays as it is. The preset is not checked against `host` here: the
+// (none in a preset from convolver-preset or, until PLUG-35, one saved at
+// the default settings, so the current ones stay). Its bypass flag is
+// cleared: the host's Bypass stays as it is. The preset is not checked against `host` here: the
 // adapter's HostFilter::load() checks it as for a preset from the host's
 // menu. `files` receives the preset alone and `wider_entry` is emptied. A
 // preset that cannot be read, belongs to another plug-in, is damaged or

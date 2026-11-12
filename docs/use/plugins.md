@@ -136,9 +136,12 @@ host's preset menu loads it. Its filter must suit the host's rate and
 channels as any preset's must, and the Gain, Mix and Latency saved in it
 apply too; the host is told, so its controls and the saved project show
 them. A preset made by `convolver-preset` holds only a filter and leaves
-Gain, Mix and Latency as they are; so does a preset saved at the default
-settings (0 dB, 100%, 0 frames), since Convolver's saved state does not
-record defaults. Bypass stays as the host has it. Another plug-in's preset,
+Gain, Mix and Latency as they are. For now, so does a preset a host saved
+at the default settings (0 dB, 100%, 0 frames), since Convolver's saved
+state does not yet record settings at their defaults; the host's own
+preset menu resets them to the defaults instead. A later version will
+record them, so that presets saved from then on load their settings in full
+(PLUG-35 in [TODO](../../TODO.md)). Bypass stays as the host has it. Another plug-in's preset,
 a damaged file or a preset saved with no filter is refused, and the
 message says what to choose instead. The window then names the filter
 after the preset file. **Reload**, and **Reload when the file changes**,
