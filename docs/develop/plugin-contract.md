@@ -320,8 +320,9 @@ format.
   tool writes. A chosen `.vstpreset` that holds settings also sets Gain, Mix
   and Latency, as a restored state's do (applied once the filter is
   accepted, the Latency at once, and parameter listeners told); one without
-  them (from `convolver-preset`, or saved at the default settings, which a
-  state does not yet record: PLUG-35) leaves them. Setting it returns an error when the file was not loaded;
+  them (from `convolver-preset`, or saved at the default settings before
+  PLUG-35 made the state record them) leaves them; one saved at the defaults
+  since then sets them back to the defaults. Setting it returns an error when the file was not loaded;
   reading it gives the path of this session's accepted file load. The file
   is read outside the control lock, on the thread that set the property
   (the host's main thread for the window); preparing the filter runs under
@@ -460,8 +461,8 @@ separate processes, so each carries values, never pointers:
   does, and undoing one in the host changes that setting back, not the
   filter. The host hands Gain and Mix back in
   `process()` with the values the processor already has, and Latency to
-  `setParamNormalized` as no change. A preset without settings leaves them
-  (for one saved at the defaults, until PLUG-35).
+  `setParamNormalized` as no change. A preset without settings leaves them; one
+  holding the defaults reports any that change (PLUG-35).
   The controller then calls
   `setDirty(true)` for an accepted file, so the host marks the project
   changed. When `setDirty` does not succeed (a host without
@@ -646,10 +647,12 @@ the plan's Gain modes (12 November 2026); its meters follow later
   8 November 2026, PERF-2). A larger value can use somewhat less processor
   time. The settings constructor refuses any other value. Adding 0 first
   left saved projects' latencies unchanged, except some at the old
-  default, 256. The VST3 state stores frames, and only when a setting
-  differs from its default: a project saved with every setting at the
-  default has none and opens at the new default, 0, while one whose Gain
-  or Mix differed stored 256 and keeps it. The Audio Unit saves its
+  default, 256. The VST3 state stores frames, and until PLUG-35 did so
+  only when a setting differed from its default: a project saved then with
+  every setting at the default has none and opens at the new default, 0,
+  while one whose Gain or Mix differed stored 256 and keeps it. Since
+  PLUG-35 every VST3 state records its settings, so a later change of
+  default leaves saved projects as they were. The Audio Unit saves its
   Latency parameter, which is the menu position, so it now also saves the
   frames under `convolver-latency-frames`; state without them is read
   through the earlier menu, whose 256 always opens at 0 (jrp, 8 November
@@ -668,10 +671,12 @@ the plan's Gain modes (12 November 2026); its meters follow later
   beside it is for a later preview (PLUG-10).
 - **Saved form:** each format's own way. The Audio Unit's parameters are
   saved by `AUBase::SaveState` in `ClassInfo` ("data"); VST3 saves them in
-  host state version 3, written only when a setting differs from its
-  default (VST3-4, [host state](#host-state)), or version 4 when the Gain
-  mode is not Set; LV2 has control ports, which the host saves (LV2-7). A preset from
-  `convolver-preset` carries the filter only, and a state moved between
+  host state version 3, defaults included since PLUG-35 (VST3-4,
+  [host state](#host-state)), or version 4 when the Gain mode is not Set;
+  LV2 has control ports, which the host saves (LV2-7). A preset
+  `convolver-preset` makes from a filter carries the filter only (one it
+  converts from a host's `.vstpreset` keeps that preset's settings), and a
+  state moved between
   formats carries the filter but not the settings, as
   [how the plug-ins behave](../use/plugins.md#settings) tells users.
 - **Audio Unit (AU-7).** Global parameters Gain (0, decibels), Gain mode
@@ -885,14 +890,24 @@ older builds refuse only a state they could not play as saved, with the
 "newer" message. Version 3 (VST3-4, VST3 only) adds the
 [settings](#settings) after the flags (Gain in dB and Mix from 0 to 1, each
 an IEEE double as two little-endian words, then Latency in frames) and is
-written only when a setting differs from its default, with a filter or a
-failed-load marker as before; decoding checks each setting's range and
+written whenever the state holds settings, with a filter or a failed-load
+marker as before. The VST3 component state always holds them, defaults
+included (PLUG-35; jrp, 12 November 2026), so a preset a host saved at the
+defaults is told apart from a filter-only one and resets them when chosen
+in the window; before PLUG-35 they were written only when one differed
+from its default; decoding checks each setting's range and
 refuses the state otherwise. The Audio Unit and LV2 read a version 3 state's
 filter and ignore its settings, which they save their own way: the Audio
 Unit as parameter values under `data`, plus its Latency in frames under
 `convolver-latency-frames` since PERF-2 (see [settings](#settings)).
-Decoders read all four; encoders write version 1 whenever nothing new is recorded,
-so older builds still read those presets. How each format stores it (the
+Decoders read all four; encoders write version 1 whenever nothing new is recorded
+(every state without settings: the presets `convolver-preset` makes from a
+filter and the Audio Unit's and LV2's states), so older builds still read
+those presets. Every published preview reads version 3, since VST3-4 came
+before the first, except that 0.12.12, from before PERF-2 added Latency 0,
+refuses a version-3 state with Latency 0 as damaged: since PLUG-35 that is
+every VST3 project and preset saved at the defaults. Version 4 (a Gain mode
+other than Set) is read only by builds with the Gain mode. How each format stores it (the
 `.vstpreset` chunk, the AU `convolver-state` key, the LV2 state property) is in
 [preset files](#preset-files).
 

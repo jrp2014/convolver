@@ -74,8 +74,8 @@ int main() {
               std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 3, 0, 0, 0, 0, 0, 0, 0})})
             rejects([&] { (void)decode_host_state(std::as_bytes(std::span(bad))); });
         // VST3-4: version 3 adds the settings after the flags (gain and mix
-        // as doubles, low word first, then the latency), and is written only
-        // when they differ from the defaults.
+        // as doubles, low word first, then the latency), and is written
+        // whenever the state holds them (PLUG-35: defaults included).
         HostState set;
         set.bypass = true;
         set.settings = HostSettings{-6.5, .25, 1024};
@@ -139,15 +139,26 @@ int main() {
             truncated.resize(32);
             (void)decode_host_state(truncated);
         });
-        // Default settings keep the older versions, byte for byte.
+        // PLUG-35: settings at the defaults are recorded too (version 3), so
+        // a preset saved at the defaults is told apart from one without
+        // settings; a state without settings keeps the older versions.
         auto defaults = identity;
         defaults.settings = HostSettings{};
-        require(encode_host_state(defaults) == encode_host_state(identity),
-                "default settings must keep version 1");
+        const auto defaults_bytes = encode_host_state(defaults);
+        require(std::to_integer<int>(defaults_bytes[4]) == 3 &&
+                    defaults_bytes.size() == encode_host_state(identity).size() + 20,
+                "default settings must be written as version 3");
+        const auto defaults_back = decode_host_state(defaults_bytes);
+        require(defaults_back.settings == HostSettings{} &&
+                    defaults_back.configuration->paths[0].impulse == std::vector<float>{1.f} &&
+                    encode_host_state(defaults_back) == defaults_bytes,
+                "default settings must round-trip as version 3");
         auto failed_defaults = failed;
         failed_defaults.settings = HostSettings{};
-        require(encode_host_state(failed_defaults) == failed_bytes,
-                "default settings must keep version 2");
+        const auto failed_defaults_back = decode_host_state(encode_host_state(failed_defaults));
+        require(std::to_integer<int>(encode_host_state(failed_defaults)[4]) == 3 &&
+                    failed_defaults_back.failed && failed_defaults_back.settings == HostSettings{},
+                "default settings with a failed load must be written as version 3");
         require(!decode_host_state(encode_host_state(identity)).settings,
                 "older states hold no settings");
         for (const HostSettings bad :

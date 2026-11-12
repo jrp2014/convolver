@@ -113,7 +113,7 @@ inline constexpr const char* faults_message = "ConvolverFaults";
 // new Latency and plays it before it answers (VST3-16: REAPER reads
 // getLatencySamples() inside restartComponent and does not restart the
 // component), so the latency the host reads is the one that plays. All three are saved
-// in the component state (host state version 3 when not at the defaults).
+// in the component state (host state version 3, defaults included: PLUG-35).
 // IDs from plugins/identities.json; never change them.
 inline constexpr Steinberg::Vst::ParamID gain_id = identity::vst3_gain_parameter_id;
 inline constexpr Steinberg::Vst::ParamID mix_id = identity::vst3_mix_parameter_id;

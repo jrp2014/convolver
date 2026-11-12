@@ -395,9 +395,11 @@ cases.
   change only once a change has settled, not after `settle()`, and never
   for a deleted file.
 - `native.state`: fixed version-1 wire fixture, the version-2 failed-load
-  marker (and that every other state is still written as version 1), a
+  marker (and that every other state without settings is still written as
+  version 1), a
   version-3 fixture with settings, its round trips with a filter and a
-  failed load, default settings still written as version 1 or 2, and
+  failed load, default settings written as version 3 and round-tripped
+  (PLUG-35) while a state without settings stays version 1 or 2, and
   out-of-range settings refused, state
   from a newer version told apart from damaged state, embedded configuration round trips, truncation, corrupt headers,
   invalid coefficients and bounded decoding.
@@ -725,8 +727,9 @@ compares the render with the audio that release rendered, by the rule
 
 `vst3.adapter` also checks the settings (VST3-4): the parameters' order,
 flags, ranges, value text and `kDryWetMix`, Gain and Mix in the audio,
-saving them as host state version 3 and restoring them in a second
-instance, an older state resetting them to their defaults, 0 dB from a host that
+saving them as host state version 3 (at the defaults too, PLUG-35) and
+restoring them in a second instance, an older state resetting them to
+their defaults, 0 dB from a host that
 keeps normalized values as float, and the Latency (VST3-16): a choice
 while active is the one `getLatencySamples()` reports when the host is asked
 to restart (the test reads it then, as REAPER does) and delays an impulse by
@@ -757,7 +760,8 @@ setting is reported as one `beginEdit`/`performEdit`/`endEdit` gesture with
 one latency restart, the saved state is the preset's, and the values the host
 hands back change nothing; choosing it again reports no settings edit (only
 VST3-17's Latency edit for a host without `setDirty`); a preset without
-settings leaves them; another plug-in's preset, a damaged one, one with no
+settings leaves them; one a processor saved at the default settings resets
+them, reporting each as an edit, with a latency restart (PLUG-35); another plug-in's preset, a damaged one, one with no
 filter, a missing file and a preset for another rate are refused, changing
 neither the filter nor the settings. `chosen_preset_before_activation()`
 chooses one before the host activates the plug-in: the settings are stored

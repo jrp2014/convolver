@@ -91,9 +91,10 @@ struct HostState {
     // Encoded as version 2; all other states stay version 1.
     bool failed = false;
     // Saved and applied by the VST3 adapter only (VST3-4): the settings its
-    // parameters held. Encoded as version 3, only when they differ from the
-    // defaults, or as version 4 when the gain mode is not Set (PLUG-10), so
-    // every other state keeps its older version. Absent in
+    // parameters held. Encoded as version 3 whenever present, defaults
+    // included (PLUG-35), so a preset saved at the defaults restores them,
+    // or as version 4 when the gain mode is not Set (PLUG-10); every state
+    // without settings keeps its older version. Absent in
     // older states, presets from convolver-preset and the other formats'
     // states; the Audio Unit and LV2 save their settings as parameters and
     // ports, and ignore these.

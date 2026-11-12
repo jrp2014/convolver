@@ -16,11 +16,14 @@ namespace {
 // of version 2 that also holds the settings, in five words after the flags:
 // the gain in decibels and the mix as 64-bit doubles (low word first), then
 // the latency in frames. Encoders write the lowest version that holds the
-// state: 3 only for settings that differ from the defaults, 2 for a failed
-// load without them, 1 otherwise, so builds that read only version 1 keep
-// reading every other state. Version 4 (PLUG-10; jrp, 12 November 2026) is
-// version 3 with one more word after the latency, the gain mode (GainMode's
-// number), written only when the mode is not Set.
+// state: 3 whenever it records settings, defaults included (PLUG-35; jrp,
+// 12 November 2026: a preset a host saves at the defaults then resets them
+// when chosen in the window), 2 for a failed load without them, 1 otherwise,
+// so builds that read only version 1 keep reading every state without
+// settings (presets from convolver-preset and the other formats' states).
+// Version 4 (PLUG-10; jrp, 12 November 2026) is version 3 with one more word
+// after the latency, the gain mode (GainMode's number), written only when the
+// mode is not Set.
 constexpr std::uint32_t magic = 0x53564e43, version = 4;
 constexpr std::size_t settings_words = 5;
 // The words the settings take in this version (none before version 3).
@@ -31,7 +34,7 @@ constexpr std::size_t settings_words_in(std::uint32_t format) noexcept {
 std::uint32_t state_version(const HostState& state) noexcept {
     if (state.settings && state.settings->gain_mode != GainMode::set)
         return 4;
-    if (state.settings && *state.settings != HostSettings{})
+    if (state.settings)
         return 3;
     return state.failed ? 2 : 1;
 }
