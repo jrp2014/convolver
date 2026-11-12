@@ -56,6 +56,21 @@ Until 1.0 the C++ API may change between minor versions.
   convolver. It needs PipeWire 1.6.2 or later: versions before 1.6 start
   the plug-in without its filter (LV2-4, in part).
 
+### Changed
+
+- Plug-in contract (PLUG-37, jrp's simplification review of 12 November
+  2026): a new section, [scope of each change](docs/develop/plugin-contract.md#scope-of-each-change),
+  states that each change does only the work it needs. Gain, Mix, the Gain
+  mode and bypass ramp on the playing filter and keep its history; names and
+  diagnostics change only what is shown; only a different filter is prepared
+  and crossfaded; only a different Latency or host configuration builds new
+  processing; saving leaves playback alone. `native.host_settings` now
+  checks that a Gain and Mix change keeps a long filter's history, latency
+  and tail (`settings_keep_history`). One place does not follow the rule
+  yet, found by reading the code: restored state or a chosen preset holding
+  the filter already playing still replaces it, listed in TODO's
+  limitations. No behaviour changes.
+
 ### Fixed
 
 - Plug-ins (PLUG-35): the VST3 plug-in now saves Gain, Mix and Latency in
