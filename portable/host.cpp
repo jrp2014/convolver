@@ -242,13 +242,64 @@ bool own_dry(const Configuration& c) noexcept {
 }
 } // namespace
 
+namespace {
+// PLUG-10: a filter's figure in decibels for a peak, as the CLI's --gain-db
+// auto and no-clip choose it for float output; absent when the gain to play
+// is not a finite float.
+std::optional<double> figure_db(double peak) {
+    const double db = peak > 0 ? -20 * std::log10(peak) : 0.0;
+    if (!std::isfinite(db) || !std::isfinite(static_cast<float>(std::pow(10.0, db / 20))))
+        return std::nullopt;
+    return db;
+}
+// The noise estimate's figure, or absent with estimate_failed set when the
+// noise overflowed single precision.
+void find_estimate(FilterGains& g, const Configuration& c) {
+    try {
+        g.estimate_db = figure_db(estimate_attenuation(c).noise_peak);
+        g.estimate_failed = !g.estimate_db;
+    } catch (const std::overflow_error&) {
+        g.estimate_db.reset();
+        g.estimate_failed = true;
+    }
+}
+// filter_gains() with the bound already found (HostFilter has it).
+FilterGains gains_for(const Configuration& c, double worst_peak, bool estimate) {
+    FilterGains g;
+    // As the CLI's no-clip refuses a bound beyond the largest float.
+    g.no_clipping_db =
+        worst_peak <= std::numeric_limits<float>::max() ? figure_db(worst_peak) : std::nullopt;
+    g.estimate_db.reset();
+    if (estimate)
+        find_estimate(g, c);
+    return g;
+}
+} // namespace
+
+FilterGains filter_gains(const Configuration& c, bool estimate) {
+    validate_configuration(c);
+    return gains_for(c, worst_case_peak(c), estimate);
+}
+
+const char* gain_mode_name(GainMode mode) noexcept {
+    switch (mode) {
+    case GainMode::estimate:
+        return "Estimate";
+    case GainMode::no_clipping:
+        return "No clipping";
+    case GainMode::set:
+        break;
+    }
+    return "Set";
+}
+
 HostPlayback filter_playback(Configuration c) {
     const bool dry = own_dry(c);
-    return {std::move(c), dry};
+    return {std::move(c), dry, {}};
 }
 
 HostPlayback unfiltered_playback(const HostLayout& host, bool failed, bool dry) {
-    return {unfiltered_configuration(host, failed), dry && host.inputs == host.outputs};
+    return {unfiltered_configuration(host, failed), dry && host.inputs == host.outputs, {}};
 }
 
 Configuration unfiltered_configuration(const HostLayout& host, bool failed) {
@@ -424,6 +475,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     std::optional<HostFailure> saved_failure, kept_failure;
     double peak = 0;
     std::uint64_t identity = 0;
+    FilterGains gains;
     try {
         if (state.failed && next)
             refuse(HostFailureKind::state_unreadable,
@@ -474,6 +526,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
         if (next) {
             peak = worst_case_peak(*next);
             identity = configuration_identity(*next);
+            gains = gains_for(*next, peak, estimating_);
         }
         if (state.failed) {
             HostFailure f;
@@ -501,7 +554,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
                     // Moved in and back, not copied: a filter can be large.
                     // On a throw `next` is never used again.
                     const bool dry = own_dry(*next);
-                    HostPlayback playing{std::move(*next), dry};
+                    HostPlayback playing{std::move(*next), dry, gains};
                     install(playing);
                     *next = std::move(playing.filter);
                 } else {
@@ -535,6 +588,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
                   std::is_nothrow_move_assignable_v<Advice>);
     filter_ = std::move(next);
     peak_ = peak;
+    gains_ = gains;
     identity_ = identity;
     failed_ = state.failed;
     accepted_ = std::move(request);
@@ -586,7 +640,23 @@ HostPlayback HostFilter::activate(const HostLayout& host) {
         return unfiltered_playback(host, true, dry_signal(*this, host));
     }
     notice_ = speaker_notice(*filter_, host);
-    return filter_playback(*filter_);
+    auto playback = filter_playback(*filter_);
+    playback.gains = gains_;
+    return playback;
+}
+
+std::optional<HostPlayback> HostFilter::estimate(bool on) {
+    estimating_ = on;
+    if (!on || !filter_ || gains_.estimate_db || gains_.estimate_failed)
+        return std::nullopt;
+    auto gains = gains_;
+    find_estimate(gains, *filter_);
+    auto playback = filter_playback(*filter_);
+    playback.gains = gains;
+    gains_ = gains; // After everything that may throw.
+    if (activation_failure_)
+        return std::nullopt; // It does not suit the host: silence plays.
+    return playback;
 }
 
 void HostFilter::fail_activation(std::string why) {
@@ -721,8 +791,23 @@ double clamp_mix(double mix) noexcept {
 }
 } // namespace
 
+std::optional<double> applied_gain_db(const HostSettings& settings,
+                                      const FilterGains& gains) noexcept {
+    switch (settings.gain_mode) {
+    case GainMode::estimate:
+        return gains.estimate_db ? gains.estimate_db : gains.no_clipping_db;
+    case GainMode::no_clipping:
+        return gains.no_clipping_db;
+    case GainMode::set:
+        break;
+    }
+    return clamp_gain_db(settings.gain_db);
+}
+
 UnfilteredSound unfiltered_sound(const HostSettings& settings, bool identity) {
-    const double mix = clamp_mix(settings.mix), db = clamp_gain_db(settings.gain_db);
+    // Without a filter, Estimate and No clipping play 0 dB (FilterGains).
+    const double mix = clamp_mix(settings.mix),
+                 db = applied_gain_db(settings, FilterGains{}).value_or(0);
     UnfilteredSound sound;
     sound.silent = !identity && mix == 1;
     sound.unchanged = mix == 0 || (identity && db == 0);
@@ -951,10 +1036,25 @@ struct HostProcessor::Impl {
         // Whether this filter has a dry signal (input c to output c), as
         // HostPlayback says: decided by HostFilter, never from the counts here.
         bool dry;
+        // PLUG-10: the linear gain each GainMode plays for this filter (Set's
+        // entry unused), as applied_gain_db() gives it, and whether there is
+        // one; without one the filter plays silence in that mode.
+        std::array<float, gain_mode_count> figure{1, 1, 1};
+        std::array<bool, gain_mode_count> known{true, true, true};
         Prepared* next_retired = nullptr;
         std::uint64_t number = 0; // Publications are numbered from 1, in order.
-        Prepared(const Configuration& c, bool dry_, std::size_t block, std::size_t inputs)
-            : engine(fitted_engine(c, block, inputs)), dry(dry_) {}
+        Prepared(const Configuration& c, bool dry_, std::size_t block, std::size_t inputs,
+                 const FilterGains& gains)
+            : engine(fitted_engine(c, block, inputs)), dry(dry_) {
+            const auto place = [&](GainMode mode, const std::optional<double>& db) {
+                const auto i = static_cast<std::size_t>(mode);
+                known[i] = db.has_value();
+                figure[i] = db ? gain_from_db(*db) : 0.f;
+            };
+            // Estimate plays the bound where the estimate is absent.
+            place(GainMode::estimate, gains.estimate_db ? gains.estimate_db : gains.no_clipping_db);
+            place(GainMode::no_clipping, gains.no_clipping_db);
+        }
     };
     static_assert(std::atomic<Prepared*>::is_always_lock_free);
     static_assert(std::atomic<std::size_t>::is_always_lock_free);
@@ -993,6 +1093,19 @@ struct HostProcessor::Impl {
     double set_db = 0;
     std::size_t gain_ramp = 0, mix_ramp = 0;
     float set_gain = 1, gain = 1, gain_target = 1, gain_step = 0;
+    // PLUG-10: the gain mode (audio thread). In Set mode both filters of a
+    // replacement play at `gain`, as before the modes existed; otherwise the
+    // filter fading out keeps the gain it had when the new one was adopted.
+    GainMode mode = GainMode::set;
+    float previous_gain = 1;
+    // The gain `p` plays at in the current mode: the Gain setting, or the
+    // filter's own figure (silence when it is unknown).
+    float target_gain(const Prepared& p) const noexcept {
+        if (mode == GainMode::set)
+            return set_gain;
+        const auto i = static_cast<std::size_t>(mode);
+        return p.known[i] ? p.figure[i] : 0.f;
+    }
     float mix_setting = 1, mix = 1, mix_target = 1, mix_step = 0;
     // Bypass and mute ramp by whole frames, counted out of setting_ramp, so
     // they end exactly at 0 and 1 at every rate (PLUG-18): a float step
@@ -1018,7 +1131,7 @@ struct HostProcessor::Impl {
     // The filter and its dry answer apart, so the Configuration overloads
     // need no copy of the filter in a HostPlayback.
     Impl(const Configuration& c, bool has_dry, std::size_t maximum_, std::size_t block_,
-         const HostSettings& settings = {}, std::size_t inputs_ = 0)
+         const HostSettings& settings = {}, std::size_t inputs_ = 0, const FilterGains& gains = {})
         : rate(c.sample_rate), inputs(std::max(inputs_, c.input_channels)),
           outputs(c.output_channels), maximum(maximum_), block(block_) {
         if (!c.input_channels || !outputs || inputs > max_channel_count ||
@@ -1026,7 +1139,7 @@ struct HostProcessor::Impl {
             std::max(inputs, outputs) * maximum > (1U << 24) ||
             (inputs_ && inputs_ < c.input_channels) || (has_dry && outputs > inputs))
             throw std::invalid_argument("invalid host channel count or callback capacity");
-        auto prepared = std::make_unique<Prepared>(c, has_dry, block, inputs);
+        auto prepared = std::make_unique<Prepared>(c, has_dry, block, inputs, gains);
         input.resize(inputs * maximum);
         wet.resize(outputs * maximum);
         old_wet.resize(wet.size());
@@ -1034,7 +1147,9 @@ struct HostProcessor::Impl {
         tail.store(prepared->engine.tail_frames());
         current = prepared.release();
         set_db = clamp_gain_db(settings.gain_db);
-        set_gain = gain = gain_target = gain_from_db(set_db);
+        set_gain = gain_from_db(set_db);
+        mode = settings.gain_mode;
+        gain = gain_target = target_gain(*current);
         mix_setting = static_cast<float>(clamp_mix(settings.mix));
         mix = mix_target = target_mix();
     }
@@ -1045,8 +1160,8 @@ struct HostProcessor::Impl {
     }
     // Audio thread, at the start of a call: a new gain or mix starts a ramp.
     void retarget() noexcept {
-        if (set_gain != gain_target) {
-            gain_target = set_gain;
+        if (const auto t = target_gain(*current); t != gain_target) {
+            gain_target = t;
             gain_step = (gain_target - gain) / setting_ramp;
             gain_ramp = setting_ramp;
         }
@@ -1070,11 +1185,12 @@ struct HostProcessor::Impl {
             item = next;
         }
     }
-    std::unique_ptr<Prepared> prepare(const Configuration& c, bool has_dry) const {
+    std::unique_ptr<Prepared> prepare(const Configuration& c, bool has_dry,
+                                      const FilterGains& gains = {}) const {
         if (c.sample_rate != rate || !c.input_channels || c.input_channels > inputs ||
             c.output_channels != outputs || (has_dry && outputs > inputs))
             throw std::invalid_argument("replacement must preserve sample rate and channels");
-        return std::make_unique<Prepared>(c, has_dry, block, inputs);
+        return std::make_unique<Prepared>(c, has_dry, block, inputs, gains);
     }
     void publish(std::unique_ptr<Prepared> prepared) noexcept {
         collect();
@@ -1086,8 +1202,8 @@ struct HostProcessor::Impl {
         published.store(prepared->number, std::memory_order_release);
         delete pending.exchange(prepared.release(), std::memory_order_acq_rel);
     }
-    void replace(const Configuration& c, bool has_dry) {
-        publish(prepare(c, has_dry));
+    void replace(const Configuration& c, bool has_dry, const FilterGains& gains = {}) {
+        publish(prepare(c, has_dry, gains));
     }
     // The audio producer only links; the control consumer owns deletion.
     // Collection must never hold up adoption of another pending filter.
@@ -1118,7 +1234,7 @@ struct HostProcessor::Impl {
         fade = 0;
         dry_frames = bypass ? setting_ramp : 0;
         // The stream starts again: the settings apply at once, without ramps.
-        gain = gain_target = set_gain;
+        gain = gain_target = target_gain(*current);
         mix = mix_target = target_mix();
         gain_ramp = mix_ramp = 0;
     }
@@ -1154,8 +1270,16 @@ struct HostProcessor::Impl {
                     previous = current;
                     previous_level_frames = level_frames;
                     previous_muted = muted;
+                    previous_gain = gain;
                     warm = block;
                     fade = 0;
+                    // PLUG-10: outside Set mode the new filter starts at its
+                    // own figure (it is silent until its warm-up ends), so
+                    // the crossfade covers the change.
+                    if (mode != GainMode::set) {
+                        gain = gain_target = target_gain(*next);
+                        gain_ramp = 0;
+                    }
                 } else {
                     // Nothing has been heard yet (initial restoration): install
                     // directly, so output follows the filter from the first frame.
@@ -1248,6 +1372,10 @@ struct HostProcessor::Impl {
             // without, or the reverse, both fade with the crossfade, so
             // neither bypass nor Mix jumps.
             const bool dry_now = current->dry, dry_before = previous && previous->dry;
+            // PLUG-10: in Set mode both filters share `gain`, computed as
+            // before the modes existed.
+            const bool shared_gain = mode == GainMode::set;
+            const float gain_before = shared_gain ? gain : previous_gain;
             const float mix_now = dry_now ? mix : 1.f;
             const float mix_before = dry_before ? mix : 1.f;
             const bool same_rule = !previous || dry_now == dry_before;
@@ -1285,15 +1413,20 @@ struct HostProcessor::Impl {
                 }
                 double value = level * static_cast<double>(wet[index]);
                 if (same_rule) {
-                    if (previous)
-                        value = (1.0 - blend) * previous_level * old_wet[index] + blend * value;
-                    // Gain 1 and mix 1 (the defaults) leave every value
-                    // exactly as it was before the settings existed.
-                    value *= gain;
+                    if (previous && !shared_gain) {
+                        value = (1.0 - blend) * gain_before * previous_level * old_wet[index] +
+                                blend * gain * value;
+                    } else {
+                        if (previous)
+                            value = (1.0 - blend) * previous_level * old_wet[index] + blend * value;
+                        // Gain 1 and mix 1 (the defaults) leave every value
+                        // exactly as it was before the settings existed.
+                        value *= gain;
+                    }
                     if (mix_now != 1)
                         value = mix_now * value + (1.0 - mix_now) * shared_dry * dry_value;
                 } else {
-                    const double before = gain * previous_level * old_wet[index];
+                    const double before = gain_before * previous_level * old_wet[index];
                     value =
                         blend * (mix_now * gain * value + (1.0 - mix_now) * dry_level * dry_value) +
                         (1.0 - blend) * (mix_before * before +
@@ -1345,13 +1478,13 @@ HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum,
 HostProcessor::HostProcessor(const HostPlayback& p, std::size_t maximum,
                              const HostSettings& settings, std::size_t inputs)
     : impl_(std::make_unique<Impl>(p.filter, p.dry, maximum, offered_latency(settings.latency),
-                                   settings, inputs)) {}
+                                   settings, inputs, p.gains)) {}
 HostProcessor::~HostProcessor() = default;
 void HostProcessor::replace(const Configuration& c) {
     impl_->replace(c, own_dry(c));
 }
 void HostProcessor::replace(const HostPlayback& p) {
-    impl_->replace(p.filter, p.dry);
+    impl_->replace(p.filter, p.dry, p.gains);
 }
 struct HostProcessor::Replacement::Data {
     const Impl* owner = nullptr;
@@ -1371,7 +1504,7 @@ HostProcessor::Replacement HostProcessor::prepare(const Configuration& c) const 
     return Replacement(std::move(data));
 }
 HostProcessor::Replacement HostProcessor::prepare(const HostPlayback& p) const {
-    auto prepared = impl_->prepare(p.filter, p.dry);
+    auto prepared = impl_->prepare(p.filter, p.dry, p.gains);
     // Member by member: Apple Clang lacks parenthesized aggregate initialization.
     auto data = std::make_unique<Replacement::Data>();
     data->owner = impl_.get();
@@ -1402,6 +1535,9 @@ void HostProcessor::set_gain_db(double db) noexcept {
 }
 void HostProcessor::set_mix(double mix) noexcept {
     impl_->mix_setting = static_cast<float>(clamp_mix(mix));
+}
+void HostProcessor::set_gain_mode(GainMode mode) noexcept {
+    impl_->mode = mode;
 }
 std::uint64_t HostProcessor::publications() const noexcept {
     return impl_->published.load(std::memory_order_acquire);

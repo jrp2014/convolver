@@ -18,11 +18,19 @@ namespace {
 // the latency in frames. Encoders write the lowest version that holds the
 // state: 3 only for settings that differ from the defaults, 2 for a failed
 // load without them, 1 otherwise, so builds that read only version 1 keep
-// reading every other state.
-constexpr std::uint32_t magic = 0x53564e43, version = 3;
+// reading every other state. Version 4 (PLUG-10; jrp, 12 November 2026) is
+// version 3 with one more word after the latency, the gain mode (GainMode's
+// number), written only when the mode is not Set.
+constexpr std::uint32_t magic = 0x53564e43, version = 4;
 constexpr std::size_t settings_words = 5;
+// The words the settings take in this version (none before version 3).
+constexpr std::size_t settings_words_in(std::uint32_t format) noexcept {
+    return format >= 4 ? settings_words + 1 : format == 3 ? settings_words : 0;
+}
 // The version encode_host_state() writes for this state.
 std::uint32_t state_version(const HostState& state) noexcept {
+    if (state.settings && state.settings->gain_mode != GainMode::set)
+        return 4;
     if (state.settings && *state.settings != HostSettings{})
         return 3;
     return state.failed ? 2 : 1;
@@ -75,8 +83,7 @@ std::size_t add(std::size_t a, std::size_t b) noexcept {
 // The words encode_host_state() writes, saturating.
 std::size_t encoded_words(const HostState& state) noexcept {
     std::size_t words = 3; // Magic, version, flags.
-    if (state_version(state) == 3)
-        words += settings_words;
+    words += settings_words_in(state_version(state));
     if (!state.configuration)
         return words;
     const auto& c = *state.configuration;
@@ -114,10 +121,9 @@ Advice host_state_size_error(const HostState& state) {
     // state holds them yet, so a filter accepted at default settings still
     // saves once a VST3 setting changes (jrp's review of 276c7dc), now and
     // after later settings are added.
-    static_assert(settings_words * 4 <= host_settings_room_bytes);
+    static_assert(settings_words_in(version) * 4 <= host_settings_room_bytes);
     auto words = encoded_words(state);
-    if (state_version(state) == 3)
-        words -= settings_words;
+    words -= settings_words_in(state_version(state));
     if (state.configuration)
         words = add(words, host_settings_room_bytes / 4);
     const auto size = word_bytes(words);
@@ -153,10 +159,12 @@ std::vector<std::byte> encode_host_state(const HostState& state) {
     w.word(magic);
     w.word(format);
     w.word((state.configuration ? 1 : 0) | (state.bypass ? 2 : 0) | (state.failed ? 4 : 0));
-    if (format == 3) {
+    if (format >= 3) {
         w.number(state.settings->gain_db);
         w.number(state.settings->mix);
         w.word(state.settings->latency);
+        if (format >= 4)
+            w.word(static_cast<std::size_t>(state.settings->gain_mode));
     }
     if (state.configuration) {
         const auto& c = *state.configuration;
@@ -205,17 +213,24 @@ HostState decode_host_state(std::span<const std::byte> bytes) {
         throw std::invalid_argument("unsupported host state version " + std::to_string(format));
     auto flags = r.word();
     // Version 2 only ever marks a failed load (flag 4); a failed load never
-    // holds a filter. Version 3 may mark one or not.
+    // holds a filter. Versions 3 and 4 may mark one or not.
     if (flags > (format == 1 ? 3U : 7U) || (flags & 5) == 5 || (format == 2 && !(flags & 4)))
         throw std::invalid_argument("invalid host state flags");
     HostState state;
     state.bypass = (flags & 2) != 0;
     state.failed = (flags & 4) != 0;
-    if (format == 3) {
+    if (format >= 3) {
         HostSettings settings;
         settings.gain_db = r.number();
         settings.mix = r.number();
         settings.latency = r.word();
+        if (format >= 4) {
+            const auto mode = r.word();
+            // Version 4 is written only for a mode other than Set.
+            if (mode == 0 || mode >= gain_mode_count)
+                throw std::invalid_argument("invalid host state settings");
+            settings.gain_mode = static_cast<GainMode>(mode);
+        }
         if (!std::isfinite(settings.gain_db) || settings.gain_db < min_gain_db ||
             settings.gain_db > max_gain_db || !std::isfinite(settings.mix) || settings.mix < 0 ||
             settings.mix > 1 ||

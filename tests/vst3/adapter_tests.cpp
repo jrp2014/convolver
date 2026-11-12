@@ -1055,9 +1055,9 @@ void failure_records() {
     require(f && f->kind == HostFailureKind::state_unreadable && f->request.number == 2,
             "damaged state not recorded");
     MemoryStream newer;
-    const std::array<unsigned char, 16> v4{12, 0, 0, 0, 0x43, 0x4e, 0x56, 0x53,
-                                           4,  0, 0, 0, 0,    0,    0,    0};
-    newer.write(const_cast<unsigned char*>(v4.data()), 16, nullptr);
+    const std::array<unsigned char, 16> v5{12, 0, 0, 0, 0x43, 0x4e, 0x56, 0x53,
+                                           5,  0, 0, 0, 0,    0,    0,    0};
+    newer.write(const_cast<unsigned char*>(v5.data()), 16, nullptr);
     newer.seek(0, IBStream::kIBSeekSet, nullptr);
     require(p.setState(&newer) == kResultFalse, "newer state accepted");
     f = p.failure();

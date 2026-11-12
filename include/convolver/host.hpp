@@ -22,6 +22,14 @@ inline constexpr double min_gain_db = -100, max_gain_db = 24; // jrp, 25 October
 // (PERF-2): zero latency added first, and the default.
 inline constexpr std::array<std::size_t, 8> host_latencies{0, 64, 128, 256, 512, 1024, 2048, 4096};
 inline constexpr std::size_t default_host_latency = 0;
+// PLUG-10: which gain plays. Set plays the Gain setting; Estimate and No
+// clipping play the filter's own figure from estimate_attenuation() (its
+// noise estimate and its no-clipping bound), computed when the filter is
+// accepted, and leave the Gain setting as it is. Saved as these numbers
+// (VST3 state version 4, the Audio Unit's parameter 1002 and LV2's
+// gain_mode port; jrp, 12 November 2026).
+enum class GainMode : std::uint8_t { set = 0, estimate = 1, no_clipping = 2 };
+inline constexpr std::size_t gain_mode_count = 3;
 struct HostSettings {
     // The filtered signal's gain in decibels, within min_gain_db and
     // max_gain_db (clamped there by HostProcessor).
@@ -36,8 +44,39 @@ struct HostSettings {
     // cannot change while a processor runs: it is the block size the
     // processor is built with.
     std::size_t latency = default_host_latency;
+    // Which gain plays (GainMode); gain_db keeps the Set value meanwhile.
+    GainMode gain_mode = GainMode::set;
     bool operator==(const HostSettings&) const = default;
 };
+
+// PLUG-10: the gains in decibels that Estimate and No clipping play for a
+// filter: estimate_attenuation()'s noise_attenuation_db and
+// worst_case_attenuation_db, applied as they are (never clamped to the Gain
+// range). 0 dB for what plays without a filter (identity or silence).
+// The bound only adds up the taps, so it is always found; it is absent only
+// when it exceeds the largest float, as the CLI's --gain-db no-clip refuses.
+// The estimate filters noise for ten filter lengths, which takes time for a
+// long filter, so HostFilter finds it only while Estimate is chosen; it is
+// absent until then, and when the noise overflows single precision
+// (estimate_failed), as --gain-db auto refuses. Where the estimate is absent,
+// Estimate plays the bound instead, which is never louder; where the bound is
+// absent too, the filter plays silence.
+struct FilterGains {
+    std::optional<double> estimate_db = 0.0;
+    std::optional<double> no_clipping_db = 0.0;
+    bool estimate_failed = false;
+    bool operator==(const FilterGains&) const = default;
+};
+// Control thread: the figures for this filter, the estimate only when
+// `estimate` is set. Never throws for a figure it cannot compute: that figure
+// is absent.
+FilterGains filter_gains(const Configuration&, bool estimate = true);
+// The gain in decibels that plays under `settings` with these figures: the
+// Gain setting (clamped to its range) in Set mode, the filter's figure
+// otherwise (the bound for an absent estimate); absent when the filter plays
+// silence.
+std::optional<double> applied_gain_db(const HostSettings&, const FilterGains&) noexcept;
+const char* gain_mode_name(GainMode) noexcept; // "Set", "Estimate", "No clipping".
 
 // Versioned self-contained host state. All codec calls are control-thread only.
 struct HostState {
@@ -53,7 +92,8 @@ struct HostState {
     bool failed = false;
     // Saved and applied by the VST3 adapter only (VST3-4): the settings its
     // parameters held. Encoded as version 3, only when they differ from the
-    // defaults, so every other state keeps its older version. Absent in
+    // defaults, or as version 4 when the gain mode is not Set (PLUG-10), so
+    // every other state keeps its older version. Absent in
     // older states, presets from convolver-preset and the other formats'
     // states; the Audio Unit and LV2 save their settings as parameters and
     // ports, and ignore these.
@@ -135,6 +175,9 @@ Advice speaker_notice(const Configuration&, const HostLayout&);
 struct HostPlayback {
     Configuration filter;
     bool dry = false;
+    // PLUG-10: what Estimate and No clipping play for this filter
+    // (HostFilter fills them in from the accepted filter's filter_gains()).
+    FilterGains gains;
 };
 // A filter that plays: a dry signal only when the filter itself has as many
 // inputs as outputs (PLUG-23), never because the host's counts are equal.
@@ -322,6 +365,24 @@ class HostFilter {
     double filter_peak() const noexcept {
         return peak_;
     }
+    // PLUG-10: filter_gains() of filter(), found when it was accepted (the
+    // estimate only while estimating()); 0 dB for both without one.
+    // HostPlayback carries them to the processor.
+    const FilterGains& gains() const noexcept {
+        return gains_;
+    }
+    // PLUG-10: whether load() finds the noise estimate, which Estimate needs
+    // and which takes time for a long filter. Adapters set it while their
+    // gain mode is Estimate, before loading, with estimate(). Turning it on
+    // also finds the estimate of the filter already accepted (control thread;
+    // filters noise, may throw std::bad_alloc) and then returns that filter's
+    // playback for the adapter to publish, so the processor crossfades to it
+    // at its new figure. Returns nothing when gains() did not change, or when
+    // no filter plays (none accepted, or it does not suit the host).
+    std::optional<HostPlayback> estimate(bool on);
+    bool estimating() const noexcept {
+        return estimating_;
+    }
     // PLUG-22: configuration_identity() of filter(), found when it was
     // accepted, so a report never computes it; 0 without one.
     std::uint64_t filter_identity() const noexcept {
@@ -442,6 +503,8 @@ class HostFilter {
     std::size_t max_channels_;
     std::optional<Configuration> filter_;
     double peak_ = 0;            // filter_peak()
+    FilterGains gains_;          // gains()
+    bool estimating_ = false;    // estimating()
     std::uint64_t identity_ = 0; // filter_identity()
     HostRequest accepted_;       // The request that supplied filter_ (or the saved failure).
     std::uint64_t requests_ = 0;
@@ -594,6 +657,12 @@ class HostProcessor {
     // counts). Each change ramps over 1.33 ms (64 frames at 48 kHz, PLUG-17).
     void set_gain_db(double) noexcept;
     void set_mix(double) noexcept;
+    // PLUG-10, audio thread: which gain plays. Estimate and No clipping play
+    // the gains the playing filter's HostPlayback carried (0 dB for one given
+    // as a Configuration), ramping like a Gain change; a filter whose figure
+    // is absent plays silence in that mode. During a replacement each filter
+    // plays at its own figure, so the crossfade covers the change.
+    void set_gain_mode(GainMode) noexcept;
     // Audio thread: the current filter ramps to silence over 1.33 ms (or is
     // silent at once, before any audio since construction or reset) and
     // stays silent until a filter published after this call takes over,

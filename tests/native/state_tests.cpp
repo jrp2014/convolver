@@ -105,6 +105,40 @@ int main() {
         const auto set_failed_back = decode_host_state(encode_host_state(set_failed));
         require(set_failed_back.failed && set_failed_back.settings == set.settings,
                 "version-3 settings with a failed load");
+        // PLUG-10: version 4 is version 3 with the gain mode after the
+        // latency, written only when the mode is not Set (jrp, 12 November
+        // 2026); the Set value of Gain is kept beside it.
+        auto moded = set;
+        moded.settings->gain_mode = GainMode::no_clipping;
+        const auto moded_bytes = encode_host_state(moded);
+        auto moded_wire = std::vector<unsigned char>(set_wire.begin(), set_wire.end());
+        moded_wire[4] = 4;
+        moded_wire.insert(moded_wire.end(), {2, 0, 0, 0}); // No clipping.
+        require(std::equal(moded_bytes.begin(), moded_bytes.end(),
+                           std::as_bytes(std::span(moded_wire)).begin(),
+                           std::as_bytes(std::span(moded_wire)).end()),
+                "version-4 gain mode wire encoding");
+        require(decode_host_state(moded_bytes).settings == moded.settings,
+                "version-4 gain mode decoding");
+        auto moded_filter = moded;
+        moded_filter.configuration = identity.configuration;
+        moded_filter.settings = HostSettings{};
+        moded_filter.settings->gain_mode = GainMode::estimate;
+        const auto moded_filter_back = decode_host_state(encode_host_state(moded_filter));
+        require(moded_filter_back.settings == moded_filter.settings &&
+                    moded_filter_back.configuration->paths[0].impulse == std::vector<float>{1.f},
+                "version-4 gain mode with a filter and otherwise default settings");
+        // Set is never written as version 4, and a mode out of range is damage.
+        for (const unsigned char bad_mode : {0, 3, 0xff}) {
+            auto bytes_bad = moded_bytes;
+            bytes_bad[32] = std::byte{bad_mode};
+            rejects([&] { (void)decode_host_state(bytes_bad); });
+        }
+        rejects([&] {
+            auto truncated = moded_bytes;
+            truncated.resize(32);
+            (void)decode_host_state(truncated);
+        });
         // Default settings keep the older versions, byte for byte.
         auto defaults = identity;
         defaults.settings = HostSettings{};
@@ -132,7 +166,7 @@ int main() {
             rejects([&] { (void)decode_host_state(bytes_bad); });
         }
         // PLUG-8: a newer state version is told apart from damaged state.
-        for (const unsigned char format : {4, 0xff}) {
+        for (const unsigned char format : {5, 0xff}) {
             const auto newer =
                 std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, format, 0, 0, 0, 0, 0, 0, 0});
             try {
