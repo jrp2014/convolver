@@ -131,6 +131,13 @@ already holds one filter.
   mono track, so use a stereo (2-in, 2-out) filter, and set its playback
   rate to the filter's
   ([the rate a host plays at](plugins.md#status-and-the-convolver-log)).
+- **VST3 or AU, from Convolver's window:** choose the `.vstpreset` with
+  **Choose…**, or drop it on the window, from any folder; no preset folder,
+  import or administrator is needed, and the Audio Unit reads it too
+  ([a preset in the window](plugins.md#a-preset-in-the-window)). Its Gain,
+  Mix and Latency load with the filter, as from the host's preset menu.
+  In Audacity 4 this avoids the preset folder, but it is not yet checked
+  in Audacity, and the window route's caveat above applies.
 - **AU:** load the `.aupreset` from the host's preset menu. Logic and
   GarageBand list the user presets in their [preset folder](#preset-folders).
 - **LV2:** copy the whole `room.preset.lv2` folder into a

@@ -178,6 +178,11 @@ the export has the filter you chose (for example by comparing it with
    sudo cp presets/*-stereo/*-stereo.vstpreset /Library/Audio/Presets/Convolver/Convolver/
    ```
 
+   Or skip the copying: with Convolver's window open (step 3), choose the
+   `.vstpreset` from any folder with **Choose…**
+   ([a preset in the window](plugins.md#a-preset-in-the-window)). This is
+   not yet checked in Audacity, and the window's export check above
+   applies.
 3. Add Convolver as a real-time effect and choose the preset by its file
    name from Audacity's preset menu. To see Convolver's window and status,
    turn on *Preset options › Use vendor UI*.

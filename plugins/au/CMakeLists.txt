@@ -51,8 +51,9 @@ else()
     message(FATAL_ERROR "CONVOLVER_AU_FILE_READER must be AUDIOTOOLBOX or LIBSNDFILE")
 endif()
 message(STATUS "Audio Unit file reader: ${au_file_reader}")
+# PLUG-26: a file chosen in the window, a filter file or a Convolver .vstpreset.
 target_link_libraries(convolver_au_adapter PUBLIC convolver_ausdk Convolver::host
-    convolver_filter_file ${au_reader_library})
+    convolver_chosen_file ${au_reader_library})
 # Public: the window test reads with the same reader.
 target_compile_definitions(convolver_au_adapter PUBLIC "CONVOLVER_AU_READER_${au_file_reader}=1")
 # What au.bundle accepts: only macOS's libraries, unless a fallback (this

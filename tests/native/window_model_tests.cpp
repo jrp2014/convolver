@@ -105,7 +105,8 @@ void content_tests() {
     const auto c2 = window_content(&copy, false);
     require(c2.action == WindowAction::copy_diagnostics && c2.filter_note.empty(),
             "copy diagnostics");
-    require(window_content(&copy, true).filter_note == "Or drop an IR file or .cfg on this window.",
+    require(window_content(&copy, true).filter_note ==
+                "Or drop an IR file, .cfg or .vstpreset on this window.",
             "the drop hint alone");
 
     // Active, nothing to say: no message, no box.
@@ -133,7 +134,7 @@ void content_tests() {
     const auto none = window_content(nullptr, true);
     require(!none.available && none.status == -1 && none.status_name == "Not available" &&
                 none.title == "Convolver" && none.boxed() && !none.fix.empty() &&
-                none.filter_note == "Or drop an IR file or .cfg on this window.",
+                none.filter_note == "Or drop an IR file, .cfg or .vstpreset on this window.",
             "no report");
 }
 

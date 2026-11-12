@@ -6,6 +6,7 @@
 #include "host_log.hpp"
 #include "pluginterfaces/vst/ivstattributes.h"
 #include "pluginterfaces/vst/vstpresetkeys.h"
+#include "presets.hpp"
 #include "processor.hpp"
 #include "public.sdk/source/common/memorystream.h"
 #include "public.sdk/source/vst/hosting/hostclasses.h"
@@ -2476,6 +2477,180 @@ void chosen_file_on_wider_bus() {
     c.terminate();
     p.terminate();
 }
+// PLUG-26: a Convolver .vstpreset chosen in the window loads as one from the
+// host's preset menu does: its filter, and the Gain, Mix and Latency it
+// holds (jrp, 8 November 2026), which the controller reports to the host as
+// edits, one gesture each, so the host's parameters and the state it saves
+// agree with what plays; a changed Latency asks for a latency restart. A
+// preset without settings (from convolver-preset) leaves the current ones.
+// Another plug-in's preset, a damaged one, one with no filter, a missing
+// file and a preset for another rate are refused, saying what to do, and
+// change nothing. `offers_dirty` false: Audacity 4.0.2 (VST3-17), which the
+// settings' own edits tell that the project changed.
+void chosen_preset(bool offers_dirty) {
+    HostApplication context;
+    Handler handler;
+    handler.offers_dirty = offers_dirty;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk && p.connect(&c) == kResultOk &&
+                c.connect(&p) == kResultOk,
+            "chosen preset: initialize");
+    SpeakerArrangement mono = SpeakerArr::kMono;
+    require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "chosen preset: buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "chosen preset: activate");
+    const auto folder = private_temp("convolver-vst3-chosen-preset");
+    std::filesystem::create_directories(folder);
+    const auto write = [&](const char* name, const std::vector<std::byte>& bytes) {
+        const auto path = folder / name;
+        std::ofstream out(path, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
+        require(static_cast<bool>(out), "chosen preset: write a preset");
+        return path.string();
+    };
+    const auto filter = [](int rate, float tap) {
+        convolver::HostState state;
+        state.configuration = convolver::Configuration{rate, 1, 1, 0, {}, {}, {}};
+        state.configuration->paths.push_back({{tap, tap / 2}, {{0, 1}}, {{0, 1}}});
+        return state;
+    };
+    const convolver::HostSettings chosen{-6, .5, 512};
+    auto hall = filter(48000, .5f);
+    hall.settings = chosen;
+    const auto hall_path = write("hall.vstpreset", convolver::presets::vst3_preset(hall));
+    const auto field = [&](const char* name) {
+        for (const auto& [key, value] : c.report())
+            if (key == name)
+                return value;
+        return std::string("(missing)");
+    };
+    const auto gestures = [&] {
+        std::vector<ParamID> ids;
+        for (std::size_t i = 0; i + 2 < handler.edits.size(); i += 3) {
+            const auto& b = handler.edits[i];
+            const auto& e = handler.edits[i + 2];
+            if (b.kind != 'b' || handler.edits[i + 1].kind != 'p' || e.kind != 'e' ||
+                b.id != handler.edits[i + 1].id || b.id != e.id)
+                return std::vector<ParamID>{kNoParamId};
+            ids.push_back(b.id);
+        }
+        if (handler.edits.size() % 3)
+            ids.push_back(kNoParamId);
+        return ids;
+    };
+
+    // A host's preset with settings: all three apply and reach the host.
+    handler.edits.clear();
+    handler.restarts.clear();
+    require(c.load_file(hall_path), "chosen preset: refused");
+    require(!p.failure() && field("filter name") == "hall.vstpreset",
+            "chosen preset: not loaded as the chosen file");
+    require(p.settings() == chosen && p.getLatencySamples() == 512,
+            "chosen preset: its settings do not play");
+    require(c.getParamNormalized(gain_id) == normalized_gain(-6) &&
+                c.getParamNormalized(mix_id) == .5 &&
+                c.getParamNormalized(latency_id) == normalized_latency(512),
+            "chosen preset: the controller's parameters disagree with what plays");
+    require(gestures() == std::vector<ParamID>{gain_id, mix_id, latency_id} &&
+                handler.edits[1].value == normalized_gain(-6) && handler.edits[4].value == .5 &&
+                handler.edits[7].value == normalized_latency(512),
+            "chosen preset: the settings were not reported as one edit each");
+    require(handler.latency_restarts() == 1, "chosen preset: no latency restart");
+    require(handler.dirty == (offers_dirty ? 1 : 0), "chosen preset: setDirty");
+    // The state saved now is the preset's, so reopening plays the same.
+    MemoryStream saved;
+    require(p.getState(&saved) == kResultOk, "chosen preset: save");
+    saved.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(convolver::encode_host_state(read_state(&saved)) == convolver::encode_host_state(hall),
+            "chosen preset: the saved state is not the preset's");
+    // What a host does with the edits: Gain and Mix come back in process(),
+    // Latency to setParamNormalized; neither is a new request.
+    handler.restarts.clear();
+    require(c.setParamNormalized(latency_id, handler.edits[7].value) == kResultOk &&
+                handler.latency_restarts() == 0,
+            "chosen preset: the Latency handed back read as a new one");
+    ParameterChanges changes;
+    int32 index = 0;
+    changes.addParameterData(gain_id, index)->addPoint(0, handler.edits[1].value, index);
+    changes.addParameterData(mix_id, index)->addPoint(0, handler.edits[4].value, index);
+    ProcessData flush{};
+    flush.inputParameterChanges = &changes;
+    require(p.process(flush) == kResultOk, "chosen preset: process");
+    require(std::abs(p.settings().gain_db + 6) < 1e-9 && p.settings().mix == .5 &&
+                p.getLatencySamples() == 512,
+            "chosen preset: the host's values changed the settings");
+
+    // A preset from convolver-preset holds no settings: they stay.
+    const auto plain_path =
+        write("plain.VSTPRESET", convolver::presets::vst3_preset(filter(48000, .25f)));
+    handler.edits.clear();
+    handler.restarts.clear();
+    require(c.load_file(plain_path) && !p.failure() && field("filter name") == "plain.VSTPRESET",
+            "plain preset: refused");
+    require(std::abs(p.settings().gain_db + 6) < 1e-9 && p.settings().mix == .5 &&
+                p.settings().latency == 512 &&
+                c.getParamNormalized(latency_id) == normalized_latency(512),
+            "plain preset: the settings changed");
+    // Only VST3-17's Latency edit that keeps its value, for a host without setDirty.
+    require(offers_dirty ? handler.edits.empty() : gestures() == std::vector<ParamID>{latency_id},
+            "plain preset: unexpected edits");
+    require(handler.latency_restarts() == 0, "plain preset: a latency restart");
+
+    // Refusals: nothing changes, and the message says what to do.
+    const auto kept = convolver::encode_host_state(filter(48000, .25f));
+    const auto refused = [&](const std::string& path, convolver::HostFailureKind kind,
+                             const char* says, const char* what) {
+        handler.edits.clear();
+        handler.restarts.clear();
+        require(!c.load_file(path), (std::string(what) + ": accepted").c_str());
+        const auto f = p.failure();
+        require(
+            f && f->kind == kind && f->request.path == path &&
+                f->message.problem.find(says) != std::string::npos &&
+                (kind != convolver::HostFailureKind::state_unreadable || !f->message.fix.empty()),
+            (std::string(what) + ": " + (f ? f->message.problem : "no failure")).c_str());
+        require(handler.edits.empty() && handler.latency_restarts() == 0 &&
+                    std::abs(p.settings().gain_db + 6) < 1e-9 && p.settings().latency == 512,
+                (std::string(what) + ": the settings changed").c_str());
+        MemoryStream state;
+        require(p.getState(&state) == kResultOk, "refused preset: save");
+        state.seek(0, IBStream::kIBSeekSet, nullptr);
+        auto now = read_state(&state);
+        now.settings.reset();
+        now.failed = false;
+        require(convolver::encode_host_state(now) == kept,
+                (std::string(what) + ": replaced the playing filter").c_str());
+    };
+    auto foreign = convolver::presets::vst3_preset(hall);
+    foreign[8] = static_cast<std::byte>(foreign[8] == std::byte{'0'} ? '1' : '0');
+    refused(write("other.vstpreset", foreign), convolver::HostFailureKind::state_unreadable,
+            "another plug-in", "another plug-in's preset");
+    auto damaged = convolver::presets::vst3_preset(hall);
+    damaged.resize(60);
+    refused(write("damaged.vstpreset", damaged), convolver::HostFailureKind::state_unreadable,
+            "damaged.vstpreset", "a damaged preset");
+    refused(write("empty.vstpreset", convolver::presets::vst3_preset({})),
+            convolver::HostFailureKind::state_unreadable, "holds no filter",
+            "a preset with no filter");
+    refused((folder / "gone.vstpreset").string(), convolver::HostFailureKind::filter_file,
+            "cannot open", "a missing preset");
+    auto slow = filter(44100, .5f);
+    slow.settings = convolver::HostSettings{3, 1, 64};
+    refused(write("slow.vstpreset", convolver::presets::vst3_preset(slow)),
+            convolver::HostFailureKind::sample_rate, "", "a 44.1 kHz preset at 48 kHz");
+    std::filesystem::remove_all(folder);
+    p.setActive(false);
+    p.disconnect(&c);
+    c.disconnect(&p);
+    c.terminate();
+    p.terminate();
+}
 // VST3-17: a host without IComponentHandler2 (Audacity 4.0.2) stores the
 // state only after the plug-in reports an edit, so an accepted file is
 // reported as one edit of Latency that keeps its value: begin, perform with
@@ -3146,6 +3321,8 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"latency_handover_waits", latency_handover_waits},
         {"report_and_files", report_and_files},
         {"chosen_file_on_wider_bus", chosen_file_on_wider_bus},
+        {"chosen_preset", [] { chosen_preset(true); }},
+        {"chosen_preset_without_set_dirty", [] { chosen_preset(false); }},
         {"load_without_set_dirty", [] { load_without_set_dirty(false); }},
         {"load_with_failing_set_dirty", [] { load_without_set_dirty(true); }},
         {"saved_filter_name", saved_filter_name},

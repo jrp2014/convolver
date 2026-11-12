@@ -2,9 +2,9 @@
 // The Audio Unit's saved state and filter loading: preset checks, the saved
 // settings, SaveState and RestoreState, a file chosen in the window, and
 // installing a new filter or recording its refusal (see effect.cpp).
+#include "chosen_file.hpp"
 #include "core_foundation.hpp"
 #include "effect.hpp"
-#include "filter_file.hpp"
 #include "host_log.hpp"
 #include "presets.hpp"
 #include "utf8.hpp"
@@ -15,6 +15,7 @@
 #include <cmath>
 #include <exception>
 #include <filesystem>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <vector>
@@ -324,8 +325,11 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                                p.first == latency_parameter;
                     })) {
                     const auto counts = host ? *host : layout();
-                    message += " Restored settings: " +
-                               settings_words(settings(), dry_signal_rule(filter_, counts)) + ".";
+                    // PLUG-26: a .vstpreset chosen in the window brings them too.
+                    message +=
+                        (request.source == HostFilterSource::file ? " Settings from the preset: "
+                                                                  : " Restored settings: ") +
+                        settings_words(settings(), dry_signal_rule(filter_, counts)) + ".";
                 }
             }
         } catch (...) { // Out of memory for the message: it is dropped.
@@ -347,9 +351,12 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
 // AU-6: a filter file chosen in Convolver's window, read with the step
 // convolver-preset uses (PLUG-9) for the unit's rate and channels, so a list
 // chooses its entry as in the CLI. The state then saved holds the filter
-// itself, not the path, as a preset does. The file is read before the
-// control lock is taken; preparing the filter runs under it, on the host's
-// thread that set the property, as a state restore does.
+// itself, not the path, as a preset does. PLUG-26: or a Convolver .vstpreset,
+// read as convolver-preset reads it (read_chosen_file()); the Gain, Mix and
+// Latency it holds apply with its filter, as a preset from the host's menu
+// brings them, and one without them (from convolver-preset) leaves them. The file is read before
+// the control lock is taken; preparing the filter runs under it, on the host's thread that set the
+// property, as a state restore does.
 OSStatus Effect::load_file(const std::string& path) {
     HostRequest request{HostFilterSource::file, path, 0};
     HostLayout host;
@@ -367,12 +374,32 @@ OSStatus Effect::load_file(const std::string& path) {
     const auto& reader = detail::audio_toolbox_files();
 #endif
     // The files it was read from, so the window can reload it.
-    auto next = read_filter_file(path, host, reader, why, &request.files, &request.wider_entry);
+    auto next = read_chosen_file(path, host, reader, why, &request.files, &request.wider_entry);
     bool accepted = false;
     if (!next) {
         reject(why.kind, why.message, request, why.filter());
     } else {
-        accepted = install(std::move(*next), request, nullptr, false);
+        // A preset's settings as parameter values: Latency is a position in
+        // host_latencies, which read_vst3_preset has checked it is in.
+        std::optional<SavedSettings> saved;
+        if (const auto& s = next->settings) {
+            const auto at = std::ranges::find(host_latencies, s->latency);
+            try {
+                saved = SavedSettings{
+                    {gain_parameter, static_cast<AudioUnitParameterValue>(s->gain_db)},
+                    {mix_parameter, static_cast<AudioUnitParameterValue>(s->mix * 100)}};
+                if (at != host_latencies.end())
+                    saved->emplace_back(latency_parameter, static_cast<AudioUnitParameterValue>(
+                                                               at - host_latencies.begin()));
+            } catch (...) { // Out of memory: the filter alone, as from convolver-preset.
+                saved.reset();
+            }
+        }
+        accepted = install(std::move(*next), request, saved ? &*saved : nullptr, false);
+        if (accepted && saved) {
+            request_latency(); // Plays at once, as a restored Latency does.
+            settings_changed();
+        }
     }
     // The state the host saves has changed either way (a refusal is recorded
     // in it, and an empty instance then plays silence): hosts that listen for
@@ -427,15 +454,8 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     // restores a project, so waiting for the next start would leave it unused
     // (the independent review).
     request_latency();
-    if (saved) {
-        // Hosts and generic views reread the settings.
-        AudioUnitEvent event{};
-        event.mEventType = kAudioUnitEvent_ParameterValueChange;
-        for (const auto id : parameter_order) {
-            event.mArgument.mParameter = {GetComponentInstance(), id, kAudioUnitScope_Global, 0};
-            AUEventListenerNotify(nullptr, nullptr, &event);
-        }
-    }
+    if (saved)
+        settings_changed();
     // The preset name and element names, as AUBase restores them. Its "data"
     // (parameter values) is left out: the settings were read above with bounds
     // checks, and AUBase reads that blob without them.
@@ -446,6 +466,17 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     CFDictionaryRemoveValue(copy.get(), CFSTR(kAUPresetDataKey));
     static_cast<void>(AUBase::RestoreState(copy.get()));
     return noErr;
+}
+
+// Hosts and generic views reread the settings, which a restored state or a
+// chosen preset has set.
+void Effect::settings_changed() noexcept {
+    AudioUnitEvent event{};
+    event.mEventType = kAudioUnitEvent_ParameterValueChange;
+    for (const auto id : parameter_order) {
+        event.mArgument.mParameter = {GetComponentInstance(), id, kAudioUnitScope_Global, 0};
+        AUEventListenerNotify(nullptr, nullptr, &event);
+    }
 }
 
 // RestoreState's checks and decoding, before anything changes. Returns false

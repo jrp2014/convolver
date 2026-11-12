@@ -4,10 +4,13 @@
 #include "bytes.hpp"
 #include "file.hpp"
 #include "host_report.hpp"
+#include "utf8.hpp"
 #include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <fstream>
+#include <iterator>
 #include <optional>
 #include <stdexcept>
 #include <system_error>
@@ -270,6 +273,39 @@ vst3::ControllerState read_vst3_filter_name(std::span<const std::byte> bytes) {
     } catch (const std::invalid_argument&) {
         return {}; // A damaged list or chunk: no name, as the plug-in reads it.
     }
+}
+
+Vst3PresetFile read_vst3_preset_file(const std::filesystem::path& path) {
+    namespace fs = std::filesystem;
+    const auto name = detail::utf8_string(path);
+    std::error_code error;
+    if (const auto size = fs::file_size(path, error); !error && size > max_vst3_preset_file_bytes)
+        throw std::runtime_error(name + " is too large to be a Convolver preset");
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        const bool there = fs::exists(path, error);
+        throw std::runtime_error(detail::advice_text(
+            {"cannot open " + name,
+             there ? "The file is there, but this program may not read it."
+                   : "There is no file at that path.",
+             there ? "Check the file's permissions."
+                   : "Check the name and folder (letter case counts on Linux and on "
+                     "case-sensitive macOS volumes).",
+             {}}));
+    }
+    std::vector<char> text((std::istreambuf_iterator<char>(file)),
+                           std::istreambuf_iterator<char>());
+    if (text.size() > max_vst3_preset_file_bytes)
+        throw std::runtime_error(name + " is too large to be a Convolver preset");
+    const std::span bytes(reinterpret_cast<const std::byte*>(text.data()), text.size());
+    Vst3PresetFile result{read_vst3_preset(bytes), {}};
+    // The name is kept only while it still names this filter, as the plug-in
+    // shows it.
+    const auto kept = read_vst3_filter_name(bytes);
+    if (!kept.identity.empty() &&
+        vst3_filter_name(result.state, kept.name).identity == kept.identity)
+        result.filter_name = kept.name;
+    return result;
 }
 
 std::string base64(std::span<const std::byte> data) {

@@ -468,9 +468,10 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
                                        action:@selector(chooseFilter:)];
     _chooseButton.accessibilityLabel = @"Choose Filter";
     _chooseButton.toolTip =
-        @"Loads an IR file, .cfg or configuration list as the filter; you can also drop the "
-        @"file on this window. The project keeps the filter itself and its file's name, as a "
-        @"preset does, so moving the file later does not change it.";
+        @"Loads an IR file, .cfg, configuration list or Convolver .vstpreset as the filter "
+        @"(a preset brings its Gain, Mix and Latency too); you can also drop the file on this "
+        @"window. The project keeps the filter itself and its file's name, as a preset does, "
+        @"so moving the file later does not change it.";
     _recentButton = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:YES];
     _recentButton.translatesAutoresizingMaskIntoConstraints = NO;
     [_recentButton addItemWithTitle:@"Recent"];
@@ -978,7 +979,9 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     panel.canChooseFiles = YES;
     panel.canChooseDirectories = NO;
     panel.allowsMultipleSelection = NO;
-    panel.message = @"Choose an IR file, .cfg or configuration list to use as the filter.";
+    panel.message =
+        @"Choose an IR file, .cfg, configuration list or Convolver .vstpreset to use as the "
+        @"filter.";
     panel.prompt = @"Load";
     // Not runModal: a modal loop inside the plug-in would stall the host's
     // own window events (plan, threads rule 4). The view may go before the
