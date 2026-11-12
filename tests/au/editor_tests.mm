@@ -435,9 +435,11 @@ void window() {
     // generic sliders). Moving one or typing sets the parameter; a change
     // from the host moves the slider; resetting (Option-click) restores the
     // default.
-    require(view.settingSliders.count == 2 && view.settingMenus.count == 1 &&
-                view.settingValues.count == 3,
-            "no setting sliders and menu");
+    require(view.settingSliders.count == 2 && view.settingMenus.count == 2 &&
+                view.settingValues.count == 4,
+            "setting rows: " + std::to_string(view.settingSliders.count) + " sliders, " +
+                std::to_string(view.settingMenus.count) + " menus, " +
+                std::to_string(view.settingValues.count) + " values");
     NSSlider* gain = view.settingSliders[0];
     NSSlider* mix = view.settingSliders[1];
     require(gain.minValue == -100 && gain.maxValue == 24 && gain.doubleValue == 0 &&
@@ -590,6 +592,40 @@ void window() {
     check(AudioUnitSetParameter(unit.get(), au::mix_parameter, kAudioUnitScope_Global, 0, 100, 0),
           "Mix back");
     [view refresh];
+
+    // PLUG-10: the Gain mode menu. A choice sets the parameter; the unit's
+    // worker thread applies it, and the row then shows the gain it plays.
+    const auto mode_note = [&](bool shown) {
+        for (int i = 0; i < 500; ++i) {
+            [view refresh];
+            if ((view.settingValues[1].stringValue.length > 0) == shown)
+                return true;
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        return false;
+    };
+    NSPopUpButton* mode = view.settingMenus[0];
+    require(mode.numberOfItems == 3 && [mode.itemTitles[0] isEqualToString:@"Set"] &&
+                [mode.itemTitles[1] isEqualToString:@"Estimate"] &&
+                [mode.itemTitles[2] isEqualToString:@"No clipping"] &&
+                mode.indexOfSelectedItem == 0 &&
+                [mode.accessibilityLabel isEqualToString:@"Gain mode"] &&
+                view.settingValues[1].stringValue.length == 0,
+            "Gain mode menu: " + text([mode.itemTitles componentsJoinedByString:@", "]) + "; " +
+                text(view.settingValues[1].stringValue));
+    [mode selectItemAtIndex:2];
+    [mode sendAction:mode.action to:mode.target];
+    check(
+        AudioUnitGetParameter(unit.get(), au::gain_mode_parameter, kAudioUnitScope_Global, 0, &now),
+        "Gain mode value");
+    require(now == 2, "the Gain mode menu did not set Gain mode: " + std::to_string(now));
+    require(mode_note(true), "no gain beside No clipping");
+    check(
+        AudioUnitSetParameter(unit.get(), au::gain_mode_parameter, kAudioUnitScope_Global, 0, 0, 0),
+        "Gain mode from the host");
+    require(mode_note(false) && mode.indexOfSelectedItem == 0,
+            "the Gain mode menu did not follow the host: " +
+                text(view.settingValues[1].stringValue));
 
     // Latency as a menu of block sizes (PLUG-10). A choice sets the
     // parameter, the unit's worker thread applies it at once, and the
