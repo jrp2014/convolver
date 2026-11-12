@@ -168,9 +168,10 @@ Editor::Editor(Controller& controller) : EditorView(&controller), link_(std::mak
             choice(link_, gain_mode_id, @"Gain mode",
                    @"Which gain plays. Set: the Gain setting. Estimate: the filter's own estimate, "
                    @"from noise played through it, as convolver --gain-db auto finds. No "
-                   @"clipping: the most the filter can amplify any input, so it can never clip, "
-                   @"as convolver --gain-db no-clip. Each filter plays at its own figure; the "
-                   @"Gain setting is kept for Set.")) {
+                   @"clipping: turned down so that no input within full scale can clip, as "
+                   @"convolver --gain-db no-clip; it is not a limiter, so input above full scale "
+                   @"still can. Each filter plays at its own figure; the Gain setting is kept "
+                   @"for Set.")) {
         NSMutableDictionary<NSString*, id>* noted = [mode mutableCopy];
         noted[@"note"] = @"gain";
         [settings addObject:noted];

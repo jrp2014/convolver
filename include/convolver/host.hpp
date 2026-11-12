@@ -375,16 +375,16 @@ class HostFilter {
     // and which takes time for a long filter. Adapters set it while their
     // gain mode is Estimate, before loading, with estimate(). Turning it on
     // also finds the estimate of the filter already accepted (control thread;
-    // filters noise, may throw std::bad_alloc) and then calls `install` with
-    // that filter's playback, so the processor crossfades to it at its new
-    // figure; as in load(), `install` must publish as its last step. gains()
-    // changes only after `install` returns: if anything throws, the estimate
-    // is not kept, and choosing Estimate again finds it again. Returns the
-    // playback it installed; nothing when gains() did not change, or when no
+    // filters noise, may throw std::bad_alloc) and then calls `apply` with
+    // the new figures, for the adapter to pass to the playing filter with
+    // HostProcessor::update_gains(), which keeps its engine and history (a
+    // replacement would restart it, silent for the filter's delay). gains()
+    // changes only after `apply` returns: if anything throws, the estimate is
+    // not kept, and choosing Estimate again finds it again. Returns whether
+    // it applied new figures: false when gains() did not change, or when no
     // filter plays (none accepted, or it does not suit the host), and then
-    // `install` is not called.
-    std::optional<HostPlayback>
-    estimate(bool on, const std::function<void(const HostPlayback&)>& install = {});
+    // `apply` is not called.
+    bool estimate(bool on, const std::function<void(const FilterGains&)>& apply = {});
     bool estimating() const noexcept {
         return estimating_;
     }
@@ -674,6 +674,12 @@ class HostProcessor {
     // is absent plays silence in that mode. During a replacement each filter
     // plays at its own figure, so the crossfade covers the change.
     void set_gain_mode(GainMode) noexcept;
+    // PLUG-10, control thread, serialized with replace(): new figures for the
+    // filter published last (or built with), such as its noise estimate found
+    // after it was published. Its engine keeps playing with its history, so
+    // nothing is interrupted; the gain ramps like a Gain change. Does not
+    // allocate or block.
+    void update_gains(const FilterGains&) noexcept;
     // Audio thread: the current filter ramps to silence over 1.33 ms (or is
     // silent at once, before any audio since construction or reset) and
     // stays silent until a filter published after this call takes over,

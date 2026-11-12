@@ -645,23 +645,20 @@ HostPlayback HostFilter::activate(const HostLayout& host) {
     return playback;
 }
 
-std::optional<HostPlayback>
-HostFilter::estimate(bool on, const std::function<void(const HostPlayback&)>& install) {
+bool HostFilter::estimate(bool on, const std::function<void(const FilterGains&)>& apply) {
     estimating_ = on;
     if (!on || !filter_ || gains_.estimate_db || gains_.estimate_failed)
-        return std::nullopt;
+        return false;
     auto gains = gains_;
     find_estimate(gains, *filter_);
     if (activation_failure_ || failed_) {
         gains_ = gains;
-        return std::nullopt; // It does not suit the host, or failed: silence plays.
+        return false; // It does not suit the host, or failed: silence plays.
     }
-    auto playback = filter_playback(*filter_);
-    playback.gains = gains;
-    if (install)
-        install(playback);
-    gains_ = gains; // After everything that may throw, the publication included.
-    return playback;
+    if (apply)
+        apply(gains);
+    gains_ = gains; // After everything that may throw, `apply` included.
+    return true;
 }
 
 void HostFilter::fail_activation(std::string why) {
@@ -1043,24 +1040,32 @@ struct HostProcessor::Impl {
         bool dry;
         // PLUG-10: the linear gain each GainMode plays for this filter (Set's
         // entry unused), as applied_gain_db() gives it, and whether there is
-        // one; without one the filter plays silence in that mode.
-        std::array<float, gain_mode_count> figure{1, 1, 1};
-        std::array<bool, gain_mode_count> known{true, true, true};
+        // one; without one the filter plays silence in that mode. Atomic, as
+        // update_gains() changes them while the filter plays.
+        std::array<std::atomic<float>, gain_mode_count> figure{1.f, 1.f, 1.f};
+        std::array<std::atomic<bool>, gain_mode_count> known{true, true, true};
         Prepared* next_retired = nullptr;
         std::uint64_t number = 0; // Publications are numbered from 1, in order.
         Prepared(const Configuration& c, bool dry_, std::size_t block, std::size_t inputs,
                  const FilterGains& gains)
             : engine(fitted_engine(c, block, inputs)), dry(dry_) {
+            set_gains(gains);
+        }
+        // Control thread; the audio thread reads them (relaxed: each figure
+        // stands alone, and the ramp hides when it is seen).
+        void set_gains(const FilterGains& gains) noexcept {
             const auto place = [&](GainMode mode, const std::optional<double>& db) {
                 const auto i = static_cast<std::size_t>(mode);
-                known[i] = db.has_value();
-                figure[i] = db ? gain_from_db(*db) : 0.f;
+                figure[i].store(db ? gain_from_db(*db) : 0.f, std::memory_order_relaxed);
+                known[i].store(db.has_value(), std::memory_order_relaxed);
             };
             // Estimate plays the bound where the estimate is absent.
             place(GainMode::estimate, gains.estimate_db ? gains.estimate_db : gains.no_clipping_db);
             place(GainMode::no_clipping, gains.no_clipping_db);
         }
     };
+    static_assert(std::atomic<float>::is_always_lock_free);
+    static_assert(std::atomic<bool>::is_always_lock_free);
     static_assert(std::atomic<Prepared*>::is_always_lock_free);
     static_assert(std::atomic<std::size_t>::is_always_lock_free);
     static_assert(std::atomic<std::uint64_t>::is_always_lock_free);
@@ -1071,6 +1076,10 @@ struct HostProcessor::Impl {
     const std::size_t crossfade = frames_at(rate, crossfade_at_reference);
     Prepared* current = nullptr;
     Prepared* previous = nullptr;
+    // Control side: the filter published last (or built with). Only the
+    // control side publishes, and a filter is retired only after a newer one
+    // is published, so this one is alive for update_gains().
+    Prepared* latest = nullptr;
     std::atomic<Prepared*> pending{nullptr}, retired{nullptr};
     std::atomic<std::size_t> tail{0};
     std::atomic<std::uint64_t> published{0}; // Publications so far (control writes).
@@ -1112,7 +1121,9 @@ struct HostProcessor::Impl {
         if (mode == GainMode::set)
             return set_gain;
         const auto i = static_cast<std::size_t>(mode);
-        return p.known[i] ? p.figure[i] : 0.f;
+        return p.known[i].load(std::memory_order_relaxed)
+                   ? p.figure[i].load(std::memory_order_relaxed)
+                   : 0.f;
     }
     float mix_setting = 1, mix = 1, mix_target = 1, mix_step = 0;
     // Bypass and mute ramp by whole frames, counted out of setting_ramp, so
@@ -1153,7 +1164,7 @@ struct HostProcessor::Impl {
         old_wet.resize(wet.size());
         dry.resize(outputs * block);
         tail.store(prepared->engine.tail_frames());
-        current = prepared.release();
+        current = latest = prepared.release();
         set_db = clamp_gain_db(settings.gain_db);
         set_gain = gain_from_db(set_db);
         mode = settings.gain_mode;
@@ -1215,6 +1226,7 @@ struct HostProcessor::Impl {
         // count also sees what the control side did before publishing.
         prepared->number = published.load(std::memory_order_relaxed) + 1;
         published.store(prepared->number, std::memory_order_release);
+        latest = prepared.get();
         delete pending.exchange(prepared.release(), std::memory_order_acq_rel);
     }
     void replace(const Configuration& c, bool has_dry, const FilterGains& gains = {}) {
@@ -1562,6 +1574,9 @@ void HostProcessor::set_mix(double mix) noexcept {
 }
 void HostProcessor::set_gain_mode(GainMode mode) noexcept {
     impl_->mode = mode;
+}
+void HostProcessor::update_gains(const FilterGains& gains) noexcept {
+    impl_->latest->set_gains(gains);
 }
 std::uint64_t HostProcessor::publications() const noexcept {
     return impl_->published.load(std::memory_order_acquire);

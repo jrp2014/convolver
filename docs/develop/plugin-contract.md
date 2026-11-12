@@ -600,7 +600,8 @@ the plan's Gain modes (12 November 2026); its meters follow later
   *Set* plays Gain; *Estimate* and *No clipping* play the filter's own
   figure from `estimate_attenuation()`, its noise estimate and its
   no-clipping bound, the figures `convolver --gain-db auto` and `no-clip`
-  apply. Gain keeps its value meanwhile and plays again in Set mode. The
+  apply. The bound holds for input within full scale; No clipping is not a
+  limiter, so floating-point input above full scale can still clip. Gain keeps its value meanwhile and plays again in Set mode. The
   figures are applied as they are, never clamped to Gain's range, and each
   filter carries its own (`FilterGains` in `HostPlayback`), so in a
   replacement the new filter starts at its own figure and the crossfade
@@ -615,10 +616,13 @@ the plan's Gain modes (12 November 2026); its meters follow later
   (`HostFilter::estimating()`). Choosing Estimate plays the bound at once;
   `HostFilter::estimate()` then finds the estimate for the filter already
   accepted, on the adapter's control side (VST3's message thread, the Audio
-  Unit's Latency worker, LV2's worker), and calls the adapter to publish
-  the filter with it, which the crossfade takes to. The estimate is kept
-  only once published, so a failure leaves nothing shown that does not
-  play. A restored state with Estimate chosen sets `set_estimating()`
+  Unit's Latency worker, LV2's worker), and the adapter gives it to the
+  playing filter with `HostProcessor::update_gains()`, which ramps to it
+  like a Gain change. The engine is not replaced, so it keeps its history:
+  a replacement would restart it, silent for the filter's own delay (jrp's
+  review found 245 ms of silence with a quarter-second delay). The estimate
+  is kept only once applied, so a failure leaves nothing shown that does
+  not play. A restored state with Estimate chosen sets `set_estimating()`
   before it loads, so its filter gets the estimate as it loads. A filter
   whose estimate overflows has none (`estimate_failed`), and Estimate plays
   its bound; a filter with no finite bound plays silence in both modes,

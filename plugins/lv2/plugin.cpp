@@ -528,9 +528,9 @@ void record_activation_failure(Instance& p, const char* why) noexcept {
 
 // PLUG-10, under the control lock: applies the newest Gain mode. Estimate
 // finds the filter's figure if it has none (HostFilter::estimate, which
-// filters noise for a long filter) and, while active, publishes the filter
-// with it: run(), which plays the port's mode, crossfades to it. Logs the
-// mode when it changed. Never throws.
+// filters noise for a long filter) and, while active, gives it to the playing
+// filter in place, which keeps its history: run(), which plays the port's
+// mode, ramps to it. Logs the mode when it changed. Never throws.
 void apply_gain_mode(Instance& p) noexcept {
     const auto mode = p.gain_mode.load(std::memory_order_relaxed);
     const bool estimate = mode == GainMode::estimate;
@@ -539,9 +539,9 @@ void apply_gain_mode(Instance& p) noexcept {
         return;
     std::string why;
     try {
-        p.filter.estimate(estimate, [&](const HostPlayback& playback) {
+        p.filter.estimate(estimate, [&](const FilterGains& gains) {
             if (p.host)
-                p.host->replace(playback);
+                p.host->update_gains(gains);
         });
     } catch (const std::exception& e) {
         try {

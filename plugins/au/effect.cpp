@@ -458,17 +458,17 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
             update_status();
         }
         // PLUG-10: a new Gain mode. Estimate's figure is found here, off the
-        // audio thread, and the filter with it is published: Render, which
-        // plays the parameter's mode, crossfades to it. Until then Estimate
-        // plays the no-clipping figure.
+        // audio thread, and given to the playing filter in place, which keeps
+        // its history: Render, which plays the parameter's mode, ramps to it.
+        // Until then Estimate plays the no-clipping figure.
         const bool estimate = current.gain_mode == GainMode::estimate;
         if ((wakes & gain_mode_wake) &&
             (current.gain_mode != applied_gain_mode_ || filter_.estimating() != estimate)) {
             std::string why;
             try {
-                filter_.estimate(estimate, [&](const HostPlayback& playback) {
+                filter_.estimate(estimate, [&](const FilterGains& gains) {
                     if (host_)
-                        host_->replace(playback);
+                        host_->update_gains(gains);
                 });
             } catch (const std::exception& e) {
                 try {

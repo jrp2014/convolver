@@ -15,8 +15,9 @@ Until 1.0 the C++ API may change between minor versions.
 - Plug-ins (PLUG-10, AU-7): a **Gain mode** setting in every format.
   **Set** plays Gain as before and is the default. **Estimate** plays the
   filter's own estimate of how far to turn it down, from noise played
-  through it, as `convolver --gain-db auto` does, and **No clipping** the
-  most the filter can amplify any input, as `--gain-db no-clip` does. Each
+  through it, as `convolver --gain-db auto` does, and **No clipping** turns
+  it down by the most it can amplify any input, as `--gain-db no-clip`
+  does, so input within full scale cannot clip (it is not a limiter). Each
   filter plays at its own figure, so loading another one changes the level
   to suit it, and Gain keeps its value for Set. The macOS and Windows
   windows have a Gain mode menu with the gain it plays beside it, and the

@@ -808,6 +808,44 @@ void gain_modes() {
     require(applied_gain_db(estimate, FilterGains{}) == -20.0, "Set plays the Gain setting");
 }
 
+// PLUG-10: choosing Estimate while a filter plays changes its gain in place.
+// jrp's review: replacing the processor's filter to carry the estimate lost
+// the engine's history, so a filter with a quarter-second delay fell silent
+// for about 245 ms. Here the delayed tap plays a steady 1 (its bound, +6 dB),
+// and Estimate must ramp to its estimate without any gap.
+void estimate_keeps_history() {
+    Configuration c{48000, 1, 1, 0, {}, {}, {}};
+    std::vector<float> delayed(12001, 0.f); // 0.25 s at 48 kHz.
+    delayed.back() = .5f;
+    c.paths.push_back({delayed, {{0, 1}}, {{0, 1}}});
+    HostFilter filter;
+    std::optional<HostPlayback> installed;
+    filter.load(HostState{c}, HostLayout{48000, 1, 1},
+                [&](const HostPlayback& p) { installed = p; });
+    require(installed && !installed->gains.estimate_db, "the delayed filter did not load");
+    HostSettings s{0, 1, 0, GainMode::estimate};
+    HostProcessor host(*installed, 64, s);
+    const auto steady = play(host, std::vector<float>(13000, 1.f), 1, 1, 64);
+    require(std::abs(steady.back() - 1) < 1e-5,
+            "the bound should play the delayed tap at 1: " + std::to_string(steady.back()));
+    require(filter.estimate(true, [&](const FilterGains& g) { host.update_gains(g); }),
+            "Estimate should find the delayed filter's estimate");
+    const auto after = play(host, std::vector<float>(4000, 1.f), 1, 1, 64);
+    const float target = .5f * std::pow(10.f, static_cast<float>(*filter.gains().estimate_db) / 20);
+    float lowest = after[0];
+    std::size_t at = 0;
+    for (std::size_t t = 0; t < after.size(); ++t)
+        if (after[t] < lowest) {
+            lowest = after[t];
+            at = t;
+        }
+    require(lowest >= std::min(1.f, target) - 1e-5f,
+            "choosing Estimate interrupted the filter: " + std::to_string(lowest) + " at frame " +
+                std::to_string(at) + " (between 1 and " + std::to_string(target) + " expected)");
+    require(std::abs(after.back() - target) < 1e-5,
+            "Estimate should end at the filter's estimate: " + std::to_string(after.back()));
+}
+
 // PLUG-10: HostFilter finds the noise estimate only while estimating, and
 // finds it for the accepted filter when estimating starts.
 void filter_estimates() {
@@ -820,23 +858,22 @@ void filter_estimates() {
     require(installed && !installed->gains.estimate_db && installed->gains.no_clipping_db &&
                 !filter.gains().estimate_db,
             "a load in Set mode should not find the estimate");
-    // A publication that fails keeps nothing: the window and log never show
-    // an estimate that does not play, and the next try finds it again.
+    // An update that fails keeps nothing: the window and log never show an
+    // estimate that does not play, and the next try finds it again.
     bool threw = false;
     try {
-        filter.estimate(true, [](const HostPlayback&) { throw std::bad_alloc(); });
+        filter.estimate(true, [](const FilterGains&) { throw std::bad_alloc(); });
     } catch (const std::bad_alloc&) {
         threw = true;
     }
     require(threw && !filter.gains().estimate_db && filter.estimating(),
-            "a failed publication should not keep the estimate");
-    std::optional<HostPlayback> published;
-    const auto playback = filter.estimate(true, [&](const HostPlayback& p) { published = p; });
-    require(playback && playback->gains.estimate_db == filter_gains(c).estimate_db &&
-                filter.gains() == playback->gains && filter.estimating() && published &&
-                published->gains == playback->gains,
-            "estimate(true) should find and publish the accepted filter's estimate");
-    require(!filter.estimate(true), "a known estimate needs no new playback");
+            "a failed update should not keep the estimate");
+    std::optional<FilterGains> applied;
+    require(filter.estimate(true, [&](const FilterGains& g) { applied = g; }) && applied &&
+                applied->estimate_db == filter_gains(c).estimate_db && filter.gains() == *applied &&
+                filter.estimating(),
+            "estimate(true) should find and apply the accepted filter's estimate");
+    require(!filter.estimate(true), "a known estimate needs no new figures");
     installed.reset();
     filter.load(HostState{c}, layout, [&](const HostPlayback& p) { installed = p; });
     require(installed && installed->gains.estimate_db == filter_gains(c).estimate_db,
@@ -871,6 +908,7 @@ int main() {
             {"no_filter_names_choosing", no_filter_names_choosing},
             {"gain_modes", gain_modes},
             {"filter_estimates", filter_estimates},
+            {"estimate_keeps_history", estimate_keeps_history},
         },
         [] { audio_thread = false; });
     std::printf("worst Estimate and No clipping oracle error %.3g of the output peak\n",

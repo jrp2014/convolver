@@ -650,10 +650,11 @@ void Processor::choose_gain_mode(GainMode mode) noexcept {
     std::string why;
     try {
         // Off the audio thread: the filter's estimate when Estimate needs it,
-        // published so the crossfade takes the filter to it.
-        filter_.estimate(estimate, [&](const HostPlayback& playback) {
+        // given to the playing filter in place, which keeps its history and
+        // ramps to it.
+        filter_.estimate(estimate, [&](const FilterGains& gains) {
             if (host_)
-                host_->replace(playback);
+                host_->update_gains(gains);
         });
     } catch (const std::exception& e) {
         try {

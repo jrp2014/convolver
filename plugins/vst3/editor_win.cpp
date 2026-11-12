@@ -433,9 +433,9 @@ Editor::Editor(Controller& controller) : EditorView(&controller) {
             settings_[i].tip =
                 L"Which gain plays. Set: the Gain setting. Estimate: the filter's own estimate, "
                 L"from noise played through it, as convolver --gain-db auto finds. No clipping: "
-                L"the most the filter can amplify any input, so it can never clip, as convolver "
-                L"--gain-db no-clip. Each filter plays at its own figure; the Gain setting is "
-                L"kept for Set.";
+                L"turned down so that no input within full scale can clip, as convolver "
+                L"--gain-db no-clip; it is not a limiter, so input above full scale still can. "
+                L"Each filter plays at its own figure; the Gain setting is kept for Set.";
         if (settings_[i].tag == latency_id)
             settings_[i].tip =
                 L"The delay Convolver adds, in frames. Smaller is less delay and more processor "
