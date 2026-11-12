@@ -10,6 +10,7 @@
 #include "convolver/host.hpp"
 #include "convolver/io.hpp"
 #include "filter_file.hpp"
+#include "host_log.hpp"
 #include "host_report.hpp"
 #include "sound_files.hpp"
 #include "utf8.hpp"
@@ -21,6 +22,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -258,6 +260,121 @@ void run(const fs::path& dir) {
     }
 }
 
+// PLUG-33: a chosen file follows the rule a preset follows (PLUG-23): the
+// host's outputs exactly and at least the filter's inputs. REAPER gives the
+// VST3 plug-in on a six-channel track 6 inputs, where the 2-in, 6-out
+// crossover was refused when chosen, though its preset played.
+void wider_bus(const fs::path& dir) {
+    impulse(dir / "wide.wav", 44100, 1);
+    const auto write = [&](const std::string& name, const std::string& text) {
+        std::ofstream(dir / name) << text;
+    };
+    write("wide-1x6.cfg", "44100 1 6 0\n0\n0 0 0 0 0 0\nwide.wav\n0\n0\n0\n");
+    write("wide-2x6.cfg", "44100 2 6 0\n0 0\n0 0 0 0 0 0\nwide.wav\n0\n1\n5\n");
+    write("wide-6x6.cfg", "44100 6 6 0\n0 0 0 0 0 0\n0 0 0 0 0 0\nwide.wav\n0\n0\n0\n");
+    write("wide-48k.cfg", "48000 2 6 0\n0 0\n0 0 0 0 0 0\nwide.wav\n0\n0\n0\n");
+    // Entries in list order: fewer inputs first, so order alone does not
+    // decide; the entry for another rate is passed over.
+    write("wide-fewer.txt", "wide-48k.cfg\nwide-1x6.cfg\nwide-2x6.cfg\n");
+    write("wide-exact.txt", "wide-2x6.cfg\nwide-6x6.cfg\n");
+    const auto chosen = [&](const std::string& name, const HostLayout& host) {
+        FilterFileFailure why;
+        std::vector<std::string> files{"stale"};
+        std::string entry = "stale";
+        auto state = read_filter_file(detail::utf8_string(dir / name), host,
+                                      detail::libsndfile_files(), why, &files, &entry);
+        if (state) {
+            require(!files.empty() && fs::path(files.front()).filename() == name &&
+                        files.back() != "stale",
+                    name + ": files read");
+            // As a preset of the same filter: accepted by the control side.
+            HostFilter filter;
+            try {
+                filter.load(*state, host);
+            } catch (const std::invalid_argument& e) {
+                require(false, name + ": read, but refused on the host's buses: " + e.what());
+            }
+        }
+        return std::tuple{std::move(state), std::move(why), std::move(entry)};
+    };
+    // `entry`: the list entry named as the wider-bus choice, or none.
+    const auto inputs = [&](const std::string& name, const HostLayout& host,
+                            const std::string& entry = {}) {
+        auto [state, why, named] = chosen(name, host);
+        require(state.has_value(),
+                name + " refused on a wider bus: " + detail::advice_text(why.message));
+        require(entry.empty() ? named.empty() : fs::path(named).filename() == entry,
+                name + ": the wider-bus entry named is \"" + named + "\"");
+        const auto& c = *state->configuration;
+        require(c.sample_rate == host.sample_rate && c.output_channels == host.outputs,
+                name + ": another rate or output count chosen");
+        return c.input_channels;
+    };
+    const HostLayout six{44100, 6, 6};
+    require(inputs("wide-2x6.cfg", six) == 2, "the crossover on 6 inputs");
+    require(inputs("wide-1x6.cfg", six) == 1, "a 1-in filter on 6 inputs");
+    // A list: an exact entry comes first, then the most inputs below the
+    // host's, whatever the order of the entries.
+    // The entry is named so the log and the window can say which plays.
+    require(inputs("wide-fewer.txt", six, "wide-2x6.cfg") == 2,
+            "the list's 2-in entry not chosen on 6 inputs");
+    require(inputs("wide-fewer.txt", HostLayout{44100, 2, 6}) == 2, "the exact 2-in entry");
+    require(inputs("wide-fewer.txt", HostLayout{44100, 1, 6}) == 1, "the exact 1-in entry");
+    require(inputs("wide-exact.txt", six) == 6, "an exact entry passed over for a smaller one");
+    require(inputs("wide-exact.txt", HostLayout{44100, 4, 6}, "wide-2x6.cfg") == 2,
+            "the 2-in entry on 4 inputs");
+    // Still refused as before: fewer inputs than the filter, other outputs,
+    // another rate, and a rate that is not whole hertz.
+    const auto refusal = [&](const std::string& name, const HostLayout& host,
+                             HostFailureKind kind) {
+        auto [state, why, named] = chosen(name, host);
+        require(!state && why.kind == kind && named.empty(),
+                name + " accepted where it does not fit");
+    };
+    refusal("wide-2x6.cfg", HostLayout{44100, 1, 6}, HostFailureKind::channels);
+    refusal("wide-2x6.cfg", HostLayout{44100, 6, 8}, HostFailureKind::channels);
+    refusal("wide-2x6.cfg", HostLayout{44100, 8, 2}, HostFailureKind::channels);
+    refusal("wide-2x6.cfg", HostLayout{48000, 6, 6}, HostFailureKind::sample_rate);
+    refusal("wide-fewer.txt", HostLayout{44100, 6, 2}, HostFailureKind::channels);
+    HostLayout pulled{0, 6, 6};
+    set_host_rate(pulled, 48000 / 1.001);
+    refusal("wide-48k.cfg", pulled, HostFailureKind::sample_rate);
+    // jrp (12 November 2026): the choice must be clear to the user. The log
+    // and the window's reference lines name the entry and say why it plays.
+    {
+        FilterFileFailure why;
+        HostRequest request{HostFilterSource::file, detail::utf8_string(dir / "wide-fewer.txt"), 0};
+        auto state = read_filter_file(request.path, six, detail::libsndfile_files(), why,
+                                      &request.files, &request.wider_entry);
+        require(state.has_value(), "wide-fewer.txt refused: " + detail::advice_text(why.message));
+        HostFilter filter;
+        filter.load(std::move(*state), six, {}, request);
+        const auto line = loaded_line(filter, std::optional<HostLayout>(six));
+        std::cout << "wider bus: " << line << '\n';
+        require(has(line, "No entry in the list has the host's 6 inputs, so ") &&
+                    has(line, "wide-2x6.cfg plays, the entry with the most inputs below 6.") &&
+                    has(line, "Inputs 3–6 are ignored: the filter reads inputs 1–2."),
+                "the log line does not explain the choice: " + line);
+        HostReportFacts facts;
+        facts.host = six;
+        const auto report = host_report(filter, facts);
+        require(std::any_of(
+                    report.reference.begin(), report.reference.end(),
+                    [](const auto& fact) {
+                        return fact.first == "List entry" && has(fact.second, "wide-2x6.cfg") &&
+                               has(fact.second,
+                                   "when the list was chosen, no entry had the host's input count");
+                    }),
+                "the window's reference lines do not name the list entry");
+    }
+    // The command line still selects exactly.
+    try {
+        load_configuration(dir / "wide-2x6.cfg", ConfigurationSelection{44100, 6, 6});
+        require(false, "the command line took a 2-in filter for 6 inputs");
+    } catch (const std::runtime_error&) {
+    }
+}
+
 // DIAG-7: a name with characters from no single Windows ANSI code page
 // (Greek, Cyrillic and Chinese), passed as UTF-8 as every window passes it.
 // On Windows, path::string() throws for such a name and path(std::string)
@@ -317,6 +434,7 @@ int main() {
     const auto failed = convolver::test::run_cases({
         {"run", [&] { run(dir); }},
         {"non_ansi_names", [&] { non_ansi_names(dir); }},
+        {"wider_bus", [&] { wider_bus(dir); }},
     });
     std::error_code ec;
     fs::remove_all(dir, ec);

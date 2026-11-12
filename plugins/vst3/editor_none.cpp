@@ -7,4 +7,7 @@ namespace convolver::vst3 {
 Steinberg::IPlugView* create_editor(Controller&) {
     return nullptr;
 }
+bool has_editor() noexcept {
+    return false;
+}
 } // namespace convolver::vst3

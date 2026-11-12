@@ -294,6 +294,17 @@ struct Instance {
         } catch (...) {
         }
     }
+    // PLUG-33: a list's entry chosen for a wider input bus is named, with
+    // the inputs it ignores, as the other formats' logs name it (jrp: the
+    // choice must be clear to the user). Best effort: out of memory drops it.
+    void note_wider_entry() noexcept {
+        if (filter.accepted().wider_entry.empty())
+            return;
+        try {
+            log_note(loaded_line(filter, std::optional<HostLayout>(layout)));
+        } catch (...) {
+        }
+    }
     void log_error(const std::string& message) noexcept {
         // Without the host's log feature this prints to stderr, which is
         // also where LV2 hosts send a plug-in's unlogged diagnostics. One
@@ -567,7 +578,7 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
     const auto newest = [&] { return p.requested.load(std::memory_order_acquire); };
     if (r.generation < newest())
         return Outcome::superseded; // Rapid loads coalesce to the newest.
-    const HostRequest request{HostFilterSource::file, path, r.generation};
+    HostRequest request{HostFilterSource::file, path, r.generation};
     // Copied before anything is published, so recording what plays below
     // cannot run out of memory. Running out here, like the copy above, fails
     // the request in work() (ROBUST-7).
@@ -605,7 +616,8 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
     // The step convolver-preset uses, for this instance's rate and channels
     // (a list chooses its entry as in the CLI; PLUG-9).
     FilterFileFailure why;
-    auto next = read_filter_file(path, p.layout, detail::libsndfile_files(), why);
+    auto next = read_filter_file(path, p.layout, detail::libsndfile_files(), why, nullptr,
+                                 &request.wider_entry);
     pause_at(p, WorkerPoint::read);
     // 1. Already overtaken: stop before recording a failure or FFT planning.
     if (r.generation < newest())
@@ -651,6 +663,7 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
     p.installed_path = std::move(kept_path);
     p.handled = std::max(p.handled, r.generation);
     p.update_status();
+    p.note_wider_entry();
     return Outcome::installed;
 }
 
@@ -1314,12 +1327,14 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
     if (!loaded && path) { // No usable embedded copy: the file.
         if (embedded)
             p.log_rejection();
-        const HostRequest from_file{HostFilterSource::file, *path, generation};
+        HostRequest from_file{HostFilterSource::file, *path, generation};
         FilterFileFailure why;
-        if (auto next = read_filter_file(*path, p.layout, detail::libsndfile_files(), why)) {
+        if (auto next = read_filter_file(*path, p.layout, detail::libsndfile_files(), why, nullptr,
+                                         &from_file.wider_entry)) {
             try {
                 p.filter.load(std::move(*next), p.layout, install, from_file, p.host.get());
                 loaded = true;
+                p.note_wider_entry();
             } catch (...) {
             }
         } else {

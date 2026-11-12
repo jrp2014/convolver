@@ -13,6 +13,7 @@
 #include <iostream>
 #include <limits>
 #include <new>
+#include <optional>
 #include <random>
 #include <stdexcept>
 #include <string>
@@ -423,6 +424,33 @@ void settings_text() {
 // input), and "Silent" after a refused first load at Mix 50% (the dry half
 // played). Each case plays a steady 0.5 through what the instance plays and
 // checks the words against the level heard.
+// PLUG-33: with no filter, Status names choosing a filter first where the
+// plug-in has a window that chooses files, and only the preset otherwise,
+// in every no-filter case, within the Status parameter's length.
+void no_filter_names_choosing() {
+    HostFilter empty;
+    const HostLayout mono{48000, 1, 1}, split{48000, 1, 2};
+    struct Case {
+        std::optional<HostLayout> host;
+        HostSettings settings;
+        const char* start;
+    };
+    const std::vector<Case> cases{
+        {std::nullopt, {}, "No filter loaded."},
+        {split, {}, "No filter: silent, as inputs and outputs differ."},
+        {mono, {-100, 1}, "No filter: audio passes at -100.0 dB (Gain and Mix)."},
+        {mono, {}, "No filter: audio passes unchanged."},
+    };
+    for (const auto& c : cases) {
+        const auto window = host_status(empty, c.host, true, c.settings, false, true).text;
+        const auto none = host_status(empty, c.host, true, c.settings, false, false).text;
+        require(window == std::string(c.start) + " Choose a filter or load a Convolver preset.",
+                "with a window: " + window);
+        require(none == std::string(c.start) + " Load a Convolver preset.",
+                "without a window: " + none);
+        require(window.size() <= max_status_text, "too long for Status: " + window);
+    }
+}
 void diagnostics_follow_settings() {
     const auto contains = [](const std::string& text, const std::string& part) {
         return text.find(part) != std::string::npos;
@@ -635,6 +663,7 @@ int main() {
             {"latency_choices", latency_choices},
             {"settings_text", settings_text},
             {"diagnostics_follow_settings", diagnostics_follow_settings},
+            {"no_filter_names_choosing", no_filter_names_choosing},
         },
         [] { audio_thread = false; });
     std::printf("worst gain and mix oracle error %.3g of the output peak (%s)\n", worst_relative,

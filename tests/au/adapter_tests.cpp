@@ -1353,8 +1353,8 @@ void settings_in_diagnostics() {
         check(unit.initialize(), "gain status initialization");
         require(std::abs(steady_output(unit, 3) - .05f) < 1e-5, "Gain -20 dB without a filter");
         const auto shown = status_text(unit);
-        require(shown == "No filter: audio passes at -20.0 dB (Gain and Mix). Load a Convolver "
-                         "preset.",
+        require(shown == "No filter: audio passes at -20.0 dB (Gain and Mix). Choose a filter or "
+                         "load a Convolver preset.",
                 "no filter at Gain -20 dB: " + shown);
         require(contains(log.text(), "No filter, so audio passes at -20.0 dB, set by Gain and "
                                      "Mix. Settings: gain -20 dB, mix 100% wet, latency 0 "
@@ -1452,7 +1452,8 @@ void status_parameter() {
         CFRelease(request.outString);
         return std::string(text);
     };
-    require(shown() == "No filter loaded. Load a Convolver preset." &&
+    // PLUG-33: the window chooses filter files, so Status names that first.
+    require(shown() == "No filter loaded. Choose a filter or load a Convolver preset." &&
                 value() == HostStatus::no_filter,
             "status before initialization: " + shown());
     check(unit.configure(48000, 2, 2, 512), "status formats");

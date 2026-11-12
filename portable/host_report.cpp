@@ -345,7 +345,8 @@ std::string filter_identity_text(std::uint64_t identity) {
 
 HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
     HostReport r;
-    r.status = host_status(filter, facts.host, facts.log_written, facts.settings, facts.bypassed);
+    r.status = host_status(filter, facts.host, facts.log_written, facts.settings, facts.bypassed,
+                           facts.chooses_files);
     r.status_name = host_status_names.at(static_cast<std::size_t>(r.status.status));
     const auto program = host_program_name();
     // Out of process (GarageBand, Logic) the program is Apple's hosting
@@ -419,6 +420,15 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
 
     if (c)
         r.reference.emplace_back("Filter file", request_reference(accepted));
+    // PLUG-33: which list entry a wider input bus chose, and why. Said of
+    // the moment of choosing, not the host's present inputs, which may have
+    // changed since without the file being read again (independent review
+    // of 43aaa07); the load's log line gives the count.
+    if (c && !accepted.wider_entry.empty())
+        r.reference.emplace_back("List entry",
+                                 accepted.wider_entry +
+                                     " (when the list was chosen, no entry had the host's input "
+                                     "count; this one had the most inputs below it)");
     if (refused_request)
         r.reference.emplace_back("Refused file", request_reference(failure->request));
     auto software = execution_line();

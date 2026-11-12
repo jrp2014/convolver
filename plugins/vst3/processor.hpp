@@ -266,6 +266,9 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // for unexplained faults at most every report_fault_interval, so an open
     // window does not log a line twice a second, as in the Audio Unit.
     HostReport report_locked() const;
+    // PLUG-33: whether the window can choose filter files here (a reader
+    // and a window on this system), for the report and the Status text.
+    bool chooses_files() const noexcept;
     static constexpr std::chrono::seconds report_fault_interval{10};
     std::chrono::steady_clock::time_point report_faults_at_{};
     const detail::SoundFiles* files_ = nullptr; // The reader, or none.

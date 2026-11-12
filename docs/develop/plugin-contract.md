@@ -707,6 +707,19 @@ filter reads inputs 1–2.", and the window report's Channels fact says the
 same (`ignored_inputs()`). Outputs stay exact: a filter is never spread over,
 or cut to, other outputs.
 
+A file chosen in a window or through LV2's file parameter follows the same
+rule (PLUG-33, `read_filter_file()`): it is read for the host's exact
+counts first and, when nothing matches, for the most inputs below the
+host's among the single filter or list entries for the host's rate and
+outputs, so a list's exact entry always wins
+([decision](../project/decisions.md#plug-in-behaviour)). When a list's
+entry is chosen that way, `HostRequest::wider_entry` names it, and the
+loaded line in the Convolver log (LV2 writes it as a note to the host's
+log, for that choice only) and the window's reference lines ("List
+entry") say which entry plays and why. The command line still selects
+exactly. With no filter, Status names choosing a filter before a
+preset where the plug-in has a window (`host_status()`'s `chooses_files`).
+
 ## Replacement and threads
 
 The host owns the audio device, clock and scheduling. Each callback supplies

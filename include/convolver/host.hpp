@@ -228,6 +228,11 @@ struct HostRequest {
     // state, apart from the component's, and the processor names its report
     // with it while HostFilter::filter_identity() matches the saved one.
     std::string name{};
+    // PLUG-33: for a configuration list chosen where no entry has the host's
+    // input count, the entry read instead, the one with the most inputs below
+    // the host's (its path, UTF-8, as read_filter_file() gives it), so the
+    // log and the window say which entry plays and why. Empty otherwise.
+    std::string wider_entry{};
 };
 inline constexpr std::size_t max_filter_name_bytes = 1024;
 struct HostFailure {
@@ -482,9 +487,11 @@ inline constexpr std::size_t max_status_text = 127; // VST3's String128, less it
 // what they let through (the input at a changed level, or the dry signal),
 // not only what the filter does. `bypassed`: the instance is bypassed; a load
 // failure or a fault still comes first, as both need attention.
+// `chooses_files`: the plug-in has a window that chooses filter files, so
+// with no filter the text names choosing one before a preset (PLUG-33).
 HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& host,
                            bool log_written = true, const HostSettings& settings = {},
-                           bool bypassed = false);
+                           bool bypassed = false, bool chooses_files = false);
 // Whether a dry signal exists under `host` (Mix's dry share and bypass pass
 // input c to output c), and if not, why.
 enum class HostDrySignal {

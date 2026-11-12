@@ -80,12 +80,8 @@ show routing; they are not a crossover ready for real speakers.
 3. Add Convolver to the track as an effect. On macOS and Windows its window
    opens and shows the status; on Linux the host shows its generic controls,
    with a read-only **Status**.
-4. Load the filter. If the host gives Convolver exactly 2 inputs and 6
-   outputs, click **Choose…** in its window and pick
-   `examples/first-use/crossover/filter.cfg`. A chosen file must have
-   exactly the inputs the host gives, while a preset needs only at least
-   them, so where the host gives more inputs (REAPER gives the VST3 plug-in
-   6 on a six-channel track), and without the window (Linux),
+4. Load the filter: click **Choose…** in Convolver's window and pick
+   `examples/first-use/crossover/filter.cfg`. Without the window (Linux),
    load `examples/first-use/crossover/first-use-crossover.vstpreset` from
    the host's preset menu instead (REAPER: the **+** button beside the
    preset menu, then the item that imports a VST preset file). Status reads
@@ -94,10 +90,10 @@ show routing; they are not a crossover ready for real speakers.
    3-6 ignored.` Convolver then reads inputs 1 and 2, so put the stereo
    source there.
 
-   If Status instead reads `Silent: the filter has 2 in, 6 out, the plug-in
-   6 in, 6 out. Details in the Convolver log.` (or other counts for the
-   plug-in), the host has not given
-   Convolver 2 inputs and 6 outputs. Check the track's channel count and the
+   If Status instead reads `Silent: the filter has 2 in, 6 out, the host
+   2 in, 2 out. Details in the Convolver log.` (or other counts for the
+   host), the host has not given Convolver at least 2 inputs and exactly
+   6 outputs. Check the track's channel count and the
    plug-in's routing (REAPER: the button at the top right of the effect
    window that shows the plug-in's inputs and outputs); the
    [Convolver log](plugins.md#status-and-the-convolver-log) records each
@@ -152,9 +148,9 @@ REAPER also loads Audio Units. Install `Components/Convolver.component` as
 place of the VST3 plug-in. It has the same window, so the steps are the
 same: after **Choose…** the window reads `filter.cfg`, Active, and its Audio
 section 48000 Hz, 2 in, 6 out, and the render and comparison are as above.
-If the host gives it more than 2 inputs, Choose… refuses the file as in
-step 4; its preset menu takes `.aupreset` files rather than `.vstpreset`,
-so make one from `filter.cfg` with `convolver-preset`
+If the host gives it more than 2 inputs, it reads inputs 1 and 2 as in
+step 4. Its preset menu takes `.aupreset` files rather than `.vstpreset`;
+`convolver-preset` makes one from `filter.cfg`
 ([plug-in presets](presets.md)).
 
 ## If something went wrong

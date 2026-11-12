@@ -296,7 +296,8 @@ Do this once. Run the commands in the extracted preview package folder.
    the status **No filter**; elsewhere, or with the FX window's **UI** button
    off, it shows its generic controls: Gain, Mix, Latency, Bypass and a
    read-only **Status**, which should read `No filter: audio passes
-   unchanged. Load a Convolver preset.` Record what REAPER shows.
+   unchanged. Choose a filter or load a Convolver preset.` (on Linux, with
+   no window, `… Load a Convolver preset.`). Record what REAPER shows.
 4. From the **+** button beside the FX window's preset menu, import
    `presets/identity-48000-stereo/identity-48000-stereo.vstpreset` (the import item for VST
    preset files). Play: the sound is unchanged. Import

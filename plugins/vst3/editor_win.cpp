@@ -1795,4 +1795,7 @@ void Editor::dropped(HDROP drop) {
 IPlugView* create_editor(Controller& controller) {
     return new Editor(controller);
 }
+bool has_editor() noexcept {
+    return true;
+}
 } // namespace convolver::vst3

@@ -64,7 +64,6 @@ cannot be used ([when a filter does not fit](plugins.md#when-a-filter-does-not-f
 | --- | --- |
 | The filter's sample rate differs from the host's | Set the host to the filter's rate, or choose a filter made for the host's rate; Convolver does not resample |
 | The track has fewer inputs than the filter, or a different number of outputs | Use a track or bus with at least the filter's inputs and exactly its outputs, or choose a filter that matches the track |
-| A file chosen in Convolver's window is refused for its channels, although a preset of the same filter plays (the track gives more inputs than the filter has, as REAPER's six-channel track does) | A chosen file needs exactly the host's inputs; a preset needs only at least them. Load the filter as a preset ([plug-in presets](presets.md)) |
 | A project was opened at another rate or layout | VST® 3 and Audio Unit: set the host back to the rate and layout the filter was made for, and the filter returns. LV2: do not save; reopen the session at the filter's rate, or load the filter again ([details](plugins.md#when-a-filter-does-not-fit)) |
 | No filter is loaded, and the input and output counts differ (a crossover, for example) | Choose a filter in Convolver's window, or load a preset |
 | The project was saved after its first filter failed | Choose or load a matching filter |

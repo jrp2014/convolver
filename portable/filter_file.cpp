@@ -40,6 +40,20 @@ Advice fractional_rate_refusal(const std::string& path, const HostLayout& host,
             "Set the host's project or audio device to " + made + ".",
             {}};
 }
+// PLUG-33: on a host with more inputs than any candidate for its rate and
+// outputs, the input count to read with: the most inputs below the host's
+// among the candidates for the host's rate and exact outputs, so a list's
+// entry that reads the most of the host's inputs plays (its first such entry
+// in list order, as the selection takes it), or 0 when none fits.
+std::size_t wider_bus_inputs(const std::vector<detail::SelectionCandidate>& candidates,
+                             const HostLayout& host) {
+    std::size_t inputs = 0;
+    for (const auto& c : candidates)
+        if (c.sample_rate == host.sample_rate && c.output_channels == host.outputs &&
+            c.input_channels > 0 && c.input_channels < host.inputs)
+            inputs = std::max(inputs, c.input_channels);
+    return inputs;
+}
 } // namespace
 
 HostState filter_file_state(const std::filesystem::path& path,
@@ -56,18 +70,49 @@ HostState filter_file_state(const std::filesystem::path& path,
 std::optional<HostState> read_filter_file(const std::string& path, const HostLayout& host,
                                           const detail::SoundFiles& reader,
                                           FilterFileFailure& failure,
-                                          std::vector<std::string>* files) {
+                                          std::vector<std::string>* files,
+                                          std::string* wider_entry) {
     failure.kind = HostFailureKind::filter_file;
     failure.carried.reset();
     if (files)
         files->clear();
+    if (wider_entry)
+        wider_entry->clear();
     try {
         // Explained in the host's terms, not the command line's (jrp's
         // GarageBand run: the window advised omitting --output-channels).
         std::vector<std::filesystem::path> sources;
-        auto state = filter_file_state(detail::utf8_path(path),
-                                       {host.sample_rate, host.inputs, host.outputs}, reader,
-                                       nullptr, true, false, &sources);
+        const auto read = [&](std::size_t inputs) {
+            sources.clear();
+            return filter_file_state(detail::utf8_path(path),
+                                     {host.sample_rate, inputs, host.outputs}, reader, nullptr,
+                                     true, false, &sources);
+        };
+        HostState state;
+        try {
+            state = read(host.inputs);
+        } catch (const detail::NoMatch& e) {
+            // PLUG-33: a chosen file follows the rule a preset follows
+            // (PLUG-23, HostFilter::mismatch()): the host's outputs exactly
+            // and at least the filter's inputs. Nothing has the host's
+            // exact input count, so read again for the fewer inputs that
+            // fit (wider_bus_inputs()), or refuse as before.
+            const auto inputs =
+                host.fractional_rate == 0 ? wider_bus_inputs(*e.candidates, host) : 0;
+            if (inputs == 0)
+                throw;
+            state = read(inputs);
+            // A list's entry is named, so the log and the window can say
+            // which one plays (jrp: the choice must be clear to the user).
+            // The selection takes the first such entry in list order.
+            if (wider_entry && e.list)
+                for (const auto& c : *e.candidates)
+                    if (c.sample_rate == host.sample_rate && c.output_channels == host.outputs &&
+                        c.input_channels == inputs) {
+                        *wider_entry = detail::utf8_string(c.path);
+                        break;
+                    }
+        }
         // VST3-9: the selection used the whole part of a fractional rate;
         // a filter made for that whole part does not suit it either.
         if (host.fractional_rate != 0 && state.configuration) {
@@ -90,6 +135,8 @@ std::optional<HostState> read_filter_file(const std::string& path, const HostLay
         }
         return state;
     } catch (const detail::NoMatch& e) {
+        if (wider_entry)
+            wider_entry->clear();
         // Readable, but made for another rate or other channels. A list is
         // a rate refusal only when no entry has the host's rate.
         const auto& checked = *e.candidates;
@@ -121,6 +168,8 @@ std::optional<HostState> read_filter_file(const std::string& path, const HostLay
                 fractional_rate_refusal(path, host, std::move(rates), !failure.carried);
         }
     } catch (const std::exception& e) {
+        if (wider_entry) // Refused after the entry was named (out of memory).
+            wider_entry->clear();
         failure.message = refusal(path, e.what());
     }
     return std::nullopt;

@@ -16,6 +16,27 @@ Until 1.0 the C++ API may change between minor versions.
   preview, on 11 November 2026
   ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.12)).
 
+### Fixed
+
+- Plug-ins (PLUG-33): a file chosen with **Choose…** (or dropped on the
+  window, or set through LV2's file parameter) follows the same channel rule
+  as a preset: the host's outputs exactly and at least the filter's inputs.
+  On REAPER's six-channel track, which gives the VST3 plug-in 6 inputs,
+  choosing the 2→6 crossover's `filter.cfg` was refused with a Fix asking
+  for 2 inputs while its preset played; it now plays, reading inputs 1 and
+  2. From a configuration list, an entry with exactly the host's inputs
+  comes first, otherwise the entry for the host's rate and outputs with the
+  most inputs below the host's (jrp's
+  [decision](docs/project/decisions.md#plug-in-behaviour)); the Convolver
+  log (for LV2, the host's log) and the window's File, software and log
+  lines name that entry and say why. With no filter, Status says "Choose a filter
+  or load a Convolver preset." where the plug-in has a window (macOS, and
+  VST3 on Windows); on Linux, where the VST3 plug-in has no window, the
+  Convolver log's advice no longer tells users to choose a file or drop one
+  on the window, and names the host's preset menu. The guides no longer send
+  REAPER users to the preset for the crossover. Filters that loaded before
+  load and sound the same.
+
 ## [0.13.12] - 2026-11-11
 
 The third published preview: macOS, Windows and Linux, unsigned, adding the

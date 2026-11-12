@@ -72,16 +72,19 @@ the [command-line tool](command-line.md) for wider filters.
 
 **More inputs than the filter needs.** A filter plays on its own number of
 outputs, exactly, and on at least its number of inputs: it reads the first
-ones and ignores the rest. (A file chosen in the window is the exception:
-it must have exactly as many inputs as the host gives, so on such a track
-load the filter as a preset.) Some hosts give a plug-in as many inputs as
+ones and ignores the rest, whether it comes from a preset, a saved project
+or a file chosen in the window. Some hosts give a plug-in as many inputs as
 outputs: REAPER gives the VST3 plug-in six inputs on a six-channel track, so a
 2→6 crossover reads inputs 1 and 2 and ignores 3 to 6. Status then ends with
 "plug-in inputs 3-6 ignored.", and the [Convolver log](#status-and-the-convolver-log)
 and the window's Host channels line say the same (`6 in, 6 out (inputs 3–6
 ignored)`). Make sure the source plays on
 the inputs the filter reads. A filter with more inputs than the host gives,
-or with a different number of outputs, is refused.
+or with a different number of outputs, is refused. From a configuration
+list, an entry with exactly the host's inputs comes first; otherwise the
+entry for the host's rate and outputs with the most inputs below the host's
+is chosen. The Convolver log (for LV2, the host's log) and the window's
+**File, software and log** lines (List entry) name that entry and say why.
 
 Channels are numbered in the host's order, and the `.cfg` routes refer to them
 in that order. For VST3 the order follows the speaker arrangement: 5.1 is left,
@@ -118,8 +121,8 @@ the one list of what each way reads:
 
 | Way in | Plug-ins | Reads |
 | --- | --- | --- |
-| **Choose…**, or dropping the file, in [Convolver's window](#convolvers-window) | The Audio Unit, and the VST3 plug-in on macOS and Windows | An IR file, a `.cfg` or a configuration list, with exactly as many inputs as the host gives; not a preset file |
-| The host's file chooser for the **Filter** parameter | LV2, in hosts that show it ([LV2 filter files](#lv2-filter-files)) | An IR file, a `.cfg` or a configuration list, with the plug-in's own channel counts |
+| **Choose…**, or dropping the file, in [Convolver's window](#convolvers-window) | The Audio Unit, and the VST3 plug-in on macOS and Windows | An IR file, a `.cfg` or a configuration list, with at least its inputs ([channels](#channels)); not a preset file |
+| The host's file chooser for the **Filter** parameter | LV2, in hosts that show it ([LV2 filter files](#lv2-filter-files)) | An IR file, a `.cfg` or a configuration list, with at least its inputs ([channels](#channels)) |
 | The host's preset menu ("Load Preset…" or its preset browser) | Every format | Convolver's preset in that format: `.vstpreset` (VST3), `.aupreset` (Audio Unit) or a `NAME.preset.lv2` folder (LV2), with at least its inputs ([channels](#channels)) |
 | A saved project | Every format | The filter and settings saved in it |
 
@@ -148,7 +151,7 @@ host:
 | --- | --- |
 | No filter loaded yet, equal input and output counts | The input, unchanged (after the latency) |
 | No filter loaded yet, different counts | Silence |
-| The host gives more inputs than the filter needs, and the outputs match | A preset or saved project: the filter, reading the first inputs; the rest are ignored ([channels](#channels)). A file chosen in the window is refused: it needs exactly the host's inputs |
+| The host gives more inputs than the filter needs, and the outputs match | The filter, from a preset, a saved project or a chosen file, reading the first inputs; the rest are ignored ([channels](#channels)) |
 | The first filter does not fit, or its preset is damaged | Silence |
 | A new filter does not fit while another is playing | The working filter, unchanged; the project keeps saving it |
 | The filter is too large to save with the project | As for a filter that does not fit: silence for a first filter, otherwise the working filter |
@@ -223,7 +226,7 @@ example (some hosts show only the status name in the first column):
 | Status | Example text |
 | --- | --- |
 | Active | `Filter loaded: 48000 Hz, 2 in, 2 out.` |
-| No filter | `No filter: audio passes unchanged. Load a Convolver preset.` |
+| No filter | `No filter: audio passes unchanged. Choose a filter or load a Convolver preset.` (without a window, on Linux: `… Load a Convolver preset.`) |
 | Load failed (silence) | `Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in the Convolver log.` |
 | Load failed (previous filter kept) | `Load failed, previous filter kept: the filter has 2 in, 6 out, the host 2 in, 2 out. Details in the Convolver log.` |
 | Waiting | `Filter loaded: 44100 Hz, 2 in, 2 out; waiting for audio settings from the host.` |
@@ -511,7 +514,8 @@ From the top, the window has:
   a warning sign and says what differs, in red: `44100 Hz ⚠ the filter is
   for 48000 Hz`.
 - **File, software and log**, folded away under a disclosure triangle: the
-  filter file's path and request number (and a refused file's), the software
+  filter file's path and request number (and a refused file's, and the
+  list entry chosen for a wider input bus, [channels](#channels)), the software
   (version, FFT library, CPU kernels, the plug-in SDK, and what reads the
   filter files), and where the log is. On the same row:
   - **Copy Diagnostics** puts all of this, with the settings and this
@@ -787,8 +791,9 @@ The LV2 plug-in has one parameter, **Filter**
 LV2 file parameters, such as Ardour and Jalv, give it a file chooser: choose
 the IR file, `.cfg` or configuration list you would pass to the
 [command-line tool](command-line.md). The file is read for the plug-in's
-sample rate and channel counts, so a list chooses its entry exactly as the
-command-line tool does, and nothing is resampled.
+sample rate and channel counts, as a list's entry is chosen by the
+command-line tool, except that a filter with fewer inputs than the plug-in
+has also fits ([channels](#channels)); nothing is resampled.
 
 The file is loaded on the host's worker thread, so audio carries on
 meanwhile: the status port shows Loading, then Active once the new filter
