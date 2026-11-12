@@ -114,6 +114,11 @@ struct Options {
     std::size_t max_block = 1024; // The host maximum; also one of the block sizes tested.
 };
 
+// PLUG-38: every adapter replaces the filter when restored state holds the
+// one already playing, so the same-filter-restore case fails in every
+// format, for each first-use fixture. Its fix removes this list.
+std::vector<Deviation> same_filter_restore_deviations();
+
 // Run every case for every fixture listed in fixtures.txt, as written by
 // `tests/plugins/fixtures.py run-documented`. Prints one line per case and a
 // summary; returns a process exit status.

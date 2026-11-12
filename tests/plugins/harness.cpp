@@ -103,6 +103,17 @@ Configuration shortened(Configuration c) {
     }
     return c;
 }
+// A copy of every response 2000 frames later at half the level, so the tail
+// lasts far longer than the 5.33 ms replacement crossfade.
+Configuration lengthened(Configuration c) {
+    for (auto& p : c.paths) {
+        const auto length = p.impulse.size();
+        p.impulse.resize(length + 2000, 0.f);
+        for (std::size_t i = 0; i < length; ++i)
+            p.impulse[i + 2000] += .5f * p.impulse[i];
+    }
+    return c;
+}
 Configuration wrong_rate(Configuration c) {
     c.sample_rate = c.sample_rate == 44100 ? 48000 : 44100;
     return c;
@@ -339,6 +350,50 @@ void live_replacement(const Context& x) {
     x.adapter.destroy();
 }
 
+// The contract's scope of each change: during playback, restored state that
+// holds the filter already playing changes nothing that is heard. A long
+// tail is excited, the input stops, the same filter arrives again as host
+// state (a preset or undo that changed only a setting), and the tail rings
+// on as if nothing had arrived, at the same latency. Recorded on 12 November
+// 2026 as a known deviation in every format (PLUG-38): each adapter
+// replaces the filter, whose fresh history drops the tail after the
+// crossfade. A reset or reactivation still starts clean (the reset case).
+void same_filter_restore(const Context& x) {
+    const auto a = lengthened(x.c());
+    const std::size_t at = 1200, no = a.output_channels;
+    auto s = x.start(&a);
+    const auto latency_before = x.adapter.latency_frames();
+    auto out = s.render(x.f.input, 0, at);
+    require(x.adapter.load({"same filter", {}, a}), "restoring the same filter was rejected");
+    require(x.adapter.latency_frames() == latency_before,
+            "restoring the same filter changed the latency");
+    x.tail_is(test::tail(a), "after restoring the same filter");
+    const auto frames = at + test::tail(a) + 3 * latency;
+    const auto rest = s.render({}, 0, frames - at); // Silence: the tail rings out.
+    out.insert(out.end(), rest.begin(), rest.end());
+    std::vector<float> excited(
+        x.f.input.begin(), x.f.input.begin() + static_cast<std::ptrdiff_t>(at * a.input_channels));
+    const auto expected = test::oracle(a, excited, latency);
+    // The defect first, with its own message, so that a partial fix (a
+    // tail with the wrong level, say) fails the run instead of matching
+    // the known deviation: once a replacement's crossfade is over, its
+    // fresh history leaves the tail silent.
+    const std::size_t fade = (static_cast<std::size_t>(a.sample_rate) * 256 + 24000) / 48000;
+    double heard = 0, due = 0;
+    for (std::size_t i = (at + latency + fade) * no; i < out.size(); ++i) {
+        heard = std::max(heard, static_cast<double>(std::abs(out[i])));
+        due = std::max(due, std::abs(expected[i]));
+    }
+    if (due > 100 * tolerance && heard <= tolerance) {
+        std::ostringstream m;
+        m << "the tail is silent after restoring the same filter: peak " << heard
+          << " once the crossfade is over, expected " << due;
+        throw Failure(m.str());
+    }
+    close(out, expected, no, "the tail after restoring the same filter");
+    x.adapter.destroy();
+}
+
 // The reported tail never shrinks during a session, and is exact again after
 // reactivation, which installs the current filter afresh.
 void tail_after_replacement(const Context& x) {
@@ -548,6 +603,16 @@ void nonfinite_input(const Context& x) {
 }
 } // namespace
 
+std::vector<Deviation> same_filter_restore_deviations() {
+    std::vector<Deviation> list;
+    for (const char* fixture : {"mono", "stereo", "crossover"})
+        list.push_back({std::string("same-filter-restore[") + fixture + "]",
+                        "the tail is silent after restoring the same filter",
+                        "restored state holding the playing filter replaces it, so the tail is "
+                        "lost after the crossfade (PLUG-38)"});
+    return list;
+}
+
 int run(Adapter& adapter, const std::filesystem::path& listing, const Options& options) {
     std::vector<Fixture> fixtures;
     try {
@@ -614,6 +679,7 @@ int run(Adapter& adapter, const std::filesystem::path& listing, const Options& o
         check(at("restore-before-setup-mismatch"), [&] { restore_before_setup_mismatch(x); });
         check(at("live-replacement"), [&] { live_replacement(x); });
         check(at("tail-after-replacement"), [&] { tail_after_replacement(x); });
+        check(at("same-filter-restore"), [&] { same_filter_restore(x); });
         check(at("failed-replacement"), [&] { failed_replacement(x); });
         check(at("failed-replacement-inactive"), [&] { failed_replacement_inactive(x); });
         check(at("failed-initial-load"), [&] { failed_initial_load(x); });
