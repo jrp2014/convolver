@@ -420,6 +420,13 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
 
     if (c)
         r.reference.emplace_back("Filter file", request_reference(accepted));
+    // PLUG-33: which list entry a wider input bus chose, and why.
+    if (c && !accepted.wider_entry.empty())
+        r.reference.emplace_back(
+            "List entry", accepted.wider_entry +
+                              (host ? " (no entry has the host's " + std::to_string(host->inputs) +
+                                          " inputs; this one has the most below that)"
+                                    : std::string()));
     if (refused_request)
         r.reference.emplace_back("Refused file", request_reference(failure->request));
     auto software = execution_line();

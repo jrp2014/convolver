@@ -228,6 +228,11 @@ struct HostRequest {
     // state, apart from the component's, and the processor names its report
     // with it while HostFilter::filter_identity() matches the saved one.
     std::string name{};
+    // PLUG-33: for a configuration list chosen where no entry has the host's
+    // input count, the entry read instead, the one with the most inputs below
+    // the host's (its path, UTF-8, as read_filter_file() gives it), so the
+    // log and the window say which entry plays and why. Empty otherwise.
+    std::string wider_entry{};
 };
 inline constexpr std::size_t max_filter_name_bytes = 1024;
 struct HostFailure {

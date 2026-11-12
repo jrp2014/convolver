@@ -2454,6 +2454,20 @@ void chosen_file_on_wider_bus() {
     require(f && f->kind == convolver::HostFailureKind::channels &&
                 p.status().text.find("previous filter kept") != std::string::npos,
             ("the refused file: " + p.status().text).c_str());
+    // A list with no 6-input entry: the 2-in entry plays, and the window's
+    // reference lines say which entry and why (jrp, 12 November 2026: the
+    // choice must be clear to the user).
+    std::ofstream(folder / "mono.cfg") << "48000 1 6 0\n0\n0 0 0 0 0 0\nband.wav\n0\n0\n0\n";
+    std::ofstream(folder / "layouts.txt") << "mono.cfg\nfilter.cfg\n";
+    require(c.load_file((folder / "layouts.txt").string()) && !p.failure(),
+            "a list chosen on 6 inputs refused");
+    std::string reference;
+    for (const auto& [key, value] : c.report())
+        if (key == "reference")
+            reference = value;
+    require(reference.find("List entry: ") != std::string::npos &&
+                reference.find("filter.cfg (no entry has the host's 6 inputs") != std::string::npos,
+            ("the report does not name the list entry: " + reference).c_str());
     std::filesystem::remove_all(folder);
     p.setActive(false);
     p.disconnect(&c);

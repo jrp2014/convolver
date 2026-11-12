@@ -711,8 +711,12 @@ A file chosen in a window or through LV2's file parameter follows the same
 rule (PLUG-33, `read_filter_file()`): it is read for the host's exact
 counts first and, when nothing matches, for the most inputs below the
 host's among the single filter or list entries for the host's rate and
-outputs, so a list's exact entry always wins. The command line still
-selects exactly. With no filter, Status names choosing a filter before a
+outputs, so a list's exact entry always wins
+([decision](../project/decisions.md#plug-in-behaviour)). When a list's
+entry is chosen that way, `HostRequest::wider_entry` names it, and the
+loaded line in the Convolver log and the window's reference lines ("List
+entry") say which entry plays and why. The command line still selects
+exactly. With no filter, Status names choosing a filter before a
 preset where the plug-in has a window (`host_status()`'s `chooses_files`).
 
 ## Replacement and threads

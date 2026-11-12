@@ -70,11 +70,14 @@ HostState filter_file_state(const std::filesystem::path& path,
 std::optional<HostState> read_filter_file(const std::string& path, const HostLayout& host,
                                           const detail::SoundFiles& reader,
                                           FilterFileFailure& failure,
-                                          std::vector<std::string>* files) {
+                                          std::vector<std::string>* files,
+                                          std::string* wider_entry) {
     failure.kind = HostFailureKind::filter_file;
     failure.carried.reset();
     if (files)
         files->clear();
+    if (wider_entry)
+        wider_entry->clear();
     try {
         // Explained in the host's terms, not the command line's (jrp's
         // GarageBand run: the window advised omitting --output-channels).
@@ -99,6 +102,16 @@ std::optional<HostState> read_filter_file(const std::string& path, const HostLay
             if (inputs == 0)
                 throw;
             state = read(inputs);
+            // A list's entry is named, so the log and the window can say
+            // which one plays (jrp: the choice must be clear to the user).
+            // The selection takes the first such entry in list order.
+            if (wider_entry && e.list)
+                for (const auto& c : *e.candidates)
+                    if (c.sample_rate == host.sample_rate && c.output_channels == host.outputs &&
+                        c.input_channels == inputs) {
+                        *wider_entry = detail::utf8_string(c.path);
+                        break;
+                    }
         }
         // VST3-9: the selection used the whole part of a fractional rate;
         // a filter made for that whole part does not suit it either.

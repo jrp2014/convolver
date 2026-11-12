@@ -53,9 +53,12 @@ struct FilterFileFailure {
 // host's rate); the message names the file and explains. `files`, when
 // given, receives every file the accepted filter was read from (the file,
 // then for a .cfg or list as filter_file_state()'s `sources`), for
-// HostRequest::files; it is emptied when the file is refused.
+// HostRequest::files; it is emptied when the file is refused. `wider_entry`,
+// when given, receives the entry a list's wider-bus choice read (UTF-8), for
+// HostRequest::wider_entry, or is emptied when there was no such choice.
 std::optional<HostState> read_filter_file(const std::string& path, const HostLayout& host,
                                           const detail::SoundFiles& reader,
                                           FilterFileFailure& failure,
-                                          std::vector<std::string>* files = nullptr);
+                                          std::vector<std::string>* files = nullptr,
+                                          std::string* wider_entry = nullptr);
 } // namespace convolver

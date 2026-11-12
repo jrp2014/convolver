@@ -367,7 +367,7 @@ OSStatus Effect::load_file(const std::string& path) {
     const auto& reader = detail::audio_toolbox_files();
 #endif
     // The files it was read from, so the window can reload it.
-    auto next = read_filter_file(path, host, reader, why, &request.files);
+    auto next = read_filter_file(path, host, reader, why, &request.files, &request.wider_entry);
     bool accepted = false;
     if (!next) {
         reject(why.kind, why.message, request, why.filter());

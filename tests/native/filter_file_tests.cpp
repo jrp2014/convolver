@@ -10,6 +10,7 @@
 #include "convolver/host.hpp"
 #include "convolver/io.hpp"
 #include "filter_file.hpp"
+#include "host_log.hpp"
 #include "host_report.hpp"
 #include "sound_files.hpp"
 #include "utf8.hpp"
@@ -21,6 +22,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -278,8 +280,9 @@ void wider_bus(const fs::path& dir) {
     const auto chosen = [&](const std::string& name, const HostLayout& host) {
         FilterFileFailure why;
         std::vector<std::string> files{"stale"};
+        std::string entry = "stale";
         auto state = read_filter_file(detail::utf8_string(dir / name), host,
-                                      detail::libsndfile_files(), why, &files);
+                                      detail::libsndfile_files(), why, &files, &entry);
         if (state) {
             require(!files.empty() && fs::path(files.front()).filename() == name &&
                         files.back() != "stale",
@@ -292,12 +295,16 @@ void wider_bus(const fs::path& dir) {
                 require(false, name + ": read, but refused on the host's buses: " + e.what());
             }
         }
-        return std::pair{std::move(state), std::move(why)};
+        return std::tuple{std::move(state), std::move(why), std::move(entry)};
     };
-    const auto inputs = [&](const std::string& name, const HostLayout& host) {
-        auto [state, why] = chosen(name, host);
+    // `entry`: the list entry named as the wider-bus choice, or none.
+    const auto inputs = [&](const std::string& name, const HostLayout& host,
+                            const std::string& entry = {}) {
+        auto [state, why, named] = chosen(name, host);
         require(state.has_value(),
                 name + " refused on a wider bus: " + detail::advice_text(why.message));
+        require(entry.empty() ? named.empty() : fs::path(named).filename() == entry,
+                name + ": the wider-bus entry named is \"" + named + "\"");
         const auto& c = *state->configuration;
         require(c.sample_rate == host.sample_rate && c.output_channels == host.outputs,
                 name + ": another rate or output count chosen");
@@ -308,17 +315,21 @@ void wider_bus(const fs::path& dir) {
     require(inputs("wide-1x6.cfg", six) == 1, "a 1-in filter on 6 inputs");
     // A list: an exact entry comes first, then the most inputs below the
     // host's, whatever the order of the entries.
-    require(inputs("wide-fewer.txt", six) == 2, "the list's 2-in entry not chosen on 6 inputs");
+    // The entry is named so the log and the window can say which plays.
+    require(inputs("wide-fewer.txt", six, "wide-2x6.cfg") == 2,
+            "the list's 2-in entry not chosen on 6 inputs");
     require(inputs("wide-fewer.txt", HostLayout{44100, 2, 6}) == 2, "the exact 2-in entry");
     require(inputs("wide-fewer.txt", HostLayout{44100, 1, 6}) == 1, "the exact 1-in entry");
     require(inputs("wide-exact.txt", six) == 6, "an exact entry passed over for a smaller one");
-    require(inputs("wide-exact.txt", HostLayout{44100, 4, 6}) == 2, "the 2-in entry on 4 inputs");
+    require(inputs("wide-exact.txt", HostLayout{44100, 4, 6}, "wide-2x6.cfg") == 2,
+            "the 2-in entry on 4 inputs");
     // Still refused as before: fewer inputs than the filter, other outputs,
     // another rate, and a rate that is not whole hertz.
     const auto refusal = [&](const std::string& name, const HostLayout& host,
                              HostFailureKind kind) {
-        auto [state, why] = chosen(name, host);
-        require(!state && why.kind == kind, name + " accepted where it does not fit");
+        auto [state, why, named] = chosen(name, host);
+        require(!state && why.kind == kind && named.empty(),
+                name + " accepted where it does not fit");
     };
     refusal("wide-2x6.cfg", HostLayout{44100, 1, 6}, HostFailureKind::channels);
     refusal("wide-2x6.cfg", HostLayout{44100, 6, 8}, HostFailureKind::channels);
@@ -328,6 +339,33 @@ void wider_bus(const fs::path& dir) {
     HostLayout pulled{0, 6, 6};
     set_host_rate(pulled, 48000 / 1.001);
     refusal("wide-48k.cfg", pulled, HostFailureKind::sample_rate);
+    // jrp (12 November 2026): the choice must be clear to the user. The log
+    // and the window's reference lines name the entry and say why it plays.
+    {
+        FilterFileFailure why;
+        HostRequest request{HostFilterSource::file, detail::utf8_string(dir / "wide-fewer.txt"), 0};
+        auto state = read_filter_file(request.path, six, detail::libsndfile_files(), why,
+                                      &request.files, &request.wider_entry);
+        require(state.has_value(), "wide-fewer.txt refused: " + detail::advice_text(why.message));
+        HostFilter filter;
+        filter.load(std::move(*state), six, {}, request);
+        const auto line = loaded_line(filter, std::optional<HostLayout>(six));
+        std::cout << "wider bus: " << line << '\n';
+        require(has(line, "No entry in the list has the host's 6 inputs, so ") &&
+                    has(line, "wide-2x6.cfg plays, the entry with the most inputs below 6.") &&
+                    has(line, "Inputs 3–6 are ignored: the filter reads inputs 1–2."),
+                "the log line does not explain the choice: " + line);
+        HostReportFacts facts;
+        facts.host = six;
+        const auto report = host_report(filter, facts);
+        require(std::any_of(report.reference.begin(), report.reference.end(),
+                            [](const auto& fact) {
+                                return fact.first == "List entry" &&
+                                       has(fact.second, "wide-2x6.cfg") &&
+                                       has(fact.second, "no entry has the host's 6 inputs");
+                            }),
+                "the window's reference lines do not name the list entry");
+    }
     // The command line still selects exactly.
     try {
         load_configuration(dir / "wide-2x6.cfg", ConfigurationSelection{44100, 6, 6});

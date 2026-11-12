@@ -26,7 +26,10 @@ Until 1.0 the C++ API may change between minor versions.
   for 2 inputs while its preset played; it now plays, reading inputs 1 and
   2. From a configuration list, an entry with exactly the host's inputs
   comes first, otherwise the entry for the host's rate and outputs with the
-  most inputs below the host's. With no filter, Status says "Choose a filter
+  most inputs below the host's (jrp's
+  [decision](docs/project/decisions.md#plug-in-behaviour)), and the
+  Convolver log and the window's File, software and log lines name that
+  entry and say why. With no filter, Status says "Choose a filter
   or load a Convolver preset." where the plug-in has a window (macOS, and
   VST3 on Windows); on Linux, where the VST3 plug-in has no window, the
   Convolver log's advice no longer tells users to choose a file or drop one

@@ -150,6 +150,15 @@ std::string ignored_sentence(const Configuration& c, const HostLayout& host) {
 }
 } // namespace
 
+namespace {
+// PLUG-33: which list entry a wider input bus chose, and why.
+std::string wider_entry_sentence(const std::string& entry, const HostLayout& host) {
+    const auto n = std::to_string(host.inputs);
+    return "No entry in the list has the host's " + n + " inputs, so " + entry +
+           " plays, the entry with the most inputs below " + n + ".";
+}
+} // namespace
+
 std::string loaded_line(const HostFilter& filter, bool host_known) {
     const auto request = request_words(filter.accepted());
     if (const auto& f = filter.failure(); f && f->kind == HostFailureKind::saved_failure)
@@ -170,6 +179,8 @@ std::string loaded_line(const HostFilter& filter, const std::optional<HostLayout
     const auto& f = filter.failure();
     if (const auto& c = filter.filter(); host && c && !(f && f->silent))
         line += ignored_sentence(*c, *host);
+    if (const auto& entry = filter.accepted().wider_entry; !entry.empty() && host)
+        line += " " + wider_entry_sentence(entry, *host);
     return line;
 }
 

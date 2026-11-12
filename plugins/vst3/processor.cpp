@@ -812,7 +812,8 @@ bool Processor::load_file(std::string_view chosen) {
         }
         FilterFileFailure why;
         // The files it was read from, so the window can reload it (VST3-11).
-        auto next = read_filter_file(path, host, *reader, why, &request.files);
+        auto next =
+            read_filter_file(path, host, *reader, why, &request.files, &request.wider_entry);
         if (!next) {
             filter_.reject(why.kind, why.message, request, why.filter());
             throw std::runtime_error("refused");

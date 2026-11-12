@@ -83,7 +83,8 @@ the inputs the filter reads. A filter with more inputs than the host gives,
 or with a different number of outputs, is refused. From a configuration
 list, an entry with exactly the host's inputs comes first; otherwise the
 entry for the host's rate and outputs with the most inputs below the host's
-is chosen.
+is chosen, and the Convolver log and the window's **File, software and
+log** lines (List entry) name that entry and say why.
 
 Channels are numbered in the host's order, and the `.cfg` routes refer to them
 in that order. For VST3 the order follows the speaker arrangement: 5.1 is left,
@@ -513,7 +514,8 @@ From the top, the window has:
   a warning sign and says what differs, in red: `44100 Hz ⚠ the filter is
   for 48000 Hz`.
 - **File, software and log**, folded away under a disclosure triangle: the
-  filter file's path and request number (and a refused file's), the software
+  filter file's path and request number (and a refused file's, and the
+  list entry chosen for a wider input bus, [channels](#channels)), the software
   (version, FFT library, CPU kernels, the plug-in SDK, and what reads the
   filter files), and where the log is. On the same row:
   - **Copy Diagnostics** puts all of this, with the settings and this
