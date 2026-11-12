@@ -42,6 +42,7 @@ void require(bool value, const std::string& message) {
 }
 double worst_relative = 0; // The worst oracle error, relative to the case's output peak.
 std::string worst_case;
+double worst_mode_relative = 0; // The same for the Estimate and No clipping cases.
 
 // A random filter with cross paths and route gains, as the PERF-5 test uses.
 Configuration random_filter(std::mt19937& random, std::size_t inputs, std::size_t outputs,
@@ -410,7 +411,7 @@ void settings_text() {
                          "gain -6 dB (No clipping: the filter is too loud for an Estimate)",
                          "-6 dB (No clipping: too loud to estimate)"},
               std::tuple{&none,
-                         "gain by Estimate: silence, as the filter's peak is too large for a "
+                         "gain by Estimate: silence, as the filter's peak is beyond the range of a "
                          "no-clipping figure",
                          "silence: no figure for this filter"}}) {
             require(gain_words(mode, gains) == words, "gain words: " + gain_words(mode, gains));
@@ -730,6 +731,7 @@ void gain_modes() {
             worst_relative = relative;
             worst_case = label;
         }
+        worst_mode_relative = std::max(worst_mode_relative, relative);
         require(relative < 2e-6, "gain mode differs from the oracle: " + label +
                                      ", relative error " + std::to_string(relative));
     }
@@ -758,6 +760,32 @@ void gain_modes() {
     for (std::size_t t = 0; t < out.size(); ++t)
         require(std::abs(out[t] - 1) < 1e-5,
                 "the replacement changed the level at frame " + std::to_string(t));
+    // A mode change during a replacement (as a host's restore makes, which
+    // sets the mode after publishing the filter): each filter ramps to its
+    // own new gain, so no sample jumps. At 0 dB, Set plays 0.5 and then
+    // 0.125, where No clipping played both at 1.
+    for (const std::size_t into : {std::size_t{0}, std::size_t{70}}) {
+        HostSettings at_zero{0, 1, 64};
+        at_zero.gain_mode = GainMode::no_clipping;
+        HostProcessor changing(HostPlayback{half, true, half_gains}, 1, at_zero);
+        per_sample(changing, 200);
+        const auto eighth = tap_filter(.125f);
+        changing.replace(HostPlayback{eighth, true, filter_gains(eighth, false)});
+        auto heard = per_sample(changing, into);
+        changing.set_gain_mode(GainMode::set);
+        const auto rest = per_sample(changing, 600);
+        heard.insert(heard.end(), rest.begin(), rest.end());
+        float last = 1;
+        for (std::size_t t = 0; t < heard.size(); ++t) {
+            require(std::abs(heard[t] - last) < .03f,
+                    "Set " + std::to_string(into) + " frames into a replacement jumped from " +
+                        std::to_string(last) + " to " + std::to_string(heard[t]) + " at frame " +
+                        std::to_string(t));
+            last = heard[t];
+        }
+        require(std::abs(heard.back() - .125f) < 1e-6,
+                "Set should end at the new filter's tap: " + std::to_string(heard.back()));
+    }
     // Where the estimate is absent, Estimate plays the bound; where both are
     // absent, silence.
     host.set_gain_mode(GainMode::estimate);
@@ -792,10 +820,22 @@ void filter_estimates() {
     require(installed && !installed->gains.estimate_db && installed->gains.no_clipping_db &&
                 !filter.gains().estimate_db,
             "a load in Set mode should not find the estimate");
-    const auto playback = filter.estimate(true);
+    // A publication that fails keeps nothing: the window and log never show
+    // an estimate that does not play, and the next try finds it again.
+    bool threw = false;
+    try {
+        filter.estimate(true, [](const HostPlayback&) { throw std::bad_alloc(); });
+    } catch (const std::bad_alloc&) {
+        threw = true;
+    }
+    require(threw && !filter.gains().estimate_db && filter.estimating(),
+            "a failed publication should not keep the estimate");
+    std::optional<HostPlayback> published;
+    const auto playback = filter.estimate(true, [&](const HostPlayback& p) { published = p; });
     require(playback && playback->gains.estimate_db == filter_gains(c).estimate_db &&
-                filter.gains() == playback->gains && filter.estimating(),
-            "estimate(true) should find the accepted filter's estimate");
+                filter.gains() == playback->gains && filter.estimating() && published &&
+                published->gains == playback->gains,
+            "estimate(true) should find and publish the accepted filter's estimate");
     require(!filter.estimate(true), "a known estimate needs no new playback");
     installed.reset();
     filter.load(HostState{c}, layout, [&](const HostPlayback& p) { installed = p; });
@@ -833,6 +873,8 @@ int main() {
             {"filter_estimates", filter_estimates},
         },
         [] { audio_thread = false; });
+    std::printf("worst Estimate and No clipping oracle error %.3g of the output peak\n",
+                worst_mode_relative);
     std::printf("worst gain and mix oracle error %.3g of the output peak (%s)\n", worst_relative,
                 worst_case.c_str());
     if (failed)

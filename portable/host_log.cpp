@@ -244,7 +244,7 @@ std::string gain_words(const HostSettings& s, const FilterGains* gains) {
     const auto played = applied_gain_db(s, *gains);
     if (!played)
         return "gain by " + mode +
-               ": silence, as the filter's peak is too large for a no-clipping figure";
+               ": silence, as the filter's peak is beyond the range of a no-clipping figure";
     if (s.gain_mode == GainMode::estimate && !gains->estimate_db)
         return "gain " + figure_text(*played) +
                (gains->estimate_failed ? " (No clipping: the filter is too loud for an Estimate)"

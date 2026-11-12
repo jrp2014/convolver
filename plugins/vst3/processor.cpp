@@ -644,12 +644,17 @@ void Processor::choose_gain_mode(GainMode mode) noexcept {
     const bool estimate = mode == GainMode::estimate;
     if (gain_mode_.load() == mode && filter_.estimating() == estimate)
         return;
+    // Played from the next audio call: until the estimate below arrives,
+    // Estimate plays the no-clipping figure.
+    gain_mode_.store(mode);
     std::string why;
     try {
         // Off the audio thread: the filter's estimate when Estimate needs it,
         // published so the crossfade takes the filter to it.
-        if (auto playback = filter_.estimate(estimate); playback && host_)
-            host_->replace(*playback);
+        filter_.estimate(estimate, [&](const HostPlayback& playback) {
+            if (host_)
+                host_->replace(playback);
+        });
     } catch (const std::exception& e) {
         try {
             why = e.what();
@@ -657,7 +662,6 @@ void Processor::choose_gain_mode(GainMode mode) noexcept {
         }
     } catch (...) {
     }
-    gain_mode_.store(mode);
     try { // Best effort: out of memory for the line changes nothing else.
         const auto chosen = settings();
         log(gain_mode_line(chosen, filter_.gains(), filter_.filter().has_value(), why),

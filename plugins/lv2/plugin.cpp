@@ -191,6 +191,7 @@ struct Instance {
     // logged); and whether a Gain mode request waits for the worker (one at
     // a time), as for the Latency.
     std::atomic<GainMode> gain_mode{GainMode::set}, gain_mode_settled{GainMode::set};
+    static_assert(std::atomic<GainMode>::is_always_lock_free);
     std::atomic<bool> gain_mode_queued{false};
     std::atomic<int> working{0}; // work() calls in progress.
     // The newest request: run() (patch:Set) and restore() count it.
@@ -538,8 +539,10 @@ void apply_gain_mode(Instance& p) noexcept {
         return;
     std::string why;
     try {
-        if (auto playback = p.filter.estimate(estimate); playback && p.host)
-            p.host->replace(*playback);
+        p.filter.estimate(estimate, [&](const HostPlayback& playback) {
+            if (p.host)
+                p.host->replace(playback);
+        });
     } catch (const std::exception& e) {
         try {
             why = e.what();

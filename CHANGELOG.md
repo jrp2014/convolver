@@ -26,7 +26,7 @@ Until 1.0 the C++ API may change between minor versions.
   state version 4, written only when the mode is not Set, so builds before
   this one refuse only such a project), Audio Unit parameter 1002 and the
   LV2 control `gain_mode`. Set mode plays every sample exactly as before;
-  the other modes match the double-precision oracle within 3.1e-7 of the
+  the other modes match the double-precision oracle within 1.3e-7 of the
   output peak. Not yet tried in a host.
 - Tests (COMPAT-1, in progress): the example presets of the published
   0.13.12 and the audio its own CLI and VST3 plug-in rendered from them are

@@ -579,8 +579,8 @@ the plan's Gain modes (12 November 2026); its meters follow later
   [`host.hpp`](../../include/convolver/host.hpp), and `settings_words()` for
   the log. `HostProcessor` takes the settings at construction; `set_gain_db()` and
   `set_mix()` are audio-thread calls like `set_bypass()`, and each change
-  ramps linearly over 1.33 ms; so is `set_gain_mode()`, whose change ramps
-  the same way. The ramps (also bypass and mute) and the
+  ramps linearly over 1.33 ms. `set_gain_mode()` is one too, and the gain
+  it changes ramps the same way. The ramps (also bypass and mute) and the
   replacement crossfade last a fixed time at every sample rate (PLUG-17):
   64 and 256 frames at 48 kHz, to the nearest frame elsewhere, so 128 and
   512 at 96 kHz and 59 and 235 at 44.1 kHz. A ramp must not click, must
@@ -603,16 +603,22 @@ the plan's Gain modes (12 November 2026); its meters follow later
   apply. Gain keeps its value meanwhile and plays again in Set mode. The
   figures are applied as they are, never clamped to Gain's range, and each
   filter carries its own (`FilterGains` in `HostPlayback`), so in a
-  replacement the old filter keeps the gain it had and the new one starts at
-  its own: the crossfade covers the change. `HostFilter::load` finds the
+  replacement the new filter starts at its own figure and the crossfade
+  covers the change. Through the crossfade each filter has its own gain,
+  which ramps to that filter's target when the mode or Gain changes: a host
+  restoring a project may set the mode just after the filter, and neither
+  filter jumps. `HostFilter::load` finds the
   bound for every accepted filter (it only sums taps); the noise estimate,
   which filters noise for ten filter lengths (at least 65536 frames, about
   0.2 s for a 5-second stereo filter and 0.6 s for a 10-second one on the
   cloud machine), only while an adapter has Estimate chosen
-  (`HostFilter::estimating()`). Choosing Estimate finds it for the filter
-  already accepted with `HostFilter::estimate()` on the control side, and
-  the adapter publishes the filter with it; until it arrives, Estimate plays
-  the bound. A restored state with Estimate chosen sets `set_estimating()`
+  (`HostFilter::estimating()`). Choosing Estimate plays the bound at once;
+  `HostFilter::estimate()` then finds the estimate for the filter already
+  accepted, on the adapter's control side (VST3's message thread, the Audio
+  Unit's Latency worker, LV2's worker), and calls the adapter to publish
+  the filter with it, which the crossfade takes to. The estimate is kept
+  only once published, so a failure leaves nothing shown that does not
+  play. A restored state with Estimate chosen sets `set_estimating()`
   before it loads, so its filter gets the estimate as it loads. A filter
   whose estimate overflows has none (`estimate_failed`), and Estimate plays
   its bound; a filter with no finite bound plays silence in both modes,

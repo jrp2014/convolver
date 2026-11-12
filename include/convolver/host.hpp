@@ -375,11 +375,16 @@ class HostFilter {
     // and which takes time for a long filter. Adapters set it while their
     // gain mode is Estimate, before loading, with estimate(). Turning it on
     // also finds the estimate of the filter already accepted (control thread;
-    // filters noise, may throw std::bad_alloc) and then returns that filter's
-    // playback for the adapter to publish, so the processor crossfades to it
-    // at its new figure. Returns nothing when gains() did not change, or when
-    // no filter plays (none accepted, or it does not suit the host).
-    std::optional<HostPlayback> estimate(bool on);
+    // filters noise, may throw std::bad_alloc) and then calls `install` with
+    // that filter's playback, so the processor crossfades to it at its new
+    // figure; as in load(), `install` must publish as its last step. gains()
+    // changes only after `install` returns: if anything throws, the estimate
+    // is not kept, and choosing Estimate again finds it again. Returns the
+    // playback it installed; nothing when gains() did not change, or when no
+    // filter plays (none accepted, or it does not suit the host), and then
+    // `install` is not called.
+    std::optional<HostPlayback>
+    estimate(bool on, const std::function<void(const HostPlayback&)>& install = {});
     bool estimating() const noexcept {
         return estimating_;
     }

@@ -324,6 +324,7 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     std::atomic<std::size_t> latency_{default_host_latency};
     // PLUG-10: the Gain mode the audio thread plays (choose_gain_mode()).
     std::atomic<GainMode> gain_mode_{GainMode::set};
+    static_assert(std::atomic<GainMode>::is_always_lock_free);
     // The running processor's latency; `inactive` while inactive (0 is a
     // latency since PERF-2).
     static constexpr std::size_t inactive = std::numeric_limits<std::size_t>::max();

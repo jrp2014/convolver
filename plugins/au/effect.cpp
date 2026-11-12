@@ -466,8 +466,10 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
             (current.gain_mode != applied_gain_mode_ || filter_.estimating() != estimate)) {
             std::string why;
             try {
-                if (auto playback = filter_.estimate(estimate); playback && host_)
-                    host_->replace(*playback);
+                filter_.estimate(estimate, [&](const HostPlayback& playback) {
+                    if (host_)
+                        host_->replace(playback);
+                });
             } catch (const std::exception& e) {
                 try {
                     why = e.what();

@@ -632,7 +632,8 @@ defaults play exactly as Convolver did before the settings existed.
   clipping figure, then fades to its own. A filter too loud for an estimate
   plays at its No clipping figure, and the log and window say so. In LV2,
   without the host's worker thread, Estimate plays the No clipping figure
-  until the host next starts the plug-in.
+  until the host next starts the plug-in. An LV2 preset saved before this
+  setting existed has no Gain mode, so loading it leaves the mode as it is.
 - The host saves the settings in the project and in presets it saves itself.
   A preset made by `convolver-preset` holds the filter only, so loading it
   leaves the settings as they are. In VST3 and the Audio Unit, the

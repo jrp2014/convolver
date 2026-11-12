@@ -645,17 +645,22 @@ HostPlayback HostFilter::activate(const HostLayout& host) {
     return playback;
 }
 
-std::optional<HostPlayback> HostFilter::estimate(bool on) {
+std::optional<HostPlayback>
+HostFilter::estimate(bool on, const std::function<void(const HostPlayback&)>& install) {
     estimating_ = on;
     if (!on || !filter_ || gains_.estimate_db || gains_.estimate_failed)
         return std::nullopt;
     auto gains = gains_;
     find_estimate(gains, *filter_);
+    if (activation_failure_ || failed_) {
+        gains_ = gains;
+        return std::nullopt; // It does not suit the host, or failed: silence plays.
+    }
     auto playback = filter_playback(*filter_);
     playback.gains = gains;
-    gains_ = gains; // After everything that may throw.
-    if (activation_failure_ || failed_)
-        return std::nullopt; // It does not suit the host, or failed: silence plays.
+    if (install)
+        install(playback);
+    gains_ = gains; // After everything that may throw, the publication included.
     return playback;
 }
 
@@ -1091,13 +1096,16 @@ struct HostProcessor::Impl {
     // PLUG-10: the gain and mix the adapter set (audio thread), and the values
     // playing, which ramp to them over setting_ramp frames.
     double set_db = 0;
-    std::size_t gain_ramp = 0, mix_ramp = 0;
+    // PLUG-10: through a replacement the filter fading out has its own gain
+    // (previous_*), which ramps to its own target in the current mode as
+    // `gain` does for the new one: a mode or Gain change during the
+    // crossfade never makes either jump. In Set mode both follow the same
+    // targets from the same values, so they stay equal and the output is
+    // computed as before the modes existed.
+    std::size_t gain_ramp = 0, mix_ramp = 0, previous_gain_ramp = 0;
     float set_gain = 1, gain = 1, gain_target = 1, gain_step = 0;
-    // PLUG-10: the gain mode (audio thread). In Set mode both filters of a
-    // replacement play at `gain`, as before the modes existed; otherwise the
-    // filter fading out keeps the gain it had when the new one was adopted.
-    GainMode mode = GainMode::set;
-    float previous_gain = 1;
+    float previous_gain = 1, previous_gain_target = 1, previous_gain_step = 0;
+    GainMode mode = GainMode::set; // PLUG-10: the gain mode (audio thread).
     // The gain `p` plays at in the current mode: the Gain setting, or the
     // filter's own figure (silence when it is unknown).
     float target_gain(const Prepared& p) const noexcept {
@@ -1164,6 +1172,13 @@ struct HostProcessor::Impl {
             gain_target = t;
             gain_step = (gain_target - gain) / setting_ramp;
             gain_ramp = setting_ramp;
+        }
+        if (previous) {
+            if (const auto t = target_gain(*previous); t != previous_gain_target) {
+                previous_gain_target = t;
+                previous_gain_step = (previous_gain_target - previous_gain) / setting_ramp;
+                previous_gain_ramp = setting_ramp;
+            }
         }
         if (const auto t = target_mix(); t != mix_target) {
             mix_target = t;
@@ -1270,12 +1285,17 @@ struct HostProcessor::Impl {
                     previous = current;
                     previous_level_frames = level_frames;
                     previous_muted = muted;
+                    // PLUG-10: the outgoing filter carries on with its
+                    // gain, ramp included.
                     previous_gain = gain;
+                    previous_gain_target = gain_target;
+                    previous_gain_step = gain_step;
+                    previous_gain_ramp = gain_ramp;
                     warm = block;
                     fade = 0;
-                    // PLUG-10: outside Set mode the new filter starts at its
-                    // own figure (it is silent until its warm-up ends), so
-                    // the crossfade covers the change.
+                    // Outside Set mode the new filter starts at its own
+                    // figure (it is silent until its warm-up ends), so the
+                    // crossfade covers the change.
                     if (mode != GainMode::set) {
                         gain = gain_target = target_gain(*next);
                         gain_ramp = 0;
@@ -1357,6 +1377,10 @@ struct HostProcessor::Impl {
                 gain += gain_step;
             else
                 gain = gain_target;
+            if (previous_gain_ramp && --previous_gain_ramp)
+                previous_gain += previous_gain_step;
+            else
+                previous_gain = previous_gain_target;
             if (mix_ramp && --mix_ramp)
                 mix += mix_step;
             else
@@ -1372,10 +1396,10 @@ struct HostProcessor::Impl {
             // without, or the reverse, both fade with the crossfade, so
             // neither bypass nor Mix jumps.
             const bool dry_now = current->dry, dry_before = previous && previous->dry;
-            // PLUG-10: in Set mode both filters share `gain`, computed as
-            // before the modes existed.
-            const bool shared_gain = mode == GainMode::set;
-            const float gain_before = shared_gain ? gain : previous_gain;
+            // PLUG-10: while both filters play at the same gain (always in
+            // Set mode), it is applied once, as before the modes existed.
+            const float gain_before = previous ? previous_gain : gain;
+            const bool shared_gain = gain_before == gain;
             const float mix_now = dry_now ? mix : 1.f;
             const float mix_before = dry_before ? mix : 1.f;
             const bool same_rule = !previous || dry_now == dry_before;
