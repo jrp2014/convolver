@@ -294,19 +294,38 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                     throw;
                 }
             }
-            filter_.load(
-                std::move(next), host,
-                [&](const HostPlayback& c) {
-                    if (host_)
-                        host_->replace(c);
-                },
-                request, host_.get());
+            // PLUG-10: restored state with Estimate chosen gets its estimate
+            // as it loads; a refused request leaves the choice as it was.
+            std::optional<GainMode> saved_mode;
+            if (saved)
+                for (const auto& [id, value] : *saved)
+                    if (id == gain_mode_parameter)
+                        saved_mode = gain_mode_at(value);
+            const bool was_estimating = filter_.estimating();
+            if (saved_mode)
+                filter_.set_estimating(*saved_mode == GainMode::estimate);
+            try {
+                filter_.load(
+                    std::move(next), host,
+                    [&](const HostPlayback& c) {
+                        if (host_)
+                            host_->replace(c);
+                    },
+                    request, host_.get());
+            } catch (...) {
+                filter_.set_estimating(was_estimating);
+                throw;
+            }
             // Nothing from here on can throw: the request is accepted.
             tail_.store(host_ ? host_->tail_frames() : uninitialized_tail);
             accepted = true;
             if (saved)
                 for (const auto& [id, value] : *saved)
                     store(id, value); // Status and unknown IDs are ignored.
+            // The restored mode is in place, with its estimate: the
+            // "Restored settings" below say so, not the Latency queue.
+            if (saved_mode)
+                applied_gain_mode_ = *saved_mode;
         } catch (...) {
             silence_failed_first_load(was_failed);
         }
@@ -322,14 +341,16 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                 // unit, so its "Started at" line shows the settings before this.
                 if (saved && std::ranges::any_of(*saved, [](const auto& p) {
                         return p.first == gain_parameter || p.first == mix_parameter ||
-                               p.first == latency_parameter;
+                               p.first == latency_parameter || p.first == gain_mode_parameter;
                     })) {
                     const auto counts = host ? *host : layout();
                     // PLUG-26: a .vstpreset chosen in the window brings them too.
                     message +=
                         (request.source == HostFilterSource::file ? " Settings from the preset: "
                                                                   : " Restored settings: ") +
-                        settings_words(settings(), dry_signal_rule(filter_, counts)) + ".";
+                        settings_words(settings(), dry_signal_rule(filter_, counts),
+                                       filter_.filter() ? &filter_.gains() : nullptr) +
+                        ".";
                 }
             }
         } catch (...) { // Out of memory for the message: it is dropped.
@@ -342,8 +363,8 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
     log_faults(faults);
     log(message, problem); // A restored failed load says why it plays silence.
     if (accepted && settings_unreadable)
-        log("The preset's parameter values (its \"data\" entry) could not be read, so Gain, Mix "
-            "and Latency keep their values.");
+        log("The preset's parameter values (its \"data\" entry) could not be read, so Gain, "
+            "Gain mode, Mix and Latency keep their values.");
     notify_status();
     return accepted;
 }
@@ -387,6 +408,7 @@ OSStatus Effect::load_file(const std::string& path) {
             try {
                 saved = SavedSettings{
                     {gain_parameter, static_cast<AudioUnitParameterValue>(s->gain_db)},
+                    {gain_mode_parameter, static_cast<AudioUnitParameterValue>(s->gain_mode)},
                     {mix_parameter, static_cast<AudioUnitParameterValue>(s->mix * 100)}};
                 if (at != host_latencies.end())
                     saved->emplace_back(latency_parameter, static_cast<AudioUnitParameterValue>(
@@ -525,6 +547,12 @@ bool Effect::read_state(CFPropertyListRef plist, HostState& next,
             saved = saved_parameters(static_cast<CFDataRef>(data));
             if (saved)
                 current_latency_position(dict, *saved);
+            // PLUG-10: state saved before the Gain mode existed played the
+            // Gain setting, so it restores Set.
+            if (saved && !saved->empty() && std::ranges::none_of(*saved, [](const auto& p) {
+                    return p.first == gain_mode_parameter;
+                }))
+                saved->emplace_back(gain_mode_parameter, 0.f);
         } catch (...) { // Out of memory: the settings are left as they are.
         }
         settings_unreadable = !saved;

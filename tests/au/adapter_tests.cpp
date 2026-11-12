@@ -507,7 +507,7 @@ void rejected_presets() {
     recorded(HostFailureKind::state_unreadable, 0, false, "a truncated convolver-state");
     require(modified([&](CFMutableDictionaryRef d) {
                 const auto key = au_test::state_key();
-                const UInt8 newer[] = {'C', 'N', 'V', 'S', 4, 0, 0, 0, 0, 0, 0, 0};
+                const UInt8 newer[] = {'C', 'N', 'V', 'S', 5, 0, 0, 0, 0, 0, 0, 0};
                 const auto data = CFDataCreate(nullptr, newer, sizeof newer);
                 CFDictionarySetValue(d, key, data);
                 CFRelease(data);
@@ -773,6 +773,8 @@ float steady_output(Unit& unit, int blocks) {
         check(render(unit, b, 512, false, silent), "settings render");
     return b.out[0].back();
 }
+std::string value_name(Unit& unit, AudioUnitParameterID id, AudioUnitParameterValue value);
+
 void settings_parameters() {
     struct Expected {
         AudioUnitParameterID id;
@@ -817,6 +819,38 @@ void settings_parameters() {
     require(std::abs(steady_output(unit, 2) - .25 * gain) < 1e-5, "Gain not applied");
     set_parameter(unit, au::mix_parameter, 50);
     require(std::abs(steady_output(unit, 2) - (.5 * .25 * gain + .25)) < 1e-5, "Mix not applied");
+    // PLUG-10: Gain mode, a non-real-time menu. No clipping and Estimate
+    // play the filter's own figure (6 dB for one tap of 0.5, so the wet
+    // share is .5), Estimate once the unit's queue has found it; Set plays
+    // Gain again.
+    {
+        AudioUnitParameterInfo info{};
+        UInt32 size = sizeof info;
+        check(AudioUnitGetProperty(unit.get(), kAudioUnitProperty_ParameterInfo,
+                                   kAudioUnitScope_Global, au::gain_mode_parameter, &info, &size),
+              "Gain mode parameter info");
+        require(info.unit == kAudioUnitParameterUnit_Indexed && info.minValue == 0 &&
+                    info.maxValue == 2 && info.defaultValue == 0 &&
+                    (info.flags & kAudioUnitParameterFlag_IsWritable) &&
+                    (info.flags & kAudioUnitParameterFlag_ValuesHaveStrings) &&
+                    (info.flags & kAudioUnitParameterFlag_NonRealTime),
+                "Gain mode is not an indexed, non-real-time parameter from 0 to 2, default 0");
+        if (info.flags & kAudioUnitParameterFlag_CFNameRelease)
+            CFRelease(info.cfNameString);
+        require(value_name(unit, au::gain_mode_parameter, 1) == "Estimate" &&
+                    value_name(unit, au::gain_mode_parameter, 2) == "No clipping",
+                "Gain mode names: " + value_name(unit, au::gain_mode_parameter, 2));
+        const auto plays = [&](double expected) {
+            return eventually([&] { return std::abs(steady_output(unit, 2) - expected) < 1e-4; });
+        };
+        set_parameter(unit, au::gain_mode_parameter, 2);
+        require(plays(.5 * .5 + .25), "No clipping does not play the filter's figure");
+        set_parameter(unit, au::gain_mode_parameter, 1.4f); // Rounded to Estimate.
+        require(parameter(unit, au::gain_mode_parameter) == 1 && plays(.5 * .5 + .25),
+                "Estimate does not play the filter's figure");
+        set_parameter(unit, au::gain_mode_parameter, 0);
+        require(plays(.5 * .25 * gain + .25), "Set does not play Gain again");
+    }
 
     // Saved with ClassInfo, restored into a new instance before it is
     // initialized, and applied when it is. The log line for the restore lists
@@ -1487,10 +1521,10 @@ void status_parameter() {
                                &size),
           "parameter list");
     // AU-7: the settings first, as generic views list them, then Status.
-    require(size == 4 * sizeof(AudioUnitParameterID) && ids[0] == au::gain_parameter &&
-                ids[1] == au::mix_parameter && ids[2] == au::latency_parameter &&
-                ids[3] == au::status_parameter,
-            "the parameters should be Gain, Mix, Latency and Status");
+    require(size == 5 * sizeof(AudioUnitParameterID) && ids[0] == au::gain_parameter &&
+                ids[1] == au::gain_mode_parameter && ids[2] == au::mix_parameter &&
+                ids[3] == au::latency_parameter && ids[4] == au::status_parameter,
+            "the parameters should be Gain, Gain mode, Mix, Latency and Status");
     AudioUnitParameterInfo info{};
     size = sizeof info;
     check(AudioUnitGetProperty(au, kAudioUnitProperty_ParameterInfo, kAudioUnitScope_Global,

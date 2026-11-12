@@ -91,6 +91,7 @@ HostSettings Effect::settings() {
     s.gain_db = Globals()->GetParameterRT(gain_parameter);
     s.mix = Globals()->GetParameterRT(mix_parameter) / 100.0;
     s.latency = host_latencies[latency_index(Globals()->GetParameterRT(latency_parameter))];
+    s.gain_mode = gain_mode_at(Globals()->GetParameterRT(gain_mode_parameter));
     return s; // Within range: store() clamps every value.
 }
 
@@ -104,6 +105,8 @@ void Effect::store(AudioUnitParameterID id, AudioUnitParameterValue value) noexc
         value = std::isnan(value) ? 100.f : std::clamp<AudioUnitParameterValue>(value, 0, 100);
     else if (id == latency_parameter)
         value = static_cast<AudioUnitParameterValue>(latency_index(value));
+    else if (id == gain_mode_parameter)
+        value = static_cast<AudioUnitParameterValue>(gain_mode_at(value));
     else
         return;
     static_cast<void>(Globals()->SetParameterOrError(id, value));
@@ -312,6 +315,17 @@ OSStatus Effect::GetParameterInfo(AudioUnitScope scope, AudioUnitParameterID id,
         info.defaultValue = 0;
         info.flags = settable;
         return noErr;
+    case gain_mode_parameter:
+        // PLUG-10: a menu, not automated, as Latency: Estimate may need time
+        // to find the filter's figure.
+        FillInParameterName(info, CFSTR("Gain mode"), false);
+        info.unit = kAudioUnitParameterUnit_Indexed;
+        info.minValue = 0;
+        info.maxValue = static_cast<AudioUnitParameterValue>(gain_mode_count - 1);
+        info.defaultValue = static_cast<AudioUnitParameterValue>(GainMode::set);
+        info.flags = settable | kAudioUnitParameterFlag_ValuesHaveStrings |
+                     kAudioUnitParameterFlag_NonRealTime;
+        return noErr;
     case mix_parameter:
         FillInParameterName(info, CFSTR("Mix"), false);
         info.unit = kAudioUnitParameterUnit_Percent;
@@ -338,7 +352,8 @@ OSStatus Effect::GetParameterInfo(AudioUnitScope scope, AudioUnitParameterID id,
 
 OSStatus Effect::GetParameterValueStrings(AudioUnitScope scope, AudioUnitParameterID id,
                                           CFArrayRef* out) {
-    if (scope != kAudioUnitScope_Global || (id != status_parameter && id != latency_parameter))
+    if (scope != kAudioUnitScope_Global ||
+        (id != status_parameter && id != latency_parameter && id != gain_mode_parameter))
         return kAudioUnitErr_InvalidProperty;
     if (!out) // Asked whether the strings exist.
         return noErr;
@@ -348,6 +363,9 @@ OSStatus Effect::GetParameterValueStrings(AudioUnitScope scope, AudioUnitParamet
         if (id == status_parameter)
             for (const auto* name : status_names)
                 names.push_back(cf_string(name));
+        else if (id == gain_mode_parameter)
+            for (std::size_t i = 0; i < gain_mode_count; ++i)
+                names.push_back(cf_string(gain_mode_name(static_cast<GainMode>(i))));
         else
             for (const auto frames : host_latencies)
                 names.push_back(cf_string(latency_name(frames)));
@@ -371,7 +389,8 @@ OSStatus Effect::SetParameter(AudioUnitParameterID id, AudioUnitScope scope,
         return AUBase::SetParameter(id, scope, element, value, offset);
     if (id == status_parameter)
         return noErr;
-    if (id != gain_parameter && id != mix_parameter && id != latency_parameter)
+    if (id != gain_parameter && id != mix_parameter && id != latency_parameter &&
+        id != gain_mode_parameter)
         return kAudioUnitErr_InvalidParameter;
     AUSDK_RT_UNSAFE_BEGIN("Clamping, then a store into the existing parameter map")
     store(id, value);
@@ -380,6 +399,8 @@ OSStatus Effect::SetParameter(AudioUnitParameterID id, AudioUnitScope scope,
     // unit's Latency queue applies it (request_latency()).
     if (id == latency_parameter)
         request_latency();
+    else if (id == gain_mode_parameter)
+        request_gain_mode();
     return noErr;
 }
 
@@ -507,6 +528,16 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         // The Status parameter's current value reads as the unit's status
         // line; any other value (or no value: the current one) as its name.
         auto* request = static_cast<AudioUnitParameterStringFromValue*>(data);
+        if (request->inParamID == gain_mode_parameter) {
+            const auto value =
+                request->inValue ? *request->inValue : Globals()->GetParameter(gain_mode_parameter);
+            try {
+                request->outString = cf_string(gain_mode_name(gain_mode_at(value))).release();
+            } catch (...) {
+                return kAudioUnitErr_InvalidPropertyValue;
+            }
+            return request->outString ? noErr : kAudioUnitErr_InvalidPropertyValue;
+        }
         if (request->inParamID == latency_parameter) {
             // A Latency value reads as its menu name (auval asks, as for any
             // parameter whose values have strings).

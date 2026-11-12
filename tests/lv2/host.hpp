@@ -142,8 +142,8 @@ class Plugin {
     // Control ports, read and written around run().
     float enabled = 1, latency = -1, status = -1;
     // LV2-7's settings ports, at their defaults: Gain in decibels, Mix in
-    // percent and Latency in frames.
-    float gain = 0, mix = 100, latency_frames = 0;
+    // percent and Latency in frames; PLUG-10's Gain mode (a GainMode).
+    float gain = 0, mix = 100, latency_frames = 0, gain_mode = 0;
     // The state interface, called directly with the property under <base>state.
     LV2_State_Status restore(std::span<const std::byte>, LV2_URID type);
     LV2_State_Status restore_empty(); // No properties at all.
@@ -237,7 +237,7 @@ class Plugin {
     std::size_t paths_freed_ = 0, delivered_ = 0;
     std::uint32_t enabled_port_ = 0, latency_port_ = 0, status_port_ = 0;
     std::uint32_t control_port_ = 0, notify_port_ = 0;
-    std::uint32_t gain_port_ = 0, mix_port_ = 0, latency_frames_port_ = 0;
+    std::uint32_t gain_port_ = 0, mix_port_ = 0, latency_frames_port_ = 0, gain_mode_port_ = 0;
     // Atom buffers, 8-byte aligned.
     std::vector<std::uint64_t> control_, notify_;
     std::vector<std::pair<bool, std::pair<std::string, LV2_URID>>> messages_; // set?, path, type

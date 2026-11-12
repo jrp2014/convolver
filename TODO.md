@@ -102,7 +102,7 @@ the suggested one.
 
 | Group | Items | Note |
 | --- | --- | --- |
-| Later previews, as decided | **VST3-12** (the Windows window, built: host and screen-reader checks left); **VST3-13** (the Linux window) only once LV2 is in a Linux package and users ask; **PLUG-9**, **PLUG-10** and **AU-7** (the other gain modes and the meters) | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the windows' order is [decided](docs/project/decisions.md#direction) in the [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md). The Linux packages use the host's own controls meanwhile; the Windows window shipped in 0.13.12, not yet tried in a host |
+| Later previews, as decided | **VST3-12** (the Windows window, built: host and screen-reader checks left); **VST3-13** (the Linux window) only once LV2 is in a Linux package and users ask; **PLUG-9**, **PLUG-10** and **AU-7** (the meters; the gain modes are built, PR #188) | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the windows' order is [decided](docs/project/decisions.md#direction) in the [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md). The Linux packages use the host's own controls meanwhile; the Windows window shipped in 0.13.12, not yet tried in a host |
 | LV2 in a preview | **LV2-3** and **LV2-4** (LV2-5 and LV2-7 are done) | LV2 is in the Linux package since 0.13.12; a source build was tried in PipeWire 1.6.8 on virtual devices, not yet in a desktop host ([decision](docs/project/decisions.md#releases)) |
 | Other configuration readers | **CFG-1**, then **CFG-2** | CFG-2 waits for CFG-1 to show which readers matter |
 | Only on request | **VST3-2** (switch filters from the host), **VST3-6** (replacing the old VST2 plug-in), **HOST-2** (CLAP), **LV2-6** (an LV2 window) | Each needs a stated user need and acceptance tests first |
@@ -309,10 +309,11 @@ is superseded.
   ([decided](docs/project/decisions.md#plug-in-behaviour)).
   Open risks carried from the archived editor plan's
   [risks](docs/archive/plans/2026-10-24-plugin-editor.md#risks-and-open-questions)
-  (8 November 2026), none of them a first-preview gate: Gain's Estimate mode may add a
-  noticeable part of a second to loading a long multichannel filter (PERF-3
-  measures it; if too slow, compute it on a worker after the load and ramp
-  to the result); LV2's notify port needs the report's size declared up
+  (8 November 2026), none of them a first-preview gate: Gain's Estimate mode adds
+  part of a second to loading a long filter while it is chosen (about 0.6 s
+  for a 10-second stereo filter, measured 12 November 2026; when Estimate is
+  chosen for a filter already playing, the bound plays until the estimate
+  is ready, PR #188); LV2's notify port needs the report's size declared up
   front (LV2-6); and typing in the window must not trigger the host's
   shortcuts, nor the host's keys reach the window.
 - [ ] **HOST-3 — Windows Media Foundation transform (parked).** Needs more
@@ -444,6 +445,15 @@ Shared work, done once for all three formats:
   and in the Audio Unit (AU-7). A new Latency plays at once, after a gap
   in the sound ([settings](docs/develop/plugin-contract.md#settings)). Remaining: the
   Estimate and No clipping gain modes and the meters.
+  Progress (12 November 2026, PR #188): the Gain mode (Set, Estimate, No
+  clipping) in `HostSettings` and `HostProcessor`, each filter carrying its
+  own figures, in VST3 (1002, host state version 4), the Audio Unit (1002)
+  and LV2 (`gain_mode`), with a menu and the gain it plays in the macOS and
+  Windows windows ([settings](docs/develop/plugin-contract.md#settings)).
+  The noise estimate is found only while Estimate is chosen, on the control
+  side, so loads in the other modes cost nothing more; until it arrives
+  Estimate plays the no-clipping figure. Not yet tried in a host.
+  Remaining: the meters (output peak, clip count and callback load).
 - [ ] **PLUG-11 — FFT planning in FFTW-built plug-ins (optional).** From the
   [editor plan](docs/archive/plans/2026-10-24-plugin-editor.md#settings), as jrp asked:
   only when a plug-in is built with `-DCONVOLVER_FFT_BACKEND=FFTW` (released
@@ -811,8 +821,9 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   (31 October 2026, PR #95): Latency (1004), with the latency change
   notification and a menu in the window; a choice made while the unit runs
   plays at once (a new processor handed to Render). Not yet checked in
-  GarageBand (AU-4's step 10). Remaining, with PLUG-10's deferred parts:
-  Gain mode (1002).
+  GarageBand (AU-4's step 10). Progress (12 November 2026, PR #188): Gain
+  mode (1002), with a menu in the window; built by macOS CI only, not yet
+  tried in GarageBand. Remaining, with PLUG-10's: the meters.
 
 ## FFmpeg integration
 

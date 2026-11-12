@@ -12,6 +12,23 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Plug-ins (PLUG-10, AU-7): a **Gain mode** setting in every format.
+  **Set** plays Gain as before and is the default. **Estimate** plays the
+  filter's own estimate of how far to turn it down, from noise played
+  through it, as `convolver --gain-db auto` does, and **No clipping**
+  plays the gain at which no input within full scale can clip (up to float
+  rounding), as `--gain-db no-clip` does; it is not a limiter. Each
+  filter plays at its own figure, so loading another one changes the level
+  to suit it, and Gain keeps its value for Set. The macOS and Windows
+  windows have a Gain mode menu with the gain it plays beside it, and the
+  Convolver log names the mode and the gain. Estimate takes a moment for a
+  long filter (about 0.6 s for a 10-second stereo filter); until it is
+  ready, the No clipping figure plays. Saved as VST3 parameter 1002 (host
+  state version 4, written only when the mode is not Set, so builds before
+  this one refuse only such a project), Audio Unit parameter 1002 and the
+  LV2 control `gain_mode`. Set mode plays every sample exactly as before;
+  the other modes match the double-precision oracle within 1.3e-7 of the
+  output peak. Not yet tried in a host.
 - Tests (COMPAT-1, in progress): the example presets of the published
   0.13.12 and the audio its own CLI and VST3 plug-in rendered from them are
   kept in `tests/upgrade/0.13.12/`, beside 0.13.2's; `upgrade.cli` and

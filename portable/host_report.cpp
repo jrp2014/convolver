@@ -308,15 +308,18 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
         const double mix = !equal || std::isnan(facts.settings.mix)
                                ? 1.0
                                : std::clamp(facts.settings.mix, 0.0, 1.0);
-        const double db = std::isnan(facts.settings.gain_db)
-                              ? 0.0
-                              : std::clamp(facts.settings.gain_db, min_gain_db, max_gain_db);
-        const double bound = mix * std::pow(10.0, db / 20) * peak + (1 - mix);
+        // PLUG-10: the gain that plays in the Gain mode (silence without a
+        // figure, which cannot clip either).
+        const auto played = applied_gain_db(facts.settings, filter.gains());
+        const double bound =
+            played ? mix * std::pow(10.0, *played / 20) * peak + (1 - mix) : 1 - mix;
+        const bool set = facts.settings.gain_mode == GainMode::set;
         audio.push_back(
             {"Loudest peak", decibels(20 * std::log10(peak)),
-             mix == 0 || bound <= 1 + 1e-9
-                 ? "(cannot clip at this Gain and Mix)"
-                 : "(Gain " + decibels(-20 * std::log10(peak)) + " or lower rules out clipping)",
+             mix == 0 || bound <= 1 + 1e-9 ? (set ? "(cannot clip at this Gain and Mix)"
+                                                  : "(cannot clip in this Gain mode and Mix)")
+             : set ? "(Gain " + decibels(-20 * std::log10(peak)) + " or lower rules out clipping)"
+                   : std::string("(Gain mode No clipping rules out clipping)"),
              false,
              "The loudest output any full-scale input could make through the filter, at most. "
              "Music is usually quieter: this is a guarantee, not an estimate."});
@@ -409,7 +412,9 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
     // and a failed load with no filter kept has no dry signal whatever the
     // host (jrp, 7 November 2026), as Status says.
     const auto dry = host ? dry_signal_rule(filter, *host) : dry_signal_before_host(filter);
-    r.settings = settings_words(facts.settings, dry);
+    const auto* gains = filter.filter() ? &filter.gains() : nullptr;
+    r.settings = settings_words(facts.settings, dry, gains);
+    r.gain_note = gain_note(facts.settings, filter.gains(), gains != nullptr);
     if (dry != HostDrySignal::present) { // PLUG-23 (dry_signal_rule()).
         r.mix_note = std::string(no_dry_reason(dry)) +
                      ", so there is no dry signal: Mix has no effect, and bypass plays silence.";
@@ -498,6 +503,7 @@ std::vector<std::pair<std::string, std::string>> report_fields(const HostReport&
             {"sample rate", r.sample_rate ? std::to_string(r.sample_rate) : std::string()},
             {"latency waits", r.latency_waits ? "yes" : "no"},
             {"mix note", r.mix_note},
+            {"gain note", r.gain_note},
             {"audio", audio},
             {"reference", reference},
             {"log path", r.log_path},

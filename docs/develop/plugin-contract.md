@@ -572,14 +572,16 @@ host controls, automation and host presets without a window. The defaults
 (gain 0 dB, mix 100%, latency 0 frames since PERF-2) leave every output
 sample exactly as a processor built without settings at that latency plays it, which `native.host_settings` checks
 bit for bit. The first version had Gain and Mix only (jrp asked to keep it
-simple, 25 October 2026); Latency followed (PLUG-10, 31 October 2026), and
-the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
+simple, 25 October 2026); Latency followed (PLUG-10, 31 October 2026), then
+the plan's Gain modes (12 November 2026); its meters follow later
+([TODO PLUG-10](../../TODO.md)).
 
 - **The shared code.** `HostSettings` in
   [`host.hpp`](../../include/convolver/host.hpp), and `settings_words()` for
   the log. `HostProcessor` takes the settings at construction; `set_gain_db()` and
   `set_mix()` are audio-thread calls like `set_bypass()`, and each change
-  ramps linearly over 1.33 ms. The ramps (also bypass and mute) and the
+  ramps linearly over 1.33 ms. `set_gain_mode()` is one too, and the gain
+  it changes ramps the same way. The ramps (also bypass and mute) and the
   replacement crossfade last a fixed time at every sample rate (PLUG-17):
   64 and 256 frames at 48 kHz, to the nearest frame elsewhere, so 128 and
   512 at 96 kHz and 59 and 235 at 44.1 kHz. A ramp must not click, must
@@ -593,7 +595,44 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   channels are exact to the sample. The latency is fixed for a processor's life.
 - **Gain** applies to the filtered signal, after convolution and before the
   mix; the dry path stays the untouched input. Range −100 to +24 dB, linear
-  in decibels (jrp). During a replacement both filters play at the same gain.
+  in decibels (jrp). In Set mode both filters of a replacement play at the
+  same gain.
+- **Gain mode** (PLUG-10, jrp, 12 November 2026) chooses which gain plays:
+  *Set* plays Gain; *Estimate* and *No clipping* play the filter's own
+  figure from `estimate_attenuation()`, its noise estimate and its
+  no-clipping bound, the figures `convolver --gain-db auto` and `no-clip`
+  apply. The bound holds for input within full scale; No clipping is not a
+  limiter, so floating-point input above full scale can still clip. Gain keeps its value meanwhile and plays again in Set mode. The
+  figures are applied as they are, never clamped to Gain's range, and each
+  filter carries its own (`FilterGains` in `HostPlayback`), so in a
+  replacement the new filter starts at its own figure and the crossfade
+  covers the change. Through the crossfade each filter has its own gain,
+  which ramps to that filter's target when the mode or Gain changes: a host
+  restoring a project may set the mode just after the filter, and neither
+  filter jumps. `HostFilter::load` finds the
+  bound for every accepted filter (it only sums taps); the noise estimate,
+  which filters noise for ten filter lengths (at least 65536 frames, about
+  0.2 s for a 5-second stereo filter and 0.6 s for a 10-second one on the
+  cloud machine), only while an adapter has Estimate chosen
+  (`HostFilter::estimating()`). Choosing Estimate plays the bound at once;
+  `HostFilter::estimate()` then finds the estimate for the filter already
+  accepted, on the adapter's control side (VST3's message thread, the Audio
+  Unit's Latency worker, LV2's worker), and the adapter gives it to the
+  playing filter with `HostProcessor::update_gains()`, which ramps to it
+  like a Gain change. The engine is not replaced, so it keeps its history:
+  a replacement would restart it, silent for the filter's own delay (jrp's
+  review found 245 ms of silence with a quarter-second delay). The estimate
+  is kept only once applied, so a failure leaves nothing shown that does
+  not play. A restored state with Estimate chosen sets `set_estimating()`
+  before it loads, so its filter gets the estimate as it loads. A filter
+  whose estimate overflows has none (`estimate_failed`), and Estimate plays
+  its bound; a filter with no finite bound plays silence in both modes,
+  which the log and the window say. Without a filter both figures are 0 dB.
+  The log line `gain_mode_line()` and `settings_words()` give the mode and
+  the gain it plays (`gain_words()`), and the window report's `gain_note`
+  field says it beside the Gain mode menu in the macOS and Windows windows.
+  Not automatable, like Latency, since Estimate may need time before it can
+  play.
 - **Mix** is the filtered share, 0 to 1, of the output before bypass; the
   rest is the latency-aligned dry signal that bypass uses. Without a dry
   signal ([bypass](#bypass): unequal counts, or a load failed and no filter
@@ -633,16 +672,22 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
 - **Saved form:** each format's own way. The Audio Unit's parameters are
   saved by `AUBase::SaveState` in `ClassInfo` ("data"); VST3 saves them in
   host state version 3, defaults included since PLUG-35 (VST3-4,
-  [host state](#host-state)); LV2 has control ports, which the host saves
-  (LV2-7). A preset `convolver-preset` makes from a filter carries the
-  filter only (one it converts from a host's `.vstpreset` keeps that
-  preset's settings), and a state moved between
+  [host state](#host-state)), or version 4 when the Gain mode is not Set;
+  LV2 has control ports, which the host saves (LV2-7). A preset
+  `convolver-preset` makes from a filter carries the filter only (one it
+  converts from a host's `.vstpreset` keeps that preset's settings), and a
+  state moved between
   formats carries the filter but not the settings, as
   [how the plug-ins behave](../use/plugins.md#settings) tells users.
-- **Audio Unit (AU-7).** Global parameters Gain (0, decibels), Mix (1003,
+- **Audio Unit (AU-7).** Global parameters Gain (0, decibels), Gain mode
+  (1002, an index of `GainMode` with value names Set, Estimate and No
+  clipping, flagged `kAudioUnitParameterFlag_NonRealTime`), Mix (1003,
   percent) and Latency (1004, an index into `host_latencies` with value names
-  such as "256 frames", flagged `kAudioUnitParameterFlag_NonRealTime`),
-  listed before Status. Values a host writes are stored within their ranges
+  such as "256 frames", also non-real-time), listed before Status. Render
+  plays the Gain mode parameter's value; a new one wakes the Latency queue
+  with its own bit, and the run finds Estimate's figure, gives it to the
+  playing filter (`update_gains()`) and logs the mode. `RestoreState` restores the mode with the other
+  parameters, and state saved before the mode existed restores Set. Values a host writes are stored within their ranges
   (Latency rounded to a whole index), and Render hands Gain and Mix to the
   processor on every call. `Initialize` builds the processor with the chosen
   Latency and posts the latency and tail notifications. A new choice plays
@@ -682,9 +727,15 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   settings (`started_line()` with `settings_words()`), Latency included.
 - **VST3 (VST3-4).** Parameters Gain (0, a `RangeParameter` in dB, normalized
   linearly over −100 to +24), Mix (1003, 0 to 100 %, tagged `kDryWetMix`
-  through `IParameterFunctionName`) and Latency (1004, a `StringListParameter`
-  "64 frames" to "4096 frames", not automatable), listed before Bypass and
-  Status, with the same IDs as the Audio Unit. The processor reads the last
+  through `IParameterFunctionName`), Latency (1004, a `StringListParameter`
+  "64 frames" to "4096 frames", not automatable) and, after Gain, Gain mode
+  (1002, a `StringListParameter` Set, Estimate, No clipping, not
+  automatable), listed before Bypass and Status, with the same IDs as the
+  Audio Unit. A new Gain mode goes from the controller to the processor in a
+  `ConvolverGainMode` message; the processor finds Estimate's figure if it
+  needs it, publishes the filter with it, then plays the new mode and
+  answers with its status. The controller's `setComponentState` mirrors a
+  restored mode without sending it back. The processor reads the last
   point of each parameter queue in `process()`, as the SDK examples do, and
   hands Gain and Mix to the processor on every call. A Gain within 1e-5 dB
   of 0 counts as 0 dB, because hosts that keep normalized values as float
@@ -831,7 +882,12 @@ large; `convolver-preset` makes the same check. Checks against the host's config
 follow [loading and failure](#loading-and-failure), including state restored
 before the host is configured. Version 1 records the filter (or an empty
 instance) and the bypass setting (used by VST3 only; see [bypass](#bypass)); version 2 is written only for a saved failed
-initial load, with no filter. Version 3 (VST3-4, VST3 only) adds the
+initial load, with no filter. Version 4 (PLUG-10, VST3 only) is version 3
+followed by the Gain mode as one little-endian word (1 Estimate, 2 No
+clipping; decoding refuses any other value), written only when the mode is
+not Set (jrp, 12 November 2026), so other states keep their version and
+older builds refuse only a state they could not play as saved, with the
+"newer" message. Version 3 (VST3-4, VST3 only) adds the
 [settings](#settings) after the flags (Gain in dB and Mix from 0 to 1, each
 an IEEE double as two little-endian words, then Latency in frames) and is
 written whenever the state holds settings, with a filter or a failed-load
@@ -844,13 +900,14 @@ refuses the state otherwise. The Audio Unit and LV2 read a version 3 state's
 filter and ignore its settings, which they save their own way: the Audio
 Unit as parameter values under `data`, plus its Latency in frames under
 `convolver-latency-frames` since PERF-2 (see [settings](#settings)).
-Decoders read all three; encoders write version 1 whenever nothing new is recorded
+Decoders read all four; encoders write version 1 whenever nothing new is recorded
 (every state without settings: the presets `convolver-preset` makes from a
 filter and the Audio Unit's and LV2's states), so older builds still read
 those presets. Every published preview reads version 3, since VST3-4 came
 before the first, except that 0.12.12, from before PERF-2 added Latency 0,
 refuses a version-3 state with Latency 0 as damaged: since PLUG-35 that is
-every VST3 project and preset saved at the defaults. How each format stores it (the
+every VST3 project and preset saved at the defaults. Version 4 (a Gain mode
+other than Set) is read only by builds with the Gain mode. How each format stores it (the
 `.vstpreset` chunk, the AU `convolver-state` key, the LV2 state property) is in
 [preset files](#preset-files).
 
@@ -1032,8 +1089,14 @@ How each adapter meets the contract where its format differs:
   Settings (LV2-7) are the control inputs `gain` (dB), `mix` (percent) and
   `latency_frames` (an enumeration of `host_latencies`, `pprops:notAutomatic`
   and `pprops:expensive`; another value counts as the nearest), after the
-  atom ports so the earlier ports keep their numbers. `run()` hands Gain and
-  Mix to the processor on every call. A new Latency while active is a worker
+  atom ports so the earlier ports keep their numbers, then `gain_mode`
+  (PLUG-10, an enumeration of the three modes, also not automatic and
+  expensive). `run()` hands Gain, Mix and the Gain mode to the processor on
+  every call. A new Gain mode is a worker request, one queued at a time as
+  for Latency: `work()` finds Estimate's figure and gives it to the playing
+  filter (`update_gains()`); `activate()` finds it for a mode chosen while inactive, so a
+  restored session plays the estimate from its first frame. Without a
+  worker, Estimate plays the bound until the next activation. A new Latency while active is a worker
   request: `work()` builds a processor with it under the lock, as activation
   does, and offers it through an atomic pointer that `run()` takes at the
   start of its next call; the control side keeps the processor `run()` may

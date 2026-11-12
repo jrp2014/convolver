@@ -110,6 +110,16 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
                                         max_gain_db, 0, 0, ParameterInfo::kCanAutomate);
         gain->setPrecision(1);
         parameters.addParameter(gain);
+        // PLUG-10: not automatable, as Latency: Estimate may need time to
+        // find the filter's figure (gain_mode_message).
+        auto* mode = new StringListParameter(STR16("Gain mode"), gain_mode_id, nullptr,
+                                             ParameterInfo::kIsList);
+        for (std::size_t i = 0; i < gain_mode_count; ++i) {
+            String128 text{};
+            copy(gain_mode_name(static_cast<GainMode>(i)), text);
+            mode->appendString(text);
+        }
+        parameters.addParameter(mode);
         auto* mix = new RangeParameter(STR16("Mix"), mix_id, STR16("%"), 0, 100, 100, 0,
                                        ParameterInfo::kCanAutomate);
         mix->setPrecision(0);
@@ -160,7 +170,7 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     // PLUG-26: the settings an accepted .vstpreset applied, which the
     // processor already plays.
     double preset_gain = 0, preset_mix = 0;
-    int64 preset_latency = -1;
+    int64 preset_latency = -1, preset_mode = 0;
     const bool preset_settings =
         load_request && load_accepted && attributes->getFloat("gain", preset_gain) == kResultOk &&
         attributes->getFloat("mix", preset_mix) == kResultOk &&
@@ -168,6 +178,10 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         std::isfinite(preset_gain) && std::isfinite(preset_mix) &&
         std::find(host_latencies.begin(), host_latencies.end(), preset_latency) !=
             host_latencies.end();
+    // PLUG-10: the preset's Gain mode; absent from an older processor, so Set.
+    attributes->getInt("gain mode", preset_mode);
+    if (preset_mode < 0 || preset_mode >= static_cast<int64>(gain_mode_count))
+        preset_mode = 0;
     std::string text, report_text, format;
     std::vector<std::pair<std::string, std::string>> report;
     try {
@@ -232,7 +246,7 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         if (componentHandler)
             componentHandler->restartComponent(kParamValuesChanged);
     }
-    // PLUG-26: a chosen preset's Gain, Mix and Latency, which the processor
+    // PLUG-26: a chosen preset's Gain, Gain mode, Mix and Latency, which the processor
     // already plays, reach the host as the user's edits would, one gesture
     // each for those that change, so the host's parameters and the state
     // it saves agree with what plays. Where the host is writing automation,
@@ -254,6 +268,7 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         };
         const auto before = latency_frames(getParamNormalized(latency_id));
         report_edit(gain_id, normalized_gain(preset_gain));
+        report_edit(gain_mode_id, normalized_gain_mode(static_cast<GainMode>(preset_mode)));
         report_edit(mix_id, std::clamp(preset_mix, 0.0, 1.0));
         report_edit(latency_id, normalized_latency(static_cast<std::size_t>(preset_latency)));
         if (latency_frames(getParamNormalized(latency_id)) != before)
@@ -321,6 +336,22 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
                 message->setMessageID(bypass_message);
                 if (auto* attributes = message->getAttributes()) {
                     attributes->setInt("bypass", after ? 1 : 0);
+                    sendMessage(message);
+                }
+            }
+        }
+        return result;
+    }
+    if (id == gain_mode_id) {
+        const auto before = gain_mode(getParamNormalized(gain_mode_id));
+        const auto result = EditController::setParamNormalized(id, value);
+        const auto after = gain_mode(getParamNormalized(gain_mode_id));
+        if (result == kResultOk && after != before) {
+            // The processor answers with its status_message.
+            if (auto message = owned(allocateMessage())) {
+                message->setMessageID(gain_mode_message);
+                if (auto* attributes = message->getAttributes()) {
+                    attributes->setInt("mode", static_cast<int64>(after));
                     sendMessage(message);
                 }
             }
@@ -404,6 +435,8 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
     const auto saved = state.settings.value_or(HostSettings{});
     EditController::setParamNormalized(gain_id, normalized_gain(saved.gain_db));
     EditController::setParamNormalized(mix_id, std::clamp(saved.mix, 0.0, 1.0));
+    // The processor has the Gain mode from the same state: no message.
+    EditController::setParamNormalized(gain_mode_id, normalized_gain_mode(saved.gain_mode));
     // The processor has the Latency from the same state: no message, but the
     // host is asked to read it again when it changed.
     const auto before = latency_frames(getParamNormalized(latency_id));

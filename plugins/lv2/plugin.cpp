@@ -105,9 +105,10 @@ std::size_t nearest_latency(float frames) noexcept {
 // What run() hands the worker; the host copies it. A file request's path
 // follows, `length` bytes without a NUL.
 enum class RequestKind : std::uint32_t {
-    file = 0,    // Load a filter file (numbered from 1).
-    faults = 1,  // DIAG-1: log the faults run() saw; not answered.
-    latency = 2, // LV2-7: build a processor with the newest Latency; not answered.
+    file = 0,      // Load a filter file (numbered from 1).
+    faults = 1,    // DIAG-1: log the faults run() saw; not answered.
+    latency = 2,   // LV2-7: build a processor with the newest Latency; not answered.
+    gain_mode = 3, // PLUG-10: apply the newest Gain mode (Estimate's figure); not answered.
 };
 struct Request {
     std::uint64_t generation = 0;
@@ -142,9 +143,10 @@ struct Instance {
     const float* enabled = nullptr;
     float* latency = nullptr;
     float* status = nullptr;
-    const float* gain_in = nullptr;    // LV2-7: decibels.
-    const float* mix_in = nullptr;     // Percent.
-    const float* latency_in = nullptr; // Frames.
+    const float* gain_in = nullptr;      // LV2-7: decibels.
+    const float* mix_in = nullptr;       // Percent.
+    const float* latency_in = nullptr;   // Frames.
+    const float* gain_mode_in = nullptr; // PLUG-10: a GainMode.
     std::array<const float*, max_channels> in{};
     std::array<float*, max_channels> out{};
     const LV2_Atom_Sequence* control_in = nullptr;
@@ -184,6 +186,13 @@ struct Instance {
     // before it clears the second.
     std::atomic<std::size_t> latency_settled{default_host_latency};
     std::atomic<bool> latency_queued{false};
+    // PLUG-10: the Gain mode last seen on its port, which run() plays; the
+    // mode the control side last applied (found Estimate's figure for, and
+    // logged); and whether a Gain mode request waits for the worker (one at
+    // a time), as for the Latency.
+    std::atomic<GainMode> gain_mode{GainMode::set}, gain_mode_settled{GainMode::set};
+    static_assert(std::atomic<GainMode>::is_always_lock_free);
+    std::atomic<bool> gain_mode_queued{false};
     std::atomic<int> working{0}; // work() calls in progress.
     // The newest request: run() (patch:Set) and restore() count it.
     std::atomic<std::uint64_t> requested{0};
@@ -226,6 +235,7 @@ struct Instance {
         s.gain_db = gain_db.load(std::memory_order_relaxed);
         s.mix = mix.load(std::memory_order_relaxed);
         s.latency = latency_wanted.load(std::memory_order_relaxed);
+        s.gain_mode = gain_mode.load(std::memory_order_relaxed);
         return s;
     }
     // Control side: frees the processor run() played before `host`, once
@@ -485,6 +495,8 @@ void connect_port(LV2_Handle handle, std::uint32_t port, void* data) {
         p.mix_in = static_cast<const float*>(data);
     else if (port == latency_frames_port(ni, no))
         p.latency_in = static_cast<const float*>(data);
+    else if (port == gain_mode_port(ni, no))
+        p.gain_mode_in = static_cast<const float*>(data);
 }
 
 // LV2-7: the settings ports' values, kept for the next processor. Called by
@@ -499,6 +511,12 @@ void read_settings(Instance& p) noexcept {
                     std::memory_order_relaxed);
     if (p.latency_in && std::isfinite(*p.latency_in))
         p.latency_wanted.store(nearest_latency(*p.latency_in), std::memory_order_relaxed);
+    if (p.gain_mode_in && std::isfinite(*p.gain_mode_in)) {
+        const auto last = static_cast<float>(gain_mode_count - 1);
+        p.gain_mode.store(static_cast<GainMode>(
+                              static_cast<int>(std::clamp(std::round(*p.gain_mode_in), 0.f, last))),
+                          std::memory_order_relaxed);
+    }
 }
 
 void record_activation_failure(Instance& p, const char* why) noexcept {
@@ -508,12 +526,53 @@ void record_activation_failure(Instance& p, const char* why) noexcept {
     }
 }
 
+// PLUG-10, under the control lock: applies the newest Gain mode. Estimate
+// finds the filter's figure if it has none (HostFilter::estimate, which
+// filters noise for a long filter) and, while active, gives it to the playing
+// filter in place, which keeps its history: run(), which plays the port's
+// mode, ramps to it. Logs the mode when it changed. Never throws.
+void apply_gain_mode(Instance& p) noexcept {
+    const auto mode = p.gain_mode.load(std::memory_order_relaxed);
+    const bool estimate = mode == GainMode::estimate;
+    const bool changed = p.gain_mode_settled.exchange(mode, std::memory_order_relaxed) != mode;
+    if (!changed && p.filter.estimating() == estimate)
+        return;
+    std::string why;
+    try {
+        p.filter.estimate(estimate, [&](const FilterGains& gains) {
+            if (p.host)
+                p.host->update_gains(gains);
+        });
+    } catch (const std::exception& e) {
+        try {
+            why = e.what();
+        } catch (...) {
+        }
+    } catch (...) {
+    }
+    p.update_status();
+    try { // Best effort: out of memory for the line changes nothing else.
+        auto settings = p.settings();
+        settings.gain_mode = mode;
+        const auto line =
+            gain_mode_line(settings, p.filter.gains(), p.filter.filter().has_value(), why);
+        if (!why.empty() || (p.filter.filter() && !applied_gain_db(settings, p.filter.gains())))
+            p.log_error(line);
+        else
+            p.log_note(line);
+    } catch (...) {
+    }
+}
+
 void activate_locked(Instance& p) {
     p.record_dropped();
     p.log_faults(); // Before the processor that counted them goes.
     p.drop_processors();
     read_settings(p);
     const auto settings = p.settings();
+    // PLUG-10: Estimate's figure before the processor is built, so a restored
+    // session plays it from the first frame (activate() is not real-time).
+    apply_gain_mode(p);
     try {
         // A fresh processor: the filter plays from the first frame, its tail
         // and history start afresh, and LV2's activate() is also its reset.
@@ -550,6 +609,7 @@ void activate_locked(Instance& p) {
     // must not block later ones.
     p.fault_report_queued.store(false, std::memory_order_release);
     p.latency_queued.store(false, std::memory_order_release);
+    p.gain_mode_queued.store(false, std::memory_order_release);
     p.faults_reported.store(0, std::memory_order_relaxed);
     p.update_status();
 }
@@ -755,6 +815,18 @@ LV2_Worker_Status work(LV2_Handle handle, LV2_Worker_Respond_Function respond,
         } catch (...) {
         }
         p.fault_report_queued.store(false, std::memory_order_release);
+        return LV2_WORKER_SUCCESS;
+    }
+    if (r.kind == RequestKind::gain_mode) { // PLUG-10; no answer.
+        try {
+            std::lock_guard lock(p.control);
+            p.retire();
+            if (!p.closing)
+                apply_gain_mode(p);
+        } catch (...) {
+        }
+        // After `gain_mode_settled`: a mode chosen meanwhile asks again.
+        p.gain_mode_queued.store(false, std::memory_order_release);
         return LV2_WORKER_SUCCESS;
     }
     if (r.kind == RequestKind::latency) { // LV2-7; no answer.
@@ -1004,6 +1076,22 @@ void request_latency(Instance& p) {
         p.latency_queued.store(false, std::memory_order_relaxed);
 }
 
+// PLUG-10: asks the worker to apply a newly chosen Gain mode, as for the
+// Latency. Without a worker, Estimate finds its figure at the next
+// activation and plays No clipping's until then.
+void request_gain_mode(Instance& p) {
+    if (!p.schedule || !p.playing || p.gain_mode_queued.load(std::memory_order_acquire))
+        return;
+    if (p.gain_mode.load(std::memory_order_relaxed) ==
+        p.gain_mode_settled.load(std::memory_order_relaxed))
+        return;
+    p.gain_mode_queued.store(true, std::memory_order_relaxed);
+    Request r;
+    r.kind = RequestKind::gain_mode;
+    if (p.schedule->schedule_work(p.schedule->handle, sizeof r, &r) != LV2_WORKER_SUCCESS)
+        p.gain_mode_queued.store(false, std::memory_order_relaxed);
+}
+
 void run(LV2_Handle handle, std::uint32_t frames) {
     auto& p = *static_cast<Instance*>(handle);
     const auto ni = p.layout.inputs, no = p.layout.outputs;
@@ -1026,6 +1114,7 @@ void run(LV2_Handle handle, std::uint32_t frames) {
     read_messages(p);
     read_settings(p);
     request_latency(p);
+    request_gain_mode(p);
     auto* host = p.playing;
     if (p.latency)
         *p.latency = static_cast<float>(host ? host->latency_frames() : default_host_latency);
@@ -1039,6 +1128,7 @@ void run(LV2_Handle handle, std::uint32_t frames) {
     } else {
         host->set_bypass(bypass);
         host->set_gain_db(p.gain_db.load(std::memory_order_relaxed));
+        host->set_gain_mode(p.gain_mode.load(std::memory_order_relaxed));
         host->set_mix(p.mix.load(std::memory_order_relaxed));
         std::array<const float*, max_channels> in{};
         std::array<float*, max_channels> out{};

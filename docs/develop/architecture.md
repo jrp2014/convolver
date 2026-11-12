@@ -47,7 +47,7 @@ For the audio vocabulary, start with [concepts](../use/concepts.md).
 The Audio Unit (AU-6) and VST3 on macOS (VST3-11) show the same AppKit view,
 from [`plugins/editor/mac/`](../../plugins/editor/mac/): the view and its
 layout in [`diagnostic_view.mm`](../../plugins/editor/mac/diagnostic_view.mm),
-its Gain, Mix and Latency rows and what the user does with them (dragging,
+its Gain, Gain mode, Mix and Latency rows and what the user does with them (dragging,
 reset, typing, choosing; AU-10) in
 [`setting_rows.mm`](../../plugins/editor/mac/setting_rows.mm), and the fonts,
 labels and stack views both lay out with in

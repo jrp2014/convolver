@@ -398,6 +398,28 @@ void cases() {
     require(fact(host_report(f, facts(stereo, {24, 0})), "Loudest peak").note ==
                 "(cannot clip at this Gain and Mix)",
             "loudest peak at mix 0");
+    // PLUG-10: the note follows the gain that plays, not the Gain setting:
+    // No clipping cannot clip at any Gain; Set at -30 dB cannot either, but
+    // Estimate plays the filter's own figure (its bound here: f has no
+    // estimate), so the note names the mode.
+    HostSettings moded{-30, 1, 0, GainMode::no_clipping};
+    require(fact(host_report(f, facts(stereo, moded)), "Loudest peak").note ==
+                "(cannot clip in this Gain mode and Mix)",
+            "loudest peak in No clipping: " +
+                fact(host_report(f, facts(stereo, moded)), "Loudest peak").note);
+    moded.gain_mode = GainMode::set;
+    require(fact(host_report(f, facts(stereo, moded)), "Loudest peak").note ==
+                "(cannot clip at this Gain and Mix)",
+            "loudest peak at -30 dB in Set");
+    HostFilter estimated(8);
+    estimated.set_estimating(true);
+    estimated.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {});
+    moded.gain_mode = GainMode::estimate;
+    const auto estimate_note = fact(host_report(estimated, facts(stereo, moded)), "Loudest peak");
+    require(estimated.gains().estimate_db &&
+                *estimated.gains().estimate_db > *estimated.gains().no_clipping_db &&
+                estimate_note.note == "(Gain mode No clipping rules out clipping)",
+            "loudest peak in Estimate: " + estimate_note.note);
     require(r.filter_name == "Restored filter" && r.filter_note.empty(),
             "filter row: " + r.filter_name + " / " + r.filter_note);
     require(reference(r, "Filter file") == "a saved project or preset, request 1",

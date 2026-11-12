@@ -250,11 +250,11 @@ std::wstring reference_text(const std::vector<ReferenceLine>& lines) {
 constexpr std::array<const wchar_t*, 4> fact_names{L"Sample rate", L"Channels", L"Length",
                                                    L"Speakers"};
 
-// One of the settings (Gain, Mix, Latency) as a row of the form.
+// One of the settings (Gain, Gain mode, Mix, Latency) as a row of the form.
 struct Setting {
     ParamID tag = 0;
     std::wstring name, unit, low, high, tip;
-    bool list = false; // Latency: a list whose value is the item's index.
+    bool list = false; // Gain mode, Latency: a list whose value is the item's index.
     double minimum = 0, maximum = 1, initial = 0;
     std::vector<std::wstring> choices;
     HWND label = nullptr, control = nullptr, value = nullptr, unit_label = nullptr;
@@ -368,7 +368,7 @@ class Editor final : public EditorView, public IPlugViewContentScaleSupport {
     HWND mix_note_ = nullptr, audio_heading_ = nullptr;
     HWND reference_toggle_ = nullptr, diagnostics_ = nullptr, log_ = nullptr, reference_ = nullptr;
     std::vector<Setting> settings_;
-    std::size_t mix_ = SIZE_MAX, latency_ = SIZE_MAX;
+    std::size_t mix_ = SIZE_MAX;
     std::vector<AudioRow> audio_;
     std::vector<HWND> named_; // Controls with a name for screen readers, cleared on close.
 
@@ -420,6 +420,7 @@ Editor::Editor(Controller& controller) : EditorView(&controller) {
         InitCommonControlsEx(&classes);
     }
     add_setting(gain_id, L"Gain", L"dB");
+    add_setting(gain_mode_id, L"Gain mode", L"");
     add_setting(mix_id, L"Mix", L"% wet");
     add_setting(latency_id, L"Latency", L"");
     for (std::size_t i = 0; i < settings_.size(); ++i) {
@@ -428,15 +429,20 @@ Editor::Editor(Controller& controller) : EditorView(&controller) {
             settings_[i].low = L"Dry"; // As reverbs label a wet/dry slider.
             settings_[i].high = L"Wet";
         }
-        if (settings_[i].tag == latency_id) {
-            latency_ = i;
+        if (settings_[i].tag == gain_mode_id)
+            settings_[i].tip =
+                L"Which gain plays. Set: the Gain setting. Estimate: the filter's own estimate, "
+                L"from noise played through it, as convolver --gain-db auto finds. No clipping: "
+                L"the gain at which no input within full scale can clip, as convolver "
+                L"--gain-db no-clip; it is not a limiter, so input above full scale still can. "
+                L"Each filter plays at its own figure; the Gain setting is kept for Set.";
+        if (settings_[i].tag == latency_id)
             settings_[i].tip =
                 L"The delay Convolver adds, in frames. Smaller is less delay and more processor "
                 L"load. A new choice plays at once, after a gap in the sound; if it cannot be "
                 L"prepared, the previous one keeps playing and this row says the choice is not "
                 L"in use yet. The host is told the delay, so it can delay other tracks to keep "
                 L"them in time.";
-        }
     }
     measure_ = CreateCompatibleDC(nullptr);
     // The size the host asks for before attaching: at the host's scale if it
@@ -921,8 +927,9 @@ void Editor::create_controls() {
         tip(diagnostics_, L"Copies this report and Convolver's recent log lines, ready to paste "
                           L"into a problem report.");
         tip(log_, L"Shows the Convolver log file in File Explorer.");
-        if (latency_ != SIZE_MAX)
-            tip(settings_[latency_].control, settings_[latency_].tip.c_str());
+        for (const auto& s : settings_) // Gain mode's and Latency's.
+            if (s.list && !s.tip.empty())
+                tip(s.control, s.tip.c_str());
     }
 }
 
@@ -1432,6 +1439,10 @@ void Editor::read_settings() {
             const auto index = static_cast<LRESULT>(std::lround(value));
             if (SendMessageW(s.control, CB_GETCURSEL, 0, 0) != index)
                 SendMessageW(s.control, CB_SETCURSEL, static_cast<WPARAM>(index), 0);
+            if (s.tag == gain_mode_id) { // PLUG-10: the gain the mode plays.
+                set_text(s.value, wide(content_.gain_note));
+                continue;
+            }
             // The time the choice adds at the host's rate; the items begin
             // with the frames ("256 frames").
             const double frames =

@@ -108,6 +108,9 @@ struct HostReport {
     // is no dry signal (the filter's inputs and outputs differ, or with no
     // filter the host's), so Mix has no effect and bypass plays silence.
     std::string mix_note;
+    // PLUG-10: beside the window's Gain mode menu, empty in Set mode: the
+    // gain the mode plays (gain_note()).
+    std::string gain_note;
     // Reference material for problem reports, smaller and folded away in
     // the window: the filter file and request, software, log.
     std::vector<std::pair<std::string, std::string>> reference;
@@ -127,9 +130,9 @@ std::string filter_identity_text(std::uint64_t identity);
 // summary (the status line), title, explanation, problem, plays, cause, fix,
 // note, action, filter name,
 // filter note, filter path, filter files (one per line), sample rate (digits, or empty), latency
-// waits ("yes" or "no"), mix note, audio (one line per fact: label, value, note, "problem" or
-// empty, and help, separated by tabs), reference (one "Label: value" line each), log path and log
-// written
+// waits ("yes" or "no"), mix note, gain note, audio (one line per fact: label, value, note,
+// "problem" or empty, and help, separated by tabs), reference (one "Label: value" line each), log
+// path and log written
 // ("yes" or "no").
 std::vector<std::pair<std::string, std::string>> report_fields(const HostReport&);
 

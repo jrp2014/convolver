@@ -133,11 +133,11 @@ the one list of what each way reads:
 `.vstpreset`, in the Audio Unit as well as the VST3 plug-in, from any
 folder: nothing has to be installed or imported first. It loads as the
 host's preset menu loads it. Its filter must suit the host's rate and
-channels as any preset's must, and the Gain, Mix and Latency saved in it
-apply too; the host is told, so its controls and the saved project show
+channels as any preset's must, and the Gain, Gain mode, Mix and Latency
+saved in it apply too; the host is told, so its controls and the saved project show
 them. A preset made by `convolver-preset` holds only a filter and leaves
-Gain, Mix and Latency as they are. A preset a host saved at the default
-settings (0 dB, 100%, 0 frames) sets them back to the defaults, as the
+the settings as they are. A preset a host saved at the default
+settings (0 dB, Set, 100%, 0 frames) sets them back to the defaults, as the
 host's own preset menu does. One saved at the defaults by an earlier
 version holds no settings, since that version recorded only settings that
 differed from the defaults, so it leaves them as they are; save it again
@@ -145,7 +145,7 @@ to have it reset them. Bypass stays as the host has it. Another plug-in's preset
 a damaged file or a preset saved with no filter is refused, and the
 message says what to choose instead. The window then names the filter
 after the preset file. **Reload**, and **Reload when the file changes**,
-read the preset again, which sets Gain, Mix and Latency back to the
+read the preset again, which sets the settings back to the
 preset's, as choosing it again would.
 
 [Plug-in presets](presets.md) shows how to make a preset with
@@ -609,15 +609,16 @@ as the VST3 window above, except:
 
 ## Settings
 
-Every format has three settings, which hosts show with their other
-parameters (in LV2, as the controls `gain`, `mix` and `latency_frames`), and
-the Audio Unit's window shows as sliders and a menu (in GarageBand, the
-window replaces the generic controls). Their
+Every format has four settings, which hosts show with their other
+parameters (in LV2, as the controls `gain`, `gain_mode`, `mix` and
+`latency_frames`), and Convolver's window shows as sliders and menus (in
+GarageBand, the window replaces the generic controls). Their
 defaults play exactly as Convolver did before the settings existed.
 
 | Setting | Values | Default | What it does |
 | --- | --- | --- | --- |
 | **Gain** | −100 to +24 dB | 0 dB | Scales the filtered signal, as the command line's `--gain-db` does. Negative values make room for a filter that boosts some frequencies; positive values make up level. |
+| **Gain mode** | Set, Estimate or No clipping | Set | Which gain plays. **Set** plays Gain. **Estimate** plays the filter's own estimate of how much to turn it down, found by playing noise through it, as the command line's `--gain-db auto`; music rarely clips at it, but it can. **No clipping** plays the gain at which no input within full scale can clip (up to the float rounding of the convolution), found from the filter's taps as `--gain-db no-clip`; it is usually quieter than Estimate, and louder than 0 dB for a filter that can only make input quieter. It is not a limiter: input above full scale, such as floating-point audio another plug-in makes louder than 0 dBFS, can still clip. Each filter plays at its own figure, so loading another filter changes the level to suit it, and Gain keeps its value for Set. Beside the menu, the window shows the gain the mode plays. |
 | **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. Whenever bypass plays silence there is no dry signal, so the mix stays at 100%: when the filter's input and output counts differ, and in the cases [bypass](#bypass) lists when no filter plays. Where bypass passes the input, the input share of Mix still plays while a kept filter is silent. |
 | **Latency** | 0, 64, 128, 256, 512, 1024, 2048 or 4096 frames | 0 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. At 0 Convolver adds no processing delay; any delay in the filter itself still plays. A larger value uses less processor time, most of all for short filters. It is the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
 
@@ -625,6 +626,14 @@ defaults play exactly as Convolver did before the settings existed.
   96 kHz), so automating them does not click. Latency cannot be automated,
   except in LV2 hosts built on JUCE, which automate it anyway; each change
   leaves a gap ([latency and tail](#latency-and-tail)).
+- **Gain mode** cannot be automated either. A change fades like Gain.
+  Estimate needs a moment for a long filter (about half a second for a
+  10-second stereo filter): until it is ready, Estimate plays the No
+  clipping figure, then fades to its own. A filter too loud for an estimate
+  plays at its No clipping figure, and the log and window say so. In LV2,
+  without the host's worker thread, Estimate plays the No clipping figure
+  until the host next starts the plug-in. An LV2 preset saved before this
+  setting existed has no Gain mode, so loading it leaves the mode as it is.
 - The host saves the settings in the project and in presets it saves itself.
   A preset made by `convolver-preset` holds the filter only, so loading it
   leaves the settings as they are. In VST3 and the Audio Unit, the
@@ -651,7 +660,7 @@ defaults play exactly as Convolver did before the settings existed.
   Unit, say) keeps the filter but not the settings: it plays at 0 dB, fully
   wet, with no latency. The same project can therefore sound different in
   another format.
-- **LV2 hosts** save the three controls in the session themselves, as they
+- **LV2 hosts** save the four controls in the session themselves, as they
   save `enabled`. A session saved before the controls existed opens at the
   defaults. A new Latency plays a moment after you choose it, once the
   host's worker thread has prepared it, and the latency output reports it
@@ -666,6 +675,8 @@ defaults play exactly as Convolver did before the settings existed.
   had no Latency 0, so it refuses a project saved at Latency 0 (the
   default) as damaged, plays silence and says so in the log; a build from
   before the settings existed refuses any such project as a newer state.
+  A project saved with Gain mode Estimate or No clipping needs a build with
+  the Gain mode: earlier builds refuse it as a newer state.
 
 ## Latency and tail
 

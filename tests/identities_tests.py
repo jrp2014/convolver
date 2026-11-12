@@ -34,6 +34,8 @@ FROZEN = {
     ('vst3', 'status_parameter_id'): 1001,
     # PLUG-10's settings in VST3 (VST3-4), the Audio Unit's IDs (jrp, 25 October 2026).
     ('vst3', 'gain_parameter_id'): 0,
+    # PLUG-10's Gain mode (jrp, 12 November 2026).
+    ('vst3', 'gain_mode_parameter_id'): 1002,
     ('vst3', 'mix_parameter_id'): 1003,
     ('vst3', 'latency_parameter_id'): 1004,
     ('au', 'type'): 'aufx',
@@ -43,6 +45,7 @@ FROZEN = {
     ('au', 'status_parameter_id'): 1001,
     # PLUG-10's settings in the Audio Unit (AU-7), approved by jrp 25 October 2026.
     ('au', 'gain_parameter_id'): 0,
+    ('au', 'gain_mode_parameter_id'): 1002,
     ('au', 'mix_parameter_id'): 1003,
     ('au', 'latency_parameter_id'): 1004,
     ('lv2', 'base_uri'): 'https://github.com/jrp2014/convolver/lv2#',

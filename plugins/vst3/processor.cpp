@@ -89,6 +89,14 @@ ParamValue normalized_latency(std::size_t frames) noexcept {
                        : static_cast<std::size_t>(at - host_latencies.begin());
     return static_cast<ParamValue>(i) / static_cast<ParamValue>(host_latencies.size() - 1);
 }
+GainMode gain_mode(ParamValue v) noexcept {
+    const auto last = static_cast<double>(gain_mode_count - 1);
+    return static_cast<GainMode>(std::lround(std::clamp(v, 0.0, 1.0) * last));
+}
+ParamValue normalized_gain_mode(GainMode mode) noexcept {
+    const auto i = std::min(static_cast<std::size_t>(mode), gain_mode_count - 1);
+    return static_cast<ParamValue>(i) / static_cast<ParamValue>(gain_mode_count - 1);
+}
 std::string encode_report(const std::vector<std::pair<std::string, std::string>>& fields) {
     std::string bytes;
     for (const auto& [name, value] : fields) {
@@ -203,7 +211,7 @@ uint32 PLUGIN_API Processor::getTailSamples() {
     return tail >= kInfiniteTail - latency ? kInfiniteTail - 1 : tail + latency;
 }
 HostSettings Processor::settings() const noexcept {
-    return {gain_db_.load(), mix_.load(), latency_.load()};
+    return {gain_db_.load(), mix_.load(), latency_.load(), gain_mode_.load()};
 }
 tresult PLUGIN_API Processor::canProcessSampleSize(int32 size) {
     return size == kSample32 || size == kSample64 ? kResultOk : kResultFalse;
@@ -436,6 +444,7 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
                 attributes->setFloat("gain", answer.settings->gain_db);
                 attributes->setFloat("mix", answer.settings->mix);
                 attributes->setInt("latency frames", static_cast<int64>(answer.settings->latency));
+                attributes->setInt("gain mode", static_cast<int64>(answer.settings->gain_mode));
             }
         }
         if (answer.latency_request)
@@ -468,6 +477,20 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
         }
         write_log();
         send_status({.latency_request = request});
+        return kResultOk;
+    }
+    if (id == gain_mode_message) {
+        int64 mode = 0;
+        auto* attributes = message->getAttributes();
+        if (!attributes || attributes->getInt("mode", mode) != kResultOk || mode < 0 ||
+            mode >= static_cast<int64>(gain_mode_count))
+            return kInvalidArgument;
+        {
+            std::lock_guard lock(control_);
+            choose_gain_mode(static_cast<GainMode>(mode));
+        }
+        write_log();
+        send_status();
         return kResultOk;
     }
     if (id == load_message) {
@@ -617,6 +640,36 @@ void Processor::choose_latency(std::size_t frames) noexcept {
     } catch (...) {
     }
 }
+void Processor::choose_gain_mode(GainMode mode) noexcept {
+    const bool estimate = mode == GainMode::estimate;
+    if (gain_mode_.load() == mode && filter_.estimating() == estimate)
+        return;
+    // Played from the next audio call: until the estimate below arrives,
+    // Estimate plays the no-clipping figure.
+    gain_mode_.store(mode);
+    std::string why;
+    try {
+        // Off the audio thread: the filter's estimate when Estimate needs it,
+        // given to the playing filter in place, which keeps its history and
+        // ramps to it.
+        filter_.estimate(estimate, [&](const FilterGains& gains) {
+            if (host_)
+                host_->update_gains(gains);
+        });
+    } catch (const std::exception& e) {
+        try {
+            why = e.what();
+        } catch (...) {
+        }
+    } catch (...) {
+    }
+    try { // Best effort: out of memory for the line changes nothing else.
+        const auto chosen = settings();
+        log(gain_mode_line(chosen, filter_.gains(), filter_.filter().has_value(), why),
+            !why.empty() || (filter_.filter() && !applied_gain_db(chosen, filter_.gains())));
+    } catch (...) {
+    }
+}
 std::unique_ptr<HostProcessor>
 Processor::install_processor(std::unique_ptr<HostProcessor> next) noexcept {
     played_host_.store(next.get());
@@ -743,13 +796,24 @@ void Processor::install(HostState next, const HostRequest& request, Origin origi
             throw;
         }
     }
-    filter_.load(
-        std::move(next), host,
-        [&](const HostPlayback& c) {
-            if (host_)
-                host_->replace(c);
-        },
-        request, host_.get(), check);
+    // PLUG-10: restored state (or a chosen .vstpreset with settings) with
+    // Estimate chosen gets its estimate as it loads; a refused request
+    // leaves the choice as it was.
+    const bool was_estimating = filter_.estimating();
+    if (restore || chosen_settings)
+        filter_.set_estimating(saved.gain_mode == GainMode::estimate);
+    try {
+        filter_.load(
+            std::move(next), host,
+            [&](const HostPlayback& c) {
+                if (host_)
+                    host_->replace(c);
+            },
+            request, host_.get(), check);
+    } catch (...) {
+        filter_.set_estimating(was_estimating);
+        throw;
+    }
     // Nothing from here on can throw: the request is accepted.
     hold_fault_signal();
     tail_.store(host_ ? static_cast<uint32>(host_->tail_frames()) : inactive_tail);
@@ -760,6 +824,13 @@ void Processor::install(HostState next, const HostRequest& request, Origin origi
     if (restore || chosen_settings) {
         gain_db_.store(saved.gain_db);
         mix_.store(saved.mix);
+        // The estimate, if the mode needs it, was found as the filter loaded.
+        if (gain_mode_.exchange(saved.gain_mode) != saved.gain_mode)
+            try {
+                log(gain_mode_line(settings(), filter_.gains(), filter_.filter().has_value()),
+                    false);
+            } catch (...) { // Out of memory for the line: the mode stands.
+            }
         choose_latency(saved.latency);
     }
     logged_.clear(); // A later failure is logged even if it repeats an earlier one.
@@ -768,7 +839,8 @@ void Processor::install(HostState next, const HostRequest& request, Origin origi
         auto line = loaded_line(filter_, host);
         if (chosen_settings) // PLUG-26, as the Audio Unit says it.
             line += " Settings from the preset: " +
-                    settings_words(settings(), dry_signal_rule(filter_, host.value_or(layout()))) +
+                    settings_words(settings(), dry_signal_rule(filter_, host.value_or(layout())),
+                                   filter_.filter() ? &filter_.gains() : nullptr) +
                     ".";
         const auto& f = filter_.failure();
         const bool kept = check == HostLoadCheck::keep_until_suited;
@@ -932,6 +1004,7 @@ bool Processor::segment(HostProcessor& host, ProcessData& d, int32 start, int32 
     }
     host.set_bypass(bypass_.load());
     host.set_gain_db(gain_db_.load());
+    host.set_gain_mode(gain_mode_.load());
     host.set_mix(mix_.load());
     return host.process(std::span(in).first(inputs_), std::span(out).first(outputs_), count);
 }
