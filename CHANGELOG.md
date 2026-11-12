@@ -22,9 +22,7 @@ Until 1.0 the C++ API may change between minor versions.
   cannot import one). Its filter loads as from the host's preset menu, with
   the Gain, Mix and Latency saved in it; the host's controls and saved
   project show them. A preset from `convolver-preset`, which holds only a
-  filter, leaves them as they are; so, until a later version records
-  settings at their defaults, does a preset a host saved at 0 dB, 100% and
-  0 frames. Another plug-in's preset or a damaged
+  filter, leaves them as they are. Another plug-in's preset or a damaged
   file is refused with a message saying what to choose instead. Not yet
   tried in a host
   ([a preset in the window](docs/use/plugins.md#a-preset-in-the-window)).
@@ -37,6 +35,15 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Plug-ins (PLUG-35): the VST3 plug-in now saves Gain, Mix and Latency in
+  projects and presets even at their defaults, so a preset a host saved at
+  0 dB, 100% and 0 frames sets them back to the defaults when chosen in the
+  window, as it does from the host's preset menu; before, it left the
+  current settings as a filter-only preset does. Presets saved at the
+  defaults by earlier versions still do. Presets from `convolver-preset`
+  still hold only the filter. Every published preview opens the projects
+  and presets saved now; a build from before the settings existed refuses
+  them as newer.
 - Plug-ins (PLUG-33): a file chosen with **Choose…** (or dropped on the
   window, or set through LV2's file parameter) follows the same channel rule
   as a preset: the host's outputs exactly and at least the filter's inputs.
