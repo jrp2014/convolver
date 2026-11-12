@@ -311,10 +311,13 @@ than checked.
   "Restored filter" (audio was right). The fix changes plug-in code after
   v0.12.8, so REAPER's refusal step (check 2) runs again on 0.13.12.
 
-**Known limitation on `main`**, deliberate and not yet published: a preset
-chosen in the window without saved settings, including one a host saved at
-the defaults, keeps the current Gain, Mix and Latency, while the host's
-preset menu resets them (PLUG-35 in [TODO](../../TODO.md)).
+**Fixed on `main`**, not yet published: a preset a host saved at the
+default settings, chosen in the window, now resets Gain, Mix and Latency as
+the host's preset menu does (PLUG-35,
+[PR #189](https://github.com/jrp2014/convolver/pull/189)); checked only by
+`native.state` and `vst3.adapter`. A preset from `convolver-preset`, or one
+saved at the defaults before this change, still keeps the current settings,
+as decided.
 
 **Unverified**, not defects: nobody has yet judged these, and they stay
 unverified rather than passing or failing. Listening in every host (the

@@ -877,7 +877,7 @@ tresult PLUGIN_API Processor::getState(IBStream* stream) {
             state.configuration = filter_.filter();
             state.bypass = bypass_.load();
             state.failed = filter_.failed(); // Reopening stays silent (state version 2).
-            state.settings = settings();     // Version 3 only when not at the defaults.
+            state.settings = settings();     // Version 3, defaults included (PLUG-35).
             if (host_)
                 host_->collect();
             result = write_state(stream, state) ? kResultOk : kResultFalse;

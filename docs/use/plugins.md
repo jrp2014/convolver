@@ -136,12 +136,12 @@ host's preset menu loads it. Its filter must suit the host's rate and
 channels as any preset's must, and the Gain, Mix and Latency saved in it
 apply too; the host is told, so its controls and the saved project show
 them. A preset made by `convolver-preset` holds only a filter and leaves
-Gain, Mix and Latency as they are. For now, so does a preset a host saved
-at the default settings (0 dB, 100%, 0 frames), since Convolver's saved
-state does not yet record settings at their defaults; the host's own
-preset menu resets them to the defaults instead. A later version will
-record them, so that presets saved from then on load their settings in full
-(PLUG-35 in [TODO](../../TODO.md)). Bypass stays as the host has it. Another plug-in's preset,
+Gain, Mix and Latency as they are. A preset a host saved at the default
+settings (0 dB, 100%, 0 frames) sets them back to the defaults, as the
+host's own preset menu does. One saved at the defaults by an earlier
+version holds no settings, since that version recorded only settings that
+differed from the defaults, so it leaves them as they are; save it again
+to have it reset them. Bypass stays as the host has it. Another plug-in's preset,
 a damaged file or a preset saved with no filter is refused, and the
 message says what to choose instead. The window then names the filter
 after the preset file. **Reload**, and **Reload when the file changes**,
@@ -660,10 +660,12 @@ defaults play exactly as Convolver did before the settings existed.
 - **VST3 hosts** mark Mix as the plug-in's dry/wet control where they have
   one. A new Latency plays at once, and Convolver tells the host the new
   delay. A
-  project saved at the default settings is saved exactly as before the
-  settings existed, so older Convolver builds still open it; one saved with
-  other settings needs a Convolver with these settings, and an older build refuses
-  it as a newer state, plays silence and says so in the log.
+  project saves its settings even at the defaults, so it reopens with them
+  whatever later versions choose as their defaults. Every published
+  Convolver preview from 0.13 on reads them. The first preview, 0.12.12,
+  had no Latency 0, so it refuses a project saved at Latency 0 (the
+  default) as damaged, plays silence and says so in the log; a build from
+  before the settings existed refuses any such project as a newer state.
 
 ## Latency and tail
 
