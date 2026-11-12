@@ -30,6 +30,7 @@ and the plug-ins have not yet been tested in named DAWs. The
 | Filter WAV files, or a stream through a pipe | [Your first filter](first-filter.md) | [Check file rendering with the command line](check-files-with-the-command-line.md), [command-line reference](command-line.md) |
 | Filter audio in a DAW or other plug-in host | [Install](install.md), then [your first sound in a host](first-sound-in-a-host.md) | [Check a stereo filter in a host](check-a-stereo-filter.md), [check a crossover in a host](check-a-crossover-in-a-host.md), [plug-in presets](presets.md), [how the plug-ins behave](plugins.md) |
 | Filter everything Windows plays | [Equalizer APO export](equalizer-apo.md) | |
+| Filter everything Linux plays | [Install](install.md), then [system-wide filtering with PipeWire](pipewire.md) | |
 | Use a filter made for Roon, JRiver, Audiolense or the old Windows Convolver | [Other programs](other-programs.md) | [Configuration files](configuration.md) |
 
 ## All pages for users
@@ -45,6 +46,7 @@ and the plug-ins have not yet been tested in named DAWs. The
 | [Install](install.md) | How-to | A preview package or your own build, for every plug-in format and system |
 | [Plug-in presets](presets.md) | How-to | Optional: turning a filter into a preset, and where hosts look for presets |
 | [Equalizer APO export](equalizer-apo.md) | How-to | System-wide filtering on Windows |
+| [System-wide filtering with PipeWire](pipewire.md) | How-to | System-wide filtering on Linux, through the LV2 plug-in |
 | [Other programs](other-programs.md) | How-to | Configurations shared with Roon, JRiver, Audiolense and the old Windows Convolver |
 | [Troubleshooting](troubleshooting.md) | How-to | Symptoms, causes and fixes |
 | [Report a problem](report-a-problem.md) | How-to | What to send when something goes wrong, or to say how a preview went |

@@ -14,7 +14,8 @@ Contents: [reading Convolver's messages](#reading-convolvers-messages) ·
 [a plug-in plays silence](#a-plug-in-plays-silence) ·
 [filters and configurations](#filters-and-configurations) ·
 [a tool will not write its output](#a-tool-will-not-write-its-output) ·
-[Equalizer APO](#equalizer-apo) · [report a problem](#report-a-problem)
+[Equalizer APO](#equalizer-apo) · [PipeWire](#pipewire) ·
+[report a problem](#report-a-problem)
 
 ## Reading Convolver's messages
 
@@ -107,6 +108,10 @@ explains each `convolver-preset` message.
 ## Equalizer APO
 
 See [Equalizer APO troubleshooting](equalizer-apo.md#troubleshooting).
+
+## PipeWire
+
+See [PipeWire troubleshooting](pipewire.md#troubleshooting).
 
 ## Report a problem
 

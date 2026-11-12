@@ -160,6 +160,46 @@ These are tools for developers, not evidence that a DAW works.
   needs the JACK development package, and `editorhost` on Linux needs GTK 3 and
   gtkmm 3.
 
+## LV2 hosts
+
+LV2-4's host matrix. A result counts only for the host version named.
+
+| Host | How it was run | Result |
+| --- | --- | --- |
+| Ardour 8.4 | Headless, in CI on every LV2 change ([Ardour](testing.md#ardour-headless)) | Records, restores and exports the three first-use examples within 1e-5 of the oracle |
+| PipeWire 1.6.8 `filter-chain` | By hand in a cloud session, 12 November 2026, on virtual devices ([below](#pipewire-filter-chain)) | Works: the first-use stereo and crossover examples match `expected.wav`; a list switches entries when the rate changes; a filter that does not fit is silent and explained in the log |
+| PipeWire 1.0.5 (Ubuntu 24.04) | Same session | Does not work: Ubuntu builds it without LV2 support. With the LV2 module built from the same source, the plug-in starts but receives no filter (it plays as with no filter), because PipeWire before 1.6 ignores `config` for LV2 |
+| Jalv, Carla, REAPER (Linux), Qtractor | Not yet tried | |
+
+### PipeWire filter-chain
+
+The run used PipeWire 1.6.8 built from Ubuntu's source package
+(`pipewire_1.6.8.orig.tar.gz`, with `-Dlv2=enabled`) and started with
+`meson devenv`, WirePlumber 0.4.17, a `support.null-audio-sink` as the
+output device, and the configuration in the
+[user guide](../use/pipewire.md#add-the-room-correction-device) in a
+`pipewire.conf.d` folder. `pw-cat` played the input to the Room correction
+device and recorded the null sink's monitor.
+
+- **First-use examples:** stereo (`discrete-2-2`) worst error 1.4e-7 and
+  crossover (`discrete-2-6`, six positions) 2.4e-7, relative to the output
+  peak, with the whole tail and silence elsewhere, at a quantum of 1024.
+- **Rate switching:** with a list holding a 44.1 kHz and a 48 kHz `.cfg`
+  that route differently, `clock.force-rate` 48000 then 44100 played each
+  rate's entry; PipeWire re-instantiates the plug-in at a new rate and passes
+  the path again.
+- **Settings:** `control = { gain = -6.0 }` in the node gave −6.000 dB.
+- **A filter that does not fit** (the 2→6 crossover in `discrete-2-2`) played
+  silence; the explanation reached PipeWire's log only at log level 3,
+  because PipeWire 1.6 logs every LV2 log message at its info level.
+- **`flags = [ nofail ]`** let PipeWire start, without the device, when the
+  plug-in URI did not exist; without it, PipeWire 1.0.5 refused to start.
+- **A stream that stops** before the filter's tail is out loses one quantum
+  of the tail (seen with the stereo example played without trailing
+  silence: frames 1024 to 2047 after the input's end were missing). With
+  trailing silence the tail matched, so this is PipeWire's handling of a
+  stopping stream, not the plug-in's output.
+
 ## Every report
 
 Record host version, OS version/build, CPU architecture, package SHA-256, FFT

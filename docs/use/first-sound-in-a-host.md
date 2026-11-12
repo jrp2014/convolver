@@ -26,8 +26,9 @@ track (2→2 for stereo, [LV2 layouts](plugins.md#lv2-channel-layouts)) and
 pick the same `filter.cfg` with the file chooser of its **Filter**
 parameter ([LV2 filter files](plugins.md#lv2-filter-files)); its
 **Status** shows Active once the filter plays. Installing a plug-in does not
-filter an ordinary music player or everything the computer plays; for that
-on Windows, see the [Equalizer APO export](equalizer-apo.md).
+filter an ordinary music player or everything the computer plays; for that,
+see the [Equalizer APO export](equalizer-apo.md) on Windows and
+[PipeWire](pipewire.md) on Linux.
 
 **Before you start:**
 

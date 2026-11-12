@@ -13,8 +13,8 @@ macOS and Windows only, as has the Audio Unit on macOS. Its packages are unsigne
 | --- | --- |
 | Measure a room or design filters | Make the filter with a tool such as DRC, REW or Audiolense, then load it |
 | Resample a filter, or adapt its channel count | Make the filter at your audio's sample rate, or keep one per rate in a [configuration list](configuration.md#paths-and-configuration-lists); use a `.cfg` to apply a mono IR to several channels |
-| Play to or record from an audio device | Use a plug-in host, a pipe between programs ([RAW streams](command-line.md#raw-streams)) or, on Windows, [Equalizer APO](equalizer-apo.md) |
-| Filter everything a computer plays, by itself | On Windows, export to [Equalizer APO](equalizer-apo.md) |
+| Play to or record from an audio device | Use a plug-in host, a pipe between programs ([RAW streams](command-line.md#raw-streams)), on Windows [Equalizer APO](equalizer-apo.md) or on Linux [PipeWire](pipewire.md) |
+| Filter everything a computer plays, by itself | On Windows, export to [Equalizer APO](equalizer-apo.md); on Linux, run the LV2 plug-in in [PipeWire](pipewire.md) |
 | Show a window or file chooser in the VST3 plug-in on Linux, or in LV2 (the VST3 plug-in has [one on macOS and Windows](plugins.md#convolvers-window), as has the Audio Unit) | Load a [preset](presets.md); the host's own bypass switch works |
 | Handle more than 8 channels in a plug-in, or more than one input and one output | Use the [command-line tool](command-line.md), which takes up to 256 channels |
 | Offer every channel layout in LV2 | Use one of the [LV2 layouts](plugins.md#lv2-channel-layouts), or the VST® 3 or Audio Unit plug-in |
