@@ -1,0 +1,284 @@
+[
+  {
+    "name": "identity-44100-mono",
+    "rate": 44100,
+    "channels": 1,
+    "kind": "identity",
+    "taps": [
+      [
+        0,
+        1.0
+      ]
+    ],
+    "latency": 256
+  },
+  {
+    "name": "echo-44100-mono",
+    "rate": 44100,
+    "channels": 1,
+    "kind": "echo",
+    "taps": [
+      [
+        0,
+        0.5
+      ],
+      [
+        257,
+        0.25
+      ]
+    ],
+    "latency": 256
+  },
+  {
+    "name": "repeat-44100-mono",
+    "rate": 44100,
+    "channels": 1,
+    "kind": "repeat",
+    "taps": [
+      [
+        0,
+        0.5
+      ],
+      [
+        11025,
+        0.25
+      ]
+    ],
+    "latency": 256
+  },
+  {
+    "name": "identity-44100-stereo",
+    "rate": 44100,
+    "channels": 2,
+    "kind": "identity",
+    "taps": [
+      [
+        0,
+        1.0
+      ]
+    ],
+    "latency": 256
+  },
+  {
+    "name": "echo-44100-stereo",
+    "rate": 44100,
+    "channels": 2,
+    "kind": "echo",
+    "taps": [
+      [
+        0,
+        0.5
+      ],
+      [
+        257,
+        0.25
+      ]
+    ],
+    "latency": 256
+  },
+  {
+    "name": "repeat-44100-stereo",
+    "rate": 44100,
+    "channels": 2,
+    "kind": "repeat",
+    "taps": [
+      [
+        0,
+        0.5
+      ],
+      [
+        11025,
+        0.25
+      ]
+    ],
+    "latency": 256
+  },
+  {
+    "name": "identity-48000-mono",
+    "rate": 48000,
+    "channels": 1,
+    "kind": "identity",
+    "taps": [
+      [
+        0,
+        1.0
+      ]
+    ],
+    "latency": 256
+  },
+  {
+    "name": "echo-48000-mono",
+    "rate": 48000,
+    "channels": 1,
+    "kind": "echo",
+    "taps": [
+      [
+        0,
+        0.5
+      ],
+      [
+        257,
+        0.25
+      ]
+    ],
+    "latency": 256
+  },
+  {
+    "name": "repeat-48000-mono",
+    "rate": 48000,
+    "channels": 1,
+    "kind": "repeat",
+    "taps": [
+      [
+        0,
+        0.5
+      ],
+      [
+        12000,
+        0.25
+      ]
+    ],
+    "latency": 256
+  },
+  {
+    "name": "identity-48000-stereo",
+    "rate": 48000,
+    "channels": 2,
+    "kind": "identity",
+    "taps": [
+      [
+        0,
+        1.0
+      ]
+    ],
+    "latency": 256
+  },
+  {
+    "name": "echo-48000-stereo",
+    "rate": 48000,
+    "channels": 2,
+    "kind": "echo",
+    "taps": [
+      [
+        0,
+        0.5
+      ],
+      [
+        257,
+        0.25
+      ]
+    ],
+    "latency": 256
+  },
+  {
+    "name": "repeat-48000-stereo",
+    "rate": 48000,
+    "channels": 2,
+    "kind": "repeat",
+    "taps": [
+      [
+        0,
+        0.5
+      ],
+      [
+        12000,
+        0.25
+      ]
+    ],
+    "latency": 256
+  },
+  {
+    "name": "identity-96000-mono",
+    "rate": 96000,
+    "channels": 1,
+    "kind": "identity",
+    "taps": [
+      [
+        0,
+        1.0
+      ]
+    ],
+    "latency": 256
+  },
+  {
+    "name": "echo-96000-mono",
+    "rate": 96000,
+    "channels": 1,
+    "kind": "echo",
+    "taps": [
+      [
+        0,
+        0.5
+      ],
+      [
+        257,
+        0.25
+      ]
+    ],
+    "latency": 256
+  },
+  {
+    "name": "repeat-96000-mono",
+    "rate": 96000,
+    "channels": 1,
+    "kind": "repeat",
+    "taps": [
+      [
+        0,
+        0.5
+      ],
+      [
+        24000,
+        0.25
+      ]
+    ],
+    "latency": 256
+  },
+  {
+    "name": "identity-96000-stereo",
+    "rate": 96000,
+    "channels": 2,
+    "kind": "identity",
+    "taps": [
+      [
+        0,
+        1.0
+      ]
+    ],
+    "latency": 256
+  },
+  {
+    "name": "echo-96000-stereo",
+    "rate": 96000,
+    "channels": 2,
+    "kind": "echo",
+    "taps": [
+      [
+        0,
+        0.5
+      ],
+      [
+        257,
+        0.25
+      ]
+    ],
+    "latency": 256
+  },
+  {
+    "name": "repeat-96000-stereo",
+    "rate": 96000,
+    "channels": 2,
+    "kind": "repeat",
+    "taps": [
+      [
+        0,
+        0.5
+      ],
+      [
+        24000,
+        0.25
+      ]
+    ],
+    "latency": 256
+  }
+]
