@@ -358,12 +358,13 @@ void wider_bus(const fs::path& dir) {
         HostReportFacts facts;
         facts.host = six;
         const auto report = host_report(filter, facts);
-        require(std::any_of(report.reference.begin(), report.reference.end(),
-                            [](const auto& fact) {
-                                return fact.first == "List entry" &&
-                                       has(fact.second, "wide-2x6.cfg") &&
-                                       has(fact.second, "no entry has the host's 6 inputs");
-                            }),
+        require(std::any_of(
+                    report.reference.begin(), report.reference.end(),
+                    [](const auto& fact) {
+                        return fact.first == "List entry" && has(fact.second, "wide-2x6.cfg") &&
+                               has(fact.second,
+                                   "when the list was chosen, no entry had the host's input count");
+                    }),
                 "the window's reference lines do not name the list entry");
     }
     // The command line still selects exactly.

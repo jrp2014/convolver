@@ -714,7 +714,8 @@ host's among the single filter or list entries for the host's rate and
 outputs, so a list's exact entry always wins
 ([decision](../project/decisions.md#plug-in-behaviour)). When a list's
 entry is chosen that way, `HostRequest::wider_entry` names it, and the
-loaded line in the Convolver log and the window's reference lines ("List
+loaded line in the Convolver log (LV2 writes it as a note to the host's
+log, for that choice only) and the window's reference lines ("List
 entry") say which entry plays and why. The command line still selects
 exactly. With no filter, Status names choosing a filter before a
 preset where the plug-in has a window (`host_status()`'s `chooses_files`).

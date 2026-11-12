@@ -135,6 +135,8 @@ std::optional<HostState> read_filter_file(const std::string& path, const HostLay
         }
         return state;
     } catch (const detail::NoMatch& e) {
+        if (wider_entry)
+            wider_entry->clear();
         // Readable, but made for another rate or other channels. A list is
         // a rate refusal only when no entry has the host's rate.
         const auto& checked = *e.candidates;
@@ -166,6 +168,8 @@ std::optional<HostState> read_filter_file(const std::string& path, const HostLay
                 fractional_rate_refusal(path, host, std::move(rates), !failure.carried);
         }
     } catch (const std::exception& e) {
+        if (wider_entry) // Refused after the entry was named (out of memory).
+            wider_entry->clear();
         failure.message = refusal(path, e.what());
     }
     return std::nullopt;

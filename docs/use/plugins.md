@@ -83,8 +83,8 @@ the inputs the filter reads. A filter with more inputs than the host gives,
 or with a different number of outputs, is refused. From a configuration
 list, an entry with exactly the host's inputs comes first; otherwise the
 entry for the host's rate and outputs with the most inputs below the host's
-is chosen, and the Convolver log and the window's **File, software and
-log** lines (List entry) name that entry and say why.
+is chosen. The Convolver log (for LV2, the host's log) and the window's
+**File, software and log** lines (List entry) name that entry and say why.
 
 Channels are numbered in the host's order, and the `.cfg` routes refer to them
 in that order. For VST3 the order follows the speaker arrangement: 5.1 is left,

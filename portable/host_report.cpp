@@ -420,13 +420,15 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
 
     if (c)
         r.reference.emplace_back("Filter file", request_reference(accepted));
-    // PLUG-33: which list entry a wider input bus chose, and why.
+    // PLUG-33: which list entry a wider input bus chose, and why. Said of
+    // the moment of choosing, not the host's present inputs, which may have
+    // changed since without the file being read again (independent review
+    // of 43aaa07); the load's log line gives the count.
     if (c && !accepted.wider_entry.empty())
-        r.reference.emplace_back(
-            "List entry", accepted.wider_entry +
-                              (host ? " (no entry has the host's " + std::to_string(host->inputs) +
-                                          " inputs; this one has the most below that)"
-                                    : std::string()));
+        r.reference.emplace_back("List entry",
+                                 accepted.wider_entry +
+                                     " (when the list was chosen, no entry had the host's input "
+                                     "count; this one had the most inputs below it)");
     if (refused_request)
         r.reference.emplace_back("Refused file", request_reference(failure->request));
     auto software = execution_line();

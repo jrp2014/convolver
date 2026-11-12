@@ -2466,7 +2466,8 @@ void chosen_file_on_wider_bus() {
         if (key == "reference")
             reference = value;
     require(reference.find("List entry: ") != std::string::npos &&
-                reference.find("filter.cfg (no entry has the host's 6 inputs") != std::string::npos,
+                reference.find("filter.cfg (when the list was chosen, no entry had") !=
+                    std::string::npos,
             ("the report does not name the list entry: " + reference).c_str());
     std::filesystem::remove_all(folder);
     p.setActive(false);

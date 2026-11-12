@@ -294,6 +294,17 @@ struct Instance {
         } catch (...) {
         }
     }
+    // PLUG-33: a list's entry chosen for a wider input bus is named, with
+    // the inputs it ignores, as the other formats' logs name it (jrp: the
+    // choice must be clear to the user). Best effort: out of memory drops it.
+    void note_wider_entry() noexcept {
+        if (filter.accepted().wider_entry.empty())
+            return;
+        try {
+            log_note(loaded_line(filter, std::optional<HostLayout>(layout)));
+        } catch (...) {
+        }
+    }
     void log_error(const std::string& message) noexcept {
         // Without the host's log feature this prints to stderr, which is
         // also where LV2 hosts send a plug-in's unlogged diagnostics. One
@@ -652,15 +663,7 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
     p.installed_path = std::move(kept_path);
     p.handled = std::max(p.handled, r.generation);
     p.update_status();
-    // PLUG-33: a list's entry chosen for a wider input bus is named, with
-    // the inputs it ignores, as the other formats' logs name it (jrp: the
-    // choice must be clear to the user). Best effort: out of memory drops it.
-    if (!p.filter.accepted().wider_entry.empty()) {
-        try {
-            p.log_note(loaded_line(p.filter, std::optional<HostLayout>(p.layout)));
-        } catch (...) {
-        }
-    }
+    p.note_wider_entry();
     return Outcome::installed;
 }
 
@@ -1331,6 +1334,7 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
             try {
                 p.filter.load(std::move(*next), p.layout, install, from_file, p.host.get());
                 loaded = true;
+                p.note_wider_entry();
             } catch (...) {
             }
         } else {
