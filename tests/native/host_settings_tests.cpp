@@ -174,6 +174,61 @@ void gain_and_mix_against_oracle() {
     }
 }
 
+// jrp's change-scope rule (docs/develop/plugin-contract.md#scope-of-each-change):
+// a Gain or Mix change while a long filter plays ramps on the playing filter
+// and keeps its history. Once the ramp is over, the output is the new gain
+// and mix applied to the filter's whole response to the uninterrupted input,
+// and the latency and tail are as before. A change that replaced or reset
+// the engine would lose the response to the input before it, which a filter
+// four latencies long still sounds.
+void settings_keep_history() {
+    std::mt19937 random(0x5c0e);
+    for (const std::size_t block : {std::size_t(0), std::size_t(256)}) {
+        const std::size_t callback = 100, taps = 3000;
+        const auto c = random_filter(random, 2, 2, taps);
+        HostSettings s;
+        s.latency = block;
+        HostProcessor host(c, callback, s);
+        const auto latency = host.latency_frames();
+        const auto tail = host.tail_frames();
+        const auto input = noise(random, 2 * 9000);
+        const std::size_t at = 4000; // A whole number of callbacks.
+        const std::vector<float> first(input.begin(), input.begin() + 2 * at),
+            second(input.begin() + 2 * at, input.end());
+        auto output = play(host, first, 2, 2, callback);
+        host.set_gain_db(-6);
+        host.set_mix(.5);
+        const auto rest = play(host, second, 2, 2, callback);
+        output.insert(output.end(), rest.begin(), rest.end());
+        require(host.latency_frames() == latency && host.tail_frames() == tail,
+                "a Gain or Mix change altered the latency or tail");
+        const auto wet = test::oracle(c, input, block);
+        const double gain = std::pow(10.0, -6.0 / 20);
+        // The ramp lasts 64 frames at 48 kHz and may end one frame late (PLUG-19).
+        const std::size_t settled = at + 64 + 1;
+        double peak = 0, error = 0;
+        for (std::size_t t = 0; t < input.size() / 2; ++t) {
+            if (t >= at && t < settled)
+                continue;
+            for (std::size_t ch = 0; ch < 2; ++ch) {
+                const double dry = t >= latency ? input[(t - latency) * 2 + ch] : 0;
+                const double expected =
+                    t < at ? wet[t * 2 + ch] : .5 * gain * wet[t * 2 + ch] + .5 * dry;
+                peak = std::max(peak, std::abs(expected));
+                error = std::max(error, std::abs(output[t * 2 + ch] - expected));
+            }
+        }
+        const double relative = error / std::max(peak, 1e-30);
+        const std::string label = "history after a change, latency " + std::to_string(block);
+        if (relative > worst_relative) {
+            worst_relative = relative;
+            worst_case = label;
+        }
+        require(relative < 2e-6, "a Gain or Mix change lost the filter's history (" + label +
+                                     "): relative error " + std::to_string(relative));
+    }
+}
+
 // A single tap of `tap` on a mono path: output = tap * gain * input after the latency.
 Configuration tap_filter(float tap, int rate = 48000) {
     return {rate, 1, 1, 0, {}, {}, {{{tap}, {{0, 1}}, {{0, 1}}}}};
@@ -911,6 +966,7 @@ int main() {
     const auto failed = convolver::test::run_cases(
         {
             {"defaults_unchanged", defaults_unchanged},
+            {"settings_keep_history", settings_keep_history},
             {"gain_and_mix_against_oracle", gain_and_mix_against_oracle},
             {"ramps", ramps},
             {"ramps_follow_time", ramps_follow_time},

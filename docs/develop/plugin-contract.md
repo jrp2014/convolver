@@ -32,6 +32,9 @@ and are maintained here.
   ([settings](#settings)); the Audio Unit has them first.
 - Nothing on the audio thread allocates, locks or does I/O; filters are
   prepared elsewhere and handed over.
+- Each change does only the work it needs: a new gain ramps on the playing
+  filter, and only a different filter or Latency prepares new processing
+  ([scope of each change](#scope-of-each-change)).
 
 These rules hold for VST3, LV2 and AU alike. Each adapter's tests check them
 through the [PLUG-2 harness](testing.md#plug-in-comparisons-plug-2), and a
@@ -42,6 +45,7 @@ optimization in every adapter.
 
 Contents: [loading and failure](#loading-and-failure) ·
 [failure reasons](#failure-reasons) ·
+[scope of each change](#scope-of-each-change) ·
 [initial restoration and live replacement](#initial-restoration-and-live-replacement) ·
 [bypass](#bypass) · [settings](#settings) · [channel layouts](#channel-layouts) ·
 [replacement and threads](#replacement-and-threads) · [host state](#host-state) ·
@@ -488,6 +492,47 @@ separate processes, so each carries values, never pointers:
   accepted answer marks the project changed. `ConvolverLatency` carries a
   request number too, and only the answer to the last one sent asks the
   host to restart (below).
+
+## Scope of each change
+
+jrp's rule (12 November 2026): each kind of change does only the work it
+needs, in a narrow function of its own, so that changing one number never
+replaces the filter. PLUG-10's first Estimate replaced the playing filter to
+change its gain, which restarted its history and silenced it for the
+filter's delay; `HostProcessor::update_gains()` now changes the figure in
+place.
+
+| Change | What it does | What must stay unchanged |
+| --- | --- | --- |
+| Gain, Mix, Gain mode or a calculated gain; bypass | Updates the value and ramps: `set_gain_db()`, `set_mix()`, `set_gain_mode()`, `update_gains()`, `set_bypass()` | The filter, its history, the latency and the tail |
+| Filter name, diagnostics, the window | Updates what is shown only | Everything the audio thread uses |
+| A different filter | Prepares it off the audio thread and crossfades (`HostProcessor::replace`, [replacement and threads](#replacement-and-threads)) | The settings and the latency |
+| Latency, or the host's rate or channels | Builds a new `HostProcessor`, only when the value differs (Latency) or at activation (the host's) | The filter and the settings |
+| Saving | Encodes the state | Playback |
+
+A request can hold several changes (restored state holds a filter and the
+settings), and each part takes its own row. Where the table leaves a case
+open, the deciding rule is not to surprise the user (jrp, 12 November
+2026); the leading reverbs that play impulse responses have usually been
+tuned on such cases already, so compare with them before choosing. Tests of a change check what
+must stay unchanged as well as the new value: that the output after a gain
+ramp is still the filter's whole response to the uninterrupted input, and
+that the latency and tail are the same, as `estimate_keeps_history` and
+`settings_keep_history` in `native.host_settings` do.
+
+Keeping history is for changes made while audio plays. Restoring a session
+after the host has reset or reactivated the plug-in starts from empty
+history, as [initial restoration](#initial-restoration-and-live-replacement)
+says, and keeping stale history there would be wrong (jrp, 12 November
+2026).
+
+Not yet: during playback, restored state or a chosen preset whose filter is
+the one already playing still replaces it (VST3 `setState` and a
+`.vstpreset` chosen in the window, AU `RestoreState`, LV2 `restore`), so a
+preset that changes only Gain restarts the filter's history and cuts a
+sounding tail. Found by
+reading the code on 12 November 2026, not reproduced in a host; listed in
+TODO's [limitations](../../TODO.md#documented-limitations).
 
 ## Initial restoration and live replacement
 

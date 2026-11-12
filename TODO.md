@@ -1659,6 +1659,7 @@ with compatibility tests; linked IDs point to open work above.
 | One FFT backend per binary; Ooura/Accelerate have no FFTW-style measured plans or wisdom | Intentional deployment choice. Assess alternatives under FFT-2; do not imply runtime fallback. | [FFT guide](docs/develop/fft-backends.md#selection-and-contract) |
 | FFTW wisdom is CPU/build/size-sensitive and process-global | Retune when relevant inputs change; external planner users must coordinate. A successful import does not prove optimality. | [Planning](docs/use/command-line.md#fftw-plan-tuning) |
 | Core processing uses interleaved float buffers that must not overlap | Use `HostProcessor` for planar/in-place float/double host buffers; internal DSP remains float. | [Engine API](docs/develop/library.md#engine-api) |
+| During playback, restored state or a chosen preset whose filter is the one already playing replaces it anyway, so a preset that changes only Gain restarts the filter's history and cuts a sounding tail | Against the [change-scope rule](docs/develop/plugin-contract.md#scope-of-each-change); found by reading the code on 12 November 2026, not reproduced in a host. Fix it when the loading path next changes, by the rule not to surprise the user: first check what the leading IR reverbs do when a preset keeps the IR, then, during playback only, keep the playing filter when the new one is identical and apply only the settings, unless they show users expect a restart. A session restored after a host reset or reactivation keeps starting from empty history (jrp, 12 November 2026). | [Scope of each change](docs/develop/plugin-contract.md#scope-of-each-change) |
 | Latency and filter replacement are not instantaneous | Core latency is B; the plug-ins' default is 0 frames (PERF-2); a larger Latency adds its delay. Replacement starts with fresh history and warms/crossfades; reset work scales with the block buffers and delay lines, not the filter length (PERF-5). | [Replacement](docs/develop/plugin-contract.md#replacement-and-threads) |
 | Callback safety has a defined thread contract | One audio thread per instance; serialized control calls; teardown requires stopped audio. Stress/deadline evidence remains ROBUST-1. | [Implementation invariants](docs/develop/architecture.md#invariants-to-preserve) |
 | Resource limits cap channels, paths, delays, text, IRs and state | Intentional bounds; assess any increase with memory/overflow tests. | [Core limits](docs/develop/library.md#resource-limits), [tests](docs/develop/testing.md) |
@@ -1689,6 +1690,10 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **PLUG-37 — The scope of each change.** 12 November 2026: jrp's rule
+  that each change does only the work it needs, with the history check in
+  `native.host_settings`
+  ([scope of each change](docs/develop/plugin-contract.md#scope-of-each-change)).
 - [x] **PLUG-35 — Saved state records the settings at their defaults.**
   12 November 2026, PR #189: the VST3 plug-in's component state records
   Gain, Mix and Latency whenever it saves them, defaults included (host
