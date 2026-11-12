@@ -188,9 +188,10 @@ have something to try. Gates 2, 3 and 7 are waived for that preview only:
 what they still need stays open below and in [TODO](../../TODO.md), and
 the release notes say it was not checked. Later previews keep the gates.
 
-The [acceptance plan](plans/2026-11-08-preview-acceptance.md) defines the stop
-rule, blocker classification and retest boundaries. The gate results below
-remain authoritative; writing the plan does not pass or waive any gate.
+[Releasing: what blocks a preview](../develop/releasing.md#what-blocks-a-preview)
+gives the stop rule, how a finding is classified and when to retest. The
+gate results below remain authoritative; those rules do not pass or waive
+any gate.
 
 These are the gates on 8 November 2026, each listed once (gates 1 and 4 are
 done and stay listed so the numbers hold), in the
@@ -331,7 +332,7 @@ explicit scope decision from jrp.
 
 Outside this list, and not smoke-test steps: the Audio Unit in REAPER,
 other hosts and two instances side by side, follow-up work under HOST-1 and
-AU-4 once the [stop rule](plans/2026-11-08-preview-acceptance.md#2-preview-acceptance-criteria)
+AU-4 once the [stop rule](../develop/releasing.md#what-blocks-a-preview)
 is met.
 
 ## Performance: what is measured

@@ -133,12 +133,10 @@ open work and the current order are tracked in
 [TODO](../TODO.md#execution-priorities). The Media Foundation and FFmpeg
 plans are parked.
 [Completed and superseded plans](archive/plans/README.md) are archived,
-including the plug-in distribution, formats and editor plans, whose open work
-is now in the maintained guides and TODO.
+including the plug-in distribution, formats and editor plans and the
+first-preview acceptance plan, whose open work is now in the maintained
+guides and TODO.
 
-- [Finish and qualify the first preview](project/plans/2026-11-08-preview-acceptance.md)
-  (REL-7, Reference): acceptance criteria, blocking defects, retest boundaries
-  and deferred work for the fixed macOS candidate.
 - [Sign and notarize the macOS packages](project/plans/2026-11-09-macos-signing.md)
   (REL-1, Reference): the Apple account, certificates, notary key and cost,
   the steps only jrp can take, and the pipeline changes; no workflow changes yet.
