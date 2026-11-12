@@ -1039,11 +1039,11 @@ struct HostProcessor::Impl {
         // HostPlayback says: decided by HostFilter, never from the counts here.
         bool dry;
         // PLUG-10: the linear gain each GainMode plays for this filter (Set's
-        // entry unused), as applied_gain_db() gives it, and whether there is
-        // one; without one the filter plays silence in that mode. Atomic, as
-        // update_gains() changes them while the filter plays.
+        // entry unused), as applied_gain_db() gives it; 0 (silence) where
+        // there is none. Why there is none stays on the control side, in
+        // FilterGains. Atomic, as update_gains() changes them while the
+        // filter plays.
         std::array<std::atomic<float>, gain_mode_count> figure{1.f, 1.f, 1.f};
-        std::array<std::atomic<bool>, gain_mode_count> known{true, true, true};
         Prepared* next_retired = nullptr;
         std::uint64_t number = 0; // Publications are numbered from 1, in order.
         Prepared(const Configuration& c, bool dry_, std::size_t block, std::size_t inputs,
@@ -1052,14 +1052,11 @@ struct HostProcessor::Impl {
             set_gains(gains);
         }
         // Control thread; the audio thread reads them (relaxed: each figure
-        // stands alone, and the ramp hides when it is seen). A block that
-        // reads a figure and its flag from different calls only sets a ramp
-        // target, which the next block corrects.
+        // stands alone, and the ramp hides when it is seen).
         void set_gains(const FilterGains& gains) noexcept {
             const auto place = [&](GainMode mode, const std::optional<double>& db) {
                 const auto i = static_cast<std::size_t>(mode);
                 figure[i].store(db ? gain_from_db(*db) : 0.f, std::memory_order_relaxed);
-                known[i].store(db.has_value(), std::memory_order_relaxed);
             };
             // Estimate plays the bound where the estimate is absent.
             place(GainMode::estimate, gains.estimate_db ? gains.estimate_db : gains.no_clipping_db);
@@ -1067,7 +1064,6 @@ struct HostProcessor::Impl {
         }
     };
     static_assert(std::atomic<float>::is_always_lock_free);
-    static_assert(std::atomic<bool>::is_always_lock_free);
     static_assert(std::atomic<Prepared*>::is_always_lock_free);
     static_assert(std::atomic<std::size_t>::is_always_lock_free);
     static_assert(std::atomic<std::uint64_t>::is_always_lock_free);
@@ -1118,14 +1114,11 @@ struct HostProcessor::Impl {
     float previous_gain = 1, previous_gain_target = 1, previous_gain_step = 0;
     GainMode mode = GainMode::set; // PLUG-10: the gain mode (audio thread).
     // The gain `p` plays at in the current mode: the Gain setting, or the
-    // filter's own figure (silence when it is unknown).
+    // filter's own figure (0, silence, when there is none).
     float target_gain(const Prepared& p) const noexcept {
         if (mode == GainMode::set)
             return set_gain;
-        const auto i = static_cast<std::size_t>(mode);
-        return p.known[i].load(std::memory_order_relaxed)
-                   ? p.figure[i].load(std::memory_order_relaxed)
-                   : 0.f;
+        return p.figure[static_cast<std::size_t>(mode)].load(std::memory_order_relaxed);
     }
     float mix_setting = 1, mix = 1, mix_target = 1, mix_step = 0;
     // Bypass and mute ramp by whole frames, counted out of setting_ramp, so
