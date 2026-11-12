@@ -69,7 +69,7 @@ For each case, `run_upgrade.py`:
   the bound shows before it fails.
 
 How far builds fall from the bound, on Linux x86-64 against the 0.13.2
-files (peaks 0.25 to 0.53): a Clang 18 Release build with Ooura reproduced
+files (0.13.12's are the same bytes) (peaks 0.25 to 0.53): a Clang 18 Release build with Ooura reproduced
 them (built with GCC 11.4) sample for sample; CI's GCC 15 Release build
 with Ooura differed by up to 1.3e-7, and a Clang 18 build with FFTW by up to
 2.1e-7 (2% of the bound). The capture renders and the double-precision

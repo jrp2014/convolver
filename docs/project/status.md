@@ -173,7 +173,8 @@ already met are below; those still open are the gates in
 At publication, and before the next preview: COMPAT-1 keeps presets, a host
 project and expected audio from the published release, so later previews are
 tested against them. The presets and audio of 0.13.2 and 0.13.12 are kept (the
-same bytes in both); a REAPER project is not yet. Not part of this milestone, but tracked: signing and
+same bytes in both); a REAPER project, to be saved with 0.13.12, is not
+kept yet. Not part of this milestone, but tracked: signing and
 notarization (the production gate, REL-1 and PLUG-5), resource budgets and
 the wider supported workloads (PERF-3; the loading gate uses its own finite
 preview workloads), other `.cfg` readers
@@ -366,7 +367,7 @@ any of them is an owner's decision.
 | Guarantee | What is promised | Owning guide | Checked by |
 | --- | --- | --- | --- |
 | `.cfg` and list syntax | Existing files keep loading with the same routes, gains, delays, paths and list selection; syntax changes need a recorded decision | [Configuration](../use/configuration.md), [compatibility](../use/other-programs.md) | Compatibility corpus, parser and fuzz replay |
-| Serialized plug-in state and presets | Every version-1 preset whose rate and counts fit keeps loading (except one made before PLUG-13 within 256 bytes of 64 MiB; none was published); version 2 only marks a failed first load | [Presets](../use/presets.md#old-and-new-versions), [presets without a layout](../develop/plugin-identities.md#presets-without-a-layout) | `native.state` (literal version-1 and version-2 bytes), `vst3.adapter` (`version1_presets`), `plugins.presets`; presets and audio kept from 0.13.2 (`upgrade.cli`, `vst3.upgrade`, COMPAT-1) |
+| Serialized plug-in state and presets | Every version-1 preset whose rate and counts fit keeps loading (except one made before PLUG-13 within 256 bytes of 64 MiB; none was published); version 2 only marks a failed first load | [Presets](../use/presets.md#old-and-new-versions), [presets without a layout](../develop/plugin-identities.md#presets-without-a-layout) | `native.state` (literal version-1 and version-2 bytes), `vst3.adapter` (`version1_presets`), `plugins.presets`; presets and audio kept from 0.13.2 and 0.13.12 (`upgrade.cli`, `vst3.upgrade`, COMPAT-1) |
 | Plug-in identity | VST3 class IDs, AU codes, LV2 URIs and bundle IDs never change after release | [Identities](../develop/plugin-identities.md) | `identities` (frozen values), `vst3.identities` |
 | C++ API and CMake package | Before 1.0, incompatible changes only in a new minor version; consumers require a matching minor version | [Versioning](../develop/versioning.md#minor-and-major-versions), [package guide](../develop/library.md) | Installed and source-tree consumer tests |
 

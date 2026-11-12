@@ -89,7 +89,7 @@ passes for 0.13, since PERF-2 changed the engine
 | **HOST-1**, **VST3-11** | REAPER and Audacity, status checks 1 to 4 | Host checks on jrp's Mac |
 | **AU-4**, **AU-6** | GarageBand, status checks 5 and 8 | Host checks on jrp's Mac |
 | **PERF-2** | Its focused REAPER and GarageBand session, status check 9; then the CPU indication beside the Latency menu and block sizes tuned on Apple silicon | The session goes ahead. The CPU indication changes the window and the tuning is optimisation, so both wait for the freeze to lift |
-| **COMPAT-1** | Keep presets, a REAPER project and expected audio made by 0.13.2, the baseline, with their own runner and the capture step in the publication steps | Tests and files only |
+| **COMPAT-1** | Keep presets, a REAPER project and expected audio from the published previews (0.13.2's and 0.13.12's presets and audio are kept; the REAPER project is owed from 0.13.12, the baseline), with their own runner and the capture step in the publication steps | Tests and files only |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **HOST-4** | The check on a real Windows device, now that the Windows package ships `convolver-equalizer-apo` | A check; needs a Windows computer |
 | **VST3-17** | Up to 0.13.8, in Audacity a filter chosen in the window plays but is missing from the export and the saved project. The fix (PR #177) is checked only by `vst3.adapter`; what remains is jrp's Audacity check, and until then the guides keep the preset menu as the checked route | Lost state, one of the freeze's exceptions: brought forward and merged without an Audacity check ([decisions](docs/project/decisions.md#plug-in-behaviour)) |
@@ -915,7 +915,7 @@ means a patched FFmpeg build with `--enable-gpl`.
   GCC 11 by up to 1.3e-7, so the criterion above now names the compiler,
   configuration and flags too; the runner reports each check's largest
   difference as a share of its bound.
-  Progress (12 November 2026): the published 0.13.12 is kept in
+  Progress (12 November 2026, PR #187): the published 0.13.12 is kept in
   `tests/upgrade/0.13.12/`, captured the same way from its Linux ZIP. Every
   preset, filter, input and expected render is byte for byte the same as
   0.13.2's, so 0.13.12 renders those presets exactly as 0.13.2 did; only
