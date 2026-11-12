@@ -14,3 +14,4 @@ Convolver behaves now.
 | --- | --- |
 | [Full entries to 6 November 2026](2026-11-06-done-entries.md) | All 111 finished items as written at `82cdc90` (0.10.10), before DOC-7 cut them to one line |
 | [Finished items to 8 November 2026](2026-11-08-done-items.md) | The 122 one-line entries of TODO's done list at `21711c5` (0.12.7), moved out of TODO |
+| [Open items before DOC-14](2026-11-12-open-item-history.md) | 29 open items as written on 12 November 2026, with their progress narratives, before DOC-14 rewrote them to say what remains, why and when they are done, merged some and ticked those finished for the previews |

@@ -58,6 +58,21 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Backlog (DOC-14, jrp's review of 12 November 2026): one consolidation
+  pass over [TODO](TODO.md). Open items now say what remains, what would
+  justify doing it and what counts as finished, and the progress
+  narratives moved, word for word, to
+  [`docs/archive/todo/`](docs/archive/todo/2026-11-12-open-item-history.md).
+  REL-1 is the one production-release checklist (PLUG-5 and AU-5 are done
+  for the previews); PLUG-10 is the meters, starting with the output peak
+  and clipping (PLUG-9 and AU-7 are done); LV2-5 is done for Linux; PERF-3
+  is one measurement exercise (PERF-1 joined it, EDGE-5 publishes it);
+  EDGE-10 and EDGE-11 investigate a candidate only when a measured
+  limitation justifies it; IO-2 starts from the rate-mismatch workflow
+  before EDGE-1; CI-32 is dormant. Typed `Advice` errors, VST3's
+  `"refused"` throw and typed report facts are notes for when that code
+  next changes. The workflow guide's rule for recording progress follows.
+
 - Plug-in contract (PLUG-37, jrp's simplification review of 12 November
   2026): a new section, [scope of each change](docs/develop/plugin-contract.md#scope-of-each-change),
   states that each change does only the work it needs. Gain, Mix, the Gain

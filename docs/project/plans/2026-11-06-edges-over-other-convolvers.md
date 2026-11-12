@@ -221,6 +221,11 @@ custom-drawn plug-in windows lack; and CLAP (HOST-2), on request.
 
 ### 1. A filter for every sample rate
 
+**Order since 12 November 2026** ([decision](../decisions.md#direction)):
+start with the actual rate-mismatch workflow (IO-2). An explicit offline
+conversion of the filter may be enough; the multi-rate saved state below
+(EDGE-1) is a separate, larger capability, taken up only if it is not.
+
 **Approach.** Keep each entry of a configuration list in the plug-in state
 and play the one matching the host's rate; switch when the rate changes,
 with the usual crossfade so there is no pop. For a rate with no filter, an

@@ -41,8 +41,8 @@ independently of the engine, the project's reference for correct output
 ([testing](../develop/testing.md)).
 
 Update this page when an item below changes level, and keep the date and
-commit above current. Dated reviews stay as they were written. Detailed
-progress has one home, the item's `Progress` lines in [TODO](../../TODO.md)
+commit above current. Dated reviews stay as they were written. Each item's
+open work has one home, the item in [TODO](../../TODO.md)
 ([recording progress](../develop/workflow.md#recording-progress-in-todo)):
 this page gives each feature's level and each condition's status in a
 sentence, names what remains, and links the item rather than retelling it.
@@ -161,7 +161,7 @@ already met are below; what still needs running is in
 | Lifecycle sequences checked against a reference model | Proposed with the milestone, so the next defect of this kind is caught | PLUG-7 | [PR #58](https://github.com/jrp2014/convolver/pull/58); `au.lifecycle` runs in macOS CI only |
 | The edge cases from jrp's review of 0.4.43 fixed | jrp's review | DIAG-1, ROBUST-4 | [PR #72](https://github.com/jrp2014/convolver/pull/72), [PR #73](https://github.com/jrp2014/convolver/pull/73), [PR #96](https://github.com/jrp2014/convolver/pull/96) |
 | The defects from jrp's later reviews fixed | jrp's reviews of `6920a45` and `276c7dc` | PLUG-12, ROBUST-3, PLUG-13 | [PR #91](https://github.com/jrp2014/convolver/pull/91), [PR #105](https://github.com/jrp2014/convolver/pull/105) |
-| Settings (Gain, Mix, Latency) and the shared macOS window implemented in VST3 and the Audio Unit, and checked in CI | jrp | PLUG-9, PLUG-10, VST3-3, VST3-4, AU-7 | Implemented and checked in CI (`vst3.editor`, `au.editor`, pluginval's editor tests); the window last redesigned in [PR #128](https://github.com/jrp2014/convolver/pull/128) (PLUG-22, 7 November 2026). Its host checks (VST3-11, AU-6) are checks 1, 4 and 5 in [checks left](#checks-left-before-publication). The Windows window followed in 0.13.12 (VST3-12); later previews: the Linux window (VST3-13), the other gain modes and the meters (PLUG-9, PLUG-10, AU-7) |
+| Settings (Gain, Mix, Latency) and the shared macOS window implemented in VST3 and the Audio Unit, and checked in CI | jrp | PLUG-9, PLUG-10, VST3-3, VST3-4, AU-7 | Implemented and checked in CI (`vst3.editor`, `au.editor`, pluginval's editor tests); the window last redesigned in [PR #128](https://github.com/jrp2014/convolver/pull/128) (PLUG-22, 7 November 2026). Its host checks (VST3-11, AU-6) are checks 1, 4 and 5 in [checks left](#checks-left-before-publication). The Windows window followed in 0.13.12 (VST3-12); later previews: the Linux window (VST3-13) and the meters (PLUG-10); the other gain modes are built (PR #188) |
 | The Audio Unit validated by `auval` and pluginval, and in the package | jrp | AU-3, AU-5 | `auval -strict` and `au.editor` in CI; pluginval on the installed component in the Audio Unit workflow; the component in both macOS candidates since PR #115, with `auval -strict` after the `.pkg` installs it (first passed in candidates [run 42108659224](https://github.com/jrp2014/convolver/actions/runs/42108659224)). AU-3's ThreadSanitizer build is gate 4 below (done) |
 | Journeys written as steps, with the presets they need in the package | jrp's milestone | REL-2 | 6 November 2026: the stereo, 2→6 crossover and CLI journeys (table above) |
 
@@ -170,7 +170,7 @@ project and expected audio from the published release, so later previews are
 tested against them. The presets and audio of 0.13.2 and 0.13.12 are kept (the
 same bytes in both); a REAPER project, to be saved with 0.13.12, is not
 kept yet. Not part of this milestone, but tracked: signing and
-notarization (the production gate, REL-1 and PLUG-5), resource budgets and
+notarization (the production gate, REL-1), resource budgets and
 the wider supported workloads (PERF-3; the loading gate uses its own finite
 preview workloads), other `.cfg` readers
 (CFG-1) and Equalizer APO on a real device (HOST-4).
@@ -300,6 +300,11 @@ than checked.
   only by `vst3.adapter`: it merged without an Audacity check
   ([decisions](decisions.md#plug-in-behaviour)), so the preset menu stays
   the checked route (check 4) until check 10 passes.
+- PLUG-38: during playback, restored state or a chosen preset that holds
+  the filter already playing replaces it in every format, so a preset
+  change or undo that alters only Gain cuts a sounding tail. Reproduced by
+  the plug-in harness (`same-filter-restore`, a known deviation in VST3,
+  LV2 and the Audio Unit), not yet in a host; a small fix follows.
 - Up to v0.13.12, **Choose…** needed the filter's input count to match the
   host's exactly, while a preset needs only at least that many inputs, so
   in REAPER on a six-channel track the crossover's `filter.cfg` was refused
