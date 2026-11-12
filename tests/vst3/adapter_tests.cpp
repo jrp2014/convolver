@@ -1794,7 +1794,7 @@ void output_silence_flags_64() {
 // VST3-8: the Bypass text converts both ways, and the controller's own
 // state calls succeed (it keeps no state, so they store and read nothing).
 // VST3-4: Gain, Mix and Latency as parameters, applied by the processor,
-// saved in the component state (version 3 only when not at the defaults), and
+// saved in the component state (version 3, defaults included: PLUG-35), and
 // a new Latency reported to the host with kLatencyChanged.
 void settings_parameters() {
     HostApplication context;
@@ -1939,6 +1939,8 @@ void settings_parameters() {
     state.seek(0, IBStream::kIBSeekSet, nullptr);
     require(p.setState(&state) == kResultOk, "restore an older state");
     require(std::abs(run(nullptr) - .5f) < 1e-5, "an older state kept the settings");
+    // PLUG-35: the default settings are saved too (state version 3), so a
+    // preset saved now restores them wherever it is loaded.
     MemoryStream plain;
     require(p.getState(&plain) == kResultOk, "save default settings");
     plain.seek(0, IBStream::kIBSeekSet, nullptr);
@@ -1946,7 +1948,10 @@ void settings_parameters() {
         std::array<unsigned char, 12> head{};
         int32 got = 0;
         plain.read(head.data(), 12, &got);
-        require(got == 12 && head[8] == 1, "default settings not saved as state version 1");
+        require(got == 12 && head[8] == 3, "default settings not saved as state version 3");
+        plain.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(read_state(&plain).settings == convolver::HostSettings{},
+                "default settings not recorded");
     }
     // Latency (VST3-16): while active the new choice plays at once, before
     // the controller asks the host to restart, so a host that only reads
@@ -2482,7 +2487,8 @@ void chosen_file_on_wider_bus() {
 // holds (jrp, 8 November 2026), which the controller reports to the host as
 // edits, one gesture each, so the host's parameters and the state it saves
 // agree with what plays; a changed Latency asks for a latency restart. A
-// preset without settings (from convolver-preset) leaves the current ones.
+// preset without settings (from convolver-preset) leaves the current ones;
+// one a host saved at the default settings resets them (PLUG-35).
 // Another plug-in's preset, a damaged one, one with no filter, a missing
 // file and a preset for another rate are refused, saying what to do, and
 // change nothing. `offers_dirty` false: Audacity 4.0.2 (VST3-17), which the
@@ -2614,6 +2620,49 @@ void chosen_preset(bool offers_dirty) {
     require(offers_dirty ? handler.edits.empty() : gestures() == std::vector<ParamID>{latency_id},
             "plain preset: unexpected edits");
     require(handler.latency_restarts() == 0, "plain preset: a latency restart");
+
+    // PLUG-35: a preset a host saved at the default settings holds them (state
+    // version 3), so choosing it resets Gain, Mix and Latency to the defaults,
+    // as the host's own preset menu does.
+    convolver::HostState at_defaults;
+    {
+        HostApplication saver_context;
+        Processor saver;
+        require(saver.initialize(&saver_context) == kResultOk &&
+                    saver.setBusArrangements(&mono, 1, &mono, 1) == kResultOk,
+                "defaults preset: initialize");
+        MemoryStream in_state;
+        require(write_state(&in_state, filter(48000, .75f)), "defaults preset: encode");
+        in_state.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(saver.setState(&in_state) == kResultOk, "defaults preset: restore");
+        MemoryStream out_state;
+        require(saver.getState(&out_state) == kResultOk, "defaults preset: save");
+        out_state.seek(0, IBStream::kIBSeekSet, nullptr);
+        at_defaults = read_state(&out_state);
+        saver.terminate();
+    }
+    require(at_defaults.settings == convolver::HostSettings{},
+            "defaults preset: the host's state does not record the default settings");
+    const auto defaults_path =
+        write("defaults.vstpreset", convolver::presets::vst3_preset(at_defaults));
+    handler.edits.clear();
+    handler.restarts.clear();
+    require(c.load_file(defaults_path) && !p.failure() &&
+                field("filter name") == "defaults.vstpreset",
+            "defaults preset: refused");
+    require(p.settings() == convolver::HostSettings{} && p.getLatencySamples() == 0,
+            "defaults preset: the default settings do not play");
+    require(c.getParamNormalized(gain_id) == normalized_gain(0) &&
+                c.getParamNormalized(mix_id) == 1 &&
+                c.getParamNormalized(latency_id) == normalized_latency(0),
+            "defaults preset: the controller's parameters disagree with what plays");
+    require(gestures() == std::vector<ParamID>{gain_id, mix_id, latency_id},
+            "defaults preset: the settings were not reported as one edit each");
+    require(handler.latency_restarts() == 1, "defaults preset: no latency restart");
+    // Back to the hall preset's settings and the plain preset's filter for
+    // the refusals below.
+    require(c.load_file(hall_path) && c.load_file(plain_path) && p.settings() == chosen,
+            "chosen preset: reload");
 
     // Refusals: nothing changes, and the message says what to do.
     const auto kept = convolver::encode_host_state(filter(48000, .25f));

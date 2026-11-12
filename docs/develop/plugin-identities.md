@@ -40,7 +40,7 @@ Contents: [the identities](#the-identities) · [forks](#if-you-distribute-a-modi
 | LV2 | Bundle | `convolver.lv2` | |
 | macOS installer | Package identifiers | `io.github.jrp2014.convolver.pkg.vst3`, `….pkg.au`, `….pkg.tools` | Installer receipts (`pkgutil --pkgs`) |
 | Windows installer | Registry keys | `HKLM\Software\Convolver`, uninstall key `Convolver` | Used to find and remove a previous installation |
-| All | Host state | magic `CNVS`, versions 1 to 3 | The encoded filter inside presets and saved projects. Version 2 only marks a failed first load, and version 3 (VST3 only) adds settings that differ from their defaults; everything else is still written as version 1 |
+| All | Host state | magic `CNVS`, versions 1 to 3 | The encoded filter inside presets and saved projects. Version 2 only marks a failed first load, and version 3 (VST3 only) adds the settings, which the VST3 plug-in's own state always records (PLUG-35); everything else is still written as version 1 |
 | AU | Preset state key | `convolver-state` | Holds the host state in `.aupreset` files and `ClassInfo`, beside Apple's standard keys; defined in `portable/presets.hpp` ([presets](plugin-contract.md#preset-files)). |
 | LV2 | State property | URI base + `state` | The host state as an `atom:Chunk` in saved state and preset bundles; defined in `portable/presets.hpp`. |
 | LV2 | Filter parameter and path state | URI base + `filter` | One URI for the **Filter** `lv2:Parameter` (`atom:Path`, set with `patch:Set`), the saved file path beside the state chunk (an `atom:Path` mapped with `state:mapPath`; a plain string or PipeWire's bare value is accepted on restore) and PipeWire `filter-chain` `config` keys; defined as `filter_suffix` in `plugins/lv2/plugin.hpp` (LV2-2). |
