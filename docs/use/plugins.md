@@ -773,6 +773,16 @@ filter starts with no history, so it cannot filter audio that played before
 it was loaded. When the host stops and restarts processing, a pending filter
 is installed at once.
 
+A preset, or an undo, that holds the filter already playing, with Latency
+unchanged, and changes only Gain, Mix or the Gain mode keeps the filter and
+what it is playing: the new settings ramp in over 1.3 ms and the reverb tail
+rings on. A different Latency still rebuilds the processing and starts the
+filter afresh. Choosing the playing filter's file again in the VST3 or
+Audio Unit window keeps it the same way; an LV2 host's file choice starts it
+afresh. Reopening a
+project, or a host stopping and restarting the plug-in, starts the filter
+afresh.
+
 ## Audio
 
 - Processing is single precision, including with 64-bit host buffers. Dither

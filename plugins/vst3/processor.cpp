@@ -806,7 +806,11 @@ void Processor::install(HostState next, const HostRequest& request, Origin origi
         filter_.load(
             std::move(next), host,
             [&](const HostPlayback& c) {
-                if (host_)
+                // PLUG-38: state or a preset holding the filter that plays
+                // keeps it and its history, and the settings below ramp to
+                // theirs; a project the host says it is opening starts
+                // clean, keeping nothing from the session before.
+                if (host_ && (origin == Origin::project || !host_->keep(c)))
                     host_->replace(c);
             },
             request, host_.get(), check);
