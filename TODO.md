@@ -360,11 +360,12 @@ LV2 (Linux first; also PipeWire system audio):
   steps 0 to 6: protection first, then one shared decision for each
   accepted request (building on PLUG-38's `HostPlayback::playing`), one rule
   for when the host has settled, one lifetime mechanism for the playing
-  processor in VST3 and the Audio Unit, diagnostics as a view of state, and
+  processor in which the audio thread adopts and the control side never
+  waits, diagnostics as a view of state, and
   typed reports and advice. **Worth doing when** the next preview is
   published; step 0, tests only, could start earlier if jrp wants. **Done
   when** the plan's counted states reach their targets (VST3 22 to 5, the
-  Audio Unit 12 to 3) or a step records with jrp why one stays, no adapter
+  Audio Unit 12 to 3, LV2 5 to 2) or a step records with jrp why one stays, no adapter
   decides what an accepted request requires, and every test of audio,
   saved state and host behaviour passes with no expected value changed
   except in a commit that names the defect or decided difference.
