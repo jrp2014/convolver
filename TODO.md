@@ -353,9 +353,9 @@ LV2 (Linux first; also PipeWire system audio):
 - [ ] **PLUG-39 — One consolidation of the load and restore path.** From
   jrp's review of 13 November 2026: individually reasonable fixes have left
   each adapter deciding for itself what an accepted request requires (six
-  decisions in 14 places), four mechanisms implemented two or three times
+  decisions in 15 places), four mechanisms implemented two or three times
   (the playing processor's ownership, when the host has settled, the status
-  ordering and the filter's name) and eleven values kept as copies. **Remains:** the
+  ordering and the filter's name) and sixteen values kept as copies. **Remains:** the
   [consolidation plan](docs/project/plans/2026-11-13-load-restore-consolidation.md)'s
   steps 0 to 6: protection first, then one shared decision for each
   accepted request (building on PLUG-38's `HostPlayback::playing`), one rule

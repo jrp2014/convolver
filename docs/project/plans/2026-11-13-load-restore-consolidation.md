@@ -11,10 +11,10 @@ revertible and protected by tests of audio, saved state and host behaviour.
 It changes no code. The inventory is of `main` at `1de4452`, with PR #193
 (PLUG-38) merged.
 
-**In short:** six decisions about an accepted request are made in 14 places
+**In short:** six decisions about an accepted request are made in 15 places
 across the adapters; four mechanisms (the playing processor's lifetime, when
 the host counts as settled, the status ordering and the filter's name) have
-two or three implementations; and eleven values are copies that must be kept
+two or three implementations; and sixteen values, in six groups, are copies that must be kept
 in step with what they copy. Three reductions remove most of this without
 changing what anyone hears, saves or sees: one shared decision for each
 accepted request, extending `HostFilter` as PR #193 began, prepared before
@@ -68,7 +68,9 @@ Three things are counted, not member variables:
 **Duplicated decisions.** `HostFilter::load()` accepts or refuses a request
 and, since PR #193, says whether its filter is the one already playing
 (`HostPlayback::playing`). Everything else about an accepted request is
-decided in the adapters, 14 places for six decisions:
+decided in the adapters, 15 places for six decisions. A place is a cell that
+names the adapter's own code making that decision; "None" and LV2's "always
+checked", where the adapter has no choice to make, do not count:
 
 | Decision | VST3 (`processor.cpp`) | Audio Unit (`effect_state.cpp`) | LV2 (`plugin.cpp`) |
 | --- | --- | --- | --- |
@@ -88,7 +90,8 @@ decided in the adapters, 14 places for six decisions:
 | The status ordering (a load failure, then a fault, then the filter) | `host_status()` for VST3 and the Audio Unit; LV2 orders them again in `update_status()` and `shown_status()` | One (step 4) |
 | A filter's name shows only while that filter plays | `HostRequest::name` in `HostFilter::accepted()` for the Audio Unit; VST3's processor and controller each keep their own rule with a second, "kept" name pair, so that a refused preset does not rename the playing filter | One, in `HostFilter` (step 4) |
 
-**Independently maintained values.**
+**Independently maintained values.** Sixteen members in six groups, one
+group to a row:
 
 | Value | What it copies or derives from | Target |
 | --- | --- | --- |
@@ -135,7 +138,7 @@ step may simplify their code but does not try to remove them:
 - **One copy of the report in the VST3 controller** (`report_`, `format_`):
   the processor and the controller may run in different processes.
 - **Fault pacing and log deduplication:** `report_faults_at_`, LV2's
-  `fault_report_queued` and `faults_reported`, and each adapter's `logged_`.
+  `fault_report_queued` and `faults_reported`, and VST3's and the Audio Unit's `logged_`.
 
 ## How similar plug-ins do it
 
@@ -148,7 +151,7 @@ does. These open-source ones were read at the commits given:
 | Plug-in | What decides what a change requires | How the playing engine is replaced and freed | What the status and window read | What is saved |
 | --- | --- | --- | --- | --- |
 | JUCE `dsp::Convolution` and its VST3, AU and LV2 wrappers (`d60b7a7`) | The wrappers translate each format's calls into one `AudioProcessor`, and its `setStateInformation()` is the plug-in's one place to decide; no wrapper decides | A background thread builds the new engine into a one-place holder where the newest wins; at the start of a block the audio thread takes it with a try-lock, crossfades for 50 ms, and queues the old one to be freed on the background thread. `destroyPreviousEngine()` frees it at once, on the audio thread, when that queue is full. The wrappers also hold a callback lock around `processBlock()` | Getters on the playing engine (`getLatency()`, `getCurrentIRSize()`) | Left to the plug-in |
-| LSP Impulse Responses (`4245722`) | One `update_settings()` compares each port with the value last applied: gain, dry/wet and pre-delay are set as values; the FFT size and the IR's own edits (pitch, head and tail cuts, fades) ask for a rebuild | Loading and rebuilding run as tasks on an executor; `process()` checks their state by request and response counters, swaps the playing convolver for the spare when a rebuild finishes (no crossfade that I found), and a separate task frees the old data | `output_parameters()` writes the status, activity and length ports from state on every `process()` | File paths |
+| LSP Impulse Responses (`4245722`) | One `update_settings()` compares each port with the value last applied: gain, dry/wet and pre-delay are set as values; the FFT size and the IR's own edits (pitch, head and tail cuts, fades) ask for a rebuild | Loading and rebuilding run as tasks on an executor; `process()` checks their state by request and response counters, swaps the playing convolver for the spare when a rebuild finishes (no crossfade found in its code), and a separate task frees the old data | `output_parameters()` writes the status, activity and length ports from state on every `process()` | File paths |
 | KlangFalter (`a91da61`) | `updateConvolvers()` rebuilds every convolver for any change to the IR's shape; gain is set directly | Convolvers are built on a background thread and swapped under a `CriticalSection` that the audio callback also takes | The window polls getters | File paths, relative to the IR folder |
 | HISE convolution (`a1d0f35`) | `reloadInternal()` rebuilds for a new IR, damping or cutoff | The audio thread takes a try-read-lock and skips the convolution for that block when a swap holds the write lock; the old engine fades out and a background thread frees it | Getters | Not checked |
 | x42 convoLV2 (`0f35dfb`) | One configuration message; the worker builds a second instance | `work_response()`, on the audio thread, swaps the two instances in one step (no crossfade) and schedules the old one's freeing on the worker; requests during a rebuild are ignored | Nothing beyond the host's ports | File paths |
@@ -337,6 +340,11 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
       AddressSanitizer as a second check), that the new Latency is reported
       at once, and that the next block plays the new processor.
 
+   The ownership contract in conditions 1 to 3 moves to the
+   [adapter contract](../../develop/plugin-contract.md) and the
+   [implementation map](../../develop/architecture.md) in the pull request
+   that first changes an adapter, not at step 6.
+
    Three pull requests: the shared class with its native tests (offering,
    superseding, adoption, retirement, deactivation and destruction under the
    sanitizer build, with a stress test that offers continuously while two
@@ -377,7 +385,10 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
 6. **Recount and close.** Recount the inventory on `main`; update the
    [implementation map](../../develop/architecture.md) and the
    [adapter contract](../../develop/plugin-contract.md) where they describe the
-   old arrangement; the CHANGELOG entry and PLUG-39 moved to done; jrp's
+   old arrangement; remove the clause in the
+   [review checklist](../../develop/workflow.md#check) that counts plug-in
+   changes against this plan's inventory; the CHANGELOG entry and PLUG-39
+   moved to done; jrp's
    REAPER and GarageBand check on the next candidate. This plan then moves
    to the archive.
 
