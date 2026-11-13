@@ -82,15 +82,25 @@ Until 1.0 the C++ API may change between minor versions.
   processing; saving leaves playback alone. `native.host_settings` now
   checks that a Gain and Mix change keeps a long filter's history, latency
   and tail (`settings_keep_history`). History is kept for changes during
-  playback; a session restored after a host reset starts clean. One place
-  does not follow the rule yet: during playback, restored state or a chosen
-  preset holding the filter already playing still replaces it, so a preset
-  change that alters only Gain cuts a sounding tail. The plug-in harness's
-  new `same-filter-restore` case reproduces it in every format, listed as a
-  known deviation until PLUG-38 fixes it. No behaviour changes.
+  playback; a session restored after a host reset starts clean. The one
+  place that did not follow the rule, restored state holding the filter
+  already playing, is fixed by PLUG-38 (below); the plug-in harness's new
+  `same-filter-restore` case checks it in every format.
 
 ### Fixed
 
+- Plug-ins (PLUG-38): during playback, a preset or undo that holds the
+  filter already playing, with Latency unchanged, and changes only Gain,
+  Mix or the Gain mode now keeps the filter and its history in every format: the settings ramp over
+  1.3 ms and a sounding tail rings on. Before, the filter restarted and
+  the tail fell silent after the 5.3 ms crossfade. The filter must be the
+  same in every value, not just by name. A different Latency, reopening a
+  VST3 project, a reset or the host restarting the plug-in still starts
+  afresh. A Gain change on
+  the same filter matches the uninterrupted tail within 2.1e-7 of the
+  output peak in `vst3.adapter`; the plug-in harness's `same-filter-restore`
+  case, a known deviation until now, passes in every format. Not yet tried
+  in a host.
 - Plug-ins (PLUG-35): the VST3 plug-in now saves Gain, Mix and Latency in
   projects and presets even at their defaults, so a preset a host saved at
   0 dB, 100% and 0 frames sets them back to the defaults when chosen in the

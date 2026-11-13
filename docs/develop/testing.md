@@ -568,7 +568,7 @@ for. Both run the same engine, so the CLI alone could hide a shared defect.
 | `restore-before-setup-mismatch` | Well-formed state for another rate, restored before setup, is kept as the saved state; activation plays exact silence; correcting the rate brings the filter back |
 | `live-replacement` | A replacement starts with fresh history; the old filter plays on for 256 frames, then a 5.33 ms linear crossfade (256 frames at 48 kHz, the fixtures' rate); two loads before the next callback coalesce to the newest |
 | `tail-after-replacement` | Replacing long with short keeps reporting the long tail; reactivation reports the short tail exactly and plays the short filter afresh; replacing short with long raises it again |
-| `same-filter-restore` | During playback, state holding the filter already playing (made 2000 frames longer, so the tail outlasts the crossfade) is restored after the input stops: the tail rings on as if nothing arrived, at the same latency ([scope of each change](plugin-contract.md#scope-of-each-change)). A known deviation in every format until PLUG-38 |
+| `same-filter-restore` | During playback, state holding the filter already playing (made 2000 frames longer, so the tail outlasts the crossfade) is restored after the input stops: the tail rings on as if nothing arrived, at the same latency ([scope of each change](plugin-contract.md#scope-of-each-change)); after a reset, the same filter arriving again plays silence. A known deviation in every format from 12 to 13 November 2026, until PLUG-38 |
 | `failed-replacement` | A filter at the wrong rate, input count or output count is rejected while active; the running filter plays on uninterrupted and stays the saved state |
 | `failed-replacement-inactive` | The same while inactive: rejected at once, and reactivation plays the last valid filter |
 | `failed-initial-load` | A first filter that cannot be used is rejected, nothing is saved, and the instance plays exact silence, never its input; a valid filter loads afterwards |
@@ -587,17 +587,17 @@ deviations**, each with the text its failure must contain and the TODO item
 that fixes it. The run prints them and still passes, but a listed case that
 fails in any other way, or starts passing, fails the run, so the list can
 neither hide a new defect nor go stale. A listed case stops at its first
-failure, so its later checks run only once it is fixed. Every format lists
-`same-filter-restore` for its three fixtures (PLUG-38, from
-`same_filter_restore_deviations()` in the harness), and nothing else: VST3's
-earlier 13 were removed by [VST3-7](../../TODO.md#done). Its driver
+failure, so its later checks run only once it is fixed. No format lists
+any now: PLUG-38 removed the last, `same-filter-restore` for each format's
+three fixtures (listed from 12 to 13 November 2026), and VST3's earlier 13
+were removed by [VST3-7](../../TODO.md#done). Its driver
 counts an instance as configured once it has been activated with the setup,
 because a VST3 host commits to its rate and buses at activation (JUCE-based
 hosts call `setupProcessing` with placeholder values before restoring state).
 The harness prints the worst error against the oracle; 1.8e-7 with Ooura on
 Linux on 22 October 2026.
 
-LV2 lists only PLUG-38's three too. Its two restore-before-setup cases are skipped (LV2
+LV2 lists none either. Its two restore-before-setup cases are skipped (LV2
 knows its rate and channels from instantiation), and the tail checks are
 skipped because LV2 core cannot report a tail: its driver's
 `Adapter::reports_tail()` returns false, and every other check of those cases,
@@ -609,7 +609,7 @@ lists its other tests.
 `au.harness` (macOS, `CONVOLVER_BUILD_AU=ON`) drives the Audio Unit through the
 Audio Unit API with the unit registered in the test process; it loads filters
 as `.aupreset` dictionaries, converts latency and tail from seconds, and lists
-only PLUG-38's three known deviations.
+no known deviations.
 
 `vst3.harness`, `lv2.harness` and `au.harness` need their plug-in builds, the
 CLI and the native targets; CTest runs `examples.first_use` first. A new format adds a driver beside its other tests
@@ -725,8 +725,8 @@ a channel all zero, so never during a tail; VST3-10), bypass automation, reset, 
 deallocation guards, corrupted state, and presets after their source files are
 deleted. The SDK validator loads the actual bundle; separate tests call the
 real processor and controller SDK interfaces. `vst3.harness` runs the PLUG-2
-comparisons; since VST3-7 the adapter lists no known deviations apart from
-PLUG-38's.
+comparisons; the adapter lists no known deviations (VST3-7 and PLUG-38
+removed them).
 `vst3.upgrade` restores each preset kept from a published release
 (COMPAT-1) in the bundle, loaded from its file as a host loads it, and
 compares the render with the audio that release rendered, by the rule

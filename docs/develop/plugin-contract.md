@@ -34,8 +34,8 @@ and are maintained here.
   prepared elsewhere and handed over.
 - Each change does only the work it needs: a new gain ramps on the playing
   filter, and only a different filter or Latency prepares new processing
-  ([scope of each change](#scope-of-each-change)); not yet for restored
-  state holding the filter already playing (PLUG-38).
+  ([scope of each change](#scope-of-each-change)), and restored state
+  holding the filter already playing keeps it.
 
 These rules hold for VST3, LV2 and AU alike. Each adapter's tests check them
 through the [PLUG-2 harness](testing.md#plug-in-comparisons-plug-2), and a
@@ -508,6 +508,7 @@ place.
 | Gain, Mix, Gain mode or a calculated gain; bypass | Updates the value and ramps: `set_gain_db()`, `set_mix()`, `set_gain_mode()`, `update_gains()`, `set_bypass()` | The filter, its history, the latency and the tail |
 | Filter name, diagnostics, the window | Updates what is shown only | Everything the audio thread uses |
 | A different filter | Prepares it off the audio thread and crossfades (`HostProcessor::replace`, [replacement and threads](#replacement-and-threads)) | The settings and the latency |
+| The filter already playing, in restored state or a preset | Keeps the processor (`HostProcessor::keep()`, below); the state's settings take their rows | The filter, its history, the latency and the tail |
 | Latency, or the host's rate or channels | Builds a new `HostProcessor`, only when the value differs (Latency) or at activation (the host's) | The filter and the settings |
 | Saving | Encodes the state | Playback |
 
@@ -527,14 +528,33 @@ history, as [initial restoration](#initial-restoration-and-live-replacement)
 says, and keeping stale history there would be wrong (jrp, 12 November
 2026).
 
-Not yet: during playback, restored state or a chosen preset whose filter is
-the one already playing still replaces it (VST3 `setState` and a
-`.vstpreset` chosen in the window, AU `RestoreState`, LV2 `restore`), so a
-preset that changes only Gain restarts the filter's history and cuts a
-sounding tail. Found by
-reading the code on 12 November 2026 and reproduced by the PLUG-2
-harness's `same-filter-restore` case, a known deviation in every format
-until PLUG-38 fixes it; not yet reproduced in a host.
+During playback, restored state or a chosen preset whose filter is the one
+already playing keeps it (PLUG-38, 13 November 2026), so a preset change or
+undo that alters only Gain ramps the Gain and the tail rings on.
+`HostFilter::load()` sets `HostPlayback::playing` when the filter is the
+accepted one, suits the host (no failure found at activation keeps it
+silent) and is equal in every stored value: the filter's identity picks the
+candidate, a full comparison of every value (floats by their bits) proves
+it, and a file name proves nothing. The adapters (VST3 `setState`, a file
+or `.vstpreset` chosen in the window, AU `RestoreState` and a chosen file,
+LV2 `restore`) then call `HostProcessor::keep()`, which passes the
+filter's gains to `update_gains()` and keeps the processor, unless the
+processor met a fault since the last accepted load, which replaces it as
+before. Saved state, the filter's name, the log and the notifications
+update as for any accepted load. VST3 state that the host marks as a
+project being opened (`kProject`) still replaces the filter, so reopening a
+project keeps nothing from the session before; a reset or reactivation
+clears history as always. LV2 files chosen through `patch:Set` go through
+the worker and still replace. The PLUG-2 harness's `same-filter-restore`
+case checks this in every format, with a reset before the same filter
+arrives still giving silence; in `vst3.adapter`,
+`same_filter_keeps_history` checks a Gain change against the uninterrupted
+tail and `same_filter_as_project_starts_clean` checks that project state
+replaces the filter without a reset; `restore_keeps_history_with_estimate`
+in `native.host_settings` checks that a kept filter plays the estimate its
+restored Gain mode needs. A different Latency in the state still builds a
+new processor, as its row says. Not yet
+tried in a host.
 
 ## Initial restoration and live replacement
 

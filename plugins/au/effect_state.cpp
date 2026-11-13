@@ -308,7 +308,10 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                 filter_.load(
                     std::move(next), host,
                     [&](const HostPlayback& c) {
-                        if (host_)
+                        // PLUG-38: state holding the filter that plays
+                        // keeps it and its history; the restored settings
+                        // ramp to theirs.
+                        if (host_ && !host_->keep(c))
                             host_->replace(c);
                     },
                     request, host_.get());

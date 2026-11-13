@@ -1382,8 +1382,14 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
     // configuration is always known and checked here. While active, a
     // prepared replacement is published (installed directly if no audio has
     // run yet); inactive, the next activation installs it.
+    // PLUG-38: state holding the filter that plays keeps it and its history
+    // (a preset that changes only Gain); the host restores the controls. If
+    // memory ran out both building the processor at activation and recording
+    // why, the silent fallback processor plays with no activation failure
+    // recorded, and such a restore keeps the silence instead of retrying;
+    // the next activation retries.
     const auto install = [&](const HostPlayback& c) {
-        if (p.host)
+        if (p.host && !p.host->keep(c))
             p.host->replace(c);
     };
     // The path that plays if a load succeeds, copied before anything is

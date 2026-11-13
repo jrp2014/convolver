@@ -1498,6 +1498,76 @@ void set_log_variable(const std::optional<std::filesystem::path>& value) {
 // input and filter values overflow the output: it is silenced and process()
 // succeeds, as before, but the fault is now counted, so the status no longer
 // says "Filter loaded" and the log explains.
+// PLUG-38: HostFilter::load() marks a filter as the one playing only when it
+// is the accepted filter, playing, and equal in every stored value (a float's
+// bits, so a signed-zero route gain differs); HostProcessor::keep() then
+// keeps the processor, with the new gains, unless it met a fault.
+void same_filter_kept() {
+    const HostLayout layout{48000, 1, 1};
+    const Configuration a = mono(.5f);
+    std::optional<bool> playing;
+    const auto install = [&](const HostPlayback& c) { playing = c.playing; };
+    const auto loads = [&](HostFilter& f, const Configuration& c, const HostLayout& host,
+                           HostLoadCheck check = HostLoadCheck::refuse_mismatch) {
+        playing.reset();
+        f.load(HostState{c}, host, install, {}, nullptr, check);
+        return playing.value_or(false);
+    };
+    HostFilter f(8);
+    require(!loads(f, a, layout), "a first load counted as the filter playing");
+    require(loads(f, a, layout), "the same filter again not counted as the one playing");
+    auto nudged = a;
+    nudged.paths[0].impulse[0] = std::nextafter(.5f, 1.f);
+    require(!loads(f, nudged, layout), "a filter one sample apart counted as the same");
+    require(loads(f, nudged, layout), "the nudged filter again not counted as playing");
+    auto zero = a, negative_zero = a;
+    zero.paths[0].outputs[0].gain = 0.f;
+    negative_zero.paths[0].outputs[0].gain = -0.f;
+    loads(f, zero, layout);
+    require(!loads(f, negative_zero, layout), "a signed-zero route gain counted as the same");
+    auto delayed = negative_zero;
+    delayed.output_delays = {1};
+    require(!loads(f, delayed, layout), "a delayed filter counted as the same");
+    // A refused request leaves the filter playing, so it still counts.
+    bool refused = false;
+    try {
+        f.load(HostState{mono(.5f)}, HostLayout{44100, 1, 1}, install);
+    } catch (const std::invalid_argument&) {
+        refused = true;
+    }
+    require(refused && loads(f, delayed, layout), "the filter after a refusal not counted");
+    // A filter kept silent because it does not suit the host does not play.
+    HostFilter kept(8);
+    const HostLayout other{44100, 1, 1};
+    loads(kept, a, other, HostLoadCheck::keep_until_suited);
+    require(!loads(kept, a, other, HostLoadCheck::keep_until_suited),
+            "a filter kept silent counted as playing");
+    kept.activate(layout);
+    require(loads(kept, a, layout), "a filter playing after activation not counted");
+
+    HostProcessor host(a, 64, 8);
+    auto same = filter_playback(a);
+    require(!host.keep(same), "kept without HostFilter saying it plays");
+    same.playing = true;
+    same.gains = FilterGains{-3.0, -1.0};
+    require(host.keep(same), "the playing filter not kept");
+    // A processor that met a fault starts afresh, as before.
+    const auto huge = std::numeric_limits<float>::max() / 4;
+    const Configuration loud = mono(huge);
+    HostProcessor faulty(loud, 64, 8);
+    std::array<float, 64> data{};
+    data[0] = huge;
+    const float* in[] = {data.data()};
+    float* out[] = {data.data()};
+    audio_thread = true;
+    faulty.process(in, out, 64);
+    audio_thread = false;
+    auto loud_playing = filter_playback(loud);
+    loud_playing.playing = true;
+    require(!faulty.keep(loud_playing), "a processor that met a fault was kept");
+    faulty.clear_faults();
+    require(faulty.keep(loud_playing), "a processor cleared of its faults not kept");
+}
 void processing_faults() {
     const auto huge = std::numeric_limits<float>::max() / 4;
     const Configuration loud = mono(huge);
@@ -2073,6 +2143,7 @@ int main() {
             {"saved_state_limit", saved_state_limit},
             {"status_lines", status_lines},
             {"processing_faults", processing_faults},
+            {"same_filter_kept", same_filter_kept},
             {"costly_moments_against_oracle", costly_moments_against_oracle},
         },
         [] {
