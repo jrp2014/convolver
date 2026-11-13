@@ -352,23 +352,23 @@ LV2 (Linux first; also PipeWire system audio):
   AU-16's. Waits for the freeze.
 - [ ] **PLUG-39 — One consolidation of the load and restore path.** From
   jrp's review of 13 November 2026: individually reasonable fixes have left
-  each adapter keeping its own copies of the accepted filter's
-  consequences, the playing processor, latency and tail, whether the host
-  has settled, the status and report, and the filter's name, and deciding
-  for itself what an accepted request requires. **Remains:** the
+  each adapter deciding for itself what an accepted request requires (six
+  decisions in 14 places), four mechanisms implemented two or three times
+  (the playing processor's ownership, when the host has settled, the status
+  ordering and the filter's name) and eleven values kept as copies. **Remains:** the
   [consolidation plan](docs/project/plans/2026-11-13-load-restore-consolidation.md)'s
   steps 0 to 6: protection first, then one shared decision for each
   accepted request (building on PLUG-38's `HostPlayback::playing`), one rule
-  for when the host has settled, one lifetime mechanism for the playing
-  processor in which the audio thread adopts and the control side never
-  waits, diagnostics as a view of state, and
+  for when the host has settled, deferred reclamation of the playing
+  processor under jrp's four conditions (approved in principle, its own
+  reviewed change), diagnostics as a view of state, and
   typed reports and advice. **Worth doing when** the next preview is
   published; step 0, tests only, could start earlier if jrp wants. **Done
-  when** the plan's counted states reach their targets (VST3 22 to 5, the
-  Audio Unit 12 to 3, LV2 5 to 2) or a step records with jrp why one stays, no adapter
-  decides what an accepted request requires, and every test of audio,
-  saved state and host behaviour passes with no expected value changed
-  except in a commit that names the defect or decided difference.
+  when** each decision is made once in shared code, each mechanism has one
+  implementation and each copied value is derived or written in one place
+  (or a step records with jrp why not), with audio, saved state and host
+  behaviour unchanged and no expected value changed except in a commit that
+  names the defect, decided difference or deliberate test change.
 - [ ] **PLUG-36 — The loading-and-failure table covers each transition.**
   Left open by the first-preview acceptance plan (section 5, archived
   12 November 2026; jrp's 8 November priority: extend the contract and the
