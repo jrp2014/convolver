@@ -62,6 +62,12 @@ CHANGES = (
         'played and why.'
     ),
     (
+        'During playback, choosing a preset or undoing a change that holds the filter already playing, with only '
+        'Gain, Mix or the Gain mode different, keeps the filter: a tail that is still sounding rings on at the new '
+        'settings instead of stopping. A different filter or Latency, reopening a VST3 project, or the host '
+        'restarting the plug-in still starts it afresh.'
+    ),
+    (
         'A new guide sets up system-wide filtering on Linux with PipeWire: a Room correction device that runs the '
         'LV2 plug-in, with a filter for each sample rate from a configuration list. It needs PipeWire 1.6.2 or '
         'later.'
@@ -201,11 +207,8 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             "saved projects, but this has been checked only by automated tests, not yet in Audacity. Audacity's own "
             'preset menu is the route that has been checked.\n'
             '- New since 0.13.12 and checked only by automated tests: the Gain mode, a `.vstpreset` chosen in the '
-            "window, and Choose… on a track with more inputs than the filter's.\n"
-            '- During playback, choosing a preset or undoing a change that restores the filter already playing '
-            'starts that filter afresh, so a tail that is still sounding is cut, even when only Gain changed. '
-            'Reproduced by automated tests, not yet seen in a host; a fix will follow. Changing Gain or Mix directly '
-            'keeps the tail.\n'
+            "window, Choose… on a track with more inputs than the filter's, and a preset or undo that keeps the "
+            'playing filter.\n'
             '- Since 0.13, Latency starts at 0 frames. Some projects saved with 0.12.12 at its default of 256 frames '
             'open at 0; choose 256 again if you want its delay back '
             f'([projects from earlier versions]({docs}/plugins.md#settings)).\n'

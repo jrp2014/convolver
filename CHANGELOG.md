@@ -60,10 +60,10 @@ Until 1.0 the C++ API may change between minor versions.
 
 - Releases: the next preview's draft notes list what changed since 0.13.12
   (the Gain mode, a `.vstpreset` chosen in the window, settings saved at
-  their defaults, **Choose…** on wider input buses and the PipeWire guide)
-  and add three known limitations: those features are checked only by
-  automated tests; restoring the filter already playing cuts a sounding
-  tail until PLUG-38 is fixed; and what earlier previews refuse (0.12.12 a
+  their defaults, **Choose…** on wider input buses, a preset or undo that
+  keeps the playing filter (PLUG-38) and the PipeWire guide) and add two
+  known limitations: those features are checked only by automated tests;
+  and what earlier previews refuse (0.12.12 a
   VST3 project saved at Latency 0, every earlier preview one saved with
   Gain mode Estimate or No clipping). The LV2 limitation names the PipeWire
   trial. No change to what the packages run or hold.

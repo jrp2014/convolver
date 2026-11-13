@@ -166,9 +166,9 @@ class PrepareReleaseTests(unittest.TestCase):
         self.assertIn('Some projects saved with 0.12.12', text)
         self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/plugins.md#settings', text)
         self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/CHANGELOG.md', text)
-        # PLUG-38 stays a known limitation until its fix merges, and what earlier
+        # PLUG-38 is fixed, so the notes no longer list it as a limitation; what earlier
         # previews refuse (PLUG-35, jrp's decision of 12 November 2026; the Gain mode's state).
-        self.assertIn('a tail that is still sounding is cut', text)
+        self.assertNotIn('a tail that is still sounding is cut', text)
         self.assertIn('refused as damaged by the first preview, 0.12.12', text)
         self.assertIn('Gain mode Estimate or No clipping is refused by every earlier preview', text)
         # What changed since the previous preview, one line per change.

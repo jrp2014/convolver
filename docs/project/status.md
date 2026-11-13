@@ -21,8 +21,9 @@ from a source build, not from the published package. Since 0.13.12, `main` adds
 **Choose…** on wider input buses (PLUG-33), system-wide filtering with
 PipeWire (LV2-4), choosing a Convolver `.vstpreset` in the window
 (PLUG-26), VST3 state that records the settings at their defaults
-(PLUG-35) and the Estimate and No clipping gain modes (PR #188), none of
-them published yet; the next preview's notes are drafted in
+(PLUG-35), the Estimate and No clipping gain modes (PR #188) and a preset
+or undo that keeps the playing filter's tail (PLUG-38), none of them
+published yet; the next preview's notes are drafted in
 [`prepare_release.py`](../../scripts/release/prepare_release.py). The command-line renderer, the
 preset tool, the Equalizer APO export and the VST3, Audio Unit and LV2
 plug-ins are implemented and tested automatically; all three plug-ins have
