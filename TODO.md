@@ -107,6 +107,7 @@ the suggested one.
 | LV2 in a preview | **LV2-3** and **LV2-4** (LV2-5 and LV2-7 are done) | LV2 is in the Linux package since 0.13.12; a source build was tried in PipeWire 1.6.8 on virtual devices, not yet in a desktop host ([decision](docs/project/decisions.md#releases)) |
 | Other configuration readers | **CFG-1**, then **CFG-2** | CFG-2 waits for CFG-1 to show which readers matter |
 | Only on request | **VST3-2** (switch filters from the host), **VST3-6** (replacing the old VST2 plug-in), **HOST-2** (CLAP), **LV2-6** (an LV2 window); distribution packages and macOS or Windows LV2 bundles (after LV2-5) | Each needs a stated user need and acceptance tests first |
+| Consolidation | **PLUG-39**, the load and restore path, in the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)'s order | After the next preview is published, so the host sessions test code it has not changed; its targets and order wait for jrp's approval of the plan |
 | Measurements, then optimisation | **PERF-3**, one measurement exercise (PERF-1's reruns joined it; EDGE-5 publishes its results); then, only where it shows a need, **FFT-2**, **VST3-5** and **PLUG-11** | PERF-3's resource budgets (callback tail latency, peak memory and preparation time while loading, replacing and resetting) decide whether further optimisation is worth doing. Its measurements change no shipped code; the optimisation they might justify waits |
 
 ### 3. Parked and later
@@ -350,6 +351,24 @@ LV2 (Linux first; also PipeWire system audio):
   queue. Done when each adapter's skip paths either follow that rule or
   are listed with why they are safe, with a held-lock test for each, as
   AU-16's. Waits for the freeze.
+- [ ] **PLUG-39 — One consolidation of the load and restore path.** From
+  jrp's review of 13 November 2026: individually reasonable fixes have left
+  each adapter keeping its own copies of the accepted filter's
+  consequences, the playing processor, latency and tail, whether the host
+  has settled, the status and report, and the filter's name, and deciding
+  for itself what an accepted request requires. **Remains:** the
+  [consolidation plan](docs/project/plans/2026-11-13-load-restore-consolidation.md)'s
+  steps 0 to 6: protection first, then one shared decision for each
+  accepted request (building on PLUG-38's `HostPlayback::playing`), one rule
+  for when the host has settled, one lifetime mechanism for the playing
+  processor in VST3 and the Audio Unit, diagnostics as a view of state, and
+  typed reports and advice. **Worth doing when** the next preview is
+  published; step 0, tests only, could start earlier if jrp wants. **Done
+  when** the plan's counted states reach their targets (VST3 22 to 5, the
+  Audio Unit 12 to 3) or a step records with jrp why one stays, no adapter
+  decides what an accepted request requires, and every test of audio,
+  saved state and host behaviour passes with no expected value changed
+  except in a commit that names the defect or decided difference.
 - [ ] **PLUG-36 — The loading-and-failure table covers each transition.**
   Left open by the first-preview acceptance plan (section 5, archived
   12 November 2026; jrp's 8 November priority: extend the contract and the
@@ -959,7 +978,9 @@ only where they leave the library (DIAG-4).
 
 When this code next changes for another reason, three narrow
 simplifications from jrp's review of 12 November 2026 go with it; none is a
-project of its own, and none changes a message a user reads:
+project of its own, and none changes a message a user reads. PLUG-39's
+[steps](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)
+1 and 5 carry them out:
 
 - Exceptions carry `Advice` as a typed error rather than English-labelled
   text ("Cause: ", "Fix: ", "Note: ") that `parse_advice()`
