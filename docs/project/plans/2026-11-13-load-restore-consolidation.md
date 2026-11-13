@@ -6,7 +6,7 @@ out PLUG-39: which states the three plug-in adapters keep apart today on the
 path that loads and restores a filter, how many of each should remain, and a
 sequence of small steps, each one revertible and protected by tests of audio,
 saved state and host behaviour. It changes no code. Counts are of `main` at
-`0fdc44c` (0.13.18) with PR #193 (PLUG-38) applied.
+`1de4452`, with PR #193 (PLUG-38) merged.
 
 **In short:** the adapters keep about 40 pieces of state on this path that
 must agree with one another or with `HostFilter`, and each adapter decides
@@ -19,7 +19,7 @@ diagnostics built as a view of that state instead of separate copies and
 text that is parsed back. The success criterion is the count: VST3 from 22
 counted states to 5, the Audio Unit from 12 to 3, LV2's status ordering and
 decisions moved to shared code, and no adapter left deciding what a request
-requires. Six steps follow PR #193, each in its own pull request; none
+requires. Seven steps, numbered 0 to 6, each in its own pull request; none
 starts before the next preview is published, so the host sessions test code
 this work has not touched. Contents: [what is counted](#what-is-counted),
 [inventory](#inventory), [what stays](#what-stays-and-why),
@@ -177,7 +177,7 @@ are stated, and steps 3 to 5 do not depend on steps 1 and 2.
    holding the playing filter with a different Latency builds a new
    processor. List the tests that reach into the machinery each later step
    replaces. No production change.
-1. **One decision for each accepted request** (after PR #193 merges). Extend
+1. **One decision for each accepted request.** Extend
    `HostFilter::load()` so that, with the filter accepted, it hands the
    adapter one plain value, provisionally `HostChange`, saying what the
    request requires: keep the playing filter or replace it, the settings to
@@ -261,8 +261,7 @@ are stated, and steps 3 to 5 do not depend on steps 1 and 2.
 - **PR #193 (PLUG-38)** is the first move in this direction:
   `HostPlayback::playing` is decided once, in `HostFilter`. Step 1 builds on
   it, folding its three adapter call sites and VST3's project exception into
-  the shared decision; nothing here conflicts with it, and step 1 waits for
-  it to merge.
+  the shared decision.
 - **The change-scope rule (PLUG-37)** in the
   [adapter contract](../../develop/plugin-contract.md#scope-of-each-change) is
   the specification step 1 implements: each row of its table becomes one
@@ -287,7 +286,7 @@ are stated, and steps 3 to 5 do not depend on steps 1 and 2.
 - **The host sessions and the next preview (PR #192)** come first. Steps 1
   to 6 start once the next preview is published, so the preview and the
   sessions on jrp's Mac test code this work has not changed. Step 0 is tests
-  only and could start once PR #193 merges, if jrp wants it earlier.
+  only and could start now, if jrp wants it earlier.
 
 ## Not in this plan
 
@@ -306,8 +305,8 @@ are stated, and steps 3 to 5 do not depend on steps 1 and 2.
 1. **Targets and order:** approve the targets in the inventory and the
    order of the steps, with steps 1 to 6 waiting for the next preview to be
    published. Recommended.
-2. **Step 0's timing:** tests only, so it could start once PR #193 merges,
-   before the host sessions; or wait with the rest. Recommended: wait,
+2. **Step 0's timing:** tests only, so it could start now, before the host
+   sessions; or wait with the rest. Recommended: wait,
    keeping CI time for the preview work.
 3. **One TODO item:** PLUG-39 with numbered step pull requests, each merged
    as one revertible commit, rather than one item per step. Recommended,
