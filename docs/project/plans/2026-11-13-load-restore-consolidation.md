@@ -1,8 +1,9 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Consolidate the plug-ins' load and restore path
 
-For jrp, who approves the targets and the order, and for whoever then carries
-out PLUG-39: which decisions the three plug-in adapters each make for
+For whoever carries out PLUG-39, whose plan and order jrp approved on
+13 November 2026 (approving the plan, not its eventual implementation: each
+step's pull request is reviewed and tested on its own): which decisions the three plug-in adapters each make for
 themselves on the path that loads and restores a filter, which mechanisms
 they implement more than once, which values they keep as copies of what
 another record already knows, and a sequence of small steps, each one
@@ -28,12 +29,13 @@ keeps Convolver's stricter rules where theirs are looser. Success is fewer
 duplicated decisions, mechanisms and copies, with unchanged audio and host
 behaviour, not a count of member variables: moving four pointers into a class
 encapsulates them but does not make four states one. Seven steps, numbered 0
-to 6; none starts before the next preview is published. Contents: [what is
+to 6, under the one TODO item; none starts before the next preview is
+published. Contents: [what is
 counted](#what-is-counted), [inventory](#inventory), [what
 stays](#what-stays-and-why), [similar plug-ins](#how-similar-plug-ins-do-it),
 [success criterion](#success-criterion), [protection](#protection-for-every-step),
 [steps](#steps), [relation to other work](#relation-to-other-work),
-[not in this plan](#not-in-this-plan), [decisions for jrp](#decisions-for-jrp).
+[not in this plan](#not-in-this-plan), [decisions](#decisions).
 
 ## What is counted
 
@@ -238,8 +240,8 @@ per step.
 
 ## Steps
 
-Each step is one pull request titled `PLUG-39 step N: …` (step 3 three of
-them), merged as one commit so that reverting it undoes it alone, with the
+Each step is one pull request titled `PLUG-39 step N: …` (steps 3 and 4 as
+substeps `3a` to `3c` and `4a` to `4c`), merged as one commit so that reverting it undoes it alone, with the
 independent review asking the
 [question on special cases](../../develop/workflow.md#check). The order puts
 the step that removes the most decisions first; the dependencies are
@@ -278,17 +280,23 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
    [scope table](../../develop/plugin-contract.md#scope-of-each-change) become
    the specification of `HostChange`, and the contract says so. A
    difference found while counting: LV2 replaces a chosen file that holds
-   the filter already playing, where VST3 and the Audio Unit keep it.
-   Making LV2 keep it changes what is heard (the tail rings on), so it is a
-   separate commit in this step, and only if jrp agrees.
+   the filter already playing, where VST3 and the Audio Unit keep it. jrp
+   chose to align LV2 (13 November 2026): re-choosing a file whose decoded
+   filter configuration is unchanged keeps the playing filter and its
+   history, decided by comparing the configuration in full as PLUG-38 does,
+   never by the file name, so a file whose contents changed still loads; any
+   settings that come with it apply by the change-scope rule. It changes
+   what is heard (the tail rings on), so it is a separate commit in this
+   step, with an LV2 test that re-chooses the same file during a tail and
+   one that re-chooses the same name with changed contents.
 2. **One rule for when the host has settled its rate and channels.** Replace
    VST3's and the Audio Unit's two implementations with one small shared
    record that each adapter feeds with the same events (activated with a
    configuration, played audio with it, told a project is being opened) and
    asks whether a request is checked, refused or kept until it suits. The
    step keeps both formats' present behaviour, including their difference
-   for a file chosen while inactive, unless jrp chooses one. After step 1,
-   because the decision value uses the answer.
+   for a file chosen while inactive, as jrp decided (13 November 2026).
+   After step 1, because the decision value uses the answer.
 3. **Deferred reclamation of the playing processor.** An ownership redesign,
    not a tidying of fields into a class, and its own reviewed change after
    the preview. Today VST3 and the Audio Unit publish the replacement and
@@ -314,10 +322,13 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
       playback is stopped (VST3-16). The tail reported follows filter
       replacements inside a processor as well as a new processor.
    3. **Retirement is bounded, and stopped playback is defined.** A newer
-      offer discards a superseded offer the audio side never adopted,
-      rather than accumulating them. At most one old processor stays alive
-      after the audio side moved on, until the next control call or until
-      deactivation or destruction (when no audio runs) reclaims it. No new
+      offer discards a superseded offer no reader ever adopted, rather than
+      accumulating them. Retired processors are accounted for every reader:
+      if two readers (VST3's `process()` and `setProcessing()`) can hold
+      different generations, each held one stays protected until its reader
+      lets go, and the number kept alive is bounded by the number of
+      readers. Each is freed by a later control call once no reader holds
+      it, or by deactivation or destruction, when no audio runs. No new
       thread.
    4. **The ownership test changes deliberately.** `latency_handover_waits()`
       becomes a test that the control call returns promptly while
@@ -399,8 +410,9 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
   its three narrow simplifications are carried out by steps 1 and 5.
 - **The host sessions and the next preview (PR #192)** come first. Steps 1
   to 6 start once the next preview is published, so the preview and the
-  sessions on jrp's Mac test code this work has not changed. Step 0 is tests
-  only and could start now, if jrp wants it earlier.
+  sessions on jrp's Mac test code this work has not changed. Step 0 waits
+  too, as jrp decided: the host sessions and publication first, then the
+  protection tests, then production changes.
 
 ## Not in this plan
 
@@ -417,26 +429,25 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
   processing during a swap, freeing on the audio thread, and saving only a
   file path.
 
-## Decisions for jrp
+## Decisions
 
-Decided on 13 November 2026: deferred reclamation of the playing processor
-in principle, with the four conditions in [step 3](#steps), as its own
-reviewed change after the preview
-([decision](../decisions.md#direction)). Still open:
+jrp's decisions of 13 November 2026 ([decisions log](../decisions.md#direction)):
 
-1. **Targets and order:** approve the revised inventory, success criterion
-   and order of the steps, with steps 1 to 6 waiting for the next preview
-   to be published. Recommended.
-2. **Step 0's timing:** tests only, so it could start now, before the host
-   sessions; or wait with the rest. Recommended: wait, keeping CI time for
-   the preview work.
-3. **One TODO item:** PLUG-39 with numbered step pull requests, each merged
-   as one revertible commit, rather than one item per step. Recommended,
-   following the 12 November decision to reduce obligations before adding
-   more.
-4. **Differences found while counting:** whether LV2 should keep a chosen
-   file that holds the filter already playing, as VST3 and the Audio Unit do
-   (step 1), and whether VST3's and the Audio Unit's check of a file chosen
-   while inactive should become one rule (step 2). Recommended: align LV2,
-   since a tail cut by re-choosing the same file would surprise a user, and
-   keep step 2 behaviour-preserving.
+1. **The plan and its order are approved.** Success means fewer duplicated
+   decisions and clearer ownership, with existing audio, saved-state and
+   host behaviour preserved. Approving the plan does not approve its
+   implementation: each step's pull request is reviewed and tested on its
+   own.
+2. **Step 0 waits until after the next preview:** the host sessions and
+   publication first, then the protection tests, before any production
+   change.
+3. **One TODO item, PLUG-39,** with numbered step pull requests, each
+   independently reviewable and revertible, and substeps (`step 3a`, `3b`,
+   `3c`; `4a`, `4b`, `4c`) where the plan already calls for several.
+4. **LV2 is aligned with VST3 and the Audio Unit** for a re-chosen file
+   whose decoded configuration is unchanged (step 1, its own commit), and
+   the VST3 and Audio Unit difference in when the host counts as settled is
+   kept (step 2).
+5. **Deferred reclamation is approved in principle,** with the four
+   conditions in [step 3](#steps), as its own reviewed change after the
+   preview.
