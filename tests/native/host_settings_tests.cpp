@@ -915,6 +915,45 @@ void estimate_keeps_history() {
                 std::to_string(replaced.back()));
 }
 
+// PLUG-38: restored state holding the filter already playing, with Estimate
+// chosen where Set played, keeps the filter and its history and plays the
+// estimate HostFilter found as it loaded: HostProcessor::keep() passes the
+// figures on. A replacement would go silent for the filter's 0.25 s delay.
+void restore_keeps_history_with_estimate() {
+    Configuration c{48000, 1, 1, 0, {}, {}, {}};
+    std::vector<float> delayed(12000, 0.f);
+    delayed.resize(12064, 1.f / 64);
+    c.paths.push_back({delayed, {{0, 1}}, {{0, 1}}});
+    const HostLayout layout{48000, 1, 1};
+    HostFilter filter;
+    std::optional<HostPlayback> installed;
+    filter.load(HostState{c}, layout, [&](const HostPlayback& p) { installed = p; });
+    require(installed && !installed->gains.estimate_db, "Set mode found an estimate");
+    HostProcessor host(*installed, 64, HostSettings{});
+    const auto steady = play(host, std::vector<float>(13000, 1.f), 1, 1, 64);
+    require(std::abs(steady.back() - 1) < 1e-5, "the delayed average should play at 1");
+    bool kept = false;
+    filter.set_estimating(true); // As an adapter does for state with Estimate.
+    filter.load(HostState{c}, layout, [&](const HostPlayback& p) {
+        kept = host.keep(p);
+        if (!kept)
+            host.replace(p);
+    });
+    require(kept && filter.gains().estimate_db, "the same filter with Estimate was not kept");
+    audio_thread = true;
+    host.set_gain_mode(GainMode::estimate); // The restored mode, applied per block.
+    audio_thread = false;
+    const float target = std::pow(10.f, static_cast<float>(*filter.gains().estimate_db) / 20);
+    const auto after = play(host, std::vector<float>(4000, 1.f), 1, 1, 64);
+    for (std::size_t t = 0; t < after.size(); ++t)
+        require(after[t] >= 1 - 1e-5f && after[t] <= target + 1e-4f,
+                "restoring the same filter with Estimate interrupted it: " +
+                    std::to_string(after[t]) + " at frame " + std::to_string(t));
+    require(std::abs(after.back() - target) < 1e-4f,
+            "the kept filter should play its estimate: " + std::to_string(after.back()) + ", not " +
+                std::to_string(target));
+}
+
 // PLUG-10: HostFilter finds the noise estimate only while estimating, and
 // finds it for the accepted filter when estimating starts.
 void filter_estimates() {
@@ -979,6 +1018,7 @@ int main() {
             {"gain_modes", gain_modes},
             {"filter_estimates", filter_estimates},
             {"estimate_keeps_history", estimate_keeps_history},
+            {"restore_keeps_history_with_estimate", restore_keeps_history_with_estimate},
         },
         [] { audio_thread = false; });
     std::printf("worst Estimate and No clipping oracle error %.3g of the output peak\n",

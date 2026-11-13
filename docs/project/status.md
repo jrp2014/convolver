@@ -303,11 +303,12 @@ than checked.
   only by `vst3.adapter`: it merged without an Audacity check
   ([decisions](decisions.md#plug-in-behaviour)), so the preset menu stays
   the checked route (check 4) until check 10 passes.
-- PLUG-38: during playback, restored state or a chosen preset that holds
-  the filter already playing replaces it in every format, so a preset
-  change or undo that alters only Gain cuts a sounding tail. Reproduced by
-  the plug-in harness (`same-filter-restore`, a known deviation in VST3,
-  LV2 and the Audio Unit), not yet in a host; a small fix follows.
+- PLUG-38: in 0.13.12 and earlier, during playback, restored state or a
+  chosen preset that holds the filter already playing replaces it in every
+  format, so a preset change or undo that alters only Gain cuts a sounding
+  tail. Fixed for the next preview (PR #193) and checked by the plug-in
+  harness (`same-filter-restore`, every format) and `vst3.adapter`; not yet
+  tried in a host.
 - Up to v0.13.12, **Choose…** needed the filter's input count to match the
   host's exactly, while a preset needs only at least that many inputs, so
   in REAPER on a six-channel track the crossover's `filter.cfg` was refused
