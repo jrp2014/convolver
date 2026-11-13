@@ -354,10 +354,11 @@ void live_replacement(const Context& x) {
 // holds the filter already playing changes nothing that is heard. A long
 // tail is excited, the input stops, the same filter arrives again as host
 // state (a preset or undo that changed only a setting), and the tail rings
-// on as if nothing had arrived, at the same latency. Recorded on 12 November
-// 2026 as a known deviation in every format (PLUG-38): each adapter
-// replaces the filter, whose fresh history drops the tail after the
-// crossfade. A reset or reactivation still starts clean (the reset case).
+// on as if nothing had arrived, at the same latency. Until PLUG-38 every
+// adapter replaced the filter, whose fresh history dropped the tail after
+// the crossfade (a known deviation in every format from 12 to 13 November
+// 2026). A reset still starts clean, also when the same filter arrives
+// after it (the end of this case, and the reset case).
 void same_filter_restore(const Context& x) {
     const auto a = lengthened(x.c());
     const std::size_t at = 1200, no = a.output_channels;
@@ -374,10 +375,9 @@ void same_filter_restore(const Context& x) {
     std::vector<float> excited(
         x.f.input.begin(), x.f.input.begin() + static_cast<std::ptrdiff_t>(at * a.input_channels));
     const auto expected = test::oracle(a, excited, latency);
-    // The defect first, with its own message, so that a partial fix (a
-    // tail with the wrong level, say) fails the run instead of matching
-    // the known deviation: once a replacement's crossfade is over, its
-    // fresh history leaves the tail silent.
+    // PLUG-38's defect first, with its own message, apart from a tail at
+    // the wrong level: once a replacement's crossfade is over, its fresh
+    // history leaves the tail silent.
     const std::size_t fade = (static_cast<std::size_t>(a.sample_rate) * 256 + 24000) / 48000;
     double heard = 0, due = 0;
     for (std::size_t i = (at + latency + fade) * no; i < out.size(); ++i) {
@@ -391,6 +391,12 @@ void same_filter_restore(const Context& x) {
         throw Failure(m.str());
     }
     close(out, expected, no, "the tail after restoring the same filter");
+    // After a reset the same filter keeps nothing of the audio before it.
+    s.render(x.f.input, 0, at);
+    x.adapter.reset();
+    require(x.adapter.load({"same filter", {}, a}),
+            "restoring the same filter after a reset was rejected");
+    silent(s.render({}, 0, x.span(a)), "after a reset and restoring the same filter");
     x.adapter.destroy();
 }
 
@@ -602,16 +608,6 @@ void nonfinite_input(const Context& x) {
     x.adapter.destroy();
 }
 } // namespace
-
-std::vector<Deviation> same_filter_restore_deviations() {
-    std::vector<Deviation> list;
-    for (const char* fixture : {"mono", "stereo", "crossover"})
-        list.push_back({std::string("same-filter-restore[") + fixture + "]",
-                        "the tail is silent after restoring the same filter",
-                        "restored state holding the playing filter replaces it, so the tail is "
-                        "lost after the crossfade (PLUG-38)"});
-    return list;
-}
 
 int run(Adapter& adapter, const std::filesystem::path& listing, const Options& options) {
     std::vector<Fixture> fixtures;

@@ -355,6 +355,34 @@ std::uint64_t configuration_identity(const Configuration& c) noexcept {
     return hash;
 }
 
+namespace {
+// PLUG-38: whether two filters are the same in every stored value, each
+// float compared by its bits as configuration_identity() hashes it, so a
+// signed-zero route gain differs from a positive zero. The identity picks
+// the candidates; only this proves them equal.
+bool same_configuration(const Configuration& a, const Configuration& b) noexcept {
+    const auto same_floats = [](float x, float y) {
+        return std::bit_cast<std::uint32_t>(x) == std::bit_cast<std::uint32_t>(y);
+    };
+    const auto same_routes = [&](const std::vector<Route>& x, const std::vector<Route>& y) {
+        return std::equal(x.begin(), x.end(), y.begin(), y.end(),
+                          [&](const Route& r, const Route& t) {
+                              return r.channel == t.channel && same_floats(r.gain, t.gain);
+                          });
+    };
+    return a.sample_rate == b.sample_rate && a.input_channels == b.input_channels &&
+           a.output_channels == b.output_channels && a.channel_mask == b.channel_mask &&
+           a.input_delays == b.input_delays && a.output_delays == b.output_delays &&
+           std::equal(a.paths.begin(), a.paths.end(), b.paths.begin(), b.paths.end(),
+                      [&](const FilterPath& x, const FilterPath& y) {
+                          return std::equal(x.impulse.begin(), x.impulse.end(), y.impulse.begin(),
+                                            y.impulse.end(), same_floats) &&
+                                 same_routes(x.inputs, y.inputs) &&
+                                 same_routes(x.outputs, y.outputs);
+                      });
+}
+} // namespace
+
 std::string ignored_inputs(const Configuration& c, const HostLayout& host, const char* dash) {
     if (host.inputs <= c.input_channels)
         return {};
@@ -554,7 +582,14 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
                     // Moved in and back, not copied: a filter can be large.
                     // On a throw `next` is never used again.
                     const bool dry = own_dry(*next);
-                    HostPlayback playing{std::move(*next), dry, gains};
+                    // PLUG-38: the filter that plays now, unchanged, may play
+                    // on with its history: one accepted, suiting the host
+                    // (no failure found at activation keeps it silent), and
+                    // equal in full, not by name or identity alone.
+                    const bool unchanged = filter_ && !failed_ && !activation_failure_ &&
+                                           identity == identity_ &&
+                                           same_configuration(*filter_, *next);
+                    HostPlayback playing{std::move(*next), dry, gains, unchanged};
                     install(playing);
                     *next = std::move(playing.filter);
                 } else {
@@ -1572,6 +1607,20 @@ void HostProcessor::set_gain_mode(GainMode mode) noexcept {
 }
 void HostProcessor::update_gains(const FilterGains& gains) noexcept {
     impl_->latest->set_gains(gains);
+}
+bool HostProcessor::keep(const HostPlayback& playback) noexcept {
+    // HostFilter vouches that the filter is the one published last; a
+    // processor that met a fault starts afresh instead, as it did before
+    // PLUG-38. A muted processor never plays an accepted filter (mute() and
+    // silence() follow a failed first load), so it never gets here. The
+    // load's commit then clears the fault baseline as for any accepted load:
+    // a fault the audio thread counts between this check and that commit is
+    // logged by the next observe() but not shown as Fault, a window of a few
+    // instructions on the control side.
+    if (!playback.playing || faults_since_clear())
+        return false;
+    update_gains(playback.gains);
+    return true;
 }
 std::uint64_t HostProcessor::publications() const noexcept {
     return impl_->published.load(std::memory_order_acquire);

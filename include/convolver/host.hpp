@@ -179,6 +179,11 @@ struct HostPlayback {
     // PLUG-10: what Estimate and No clipping play for this filter
     // (HostFilter fills them in from the accepted filter's filter_gains()).
     FilterGains gains;
+    // PLUG-38: HostFilter::load() found `filter` to be the one it had
+    // accepted and was playing, compared in full, so an adapter may keep the
+    // processor and its history (HostProcessor::keep()) instead of replacing
+    // it. False everywhere else.
+    bool playing = false;
 };
 // A filter that plays: a dry signal only when the filter itself has as many
 // inputs as outputs (PLUG-23), never because the host's counts are equal.
@@ -681,6 +686,17 @@ class HostProcessor {
     // nothing is interrupted; the gain ramps like a Gain change. Does not
     // allocate or block.
     void update_gains(const FilterGains&) noexcept;
+    // PLUG-38, control thread, serialized with replace() and publish(): for a
+    // `playback` whose `playing` says HostFilter found its filter to be the
+    // one this processor already plays, and a processor that has counted no
+    // faults since the last clear_faults(), passes its gains to
+    // update_gains() and returns true: the filter plays on with its history,
+    // and settings applied afterwards ramp as usual. Otherwise changes
+    // nothing and returns false, and the adapter calls replace(). Adapters
+    // call it where a restored state or preset may hold the filter already
+    // playing (docs/develop/plugin-contract.md#scope-of-each-change). Does
+    // not allocate or block.
+    bool keep(const HostPlayback& playback) noexcept;
     // Audio thread: the current filter ramps to silence over 1.33 ms (or is
     // silent at once, before any audio since construction or reset) and
     // stays silent until a filter published after this call takes over,

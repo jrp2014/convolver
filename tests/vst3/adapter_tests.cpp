@@ -2248,6 +2248,107 @@ void gain_modes() {
     c.terminate();
     p.terminate();
 }
+// PLUG-38: a preset or undo that holds the filter already playing and
+// changes only Gain keeps the filter and its history. A long tail is excited,
+// the input stops, the same filter arrives as state with Gain at -6 dB, and
+// the tail rings on as if nothing had arrived, ramping to the new Gain over
+// 64 frames (plus one, PLUG-19) instead of falling silent after a
+// replacement's crossfade. State the host marks as a project being opened
+// (`project`) still replaces the filter, without a reset, so a reopened
+// project keeps nothing from before. The PLUG-2 harness's
+// same-filter-restore case checks the same in every format without a
+// settings change, and that a reset still clears history.
+void same_filter_restore(bool project) {
+    HostApplication context;
+    Processor p;
+    require(p.initialize(&context) == kResultOk, "same filter initialize");
+    SpeakerArrangement mono = SpeakerArr::kMono;
+    require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "same filter buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    std::mt19937 random(0x38);
+    std::uniform_real_distribution<float> unit(-1, 1);
+    constexpr std::size_t taps = 3000, block = 100, at = 1200, frames = at + taps + 2 * block;
+    std::vector<float> impulse(taps);
+    for (std::size_t i = 0; i < taps; ++i)
+        impulse[i] = unit(random) * .05f * static_cast<float>(std::exp(-double(i) / 1500));
+    convolver::HostState playing;
+    playing.configuration =
+        convolver::Configuration{48000, 1, 1, 0, {}, {}, {{impulse, {{0, 1}}, {{0, 1}}}}};
+    playing.settings = convolver::HostSettings{};
+    auto quieter = playing;
+    quieter.settings->gain_db = -6;
+    MemoryStream first;
+    const auto second =
+        project ? std::make_unique<ProjectStream>() : std::make_unique<MemoryStream>();
+    require(write_state(&first, playing) && write_state(second.get(), quieter),
+            "same filter states");
+    first.seek(0, IBStream::kIBSeekSet, nullptr);
+    second->seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&first) == kResultOk, "same filter restore");
+    ProcessSetup setup{kRealtime, kSample32, static_cast<int32>(block), 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk &&
+                p.setProcessing(true) == kResultOk,
+            "same filter activate");
+    std::vector<float> input(frames), output(frames);
+    for (std::size_t t = 0; t < at; ++t)
+        input[t] = unit(random);
+    for (std::size_t start = 0; start < frames; start += block) {
+        if (start == at)
+            require(p.setState(second.get()) == kResultOk,
+                    "same filter with a Gain change refused");
+        float* ins[] = {input.data() + start};
+        float* outs[] = {output.data() + start};
+        AudioBusBuffers in{}, out{};
+        in.numChannels = out.numChannels = 1;
+        in.channelBuffers32 = ins;
+        out.channelBuffers32 = outs;
+        ProcessData d{};
+        d.symbolicSampleSize = kSample32;
+        d.numInputs = d.numOutputs = 1;
+        d.inputs = &in;
+        d.outputs = &out;
+        d.numSamples = static_cast<int32>(block);
+        require(p.process(d) == kResultOk, "same filter process");
+    }
+    require(p.getLatencySamples() == latency_samples, "same filter changed the latency");
+    // The uninterrupted tail, in double precision, then the Gain applied.
+    const double gain = std::pow(10.0, -6.0 / 20);
+    const std::size_t settled = at + 64 + 1, faded = at + 256 + 1;
+    double peak = 0, error = 0, ramp_error = 0, late = 0, after_fade = 0;
+    for (std::size_t t = 0; t < frames; ++t) {
+        double wet = 0;
+        for (std::size_t i = 0; i < taps && i <= t; ++i)
+            wet += double(impulse[i]) * input[t - i];
+        peak = std::max(peak, std::abs(wet));
+        if (t >= at + 300)
+            late = std::max(late, std::abs(wet));
+        if (t >= faded)
+            after_fade = std::max(after_fade, double(std::abs(output[t])));
+        if (t < at || (!project && t >= settled)) {
+            error = std::max(error, std::abs(output[t] - (t < at ? wet : gain * wet)));
+        } else if (!project && t < settled) { // On the ramp: between the old level and the new.
+            const double lo = std::min(gain * wet, wet), hi = std::max(gain * wet, wet);
+            ramp_error = std::max({ramp_error, lo - output[t], output[t] - hi});
+        }
+    }
+    const double relative = error / peak;
+    require(late > .01, "same filter: the test tail is too quiet to show history");
+    if (project) {
+        // Replaced: the fresh filter has heard nothing since the input stopped.
+        require(relative < 2e-6, "same filter as a project: the output before it changed");
+        require(after_fade == 0, "a project holding the playing filter kept its history");
+    } else {
+        std::cout << "same filter with a Gain change: relative error " << relative
+                  << " against the uninterrupted tail\n";
+        require(relative < 2e-6,
+                "a same-filter state with a Gain change lost the filter's history");
+        require(ramp_error < 2e-6 * peak, "the Gain ramp left the old and new levels");
+    }
+    p.setProcessing(false);
+    p.setActive(false);
+    p.terminate();
+}
 // VST3-16: Latency choices and filter replacements while the audio thread
 // plays. Each choice replaces the processor at once, so the control side
 // must wait until process() has left the previous one before freeing it
@@ -3606,6 +3707,8 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"controller_conversions", controller_conversions},
         {"settings_parameters", settings_parameters},
         {"gain_modes", gain_modes},
+        {"same_filter_keeps_history", [] { same_filter_restore(false); }},
+        {"same_filter_as_project_starts_clean", [] { same_filter_restore(true); }},
         {"latency_while_playing", latency_while_playing},
         {"latency_handover_waits", latency_handover_waits},
         {"report_and_files", report_and_files},

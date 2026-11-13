@@ -171,10 +171,9 @@ int main(int argc, char** argv) {
         return 2;
     }
     // The adapter follows the shared adapter contract
-    // (docs/develop/plugin-contract.md) apart from PLUG-38, the one known
-    // deviation (VST3-7 removed the earlier ones).
-    test::Options options;
-    options.known_deviations = test::same_filter_restore_deviations();
+    // (docs/develop/plugin-contract.md), so no
+    // case is listed as a known deviation (VST3-7 removed the last ones).
+    const test::Options options;
     Vst3 adapter;
     return test::run(adapter, argv[1], options);
 }

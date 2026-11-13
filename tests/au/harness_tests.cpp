@@ -116,10 +116,9 @@ int main(int argc, char** argv) {
     }
     try {
         // The adapter follows the shared adapter contract
-        // (docs/develop/plugin-contract.md) apart from PLUG-38, the one
-        // known deviation.
-        test::Options options;
-        options.known_deviations = test::same_filter_restore_deviations();
+        // (docs/develop/plugin-contract.md), so
+        // no case is listed as a known deviation.
+        const test::Options options;
         AudioUnitAdapter adapter;
         return test::run(adapter, argv[1], options);
     } catch (const std::exception& e) {
