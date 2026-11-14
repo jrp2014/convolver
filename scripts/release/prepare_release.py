@@ -32,41 +32,46 @@ CANDIDATE_WORKFLOW = '.github/workflows/release.yml'
 # in their words; each preview's release-notes change updates both
 # (docs/develop/releasing.md#publishing-an-unsigned-preview). The changelog
 # holds every change.
-PREVIOUS_PREVIEW = '0.13.2'
+PREVIOUS_PREVIEW = '0.13.12'
 CHANGES = (
     (
-        "On Windows the VST3 plug-in has Convolver's window, as on macOS: choose, drop or reload a filter, set "
-        'Gain, Mix and Latency, and read the status and Copy Diagnostics there. Choose… reads the same sound '
-        'files as the command-line tool (WAV, RF64, W64, AIFF, CAF).'
+        'A new **Gain mode** setting in every plug-in format. **Set** plays Gain as before and is the default. '
+        "**Estimate** plays the filter's own estimate of how far to turn it down, as `convolver --gain-db auto` "
+        'does, and **No clipping** plays the gain at which no input within full scale can clip, as '
+        '`--gain-db no-clip` does; it is not a limiter. Each filter plays at a gain worked out for that filter, '
+        'and the macOS and Windows windows show it beside the menu. Estimate takes a moment for a long filter, '
+        'and plays the No clipping gain until it is ready.'
     ),
     (
-        'WAV files that other programs write and Convolver refused as cut short are now read: a last chunk '
-        "without its padding byte, as Python's `wave` module writes mono 24-bit audio with an odd number of "
-        'frames, and sizes that were never filled in, as FFmpeg writes to a pipe. A file without sizes of 4 GiB '
-        'or more is still refused, and one that FFmpeg stopped writing half way is read as if it were complete.'
+        "**Choose…** and dropping a file in Convolver's window (the Audio Unit, and the VST3 plug-in on macOS and "
+        'Windows) also open a Convolver `.vstpreset` from any folder, so a preset no longer has to be installed or '
+        "imported through the host first. Its filter loads as from the host's preset menu, with the Gain, Gain "
+        'mode, Mix and Latency saved in it; a preset from `convolver-preset` holds only a filter and leaves them '
+        'as they are.'
     ),
     (
-        'A sound file that cannot be used as a filter is reported with the reason, for example a damaged header '
-        'or too many channels, instead of a general message. `convolver --inspect` gives such a file the new '
-        'code `unreadable-asset`.'
+        'The VST3 plug-in now saves Gain, Mix and Latency in projects and presets even at their defaults, so a '
+        'preset a host saved at the defaults sets them back to the defaults when chosen in the window, as it does '
+        "from the host's preset menu. A preset saved at the defaults by an earlier version still leaves the "
+        'current settings; save it again to have it reset them.'
     ),
     (
-        'Linux packages include the LV2 plug-in: one plug-in for each channel layout, the filter chosen with the '
-        "host's file chooser or an LV2 preset made with `convolver-preset`, and Gain, Mix and Latency as host "
-        'controls.'
+        "A file chosen with **Choose…** (or dropped on the window, or set through LV2's Filter parameter) now "
+        "plays on a track with more channels than the filter has inputs, as a preset does: on REAPER's "
+        "six-channel track, the 2→6 crossover's `filter.cfg` now plays. From a configuration list, the entry with "
+        "exactly the host's inputs comes first, otherwise the closest one with fewer; the window and the log say "
+        'which entry played and why.'
     ),
     (
-        "In Audacity, a filter loaded from Convolver's window (Choose…, Recent or Reload) should now be kept for "
-        'exports and saved projects (see the known limitations).'
+        'During playback, choosing a preset or undoing a change that holds the filter already playing, with only '
+        'Gain, Mix or the Gain mode different, keeps the filter: a tail that is still sounding rings on at the new '
+        'settings instead of stopping. A different filter or Latency, reopening a VST3 project, or the host '
+        'restarting the plug-in still starts it afresh.'
     ),
     (
-        'On Windows, a file whose name holds characters outside the system code page, such as Greek, Cyrillic '
-        'or Chinese letters, is named correctly in messages, and a configuration naming an IR file whose extension '
-        'holds such characters loads.'
-    ),
-    (
-        'A new guide to reporting a problem (linked below) says what to collect on each system, and a Preview '
-        'feedback form asks what worked and what did not.'
+        'A new guide sets up system-wide filtering on Linux with PipeWire: a Room correction device that runs the '
+        'LV2 plug-in, with a filter for each sample rate from a configuration list. It needs PipeWire 1.6.2 or '
+        'later with its LV2 support, not the PipeWire in Ubuntu 22.04 or 24.04.'
     ),
 )
 TAG = re.compile(r'v(\d+\.\d+\.\d+)')
@@ -174,13 +179,14 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             '(each example comes with a `.vstpreset`, and `convolver-preset` makes one from your own filter) and set '
             "Gain, Mix and Latency in the host's own controls "
             f'([load a preset]({docs}/first-sound-in-a-host.md#optional-load-a-preset)).\n'
-            '- The LV2 plug-in (Linux) is new in the previews. It has no window: '
+            '- The LV2 plug-in (Linux) has no window: '
             "choose a filter with the host's file chooser for its Filter parameter, where the host shows one, or "
             f'load an LV2 preset made with `convolver-preset` ([plug-in presets]({docs}/presets.md)), and set Gain, '
             "Mix and Latency with the host's own controls. Each channel layout is "
-            'its own plug-in. It was checked only automatically, with lilv, lv2lint, pluginval and a headless '
-            'Ardour session.\n'
-            '- The Windows window is new and has been checked only automatically, on Windows CI machines: it opens, '
+            'its own plug-in. It was checked automatically, with lilv, lv2lint, pluginval and a headless Ardour '
+            'session, and from a source build in PipeWire 1.6.8 on virtual devices; nobody has used it in a '
+            'desktop host yet.\n'
+            '- The Windows window has been checked only automatically, on Windows CI machines: it opens, '
             "and the plug-in validator's window tests pass. Nobody has tried it in a Windows host or with a screen "
             'reader yet.\n'
             '- Unsigned: macOS asks you to confirm that you want to open it, and Windows shows a SmartScreen '
@@ -201,9 +207,18 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             "- In Audacity, Convolver's window (Choose…, Recent or Reload) should now keep the filter for exports and "
             "saved projects, but this has been checked only by automated tests, not yet in Audacity. Audacity's own "
             'preset menu is the route that has been checked.\n'
+            '- New since 0.13.12 and checked only by automated tests: the Gain mode, a `.vstpreset` chosen in the '
+            "window, Choose… on a track with more inputs than the filter's, and a preset or undo that keeps the "
+            'playing filter.\n'
             '- Since 0.13, Latency starts at 0 frames. Some projects saved with 0.12.12 at its default of 256 frames '
             'open at 0; choose 256 again if you want its delay back '
-            f'([projects from earlier versions]({docs}/plugins.md#settings)).'
+            f'([projects from earlier versions]({docs}/plugins.md#settings)).\n'
+            '- Opening a project in an earlier preview: in VST3, a project or preset saved with this version at '
+            'Latency 0, the default, is refused as damaged by the first preview, 0.12.12, which plays silence and '
+            'says so in its log, and one saved with Gain mode Estimate or No clipping is refused by every earlier '
+            'preview. In the Audio Unit and LV2, an earlier preview has no Gain mode, so it plays such a project at '
+            'its Gain setting, which can be louder. Projects and presets saved with earlier previews open in this '
+            'one.'
         ),
         '## Report a problem',
         (

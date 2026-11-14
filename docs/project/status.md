@@ -9,7 +9,8 @@ going. [TODO](../../TODO.md) is the backlog and owns the order of work; the
 linked guides own the behaviour.
 
 **In short:** status checked on 12 November 2026 against `main` at
-`d414ce9` (0.13.14). jrp has published three unsigned developer previews as
+`d414ce9` (0.13.14); the list of unpublished changes below brought up to
+date on 14 November 2026 (0.13.19). jrp has published three unsigned developer previews as
 GitHub pre-releases: [0.12.12](https://github.com/jrp2014/convolver/releases/tag/v0.12.12) for macOS (8 November 2026),
 [0.13.2](https://github.com/jrp2014/convolver/releases/tag/v0.13.2) for macOS, Windows and Linux with the new audio engine
 (PERF-2, 9 November), and [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12) (11 November), which adds the
@@ -19,8 +20,12 @@ independent walkthrough, which stay open; nobody has yet tried the new
 engine or the Windows window in a host, and LV2 only in PipeWire 1.6.8
 from a source build, not from the published package. Since 0.13.12, `main` adds
 **Choose…** on wider input buses (PLUG-33), system-wide filtering with
-PipeWire (LV2-4) and choosing a Convolver `.vstpreset` in the window
-(PLUG-26), none of them published yet. The command-line renderer, the
+PipeWire (LV2-4), choosing a Convolver `.vstpreset` in the window
+(PLUG-26), VST3 state that records the settings at their defaults
+(PLUG-35), the Estimate and No clipping gain modes (PR #188) and a preset
+or undo that keeps the playing filter's tail (PLUG-38), none of them
+published yet; the next preview's notes are drafted in
+[`prepare_release.py`](../../scripts/release/prepare_release.py). The command-line renderer, the
 preset tool, the Equalizer APO export and the VST3, Audio Unit and LV2
 plug-ins are implemented and tested automatically; all three plug-ins have
 Gain, Mix and Latency, VST3 and the Audio Unit share one window on macOS,
@@ -240,7 +245,10 @@ its release notes say what was not checked. On 10 November 2026 he decided
 the same for a third preview, once the changes in flight are in
 (VST3-17 without a check in Audacity, the Windows window, LV2; all merged
 by 0.13.11) ([decision](decisions.md#releases)); he published it,
-[0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), on 11 November 2026. On 9 November 2026 he made the
+[0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), on 11 November 2026. On 14 November 2026 he asked
+for a fourth on the same terms, from the tag that PR #192's release notes
+make; the checks left stay on 0.13.12 unless he moves the baseline
+([decision](decisions.md#releases)). On 9 November 2026 he made the
 published 0.13 preview (0.13.2) the baseline, and on 11 November 2026 moved
 it to 0.13.12, which holds the Audacity fix, the Windows window and LV2: the
 checks left and REL-3 run on 0.13.12's exact files, and the v0.12.8 results
