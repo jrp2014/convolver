@@ -140,6 +140,11 @@ guides and TODO.
 - [Sign and notarize the macOS packages](project/plans/2026-11-09-macos-signing.md)
   (REL-1, Reference): the Apple account, certificates, notary key and cost,
   the steps only jrp can take, and the pipeline changes; no workflow changes yet.
+- [Consolidate the plug-ins' load and restore path](project/plans/2026-11-13-load-restore-consolidation.md)
+  (PLUG-39, Reference): the decisions, mechanisms and copied values each
+  adapter keeps on that path, how they become one each, and seven small steps,
+  each protected by tests of audio, saved state and host behaviour; no code
+  changes yet.
 - [Plug-in windows on Windows and Linux](project/plans/2026-11-10-windows-linux-plugin-windows.md)
   (PLUG-34, VST3-12, VST3-13, Reference): what any route needs first (a sound-file
   reader and the window's behaviour in shared code), the routes compared, and
