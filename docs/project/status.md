@@ -244,7 +244,10 @@ its release notes say what was not checked. On 10 November 2026 he decided
 the same for a third preview, once the changes in flight are in
 (VST3-17 without a check in Audacity, the Windows window, LV2; all merged
 by 0.13.11) ([decision](decisions.md#releases)); he published it,
-[0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), on 11 November 2026. On 9 November 2026 he made the
+[0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), on 11 November 2026. On 14 November 2026 he asked
+for a fourth on the same terms, from the tag that PR #192's release notes
+make; the checks left stay on 0.13.12 unless he moves the baseline
+([decision](decisions.md#releases)). On 9 November 2026 he made the
 published 0.13 preview (0.13.2) the baseline, and on 11 November 2026 moved
 it to 0.13.12, which holds the Audacity fix, the Windows window and LV2: the
 checks left and REL-3 run on 0.13.12's exact files, and the v0.12.8 results
