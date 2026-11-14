@@ -9,7 +9,8 @@ going. [TODO](../../TODO.md) is the backlog and owns the order of work; the
 linked guides own the behaviour.
 
 **In short:** status checked on 12 November 2026 against `main` at
-`d414ce9` (0.13.14). jrp has published three unsigned developer previews as
+`d414ce9` (0.13.14); the list of unpublished changes below brought up to
+date on 14 November 2026 (0.13.19). jrp has published three unsigned developer previews as
 GitHub pre-releases: [0.12.12](https://github.com/jrp2014/convolver/releases/tag/v0.12.12) for macOS (8 November 2026),
 [0.13.2](https://github.com/jrp2014/convolver/releases/tag/v0.13.2) for macOS, Windows and Linux with the new audio engine
 (PERF-2, 9 November), and [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12) (11 November), which adds the

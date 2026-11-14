@@ -676,7 +676,10 @@ defaults play exactly as Convolver did before the settings existed.
   default) as damaged, plays silence and says so in the log; a build from
   before the settings existed refuses any such project as a newer state.
   A project saved with Gain mode Estimate or No clipping needs a build with
-  the Gain mode: earlier builds refuse it as a newer state.
+  the Gain mode: earlier builds refuse it as a newer state. The Audio Unit
+  and LV2 plug-ins of earlier builds have no Gain mode either, but they
+  play such a project at its Gain setting instead of refusing it, which can
+  be louder.
 
 ## Latency and tail
 
