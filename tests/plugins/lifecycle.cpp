@@ -514,11 +514,16 @@ class Runner {
         if (configured)
             m.committed = m.host; // Created as PLUG-2 creates: negotiated and bound.
         driver_.create(filters_.host, configured);
+        audio_guard::take();
         step_ = 0;
         for (const auto op : ops) {
             if (!allowed(x, m, op))
                 throw std::logic_error(std::string("not allowed here: ") + name(op));
             perform(x, m, op);
+            // Audio-thread calls outside the callbacks render() checks (a
+            // parameter-only callback, LV2's run() that delivers a chosen
+            // file, setProcessing) neither allocate nor lock either.
+            quiet(std::string("the audio-thread calls of ") + name(op));
             ++step_;
             if (step_ > unchecked || step_ == ops.size())
                 check(m);
@@ -552,7 +557,7 @@ class Runner {
                 out[c].assign(n, .75f); // Not silence: the plug-in must write every frame.
                 op[c] = out[c].data();
             }
-            audio_guard::take();
+            quiet("the audio-thread calls before a callback");
             const bool ok = driver_.process(ip, op, n);
             const auto counted = audio_guard::take();
             expect(ok, "a callback reported a processing error");
@@ -567,6 +572,15 @@ class Runner {
             done += n;
         }
         return result;
+    }
+    // Contract, replacement and threads: nothing on the audio thread
+    // allocates or locks; counts what the guard saw since it was last read.
+    static void quiet(const std::string& what) {
+        const auto counted = audio_guard::take();
+        expect(!counted.allocations, what + " allocated or freed memory " +
+                                         std::to_string(counted.allocations) + " times");
+        expect(!counted.locks,
+               what + " locked a mutex " + std::to_string(counted.locks) + " times");
     }
     std::vector<float> noise(std::size_t frames, std::size_t channels) {
         std::vector<float> v(frames * channels);
@@ -677,6 +691,7 @@ class Runner {
             // control call; an accepted filter keeps playing.
             const bool mutes = refused && m.active && !m.bypass && !m.filter;
             driver_.choose_file(op == Op::file_missing ? f.missing_file : f.a_file, refused);
+            quiet("the run() that delivers the chosen file");
             if (mutes) {
                 // The contract's ramp is 64 frames; the margin covers a
                 // crossfade from an earlier filter that may still be running,
@@ -837,7 +852,6 @@ class Runner {
         // check does, done once and only while active, whatever is read
         // afterwards, so adding a reading does not change the sequence.
         if (m.active) {
-            audio_guard::take();
             driver_.refresh();
             const auto counted = audio_guard::take();
             expect(!counted.allocations && !counted.locks,

@@ -264,10 +264,10 @@ Latency queue and LV2's worker for Latency in the lifecycle runner:
 
 | Behaviour | Host layer | VST3 | Audio Unit | LV2 |
 | --- | --- | --- | --- | --- |
-| A Gain change: saved, played, kept by a restore that holds no settings and by a reopen | Lifecycle `gain` | Lifecycle `gain` | Lifecycle `gain` | Lifecycle `gain` (the host saves the port) |
+| A Gain change: saved, played, and kept by a reopen; a restore without settings keeps it, except in VST3, where it resets the settings to the defaults | Lifecycle `gain` | Lifecycle `gain` | Lifecycle `gain` | Lifecycle `gain` (the host saves the port) |
 | A Latency change: reported, saved, played | Lifecycle `latency` | Lifecycle `latency` | `au.adapter` `latency_parameter()` | `lv2.adapter` `settings_ports()` |
 | Restored settings applied with the filter | None: no settings in its state | Lifecycle `state-A-settings` (the defaults for a state without them) | `au.adapter` `settings_parameters()` and `latency_parameter()` | None: the host restores the ports |
-| The playing filter restored with another Latency builds a new processor | None | Harness `same-filter-new-latency` | `au.adapter` `latency_parameter()` | Not one request: the restore keeps the filter (`same-filter-restore`) and the worker applies the port's Latency as any other change (`settings_ports()`) |
+| The playing filter restored with another Latency builds a new processor | None | Harness `same-filter-new-latency` | `au.adapter` `latency_parameter()`: the reported latency and an impulse's delay only, with a one-tap filter, so neither history nor Gain | Not one request: the restore keeps the filter (`same-filter-restore`) and the worker applies the port's Latency as any other change (`settings_ports()`) |
 
 Apart from these, the tests drive the plug-ins through the hosts'
 interfaces and read what is saved, what plays, what the host is told and

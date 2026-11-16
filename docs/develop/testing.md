@@ -569,7 +569,7 @@ for. Both run the same engine, so the CLI alone could hide a shared defect.
 | `live-replacement` | A replacement starts with fresh history; the old filter plays on for 256 frames, then a 5.33 ms linear crossfade (256 frames at 48 kHz, the fixtures' rate); two loads before the next callback coalesce to the newest |
 | `tail-after-replacement` | Replacing long with short keeps reporting the long tail; reactivation reports the short tail exactly and plays the short filter afresh; replacing short with long raises it again |
 | `same-filter-restore` | During playback, state holding the filter already playing (made 2000 frames longer, so the tail outlasts the crossfade) is restored after the input stops: the tail rings on as if nothing arrived, at the same latency ([scope of each change](plugin-contract.md#scope-of-each-change)); after a reset, the same filter arriving again plays silence. A known deviation in every format from 12 to 13 November 2026, until PLUG-38 |
-| `same-filter-new-latency` | During playback, state holding the filter already playing (lengthened as above) with Latency 256 and Gain −6 dB builds a new processor, as the Latency row of the [scope of each change](plugin-contract.md#scope-of-each-change) says: the host is told 256 frames at once, the tail is the filter's, and from the next frame the filter plays at the new latency and the state's Gain with fresh history, nothing of the earlier audio or its tail (PLUG-39 step 0). Skipped for formats whose state holds no settings: the Audio Unit applies a restored Latency on its own queue, which `au.adapter`'s `latency_parameter` checks for this case, and LV2's host sets its ports |
+| `same-filter-new-latency` | During playback, state holding the filter already playing (lengthened as above) with Latency 256 and Gain −6 dB builds a new processor, as the Latency row of the [scope of each change](plugin-contract.md#scope-of-each-change) says: the host is told 256 frames at once, the tail is the filter's, and from the next frame the filter plays at the new latency and the state's Gain with fresh history, nothing of the earlier audio or its tail (PLUG-39 step 0). Skipped where restored settings are not applied within the restore: the Audio Unit applies a restored Latency later, on its own queue (`au.adapter`'s `latency_parameter` checks the reported latency and the delay for this case), and LV2's host sets its ports |
 | `failed-replacement` | A filter at the wrong rate, input count or output count is rejected while active; the running filter plays on uninterrupted and stays the saved state |
 | `failed-replacement-inactive` | The same while inactive: rejected at once, and reactivation plays the last valid filter |
 | `failed-initial-load` | A first filter that cannot be used is rejected, nothing is saved, and the instance plays exact silence, never its input; a valid filter loads afterwards |
@@ -652,15 +652,17 @@ operation of a fixed or seeded one, it compares with the model:
   oracle of the filter the model says plays, at the model's Gain and
   Latency, or as the dry input delayed by the latency, or as exact silence.
   After a new Latency while active the model does not describe the new
-  processor's first frames, so it listens once they have settled. With no audio since the last activation or
-  reset, the filter must play from the first frame (direct installation);
-  otherwise silence is played first until every ramp and crossfade is over.
-  Every prefix of an enumerated sequence is enumerated too, so this covers the
-  audible filter after every operation without listening in between, which
-  would change the sequence;
-- that no audio-thread call allocates or frees through `operator new` and
-  `delete` (aligned forms included) or, on Linux, locks with
-  `pthread_mutex_lock`.
+  processor's first frames, so it listens once they have settled. With no
+  audio since the last activation or reset, the filter must play from the
+  first frame (direct installation); otherwise silence is played first until
+  every ramp and crossfade is over. Every prefix of an enumerated sequence is
+  enumerated too, so this covers the audible filter after every operation
+  without listening in between, which would change the sequence;
+- that no audio-thread call allocates, frees or locks: each callback, and since PLUG-39 step 0 also the
+  audio-thread calls each operation makes outside them (a VST3 callback
+  with only parameter changes, `setProcessing`, LV2's `run()` that
+  delivers a chosen file). The guard counts `operator new` and `delete`
+  (aligned forms included) and, on Linux, `pthread_mutex_lock`.
   [`tests/plugins/audio_guard.hpp`](../../tests/plugins/audio_guard.hpp)
   replaces them in the test executable and checks at start that it sees
   allocations and locks, including the LV2 plug-in library's own (linked
@@ -718,13 +720,15 @@ twenty times slower. LV2, with about twice as many operations, uses one fewer
 (`CONVOLVER_LV2_LIFECYCLE_LENGTH`). Each executable also takes the length as
 its last argument. On one machine in October 2026, `vst3.lifecycle` (Debug,
 no sanitizers) ran 31,170 sequences per layout (31,152 enumerated, the rest
-fixed and seeded), for both layouts in about 30 seconds. The settings
-operations (PLUG-39 step 0, November 2026) are enumerated in sequences of
-up to three operations only (`Options::settings_length`): at every length
-they made 73,065 sequences per layout, and Windows CI's `vst3.lifecycle`
-went from 84 seconds to its 300-second timeout. Limited, they add 2,703
-sequences per layout (33,877), about one second in a Release build on the
-cloud machine.
+fixed and seeded), for both layouts in about 30 seconds. Sequences holding a
+settings operation (PLUG-39 step 0, November 2026) are enumerated up to
+three operations only (`Options::settings_length`), so builds without
+sanitizers enumerate them no further than sanitizer builds do. At every
+length they made 73,065 sequences per layout, and Windows CI's
+`vst3.lifecycle` went from 84 seconds to its 300-second timeout. Limited,
+`vst3.lifecycle` runs 33,877 sequences per layout against 31,174 just
+before step 0: 10.8 seconds for both layouts in a Release build on the
+cloud machine, against 10 seconds.
 
 ## Load timing (PERF-9)
 

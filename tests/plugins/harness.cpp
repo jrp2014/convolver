@@ -417,7 +417,7 @@ void same_filter_new_latency(const Context& x) {
     s.render(x.f.input, 0, 1200);
     const auto accepted = x.adapter.load_with_settings({"same filter", {}, a}, settings);
     if (!accepted)
-        throw Skipped("the format's state holds no settings");
+        throw Skipped("the format does not apply restored settings within the restore");
     require(*accepted, "restoring the same filter with a new Latency was rejected");
     require(x.adapter.latency_frames() == settings.latency,
             "the host is told the latency is " + std::to_string(x.adapter.latency_frames()) +
