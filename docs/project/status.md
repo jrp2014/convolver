@@ -9,23 +9,21 @@ going. [TODO](../../TODO.md) is the backlog and owns the order of work; the
 linked guides own the behaviour.
 
 **In short:** status checked on 12 November 2026 against `main` at
-`d414ce9` (0.13.14); the list of unpublished changes below brought up to
-date on 14 November 2026 (0.13.19). jrp has published three unsigned developer previews as
+`d414ce9` (0.13.14); the published previews brought up to date on
+16 November 2026 (0.13.20). jrp has published four unsigned developer previews as
 GitHub pre-releases: [0.12.12](https://github.com/jrp2014/convolver/releases/tag/v0.12.12) for macOS (8 November 2026),
 [0.13.2](https://github.com/jrp2014/convolver/releases/tag/v0.13.2) for macOS, Windows and Linux with the new audio engine
-(PERF-2, 9 November), and [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12) (11 November), which adds the
+(PERF-2, 9 November), [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12) (11 November), which adds the
 VST3 window on Windows, the LV2 plug-in in the Linux package and VST3-17's
-Audacity fix. Each was published without the remaining host checks and the
+Audacity fix, and [0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20) (16 November), which adds the Gain mode,
+opening a Convolver `.vstpreset` in the window (PLUG-26), VST3 state that
+records the settings at their defaults (PLUG-35), **Choose…** on wider input
+buses (PLUG-33) and a preset or undo that keeps the playing filter's tail
+(PLUG-38), with the PipeWire guide (LV2-4). Each was published without the remaining host checks and the
 independent walkthrough, which stay open; nobody has yet tried the new
 engine or the Windows window in a host, and LV2 only in PipeWire 1.6.8
-from a source build, not from the published package. Since 0.13.12, `main` adds
-**Choose…** on wider input buses (PLUG-33), system-wide filtering with
-PipeWire (LV2-4), choosing a Convolver `.vstpreset` in the window
-(PLUG-26), VST3 state that records the settings at their defaults
-(PLUG-35), the Estimate and No clipping gain modes (PR #188) and a preset
-or undo that keeps the playing filter's tail (PLUG-38), none of them
-published yet; the next preview's notes are drafted in
-[`prepare_release.py`](../../scripts/release/prepare_release.py). The command-line renderer, the
+from a source build, not from the published package; nobody has tried
+0.13.20's additions in a host either. The command-line renderer, the
 preset tool, the Equalizer APO export and the VST3, Audio Unit and LV2
 plug-ins are implemented and tested automatically; all three plug-ins have
 Gain, Mix and Latency, VST3 and the Audio Unit share one window on macOS,
@@ -84,13 +82,13 @@ documentation alone.
 
 | Feature | Implemented | Automatically tested | Named host | Published |
 | --- | --- | --- | --- | --- |
-| Command-line renderer `convolver` ([reference](../use/command-line.md)) | Yes | Yes: "Native and historical tests" workflow on Linux (Clang, GCC), macOS (FFTW, Accelerate) and Windows (MSVC); direct double-precision oracle | Not applicable | Yes: in every preview package, latest [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12) |
+| Command-line renderer `convolver` ([reference](../use/command-line.md)) | Yes | Yes: "Native and historical tests" workflow on Linux (Clang, GCC), macOS (FFTW, Accelerate) and Windows (MSVC); direct double-precision oracle | Not applicable | Yes: in every preview package, latest [0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20) |
 | Configuration inspection and validation ([compatibility](../use/other-programs.md)) | Yes | Yes: parser tests, a corpus of example configurations, and replay of inputs found by fuzzing | Other readers of `.cfg` not checked (CFG-1) | Yes: part of the published `convolver` |
-| Preset tool `convolver-preset` ([guide](../use/presets.md)) | Yes | Yes: `native.presets`, `plugins.presets`, `vst3.preset_format` | Not applicable | Yes: in every preview package, latest [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12) |
-| Equalizer APO export ([guide](../use/equalizer-apo.md)) | Yes | Yes: against a model of Equalizer APO 1.4.2, and on Windows CI in Equalizer APO's own `Benchmark.exe` (`export.equalizer_apo.runtime`) | Not yet checked on a real Windows device (HOST-4) | Yes: in every preview package, latest [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12) |
+| Preset tool `convolver-preset` ([guide](../use/presets.md)) | Yes | Yes: `native.presets`, `plugins.presets`, `vst3.preset_format` | Not applicable | Yes: in every preview package, latest [0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20) |
+| Equalizer APO export ([guide](../use/equalizer-apo.md)) | Yes | Yes: against a model of Equalizer APO 1.4.2, and on Windows CI in Equalizer APO's own `Benchmark.exe` (`export.equalizer_apo.runtime`) | Not yet checked on a real Windows device (HOST-4) | Yes: in every preview package, latest [0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20) |
 | VST3 plug-in ([guide](../use/plugins.md)) | Yes: 1–8 in, 1–8 out; Gain, Mix and Latency (VST3-4); the window on macOS (VST3-11) and Windows (VST3-12), not yet on Linux, where hosts show their own controls | Yes: SDK validator, pluginval at strictness 10, `vst3.harness` (against the oracle and the CLI) and `vst3.adapter` on Linux, macOS and Windows; the VST3 tests under ASan and UBSan and `vst3.adapter` under ThreadSanitizer on Linux (CI-36); `vst3.editor` and pluginval's editor tests on macOS and Windows | REAPER 7.85 on macOS (HOST-1): on 6 November (candidate 0.10.9) the smoke steps, the stereo journey and the window's settings passed, except that a new Latency was used only after reopening the project ([record](../archive/reviews/2026-11-06-host1-reaper.md)), which VST3-16 fixed and jrp checked in REAPER on 8 November ([record](../archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md)); on 7 November the 2→6 crossover passed with PR #131's candidate ([record](../archive/reviews/2026-11-07-reaper-crossover-retest.md)); on 8 November generated presets showed their filter's name (PLUG-31, [record](../archive/reviews/2026-11-08-plug31-reaper.md)). Audacity 4.0.2 on macOS (7 November 2026, candidate 0.10.13): every stereo export with a filter or bypass matched the CLI, including after a refused preset and after restarting Audacity; listening, mono and a Latency change not yet checked there ([record](../archive/reviews/2026-11-07-host1-audacity.md)). Both hosts ran the window from before PLUG-22 (0.12.0); REAPER ran the current window on 8 November with the 0.12.5 candidate (part C: controls and state passed, listening not checked; [record](../archive/reviews/2026-11-08-host1-reaper-window.md)) | Yes: macOS since 0.12.12, Windows and Linux since 0.13.2, the Windows window since [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12). The host results here are from 0.12.x builds |
 | LV2 plug-in ([guide](../use/plugins.md)) | Yes: adapter and layouts (LV2-1); filter files through the worker and saved paths (LV2-2); Gain, Mix and Latency as control ports (LV2-7) | Yes: `lv2.harness`, `lv2.adapter`, `lv2lint` and pluginval at strictness 10 on Linux; a headless Ardour session records, restores and exports the first-use examples against the oracle (HOST-5); in each Linux candidate, the LV2 tests and a load of the packaged library | None | Yes: in the Linux package since [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12) |
-| Audio Unit ([guide](../use/plugins.md)) | Yes: adapter, state and `.aupreset` loading (AU-1, AU-2; a named host's preset menu is checked under AU-4); Gain, Mix and Latency (AU-7); Convolver's window with Choose… and file dropping (AU-6) | Yes: `au.harness`, `au.adapter`, `au.lifecycle`, `au.editor`, `au.bundle`, `auval -strict`, pluginval at strictness 10 (with its editor tests) and an AVAudioEngine render of the first-use examples against the oracle (AU-15) on macOS; in each macOS candidate, `au.bundle`'s checks on the packaged component and `auval -strict` after installing the `.pkg` | GarageBand: jrp's checks of the settings (25 October 2026) and of the window up to its redesign (`bbf94c5`, 1 November) passed (DIAG-2 has since reworded its messages and moved Bypass and the diagnostics buttons, and PLUG-22 redesigned the window; jrp saw both on 8 November with the 0.12.5 candidate, when the controls, state and exports passed and listening, bypass clicks, live latency compensation and VoiceOver were not checked, [record](../archive/reviews/2026-11-08-au4-garageband.md)); the full smoke test, including Latency, is not yet recorded (AU-4; what was checked is under AU-6) | Yes: in the macOS packages since 0.12.12, latest [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12). The host results here are from 0.12.x builds |
+| Audio Unit ([guide](../use/plugins.md)) | Yes: adapter, state and `.aupreset` loading (AU-1, AU-2; a named host's preset menu is checked under AU-4); Gain, Mix and Latency (AU-7); Convolver's window with Choose… and file dropping (AU-6) | Yes: `au.harness`, `au.adapter`, `au.lifecycle`, `au.editor`, `au.bundle`, `auval -strict`, pluginval at strictness 10 (with its editor tests) and an AVAudioEngine render of the first-use examples against the oracle (AU-15) on macOS; in each macOS candidate, `au.bundle`'s checks on the packaged component and `auval -strict` after installing the `.pkg` | GarageBand: jrp's checks of the settings (25 October 2026) and of the window up to its redesign (`bbf94c5`, 1 November) passed (DIAG-2 has since reworded its messages and moved Bypass and the diagnostics buttons, and PLUG-22 redesigned the window; jrp saw both on 8 November with the 0.12.5 candidate, when the controls, state and exports passed and listening, bypass clicks, live latency compensation and VoiceOver were not checked, [record](../archive/reviews/2026-11-08-au4-garageband.md)); the full smoke test, including Latency, is not yet recorded (AU-4; what was checked is under AU-6) | Yes: in the macOS packages since 0.12.12, latest [0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20). The host results here are from 0.12.x builds |
 | C++ libraries ([CMake package](../develop/library.md)) | Yes | Yes: installed and source-tree consumer tests | Not applicable | Source only |
 | FFmpeg pipe ([example](../use/command-line.md#with-ffmpeg)) | Documented | Yes: `native.ffmpeg_pipe` runs the example with Ubuntu's FFmpeg in the Linux g++ Release CI job (FFMPEG-1) | Not applicable | Not applicable |
 
@@ -166,7 +164,7 @@ already met are below; what still needs running is in
 | Lifecycle sequences checked against a reference model | Proposed with the milestone, so the next defect of this kind is caught | PLUG-7 | [PR #58](https://github.com/jrp2014/convolver/pull/58); `au.lifecycle` runs in macOS CI only |
 | The edge cases from jrp's review of 0.4.43 fixed | jrp's review | DIAG-1, ROBUST-4 | [PR #72](https://github.com/jrp2014/convolver/pull/72), [PR #73](https://github.com/jrp2014/convolver/pull/73), [PR #96](https://github.com/jrp2014/convolver/pull/96) |
 | The defects from jrp's later reviews fixed | jrp's reviews of `6920a45` and `276c7dc` | PLUG-12, ROBUST-3, PLUG-13 | [PR #91](https://github.com/jrp2014/convolver/pull/91), [PR #105](https://github.com/jrp2014/convolver/pull/105) |
-| Settings (Gain, Mix, Latency) and the shared macOS window implemented in VST3 and the Audio Unit, and checked in CI | jrp | PLUG-9, PLUG-10, VST3-3, VST3-4, AU-7 | Implemented and checked in CI (`vst3.editor`, `au.editor`, pluginval's editor tests); the window last redesigned in [PR #128](https://github.com/jrp2014/convolver/pull/128) (PLUG-22, 7 November 2026). Its host checks (VST3-11, AU-6) are checks 1, 4 and 5 in [checks left](#checks-left-before-publication). The Windows window followed in 0.13.12 (VST3-12); later previews: the Linux window (VST3-13) and the meters (PLUG-10); the other gain modes are built (PR #188) |
+| Settings (Gain, Mix, Latency) and the shared macOS window implemented in VST3 and the Audio Unit, and checked in CI | jrp | PLUG-9, PLUG-10, VST3-3, VST3-4, AU-7 | Implemented and checked in CI (`vst3.editor`, `au.editor`, pluginval's editor tests); the window last redesigned in [PR #128](https://github.com/jrp2014/convolver/pull/128) (PLUG-22, 7 November 2026). Its host checks (VST3-11, AU-6) are checks 1, 4 and 5 in [checks left](#checks-left-before-publication). The Windows window followed in 0.13.12 (VST3-12); later previews: the Linux window (VST3-13) and the meters (PLUG-10); the other gain modes are in 0.13.20 (PR #188) |
 | The Audio Unit validated by `auval` and pluginval, and in the package | jrp | AU-3, AU-5 | `auval -strict` and `au.editor` in CI; pluginval on the installed component in the Audio Unit workflow; the component in both macOS candidates since PR #115, with `auval -strict` after the `.pkg` installs it (first passed in candidates [run 42108659224](https://github.com/jrp2014/convolver/actions/runs/42108659224)). AU-3's ThreadSanitizer build is gate 4 below (done) |
 | Journeys written as steps, with the presets they need in the package | jrp's milestone | REL-2 | 6 November 2026: the stereo, 2→6 crossover and CLI journeys (table above) |
 
@@ -247,8 +245,9 @@ the same for a third preview, once the changes in flight are in
 by 0.13.11) ([decision](decisions.md#releases)); he published it,
 [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), on 11 November 2026. On 14 November 2026 he asked
 for a fourth on the same terms, from the tag that PR #192's release notes
-make; the checks left stay on 0.13.12 unless he moves the baseline
-([decision](decisions.md#releases)). On 9 November 2026 he made the
+made; the checks left stay on 0.13.12 unless he moves the baseline
+([decision](decisions.md#releases)); he published it,
+[0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20), on 16 November 2026. On 9 November 2026 he made the
 published 0.13 preview (0.13.2) the baseline, and on 11 November 2026 moved
 it to 0.13.12, which holds the Audacity fix, the Windows window and LV2: the
 checks left and REL-3 run on 0.13.12's exact files, and the v0.12.8 results
@@ -311,22 +310,22 @@ than checked.
 - PLUG-38: in 0.13.12 and earlier, during playback, restored state or a
   chosen preset that holds the filter already playing replaces it in every
   format, so a preset change or undo that alters only Gain cuts a sounding
-  tail. Fixed for the next preview (PR #193) and checked by the plug-in
+  tail. Fixed in [0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20) (PR #193) and checked by the plug-in
   harness (`same-filter-restore`, every format) and `vst3.adapter`; not yet
   tried in a host.
 - Up to v0.13.12, **Choose…** needed the filter's input count to match the
   host's exactly, while a preset needs only at least that many inputs, so
   in REAPER on a six-channel track the crossover's `filter.cfg` was refused
-  through **Choose…** and its preset played. Fixed on main after v0.13.12
-  (PLUG-33, [PR #184](https://github.com/jrp2014/convolver/pull/184)), not yet in a published preview and checked only by
+  through **Choose…** and its preset played. Fixed in [0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20)
+  (PLUG-33, [PR #184](https://github.com/jrp2014/convolver/pull/184)) and checked only by
   `native.filter_file`, `vst3.adapter` and `au.editor`; the **Choose…**
-  checks on a six-channel track run on the next preview.
+  checks on a six-channel track need 0.13.20's files.
 - Fixed after the v0.12.8 checks, at jrp's request: in REAPER, after a
   refused preset, the heading changed from the playing filter's name to
   "Restored filter" (audio was right). The fix changes plug-in code after
   v0.12.8, so REAPER's refusal step (check 2) runs again on 0.13.12.
 
-**Fixed on `main`**, not yet published: a preset a host saved at the
+**Fixed in [0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20)**: a preset a host saved at the
 default settings, chosen in the window, now resets Gain, Mix and Latency as
 the host's preset menu does (PLUG-35,
 [PR #189](https://github.com/jrp2014/convolver/pull/189)); checked only by

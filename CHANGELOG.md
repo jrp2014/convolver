@@ -12,6 +12,20 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Releases: jrp published Convolver 0.13.20, the fourth unsigned developer
+  preview, on 16 November 2026
+  ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.20)).
+
+## [0.13.20] - 2026-11-16
+
+The fourth published preview: macOS, Windows and Linux, unsigned, adding
+the Gain mode, opening a Convolver preset from the window, **Choose…** on
+wider input buses and a preset or undo that keeps the playing filter's tail,
+published before any of them was tried in a host
+([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.20)).
+
+### Added
+
 - Plug-ins (PLUG-10, AU-7): a **Gain mode** setting in every format.
   **Set** plays Gain as before and is the default. **Estimate** plays the
   filter's own estimate of how far to turn it down, from noise played
@@ -2300,7 +2314,8 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.13.12...HEAD
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.13.20...HEAD
+[0.13.20]: https://github.com/jrp2014/convolver/releases/tag/v0.13.20
 [0.13.12]: https://github.com/jrp2014/convolver/releases/tag/v0.13.12
 [0.13.2]: https://github.com/jrp2014/convolver/releases/tag/v0.13.2
 [0.12.12]: https://github.com/jrp2014/convolver/releases/tag/v0.12.12
