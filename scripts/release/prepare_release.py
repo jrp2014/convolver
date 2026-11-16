@@ -36,10 +36,11 @@ PREVIOUS_PREVIEW = '0.13.20'
 CHANGES = (
     (
         'A fix for the LV2 plug-in (Linux): in hosts built on JUCE, pluginval among them, changing the Gain mode '
-        'just before the host closed the plug-in could crash the host. Closing now waits briefly (up to 100 ms) for '
-        'the change, as it already did for a Latency change; that makes the crash much less likely, but cannot '
-        'rule out a host that runs the change later still. No change to the sound or to saved state. The VST3 '
-        'plug-in, the Audio Unit and the tools are built from the same source as 0.13.20.'
+        'just before the host closed the plug-in (which such a host does whenever the sample rate or block size is '
+        'set) could crash the host. Closing now waits up to 100 ms for the change, as it already did for a Latency '
+        'change. This mitigates the crash rather than ruling it out: a host that runs the change more than 100 ms '
+        'later can still crash. No change to the sound or to saved state. The VST3 plug-in, the Audio Unit and the '
+        'tools are unchanged from 0.13.20 apart from the version number.'
     ),
 )
 TAG = re.compile(r'v(\d+\.\d+\.\d+)')
@@ -183,10 +184,10 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             f'([projects from earlier versions]({docs}/plugins.md#settings)).\n'
             '- Opening a project in an earlier preview: in VST3, a project or preset saved with this version at '
             'Latency 0, the default, is refused as damaged by the first preview, 0.12.12, which plays silence and '
-            'says so in its log, and one saved with Gain mode Estimate or No clipping is refused by every earlier '
-            'preview. In the Audio Unit and LV2, an earlier preview has no Gain mode, so it plays such a project at '
-            'its Gain setting, which can be louder. Projects and presets saved with earlier previews open in this '
-            'one.'
+            'says so in its log, and one saved with Gain mode Estimate or No clipping is refused by every preview '
+            'before 0.13.20. In the Audio Unit and LV2, previews before 0.13.20 have no Gain mode, so they play such '
+            'a project at its Gain setting, which can be louder. Projects and presets saved with earlier previews '
+            'open in this one.'
         ),
         '## Report a problem',
         (
