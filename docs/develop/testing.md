@@ -719,9 +719,12 @@ twenty times slower. LV2, with about twice as many operations, uses one fewer
 its last argument. On one machine in October 2026, `vst3.lifecycle` (Debug,
 no sanitizers) ran 31,170 sequences per layout (31,152 enumerated, the rest
 fixed and seeded), for both layouts in about 30 seconds. The settings
-operations (PLUG-39 step 0, November 2026) raised that to 73,065 per layout:
-about 26 seconds for both in a Release build on the cloud machine, against
-10 seconds before them.
+operations (PLUG-39 step 0, November 2026) are enumerated in sequences of
+up to three operations only (`Options::settings_length`): at every length
+they made 73,065 sequences per layout, and Windows CI's `vst3.lifecycle`
+went from 84 seconds to its 300-second timeout. Limited, they add 2,703
+sequences per layout (33,877), about one second in a Release build on the
+cloud machine.
 
 ## Load timing (PERF-9)
 

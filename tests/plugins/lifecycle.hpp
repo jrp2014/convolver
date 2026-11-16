@@ -222,6 +222,12 @@ struct Start {
 struct Options {
     // Every allowed sequence of up to `length` operations after each start.
     std::size_t length = 4;
+    // Sequences holding a settings operation (gain, latency,
+    // state-A-settings) are enumerated up to this many operations only. A
+    // Latency change builds a processor, and with them at every length the
+    // enumeration took over three and a half times as long on Windows CI.
+    // Seeded and fixed sequences hold them at any length.
+    std::size_t settings_length = 3;
     // Default: configured and empty; unconfigured (formats with `setup`);
     // started with A playing.
     std::vector<Start> starts;

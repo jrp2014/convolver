@@ -379,6 +379,10 @@ bool starving(Op op) {
     return op == Op::state_b_starved || op == Op::state_b_shortage ||
            op == Op::state_malformed_starved;
 }
+// The settings operations, enumerated in shorter sequences (Options).
+bool setting(Op op) {
+    return op == Op::gain || op == Op::latency || op == Op::state_a_settings;
+}
 bool supports(const Format& format, Op op) {
     return op == Op::listen || std::find(format.operations.begin(), format.operations.end(), op) !=
                                    format.operations.end();
@@ -1050,7 +1054,10 @@ std::size_t run(Driver& driver, const Filters& filters, const Options& options) 
         }
         auto ops = start.prologue;
         const auto fixed = ops.size();
-        const std::function<void(const Model&)> visit = [&](const Model& now) {
+        // `with_settings`: the sequence so far holds a settings operation,
+        // so it stops at options.settings_length.
+        const std::function<void(const Model&, bool)> visit = [&](const Model& now,
+                                                                  bool with_settings) {
             if (ops.size() > fixed)
                 one(start.configured, ops, ops.size());
             if (ops.size() == fixed + options.length)
@@ -1058,14 +1065,17 @@ std::size_t run(Driver& driver, const Filters& filters, const Options& options) 
             for (const auto& [op, n] : names) {
                 if (op == Op::listen || starving(op) || !allowed(x, now, op))
                     continue;
+                const bool settings = with_settings || setting(op);
+                if (settings && ops.size() - fixed + 1 > options.settings_length)
+                    continue;
                 Model next = now;
                 apply(x, next, op);
                 ops.push_back(op);
-                visit(next);
+                visit(next, settings);
                 ops.pop_back();
             }
         };
-        visit(m);
+        visit(m, false);
     }
     // Longer seeded sequences, checked after every operation.
     for (unsigned seed = 1; seed <= options.seeds; ++seed) {
