@@ -1207,8 +1207,11 @@ move to the archive.
 - [x] **LV2-9 — Closing waits for a queued Gain mode request.** 16
   November 2026, from pluginval failures on `main`
   ([run 43910524162](https://github.com/jrp2014/convolver/actions/runs/43910524162)):
-  JUCE's LV2 host ran a Gain mode request on the freed instance;
-  `cleanup()` now waits for every request `run()` queues one at a time
+  JUCE's LV2 host ran a Gain mode request on the freed instance, whose
+  mutex glibc then aborted on or blocked JUCE's one worker thread for good
+  (the hang in [run 43912718333](https://github.com/jrp2014/convolver/actions/runs/43912718333)).
+  `cleanup()` waited for a queued Latency alone; it now waits for every
+  request `run()` queues one at a time, PR #198
   ([format notes](docs/develop/plugin-contract.md#format-notes)).
 - [x] **PLUG-5 — One release pipeline.** Done for the previews, 12 November
   2026 (DOC-14): one candidate pipeline packages the VST3 plug-in, the Audio
