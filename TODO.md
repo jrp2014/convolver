@@ -1151,6 +1151,18 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   waiting-time savings, with oracle, regression, validator, platform and
   release checks retained.
 
+- [ ] **CI-39 — Windows core-only steps fail when their build fails.**
+  From CI-38's independent review (16 November 2026): in
+  `.github/workflows/regression.yml`, the two core-only Windows steps run
+  configure, build and CTest in one PowerShell script, which does not stop
+  when a native command fails, so the step's result is CTest's alone. A
+  failed configure leaves no tests (CTest exits 0 without
+  `--no-tests=error`), and a failed build of a target no test runs goes
+  unnoticed. **Done when** a failed configure or build fails its step
+  (for example `$PSNativeCommandUseErrorActionPreference = $true`, or a
+  `$LASTEXITCODE` check after each command), shown by one deliberate
+  failure. Effort S.
+
 - [ ] **CI-32 — Run the most extreme numerical cases less often.** Dormant.
   From jrp's review of 5 November 2026: the largest and most extreme cases
   (`native.kernel_divergence`'s 128k to 512k filters and its noise near
@@ -1212,9 +1224,7 @@ Items finished since then are listed here, one line each, until the next
 move to the archive.
 
 - [x] **CI-38 — Safe CI speedups without restructuring.** 16 November
-  2026, from jrp's request that day: parallel MSVC compiles in the Windows
-  build steps ([compiler cache](docs/develop/testing.md#compiler-cache)),
-  the longest core tests first
+  2026, from jrp's request that day: the longest core tests first
   ([test order](docs/develop/testing.md#build-targets-and-test-order))
   and the advisory pluginval pre-release off pull requests
   ([pre-releases](docs/develop/build.md#pre-releases-and-newer-upstream-versions)).

@@ -1822,7 +1822,7 @@ manual runs save theirs. Each job's log ends with ccache's hit statistics.
 
 The Windows jobs use the Visual Studio generator, which takes no compiler
 launcher, and the release candidates are built without a cache, from the
-corresponding source alone. The native and VST3 Windows jobs instead set
-`CL=/MP` for their build commands only, so the compiler also builds a
-project's files side by side, not just MSBuild's projects (CI-38); the objects are the
-same, and their tests run without it, one process per CPU.
+corresponding source alone. Setting `CL=/MP` for their build commands, so
+the compiler also builds a project's files side by side, was tried on 16
+November 2026 and dropped: the native Windows build was about 25 s faster and
+the VST3 one slower, within the runners' variation (CI-38).
