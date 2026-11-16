@@ -245,15 +245,22 @@ jobs:
       # failure, since a pre-release only signposts what is coming. The one
       # exception is the acceptance test, which needs pluginval 2's `test`
       # command that no full release has yet (docs/develop/testing.md#pluginval).
+      # Pull requests run only that required test here; the advisory runs
+      # are left to pushes to main, the weekly and manual runs (CI-38).
       - name: Newest pluginval pre-release (advisory)
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          ADVISORY: ${{ github.event_name != 'pull_request' }}
         run: |
           # Problems here are warnings, except that the acceptance test must
           # pass while the formal release (pluginval 1) cannot run it.
           required=false
           if [ "${PLUGINVAL_VERSION%%.*}" -lt 2 ]; then required=true; fi
+          if [ "$required" = false ] && [ "$ADVISORY" != true ]; then
+            echo 'Pull request: the advisory pluginval pre-release runs are left to main (CI-38).'
+            exit 0
+          fi
           advise() {
             echo "::warning title=pluginval pre-release::$1"
             echo "**Warning:** $1" >> "$GITHUB_STEP_SUMMARY"
@@ -292,6 +299,7 @@ jobs:
           if [ "${version%%.*}" -lt 2 ]; then
             required=false  # It could not run the acceptance test either.
             advise "pluginval $version cannot run the acceptance test (it needs pluginval 2)."
+            if [ "$ADVISORY" != true ]; then exit 0; fi
           fi
           (cd "$directory" && unzip -q "$archive") ||
             give_up "Cannot unpack pluginval $version; see the log of this step."
@@ -300,7 +308,9 @@ jobs:
           cmake -S . -B build-vst3 "-DCONVOLVER_PLUGINVAL=$directory/$PLUGINVAL_EXECUTABLE" \
             "-DCONVOLVER_PLUGINVAL_ARGS=$arguments" ||
             give_up "Cannot configure the tests with pluginval $version; see the log of this step."
-          if ctest --test-dir build-vst3 -C Release --output-on-failure --no-tests=error \
+          if [ "$ADVISORY" != true ]; then
+            echo 'Pull request: only the required acceptance test runs with the pre-release (CI-38).'
+          elif ctest --test-dir build-vst3 -C Release --output-on-failure --no-tests=error \
             -R '^vst3\.pluginval$' --output-junit advisory-junit.xml; then
             echo "pluginval $version (pre-release): validation passes, as with $PLUGINVAL_VERSION." \
               >> "$GITHUB_STEP_SUMMARY"
@@ -317,7 +327,8 @@ jobs:
               echo "::error::The acceptance test was skipped with pluginval $version."
               exit 1
             fi
-          elif [ "${version%%.*}" -ge 2 ] && ! ctest --test-dir build-vst3 -C Release --output-on-failure \
+          elif [ "$ADVISORY" = true ] && [ "${version%%.*}" -ge 2 ] &&
+            ! ctest --test-dir build-vst3 -C Release --output-on-failure \
             --no-tests=error -R '^vst3\.pluginval\.acceptance$' --output-junit advisory-junit.xml; then
             advise "The acceptance test fails with pluginval $version (pre-release); see the log of this step."
             keep_evidence acceptance

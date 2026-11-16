@@ -31,7 +31,11 @@ Until 1.0 the C++ API may change between minor versions.
   restructuring): the native and VST3 Windows jobs compile each project's
   files side by side (`CL=/MP`) in their build commands only; the compiler,
   flags and tests are unchanged
-  ([compiler cache](docs/develop/testing.md#compiler-cache)).
+  ([compiler cache](docs/develop/testing.md#compiler-cache)). Pull requests
+  no longer run the advisory newest-pluginval pre-release in the VST3,
+  Audio Unit and LV2 workflows; pushes to `main`, the weekly and manual runs
+  still do, and a VST3 pull request still runs the required acceptance test
+  with it ([pre-releases](docs/develop/build.md#pre-releases-and-newer-upstream-versions)).
 
 ## [0.13.24] - 2026-11-16
 

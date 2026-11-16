@@ -176,15 +176,17 @@ jobs:
           python tests/plugins/pluginval.py validate "$PLUGINVAL" \
             "$HOME/Library/Audio/Plug-Ins/Components/Convolver.component" "${options[@]}"
       # A newer beta or release candidate only signposts what is coming:
-      # what it reports is a warning, never a failure.
+      # what it reports is a warning, never a failure. Pushes to main, the
+      # weekly and manual runs check it; pull requests do not (CI-38).
       - name: Newest pluginval pre-release
         id: pluginval-prerelease
+        if: github.event_name != 'pull_request'
         continue-on-error: true
         uses: ./.github/actions/pluginval
         with:
           prerelease: 'true'
       - name: pluginval pre-release (advisory)
-        if: always() && steps.pluginval.outcome == 'success'
+        if: always() && steps.pluginval.outcome == 'success' && github.event_name != 'pull_request'
         env:
           FETCHED: ${{ steps.pluginval-prerelease.outcome }}
           AVAILABLE: ${{ steps.pluginval-prerelease.outputs.available }}

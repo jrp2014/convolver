@@ -535,7 +535,10 @@ exception below).
   the exception: it needs pluginval 2's `test` command, which no full release
   has yet, so it runs with the pre-release and must pass (a skip counts as a
   failure there)
-  ([pluginval](testing.md#pluginval)).
+  ([pluginval](testing.md#pluginval)). The advisory pluginval runs, in the
+  VST3, Audio Unit and LV2 workflows, happen on pushes to `main`, the weekly
+  and manual runs; a pull request runs only the required acceptance test
+  (CI-38).
 - lilv: the formal LV2 tests use Ubuntu 24.04's packages. The **Newest upstream
   lilv (advisory)** job builds the newest versions of lilv, zix, serd, sord
   and sratom (`resolve.py checkout`, from the policy's `test_sources`; a
