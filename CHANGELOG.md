@@ -33,7 +33,9 @@ Until 1.0 the C++ API may change between minor versions.
   configuration lists, measured dither defaults, files from published
   previews kept as upgrade tests (from 0.13.2), and free source for macOS,
   Windows and Linux. Each claim links to the guide, test or measurement
-  that backs it; the preview's limitations follow in their own section.
+  that backs it. A table lists problems users have reported with
+  convolvers that Convolver handles, naming no product, and those still
+  planned; the preview's limitations follow in their own section.
 - Releases: the patch preview's draft notes list what changed since 0.13.20,
   LV2-9's fix alone, and say that the VST3 plug-in, the Audio Unit and the
   tools are unchanged from 0.13.20 apart from the version number. The known
