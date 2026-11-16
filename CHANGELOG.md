@@ -25,6 +25,14 @@ Until 1.0 the C++ API may change between minor versions.
   REL-3's walkthrough and COMPAT-1's REAPER project from 0.13.20 to 0.13.24
   ([decision](docs/project/decisions.md#releases)).
 
+### Changed
+
+- CI (CI-38, john's request of 16 November 2026 for safe speedups without
+  restructuring): the native and VST3 Windows jobs compile each project's
+  files side by side (`CL=/MP`) in their build commands only; the compiler,
+  flags and tests are unchanged
+  ([compiler cache](docs/develop/testing.md#compiler-cache)).
+
 ## [0.13.24] - 2026-11-16
 
 The fifth published preview, a patch of 0.13.20 for macOS, Windows and

@@ -1211,6 +1211,10 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **CI-38 — Safe CI speedups without restructuring.** 16 November
+  2026, from john's request that day: parallel MSVC compiles in the Windows
+  build steps
+  ([compiler cache](docs/develop/testing.md#compiler-cache)).
 - [x] **LV2-9 — Closing waits for a queued Gain mode request.** 16
   November 2026, from pluginval failures on `main`
   ([run 43910524162](https://github.com/jrp2014/convolver/actions/runs/43910524162)):

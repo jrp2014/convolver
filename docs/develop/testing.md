@@ -1819,4 +1819,7 @@ manual runs save theirs. Each job's log ends with ccache's hit statistics.
 
 The Windows jobs use the Visual Studio generator, which takes no compiler
 launcher, and the release candidates are built without a cache, from the
-corresponding source alone.
+corresponding source alone. The native and VST3 Windows jobs instead set
+`CL=/MP` for their build commands only, so the compiler also builds a
+project's files side by side, not just MSBuild's projects (CI-38); the objects are the
+same, and their tests run without it, one process per CPU.

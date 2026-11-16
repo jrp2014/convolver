@@ -202,7 +202,11 @@ jobs:
           "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
           -DVCPKG_TARGET_TRIPLET=x64-windows-static-md -DCONVOLVER_LEGACY_TESTS=OFF
           "-DCONVOLVER_PLUGINVAL=$env:PLUGINVAL"
+      # CI-38: on Windows, /MP (read by cl.exe from CL) compiles a
+      # project's files side by side; the tests below run without it.
       - name: Build actual plugin, preset tool and SDK validator
+        env:
+          CL: ${{ runner.os == 'Windows' && '/MP' || '' }}
         run: cmake --build build-vst3 --config Release ${{ matrix.targets }}
       - name: VST3 validator, pluginval and the VST3 tests
         run: >-
