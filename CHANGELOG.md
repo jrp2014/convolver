@@ -29,7 +29,7 @@ Until 1.0 the C++ API may change between minor versions.
   apart, in a "What sets it apart" section: output checked against an
   independent double-precision convolution, long reverbs with no added
   delay at a measured cost, the Gain mode, failing safe with a Status and
-  log, changes without clicks or lost tails, the `.cfg` format and
+  log, smooth changes during playback, the `.cfg` format and
   configuration lists, measured dither defaults, files from published
   previews kept as upgrade tests (from 0.13.2), and free source for macOS,
   Windows and Linux. Each claim links to the guide, test or measurement

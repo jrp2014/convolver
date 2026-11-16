@@ -69,17 +69,21 @@ Each point links to the guide, test or measurement that backs it, and
   ([gain](docs/use/command-line.md#gain-and-attenuation)).
 - **It fails safe and says why.** A first filter that cannot be loaded
   plays silence, not your unfiltered audio; a replacement that does not
-  fit leaves the playing filter in place; Convolver's own Bypass fades a
-  crossover's outputs to silence, so full-range audio does not reach a
-  tweeter (check which kind of bypass your host's button uses:
-  [bypass](docs/use/plugins.md#bypass)). In VST3 and the Audio Unit, a
+  fit leaves the playing filter in place. For filters with different input
+  and output counts, such as a 2→6 crossover, Convolver's own Bypass fades
+  to silence; a host that takes the plug-in out of the signal path may
+  still route unfiltered audio around it, so check which kind of bypass
+  your host's button uses ([bypass](docs/use/plugins.md#bypass)). In VST3 and the Audio Unit, a
   Status parameter and the Convolver log say why audio is silent and what to do
   ([status and log](docs/use/plugins.md#status-and-the-convolver-log)).
-- **Changes without clicks or lost tails.** A filter loaded during playback
-  crossfades in over 5.3 ms; Gain and Mix changes fade over 1.3 ms; a preset
-  or undo that holds the filter already playing keeps it, and its reverb
-  tail rings on, as long as the Latency is unchanged
-  ([replacing a filter](docs/use/plugins.md#replacing-a-filter)).
+- **Smooth changes during playback.** Gain and Mix changes fade over
+  1.3 ms. A filter loaded during playback crossfades in over 5.3 ms, though
+  the new filter starts without the old one's history. A preset or undo
+  that holds the filter already playing, at the same Latency, keeps it and
+  lets its reverb tail ring on
+  ([replacing a filter](docs/use/plugins.md#replacing-a-filter)). A
+  Latency change restarts processing, which leaves a gap and cuts a tail
+  that is still sounding ([latency and tail](docs/use/plugins.md#latency-and-tail)).
   The host is told the exact latency, and Mix delays the dry signal to line
   up with the filtered one.
 - **The room-correction files people have.** Convolver reads the `.cfg`
@@ -90,8 +94,9 @@ Each point links to the guide, test or measurement that backs it, and
   Windows Convolver? Your `.cfg` files may need a few edits
   ([how](docs/use/other-programs.md#configurations-from-the-old-windows-convolver)).
   A configuration list holds filters for several sample rates and channel
-  counts, and Convolver picks the first that fits (a plug-in when the filter
-  is loaded). `convolver --validate` checks a configuration, and
+  counts: the command-line tool takes the first entry that fits, and a
+  plug-in selects a compatible entry for the host's rate and channels when
+  the filter is loaded ([channels](docs/use/plugins.md#channels)). `convolver --validate` checks a configuration, and
   `--profile portable-paths` whether its paths will work on another
   computer ([check a configuration](docs/use/other-programs.md#check-a-configuration)).
 - **Dither where it can be heard, and nowhere else.** For integer output the
