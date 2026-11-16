@@ -15,13 +15,17 @@
 
 namespace convolver::plugin_test::lifecycle {
 namespace {
-constexpr std::size_t latency = default_host_latency; // The contract's reported latency.
+// The Latency settings the sequences use: the default, the gain and latency
+// operations' other value, and state-A-settings' (contract, settings).
+constexpr std::size_t changed_latency = 64, state_latency = 128;
+constexpr double changed_gain_db = -6, state_gain_db = -12;
+constexpr std::size_t max_latency = state_latency;
 // A replacement's warm-up (the latency) and crossfade (256 frames).
-constexpr std::size_t transition = latency + 256;
+constexpr std::size_t transition = max_latency + 256;
 constexpr std::size_t ramp = 64;   // Bypass and mute ramps.
 constexpr double tolerance = 1e-5; // PLUG-2's tolerance against the oracle.
 
-constexpr std::array<std::pair<Op, const char*>, 25> names{{
+constexpr std::array<std::pair<Op, const char*>, 28> names{{
     {Op::state_a, "state-A"},
     {Op::state_b, "state-B"},
     {Op::state_other_rate, "state-other-rate"},
@@ -31,6 +35,7 @@ constexpr std::array<std::pair<Op, const char*>, 25> names{{
     {Op::state_b_starved, "state-B-starved"},
     {Op::state_b_shortage, "state-B-shortage"},
     {Op::state_malformed_starved, "state-malformed-starved"},
+    {Op::state_a_settings, "state-A-settings"},
     {Op::play, "play"},
     {Op::bypass, "bypass"},
     {Op::reset, "reset"},
@@ -41,6 +46,8 @@ constexpr std::array<std::pair<Op, const char*>, 25> names{{
     {Op::layout, "layout"},
     {Op::setup, "setup"},
     {Op::listen, "listen"},
+    {Op::gain, "gain"},
+    {Op::latency, "latency"},
     {Op::empty_map, "empty-map"},
     {Op::file_a, "file-A"},
     {Op::file_missing, "file-missing"},
@@ -110,6 +117,9 @@ struct Model {
     bool settled_bypass = false;   // Bypass as of that activation or reset (no ramp).
     std::optional<Host> committed; // Known while stopped (activation, played, rendering).
     bool bypass = false;
+    // The settings (PLUG-39 step 0): Gain in dB and Latency in frames.
+    double gain_db = 0;
+    std::size_t latency = default_host_latency;
     // What the instance keeps and saves.
     std::optional<Which> filter;
     bool failed = false; // A failed first load: saved as state version 2.
@@ -181,7 +191,21 @@ void accept(const Context& x, Model& m, std::optional<Which> filter, bool failed
 }
 // Contract, loading and failure: checks on the state itself at once; checks
 // against the host at once when it is known, otherwise at activation.
-void restore(const Context& x, Model& m, std::optional<Which> filter, bool failed, bool malformed) {
+// Contract, settings: VST3's accepted state sets the settings it holds, or
+// the defaults for a state without them; a rejected one changes none. A new
+// Latency while active is a new processor, whose first frames the model does
+// not describe: listening waits until it has settled.
+struct Settings {
+    double gain_db = 0;
+    std::size_t latency = default_host_latency;
+};
+void choose_latency(Model& m, std::size_t frames) {
+    if (m.active && frames != m.latency)
+        m.started = true;
+    m.latency = frames;
+}
+void restore(const Context& x, Model& m, std::optional<Which> filter, bool failed, bool malformed,
+             Settings settings = {}) {
     const auto request = ++m.requests;
     if (malformed)
         return reject(m, HostFailureKind::state_unreadable, request);
@@ -189,6 +213,10 @@ void restore(const Context& x, Model& m, std::optional<Which> filter, bool faile
     if (kind && known(x, m))
         return reject(m, *kind, request);
     accept(x, m, filter, failed, request, false);
+    if (x.format.state_settings) {
+        m.gain_db = settings.gain_db;
+        choose_latency(m, settings.latency);
+    }
     // VST3: restored once the host has started the plug-in with its
     // configuration but before audio has played with it, a filter that does
     // not suit is kept silent, with the reason, as at activation (jrp's
@@ -230,6 +258,8 @@ void apply(const Context& x, Model& m, Op op) {
     switch (op) {
     case Op::state_a:
         return restore(x, m, Which::a, false, false);
+    case Op::state_a_settings:
+        return restore(x, m, Which::a, false, false, {state_gain_db, state_latency});
     case Op::state_b:
         return restore(x, m, Which::b, false, false);
     case Op::state_b_starved:
@@ -262,6 +292,15 @@ void apply(const Context& x, Model& m, Op op) {
     case Op::bypass:
         m.bypass = !m.bypass;
         return;
+    case Op::gain:
+        // Contract, settings: a Gain change ramps; nothing else changes.
+        m.gain_db = m.gain_db == 0 ? changed_gain_db : 0;
+        return;
+    case Op::latency:
+        // Contract, settings: a new Latency is a new processor with the
+        // filter and the other settings unchanged.
+        return choose_latency(m, m.latency == default_host_latency ? changed_latency
+                                                                   : default_host_latency);
     case Op::reset:
         m.started = false;
         m.settled_bypass = m.bypass;
@@ -288,9 +327,13 @@ void apply(const Context& x, Model& m, Op op) {
         // path too. A new instance numbers its requests afresh; restored
         // before the host negotiates, its configuration is not known yet.
         const bool was_active = m.active;
+        // The settings return too: in VST3's state, the Audio Unit's
+        // parameters, and LV2's ports, which the host saves.
         Model next;
         next.host = m.host;
         next.bypass = m.bypass;
+        next.gain_db = m.gain_db;
+        next.latency = m.latency;
         accept(x, next, m.filter, m.failed, ++next.requests, m.path);
         next.bypass = m.bypass;
         m = next;
@@ -336,6 +379,10 @@ bool starving(Op op) {
     return op == Op::state_b_starved || op == Op::state_b_shortage ||
            op == Op::state_malformed_starved;
 }
+// The settings operations, enumerated in shorter sequences (Options).
+bool setting(Op op) {
+    return op == Op::gain || op == Op::latency || op == Op::state_a_settings;
+}
 bool supports(const Format& format, Op op) {
     return op == Op::listen || std::find(format.operations.begin(), format.operations.end(), op) !=
                                    format.operations.end();
@@ -352,6 +399,7 @@ bool allowed(const Context& x, const Model& m, Op op) {
     case Op::reset:
     case Op::stop:
     case Op::bypass:
+    case Op::gain:
     case Op::file_a:
     case Op::file_missing:
     case Op::file_refused:
@@ -413,6 +461,11 @@ Audible audible(const Context& x, const Model& m) {
         return {Audible::silence, {}};
     return {Audible::filter, unfiltered_configuration({h.sample_rate, h.inputs, h.outputs}, false)};
 }
+// Contract, settings: Gain applies to the filtered signal (identity included,
+// which plays as a filter); bypass's dry signal is the untouched input.
+double gain(const Model& m) {
+    return std::pow(10.0, m.gain_db / 20);
+}
 
 std::string describe(const std::optional<Which>& w) {
     if (!w)
@@ -461,11 +514,16 @@ class Runner {
         if (configured)
             m.committed = m.host; // Created as PLUG-2 creates: negotiated and bound.
         driver_.create(filters_.host, configured);
+        audio_guard::take();
         step_ = 0;
         for (const auto op : ops) {
             if (!allowed(x, m, op))
                 throw std::logic_error(std::string("not allowed here: ") + name(op));
             perform(x, m, op);
+            // Audio-thread calls outside the callbacks render() checks (a
+            // parameter-only callback, LV2's run() that delivers a chosen
+            // file, setProcessing) neither allocate nor lock either.
+            quiet(std::string("the audio-thread calls of ") + name(op));
             ++step_;
             if (step_ > unchecked || step_ == ops.size())
                 check(m);
@@ -499,7 +557,7 @@ class Runner {
                 out[c].assign(n, .75f); // Not silence: the plug-in must write every frame.
                 op[c] = out[c].data();
             }
-            audio_guard::take();
+            quiet("the audio-thread calls before a callback");
             const bool ok = driver_.process(ip, op, n);
             const auto counted = audio_guard::take();
             expect(ok, "a callback reported a processing error");
@@ -515,6 +573,15 @@ class Runner {
         }
         return result;
     }
+    // Contract, replacement and threads: nothing on the audio thread
+    // allocates or locks; counts what the guard saw since it was last read.
+    static void quiet(const std::string& what) {
+        const auto counted = audio_guard::take();
+        expect(!counted.allocations, what + " allocated or freed memory " +
+                                         std::to_string(counted.allocations) + " times");
+        expect(!counted.locks,
+               what + " locked a mutex " + std::to_string(counted.locks) + " times");
+    }
     std::vector<float> noise(std::size_t frames, std::size_t channels) {
         std::vector<float> v(frames * channels);
         for (auto& s : v)
@@ -524,10 +591,12 @@ class Runner {
 
     void perform(const Context& x, Model& m, Op op) {
         const auto& f = filters_;
-        const auto state = [&](const std::optional<Configuration>& c, bool failed) {
+        const auto state = [&](const std::optional<Configuration>& c, bool failed,
+                               std::optional<HostSettings> settings = std::nullopt) {
             HostState s;
             s.configuration = c;
             s.failed = failed;
+            s.settings = settings;
             return encode_host_state(s);
         };
         bool accepted = true, expected = true;
@@ -538,11 +607,17 @@ class Runner {
         case Op::state_empty:
         case Op::state_failed:
         case Op::state_malformed:
+        case Op::state_a_settings:
         case Op::empty_map: {
             std::vector<std::byte> bytes;
             if (op == Op::state_a)
                 bytes = state(f.a, false);
-            else if (op == Op::state_b)
+            else if (op == Op::state_a_settings) {
+                HostSettings settings;
+                settings.gain_db = state_gain_db;
+                settings.latency = state_latency;
+                bytes = state(f.a, false, settings);
+            } else if (op == Op::state_b)
                 bytes = state(f.b, false);
             else if (op == Op::state_other_rate)
                 bytes = state(f.other_rate_filter, false);
@@ -579,6 +654,13 @@ class Runner {
         case Op::bypass:
             driver_.set_bypass(!m.bypass);
             break;
+        case Op::gain:
+            driver_.set_gain(m.gain_db == 0 ? changed_gain_db : 0);
+            break;
+        case Op::latency:
+            driver_.set_latency(m.latency == default_host_latency ? changed_latency
+                                                                  : default_host_latency);
+            break;
         case Op::reset:
             driver_.reset();
             break;
@@ -609,6 +691,7 @@ class Runner {
             // control call; an accepted filter keeps playing.
             const bool mutes = refused && m.active && !m.bypass && !m.filter;
             driver_.choose_file(op == Op::file_missing ? f.missing_file : f.a_file, refused);
+            quiet("the run() that delivers the chosen file");
             if (mutes) {
                 // The contract's ramp is 64 frames; the margin covers a
                 // crossfade from an earlier filter that may still be running,
@@ -736,6 +819,20 @@ class Runner {
         if (format_.state_bypass)
             expect(saved.bypass == m.bypass,
                    std::string("saved bypass is ") + (saved.bypass ? "on" : "off"));
+        // Contract, settings and host state: what a host saves now holds the
+        // settings the model says (VST3's in the state already read).
+        if (format_.state_settings)
+            expect(saved.settings.has_value(),
+                   "the saved state holds no settings (since PLUG-35 it always does)");
+        const auto settings = format_.state_settings ? saved.settings : driver_.settings();
+        if (settings) {
+            expect(std::abs(settings->gain_db - m.gain_db) <= 1e-5,
+                   "saved Gain is " + std::to_string(settings->gain_db) + " dB, expected " +
+                       std::to_string(m.gain_db));
+            expect(settings->latency == m.latency,
+                   "saved Latency is " + std::to_string(settings->latency) + " frames, expected " +
+                       std::to_string(m.latency));
+        }
         const auto failure = driver_.failure();
         const auto& want = m.activation_failure ? m.activation_failure : m.load_failure;
         expect(failure.has_value() == want.has_value() &&
@@ -749,6 +846,17 @@ class Runner {
             expect(path == want_path,
                    "saved path is \"" + path + "\", expected \"" + want_path + "\"");
         }
+        // Output ports are read after one refresh, as a host reads them after
+        // a cycle (LV2: two run() calls of no frames, which deliver the
+        // worker's answers and then show them). It is the only processing a
+        // check does, done once and only while active, whatever is read
+        // afterwards, so adding a reading does not change the sequence.
+        if (m.active) {
+            driver_.refresh();
+            const auto counted = audio_guard::take();
+            expect(!counted.allocations && !counted.locks,
+                   "refreshing the output ports (a run() of no frames) allocated or locked");
+        }
         if (format_.status && m.active) {
             // Plan, LV2 adapter design: the status follows the newest request
             // (3 loading while it is queued), then the record.
@@ -760,12 +868,15 @@ class Runner {
             else if (m.filter)
                 want_status = 0;
             const auto status = driver_.status();
-            const auto counted = audio_guard::take();
-            expect(!counted.allocations && !counted.locks,
-                   "a run() of no frames allocated or locked");
             expect(status == want_status, "status port shows " + std::to_string(status) +
                                               ", expected " + std::to_string(want_status));
         }
+        // Contract, settings: the host reads the latency that plays (the
+        // chosen one while inactive).
+        if (const auto reported = driver_.latency())
+            expect(*reported == m.latency, "the host is told the latency is " +
+                                               std::to_string(*reported) + " frames, expected " +
+                                               std::to_string(m.latency));
     }
 
     // A burst of noise, compared with what the model says plays. With no
@@ -777,9 +888,10 @@ class Runner {
         const auto ni = m.host.inputs, no = m.host.outputs;
         const bool direct = !m.started && m.bypass == m.settled_bypass;
         if (!direct)
-            render(m, {}, 2 * latency + transition + 2 * ramp + tail_);
+            render(m, {}, 2 * max_latency + transition + 2 * ramp + tail_);
         constexpr std::size_t burst = 96;
         const auto input = noise(burst, ni);
+        const auto latency = m.latency;
         const auto frames = burst + latency + tail_ + ramp;
         const auto out = render(m, input, frames);
         m.rendered = m.started = true;
@@ -787,7 +899,9 @@ class Runner {
         std::vector<double> want(frames * no);
         if (a.kind == Audible::filter) {
             const auto o = test::oracle(a.configuration, input, latency);
-            std::copy_n(o.begin(), std::min(o.size(), want.size()), want.begin());
+            const auto g = gain(m);
+            for (std::size_t i = 0; i < std::min(o.size(), want.size()); ++i)
+                want[i] = o[i] * g;
         } else if (a.kind == Audible::dry) {
             for (std::size_t t = 0; t < burst; ++t)
                 for (std::size_t c = 0; c < no; ++c)
@@ -802,7 +916,8 @@ class Runner {
         expect(ok, "audible output is not " + a.describe() +
                        (direct ? " from the first frame" : " once settled") + " (filter " +
                        describe(m.filter) + (m.failed ? ", load failed" : "") +
-                       (m.bypass ? ", bypassed" : "") + "; worst difference " +
+                       (m.bypass ? ", bypassed" : "") + ", Gain " + std::to_string(m.gain_db) +
+                       " dB, Latency " + std::to_string(latency) + "; worst difference " +
                        std::to_string(worst) + ")");
         worst_ = std::max(worst_, a.kind == Audible::silence ? 0. : worst);
     }
@@ -953,7 +1068,10 @@ std::size_t run(Driver& driver, const Filters& filters, const Options& options) 
         }
         auto ops = start.prologue;
         const auto fixed = ops.size();
-        const std::function<void(const Model&)> visit = [&](const Model& now) {
+        // `with_settings`: the sequence so far holds a settings operation,
+        // so it stops at options.settings_length.
+        const std::function<void(const Model&, bool)> visit = [&](const Model& now,
+                                                                  bool with_settings) {
             if (ops.size() > fixed)
                 one(start.configured, ops, ops.size());
             if (ops.size() == fixed + options.length)
@@ -961,14 +1079,17 @@ std::size_t run(Driver& driver, const Filters& filters, const Options& options) 
             for (const auto& [op, n] : names) {
                 if (op == Op::listen || starving(op) || !allowed(x, now, op))
                     continue;
+                const bool settings = with_settings || setting(op);
+                if (settings && ops.size() - fixed + 1 > options.settings_length)
+                    continue;
                 Model next = now;
                 apply(x, next, op);
                 ops.push_back(op);
-                visit(next);
+                visit(next, settings);
                 ops.pop_back();
             }
         };
-        visit(m);
+        visit(m, false);
     }
     // Longer seeded sequences, checked after every operation.
     for (unsigned seed = 1; seed <= options.seeds; ++seed) {

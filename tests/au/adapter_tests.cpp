@@ -1266,6 +1266,25 @@ void latency_parameter() {
     restored(state_with(1, 2048), 2048, "state with 2048 frames at position 1");
     restored(state_with(1, 0), 0, "state with 0 frames at position 1");
     restored(state_with(1, 100), 1024, "state with 100 frames");
+    // PLUG-39 step 0, the Latency row of the contract's scope of each change
+    // (VST3's harness case same-filter-new-latency): while a filter plays,
+    // restored state holding that same filter with another Latency builds a
+    // new processor, so the host is told the new latency and the audio has it.
+    {
+        Unit playing;
+        check(playing.configure(48000, 2, 2, 512), "same-filter formats");
+        check(playing.restore(saved), "the filter at 64 frames");
+        check(playing.initialize(), "same-filter initialization");
+        require(impulse_delay(playing) == 64, "the filter does not play at 64 frames");
+        const auto state = state_with(3, 256);
+        check(playing.restore(state), "the same filter with Latency 256");
+        CFRelease(state);
+        require(reports(playing, 256),
+                "the same filter restored with Latency 256 is not reported at 256 frames");
+        require(impulse_delay(playing) == 256,
+                "the same filter restored with Latency 256 does not play at 256 frames");
+        playing.uninitialize();
+    }
     CFRelease(latency_key);
     CFRelease(saved);
     unit.uninitialize();

@@ -14,15 +14,18 @@
 // - the failure record (PLUG-8): its kind, its request number, and whether
 //   the instance plays silence;
 // - the reported path and the status (LV2);
+// - the Gain and Latency settings the instance would save, and the latency it
+//   reports to the host (PLUG-39 step 0), where the format has them;
 // - that the audio callbacks neither allocate nor lock (audio_guard.hpp).
 //
 // What is audible is compared at the end of each sequence (and wherever the
 // sequence listens): silence is played until any transition, ramp and tail is
 // over, then a short noise burst, which must come out as the double-precision
-// oracle of the filter the model says plays (or the latency-delayed dry
-// signal, identity, or exact silence). Every prefix of an enumerated sequence
-// is itself enumerated, so the audible filter is checked after every
-// operation without listening in between, which would change the sequence.
+// oracle of the filter the model says plays, at the model's Gain and Latency
+// (or the latency-delayed dry signal, identity, or exact silence). Every
+// prefix of an enumerated sequence is itself enumerated, so the audible
+// filter is checked after every operation without listening in between,
+// which would change the sequence.
 //
 // The model is plain data and one function per operation (lifecycle.cpp). Each
 // expectation cites the clause of docs/develop/plugin-contract.md or of the
@@ -54,6 +57,8 @@ enum class Op {
     state_malformed_starved, // Malformed state, first with memory running out at
                              // each allocation in turn (ROBUST-3); fixed
                              // sequences only.
+    state_a_settings,        // A, with settings unlike any the host sets
+                             // (Format::state_settings).
     // What a host does.
     play,   // Some audio, in uneven callbacks; may leave a transition running.
     bypass, // Toggle bypass.
@@ -65,6 +70,9 @@ enum class Op {
     layout, // While stopped: switch the host to other output channels, or back.
     setup,  // Negotiate an instance created before the host was configured.
     listen, // Compare what is audible with the model (also done at the end).
+    // Settings (PLUG-39 step 0), as the host sets its parameters.
+    gain,    // While active: toggle Gain between 0 and -6 dB.
+    latency, // Toggle Latency between 0 and 64 frames.
     // LV2.
     empty_map,    // Restore a state map with none of the plug-in's properties.
     file_a,       // Choose A's file on the filter parameter (queued for the worker).
@@ -99,6 +107,10 @@ struct Format {
     bool worker = true;         // LV2: the host provides a worker.
     bool status = false;        // LV2: the status port.
     bool path = false;          // LV2: the saved filter path.
+    // VST3: accepted state sets the settings it holds, or the defaults when
+    // it holds none, and the instance saves them with the filter (contract,
+    // settings). Elsewhere a restore leaves them as the host set them.
+    bool state_settings = false;
 };
 
 // The sample rate and channels a host negotiates.
@@ -153,18 +165,41 @@ class Driver {
     virtual void reset() = 0;
     // As a host reopens a project: saves the session, closes the instance and
     // opens a new one, restores the session (before negotiating, where the
-    // format allows that), negotiates `host`, restores host-owned bypass and
-    // starts it if `active`. True if the restore was accepted.
+    // format allows that), negotiates `host`, restores host-owned bypass (and
+    // the settings, where the host keeps them) and starts it if `active`.
+    // True if the restore was accepted.
     virtual bool reopen(const Host&, bool active, bool bypass) = 0;
     // What the instance would save now.
     virtual HostState saved() = 0;
     virtual std::optional<HostFailure> failure() = 0;
     virtual std::size_t max_block() const = 0;
+    // Settings, for formats that list the gain and latency operations. The
+    // host's parameter change, delivered as the format delivers it (the
+    // VST3 controller's message for Latency; a call with no frames where
+    // parameters reach the audio thread), and done before it returns.
+    virtual void set_gain(double /*db*/) {}
+    virtual void set_latency(std::size_t /*frames*/) {}
+    // The Gain and Latency the instance would save as its parameters (the
+    // Audio Unit); nothing where the host keeps them (LV2's ports) or the
+    // driver has none. Formats with Format::state_settings are read from
+    // saved() instead.
+    virtual std::optional<HostSettings> settings() {
+        return std::nullopt;
+    }
+    // While active, before output ports are read: what a host does to read
+    // them, once per check (LV2: two run() calls of no frames). status() and
+    // latency() only read what it left, so reading never processes.
+    virtual void refresh() {}
+    // The latency in frames the instance reports to the host now; nothing if
+    // the driver cannot read it.
+    virtual std::optional<std::size_t> latency() {
+        return std::nullopt;
+    }
     // LV2.
     virtual std::string saved_path() {
         return {};
     }
-    virtual int status() {
+    virtual int status() { // After refresh().
         return -1;
     }
     virtual bool restore_empty_map() {
@@ -187,6 +222,12 @@ struct Start {
 struct Options {
     // Every allowed sequence of up to `length` operations after each start.
     std::size_t length = 4;
+    // Sequences holding a settings operation (gain, latency,
+    // state-A-settings) are enumerated up to this many operations only. A
+    // Latency change builds a processor, and with them at every length the
+    // enumeration took over three and a half times as long on Windows CI.
+    // Seeded and fixed sequences hold them at any length.
+    std::size_t settings_length = 3;
     // Default: configured and empty; unconfigured (formats with `setup`);
     // started with A playing.
     std::vector<Start> starts;

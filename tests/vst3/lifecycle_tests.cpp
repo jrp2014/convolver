@@ -38,8 +38,10 @@ class Vst3 final : public lc::Driver {
         // known once activated with it and audio has played, while the rate
         // and buses stay the same.
         f.known = lc::Known::played;
-        // Contract, bypass: VST3 saves its bypass parameter with the state.
+        // Contract, bypass and settings: VST3 saves its bypass parameter and
+        // its settings with the state.
         f.state_bypass = true;
+        f.state_settings = true;
         f.operations = {Op::state_a,
                         Op::state_b,
                         Op::state_other_rate,
@@ -57,7 +59,10 @@ class Vst3 final : public lc::Driver {
                         Op::reopen,
                         Op::rate,
                         Op::layout,
-                        Op::setup};
+                        Op::setup,
+                        Op::state_a_settings,
+                        Op::gain,
+                        Op::latency};
         return f;
     }
     void create(const lc::Host& host, bool configured) override {
@@ -141,6 +146,26 @@ class Vst3 final : public lc::Driver {
         changes.addParameterData(convolver::vst3::bypass_id, index)->addPoint(0, on ? 1 : 0, index);
         check(call({}, {}, 0, &changes), "bypass parameter");
     }
+    void set_gain(double db) override {
+        ParameterChanges changes;
+        int32 index = 0;
+        changes.addParameterData(convolver::vst3::gain_id, index)
+            ->addPoint(0, convolver::vst3::normalized_gain(db), index);
+        check(call({}, {}, 0, &changes), "Gain parameter");
+    }
+    // The controller's latency_message, as a new Latency choice sends it.
+    void set_latency(std::size_t frames) override {
+        IPtr<HostMessage> message = owned(new HostMessage);
+        message->setMessageID(convolver::vst3::latency_message);
+        auto* attributes = message->getAttributes();
+        check(attributes && attributes->setInt("frames", static_cast<int64>(frames)) == kResultOk,
+              "latency message");
+        attributes->setInt("request", ++requests_);
+        check(processor_->notify(message) == kResultOk, "latency message");
+    }
+    std::optional<std::size_t> latency() override {
+        return processor_->getLatencySamples();
+    }
     void reset() override {
         guard::Scope audio;
         processor_->setProcessing(false);
@@ -218,7 +243,7 @@ class Vst3 final : public lc::Driver {
     std::size_t inputs_ = 2, outputs_ = 2;
     bool active_ = false;
     std::optional<std::pair<std::size_t, bool>> starve_; // For restore_starved.
-    int64 requests_ = 0;                                 // load_file's message numbers.
+    int64 requests_ = 0; // load_file's and set_latency's message numbers.
 };
 
 // The loading-responsiveness timings (tests/plugins/load_timing.hpp): the
@@ -265,6 +290,11 @@ int main(int argc, char** argv) {
                  // it plays again, is kept (jrp's REAPER retest; c3dbf0d).
                  "start play stop rate start state-A listen stop rate start listen",
                  "start play stop layout start state-A listen stop layout start listen",
+                 // PLUG-39 step 0: state's settings before the host is
+                 // configured, then changed and restored again while the
+                 // same filter plays, and kept by a reopen.
+                 "state-A-settings setup start listen latency gain listen reopen listen",
+                 "start state-A play gain latency play state-A-settings listen state-A listen",
              })
             options.fixed.push_back(lc::parse(s));
         std::size_t failures = 0;

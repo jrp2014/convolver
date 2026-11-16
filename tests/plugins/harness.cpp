@@ -400,6 +400,39 @@ void same_filter_restore(const Context& x) {
     x.adapter.destroy();
 }
 
+// PLUG-39 step 0, from the contract's scope of each change: restored state
+// holding the filter that plays, with a different Latency, builds a new
+// processor (the Latency row) rather than keeping the old one (the row for
+// the filter already playing). The host reads the new latency as soon as
+// the state is accepted, and what plays from then on is the filter at the
+// new latency and the state's Gain from the first frame, with fresh history:
+// nothing of the audio before, not even the long tail that was sounding.
+void same_filter_new_latency(const Context& x) {
+    const auto a = lengthened(x.c());
+    const std::size_t no = a.output_channels;
+    HostSettings settings;
+    settings.latency = 256;
+    settings.gain_db = -6;
+    auto s = x.start(&a);
+    s.render(x.f.input, 0, 1200);
+    const auto accepted = x.adapter.load_with_settings({"same filter", {}, a}, settings);
+    if (!accepted)
+        throw Skipped("the format does not apply restored settings within the restore");
+    require(*accepted, "restoring the same filter with a new Latency was rejected");
+    require(x.adapter.latency_frames() == settings.latency,
+            "the host is told the latency is " + std::to_string(x.adapter.latency_frames()) +
+                " frames after restoring a Latency of " + std::to_string(settings.latency));
+    x.tail_is(test::tail(a), "after restoring the same filter with a new Latency");
+    const auto frames = x.f.frames() + test::tail(a) + 3 * settings.latency;
+    auto expected = test::oracle(a, x.f.input, settings.latency);
+    for (auto& v : expected)
+        v *= std::pow(10.0, settings.gain_db / 20);
+    close(s.render(x.f.input, 0, frames), expected, no,
+          "after restoring the same filter with a new Latency (fresh history, the new latency "
+          "and the state's Gain from the first frame)");
+    x.adapter.destroy();
+}
+
 // The reported tail never shrinks during a session, and is exact again after
 // reactivation, which installs the current filter afresh.
 void tail_after_replacement(const Context& x) {
@@ -676,6 +709,7 @@ int run(Adapter& adapter, const std::filesystem::path& listing, const Options& o
         check(at("live-replacement"), [&] { live_replacement(x); });
         check(at("tail-after-replacement"), [&] { tail_after_replacement(x); });
         check(at("same-filter-restore"), [&] { same_filter_restore(x); });
+        check(at("same-filter-new-latency"), [&] { same_filter_new_latency(x); });
         check(at("failed-replacement"), [&] { failed_replacement(x); });
         check(at("failed-replacement-inactive"), [&] { failed_replacement_inactive(x); });
         check(at("failed-initial-load"), [&] { failed_initial_load(x); });
