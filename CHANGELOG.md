@@ -12,6 +12,12 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Tests (COMPAT-1, in progress): the example presets of the published
+  0.13.20 and the audio its own CLI and VST3 plug-in rendered from them are
+  kept in `tests/upgrade/0.13.20/`, beside 0.13.2's and 0.13.12's;
+  `upgrade.cli` and `vst3.upgrade` check later builds against all three.
+  Every file matches 0.13.12's byte for byte, so 0.13.20 renders those
+  presets exactly as the two earlier previews did.
 - Releases: jrp published Convolver 0.13.20, the fourth unsigned developer
   preview, on 16 November 2026
   ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.20)).

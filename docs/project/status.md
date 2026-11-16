@@ -171,9 +171,9 @@ already met are below; what still needs running is in
 
 At publication, and before the next preview: COMPAT-1 keeps presets, a host
 project and expected audio from the published release, so later previews are
-tested against them. The presets and audio of 0.13.2 and 0.13.12 are kept (the
-same bytes in both); 0.13.20's are not captured yet, and a REAPER project,
-to be saved with 0.13.20, the baseline, is not kept yet. Not part of this milestone, but tracked: signing and
+tested against them. The presets and audio of 0.13.2, 0.13.12 and 0.13.20 are kept
+(the same bytes in all three); a REAPER project, to be saved with 0.13.20,
+the baseline, is not kept yet. Not part of this milestone, but tracked: signing and
 notarization (the production gate, REL-1), resource budgets and
 the wider supported workloads (PERF-3; the loading gate uses its own finite
 preview workloads), other `.cfg` readers

@@ -91,7 +91,7 @@ passes for 0.13, since PERF-2 changed the engine
 | **HOST-1**, **VST3-11** | REAPER and Audacity, status checks 1 to 4 | Host checks on jrp's Mac |
 | **AU-4**, **AU-6** | GarageBand, status checks 5 and 8 | Host checks on jrp's Mac |
 | **PERF-2** | Its focused REAPER and GarageBand session, status check 9; then the CPU indication beside the Latency menu and block sizes tuned on Apple silicon | The session goes ahead. The CPU indication changes the window and the tuning is optimisation, so both wait for the freeze to lift |
-| **COMPAT-1** | Keep presets, a REAPER project and expected audio from the published previews (0.13.2's and 0.13.12's presets and audio are kept, 0.13.20's are owed; the REAPER project is owed from 0.13.20, the baseline), with their own runner and the capture step in the publication steps | Tests and files only |
+| **COMPAT-1** | Keep presets, a REAPER project and expected audio from the published previews (the presets and audio of 0.13.2, 0.13.12 and 0.13.20 are kept; the REAPER project is owed from 0.13.20, the baseline), with their own runner and the capture step in the publication steps | Tests and files only |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **HOST-4** | The check on a real Windows device, now that the Windows package ships `convolver-equalizer-apo` | A check; needs a Windows computer |
 | **VST3-17** | In 0.13.2 and earlier, in Audacity a filter chosen in the window plays but is missing from the export and the saved project. The fix (PR #177) is published in 0.13.12 and checked only by `vst3.adapter`; what remains is jrp's Audacity check on 0.13.20 (status check 10), and until then the guides keep the preset menu as the checked route | Lost state, one of the freeze's exceptions: brought forward and merged without an Audacity check ([decisions](docs/project/decisions.md#plug-in-behaviour)) |
@@ -511,12 +511,13 @@ means a patched FFmpeg build with `--enable-gpl`.
   its version, configuration and flags are unchanged, otherwise within the
   PLUG-2 tolerance (1e-5, scaled by the peak of a file louder than full
   scale; [decision](docs/project/decisions.md#releases)). Never regenerate a
-  kept file; a deliberate incompatibility is jrp's decision. 0.13.2 and
-  0.13.12 are kept (PRs #170, #187), checked by `upgrade.cli` and
-  `vst3.upgrade`, and the capture step is in the
+  kept file; a deliberate incompatibility is jrp's decision. 0.13.2,
+  0.13.12 and 0.13.20 are kept (PRs #170, #187 and this capture's), checked
+  by `upgrade.cli` and `vst3.upgrade`, and the capture step is in the
   [publication steps](docs/develop/releasing.md#publishing-an-unsigned-preview).
-  **Remains:** 0.13.20's presets and audio (the capture step), a REAPER
-  project saved with 0.13.20, the baseline (jrp's Mac session),
+  The three hold the same presets, filters, inputs and expected renders,
+  byte for byte; only the manifests differ.
+  **Remains:** a REAPER project saved with 0.13.20, the baseline (jrp's Mac session),
   with its state chunk restored through each adapter, and Audio Unit state
   from a release. **Done when** both are kept and checked. The guarantees
   it protects are in [status](docs/project/status.md#compatibility-guarantees).
