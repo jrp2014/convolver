@@ -32,46 +32,14 @@ CANDIDATE_WORKFLOW = '.github/workflows/release.yml'
 # in their words; each preview's release-notes change updates both
 # (docs/develop/releasing.md#publishing-an-unsigned-preview). The changelog
 # holds every change.
-PREVIOUS_PREVIEW = '0.13.12'
+PREVIOUS_PREVIEW = '0.13.20'
 CHANGES = (
     (
-        'A new **Gain mode** setting in every plug-in format. **Set** plays Gain as before and is the default. '
-        "**Estimate** plays the filter's own estimate of how far to turn it down, as `convolver --gain-db auto` "
-        'does, and **No clipping** plays the gain at which no input within full scale can clip, as '
-        '`--gain-db no-clip` does; it is not a limiter. Each filter plays at a gain worked out for that filter, '
-        'and the macOS and Windows windows show it beside the menu. Estimate takes a moment for a long filter, '
-        'and plays the No clipping gain until it is ready.'
-    ),
-    (
-        "**Choose…** and dropping a file in Convolver's window (the Audio Unit, and the VST3 plug-in on macOS and "
-        'Windows) also open a Convolver `.vstpreset` from any folder, so a preset no longer has to be installed or '
-        "imported through the host first. Its filter loads as from the host's preset menu, with the Gain, Gain "
-        'mode, Mix and Latency saved in it; a preset from `convolver-preset` holds only a filter and leaves them '
-        'as they are.'
-    ),
-    (
-        'The VST3 plug-in now saves Gain, Mix and Latency in projects and presets even at their defaults, so a '
-        'preset a host saved at the defaults sets them back to the defaults when chosen in the window, as it does '
-        "from the host's preset menu. A preset saved at the defaults by an earlier version still leaves the "
-        'current settings; save it again to have it reset them.'
-    ),
-    (
-        "A file chosen with **Choose…** (or dropped on the window, or set through LV2's Filter parameter) now "
-        "plays on a track with more channels than the filter has inputs, as a preset does: on REAPER's "
-        "six-channel track, the 2→6 crossover's `filter.cfg` now plays. From a configuration list, the entry with "
-        "exactly the host's inputs comes first, otherwise the closest one with fewer; the window and the log say "
-        'which entry played and why.'
-    ),
-    (
-        'During playback, choosing a preset or undoing a change that holds the filter already playing, with only '
-        'Gain, Mix or the Gain mode different, keeps the filter: a tail that is still sounding rings on at the new '
-        'settings instead of stopping. A different filter or Latency, reopening a VST3 project, or the host '
-        'restarting the plug-in still starts it afresh.'
-    ),
-    (
-        'A new guide sets up system-wide filtering on Linux with PipeWire: a Room correction device that runs the '
-        'LV2 plug-in, with a filter for each sample rate from a configuration list. It needs PipeWire 1.6.2 or '
-        'later with its LV2 support, not the PipeWire in Ubuntu 22.04 or 24.04.'
+        'A fix for the LV2 plug-in (Linux): in hosts built on JUCE, pluginval among them, changing the Gain mode '
+        'just before the host closed the plug-in could crash the host. Closing now waits briefly (up to 100 ms) for '
+        'the change, as it already did for a Latency change; that makes the crash much less likely, but cannot '
+        'rule out a host that runs the change later still. No change to the sound or to saved state. The VST3 '
+        'plug-in, the Audio Unit and the tools are built from the same source as 0.13.20.'
     ),
 )
 TAG = re.compile(r'v(\d+\.\d+\.\d+)')
@@ -207,7 +175,7 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             "- In Audacity, Convolver's window (Choose…, Recent or Reload) should now keep the filter for exports and "
             "saved projects, but this has been checked only by automated tests, not yet in Audacity. Audacity's own "
             'preset menu is the route that has been checked.\n'
-            '- New since 0.13.12 and checked only by automated tests: the Gain mode, a `.vstpreset` chosen in the '
+            '- New in 0.13.20 and checked only by automated tests: the Gain mode, a `.vstpreset` chosen in the '
             "window, Choose… on a track with more inputs than the filter's, and a preset or undo that keeps the "
             'playing filter.\n'
             '- Since 0.13, Latency starts at 0 frames. Some projects saved with 0.12.12 at its default of 256 frames '
