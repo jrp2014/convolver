@@ -21,9 +21,10 @@ Until 1.0 the C++ API may change between minor versions.
 - LV2 plug-in (LV2-9): in hosts built on JUCE, pluginval among them,
   changing the Gain mode just before the host closed the plug-in (which
   JUCE's LV2 host does whenever the sample rate or block size is set) could
-  crash the host or leave it hanging. Closing now waits briefly (up to
-  100 ms) for a queued Gain mode change or fault report, as it already did
-  for a Latency change. Present since the Gain mode arrived in 0.13.20. No
+  crash the host. Closing now waits briefly (up to 100 ms) for a queued
+  Gain mode change or fault report, as it already did for a Latency
+  change; this mitigates the crash rather than ruling out every late
+  call. Present since the Gain mode arrived in 0.13.20. No
   change to the sound or to saved state.
 
 ## [0.13.20] - 2026-11-16
