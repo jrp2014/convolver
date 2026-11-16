@@ -30,10 +30,10 @@ Until 1.0 the C++ API may change between minor versions.
   tools are unchanged from 0.13.20 apart from the version number. The known
   limitations now say that the features checked only by automated tests are
   new in 0.13.20, and that it is the previews before 0.13.20 that refuse or
-  play louder a project saved with Gain mode Estimate or No clipping. jrp asked on 16 November
-  2026 for this patch preview so that 0.13.20's Linux LV2 users get the fix
-  ([decision](docs/project/decisions.md#releases)). No change to what the
-  packages run or hold.
+  play louder a project saved with Gain mode Estimate or No clipping. jrp
+  asked on 16 November 2026 for this patch preview so that 0.13.20's Linux
+  LV2 users get the fix ([decision](docs/project/decisions.md#releases)).
+  No change to what the packages run or hold.
 
 ### Fixed
 
