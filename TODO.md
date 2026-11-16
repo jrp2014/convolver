@@ -6,10 +6,12 @@ item. This is the shared backlog, not a promise that every idea will be
 implemented. Finished items are listed briefly under [done](#done); what they
 delivered is described in the guides and the [CHANGELOG](CHANGELOG.md).
 
-**In short:** jrp has published three unsigned previews: 0.12.12 for macOS
+**In short:** jrp has published four unsigned previews: 0.12.12 for macOS
 (8 November 2026), 0.13.2 for macOS, Windows and Linux, with the new audio
-engine (9 November 2026), and [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), which adds the
-Windows VST3 window and the LV2 plug-in (11 November 2026). The runtime
+engine (9 November 2026), [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), which adds the
+Windows VST3 window and the LV2 plug-in (11 November 2026), and
+[0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20), which adds the Gain mode and opening a preset from the
+window (16 November 2026). The runtime
 freeze of 9 November was lifted on 10 November; significant features come
 before corner and edge cases
 ([decision](docs/project/decisions.md#releases)). The
@@ -78,21 +80,21 @@ Checks of what the previews ship, which change no shipped code and so go
 ahead under the freeze, and the known defects users meet.
 [Checks left](docs/project/status.md#checks-left-before-publication) on the
 status page is the one list of the host steps that remain. They and REL-3
-run on the published 0.13.12 files, the baseline jrp chose on 11 November
-2026 in place of 0.13.2; the results recorded on 0.12.x builds are records of those builds, not
+run on the published 0.13.20 files, the baseline jrp chose on 16 November
+2026 in place of 0.13.12; the results recorded on 0.12.x builds are records of those builds, not
 passes for 0.13, since PERF-2 changed the engine
 ([decision](docs/project/decisions.md#releases)).
 
 | Item | What remains | Under the freeze |
 | --- | --- | --- |
-| **REL-3** | The independent walkthrough of the published 0.13.12 files; jrp chooses the tester | Goes ahead. A finding in the freeze's exceptions is fixed at once; the rest joins the preview feedback |
+| **REL-3** | The independent walkthrough of the published 0.13.20 files; jrp chooses the tester | Goes ahead. A finding in the freeze's exceptions is fixed at once; the rest joins the preview feedback |
 | **HOST-1**, **VST3-11** | REAPER and Audacity, status checks 1 to 4 | Host checks on jrp's Mac |
 | **AU-4**, **AU-6** | GarageBand, status checks 5 and 8 | Host checks on jrp's Mac |
 | **PERF-2** | Its focused REAPER and GarageBand session, status check 9; then the CPU indication beside the Latency menu and block sizes tuned on Apple silicon | The session goes ahead. The CPU indication changes the window and the tuning is optimisation, so both wait for the freeze to lift |
-| **COMPAT-1** | Keep presets, a REAPER project and expected audio from the published previews (0.13.2's and 0.13.12's presets and audio are kept; the REAPER project is owed from 0.13.12, the baseline), with their own runner and the capture step in the publication steps | Tests and files only |
+| **COMPAT-1** | Keep presets, a REAPER project and expected audio from the published previews (0.13.2's and 0.13.12's presets and audio are kept, 0.13.20's are owed; the REAPER project is owed from 0.13.20, the baseline), with their own runner and the capture step in the publication steps | Tests and files only |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **HOST-4** | The check on a real Windows device, now that the Windows package ships `convolver-equalizer-apo` | A check; needs a Windows computer |
-| **VST3-17** | In 0.13.2 and earlier, in Audacity a filter chosen in the window plays but is missing from the export and the saved project. The fix (PR #177) is published in 0.13.12 and checked only by `vst3.adapter`; what remains is jrp's Audacity check on 0.13.12 (status check 10), and until then the guides keep the preset menu as the checked route | Lost state, one of the freeze's exceptions: brought forward and merged without an Audacity check ([decisions](docs/project/decisions.md#plug-in-behaviour)) |
+| **VST3-17** | In 0.13.2 and earlier, in Audacity a filter chosen in the window plays but is missing from the export and the saved project. The fix (PR #177) is published in 0.13.12 and checked only by `vst3.adapter`; what remains is jrp's Audacity check on 0.13.20 (status check 10), and until then the guides keep the preset menu as the checked route | Lost state, one of the freeze's exceptions: brought forward and merged without an Audacity check ([decisions](docs/project/decisions.md#plug-in-behaviour)) |
 
 ### 2. Decided or likely, after the freeze
 
@@ -102,11 +104,11 @@ the suggested one.
 
 | Group | Items | Note |
 | --- | --- | --- |
-| Later previews, as decided | **VST3-12** (the Windows window, built: host and screen-reader checks left); **VST3-13** (the Linux window) only once LV2 is in a Linux package and users ask; **PLUG-10** (the meters, starting with the output peak and clipping; the gain modes are built, PR #188) | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the windows' order is [decided](docs/project/decisions.md#direction) in the [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md). The Linux packages use the host's own controls meanwhile; the Windows window shipped in 0.13.12, not yet tried in a host |
+| Later previews, as decided | **VST3-12** (the Windows window, built: host and screen-reader checks left); **VST3-13** (the Linux window) only once LV2 is in a Linux package and users ask; **PLUG-10** (the meters, starting with the output peak and clipping; the gain modes are in 0.13.20, PR #188) | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the windows' order is [decided](docs/project/decisions.md#direction) in the [windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md). The Linux packages use the host's own controls meanwhile; the Windows window shipped in 0.13.12, not yet tried in a host |
 | LV2 in a preview | **LV2-3** and **LV2-4** (LV2-5 and LV2-7 are done) | LV2 is in the Linux package since 0.13.12; a source build was tried in PipeWire 1.6.8 on virtual devices, not yet in a desktop host ([decision](docs/project/decisions.md#releases)) |
 | Other configuration readers | **CFG-1**, then **CFG-2** | CFG-2 waits for CFG-1 to show which readers matter |
 | Only on request | **VST3-2** (switch filters from the host), **VST3-6** (replacing the old VST2 plug-in), **HOST-2** (CLAP), **LV2-6** (an LV2 window); distribution packages and macOS or Windows LV2 bundles (after LV2-5) | Each needs a stated user need and acceptance tests first |
-| Consolidation | **PLUG-39**, the load and restore path, in the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)'s order | After the next preview is published, step 0's protection tests first, so the host sessions test code it has not changed; plan approved by jrp on 13 November 2026 |
+| Consolidation | **PLUG-39**, the load and restore path, in the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)'s order | Now that 0.13.20 is published (16 November 2026), step 0's protection tests first, so the host sessions test code it has not changed; plan approved by jrp on 13 November 2026 |
 | Measurements, then optimisation | **PERF-3**, one measurement exercise (PERF-1's reruns joined it; EDGE-5 publishes its results); then, only where it shows a need, **FFT-2**, **VST3-5** and **PLUG-11** | PERF-3's resource budgets (callback tail latency, peak memory and preparation time while loading, replacing and resetting) decide whether further optimisation is worth doing. Its measurements change no shipped code; the optimisation they might justify waits |
 
 ### 3. Parked and later
@@ -148,7 +150,7 @@ is superseded.
   passed, and jrp publishes it.
 - [ ] **REL-3 — Independent walkthrough of an exact preview.** Someone who
   did not write the code or the guides follows the REL-2 journeys from the
-  published 0.13.12 files (identified by their SHA-256 sums), on their own
+  published 0.13.20 files (identified by their SHA-256 sums), on their own
   machine, using only the documentation; first, as jrp asked on
   8 November 2026, "installing, loading their own filter, saving and
   reopening with only the supplied instructions". jrp chooses the tester.
@@ -178,7 +180,7 @@ is superseded.
   ([host qualification](docs/develop/host-testing.md#steinbergs-sdk-hosts)).
   **Remains:** REAPER and Audacity on jrp's Mac, checks 1 to 4 and 10 in
   [checks left](docs/project/status.md#checks-left-before-publication), on
-  the published 0.13.12 files; then Windows hosts. **Worth doing because**
+  the published 0.13.20 files; then Windows hosts. **Worth doing because**
   a preview's notes can claim only what a host has shown. **Done when**
   each check passes or jrp narrows it, each record keeping what
   [every report](docs/develop/host-testing.md#every-report) lists (package
@@ -239,9 +241,9 @@ Shared work, done once for all three formats:
   in every format (PRs #80, #95, #188;
   [settings](docs/develop/plugin-contract.md#settings)); their host checks
   are in [checks left](docs/project/status.md#checks-left-before-publication)
-  with HOST-1's and AU-4's, except the Gain mode, which no published
-  preview has yet and which is not yet tried in a host: its check joins
-  them with the next preview. **Remains:** meters, starting with the output
+  with HOST-1's and AU-4's, except the Gain mode, first published in
+  0.13.20 and not yet tried in a host: its check joins them on 0.13.20's
+  files. **Remains:** meters, starting with the output
   peak and a count of clipped samples, kept as audio-thread counters and
   shown in each window and in Copy Diagnostics; a callback-load meter only
   if hosts' own CPU displays prove insufficient. **Worth doing when** users
@@ -364,8 +366,8 @@ LV2 (Linux first; also PipeWire system audio):
   reviewed change), diagnostics as a view of state, and
   typed reports and advice. Plan and order approved by jrp on 13 November
   2026, not the implementation: each step's pull request is reviewed and
-  tested on its own. **Worth doing when** the next preview is published,
-  step 0 included. **Done
+  tested on its own. **Worth doing** now that 0.13.20 is published
+  (16 November 2026), step 0 included. **Done
   when** each decision is made once in shared code, each mechanism has one
   implementation and each copied value is derived or written in one place
   (or a step records with jrp why not), with audio, saved state and host
@@ -413,7 +415,7 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   written (`docs/use/plugins.md`, `docs/use/install.md`). **Remains:**
   GarageBand, checks 5 and 8 in
   [checks left](docs/project/status.md#checks-left-before-publication), on
-  the published 0.13.12 files: listening to the presets, Gain and Mix, a
+  the published 0.13.20 files: listening to the presets, Gain and Mix, a
   click on bypass, the track in time after a Latency change, Latency with
   the window open, and VoiceOver; Logic, SoundSource, Live, REAPER and FL
   Studio (with an `.aupreset` from each host's preset menu) only on
@@ -513,7 +515,8 @@ means a patched FFmpeg build with `--enable-gpl`.
   0.13.12 are kept (PRs #170, #187), checked by `upgrade.cli` and
   `vst3.upgrade`, and the capture step is in the
   [publication steps](docs/develop/releasing.md#publishing-an-unsigned-preview).
-  **Remains:** a REAPER project saved with 0.13.12 (jrp's Mac session),
+  **Remains:** 0.13.20's presets and audio (the capture step), a REAPER
+  project saved with 0.13.20, the baseline (jrp's Mac session),
   with its state chunk restored through each adapter, and Audio Unit state
   from a release. **Done when** both are kept and checked. The guarantees
   it protects are in [status](docs/project/status.md#compatibility-guarantees).
@@ -1337,7 +1340,8 @@ move to the archive.
   ([publishing](docs/develop/releasing.md#publishing-an-unsigned-preview),
   [decision](docs/project/decisions.md#releases)). jrp published the first
   such preview, [0.13.2](https://github.com/jrp2014/convolver/releases/tag/v0.13.2), on 9 November 2026, and the
-  next, [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), on 11 November 2026.
+  next, [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), on 11 November 2026, then
+  [0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20) on 16 November 2026.
 - [x] **REL-7 — Apply bounded preview acceptance.** 8 November 2026,
   PRs #156 and #159; jrp published [0.12.12](https://github.com/jrp2014/convolver/releases/tag/v0.12.12) without the remaining
   host checks and REL-3, which stay open under HOST-1, AU-4 and REL-3
