@@ -512,7 +512,7 @@ means a patched FFmpeg build with `--enable-gpl`.
   PLUG-2 tolerance (1e-5, scaled by the peak of a file louder than full
   scale; [decision](docs/project/decisions.md#releases)). Never regenerate a
   kept file; a deliberate incompatibility is jrp's decision. 0.13.2,
-  0.13.12 and 0.13.20 are kept (PRs #170, #187 and this capture's), checked
+  0.13.12 and 0.13.20 are kept (PRs #170, #187, #197), checked
   by `upgrade.cli` and `vst3.upgrade`, and the capture step is in the
   [publication steps](docs/develop/releasing.md#publishing-an-unsigned-preview).
   The three hold the same presets, filters, inputs and expected renders,
