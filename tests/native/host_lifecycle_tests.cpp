@@ -43,7 +43,9 @@ class Reference final : public lc::Driver {
                         Op::reopen,
                         Op::rate,
                         Op::layout,
-                        Op::setup};
+                        Op::setup,
+                        Op::gain,
+                        Op::latency};
         return f;
     }
     void create(const lc::Host& host, bool configured) override {
@@ -52,6 +54,7 @@ class Reference final : public lc::Driver {
         host_ = host;
         bound_ = configured ? std::optional(host) : std::nullopt;
         bypass_ = false;
+        settings_ = {};
     }
     void configure(const lc::Host& host) override {
         host_ = host;
@@ -98,11 +101,7 @@ class Reference final : public lc::Driver {
         return restore(bytes);
     }
     bool start() override {
-        // PLUG-23: activate() may read fewer inputs than the host gives.
-        processor_ = std::make_unique<HostProcessor>(filter_->activate(layout()), max_block(),
-                                                     HostSettings{}, layout().inputs);
-        processor_->set_bypass(bypass_);
-        processor_->reset();
+        build();
         bound_ = host_;
         return true;
     }
@@ -113,10 +112,26 @@ class Reference final : public lc::Driver {
                  std::size_t frames) override {
         guard::Scope audio;
         processor_->set_bypass(bypass_);
+        processor_->set_gain_db(settings_.gain_db);
         return processor_->process(in, out, frames);
     }
     void set_bypass(bool on) override {
         bypass_ = on;
+    }
+    // Contract, settings: Gain reaches the audio thread with the next
+    // callback, as bypass does; a new Latency while active is a new
+    // processor, built with the filter that plays.
+    void set_gain(double db) override {
+        settings_.gain_db = db;
+    }
+    void set_latency(std::size_t frames) override {
+        const bool changed = settings_.latency != frames;
+        settings_.latency = frames;
+        if (processor_ && changed)
+            build();
+    }
+    std::optional<std::size_t> latency() override {
+        return processor_ ? processor_->latency_frames() : settings_.latency;
     }
     void reset() override {
         guard::Scope audio;
@@ -124,7 +139,9 @@ class Reference final : public lc::Driver {
     }
     bool reopen(const lc::Host& host, bool active, bool bypass) override {
         const auto bytes = encode_host_state(saved());
+        const auto settings = settings_; // The host keeps them.
         create(host, false);
+        settings_ = settings;
         const bool accepted = restore(bytes);
         configure(host);
         bypass_ = bypass;
@@ -148,6 +165,13 @@ class Reference final : public lc::Driver {
     }
 
   private:
+    // PLUG-23: activate() may read fewer inputs than the host gives.
+    void build() {
+        processor_ = std::make_unique<HostProcessor>(filter_->activate(layout()), max_block(),
+                                                     settings_, layout().inputs);
+        processor_->set_bypass(bypass_);
+        processor_->reset();
+    }
     HostLayout layout() const {
         return {host_.sample_rate, host_.inputs, host_.outputs};
     }
@@ -161,6 +185,7 @@ class Reference final : public lc::Driver {
     lc::Host host_;
     std::optional<lc::Host> bound_; // The configuration of the last activation.
     bool bypass_ = false;
+    HostSettings settings_; // The host's parameters.
 };
 } // namespace
 
@@ -185,6 +210,10 @@ int main(int argc, char** argv) {
                  // is recorded, before audio and while it plays.
                  "start state-malformed-starved listen",
                  "start play state-malformed-starved listen",
+                 // PLUG-39 step 0: settings changed around replacements, a
+                 // new Latency while active and inactive, and a reopen.
+                 "start state-A play gain latency play state-B listen reopen listen",
+                 "start state-A play latency stop latency start gain listen bypass listen",
              })
             options.fixed.push_back(lc::parse(s));
         std::size_t failures = 0;

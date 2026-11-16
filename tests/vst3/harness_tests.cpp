@@ -68,9 +68,17 @@ class Vst3 final : public test::Adapter {
         processor_.reset();
     }
     bool load(const test::Filter& filter) override {
+        return load(filter, std::nullopt);
+    }
+    std::optional<bool> load_with_settings(const test::Filter& filter,
+                                           const convolver::HostSettings& settings) override {
+        return load(filter, settings);
+    }
+    bool load(const test::Filter& filter, std::optional<convolver::HostSettings> settings) {
         convolver::HostState state;
         state.configuration = filter.configuration;
         state.bypass = bypass_;
+        state.settings = settings;
         MemoryStream stream;
         check(convolver::vst3::write_state(&stream, state), "encode state");
         stream.seek(0, IBStream::kIBSeekSet, nullptr);

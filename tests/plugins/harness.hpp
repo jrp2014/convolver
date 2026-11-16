@@ -66,6 +66,13 @@ class Adapter {
     // Load a filter through the format's own state or parameter mechanism.
     // False means the adapter rejected it (the host would see an error).
     virtual bool load(const Filter&) = 0;
+    // load() with these settings in the same state, for formats whose state
+    // holds the settings (VST3); nothing for the others, whose cases that
+    // need it are skipped (the Audio Unit applies a restored Latency on its
+    // own queue, and LV2's host sets its ports).
+    virtual std::optional<bool> load_with_settings(const Filter&, const HostSettings&) {
+        return std::nullopt;
+    }
     // Start and stop processing (VST3 setActive and setProcessing, LV2
     // activate/deactivate, AU Initialize/Uninitialize).
     virtual bool activate() = 0;
