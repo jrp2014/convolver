@@ -257,6 +257,18 @@ the [success criterion](#success-criterion) allows:
 | `lv2.adapter` `settings_ports()` | `WorkerPoint::latency_built` | A processor for a new Latency built, before it is offered to `run()` | 3 |
 | `lv2.adapter` `worker_loads()` | `WorkerPoint::deactivate_waits` (`wait_until_deactivation_waits()`) | `deactivate()` waiting for the control lock that `work()` holds (PLUG-21) | 3, if deferred reclamation changes what `deactivate()` waits for |
 
+The settings are covered in each format as follows; step 0 added the
+lifecycle operations and both same-filter cases, and left the rest to the
+adapter tests that already had it, rather than model the Audio Unit's
+Latency queue and LV2's worker for Latency in the lifecycle runner:
+
+| Behaviour | Host layer | VST3 | Audio Unit | LV2 |
+| --- | --- | --- | --- | --- |
+| A Gain change: saved, played, kept by a restore that holds no settings and by a reopen | Lifecycle `gain` | Lifecycle `gain` | Lifecycle `gain` | Lifecycle `gain` (the host saves the port) |
+| A Latency change: reported, saved, played | Lifecycle `latency` | Lifecycle `latency` | `au.adapter` `latency_parameter()` | `lv2.adapter` `settings_ports()` |
+| Restored settings applied with the filter | None: no settings in its state | Lifecycle `state-A-settings` (the defaults for a state without them) | `au.adapter` `settings_parameters()` and `latency_parameter()` | None: the host restores the ports |
+| The playing filter restored with another Latency builds a new processor | None | Harness `same-filter-new-latency` | `au.adapter` `latency_parameter()` | Not one request: the restore keeps the filter (`same-filter-restore`) and the worker applies the port's Latency as any other change (`settings_ports()`) |
+
 Apart from these, the tests drive the plug-ins through the hosts'
 interfaces and read what is saved, what plays, what the host is told and
 the failure record (PLUG-8's test-only accessors), all of which the steps

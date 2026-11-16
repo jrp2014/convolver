@@ -179,12 +179,17 @@ class Driver {
     // parameters reach the audio thread), and done before it returns.
     virtual void set_gain(double /*db*/) {}
     virtual void set_latency(std::size_t /*frames*/) {}
-    // The Gain and Latency the instance would save, in its state (VST3) or as
-    // its parameters (the Audio Unit); nothing where the host keeps them
-    // (LV2's ports) or the driver has none.
+    // The Gain and Latency the instance would save as its parameters (the
+    // Audio Unit); nothing where the host keeps them (LV2's ports) or the
+    // driver has none. Formats with Format::state_settings are read from
+    // saved() instead.
     virtual std::optional<HostSettings> settings() {
         return std::nullopt;
     }
+    // While active, before output ports are read: what a host does to read
+    // them, once per check (LV2: two run() calls of no frames). status() and
+    // latency() only read what it left, so reading never processes.
+    virtual void refresh() {}
     // The latency in frames the instance reports to the host now; nothing if
     // the driver cannot read it.
     virtual std::optional<std::size_t> latency() {
@@ -194,7 +199,7 @@ class Driver {
     virtual std::string saved_path() {
         return {};
     }
-    virtual int status() {
+    virtual int status() { // After refresh().
         return -1;
     }
     virtual bool restore_empty_map() {

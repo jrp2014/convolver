@@ -569,7 +569,7 @@ for. Both run the same engine, so the CLI alone could hide a shared defect.
 | `live-replacement` | A replacement starts with fresh history; the old filter plays on for 256 frames, then a 5.33 ms linear crossfade (256 frames at 48 kHz, the fixtures' rate); two loads before the next callback coalesce to the newest |
 | `tail-after-replacement` | Replacing long with short keeps reporting the long tail; reactivation reports the short tail exactly and plays the short filter afresh; replacing short with long raises it again |
 | `same-filter-restore` | During playback, state holding the filter already playing (made 2000 frames longer, so the tail outlasts the crossfade) is restored after the input stops: the tail rings on as if nothing arrived, at the same latency ([scope of each change](plugin-contract.md#scope-of-each-change)); after a reset, the same filter arriving again plays silence. A known deviation in every format from 12 to 13 November 2026, until PLUG-38 |
-| `same-filter-new-latency` | During playback, state holding the filter already playing (lengthened as above) with Latency 256 and Gain −6 dB builds a new processor, as the Latency row of the [scope of each change](plugin-contract.md#scope-of-each-change) says: the host is told 256 frames at once, the tail is the filter's, and from the next frame the filter plays at the new latency and the state's Gain with fresh history, nothing of the earlier audio or its tail (PLUG-39 step 0). Skipped for formats whose state holds no settings (the Audio Unit applies a restored Latency on its own queue, and LV2's host sets its ports) |
+| `same-filter-new-latency` | During playback, state holding the filter already playing (lengthened as above) with Latency 256 and Gain −6 dB builds a new processor, as the Latency row of the [scope of each change](plugin-contract.md#scope-of-each-change) says: the host is told 256 frames at once, the tail is the filter's, and from the next frame the filter plays at the new latency and the state's Gain with fresh history, nothing of the earlier audio or its tail (PLUG-39 step 0). Skipped for formats whose state holds no settings: the Audio Unit applies a restored Latency on its own queue, which `au.adapter`'s `latency_parameter` checks for this case, and LV2's host sets its ports |
 | `failed-replacement` | A filter at the wrong rate, input count or output count is rejected while active; the running filter plays on uninterrupted and stays the saved state |
 | `failed-replacement-inactive` | The same while inactive: rejected at once, and reactivation plays the last valid filter |
 | `failed-initial-load` | A first filter that cannot be used is rejected, nothing is saved, and the instance plays exact silence, never its input; a valid filter loads afterwards |
@@ -695,7 +695,11 @@ layer's driver and VST3 take all three operations. LV2 and the Audio Unit
 take `gain` only: both apply a new Latency on queues of their own (LV2's
 worker, the Audio Unit's Latency queue), which the model does not follow, so
 their Latency is covered by `lv2.adapter` (`settings_ports`) and
-`au.adapter` (`latency_parameter`).
+`au.adapter` (`latency_parameter`, which also restores the playing filter
+with another Latency). Output ports are read after one refresh per check,
+LV2's two `run()` calls of no frames while active, so that reading the
+status and the latency adds no processing to the sequence. VST3's saved
+settings are read from the state the check has already saved.
 
 A failure prints the sequence, for example
 `start state-A play state-empty file-refused listen`, and the check that

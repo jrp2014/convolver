@@ -163,11 +163,6 @@ class Vst3 final : public lc::Driver {
         attributes->setInt("request", ++requests_);
         check(processor_->notify(message) == kResultOk, "latency message");
     }
-    std::optional<convolver::HostSettings> settings() override {
-        const auto state = saved();
-        check(state.settings.has_value(), "saved state with its settings (PLUG-35)");
-        return state.settings;
-    }
     std::optional<std::size_t> latency() override {
         return processor_->getLatencySamples();
     }

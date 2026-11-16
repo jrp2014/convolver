@@ -801,9 +801,12 @@ class Runner {
             expect(saved.bypass == m.bypass,
                    std::string("saved bypass is ") + (saved.bypass ? "on" : "off"));
         // Contract, settings and host state: what a host saves now holds the
-        // settings the model says, and the host reads the latency that plays
-        // (the chosen one while inactive).
-        if (const auto settings = driver_.settings()) {
+        // settings the model says (VST3's in the state already read).
+        if (format_.state_settings)
+            expect(saved.settings.has_value(),
+                   "the saved state holds no settings (since PLUG-35 it always does)");
+        const auto settings = format_.state_settings ? saved.settings : driver_.settings();
+        if (settings) {
             expect(std::abs(settings->gain_db - m.gain_db) <= 1e-5,
                    "saved Gain is " + std::to_string(settings->gain_db) + " dB, expected " +
                        std::to_string(m.gain_db));
@@ -811,10 +814,6 @@ class Runner {
                    "saved Latency is " + std::to_string(settings->latency) + " frames, expected " +
                        std::to_string(m.latency));
         }
-        if (const auto reported = driver_.latency())
-            expect(*reported == m.latency, "the host is told the latency is " +
-                                               std::to_string(*reported) + " frames, expected " +
-                                               std::to_string(m.latency));
         const auto failure = driver_.failure();
         const auto& want = m.activation_failure ? m.activation_failure : m.load_failure;
         expect(failure.has_value() == want.has_value() &&
@@ -828,6 +827,18 @@ class Runner {
             expect(path == want_path,
                    "saved path is \"" + path + "\", expected \"" + want_path + "\"");
         }
+        // Output ports are read after one refresh, as a host reads them after
+        // a cycle (LV2: two run() calls of no frames, which deliver the
+        // worker's answers and then show them). It is the only processing a
+        // check does, done once and only while active, whatever is read
+        // afterwards, so adding a reading does not change the sequence.
+        if (m.active) {
+            audio_guard::take();
+            driver_.refresh();
+            const auto counted = audio_guard::take();
+            expect(!counted.allocations && !counted.locks,
+                   "refreshing the output ports (a run() of no frames) allocated or locked");
+        }
         if (format_.status && m.active) {
             // Plan, LV2 adapter design: the status follows the newest request
             // (3 loading while it is queued), then the record.
@@ -839,12 +850,15 @@ class Runner {
             else if (m.filter)
                 want_status = 0;
             const auto status = driver_.status();
-            const auto counted = audio_guard::take();
-            expect(!counted.allocations && !counted.locks,
-                   "a run() of no frames allocated or locked");
             expect(status == want_status, "status port shows " + std::to_string(status) +
                                               ", expected " + std::to_string(want_status));
         }
+        // Contract, settings: the host reads the latency that plays (the
+        // chosen one while inactive).
+        if (const auto reported = driver_.latency())
+            expect(*reported == m.latency, "the host is told the latency is " +
+                                               std::to_string(*reported) + " frames, expected " +
+                                               std::to_string(m.latency));
     }
 
     // A burst of noise, compared with what the model says plays. With no

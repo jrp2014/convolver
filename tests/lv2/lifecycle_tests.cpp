@@ -169,12 +169,11 @@ class Lv2 final : public lc::Driver {
     void set_gain(double db) override {
         plugin_->gain = static_cast<float>(db);
     }
-    // The latency port, which run() writes; hosts run() with no frames to
-    // read output ports, and only while active.
+    // The latency port as the last run() wrote it; read only while active,
+    // after refresh().
     std::optional<std::size_t> latency() override {
         if (!plugin_->active())
             return std::nullopt;
-        plugin_->run_empty();
         return static_cast<std::size_t>(plugin_->latency);
     }
     void reset() override {
@@ -204,11 +203,13 @@ class Lv2 final : public lc::Driver {
         return {reinterpret_cast<const char*>(v.data()),
                 strnlen(reinterpret_cast<const char*>(v.data()), v.size())};
     }
-    int status() override {
+    void refresh() override {
         // The first run() delivers the worker's answers after it, the
         // second shows them, as a host's next two cycles would.
         plugin_->run_empty();
         plugin_->run_empty();
+    }
+    int status() override {
         return static_cast<int>(plugin_->status);
     }
     std::optional<HostFailure> failure() override {
