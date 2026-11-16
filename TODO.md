@@ -108,7 +108,7 @@ the suggested one.
 | LV2 in a preview | **LV2-3** and **LV2-4** (LV2-5 and LV2-7 are done) | LV2 is in the Linux package since 0.13.12; a source build was tried in PipeWire 1.6.8 on virtual devices, not yet in a desktop host ([decision](docs/project/decisions.md#releases)) |
 | Other configuration readers | **CFG-1**, then **CFG-2** | CFG-2 waits for CFG-1 to show which readers matter |
 | Only on request | **VST3-2** (switch filters from the host), **VST3-6** (replacing the old VST2 plug-in), **HOST-2** (CLAP), **LV2-6** (an LV2 window); distribution packages and macOS or Windows LV2 bundles (after LV2-5) | Each needs a stated user need and acceptance tests first |
-| Consolidation | **PLUG-39**, the load and restore path, in the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)'s order | Now that 0.13.20 is published (16 November 2026), step 0's protection tests first, so the host sessions test code it has not changed; plan approved by jrp on 13 November 2026 |
+| Consolidation | **PLUG-39**, the load and restore path, in the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)'s order | Now that 0.13.20 is published (16 November 2026), step 0's protection tests first (PR #200), so the host sessions test code it has not changed; plan approved by jrp on 13 November 2026 |
 | Measurements, then optimisation | **PERF-3**, one measurement exercise (PERF-1's reruns joined it; EDGE-5 publishes its results); then, only where it shows a need, **FFT-2**, **VST3-5** and **PLUG-11** | PERF-3's resource budgets (callback tail latency, peak memory and preparation time while loading, replacing and resetting) decide whether further optimisation is worth doing. Its measurements change no shipped code; the optimisation they might justify waits |
 
 ### 3. Parked and later
@@ -357,9 +357,13 @@ LV2 (Linux first; also PipeWire system audio):
   each adapter deciding for itself what an accepted request requires (six
   decisions in 15 places), four mechanisms implemented two or three times
   (the playing processor's ownership, when the host has settled, the status
-  ordering and the filter's name) and sixteen values kept as copies. **Remains:** the
+  ordering and the filter's name) and sixteen values kept as copies. Step
+  0's protection tests are in PR #200 (the lifecycle runner's Gain and
+  Latency, the harness's `same-filter-new-latency`, and the
+  [list](docs/project/plans/2026-11-13-load-restore-consolidation.md#protection-for-every-step)
+  of tests that reach into the machinery). **Remains:** the
   [consolidation plan](docs/project/plans/2026-11-13-load-restore-consolidation.md)'s
-  steps 0 to 6: protection first, then one shared decision for each
+  steps 1 to 6: one shared decision for each
   accepted request (building on PLUG-38's `HostPlayback::playing`), one rule
   for when the host has settled, deferred reclamation of the playing
   processor under jrp's four conditions (approved in principle, its own
@@ -367,7 +371,7 @@ LV2 (Linux first; also PipeWire system audio):
   typed reports and advice. Plan and order approved by jrp on 13 November
   2026, not the implementation: each step's pull request is reviewed and
   tested on its own. **Worth doing** now that 0.13.20 is published
-  (16 November 2026), step 0 included. **Done
+  (16 November 2026). **Done
   when** each decision is made once in shared code, each mechanism has one
   implementation and each copied value is derived or written in one place
   (or a step records with jrp why not), with audio, saved state and host

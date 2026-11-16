@@ -569,6 +569,7 @@ for. Both run the same engine, so the CLI alone could hide a shared defect.
 | `live-replacement` | A replacement starts with fresh history; the old filter plays on for 256 frames, then a 5.33 ms linear crossfade (256 frames at 48 kHz, the fixtures' rate); two loads before the next callback coalesce to the newest |
 | `tail-after-replacement` | Replacing long with short keeps reporting the long tail; reactivation reports the short tail exactly and plays the short filter afresh; replacing short with long raises it again |
 | `same-filter-restore` | During playback, state holding the filter already playing (made 2000 frames longer, so the tail outlasts the crossfade) is restored after the input stops: the tail rings on as if nothing arrived, at the same latency ([scope of each change](plugin-contract.md#scope-of-each-change)); after a reset, the same filter arriving again plays silence. A known deviation in every format from 12 to 13 November 2026, until PLUG-38 |
+| `same-filter-new-latency` | During playback, state holding the filter already playing (lengthened as above) with Latency 256 and Gain −6 dB builds a new processor, as the Latency row of the [scope of each change](plugin-contract.md#scope-of-each-change) says: the host is told 256 frames at once, the tail is the filter's, and from the next frame the filter plays at the new latency and the state's Gain with fresh history, nothing of the earlier audio or its tail (PLUG-39 step 0). Skipped for formats whose state holds no settings (the Audio Unit applies a restored Latency on its own queue, and LV2's host sets its ports) |
 | `failed-replacement` | A filter at the wrong rate, input count or output count is rejected while active; the running filter plays on uninterrupted and stays the saved state |
 | `failed-replacement-inactive` | The same while inactive: rejected at once, and reactivation plays the last valid filter |
 | `failed-initial-load` | A first filter that cannot be used is rejected, nothing is saved, and the instance plays exact silence, never its input; a valid filter loads afterwards |
@@ -644,9 +645,14 @@ operation of a fixed or seeded one, it compares with the model:
 - the saved filter, the "load failed" flag and (VST3) the saved bypass;
 - the failure record: its kind, its request number and whether it is silent;
 - LV2's saved filter path and status port;
+- the Gain and Latency the instance would save (VST3's state, the Audio
+  Unit's parameters) and the latency it reports to the host, which is the
+  one that plays, or the chosen one while inactive (PLUG-39 step 0);
 - what is audible. A burst of noise must come out as the double-precision
-  oracle of the filter the model says plays, or as the dry input delayed by
-  the latency, or as exact silence. With no audio since the last activation or
+  oracle of the filter the model says plays, at the model's Gain and
+  Latency, or as the dry input delayed by the latency, or as exact silence.
+  After a new Latency while active the model does not describe the new
+  processor's first frames, so it listens once they have settled. With no audio since the last activation or
   reset, the filter must play from the first frame (direct installation);
   otherwise silence is played first until every ramp and crossfade is over.
   Every prefix of an enumerated sequence is enumerated too, so this covers the
@@ -679,16 +685,28 @@ These are fixed sequences only, at the start of a session, as a replacement,
 while inactive and before the host is configured, because each one restores
 the state some fifty times.
 
+**Settings.** `gain` toggles Gain between 0 and −6 dB while active, as host
+automation does; `latency` toggles Latency between 0 and 64 frames, at any
+time; `state-A-settings` restores filter A with Gain −12 dB and Latency 128
+frames in the state. Accepted VST3 state sets the settings it holds, or the
+defaults when it holds none; in the other formats a restore leaves them as
+the host set them, and a reopen brings them back in every format. The host
+layer's driver and VST3 take all three operations. LV2 and the Audio Unit
+take `gain` only: both apply a new Latency on queues of their own (LV2's
+worker, the Audio Unit's Latency queue), which the model does not follow, so
+their Latency is covered by `lv2.adapter` (`settings_ports`) and
+`au.adapter` (`latency_parameter`).
+
 A failure prints the sequence, for example
 `start state-A play state-empty file-refused listen`, and the check that
 failed; `lifecycle::parse` turns it into a fixed regression.
 
 | Test | Driver | Operations beyond loading state, playing, bypass, reset, stop, start and reopen |
 | --- | --- | --- |
-| `native.host_lifecycle` | `HostFilter` and `HostProcessor` with only what the contract asks of an adapter ([`host_lifecycle_tests.cpp`](../../tests/native/host_lifecycle_tests.cpp)) | Rate and layout changes, negotiation after restoring |
-| `vst3.lifecycle` | The processor through its SDK interfaces ([`lifecycle_tests.cpp`](../../tests/vst3/lifecycle_tests.cpp)) | The same, and bypass saved with the state |
-| `au.lifecycle` | The unit through the Audio Unit API, macOS only ([`lifecycle_tests.cpp`](../../tests/au/lifecycle_tests.cpp)) | The same; formats bind once the unit has rendered |
-| `lv2.lifecycle` | The plug-in through lilv ([`lifecycle_tests.cpp`](../../tests/lv2/lifecycle_tests.cpp)) | The empty state map; filter files queued for a worker that runs only when a sequence says, so a request can be outstanding across any other operation, teardown included; a full worker queue; a request overtaking one the worker is preparing; a host with no worker |
+| `native.host_lifecycle` | `HostFilter` and `HostProcessor` with only what the contract asks of an adapter ([`host_lifecycle_tests.cpp`](../../tests/native/host_lifecycle_tests.cpp)) | Rate and layout changes, negotiation after restoring, Gain and Latency |
+| `vst3.lifecycle` | The processor through its SDK interfaces ([`lifecycle_tests.cpp`](../../tests/vst3/lifecycle_tests.cpp)) | The same, bypass and the settings saved with the state, and state holding settings |
+| `au.lifecycle` | The unit through the Audio Unit API, macOS only ([`lifecycle_tests.cpp`](../../tests/au/lifecycle_tests.cpp)) | Rate and layout changes, negotiation after restoring, and Gain; formats bind once the unit has rendered |
+| `lv2.lifecycle` | The plug-in through lilv ([`lifecycle_tests.cpp`](../../tests/lv2/lifecycle_tests.cpp)) | Gain; the empty state map; filter files queued for a worker that runs only when a sequence says, so a request can be outstanding across any other operation, teardown included; a full worker queue; a request overtaking one the worker is preparing; a host with no worker |
 
 **Length.** `CONVOLVER_LIFECYCLE_LENGTH` sets how many operations are enumerated
 after each start: 4, or 3 in sanitizer builds, where a sequence is ten to
@@ -696,7 +714,10 @@ twenty times slower. LV2, with about twice as many operations, uses one fewer
 (`CONVOLVER_LV2_LIFECYCLE_LENGTH`). Each executable also takes the length as
 its last argument. On one machine in October 2026, `vst3.lifecycle` (Debug,
 no sanitizers) ran 31,170 sequences per layout (31,152 enumerated, the rest
-fixed and seeded), for both layouts in about 30 seconds.
+fixed and seeded), for both layouts in about 30 seconds. The settings
+operations (PLUG-39 step 0, November 2026) raised that to 73,065 per layout:
+about 26 seconds for both in a Release build on the cloud machine, against
+10 seconds before them.
 
 ## Load timing (PERF-9)
 
