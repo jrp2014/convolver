@@ -168,9 +168,9 @@ class PrepareReleaseTests(unittest.TestCase):
         self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/CHANGELOG.md', text)
         # What earlier previews refuse (PLUG-35, jrp's decision of 12 November 2026;
         # the Gain mode's state), and what they play instead in the Audio Unit and LV2.
-        self.assertIn('In the Audio Unit and LV2, an earlier preview has no Gain mode', text)
+        self.assertIn('In the Audio Unit and LV2, previews before 0.13.20 have no Gain mode', text)
         self.assertIn('refused as damaged by the first preview, 0.12.12', text)
-        self.assertIn('Gain mode Estimate or No clipping is refused by every earlier preview', text)
+        self.assertIn('Gain mode Estimate or No clipping is refused by every preview before 0.13.20', text)
         # What changed since the previous preview, one line per change.
         self.assertIn(f'Since {prepare_release.PREVIOUS_PREVIEW}:', text)
         for change in prepare_release.CHANGES:

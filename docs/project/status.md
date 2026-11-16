@@ -247,7 +247,11 @@ by 0.13.11) ([decision](decisions.md#releases)); he published it,
 [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), on 11 November 2026. On 14 November 2026 he asked
 for a fourth on the same terms, from the tag that PR #192's release notes
 made ([decision](decisions.md#releases)); he published it,
-[0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20), on 16 November 2026. On 9 November 2026 he made the
+[0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20), on 16 November 2026. The same day he asked for a
+patch preview with LV2-9's fix, so that 0.13.20's Linux LV2 users get it,
+from the tag that PR #199's release notes make
+([decision](decisions.md#releases)); it changes only the LV2 plug-in, and
+the baseline below stays 0.13.20 unless he moves it. On 9 November 2026 he made the
 published 0.13 preview (0.13.2) the baseline, and on 11 November 2026 moved
 it to 0.13.12, which holds the Audacity fix, the Windows window and LV2: the
 checks left and REL-3 ran on 0.13.12's exact files. On 16 November 2026 he
