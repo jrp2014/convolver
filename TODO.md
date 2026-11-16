@@ -172,6 +172,14 @@ is superseded.
   2026); the old SourceForge website stays as it is. Remaining, at each
   preview: the steps after publishing; for 0.13.12, which adds a format
   (LV2), the community posts and the LV2 list proposal those steps name.
+- [ ] **DOC-15 — Say what sets Convolver apart in the README.** jrp,
+  16 November 2026: "Update the README to refine the USP of this filter.
+  Most reverbs have similar guts, but we have spent a lot of efforts on
+  refinements. Sell them!", with every claim verifiable. **Remains:** the
+  README's opening names the refinements already built, each linked to the
+  guide, test or measurement that backs it, describes Convolver's niche
+  without comparing it with other products, and keeps the preview's
+  limitations visible. **Done when** jrp approves the wording.
 - [ ] **HOST-1 — Named host matrix.** Versions and results for the named
   hosts: scan, load, preset and state restore, silence and tails, seek,
   variable callbacks, bypass, filter changes, multiple instances and
