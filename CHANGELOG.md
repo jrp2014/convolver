@@ -26,14 +26,15 @@ Until 1.0 the C++ API may change between minor versions.
 ### Changed
 
 - Documentation (DOC-15): the README's opening says what sets Convolver
-  apart, in a "What sets it apart" section: faithful filtering checked
-  against an independent double-precision convolution, efficient
-  zero-latency processing, routing for room correction and crossovers, and
-  diagnostics and safe failure, then the Gain mode, smoothed changes,
-  measured dither defaults, upgrade checks and free source for macOS,
-  Windows and Linux. Each claim links to the guide, test or measurement
-  behind it; the preview's limitations follow in their own section. The
-  download and latest-preview links name 0.13.24.
+  apart, in a "What sets it apart" section under jrp's four emphases:
+  accurate (checked against an independent double-precision convolution),
+  light on the system (no added delay at a measured cost), robust (the
+  shared lifecycle tests, safe failure and upgrade checks) and behaves as
+  you'd expect (smoothed changes, exact latency, Status and log); then
+  routing, the Gain mode, measured dither defaults and free source for
+  macOS, Windows and Linux. Each claim links to the guide, test or
+  measurement behind it; the preview's limitations follow in their own
+  section. The download and latest-preview links name 0.13.24.
 - Releases: the patch preview's draft notes list what changed since 0.13.20,
   LV2-9's fix alone, and say that the VST3 plug-in, the Audio Unit and the
   tools are unchanged from 0.13.20 apart from the version number. The known

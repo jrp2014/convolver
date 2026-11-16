@@ -26,34 +26,63 @@ a configuration list naming several of them.
 Convolver's niche is playing a filter faithfully, to within float
 rounding: a room correction, a crossover or a reverb's impulse response,
 with no colouring of its own. Convolution itself is a well-known technique;
-most of the effort here has gone into the refinements around it. Each
-point links to the guide, test or measurement behind it, and
-[preview status](#preview-status) says what has not yet been tried.
+the effort here has gone into making it accurate, light on the system,
+robust and unsurprising. Each point links to the guide, test or measurement
+behind it, and [preview status](#preview-status) says what has not yet been
+tried.
 
-- **Faithful filtering, checked.** Automated tests on Linux, macOS and
-  Windows compare the engine's output with a double-precision convolution
-  written independently of it. The recorded results for the current engine
-  are a worst difference of 5.2e-7 of the output's peak (about −126 dB) in
-  those tests ([changelog](CHANGELOG.md#0132---2026-11-09)), and within 4e-6
-  (about −108 dB) in long stress and soak runs
+- **Accurate.** Automated tests on Linux, macOS and Windows compare the
+  engine's output with a double-precision convolution written independently
+  of it. The recorded results for the current engine are a worst difference
+  of 5.2e-7 of the output's peak (about −126 dB) in those tests
+  ([changelog](CHANGELOG.md#0132---2026-11-09)), and within 4e-6 (about
+  −108 dB) in long stress and soak runs
   ([testing](docs/develop/testing.md#native-production-tests)). Each
   plug-in format gives the command-line tool's samples for the bundled
-  examples ([plug-in comparisons](docs/develop/testing.md#plug-in-comparisons-plug-2)),
-  and `convolver --compare` checks a host's render against the expected
-  file ([check a stereo filter in a host](docs/use/check-a-stereo-filter.md)).
-- **Efficient zero-latency processing.** By default Convolver adds no
-  processing delay: it sums a filter's first taps directly and spreads the
-  work of its larger blocks over the callbacks in between
-  ([latency and tail](docs/use/plugins.md#latency-and-tail)). In jrp's
-  recorded comparison on an Apple silicon Mac (8 November 2026, 0.13.0),
-  at a Latency of 256 frames, this engine used 15 to 17 times less
+  examples, and `convolver --compare` checks a host's render against the
+  expected file ([check a stereo filter in a host](docs/use/check-a-stereo-filter.md)).
+- **Light on the system.** By default Convolver adds no processing delay:
+  it sums a filter's first taps directly and spreads the work of its larger
+  blocks over the callbacks in between
+  ([latency and tail](docs/use/plugins.md#latency-and-tail)). In a
+  benchmark on a Linux cloud machine at Latency 0, a 30-second stereo
+  reverb used under 2% of one core and a 30-second 2→6 crossover, with six
+  paths, about 5.5%
+  ([measurements](docs/develop/fft-measurements.md#the-non-uniform-engine)).
+  In jrp's recorded comparison on an Apple silicon Mac (8 November 2026,
+  0.13.0), at a Latency of 256 frames, the engine used 15 to 17 times less
   processor time for 30-second filters than the first preview's engine
-  ([measurements](docs/develop/fft-measurements.md#on-apple-silicon)); in
-  a benchmark on a Linux cloud machine, a 30-second stereo reverb at
-  Latency 0 used under 2% of one core
-  ([threads and cores](docs/develop/architecture.md#threads-and-cores)).
-  The Latency setting trades delay for processor time when you are not
+  ([measurements](docs/develop/fft-measurements.md#on-apple-silicon)). The
+  Latency setting trades delay for processor time when you are not
   monitoring live.
+- **Robust.** Every plug-in format is held to the same lifecycle tests:
+  loading before and after the host starts, restoring saved projects,
+  replacing and refusing filters, bypass, reset, variable buffer sizes and
+  input that is not a finite number
+  ([plug-in comparisons](docs/develop/testing.md#plug-in-comparisons-plug-2)).
+  A first filter that cannot be loaded plays silence, not your unfiltered
+  audio, and a replacement that does not fit leaves the playing filter in
+  place. For filters with different input and output counts, such as a
+  2→6 crossover, Convolver's own bypass fades to silence instead of
+  passing unfiltered audio; a host that takes the plug-in out of the signal
+  path can still route audio around it, so check which kind of bypass your
+  host's button uses ([bypass](docs/use/plugins.md#bypass)). From 0.13.2
+  on, each published preview's example presets and renders are kept, and
+  every later build's command-line tool and VST3 plug-in must reproduce
+  them within a stated tolerance ([upgrade tests](tests/upgrade/README.md)).
+- **Behaves as you'd expect.** Changes are smoothed, with tails preserved
+  for settings-only updates: Gain and Mix ramp over 1.3 ms, and a new
+  filter crossfades in over 5.3 ms, starting with fresh history; a Latency
+  change restarts processing and leaves a gap
+  ([replacing a filter](docs/use/plugins.md#replacing-a-filter)). The host
+  is told the exact latency, and Mix delays the dry signal to line up with
+  the filtered one ([settings](docs/use/plugins.md#settings)). In VST3 and
+  the Audio Unit, a Status parameter and the Convolver log say why audio is
+  silent and what to do
+  ([status and log](docs/use/plugins.md#status-and-the-convolver-log)).
+
+Also:
+
 - **Routing for room correction and crossovers.** Convolver reads the
   `.cfg` format of the old Windows Convolver (version 3.0 and later), with
   matrix routing, fractional gains and delays; Roon, JRiver and Audiolense
@@ -65,34 +94,13 @@ point links to the guide, test or measurement behind it, and
   `convolver --validate` checks a configuration, and `--profile
   portable-paths` warns about common portability problems
   ([check a configuration](docs/use/other-programs.md#check-a-configuration)).
-- **Diagnostics and safe failure.** In VST3 and the Audio Unit, a Status
-  parameter and the Convolver log say why audio is silent and what to do
-  ([status and log](docs/use/plugins.md#status-and-the-convolver-log)). A
-  first filter that cannot be loaded plays silence, not your unfiltered
-  audio, and a replacement that does not fit leaves the playing filter in
-  place. For filters with different input and output counts, such as a
-  2→6 crossover, Convolver's own bypass fades to silence instead of
-  passing unfiltered audio; a host that takes the plug-in out of the signal
-  path can still route audio around it, so check which kind of bypass your
-  host's button uses ([bypass](docs/use/plugins.md#bypass)).
-
-Also:
-
 - **A level that suits each filter.** The Gain mode plays your Gain, a
   noise-based estimate, or the gain at which no input within full scale can
   clip, worked out from the filter's taps ([settings](docs/use/plugins.md#settings));
   the command-line tool has `--gain-db auto` and `no-clip`
   ([gain](docs/use/command-line.md#gain-and-attenuation)).
-- **Smoothed changes, with tails preserved for settings-only updates.**
-  Gain and Mix ramp over 1.3 ms, and a new filter crossfades in over
-  5.3 ms, starting with fresh history; a Latency change restarts processing
-  and leaves a gap ([replacing a filter](docs/use/plugins.md#replacing-a-filter)).
 - **Dither defaults informed by measurement** for the command-line tool's
   integer output ([dither](docs/use/command-line.md#integer-formats-dither-and-noise-shaping)).
-- **Upgrade checks.** From 0.13.2 on, each published preview's example
-  presets and renders are kept, and every later build's command-line tool
-  and VST3 plug-in must reproduce them within a stated tolerance
-  ([upgrade tests](tests/upgrade/README.md)).
 - **Free, on macOS, Windows and Linux:** GPL source, no copy protection or
   account, and the same engine in every format.
 
