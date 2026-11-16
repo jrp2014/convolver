@@ -525,6 +525,11 @@ void status_and_log(host::World& world, const Fixture& f) {
         static_cast<void>(render(*d, invalid, 2000, 300));
         check(d->queued_work() == 1 && d->run_deferred_work() == 1,
               label + "deferred: a fault after reactivation still reports");
+        // LV2-9: freed as JUCE's host does, with a report still queued:
+        // cleanup() waits for it, as for a Latency request.
+        static_cast<void>(render(*d, invalid, 2000, 300));
+        check(d->queued_work() == 1 && d->free_before_queued_work() == 0,
+              label + "deferred: cleanup() waits for a queued fault report");
     }
 
     // Without log:log, messages go to stderr and nothing breaks.
@@ -2099,6 +2104,17 @@ void settings_ports(host::World& world, const fs::path& work) {
         p->run_empty();
         check(p->queued_work() == 1 && p->free_before_queued_work() == 0,
               "settings: cleanup() waits for work the host queued before freeing");
+    }
+    // LV2-9: the same for a Gain mode request, which pluginval's Automation
+    // test queues in JUCE's host just before it frees the instance.
+    {
+        auto p = worker_instance(world, Worker::deferred);
+        p->activate();
+        p->run_empty();
+        p->gain_mode = 1;
+        p->run_empty();
+        check(p->queued_work() == 1 && p->free_before_queued_work() == 0,
+              "settings: cleanup() waits for a Gain mode request the host queued");
     }
 }
 

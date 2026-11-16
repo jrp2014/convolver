@@ -1179,15 +1179,22 @@ How each adapter meets the contract where its format differs:
   A narrow fix for one host family: JUCE's LV2 host (pluginval, and hosts
   built on it) ignores `pprops:notAutomatic`, destroys the instance at every
   `prepareToPlay`, and still runs work it queued after `cleanup()`, on the
-  freed instance. `cleanup()` therefore waits, up to 100 ms, for a queued
-  Latency request to be worked (`wait_for_queued_latency` in
-  `plugins/lv2/plugin.cpp`). It is narrow because file and fault requests
-  are not waited for: they follow a person's choice or a rare fault, and
-  waiting for them would slow every host that drops queued work on closing,
-  as the specification lets it. It is not a guarantee: JUCE runs one worker
-  thread for every LV2 instance in the process, so another plug-in's work
-  lasting over 100 ms can still leave a queued Latency request to run after
-  the instance is freed.
+  freed instance. `cleanup()` therefore waits, up to 100 ms, for every
+  request that `run()` queues one at a time by itself to be worked: a
+  Latency, a Gain mode and a fault report (`wait_for_queued_requests` in
+  `plugins/lv2/plugin.cpp`). Until LV2-9 it waited for the Latency alone,
+  so a Gain mode request that pluginval's Automation test queued just
+  before it freed the instance locked the freed instance's mutex: glibc
+  aborted, or JUCE's one worker thread blocked for good and the next test
+  timed out (CI runs 43910524162 and 43912718333 on 16 November 2026). It
+  is narrow because file requests are not waited for: they follow a
+  person's choice, several can be queued, and waiting for them would slow
+  every host that drops queued work on closing, as the specification lets
+  it. It is not a guarantee: JUCE runs one worker thread for every LV2
+  instance in the process, so another plug-in's work lasting over 100 ms
+  can still leave a queued request to run after the instance is freed, and
+  a request queued before a deactivation and activation in the same
+  instance is no longer counted.
   It needs `urid:map`, uses `work:schedule` to load files, logs through
   `log:log` (otherwise standard error), and reads `bufsz:maxBlockLength` from
   `options` when given; without it, or for longer `run()` calls, it processes in

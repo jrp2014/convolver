@@ -1115,7 +1115,7 @@ python3 tests/au/avaudioengine_tests.py build-au/convolver-preset
   without one, one Latency request queued at a time, a value chosen again
   after the worker read a newer one, a first load refused while a new
   Latency is built, and teardown before a worker that, like JUCE's, still
-  runs a queued Latency request);
+  runs a queued Latency or Gain mode request, or fault report: LV2-9);
   deactivation and teardown at each pause point
   (PLUG-21: `work()` held after reading, after preparation and after its
   last check while another thread deactivates, and released only once
