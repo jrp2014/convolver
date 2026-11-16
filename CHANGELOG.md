@@ -13,6 +13,27 @@ Until 1.0 the C++ API may change between minor versions.
 ### Added
 
 - Tests (COMPAT-1, in progress): the example presets of the published
+  0.13.24 and the audio its own CLI and VST3 plug-in rendered from them are
+  kept in `tests/upgrade/0.13.24/`, beside those of 0.13.2, 0.13.12 and
+  0.13.20; `upgrade.cli` and `vst3.upgrade` check later builds against all
+  four. Every preset, filter, input and expected render matches 0.13.20's
+  byte for byte, as expected of a patch that changed only the LV2 plug-in.
+- Releases: jrp published Convolver 0.13.24, the fifth unsigned developer
+  preview and a patch of 0.13.20 with LV2-9's fix, on 16 November 2026
+  ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.24)). He then moved the baseline for the checks left,
+  REL-3's walkthrough and COMPAT-1's REAPER project from 0.13.20 to 0.13.24
+  ([decision](docs/project/decisions.md#releases)).
+
+## [0.13.24] - 2026-11-16
+
+The fifth published preview, a patch of 0.13.20 for macOS, Windows and
+Linux, unsigned: it fixes a host crash in the LV2 plug-in after a Gain mode
+change; the VST3 plug-in, the Audio Unit and the tools are unchanged apart
+from the version number ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.24)).
+
+### Added
+
+- Tests (COMPAT-1, in progress): the example presets of the published
   0.13.20 and the audio its own CLI and VST3 plug-in rendered from them are
   kept in `tests/upgrade/0.13.20/`, beside 0.13.2's and 0.13.12's;
   `upgrade.cli` and `vst3.upgrade` check later builds against all three.
@@ -2344,7 +2365,8 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.13.20...HEAD
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.13.24...HEAD
+[0.13.24]: https://github.com/jrp2014/convolver/releases/tag/v0.13.24
 [0.13.20]: https://github.com/jrp2014/convolver/releases/tag/v0.13.20
 [0.13.12]: https://github.com/jrp2014/convolver/releases/tag/v0.13.12
 [0.13.2]: https://github.com/jrp2014/convolver/releases/tag/v0.13.2
