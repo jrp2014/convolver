@@ -109,6 +109,27 @@ Each point links to the guide, test or measurement that backs it, and
 - **Free, on macOS, Windows and Linux.** GPL source, no copy protection or
   account, and the same engine in every format.
 
+### Problems users have reported
+
+People choosing a convolver have described the problems below in public
+forums and vendors' help pages, gathered on 7 November 2026 in the
+[edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#limitations-users-cite).
+They are general to convolvers rather than to one product. This is how
+Convolver handles each:
+
+| Reported | What Convolver does |
+| --- | --- |
+| Long reverbs cause processor spikes or dropouts at small host buffers | Spreads the work of its large blocks over the callbacks between them: with a 30-second filter at 64-frame callbacks, the 99th-percentile callback stayed under a tenth of the period ([measurements](docs/develop/fft-measurements.md#the-non-uniform-engine)) |
+| Zero latency costs processor time and cannot be turned off | Zero latency is the default; the Latency setting (64 to 4096 frames) trades delay for processor time, and its cost is published ([latency and tail](docs/use/plugins.md#latency-and-tail)) |
+| A bounce faster than real time drops out when convolution runs on a background thread | Processes within the host's own call, on the host's audio thread, so a bounce cannot outrun it ([threads and cores](docs/develop/architecture.md#threads-and-cores)) |
+| A convolver does not say what went wrong | The Status parameter and the Convolver log say why audio is silent and what to do ([status and log](docs/use/plugins.md#status-and-the-convolver-log)) |
+| The length shown is not the filter's | The window and `convolver --inspect` show the decoded length of what is loaded ([window](docs/use/plugins.md#convolvers-window), [inspection](docs/use/command-line.md#inspecting-and-validating-configurations)) |
+| A filter resampled to another rate changes level or clips | Never resamples a filter: a configuration list holds one per sample rate, and a filter for another rate is refused with a message rather than resampled ([configuration lists](docs/use/configuration.md#paths-and-configuration-lists)) |
+
+Other reported problems are not yet addressed: memory per instance,
+true-stereo reverb files without a `.cfg`, and the delay of long
+linear-phase filters. They are planned in [TODO](TODO.md#edges-over-other-convolvers).
+
 Because it plays the response you give it as it is, Convolver brings no
 library of sampled spaces and no controls that reshape a reverb's decay or
 tone; you bring the filter.
