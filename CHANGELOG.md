@@ -20,15 +20,16 @@ Until 1.0 the C++ API may change between minor versions.
   byte for byte, as expected of a patch that changed only the LV2 plug-in.
 - Releases: jrp published Convolver 0.13.24, the fifth unsigned developer
   preview and a patch of 0.13.20 with LV2-9's fix, on 16 November 2026
-  ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.24)). He then moved the baseline for the checks left,
+  ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.24)).
+  Before publishing it he asked to move the baseline for the checks left,
   REL-3's walkthrough and COMPAT-1's REAPER project from 0.13.20 to 0.13.24
   ([decision](docs/project/decisions.md#releases)).
 
 ## [0.13.24] - 2026-11-16
 
 The fifth published preview, a patch of 0.13.20 for macOS, Windows and
-Linux, unsigned: it fixes a host crash in the LV2 plug-in after a Gain mode
-change; the VST3 plug-in, the Audio Unit and the tools are unchanged apart
+Linux, unsigned: it mitigates a host crash in the LV2 plug-in after a Gain
+mode change; the VST3 plug-in, the Audio Unit and the tools are unchanged apart
 from the version number ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.24)).
 
 ### Added

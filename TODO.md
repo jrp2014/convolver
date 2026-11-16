@@ -95,7 +95,7 @@ passes for 0.13, since PERF-2 changed the engine
 | **COMPAT-1** | Keep presets, a REAPER project and expected audio from the published previews (the presets and audio of 0.13.2, 0.13.12, 0.13.20 and 0.13.24 are kept; the REAPER project is owed from 0.13.24, the baseline), with their own runner and the capture step in the publication steps | Tests and files only |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **HOST-4** | The check on a real Windows device, now that the Windows package ships `convolver-equalizer-apo` | A check; needs a Windows computer |
-| **VST3-17** | In 0.13.2 and earlier, in Audacity a filter chosen in the window plays but is missing from the export and the saved project. The fix (PR #177) is published in 0.13.12 and checked only by `vst3.adapter`; what remains is jrp's Audacity check on 0.13.20 (status check 10), and until then the guides keep the preset menu as the checked route | Lost state, one of the freeze's exceptions: brought forward and merged without an Audacity check ([decisions](docs/project/decisions.md#plug-in-behaviour)) |
+| **VST3-17** | In 0.13.2 and earlier, in Audacity a filter chosen in the window plays but is missing from the export and the saved project. The fix (PR #177) is published in 0.13.12 and checked only by `vst3.adapter`; what remains is jrp's Audacity check on 0.13.24 (status check 10), and until then the guides keep the preset menu as the checked route | Lost state, one of the freeze's exceptions: brought forward and merged without an Audacity check ([decisions](docs/project/decisions.md#plug-in-behaviour)) |
 
 ### 2. Decided or likely, after the freeze
 
@@ -513,8 +513,8 @@ means a patched FFmpeg build with `--enable-gpl`.
   PLUG-2 tolerance (1e-5, scaled by the peak of a file louder than full
   scale; [decision](docs/project/decisions.md#releases)). Never regenerate a
   kept file; a deliberate incompatibility is jrp's decision. 0.13.2,
-  0.13.12, 0.13.20 and 0.13.24 are kept (PRs #170, #187, #197 and the
-  0.13.24 records change), checked
+  0.13.12, 0.13.20 and 0.13.24 are kept (PRs #170, #187, #197 and
+  #202), checked
   by `upgrade.cli` and `vst3.upgrade`, and the capture step is in the
   [publication steps](docs/develop/releasing.md#publishing-an-unsigned-preview).
   The four hold the same presets, filters, inputs and expected renders,

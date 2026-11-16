@@ -20,7 +20,7 @@ opening a Convolver `.vstpreset` in the window (PLUG-26), VST3 state that
 records the settings at their defaults (PLUG-35), **Choose…** on wider input
 buses (PLUG-33) and a preset or undo that keeps the playing filter's tail
 (PLUG-38), with the PipeWire guide (LV2-4), and the patch [0.13.24](https://github.com/jrp2014/convolver/releases/tag/v0.13.24) (16 November),
-which fixes a host crash in the LV2 plug-in after a Gain mode change (LV2-9).
+which mitigates a host crash in the LV2 plug-in after a Gain mode change (LV2-9).
 Each was published without the remaining host checks and the
 independent walkthrough, which stay open; nobody has yet tried the new
 engine or the Windows window in a host, and LV2 only in PipeWire 1.6.8
@@ -258,8 +258,8 @@ published 0.13 preview (0.13.2) the baseline, and on 11 November 2026 moved
 it to 0.13.12, which holds the Audacity fix, the Windows window and LV2: the
 checks left and REL-3 ran on 0.13.12's exact files. On 16 November 2026 he
 moved it to 0.13.20, which holds the PLUG-33 and PLUG-38 fixes and the Gain
-mode, and after publishing 0.13.24 moved it again to 0.13.24, which differs
-from 0.13.20 only in the LV2 plug-in: the checks left and REL-3 run on
+mode; before publishing 0.13.24 he asked to move it again, to 0.13.24, which
+differs from 0.13.20 only in the LV2 plug-in: the checks left and REL-3 run on
 0.13.24's exact files, and the
 v0.12.8 results in the table below are records of that build, not passes
 for 0.13 ([decision](decisions.md#releases)).
@@ -284,7 +284,7 @@ next published preview.
 | 3 | REAPER: the stereo journey (three `convolver --compare` results) and the 2→6 crossover (render, Mix 0% still filtered, bypass silent, save and reopen, refused presets), each following its guide | REAPER steps 10 and 12 | 25 min | Not run since DOC-10 rewrote the guides |
 | 4 | Audacity, through its preset menu only (jrp narrowed it, [decision](decisions.md#plug-in-behaviour)): packaged presets from the all-users folder and one made from your own filter with `convolver-preset`; listening; an export compared with the CLI; save, quit, reopen and export again; a refused preset with a stop and start; a mono track; a Latency change; the window's layout. HOST-1 also lists VoiceOver and a tail longer than the clip (see the narrowing below) | [Prepare the Mac](../develop/host-testing.md#prepare-the-mac) step 3; [Audacity](../develop/host-testing.md#audacity-vst3) steps 1 to 8 and 10; step 9 only for the window's layout, Gain, Mix and Latency | 30 min | **Failed:** a filter chosen with **Choose…** was missing from the export (VST3-17, fixed in 0.13.12; check 10 checks the fix, and this check keeps the preset menu, the route jrp narrowed Audacity to). The window shows, not clipped. The rest open |
 | 5 | GarageBand: a packaged preset and save and reopen (what PLUG-31 touches); listening to the presets, Gain and Mix; a click on bypass; whether the track stays in time after a Latency change; **Recent** and **Reload**; VoiceOver on the window | [GarageBand](../develop/host-testing.md#garageband-audio-unit) steps 4 to 6, 9 and 10; AU-6 | 20 min | Packaged preset with save and reopen, **Recent** and **Reload** passed on v0.12.8. Listening, the bypass click, the in-time check and VoiceOver open |
-| 6 | The exact candidate: the candidates workflow on the preview's tag passes, and the draft release's clean-machine checks pass | [Releasing](../develop/releasing.md#candidates); gate 6 | CI | **Passed** for 0.13.12: [run 43000575335](https://github.com/jrp2014/convolver/actions/runs/43000575335), then the draft workflow's [run 43005198506](https://github.com/jrp2014/convolver/actions/runs/43005198506) |
+| 6 | The exact candidate: the candidates workflow on the preview's tag passes, and the draft release's clean-machine checks pass | [Releasing](../develop/releasing.md#candidates); gate 6 | CI | **Passed** for 0.13.24: [run 43960807616](https://github.com/jrp2014/convolver/actions/runs/43960807616), then the draft workflow's [run 43965531349](https://github.com/jrp2014/convolver/actions/runs/43965531349) |
 | 8 | GarageBand with the Audio Unit's window open: change Latency stopped and while playing, then save and reopen (AU-17, PR #158, changed how the unit tells the host about latency) | GarageBand steps 4 to 6 with the window open | 5 min | Not run (after v0.12.8) |
 | 7 | The independent walkthrough of 0.13.24: install, load their own filter, save and reopen, with only the supplied instructions; then the REL-2 journeys (stereo, 2→6 crossover, file rendering) from the package | REL-3 | the tester | Not started |
 | 9 | PERF-2's focused session on 0.13.24: a long filter at Latency 0 by ear in REAPER and GarageBand, Latency changes and filter replacement while playing, projects saved by 0.12.12 reopening at the Latency the [plug-in guide](../use/plugins.md#settings) gives, and a saved Latency of 1024 reopening in time | PERF-2 in [TODO](../../TODO.md) | 30 min | Not run (0.13.2, 0.13.12, 0.13.20 and 0.13.24 published without it) |
@@ -329,11 +329,11 @@ than checked.
   through **Choose…** and its preset played. Fixed in [0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20)
   (PLUG-33, [PR #184](https://github.com/jrp2014/convolver/pull/184)) and checked only by
   `native.filter_file`, `vst3.adapter` and `au.editor`; the **Choose…**
-  checks on a six-channel track need 0.13.20's files.
+  checks on a six-channel track need the baseline's files (0.13.24).
 - Fixed after the v0.12.8 checks, at jrp's request: in REAPER, after a
   refused preset, the heading changed from the playing filter's name to
   "Restored filter" (audio was right). The fix changes plug-in code after
-  v0.12.8, so REAPER's refusal step (check 2) runs again on 0.13.20.
+  v0.12.8, so REAPER's refusal step (check 2) runs again on 0.13.24.
 
 **Fixed in [0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20)**: a preset a host saved at the
 default settings, chosen in the window, now resets Gain, Mix and Latency as

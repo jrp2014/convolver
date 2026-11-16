@@ -28,7 +28,7 @@ unsigned pre-release for macOS, Windows and Linux. Its VST3 plug-in has a
 window on macOS and Windows and uses the host's controls on Linux, and the
 Linux package holds the LV2 plug-in. 0.13.20 added a Gain mode setting (Estimate
 and No clipping as well as Set) and opening a Convolver preset from the window,
-and 0.13.24 fixes a crash in the LV2 plug-in. It was
+and 0.13.24 makes a host crash in the LV2 plug-in much less likely. It was
 published before anyone listened to the new audio engine (since 0.13) or
 tried the Windows window, LV2 or 0.13.20's new features in a host, and
 before an independent user's walkthrough, which are still to come
