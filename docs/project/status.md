@@ -29,12 +29,12 @@ plug-ins are implemented and tested automatically; all three plug-ins have
 Gain, Mix and Latency, VST3 and the Audio Unit share one window on macOS,
 and VST3 has its own on Windows. jrp ran the VST3 plug-in in REAPER (6 to 8
 November) and Audacity (7 November), and the Audio Unit in GarageBand (up to
-8 November), all on 0.12.x builds; since 0.13.12 is the baseline, those
+8 November), all on 0.12.x builds; since 0.13.20 is the baseline, those
 results are records, not passes for 0.13
 ([decision](decisions.md#releases)). Loading responsiveness qualified on
 his MacBook Pro with the 0.12.5 source (REL-6, gate 5). No independent
 user has followed the instructions. The next milestone is an independent
-user installing and using the published 0.13.12 (REL-3).
+user installing and using the published 0.13.20 (REL-3).
 [Checks left](#checks-left-before-publication) is the one list of what
 remains to be run; [what still blocked the first preview](#what-still-blocks-the-first-preview)
 keeps that preview's gates as a record.
@@ -143,8 +143,9 @@ with the lifecycle regression fixed and the advertised workflows demonstrated.
 The first preview is macOS-only ([decisions](decisions.md#plug-in-behaviour)):
 the VST3 plug-in and the Audio Unit with the existing shared window and their
 Gain, Mix and Latency settings, the `convolver` CLI and the preset tool. The
-Windows window followed in the third, 0.13.12 (VST3-12); the Linux
-window, the other gain modes and the meters come in later previews. LV2 joined the Linux package with its packaging and settings
+Windows window followed in the third, 0.13.12 (VST3-12), and the other
+gain modes in the fourth, 0.13.20 (PR #188); the Linux window and the meters
+come in later previews. LV2 joined the Linux package with its packaging and settings
 (LV2-5, LV2-7; [decisions](decisions.md#releases)). The
 Windows and Linux packages are published from the second preview (VST3
 with the host's controls and the tools; from 0.13.12 the Windows VST3 has
@@ -171,8 +172,8 @@ already met are below; what still needs running is in
 At publication, and before the next preview: COMPAT-1 keeps presets, a host
 project and expected audio from the published release, so later previews are
 tested against them. The presets and audio of 0.13.2 and 0.13.12 are kept (the
-same bytes in both); a REAPER project, to be saved with 0.13.12, is not
-kept yet. Not part of this milestone, but tracked: signing and
+same bytes in both); 0.13.20's are not captured yet, and a REAPER project,
+to be saved with 0.13.20, the baseline, is not kept yet. Not part of this milestone, but tracked: signing and
 notarization (the production gate, REL-1), resource budgets and
 the wider supported workloads (PERF-3; the loading gate uses its own finite
 preview workloads), other `.cfg` readers
@@ -182,7 +183,7 @@ preview workloads), other `.cfg` readers
 
 This section keeps the first preview's gates as they stood when jrp
 published it on 8 November 2026, so the gate numbers hold; it is a record,
-not a list of open work. What remains, on 0.13.12, is in
+not a list of open work. What remains, on 0.13.20, is in
 [checks left](#checks-left-before-publication).
 
 jrp [decided](decisions.md#releases) on 8 November 2026 to publish the
@@ -245,20 +246,21 @@ the same for a third preview, once the changes in flight are in
 by 0.13.11) ([decision](decisions.md#releases)); he published it,
 [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), on 11 November 2026. On 14 November 2026 he asked
 for a fourth on the same terms, from the tag that PR #192's release notes
-made; the checks left stay on 0.13.12 unless he moves the baseline
-([decision](decisions.md#releases)); he published it,
+made ([decision](decisions.md#releases)); he published it,
 [0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20), on 16 November 2026. On 9 November 2026 he made the
 published 0.13 preview (0.13.2) the baseline, and on 11 November 2026 moved
 it to 0.13.12, which holds the Audacity fix, the Windows window and LV2: the
-checks left and REL-3 run on 0.13.12's exact files, and the v0.12.8 results
-in the table below are records of that build, not passes for 0.13
-([decision](decisions.md#releases)).
+checks left and REL-3 ran on 0.13.12's exact files. On 16 November 2026 he
+moved it to 0.13.20, which holds the PLUG-33 and PLUG-38 fixes and the Gain
+mode: the checks left and REL-3 run on 0.13.20's exact files, and the
+v0.12.8 results in the table below are records of that build, not passes
+for 0.13 ([decision](decisions.md#releases)).
 
 This is the one list of what remains (REL-7), from jrp's direction of
 8 November 2026: finish the genuinely missing listening, host and
 independent-user checks, or narrow the preview's claims where he defers a
 requirement, without repeating checks already accepted or another general
-review. Every check runs on the published 0.13.12 files, the baseline
+review. Every check runs on the published 0.13.20 files, the baseline
 ([decision](decisions.md#releases)); each record gives the package's
 SHA-256. The last column gives the latest result: from the v0.12.8
 candidate ([run 42506723627](https://github.com/jrp2014/convolver/actions/runs/42506723627)) unless it says otherwise,
@@ -276,8 +278,8 @@ next published preview.
 | 5 | GarageBand: a packaged preset and save and reopen (what PLUG-31 touches); listening to the presets, Gain and Mix; a click on bypass; whether the track stays in time after a Latency change; **Recent** and **Reload**; VoiceOver on the window | [GarageBand](../develop/host-testing.md#garageband-audio-unit) steps 4 to 6, 9 and 10; AU-6 | 20 min | Packaged preset with save and reopen, **Recent** and **Reload** passed on v0.12.8. Listening, the bypass click, the in-time check and VoiceOver open |
 | 6 | The exact candidate: the candidates workflow on the preview's tag passes, and the draft release's clean-machine checks pass | [Releasing](../develop/releasing.md#candidates); gate 6 | CI | **Passed** for 0.13.12: [run 43000575335](https://github.com/jrp2014/convolver/actions/runs/43000575335), then the draft workflow's [run 43005198506](https://github.com/jrp2014/convolver/actions/runs/43005198506) |
 | 8 | GarageBand with the Audio Unit's window open: change Latency stopped and while playing, then save and reopen (AU-17, PR #158, changed how the unit tells the host about latency) | GarageBand steps 4 to 6 with the window open | 5 min | Not run (after v0.12.8) |
-| 7 | The independent walkthrough of 0.13.12: install, load their own filter, save and reopen, with only the supplied instructions; then the REL-2 journeys (stereo, 2→6 crossover, file rendering) from the package | REL-3 | the tester | Not started |
-| 9 | PERF-2's focused session on 0.13.12: a long filter at Latency 0 by ear in REAPER and GarageBand, Latency changes and filter replacement while playing, projects saved by 0.12.12 reopening at the Latency the [plug-in guide](../use/plugins.md#settings) gives, and a saved Latency of 1024 reopening in time | PERF-2 in [TODO](../../TODO.md) | 30 min | Not run (0.13.2 and 0.13.12 published without it) |
+| 7 | The independent walkthrough of 0.13.20: install, load their own filter, save and reopen, with only the supplied instructions; then the REL-2 journeys (stereo, 2→6 crossover, file rendering) from the package | REL-3 | the tester | Not started |
+| 9 | PERF-2's focused session on 0.13.20: a long filter at Latency 0 by ear in REAPER and GarageBand, Latency changes and filter replacement while playing, projects saved by 0.12.12 reopening at the Latency the [plug-in guide](../use/plugins.md#settings) gives, and a saved Latency of 1024 reopening in time | PERF-2 in [TODO](../../TODO.md) | 30 min | Not run (0.13.2, 0.13.12 and 0.13.20 published without it) |
 | 10 | Audacity, the fix for VST3-17: choose the stereo example's `filter.cfg` with **Choose…**, touch no setting, export without playing, compare with the CLI; save, quit, reopen and export again | [Audacity](../develop/host-testing.md#audacity-vst3) step 11 | 10 min | Not run (the fix is first published in 0.13.12) |
 
 Not repeated, and kept as records of their builds rather than passes for
@@ -323,7 +325,7 @@ than checked.
 - Fixed after the v0.12.8 checks, at jrp's request: in REAPER, after a
   refused preset, the heading changed from the playing filter's name to
   "Restored filter" (audio was right). The fix changes plug-in code after
-  v0.12.8, so REAPER's refusal step (check 2) runs again on 0.13.12.
+  v0.12.8, so REAPER's refusal step (check 2) runs again on 0.13.20.
 
 **Fixed in [0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20)**: a preset a host saved at the
 default settings, chosen in the window, now resets Gain, Mix and Latency as

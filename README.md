@@ -26,8 +26,8 @@ edits ([how](docs/use/other-programs.md#configurations-from-the-old-windows-conv
 Convolver is a developer preview: the latest, [0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20), is an
 unsigned pre-release for macOS, Windows and Linux. Its VST3 plug-in has a
 window on macOS and Windows and uses the host's controls on Linux, and the
-Linux package holds the LV2 plug-in. 0.13.20 adds a Gain mode (Estimate or
-No clipping) and opening a Convolver preset from the window. It was
+Linux package holds the LV2 plug-in. 0.13.20 adds a Gain mode setting (Estimate
+and No clipping as well as Set) and opening a Convolver preset from the window. It was
 published before anyone listened to the new audio engine (since 0.13) or
 tried the Windows window, LV2 or 0.13.20's new features in a host, and
 before an independent user's walkthrough, which are still to come
