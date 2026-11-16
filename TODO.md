@@ -1212,8 +1212,10 @@ Items finished since then are listed here, one line each, until the next
 move to the archive.
 
 - [x] **CI-38 — Safe CI speedups without restructuring.** 16 November
-  2026, from john's request that day: parallel MSVC compiles in the Windows
-  build steps ([compiler cache](docs/develop/testing.md#compiler-cache))
+  2026, from jrp's request that day: parallel MSVC compiles in the Windows
+  build steps ([compiler cache](docs/develop/testing.md#compiler-cache)),
+  the longest core tests first
+  ([test order](docs/develop/testing.md#build-targets-and-test-order))
   and the advisory pluginval pre-release off pull requests
   ([pre-releases](docs/develop/build.md#pre-releases-and-newer-upstream-versions)).
 - [x] **LV2-9 — Closing waits for a queued Gain mode request.** 16

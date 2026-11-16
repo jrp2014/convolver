@@ -642,10 +642,13 @@ if(CONVOLVER_BUILD_TESTS)
     # CI-9: ctest --parallel starts the costliest ready tests first, so the
     # long ones do not start late and finish last. Each COST is about the
     # test's longest time in CI, in seconds (macOS Debug with sanitizers, 25
-    # October 2026). Fixture setups still run before the tests that need them.
-    # A name not defined in this build is skipped, so rename tests here too.
-    set(test_costs compatibility.corpus 45 native.fft_planning 40 native.limits 28
-        native.kernel_divergence 25 native.cli 22 native.host_settings 20 native.host_lifecycle 20)
+    # October 2026; native.engine_stress, native.engine and native.host on 16
+    # November 2026, CI-38). Fixture setups still run before the tests that
+    # need them. A name not defined in this build is skipped, so rename tests
+    # here too.
+    set(test_costs native.engine_stress 75 compatibility.corpus 45 native.fft_planning 40
+        native.engine 40 native.host 35 native.limits 28 native.kernel_divergence 25 native.cli 22
+        native.host_settings 20 native.host_lifecycle 20)
     while(test_costs)
         list(POP_FRONT test_costs test_name test_cost)
         if(TEST ${test_name})
