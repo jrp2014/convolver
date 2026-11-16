@@ -16,6 +16,17 @@ Until 1.0 the C++ API may change between minor versions.
   preview, on 16 November 2026
   ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.20)).
 
+### Fixed
+
+- LV2 plug-in (LV2-9): in hosts built on JUCE, pluginval among them,
+  changing the Gain mode just before the host closed the plug-in (which
+  JUCE's LV2 host does whenever the sample rate or block size is set) could
+  crash the host. Closing now waits briefly (up to 100 ms) for a queued
+  Gain mode change or fault report, as it already did for a Latency
+  change; this mitigates the crash rather than ruling out every late
+  call. Present since the Gain mode arrived in 0.13.20. No
+  change to the sound or to saved state.
+
 ## [0.13.20] - 2026-11-16
 
 The fourth published preview: macOS, Windows and Linux, unsigned, adding

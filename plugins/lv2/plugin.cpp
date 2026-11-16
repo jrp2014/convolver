@@ -41,12 +41,14 @@
 // from the next activation. One Latency request waits at a time, and work()
 // builds the newest Latency, so automating it does not flood the worker.
 //
-// cleanup() waits for a queued Latency request (up to 100 ms): JUCE's LV2
+// cleanup() waits (up to 100 ms) for the requests run() queues one at a time
+// by itself: a Latency, a Gain mode (LV2-9) or a fault report. JUCE's LV2
 // host (pluginval, and hosts built on JUCE) runs queued work even after it
 // has destroyed the instance, and destroys it whenever the sample rate or
-// block size is set, so automating Latency there could crash. File and fault
-// requests are not waited for: they follow a person's choice or a rare
-// fault, and other hosts drop queued work when they close a plug-in.
+// block size is set, so automating Latency or the Gain mode there could
+// crash. File requests are not waited for: they follow a person's choice,
+// several can be queued, and other hosts drop queued work when they close a
+// plug-in.
 #include "plugin.hpp"
 #include "convolver/host.hpp"
 #include "convolver/io.hpp"
@@ -1167,18 +1169,21 @@ void deactivate(LV2_Handle handle) {
     }
 }
 
-// Waits until the worker has worked a queued Latency request and no work()
-// call is in progress. Gives up after 100 ms of waiting for a request no
-// call has taken, as with a host that dropped its queue on deactivation,
-// which LV2 allows (JUCE's worker looks for work every millisecond). Without
-// the control lock, which work() takes.
-void wait_for_queued_latency(const Instance& p) noexcept {
+// Waits until the worker has worked every queued request that run() queues
+// one at a time (a Latency, a Gain mode, a fault report) and no work() call
+// is in progress. Gives up after 100 ms of waiting for a request no call has
+// taken, as with a host that dropped its queue on deactivation, which LV2
+// allows (JUCE's worker looks for work every millisecond). Without the
+// control lock, which work() takes.
+void wait_for_queued_requests(const Instance& p) noexcept {
     using clock = std::chrono::steady_clock;
     constexpr auto patience = std::chrono::milliseconds(100);
     auto since = clock::now();
     for (;;) {
-        // The flag first: work() counts itself before it clears it.
-        const bool queued = p.latency_queued.load(std::memory_order_acquire);
+        // The flags first: work() counts itself before it clears one.
+        const bool queued = p.latency_queued.load(std::memory_order_acquire) ||
+                            p.gain_mode_queued.load(std::memory_order_acquire) ||
+                            p.fault_report_queued.load(std::memory_order_acquire);
         if (p.working.load(std::memory_order_acquire) > 0)
             since = clock::now();
         else if (!queued || clock::now() - since > patience)
@@ -1200,7 +1205,7 @@ void cleanup(LV2_Handle handle) {
         // LV2 requires the host to stop calling work() before cleanup(), but
         // JUCE's host still works what it queued, on the freed instance.
         // With `closing` set, such a call returns at once.
-        wait_for_queued_latency(*p);
+        wait_for_queued_requests(*p);
     } catch (...) {
     }
     delete p;
