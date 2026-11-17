@@ -172,15 +172,17 @@ jobs:
           PLUGINVAL: ${{ steps.pluginval.outputs.path }}
         run: python tests/lv2/pluginval_tests.py "$PLUGINVAL" build-lv2/lv2/convolver.lv2
       # A newer beta or release candidate only signposts what is coming:
-      # what it reports is a warning, never a failure.
+      # what it reports is a warning, never a failure. Pushes to main, the
+      # weekly and manual runs check it; pull requests do not (CI-38).
       - name: Newest pluginval pre-release
         id: pluginval-prerelease
+        if: github.event_name != 'pull_request'
         continue-on-error: true
         uses: ./.github/actions/pluginval
         with:
           prerelease: 'true'
       - name: pluginval pre-release on every plug-in (advisory)
-        if: always() && steps.pluginval.outcome == 'success'
+        if: always() && steps.pluginval.outcome == 'success' && github.event_name != 'pull_request'
         env:
           FETCHED: ${{ steps.pluginval-prerelease.outcome }}
           AVAILABLE: ${{ steps.pluginval-prerelease.outputs.available }}
