@@ -1151,18 +1151,6 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   waiting-time savings, with oracle, regression, validator, platform and
   release checks retained.
 
-- [ ] **CI-39 — Windows core-only steps fail when their build fails.**
-  From CI-38's independent review (16 November 2026): in
-  `.github/workflows/regression.yml`, the two core-only Windows steps run
-  configure, build and CTest in one PowerShell script, which does not stop
-  when a native command fails, so the step's result is CTest's alone. A
-  failed configure leaves no tests (CTest exits 0 without
-  `--no-tests=error`), and a failed build of a target no test runs goes
-  unnoticed. **Done when** a failed configure or build fails its step
-  (for example `$PSNativeCommandUseErrorActionPreference = $true`, or a
-  `$LASTEXITCODE` check after each command), shown by one deliberate
-  failure. Effort S.
-
 - [ ] **CI-32 — Run the most extreme numerical cases less often.** Dormant.
   From jrp's review of 5 November 2026: the largest and most extreme cases
   (`native.kernel_divergence`'s 128k to 512k filters and its noise near
@@ -1223,6 +1211,11 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **CI-39 — Windows core-only steps fail when their build fails.** 17
+  November 2026, from CI-38's independent review: the two core-only steps
+  of the native Windows job stop at a failed configure or build
+  (`$PSNativeCommandUseErrorActionPreference`), shown on its pull request by a
+  deliberate build failure.
 - [x] **CI-38 — Safe CI speedups without restructuring.** 16 November
   2026, from jrp's request that day: the longest core tests first
   ([test order](docs/develop/testing.md#build-targets-and-test-order))
