@@ -259,8 +259,14 @@ jobs:
         run: ctest --test-dir build -C Release --output-on-failure --output-junit junit.xml
       - name: Linked versions
         run: ./build/Release/convolver.exe --version
+      # CI-39: these steps run several commands in one PowerShell script,
+      # which by itself goes on after a command fails, leaving the step
+      # CTest's result; a failed configure or build now stops the step
+      # (with the runner's $ErrorActionPreference = 'stop').
       - name: Core-only MSVC build and consumer tests
         run: >-
+          $PSNativeCommandUseErrorActionPreference = $true
+
           cmake -S . -B build-core -A x64
           "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
           -DVCPKG_TARGET_TRIPLET=x64-windows -DCONVOLVER_BUILD_IO=OFF -DCONVOLVER_BUILD_CLI=OFF
@@ -271,6 +277,8 @@ jobs:
           ctest --test-dir build-core -C Release --output-on-failure --output-junit junit.xml
       - name: Core-only MSVC build with the Ooura backend
         run: >-
+          $PSNativeCommandUseErrorActionPreference = $true
+
           cmake -S . -B build-ooura -A x64 -DCONVOLVER_FFT_BACKEND=OOURA
           -DCONVOLVER_BUILD_IO=OFF -DCONVOLVER_BUILD_CLI=OFF
           -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverFFTW=ON

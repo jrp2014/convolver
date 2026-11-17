@@ -39,6 +39,14 @@ Until 1.0 the C++ API may change between minor versions.
   with it ([pre-releases](docs/develop/build.md#pre-releases-and-newer-upstream-versions)).
   Parallel MSVC compiles (`CL=/MP`) were tried and dropped: no measured gain.
 
+### Fixed
+
+- CI (CI-39): the native Windows job's two core-only steps run configure,
+  build and CTest in one PowerShell script, which went on after a failed
+  command, so a failed configure (leaving no tests) or a failed build of a
+  target no test runs still passed the step. A failed command now fails it.
+  Found by CI-38's independent review.
+
 ## [0.13.24] - 2026-11-16
 
 The fifth published preview, a patch of 0.13.20 for macOS, Windows and
