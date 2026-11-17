@@ -237,6 +237,43 @@ checks. Tests that state what an adapter must do follow the contract, not
 the production decision functions: as PLUG-36 requires, an expected result
 is never computed by the shared decision that step 1 introduces.
 
+Step 0 added the protection the inventory found missing (16 November
+2026): the lifecycle runner's Gain and Latency operations, its checks of
+the saved settings and the reported latency, and the harness's
+`same-filter-new-latency` case ([testing](../../develop/testing.md#lifecycle-sequences-plug-7)).
+It also listed the tests that reach into the machinery, by the step that
+replaces what they reach. Each such step moves the hook with the same
+meaning, or changes the assertion in a commit of its own as condition 4 of
+the [success criterion](#success-criterion) allows:
+
+| Test | Hook it uses | What the hook reaches | Step |
+| --- | --- | --- | --- |
+| `vst3.adapter` `latency_handover_waits()` | `holding_for_tests`, `releasing_for_tests` | `process()` holding its processor, and the control side waiting in `release_processor()` | 3: the assertion that the control call waits becomes the safety requirement, as above |
+| `vst3.adapter` `settings_parameters()`, `vst3.editor` `window` | `latency_preparation_for_tests` | Building the processor for a new Latency while active fails | 3: the hook moves to where the shared mechanism builds the processor it offers |
+| `au.adapter` `bypass_while_latency_work_holds_lock()` | `latency_locked_for_tests`, with the waits below | The Latency work holding the control lock, and the Status's `status_bypassed_` copy | 4: the Status becomes a view of state; the hold stays, since the queue does |
+| `au.adapter` `latency_queue_lifetime()`, `latency_witness_per_unit()`, `latency_staged_closing()`; `latency_parameter()`, `status_parameter()`, `timing_in_seconds()`, `listeners_on_main_thread()`, which wait through `latency_settled()` | `latency_queue_failure_for_tests`, `latency_progress_for_tests`, `latency_started_for_tests`, `latency_closing_for_tests` | The Audio Unit's Latency queue: its requests, runs and closing | 3, only where it changes how the queue hands over the processor; the queue itself stays ([what stays](#what-stays-and-why)) |
+| `au.editor` `responsive` | `load_started_for_tests` | The start of a load chosen in the window | 1: the hook stays at the start of the request, before the shared decision |
+| `lv2.adapter` `worker_loads()`, `refused_first_loads()`; `lv2.lifecycle`'s `overtake` | `WorkerPoint::read`, `prepared`, `checked` (`pause_at()`) | The worker between reading a file, preparing the filter, its last check for a newer request and publishing | 1 (the decision for a chosen file, with LV2's same-file keep) and 3 (`stage()`, `retire()`, `handover`): each pause keeps its meaning |
+| `lv2.adapter` `settings_ports()` | `WorkerPoint::latency_built` | A processor for a new Latency built, before it is offered to `run()` | 3 |
+| `lv2.adapter` `worker_loads()` | `WorkerPoint::deactivate_waits` (`wait_until_deactivation_waits()`) | `deactivate()` waiting for the control lock that `work()` holds (PLUG-21) | 3, if deferred reclamation changes what `deactivate()` waits for |
+
+The settings are covered in each format as follows; step 0 added the
+lifecycle operations and both same-filter cases, and left the rest to the
+adapter tests that already had it, rather than model the Audio Unit's
+Latency queue and LV2's worker for Latency in the lifecycle runner:
+
+| Behaviour | Host layer | VST3 | Audio Unit | LV2 |
+| --- | --- | --- | --- | --- |
+| A Gain change: saved, played, and kept by a reopen; a restore without settings keeps it, except in VST3, where it resets the settings to the defaults | Lifecycle `gain` | Lifecycle `gain` | Lifecycle `gain` | Lifecycle `gain` (the host saves the port) |
+| A Latency change: reported, saved, played | Lifecycle `latency` | Lifecycle `latency` | `au.adapter` `latency_parameter()` | `lv2.adapter` `settings_ports()` |
+| Restored settings applied with the filter | None: no settings in its state | Lifecycle `state-A-settings` (the defaults for a state without them) | `au.adapter` `settings_parameters()` and `latency_parameter()` | None: the host restores the ports |
+| The playing filter restored with another Latency builds a new processor | None | Harness `same-filter-new-latency` | `au.adapter` `latency_parameter()`: the reported latency and an impulse's delay only, with a one-tap filter, so neither history nor Gain | Not one request: the restore keeps the filter (`same-filter-restore`) and the worker applies the port's Latency as any other change (`settings_ports()`) |
+
+Apart from these, the tests drive the plug-ins through the hosts'
+interfaces and read what is saved, what plays, what the host is told and
+the failure record (PLUG-8's test-only accessors), all of which the steps
+keep.
+
 Real hosts come once, at the end: a short REAPER and GarageBand check on the
 candidate built after the last step, in jrp's usual session, rather than one
 per step.

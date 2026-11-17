@@ -553,7 +553,8 @@ tail and `same_filter_as_project_starts_clean` checks that project state
 replaces the filter without a reset; `restore_keeps_history_with_estimate`
 in `native.host_settings` checks that a kept filter plays the estimate its
 restored Gain mode needs. A different Latency in the state still builds a
-new processor, as its row says. Not yet
+new processor, as its row says, which the harness's
+`same-filter-new-latency` case checks in VST3 (PLUG-39 step 0). Not yet
 tried in a host.
 
 ## Initial restoration and live replacement

@@ -8,6 +8,7 @@
 #include "plugins/audio_guard.hpp"
 #include "plugins/lifecycle.hpp"
 #include "plugins/load_timing.hpp"
+#include <cmath>
 #include <cstring>
 #include <iostream>
 #include <memory>
@@ -49,12 +50,14 @@ class AudioUnitDriver final : public lc::Driver {
                         Op::reopen,
                         Op::rate,
                         Op::layout,
-                        Op::setup};
+                        Op::setup,
+                        Op::gain};
         return f;
     }
     void create(const lc::Host& h, bool configured) override {
         destroy();
         unit_ = std::make_unique<host::Unit>();
+        sample_rate_ = 0;
         if (!configured)
             return;
         // As PLUG-2's driver: the formats bind once the unit has rendered.
@@ -72,6 +75,7 @@ class AudioUnitDriver final : public lc::Driver {
         unit_->uninitialize();
     }
     void configure(const lc::Host& h) override {
+        sample_rate_ = h.sample_rate;
         host::check(unit_->configure(h.sample_rate, static_cast<UInt32>(h.inputs),
                                      static_cast<UInt32>(h.outputs),
                                      static_cast<UInt32>(max_block())),
@@ -126,6 +130,39 @@ class AudioUnitDriver final : public lc::Driver {
     void set_bypass(bool on) override {
         unit_->set_bypass(on);
     }
+    // Contract, settings (AU-7): Render hands Gain to the processor on every
+    // call. A Latency choice is applied by the unit's own queue, which the
+    // sequences do not wait for, so they leave it at its default; au.adapter
+    // tests it.
+    void set_gain(double db) override {
+        host::check(AudioUnitSetParameter(unit_->get(), au::gain_parameter, kAudioUnitScope_Global,
+                                          0, static_cast<AudioUnitParameterValue>(db), 0),
+                    "set Gain");
+    }
+    // The parameters AUBase::SaveState writes into ClassInfo.
+    std::optional<HostSettings> settings() override {
+        AudioUnitParameterValue gain = 0, latency = 0;
+        host::check(AudioUnitGetParameter(unit_->get(), au::gain_parameter, kAudioUnitScope_Global,
+                                          0, &gain),
+                    "Gain");
+        host::check(AudioUnitGetParameter(unit_->get(), au::latency_parameter,
+                                          kAudioUnitScope_Global, 0, &latency),
+                    "Latency");
+        const auto index = static_cast<std::size_t>(std::lround(latency));
+        if (index >= host_latencies.size())
+            throw std::runtime_error("the Latency parameter is not an index of host_latencies");
+        HostSettings s;
+        s.gain_db = gain;
+        s.latency = host_latencies[index];
+        return s;
+    }
+    // kAudioUnitProperty_Latency is in seconds.
+    std::optional<std::size_t> latency() override {
+        if (!sample_rate_)
+            return std::nullopt;
+        return static_cast<std::size_t>(
+            std::lround(unit_->seconds(kAudioUnitProperty_Latency) * sample_rate_));
+    }
     void reset() override {
         unit_->reset();
     }
@@ -176,6 +213,7 @@ class AudioUnitDriver final : public lc::Driver {
 
   private:
     std::unique_ptr<host::Unit> unit_;
+    int sample_rate_ = 0; // The rate last negotiated, for latency().
 };
 
 // The loading-responsiveness timings (tests/plugins/load_timing.hpp): the

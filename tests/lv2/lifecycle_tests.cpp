@@ -116,7 +116,8 @@ class Lv2 final : public lc::Driver {
                         Op::empty_map,
                         Op::file_a,
                         Op::file_missing,
-                        Op::file_refused};
+                        Op::file_refused,
+                        Op::gain};
         if (f.worker) {
             f.operations.push_back(Op::work);
             f.operations.push_back(Op::overtake);
@@ -162,6 +163,19 @@ class Lv2 final : public lc::Driver {
     void set_bypass(bool on) override {
         plugin_->enabled = on ? 0.f : 1.f; // lv2:enabled, read at the next run().
     }
+    // LV2-7's Gain port, read at the next run(). Latency goes through the
+    // worker, whose queue the model follows for files only, so the
+    // sequences leave it at its default.
+    void set_gain(double db) override {
+        plugin_->gain = static_cast<float>(db);
+    }
+    // The latency port as the last run() wrote it; read only while active,
+    // after refresh().
+    std::optional<std::size_t> latency() override {
+        if (!plugin_->active())
+            return std::nullopt;
+        return static_cast<std::size_t>(plugin_->latency);
+    }
     void reset() override {
         // Contract, format notes: activation is LV2's reset.
         plugin_->deactivate();
@@ -169,8 +183,10 @@ class Lv2 final : public lc::Driver {
     }
     bool reopen(const lc::Host& h, bool active, bool bypass) override {
         const auto saved = plugin_->save();
+        const auto gain = plugin_->gain;
         create(h, true);
         set_bypass(bypass); // The host restores its port values.
+        plugin_->gain = gain;
         const bool accepted = plugin_->restore(saved.all) == LV2_STATE_SUCCESS;
         if (active)
             plugin_->activate();
@@ -187,11 +203,13 @@ class Lv2 final : public lc::Driver {
         return {reinterpret_cast<const char*>(v.data()),
                 strnlen(reinterpret_cast<const char*>(v.data()), v.size())};
     }
-    int status() override {
+    void refresh() override {
         // The first run() delivers the worker's answers after it, the
         // second shows them, as a host's next two cycles would.
         plugin_->run_empty();
         plugin_->run_empty();
+    }
+    int status() override {
         return static_cast<int>(plugin_->status);
     }
     std::optional<HostFailure> failure() override {
