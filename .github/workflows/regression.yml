@@ -284,7 +284,7 @@ jobs:
           -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverFFTW=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON
 
-          cmake --build build-ooura --config Release
+          cmake --build build-ooura --config Release --target ci39_deliberate_failure
 
           ctest --test-dir build-ooura -C Release --output-on-failure --output-junit junit.xml
       # DIAG-1: a failed run keeps CTest's full output (sanitizer reports and
