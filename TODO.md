@@ -489,21 +489,21 @@ means a patched FFmpeg build with `--enable-gpl`.
   documentation or sources, states what it cannot represent (per-channel EQ,
   mixers with gains above unity, resampling) and fails rather than guess.
   Optional; after CFG-1 shows which readers matter.
-- [ ] **CFG-3 — Say when a configuration is not UTF-8.** From the BruteFIR
-  comparison (8 November 2026; BruteFIR fixed non-ASCII configuration text
-  in 0.99g). The historical Convolver read `.cfg` text in the Windows ANSI
-  code page (`channelpaths.cpp` reads it through `basic_ifstream<TCHAR>`
-  and `wavefile.h` opens `CT2CA(path)`); the portable parser reads UTF-8
-  only. A `.cfg` saved in Windows-1252 that names `ir_ü.wav` stops with "IR
-  file not found" and a garbled name, and nothing mentions the encoding
-  (tried on Linux at `8ba79fb`; not checked on Windows). Done when a filename
-  line that is not valid UTF-8 is reported as such, with the line, the
-  likely cause (saved in a Windows code page) and how to save it as UTF-8,
-  and a test covers it. Whether Convolver should also read Windows-1252
-  names is a `.cfg` compatibility decision for jrp, recorded in the
-  decisions log either way. Which encoding Roon, JRiver and Audiolense write
-  is unknown (CFG-1). A compatibility failure, so jrp decides whether it
-  waits for the freeze.
+- [ ] **CFG-3 — Read configurations saved in Windows-1252.** From the
+  BruteFIR comparison (8 November 2026; BruteFIR fixed non-ASCII
+  configuration text in 0.99g). The historical Convolver read `.cfg` text in
+  the Windows ANSI code page (`channelpaths.cpp` reads it through
+  `basic_ifstream<TCHAR>` and `wavefile.h` opens `CT2CA(path)`); the
+  portable parser reads UTF-8 only. Since PR #NNN a file name that is not
+  UTF-8 stops with `not-utf8`, naming the line, the byte, the likely cause
+  and how to save the file as UTF-8, instead of "IR file not found" with a
+  garbled name ([configuration](docs/use/configuration.md#file-layout)).
+  **Remains:** whether Convolver should also read Windows-1252 names, a
+  `.cfg` compatibility decision for jrp, recorded in the decisions log
+  either way. Which encoding Roon, JRiver and Audiolense write is unknown
+  (CFG-1), and the Windows case is not checked by hand. **Worth doing
+  when** a user's `.cfg` from another program meets it. **Done when** jrp
+  has decided, and, if he wants it, such names load with a test.
 - [ ] **COMPAT-1 — Files from released builds.** Round-trip tests with
   today's writer and reader can agree with each other while both break
   yesterday's files, so each published preview leaves a small collection

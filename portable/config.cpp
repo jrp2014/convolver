@@ -150,6 +150,40 @@ std::string read_configuration_text(const std::filesystem::path& path) {
     return text;
 }
 
+namespace {
+// CFG-3: a file name that is not UTF-8 text. The historical Convolver read
+// .cfg text in the Windows ANSI code page, so a name with an accented letter
+// saved that way (ir_\xFC.wav for ir_ü.wav in Windows-1252) reaches here.
+// Convolver does not guess the code page; whether it should read
+// Windows-1252 is jrp's .cfg decision (CFG-3 in TODO).
+std::string not_utf8_advice(const std::filesystem::path& owner, const std::string& name,
+                            const SourceLocation& where) {
+    std::string_view rest = name;
+    while (const auto length = utf8_character_length(rest))
+        rest.remove_prefix(length);
+    constexpr char digits[] = "0123456789ABCDEF";
+    const auto first = static_cast<unsigned char>(rest.front());
+    const std::string hex{'0', 'x', digits[first >> 4], digits[first & 15]};
+    return advice_text(
+        {"the file name '" + utf8_escaped(name) + "' is not UTF-8 text",
+         "Convolver reads configurations and lists as UTF-8 text, and byte " + hex +
+             " (shown as \\x" + hex.substr(2) +
+             ") cannot appear where it does in UTF-8. The file was most likely saved in a "
+             "Windows code page such as Windows-1252 (often called ANSI), as older versions of "
+             "Windows Notepad and the original Windows Convolver did. That turns accented "
+             "letters such as \xC3\xBC into bytes that are not UTF-8, so the name cannot match "
+             "the file.",
+         "Open " + utf8_string(owner.filename()) +
+             " in a text editor and save it again as UTF-8 (in Windows Notepad: "
+             "File > Save As, Encoding: UTF-8), then check that the name on line " +
+             std::to_string(where.line) +
+             " reads correctly. Or rename the file it names using only unaccented letters, "
+             "digits and punctuation, and change line " +
+             std::to_string(where.line) + " to match.",
+         {}});
+}
+} // namespace
+
 std::filesystem::path resolve_reference(const std::filesystem::path& owner,
                                         const ParsedReference& ref,
                                         [[maybe_unused]] const FileExists& exists) {
@@ -179,6 +213,19 @@ std::filesystem::path resolve_reference(const std::filesystem::path& owner,
 #endif
     auto normalized = name;
     std::replace(normalized.begin(), normalized.end(), '\\', '/');
+    if (!valid_utf8(normalized)) {
+#ifndef _WIN32
+        // macOS and Linux names are bytes: a file that has exactly this name
+        // still opens, as it always has.
+        const std::filesystem::path bytes(normalized);
+        const auto found = bytes.is_absolute() ? bytes : owner.parent_path() / bytes;
+        std::error_code ec;
+        if (exists ? exists(found) : std::filesystem::exists(found, ec))
+            return found;
+#endif
+        throw ConfigurationError("not-utf8", ref.location,
+                                 not_utf8_advice(owner, name, ref.location));
+    }
     const auto p = utf8_path(normalized);
     return p.is_absolute() ? p : owner.parent_path() / p;
 }

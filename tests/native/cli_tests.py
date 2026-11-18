@@ -1083,6 +1083,15 @@ def main():
         other_writers_tests(d)
         failure_message_tests(d)
         refused_sound_filter_tests(d)
+        # CFG-3: a .cfg saved in Windows-1252 names ir_\xfc.wav for ir_u-umlaut.wav:
+        # a failure that says so, not "IR file not found", with its code.
+        (d / 'ansi.cfg').write_bytes(b'48000 1 1 0\n0\n0\nir_\xfc.wav\n0\n0\n0\n')
+        err = call(['--filter', d / 'ansi.cfg', '--input', src, '--output', dst], ok=False).stderr.decode()
+        assert "ansi.cfg:4:1: the file name 'ir_\\xFC.wav' is not UTF-8 text" in err, err
+        assert 'Windows-1252' in err and 'Open ansi.cfg in a text editor and save it again as UTF-8' in err, err
+        assert 'not found' not in err, err
+        report = json.loads(call(['--validate', d / 'ansi.cfg', '--json'], ok=False).stdout)
+        assert [x['code'] for x in report['diagnostics']] == ['not-utf8'], report
         # An option value spelled like an inspection flag is still a value.
         pcm(d / 'v-ir.wav', [16384])
         pcm(d / 'v-in.wav', [1000, -1000])

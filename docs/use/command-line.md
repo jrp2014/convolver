@@ -551,6 +551,7 @@ The error codes are:
 | `ir-channel` | A path names a channel its IR file does not have |
 | `rate-mismatch` | An IR file's sample rate is not the configuration's |
 | `nonportable-path` | A Windows drive, UNC or `\`-rooted path on macOS or Linux |
+| `not-utf8` | A file name in a configuration or list is not UTF-8 text (saved in a Windows code page, most likely) and no file has exactly that name |
 | `cycle` | A list includes itself |
 | `no-match` | No entry suits the requested rate and channels |
 | `limit` | A size or count limit was reached |

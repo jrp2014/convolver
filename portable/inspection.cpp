@@ -121,7 +121,19 @@ class Inspector {
             } catch (const ConfigurationError& e) {
                 // Only syntax-only inspection reaches this: the resolver already
                 // resolved every reference of a visited configuration.
-                add(diagnostic(e));
+#ifndef _WIN32
+                // CFG-3: a syntax-only check looks for no files, and on macOS
+                // and Linux a file may have exactly these bytes as its name,
+                // so the name is resolved as bytes, as before; the report's
+                // invalid-utf8 warning still names the text.
+                if (e.code() == "not-utf8") {
+                    auto bytes = path.ir.spelling;
+                    std::replace(bytes.begin(), bytes.end(), '\\', '/');
+                    const std::filesystem::path name(bytes);
+                    f.resolved = name.is_absolute() ? name : doc.source.parent_path() / name;
+                } else
+#endif
+                    add(diagnostic(e));
             }
             for (const auto& r : path.inputs)
                 f.inputs.push_back({r.token, r.channel, r.gain});
