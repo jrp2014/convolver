@@ -287,7 +287,7 @@ LV2 (Linux first; also PipeWire system audio):
   telling the rate the playing copy runs at from the export's rate. The
   guides say so ([plug-ins](docs/use/plugins.md#status-and-the-convolver-log),
   [Audacity steps](docs/develop/host-testing.md#audacity-vst3)), and since
-  PR #NNN every format's rate refusal, for a preset or a chosen file, adds
+  PR #210 every format's rate refusal, for a preset or a chosen file, adds
   the agreed line to its Fix ([decided](docs/project/decisions.md#diagnostics)),
   checked by `native.host`, `native.filter_file` and `vst3.adapter`.
   **Remains:** whether the window should mark a host rate as not yet
