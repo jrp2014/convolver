@@ -116,7 +116,7 @@ the suggested one.
 
 | Group | Items | Note |
 | --- | --- | --- |
-| Parked by jrp until after REL-3 | **ROBUST-1**, **ROBUST-8**, **PLUG-25**, **PLUG-27**, **PLUG-29**, **PLUG-30**, **PLUG-36**, **HOST-6**, **CFG-3**, **DIAG-5**, **CI-32**; **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19**; and **CI-34** apart from its first step (done) | jrp, 8 November 2026: "park any non-essential corner or edge case robustness tests", and "Park both"; PLUG-36 on 12 November 2026 ("park until after REL-3") for the items and CI-34's narrowing ([decision](docs/project/decisions.md#releases)); CI-34's remaining steps wait for his go-ahead. No existing test is removed, and a reproduced crash, lost state, unsafe output or wrong audio reopens one at once |
+| Parked by jrp until after REL-3 | **ROBUST-1**, **ROBUST-8**, **PLUG-25**, **PLUG-27**, **PLUG-29**, **PLUG-30**, **PLUG-36**, **HOST-6**, **CFG-3**, **DIAG-5**, **CI-32**; **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19** | jrp, 8 November 2026: "park any non-essential corner or edge case robustness tests", and "Park both"; PLUG-36 on 12 November 2026 ("park until after REL-3") ([decision](docs/project/decisions.md#releases)). No existing test is removed, and a reproduced crash, lost state, unsafe output or wrong audio reopens one at once |
 | The production gate | **REL-1**, the one production checklist (PLUG-5 and AU-5 joined it): Developer ID signing and notarization on macOS, Authenticode on Windows, verified minimum OS and CPU versions, the final licence and corresponding-source review; **PLUG-20** (the VST logo in the window, optional) | The previews are unsigned by decision ([releasing](docs/develop/releasing.md#production-gates)). Planning it changes nothing shipped |
 | Edges over other convolvers | First the limitations users cite: **IO-2** (the rate-mismatch workflow; **EDGE-1** only if offline conversion proves inadequate), **EDGE-11** and **EDGE-10** (a candidate only when a measured limitation justifies it), then **EDGE-3** and **EDGE-13**; then **EDGE-12**, **EDGE-9**, **EDGE-2**, **EDGE-4** and **EDGE-5**; then **EDGE-6** to **EDGE-8**; **EDGE-14** and **EDGE-15** | jrp's goal (6 November 2026): be better than the most popular reverb plug-ins, in the ranked order of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build), keeping its non-negotiables; each starts with the owner's decision its plan row names. Waits for REL-3 unless jrp lifts the freeze; feedback that asks for one of them (sample rates, true stereo, a filter's own delay, an output ceiling) moves it up |
 | Supporting work | **IO-1** (large files) | Take it up when a reproducible defect or a user need calls for it |
@@ -1140,17 +1140,6 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
 
 ## Developer tooling
 
-- [ ] **CI-34 — Reduce duplicate CI scheduling, preserving coverage.**
-  Following the [CI plan](docs/project/plans/2026-11-08-ci-scheduling.md).
-  The first step is done: a pull request builds the candidates only when it
-  touches what they ship, or when started by hand
-  ([CI triggers](docs/develop/testing.md#when-pull-requests-build-the-candidates)).
-  **Remains**, waiting for jrp's go-ahead: the fuzz triggers, the coverage
-  table and matched runs. **Done when** scope tests and affected CI pass,
-  every configuration has a retained trigger, and matched runs show the
-  waiting-time savings, with oracle, regression, validator, platform and
-  release checks retained.
-
 - [ ] **CI-32 — Run the most extreme numerical cases less often.** Dormant.
   From jrp's review of 5 November 2026: the largest and most extreme cases
   (`native.kernel_divergence`'s 128k to 512k filters and its noise near
@@ -1211,6 +1200,12 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **CI-34 — Reduce duplicate CI scheduling, preserving coverage.** 18
+  November 2026, PR #207 (the first step, the candidates, in PR #154): pull
+  requests build the candidates and run the fuzz targets only when they
+  change what those are built from; `main`, weekly and manual runs keep
+  both ([CI triggers](docs/develop/testing.md#when-pull-requests-run-the-fuzz-targets),
+  [plan](docs/archive/plans/2026-11-08-ci-scheduling.md)).
 - [x] **DOC-15 — Say what sets Convolver apart in the README.** 17
   November 2026, PR #201: the README's "What sets it apart" section, under
   jrp's four emphases (accurate, light on the system, robust, behaves as
