@@ -81,7 +81,7 @@ open pull requests for the ID before starting.
 | **DIAG-5** | Reporting clipping after a command-line render | Nothing |
 | **PLUG-25** | The decided Fix line for a rate refusal | Parked until REL-3: marking a host rate as not yet confirmed, which also needs jrp's decision (PLUG-27 overlaps it) |
 | **CFG-3** | Reporting a filename line that is not valid UTF-8 | Parked until REL-3: whether to read Windows-1252 names, which is also a `.cfg` decision for jrp |
-| **CI-34** | The fuzz triggers | Parked until REL-3: the coverage table and matched runs |
+| **CI-34** | The rest of it: the fuzz triggers, the coverage table and matched runs | Nothing |
 | **EDGE-11** | Exact idling once silent input has outlasted the tail | The other candidates wait for a measured limitation, as the EDGE items under [needs a decision](#needs-a-decision) do |
 
 ### Ready
@@ -118,7 +118,8 @@ open pull requests for the ID before starting.
 ### Parked
 
 Until REL-3, from jrp, 8 November 2026: "park any non-essential corner or edge case robustness
-tests", then "Park both" (the items and CI-34's narrowing); PLUG-36 on
+tests", then "Park both" (the items and CI-34's narrowing, which he
+brought back on 18 November 2026); PLUG-36 on
 12 November 2026 ("park until after REL-3")
 ([decision](docs/project/decisions.md#releases)). The freeze's lifting did
 not change this. No existing test is removed, and a reproduced crash, lost
@@ -131,7 +132,7 @@ REL-3.
 | **ROBUST-1**, **ROBUST-8**, **PLUG-27**, **PLUG-29**, **PLUG-30**, **PLUG-36**, **HOST-6** | Robustness and lifecycle corner cases |
 | **CI-32** | The most extreme numerical cases less often; dormant as well (jrp, 12 November 2026) |
 | **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19** | Profiling and measurement-only optimisations |
-| The rest of **PLUG-25**, **CFG-3** and **CI-34** | Beyond the parts in progress above |
+| The rest of **PLUG-25** and **CFG-3** | Beyond the parts in progress above |
 | **FFMPEG-2** to **FFMPEG-5**, **HOST-3** | A C API and FFmpeg filter; a Windows Media Foundation transform. Parked by owner decision; revisit only by his decision |
 
 The ordering of the first preview's steps that this section held until
@@ -1159,9 +1160,8 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   The first step is done: a pull request builds the candidates only when it
   touches what they ship, or when started by hand
   ([CI triggers](docs/develop/testing.md#when-pull-requests-build-the-candidates)).
-  **Remains:** the fuzz triggers, which jrp brought forward on 18 November
-  2026, then the coverage table and matched runs, which wait for his
-  go-ahead. **Done when** scope tests and affected CI pass,
+  **Remains**, brought forward by jrp on 18 November 2026: the fuzz
+  triggers, the coverage table and matched runs. **Done when** scope tests and affected CI pass,
   every configuration has a retained trigger, and matched runs show the
   waiting-time savings, with oracle, regression, validator, platform and
   release checks retained.
