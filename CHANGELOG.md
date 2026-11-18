@@ -36,7 +36,10 @@ Until 1.0 the C++ API may change between minor versions.
   ready, depends on, needs a decision or parked until REL-3, in place of
   columns written for the freeze lifted on 10 November, with jrp's parking
   decisions kept and the five items he brought forward that day (DIAG-5,
-  and parts of PLUG-25, CFG-3, CI-34 and EDGE-11) shown in progress. The
+  CI-34, and parts of PLUG-25, CFG-3 and EDGE-11) shown in progress. jrp
+  decided that day that lifting the freeze also ended the hold of
+  6 November on optional features
+  ([decision](docs/project/decisions.md#releases)). The
   workflow guide's verification table decides what to run when starting,
   picking up and finishing work, with results for an exact commit carried
   forward; a review's later rounds read the commits since the reviewed one;

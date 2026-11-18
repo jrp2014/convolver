@@ -47,9 +47,10 @@ Claim an item with a draft pull request before starting so independent tasks
 do not duplicate changes.
 
 The runtime freeze of 9 November 2026 was lifted on 10 November: runtime
-changes can go ahead, with significant features before corner and edge cases
-([decision](docs/project/decisions.md#releases)). Lifting it did not unpark
-what jrp parked by name, so each open item, or each part of one, is in one
+changes can go ahead, with significant features before corner and edge cases,
+and the hold on optional features of 6 November ended with it (jrp,
+18 November 2026; [decisions](docs/project/decisions.md#releases)). Lifting
+it did not unpark what jrp parked by name, so each open item, or each part of one, is in one
 table below, by what it waits for: **in progress**, **ready** to start, waiting on something that
 **depends on** another person or item, **needs a decision** from jrp, or
 **parked**. Within a table, the order is the suggested one. The

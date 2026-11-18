@@ -11,7 +11,8 @@ micro-optimisation waits for the walkthroughs (jrp, 7 November 2026). This plan 
 into TODO items (EDGE-1 to EDGE-14, with PERF-2, PERF-3 and IO-2) to take
 up afterwards in the order given here, unless jrp
 [decides otherwise](#decisions-for-jrp). Last revised on 7 November 2026
-after jrp's review of `ecd087a`; his decisions along the way are in
+after jrp's review of `ecd087a`, with its status brought up to date on
+18 November 2026 (DOC-16); his decisions along the way are in
 [decisions](../decisions.md#direction), and the earlier versions in git.
 Rationale and measurements live here; TODO holds each item's acceptance
 criteria.
@@ -193,8 +194,10 @@ the reverb features (ranks 11 to 13). Within each group, by value to users,
 how clearly the gap shows and effort. The rank is an order of work once an
 item passes the [gate](#before-an-item-starts), not a promise to build it.
 Effort: **S** about a pull request, **M** a few, **L** a design and several.
-Nothing starts before REL-3 unless jrp lifts the freeze
-([decisions for jrp](#decisions-for-jrp)); platform- and chip-level
+Each item starts with the owner's decision its row names
+([decisions for jrp](#decisions-for-jrp)); the hold on optional features
+until REL-3 ended with the freeze on 10 November
+([decision](../decisions.md#releases)), and platform- and chip-level
 micro-optimisation waits for the walkthroughs (jrp, 7 November 2026). Each
 row links to its section, which holds the gap, the approach and jrp's
 question; TODO holds the acceptance criteria.

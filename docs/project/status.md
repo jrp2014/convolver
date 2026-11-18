@@ -146,8 +146,9 @@ on clean machines (REL-9), the Windows window (VST3-12), LV2 in the Linux
 package (LV2-5, LV2-7) and the other gain modes (PR #188)
 ([decisions](decisions.md#releases)); the Linux window and the meters come
 later. Since 10 November 2026 significant features come before corner and
-edge cases, and the items jrp parked wait for the walkthrough
-([TODO](../../TODO.md#execution-priorities)); crashes, lost state, wrong
+edge cases, optional features included, and the items jrp parked by name
+wait for the walkthrough ([decisions](decisions.md#releases),
+[TODO](../../TODO.md#execution-priorities)); crashes, lost state, wrong
 audio, ordinary compatibility failures and demonstrated dropouts are still
 fixed at once.
 
