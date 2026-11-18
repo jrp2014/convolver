@@ -51,6 +51,13 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- CI (CI-40, from jrp's review of 18 November 2026): clang-tidy ran on a
+  hand-kept list of portable sources, repeated in CONTRIBUTING, that had
+  missed `portable/partitions.cpp`. CI and the documented command now
+  analyse every portable source the build compiles, chosen from its
+  `compile_commands.json` with the vendored `portable/third_party/` left
+  out, so a new file is covered without editing a list
+  ([lint checks](CONTRIBUTING.md#formatting-and-analysis)).
 - CI (CI-39): the native Windows job's two core-only steps run configure,
   build and CTest in one PowerShell script, which went on after a failed
   command, so a failed configure (leaving no tests) or a failed build of a

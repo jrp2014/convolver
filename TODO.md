@@ -1211,6 +1211,12 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **CI-40 — Static analysis covers every portable source.** 18
+  November 2026, from jrp's review of `e89a9dc`: CI and CONTRIBUTING ran
+  clang-tidy on a hand-kept list that had missed `portable/partitions.cpp`;
+  both now take the portable sources from the build's
+  `compile_commands.json`, leaving out the vendored `portable/third_party/`
+  ([lint checks](CONTRIBUTING.md#formatting-and-analysis)).
 - [x] **DOC-15 — Say what sets Convolver apart in the README.** 17
   November 2026, PR #201: the README's "What sets it apart" section, under
   jrp's four emphases (accurate, light on the system, robust, behaves as
