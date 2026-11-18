@@ -37,6 +37,25 @@ Until 1.0 the C++ API may change between minor versions.
   macOS, Windows and Linux. Each claim links to the guide, test or
   measurement behind it; the preview's limitations follow in their own
   section.
+- CI (CI-38, jrp's request of 16 November 2026 for safe speedups without
+  restructuring): `native.engine_stress`, `native.engine` and `native.host`,
+  the longest core tests under sanitizers, carry a CTest `COST`, so they
+  start first
+  ([test order](docs/develop/testing.md#build-targets-and-test-order)).
+  Pull requests no longer run the advisory newest-pluginval pre-release in
+  the VST3, Audio Unit and LV2 workflows, nor with it the macOS real-time
+  check (`--rtcheck relaxed`); pushes to `main`, the weekly and manual runs
+  still do, and a VST3 pull request still runs the required acceptance test
+  with it ([pre-releases](docs/develop/build.md#pre-releases-and-newer-upstream-versions)).
+  Parallel MSVC compiles (`CL=/MP`) were tried and dropped: no measured gain.
+
+### Fixed
+
+- CI (CI-39): the native Windows job's two core-only steps run configure,
+  build and CTest in one PowerShell script, which went on after a failed
+  command, so a failed configure (leaving no tests) or a failed build of a
+  target no test runs still passed the step. A failed command now fails it.
+  Found by CI-38's independent review.
 
 ## [0.13.24] - 2026-11-16
 

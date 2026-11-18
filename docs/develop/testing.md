@@ -918,7 +918,9 @@ October 2026) and records its version and checksum in the job summary. A
 newer pre-release (2.0.0-beta3) then runs both tests again: its validation
 findings are warnings, but the acceptance test must pass, because no full
 release can run it yet
-([pre-releases](build.md#pre-releases-and-newer-upstream-versions)). The VST3 CI matrix runs
+([pre-releases](build.md#pre-releases-and-newer-upstream-versions)). A pull
+request runs only that acceptance test with the pre-release; the advisory
+validation runs on pushes to `main`, the weekly and manual runs (CI-38). The VST3 CI matrix runs
 on Linux, Windows and macOS. None of this proves hard real-time deadlines or
 compatibility with every DAW; see [host testing](host-testing.md).
 
@@ -941,7 +943,8 @@ python3 tests/plugins/pluginval.py validate /path/to/pluginval \
 ```
 
 Both workflows use the newest full release for the formal result and run
-the newest pre-release afterwards as a warning only; on macOS the
+the newest pre-release afterwards as a warning only, on pushes to `main`,
+the weekly and manual runs but not for pull requests (CI-38); on macOS the
 pre-release adds `--rtcheck relaxed`. These runs load the plug-ins without a
 filter; audio with a filter loaded is checked by the PLUG-2 harnesses, the
 VST3 acceptance test and the Audio Unit's [AVAudioEngine render](#avaudioengine-render).
@@ -1819,4 +1822,7 @@ manual runs save theirs. Each job's log ends with ccache's hit statistics.
 
 The Windows jobs use the Visual Studio generator, which takes no compiler
 launcher, and the release candidates are built without a cache, from the
-corresponding source alone.
+corresponding source alone. Setting `CL=/MP` for their build commands, so
+the compiler also builds a project's files side by side, was tried on 16
+November 2026 and dropped: the native Windows build was about 25 s faster and
+the VST3 one slower, within the runners' variation (CI-38).

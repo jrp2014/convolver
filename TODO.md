@@ -1216,6 +1216,16 @@ move to the archive.
   jrp's four emphases (accurate, light on the system, robust, behaves as
   you'd expect), each claim linked to its evidence
   ([README](README.md#what-sets-it-apart)).
+- [x] **CI-39 — Windows core-only steps fail when their build fails.** 17
+  November 2026, from CI-38's independent review: the two core-only steps
+  of the native Windows job stop at a failed configure or build
+  (`$PSNativeCommandUseErrorActionPreference`), shown on its pull request by a
+  deliberate build failure.
+- [x] **CI-38 — Safe CI speedups without restructuring.** 16 November
+  2026, from jrp's request that day: the longest core tests first
+  ([test order](docs/develop/testing.md#build-targets-and-test-order))
+  and the advisory pluginval pre-release off pull requests
+  ([pre-releases](docs/develop/build.md#pre-releases-and-newer-upstream-versions)).
 - [x] **LV2-9 — Closing waits for a queued Gain mode request.** 16
   November 2026, from pluginval failures on `main`
   ([run 43910524162](https://github.com/jrp2014/convolver/actions/runs/43910524162)):
