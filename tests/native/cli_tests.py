@@ -515,6 +515,11 @@ def no_clip_headroom_tests(d):
     assert b'headroom' not in err, err
 
 
+def stderr_text(stderr):
+    """Standard error as text with LF line ends (Windows writes CRLF)."""
+    return stderr.decode().replace('\r\n', '\n')
+
+
 def clip_report_tests(d):
     """DIAG-5: after a render, stderr reports what went beyond full scale.
 
@@ -538,7 +543,7 @@ def clip_report_tests(d):
     peak = max(abs(v) for v in left)
     above = sum(abs(v) > 1 for v in left)
     peak_text = f'peak {20 * math.log10(peak):+.2f} dBFS'
-    err = p.stderr.decode()
+    err = stderr_text(p.stderr)
     assert f'convolver: note: {real} has {above} samples above full scale in 1 of 2 channels' in err, err
     assert f'channel 1: {above} of {len(left)} samples above full scale, {peak_text}' in err, err
     assert 'channel 2' not in err and 'converting it to integer samples later' in err, err
@@ -549,7 +554,7 @@ def clip_report_tests(d):
     p = call(['--filter', cfg, '--input', src, '--output', fixed, '--gain-db', '12', '--output-format', 'wav-pcm24'])
     clipped = sum(not -(2**23) <= math.floor(v * 2**23 + 0.5) <= 2**23 - 1 for v in left)
     assert clipped > 1000, clipped
-    err = p.stderr.decode()
+    err = stderr_text(p.stderr)
     assert f'convolver: warning: {fixed} clipped {clipped} samples in 1 of 2 channels' in err, err
     assert f'channel 1: {clipped} of {len(left)} samples clipped, {peak_text}' in err, err
     assert '24-bit integer samples cannot hold them' in err and 'channel 2' not in err, err
@@ -572,14 +577,14 @@ def clip_report_tests(d):
     p = call(
         ['--filter', mono_ir, '--input', mono_in, '--output', fixed, '--output-format', 'wav-pcm16', '--gain-db', '12']
     )
-    assert f'{fixed} clipped 2 samples\n    channel 1: 2 of 2 samples clipped' in p.stderr.decode(), p.stderr
+    assert f'{fixed} clipped 2 samples\n    channel 1: 2 of 2 samples clipped' in stderr_text(p.stderr), p.stderr
     # With no-clip only input beyond full scale can clip, so the fix says so.
     loud = d / 'clip-loud.wav'
     float_wave(loud, [(1.5 * math.sin(i / 5), 0.1) for i in range(1000)], channels=2)
     p = call(
         ['--filter', cfg, '--input', loud, '--output', fixed, '--output-format', 'wav-pcm24', '--gain-db', 'no-clip']
     )
-    err = p.stderr.decode()
+    err = stderr_text(p.stderr)
     assert 'clipped' in err and 'Lower --gain-db below the no-clip figure reported above' in err, err
     assert 'this input goes beyond full scale' in err and 'Render again' not in err, err
 
