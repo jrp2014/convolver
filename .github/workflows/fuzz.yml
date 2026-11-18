@@ -56,8 +56,8 @@ jobs:
       - uses: ./.github/actions/use-every-cpu
       - name: Dependencies
         run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libsndfile1-dev clang llvm
-      # Compiler cache: pull requests restore it; main and manual runs also
-      # save it (docs/develop/testing.md#compiler-cache).
+      # Compiler cache: pull requests restore it; main, scheduled and manual
+      # runs also save it (docs/develop/testing.md#compiler-cache).
       - name: Compiler cache
         uses: hendrikmuhs/ccache-action@dbeefd73e8e2ffc1bbc412570072735eb4db3607  # v1.2.25
         with:

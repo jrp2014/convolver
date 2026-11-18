@@ -674,18 +674,31 @@ class Command(unittest.TestCase):
                 text=True,
             )
 
-        harness = str(ROOT / 'tests/fuzz/fuzz_host_state.cpp')
-        listed = (harness, str(ROOT / 'portable/state.cpp'), 'include/convolver/host.hpp')
-        outside = ('/usr/include/c++/13/string', str(ROOT / 'build-fuzz/generated/speakers.hpp'), '<stdin>')
+        harnesses = sorted(str(path) for path in (ROOT / 'tests/fuzz').glob('fuzz_*.cpp'))
+        self.assertEqual(len(harnesses), 4)
+        listed = (*harnesses, str(ROOT / 'portable/state.cpp'), 'include/convolver/host.hpp')
+        outside = ('/usr/include/c++/13/string', str(ROOT / 'build-fuzz/<stdin>'), '<stdin>')
         result = check(*listed, *outside)
         self.assertEqual(result.returncode, 0, result.stderr)
         result = check(*listed, str(ROOT / 'portable/host.cpp'))
         self.assertEqual(result.returncode, 1)
         self.assertIn('  portable/host.cpp', result.stderr)
         self.assertNotIn('state.cpp', result.stderr)
-        result = check(str(ROOT / 'portable/state.cpp'))
+        # A file the build wrote (a generated header) has inputs FUZZED may not name.
+        with tempfile.TemporaryDirectory(dir=ROOT) as temporary:
+            written = Path(temporary) / 'generated' / 'convolver_identities.hpp'
+            written.parent.mkdir()
+            written.write_text('// generated\n')
+            result = check(*listed, str(written))
+            self.assertEqual(result.returncode, 1)
+            self.assertIn('written by the build', result.stderr)
+            self.assertIn(written.relative_to(ROOT).as_posix(), result.stderr)
+            with mock.patch.object(ci_scope, 'FUZZED_GENERATED', ('convolver_identities.hpp',)):
+                self.assertEqual(ci_scope.fuzz_sources([*listed, str(written)], ROOT), ([], [], []))
+        # Every harness must be there: a list from fewer targets, or none, fails.
+        result = check(*listed[1:])
         self.assertEqual(result.returncode, 1)
-        self.assertIn('no fuzz harness', result.stderr)
+        self.assertIn('  tests/fuzz/' + Path(harnesses[0]).name, result.stderr)
         self.assertEqual(check().returncode, 1)
 
     def test_pull_request_merge_commit(self):

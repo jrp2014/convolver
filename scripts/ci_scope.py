@@ -200,6 +200,10 @@ FUZZED = (
     'portable/fft_fftw.cpp',  # The runner's FFT backend.
     'portable/denormals.hpp',
 )
+# Files the build writes that may be compiled into the fuzz targets, by name,
+# once the files each is made from are in FUZZED. None is today; the check
+# fails on any other written file it finds (CI-34).
+FUZZED_GENERATED = ()
 # Workflows gated by this script, named by their file in .github/workflows/.
 WORKFLOWS = ('regression', 'fuzz', 'vst3', 'au', 'lv2', 'release')
 
@@ -365,42 +369,55 @@ def changed_files():
 
 
 def fuzz_sources(lines, root):
-    """The repository files among the source paths compiled into the fuzz
-    targets (one per line, as llvm-dwarfdump --show-sources prints them) that
-    FUZZED does not name, and whether any harness was among them. Paths
-    outside the repository's tracked files (system headers, files the build
-    writes) are left out."""
+    """Check the source paths compiled into the fuzz targets (one per line,
+    as llvm-dwarfdump --show-sources prints them) against FUZZED. Returns the
+    repository files FUZZED does not name, the files inside the repository
+    that are not tracked (written by the build, such as a generated header)
+    and not in FUZZED_GENERATED, and the harnesses (tests/fuzz/fuzz_*.cpp)
+    that are missing from the list. Paths outside the repository, and names
+    that are not files (such as <stdin>), are left out."""
     root = Path(root).resolve()
     tracked = set(
         subprocess.run(
             ['git', '-c', 'core.quotePath=false', 'ls-files'], cwd=root, check=True, capture_output=True, text=True
         ).stdout.splitlines()
     )
-    sources = set()
+    sources, generated = set(), set()
     for line in lines:
         name = line.strip()
         if not name:
             continue
         path = Path(name)
+        path = (path if path.is_absolute() else root / path).resolve()
         try:
-            relative = (path if path.is_absolute() else root / path).resolve().relative_to(root).as_posix()
+            relative = path.relative_to(root).as_posix()
         except ValueError:
             continue  # Outside the repository.
         if relative in tracked:
             sources.add(relative)
-    harnesses = any(path.startswith('tests/fuzz/fuzz_') for path in sources)
-    return sorted(path for path in sources if not matches(path, FUZZED)), harnesses
+        elif path.is_file() and path.name not in FUZZED_GENERATED:
+            generated.add(relative)
+    harnesses = {path for path in tracked if re.fullmatch(r'tests/fuzz/fuzz_[^/]*\.cpp', path)}
+    missing = sorted(path for path in sources if not matches(path, FUZZED))
+    return missing, sorted(generated), sorted(harnesses - sources)
 
 
 def check_fuzz_sources(source):
     """--fuzz-sources: fail when a repository file compiled into the fuzz
-    targets is missing from FUZZED, or when no harness is among the sources
-    (the list did not come from the targets)."""
+    targets is missing from FUZZED, when a file the build wrote is compiled
+    in, or when a harness is missing from the list (it did not come from all
+    the targets)."""
     lines = sys.stdin.readlines() if source == '-' else Path(source).read_text(encoding='utf-8').splitlines()
-    missing, harnesses = fuzz_sources(lines, Path(__file__).resolve().parents[1])
-    if not harnesses:
-        print('CI scope: no fuzz harness among the sources; were they read from the fuzz targets?', file=sys.stderr)
-        return 1
+    missing, generated, absent = fuzz_sources(lines, Path(__file__).resolve().parents[1])
+    failed = False
+    if absent:
+        print(
+            'CI scope: these harnesses are not among the sources; were they read from all the fuzz targets?',
+            *(f'  {path}' for path in absent),
+            sep='\n',
+            file=sys.stderr,
+        )
+        failed = True
     if missing:
         print(
             'CI scope: these files are compiled into the fuzz targets, but a pull request that changes them\n'
@@ -409,6 +426,17 @@ def check_fuzz_sources(source):
             sep='\n',
             file=sys.stderr,
         )
+        failed = True
+    if generated:
+        print(
+            'CI scope: these files, written by the build, are compiled into the fuzz targets. Add the files\n'
+            'each is made from to FUZZED, and its name to FUZZED_GENERATED, in scripts/ci_scope.py (CI-34):',
+            *(f'  {path}' for path in generated),
+            sep='\n',
+            file=sys.stderr,
+        )
+        failed = True
+    if failed:
         return 1
     print('CI scope: FUZZED names every repository file compiled into the fuzz targets.')
     return 0

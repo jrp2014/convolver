@@ -37,7 +37,7 @@ Until 1.0 the C++ API may change between minor versions.
   macOS, Windows and Linux. Each claim links to the guide, test or
   measurement behind it; the preview's limitations follow in their own
   section.
-- CI (CI-34, finished; approved by jrp on 18 November 2026): a pull request
+- CI (CI-34, finished; chosen by jrp on 18 November 2026): a pull request
   runs the fuzz workflow only when it changes what the four fuzz targets are
   built from: their harnesses, seeds and regression inputs, the parsers,
   audio reader and state decoder with the code compiled in with them, the

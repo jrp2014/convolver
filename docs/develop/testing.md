@@ -1755,9 +1755,10 @@ changed files cannot be listed still builds everything.
 ### When pull requests run the fuzz targets
 
 The fuzz workflow builds four libFuzzer targets and runs each for 60
-seconds, about 3 minutes on one Linux runner. Most code pull requests change
-nothing the targets read, so a pull request runs them only when it changes
-what they are built from (CI-34, approved by jrp on 18 November 2026):
+seconds, about 3 minutes on one Linux runner. Many code pull requests change
+nothing the targets read (about a third of the runs measured below), so a
+pull request runs them only when it changes what they are built from (CI-34,
+chosen by jrp on 18 November 2026):
 
 - the harnesses, seeds and regression inputs in `tests/fuzz/`, and the
   files the workflow runs: `fuzz_campaigns.sh`, `ci_scope.py` and the
@@ -1773,9 +1774,12 @@ what they are built from (CI-34, approved by jrp on 18 November 2026):
 The list is `FUZZED` in `ci_scope.py`. Every run of the workflow checks it
 against the targets themselves: `llvm-dwarfdump --show-sources` lists every
 file compiled into them, and `ci_scope.py --fuzz-sources` fails if a
-repository file among them is missing from `FUZZED`. A new dependency has to
-be added in a file already compiled in, so the pull request that adds it runs
-the workflow and fails there. `tests/ci_scope_tests.py` (in pre-commit)
+repository file among them is missing from `FUZZED`, if a file the build
+wrote (a generated header, made from files `FUZZED` may not name) is among
+them without its name in `FUZZED_GENERATED`, or if any of the four harnesses
+is missing from the list. A new dependency has to be added in a file already
+compiled in, so the pull request that adds it runs the workflow and fails
+there. `tests/ci_scope_tests.py` (in pre-commit)
 checks that every entry exists and that the listed sources include no
 unlisted header.
 
@@ -1870,8 +1874,8 @@ flag and every included header, so a cached object is reused only for an
 identical compilation; the cache key (workflow, job and matrix entry) only
 chooses which earlier cache to start from. Pull requests restore the cache that
 `main` saved and never save one, so the repository's 10 GB cache stays bounded
-and a pull request cannot change what `main` builds from; pushes to `main` and
-manual runs save theirs. Each job's log ends with ccache's hit statistics.
+and a pull request cannot change what `main` builds from; pushes to `main`,
+scheduled and manual runs save theirs. Each job's log ends with ccache's hit statistics.
 
 The Windows jobs use the Visual Studio generator, which takes no compiler
 launcher, and the release candidates are built without a cache, from the
