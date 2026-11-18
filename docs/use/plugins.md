@@ -306,7 +306,10 @@ effects at the rate in *Audio setup › Audio settings › Default sample rate*
 (44100 Hz unless changed). Check the playing copy's `Started at` line in
 the log for the rate it runs at (in Audacity the window's Host sample rate
 can belong to a copy that does not play), and set the host's playback rate
-to the filter's.
+to the filter's. Every refusal for the rate says this in its Fix, in the
+window, Status details and the log: "The host may play at a different rate
+from the one it exports at: the "Started at" line in the log gives the rate
+it plays at."
 
 **The Convolver log** is a text file with one line for each filter loaded,
 each time the host sends its audio settings (the sample rate, channels and block

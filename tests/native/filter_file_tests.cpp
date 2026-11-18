@@ -74,6 +74,23 @@ void run(const fs::path& dir) {
             "channel counts: " + channels);
     const auto rate = refused(dir / "fast.wav", stereo, HostFailureKind::sample_rate);
     require(has(rate, "the filter is for 48000 Hz, the host runs at 44100 Hz."), "rate: " + rate);
+    // PLUG-25: a chosen file refused for its rate carries the agreed line in
+    // its fix (decisions log, 8 November 2026); one refused for its channels
+    // does not.
+    {
+        FilterFileFailure why;
+        require(!read_filter_file((dir / "fast.wav").string(), stereo, detail::libsndfile_files(),
+                                  why) &&
+                    has(why.message.fix, "set the host's project or audio device to 48000 Hz. "
+                                         "The host may play at a different rate from the one it "
+                                         "exports at: the \"Started at\" line in the log gives "
+                                         "the rate it plays at."),
+                "chosen file's rate refusal without the playback-rate line: " + why.message.fix);
+        require(!read_filter_file((dir / "mono.wav").string(), stereo, detail::libsndfile_files(),
+                                  why) &&
+                    !has(why.message.fix, "exports at"),
+                "chosen file's channel refusal names the playback rate: " + why.message.fix);
+    }
 
     // VST3-9: a host rate that is not whole hertz is kept exactly, and no
     // filter suits it, not even one for its whole part.
@@ -116,7 +133,10 @@ void run(const fs::path& dir) {
                     why.kind == HostFailureKind::sample_rate &&
                     has(why.message.problem,
                         "the filter is for 48000 Hz, and the host runs at 47952.04795 Hz") &&
-                    why.message.fix == "Set the host's project or audio device to 48000 Hz.",
+                    why.message.fix ==
+                        "Set the host's project or audio device to 48000 Hz. The host may play at "
+                        "a different rate from the one it exports at: the \"Started at\" line in "
+                        "the log gives the rate it plays at.",
                 "a file at a fractional rate not refused with both rates");
         // A filter for the rate's whole part is refused when the file is
         // read, so it cannot slip in before the host is known (when a load
@@ -142,7 +162,10 @@ void run(const fs::path& dir) {
         require(!read_filter_file((dir / "whole part mono.wav").string(), pulled,
                                   detail::libsndfile_files(), why) &&
                     why.kind == HostFailureKind::sample_rate &&
-                    why.message.fix == "Set the host's project or audio device to 47952 Hz.",
+                    why.message.fix ==
+                        "Set the host's project or audio device to 47952 Hz. The host may play at "
+                        "a different rate from the one it exports at: the \"Started at\" line in "
+                        "the log gives the rate it plays at.",
                 "a mono filter for the whole part not refused for its rate");
     }
 

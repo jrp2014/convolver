@@ -241,7 +241,7 @@ std::string resample_fix(int wanted, const std::string& available, bool list, Ch
            (who == Chooser::host      ? "set the host's project or audio device to " + available
             : who == Chooser::options ? "choose " + available + " with --sample-rate"
                                       : "convert the audio to " + available + " first") +
-           ".";
+           "." + (who == Chooser::host ? " " + std::string(host_playback_rate_fix) : std::string());
 }
 std::string resample_note(bool list) {
     return std::string("Convolver never resamples, so a filter only fits audio at the rate it "
