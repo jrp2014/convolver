@@ -494,7 +494,7 @@ means a patched FFmpeg build with `--enable-gpl`.
   configuration text in 0.99g). The historical Convolver read `.cfg` text in
   the Windows ANSI code page (`channelpaths.cpp` reads it through
   `basic_ifstream<TCHAR>` and `wavefile.h` opens `CT2CA(path)`); the
-  portable parser reads UTF-8 only. Since PR #NNN a file name that is not
+  portable parser reads UTF-8 only. Since PR #211 a file name that is not
   UTF-8 stops with `not-utf8`, naming the line, the byte, the likely cause
   and how to save the file as UTF-8, instead of "IR file not found" with a
   garbled name ([configuration](docs/use/configuration.md#file-layout)).
