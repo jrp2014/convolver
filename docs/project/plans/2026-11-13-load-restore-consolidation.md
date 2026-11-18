@@ -499,7 +499,10 @@ jrp's decisions of 13 November 2026 ([decisions log](../decisions.md#direction))
    change.
 3. **One TODO item, PLUG-39,** with numbered step pull requests, each
    independently reviewable and revertible, and substeps (`step 3a`, `3b`,
-   `3c`; `4a`, `4b`, `4c`) where the plan already calls for several.
+   `3c`; `4a`, `4b`, `4c`) where the plan already calls for several. On
+   18 November 2026 jrp chose to start step 1 with the redundant analysis on
+   a restore, so step 1 has substeps `1a` and `1b`
+   ([decisions log](../decisions.md#direction)).
 4. **LV2 is aligned with VST3 and the Audio Unit** for a re-chosen file
    whose decoded configuration is unchanged (step 1, its own commit), and
    the VST3 and Audio Unit difference in when the host counts as settled is
