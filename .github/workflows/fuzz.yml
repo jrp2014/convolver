@@ -7,7 +7,12 @@ name: Fuzz smoke tests
   # request can be tested with "Run workflow" (docs/develop/testing.md#ci-triggers).
   push:
     branches: [main]
+  # Pull requests run the targets only when they change what the targets are
+  # built from (CI-34, scripts/ci_scope.py FUZZED); each Monday a longer
+  # campaign runs whatever changed.
   pull_request:
+  schedule:
+    - cron: '23 6 * * 1'
   workflow_dispatch:
     inputs:
       seconds:
@@ -18,15 +23,15 @@ permissions:
   contents: read
 
 # A new commit on a pull request cancels the run for the commit it replaces.
-# Pushes to main and manual runs each get a group of their own.
+# Pushes to main, scheduled and manual runs each get a group of their own.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
-  # Pull requests that change only documentation, or only another plug-in
-  # format's or workflow's own files (CI-13), skip the builds and tests
-  # (scripts/ci_scope.py, docs/develop/testing.md#documentation-only-pull-requests).
+  # Pull requests that change nothing the fuzz targets are built from skip
+  # them (CI-34, scripts/ci_scope.py,
+  # docs/develop/testing.md#when-pull-requests-run-the-fuzz-targets).
   scope:
     runs-on: ubuntu-latest
     outputs:
@@ -50,7 +55,7 @@ jobs:
       # Builds and tests use every CPU the runner has.
       - uses: ./.github/actions/use-every-cpu
       - name: Dependencies
-        run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libsndfile1-dev clang
+        run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libsndfile1-dev clang llvm
       # Compiler cache: pull requests restore it; main and manual runs also
       # save it (docs/develop/testing.md#compiler-cache).
       - name: Compiler cache
@@ -68,6 +73,13 @@ jobs:
         run: >
           cmake --build build-fuzz
           --target fuzz_config_text fuzz_config_list fuzz_host_state fuzz_ir_file
+      # CI-34: a pull request runs this workflow only when a file in FUZZED
+      # changes, so that list must name every repository file compiled into
+      # the targets. The debug information lists them; a new dependency fails
+      # here, on the pull request that adds it.
+      - name: Check that the scope list names every source
+        shell: bash
+        run: llvm-dwarfdump --show-sources build-fuzz/fuzz_* | python3 scripts/ci_scope.py --fuzz-sources -
       # CI-12: the campaigns run side by side, at most one per physical core,
       # so each keeps a core of its own for its whole time budget: four at once
       # on the runner's 4 CPUs gave each about half its usual executions
@@ -76,8 +88,10 @@ jobs:
       # tests/fuzz/scheduler_tests.py tests that (CI-15). Each log's last lines
       # include its "Done N runs".
       - name: Run each target
+        # 60 seconds each on pull requests and main, 600 on the weekly run,
+        # and the input's value (600 by default) when started by hand.
         env:
-          SECONDS_PER_TARGET: ${{ github.event.inputs.seconds || '60' }}
+          SECONDS_PER_TARGET: ${{ github.event.inputs.seconds || (github.event_name == 'schedule' && '600') || '60' }}
         run: scripts/fuzz_campaigns.sh --build build-fuzz --output fuzz-out --seconds "$SECONDS_PER_TARGET"
       - name: Keep crash inputs and logs
         if: failure()
