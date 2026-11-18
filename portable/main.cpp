@@ -11,6 +11,7 @@
 #include "sound_files.hpp"
 #include "utf8.hpp"
 #include <algorithm>
+#include <cctype>
 #include <charconv>
 #include <cmath>
 #include <csignal>
@@ -148,6 +149,79 @@ std::string exact_decimal(double value) {
 // overshoot measured at the bound (1.2e-7 of full scale, with 65,536 and
 // 262,144 random taps at blocks of 64 to 16,384 frames).
 constexpr double no_clip_rounding = 1.0 / 65536;
+// DIAG-5: after a render, what went beyond full scale, as BruteFIR has
+// reported overflows since 0.99. For integer output, `counts` are the samples
+// the quantizer clipped (AudioWriter::clipped_samples()); for float output,
+// the samples above full scale, which the file keeps but a later conversion
+// to integer samples clips. `peaks` are each channel's largest magnitude
+// after --gain-db and `frames` the frames written; `no_clip` says the gain
+// came from --gain-db no-clip, so only input beyond full scale can be the
+// cause. Empty when nothing went beyond full scale, so a clean render prints
+// nothing.
+std::string clip_report(const std::string& name, unsigned significant_bits,
+                        const std::vector<float>& peaks, const std::vector<std::uint64_t>& counts,
+                        std::uint64_t frames, bool no_clip) {
+    const bool integer = significant_bits != 0;
+    std::uint64_t total = 0;
+    std::size_t affected = 0;
+    double loudest = 0;
+    std::ostringstream lines;
+    lines.imbue(std::locale::classic());
+    for (std::size_t c = 0; c < counts.size() && c < peaks.size(); ++c) {
+        if (!counts[c])
+            continue;
+        total += counts[c];
+        ++affected;
+        const double db = 20 * std::log10(static_cast<double>(peaks[c]));
+        loudest = std::max(loudest, db);
+        lines << "\n    channel " << c + 1 << ": " << counts[c] << " of " << frames
+              << (frames == 1 ? " sample " : " samples ")
+              << (integer ? "clipped" : "above full scale") << ", peak " << std::fixed
+              << std::setprecision(2) << std::showpos << db << std::noshowpos << " dBFS";
+    }
+    if (!total)
+        return {};
+    std::ostringstream text;
+    text.imbue(std::locale::classic());
+    const auto samples = std::to_string(total) + (total == 1 ? " sample" : " samples");
+    const auto channels = counts.size() == 1 ? std::string()
+                                             : " in " + std::to_string(affected) + " of " +
+                                                   std::to_string(counts.size()) + " channels";
+    std::ostringstream peak;
+    peak.imbue(std::locale::classic());
+    peak << std::fixed << std::setprecision(2) << loudest << " dB";
+    const bool above = loudest >= 0.005; // Otherwise rounding or dither took them over.
+    std::string fix;
+    if (no_clip)
+        fix = "Lower --gain-db below the no-clip figure reported above" +
+              (above ? " by more than the highest peak, " + peak.str() : std::string()) +
+              ": no-clip keeps full-scale input within full scale, and this input goes "
+              "beyond full scale.";
+    else
+        fix = "Render again with --gain-db no-clip, which keeps full-scale input within full "
+              "scale" +
+              (above ? ", or lower --gain-db by more than the highest peak, " + peak.str()
+                     : std::string()) +
+              ".";
+    if (integer) {
+        text << "convolver: warning: " << name << " clipped " << samples << channels << lines.str()
+             << "\n  Cause: Those samples went beyond full scale after the "
+             << "filter and --gain-db, and " << significant_bits
+             << "-bit integer samples cannot hold them, so each was written as the largest "
+                "value instead. Clipping distorts the sound; the filter's gain, --gain-db or the "
+                "input's level is too high.\n  Fix: "
+             << fix << "\n  Note: The output is complete and the render succeeded.\n";
+    } else {
+        text << "convolver: note: " << name << " has " << samples << " above full scale" << channels
+             << lines.str()
+             << "\n  Cause: Float samples keep values above full scale, so this output is not "
+                "clipped, but converting it to integer samples later (for a CD, a 24-bit file "
+                "or a playback device) will clip them.\n  Fix: To keep it within full scale: "
+             << static_cast<char>(std::tolower(static_cast<unsigned char>(fix[0]))) << fix.substr(1)
+             << '\n';
+    }
+    return text.str();
+}
 // CONTAINER-TYPE, for example wav-pcm24 or flac-pcm16.
 std::optional<convolver::OutputEncoding> parse_output_format(std::string_view name) {
     using convolver::Container;
@@ -676,6 +750,10 @@ int run(int argc, char** argv) {
             std::vector<float> in(chunk * engine.input_channels()), out(chunk * channels);
             std::size_t skip = keep ? 0 : engine.latency_frames();
             std::uint64_t written = 0; // Output frames so far, for messages.
+            // DIAG-5: each channel's peak, and for float output the samples
+            // above full scale, for clip_report().
+            std::vector<float> peaks(channels);
+            std::vector<std::uint64_t> above(channels);
             auto emit = [&](std::size_t frames) {
                 const auto drop = std::min(skip, frames);
                 skip -= drop;
@@ -694,6 +772,11 @@ int run(int argc, char** argv) {
                              "Lower --gain-db, or use '--gain-db no-clip', which keeps "
                              "full-scale input within full scale.",
                              {}}));
+                    const auto magnitude = std::abs(samples[i]);
+                    auto& peak = peaks[i % channels];
+                    peak = std::max(peak, magnitude);
+                    if (magnitude > 1)
+                        ++above[i % channels];
                 }
                 written += frames - drop;
                 if (!samples.empty())
@@ -717,6 +800,10 @@ int run(int argc, char** argv) {
             }
             reader.close();
             writer.close();
+            std::cerr << clip_report(
+                output == "-" ? std::string("standard output") : utf8_string(output),
+                bits ? (quantization.valid_bits ? quantization.valid_bits : bits) : 0, peaks,
+                bits ? writer.clipped_samples() : above, written, automatic_gain == "no-clip");
         } catch (const std::exception& error) {
             auto advice = convolver::detail::parse_advice(error.what());
             const auto incomplete =
