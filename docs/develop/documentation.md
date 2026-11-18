@@ -202,7 +202,11 @@ over current code or user instructions. (Until 21 October 2026 they lived in
 with an archive notice and a row in that index, and fix links to it. Do the
 same, with the notice saying "superseded", when what a plan left open is owned
 by a maintained guide and TODO items, so the plan is no longer the place to
-start. Put source comments near non-obvious invariants; put contributor navigation here, rather
+start. Put source comments near non-obvious invariants: say the constraint,
+why it holds and, where there is one, the test or upstream issue that
+protects it; for a workaround, also what it does not cover and when it can
+go. Leave task history, dates and a restatement of the next line to the pull
+request, TODO and the changelog. Put contributor navigation here, rather
 than adding large instruction blocks to implementation files.
 
 External references should point to primary specifications, project repositories

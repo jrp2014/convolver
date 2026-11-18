@@ -4,10 +4,10 @@
 Status: written on 6 November 2026 against Convolver `f6895f3` (0.10.x), at
 jrp's request: "Make it a goal of this project to be superior to the existing
 most popular reverb plug-ins. Identify those edges and move towards them."
-Nothing here is implemented. Optional features wait until the first
-independent walkthrough (REL-3, [decided](../decisions.md#plug-in-behaviour)),
-and platform- and chip-level micro-optimisation waits for the walkthroughs
-(jrp, 7 November 2026). This plan names the edges, ranks them and turns them
+Of what it ranks, only the non-uniform engine of rank 3 is in (PERF-2, in
+0.13.0). Each edge starts with the owner's decision its row names and the
+[gate](#before-an-item-starts) below, and platform- and chip-level
+micro-optimisation waits for the walkthroughs (jrp, 7 November 2026). This plan names the edges, ranks them and turns them
 into TODO items (EDGE-1 to EDGE-14, with PERF-2, PERF-3 and IO-2) to take
 up afterwards in the order given here, unless jrp
 [decides otherwise](#decisions-for-jrp). Last revised on 7 November 2026

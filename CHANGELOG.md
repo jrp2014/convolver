@@ -27,6 +27,24 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Documentation (DOC-16, from jrp's review of 18 November 2026): the
+  plug-ins guide no longer promises that Reload when the file changes never
+  reads a file part-way: waiting until a change has held for a second makes
+  it less likely, and the guide recommends that tools writing filters
+  write each file under a temporary name and rename it into place. For
+  contributors, TODO's execution priorities sort open work as in progress,
+  ready, depends on, needs a decision or parked until REL-3, in place of
+  columns written for the freeze lifted on 10 November, with jrp's parking
+  decisions kept and the five items he brought forward that day (DIAG-5,
+  and parts of PLUG-25, CFG-3, CI-34 and EDGE-11) shown in progress. The
+  workflow guide's verification table decides what to run when starting,
+  picking up and finishing work, with results for an exact commit carried
+  forward; a review's later rounds read the commits since the reviewed one;
+  older CI failures that a later commit explains need only a line. The
+  status page and TODO point to the changelog and decisions log instead of
+  retelling each preview's publication, CONTRIBUTING no longer calls
+  bundled dependencies future work, and the documentation guide says what
+  a source comment should hold.
 - Documentation (DOC-15): the README's opening says what sets Convolver
   apart, in a "What sets it apart" section under jrp's four emphases:
   accurate (checked against an independent double-precision convolution),

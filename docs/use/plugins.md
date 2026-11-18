@@ -486,9 +486,15 @@ From the top, the window has:
     once a second it checks the file and, for a `.cfg` or list, the files it
     names that make up the filter that plays (for a list, the lists and
     `.cfg` files it reads and the IR files of the entry chosen, not those
-    of other entries, which need not be installed), and reloads a second
-    after one has changed, so a file still being written is not read half
-    way. A file that has gone (moved or deleted)
+    of other entries, which need not be installed), and reloads once a
+    change has stayed the same for a second. That makes it less likely to
+    read a file still being written, but cannot rule it out: a program that
+    pauses while writing, or writes a filter's files one after another, can
+    still be caught part-way. A script or tool that writes filters for
+    Convolver should write each file under a temporary name in the same
+    folder and then rename it over the old one, so the file is only ever
+    seen whole, and rename all of a filter's files at the end, together.
+    A file that has gone (moved or deleted)
     is not reloaded; the filter that plays stays, as it does when a reload
     is refused (say, a `.cfg` that names a file not written yet): press
     Reload once the file is ready. A filter the host has restored since

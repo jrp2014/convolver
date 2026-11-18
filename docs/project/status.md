@@ -10,17 +10,13 @@ linked guides own the behaviour.
 
 **In short:** status checked on 12 November 2026 against `main` at
 `d414ce9` (0.13.14); the published previews brought up to date on
-16 November 2026 (0.13.24). jrp has published five unsigned developer previews as
-GitHub pre-releases: [0.12.12](https://github.com/jrp2014/convolver/releases/tag/v0.12.12) for macOS (8 November 2026),
-[0.13.2](https://github.com/jrp2014/convolver/releases/tag/v0.13.2) for macOS, Windows and Linux with the new audio engine
-(PERF-2, 9 November), [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12) (11 November), which adds the
-VST3 window on Windows, the LV2 plug-in in the Linux package and VST3-17's
-Audacity fix, and [0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20) (16 November), which adds the Gain mode,
-opening a Convolver `.vstpreset` in the window (PLUG-26), VST3 state that
-records the settings at their defaults (PLUG-35), **Choose…** on wider input
-buses (PLUG-33) and a preset or undo that keeps the playing filter's tail
-(PLUG-38), with the PipeWire guide (LV2-4), and the patch [0.13.24](https://github.com/jrp2014/convolver/releases/tag/v0.13.24) (16 November),
-which mitigates a host crash in the LV2 plug-in after a Gain mode change (LV2-9).
+16 November 2026 (0.13.24). jrp has published five unsigned developer
+previews as GitHub pre-releases, for macOS from 0.12.12 and for macOS,
+Windows and Linux from 0.13.2; the latest is
+[0.13.24](https://github.com/jrp2014/convolver/releases/tag/v0.13.24)
+(16 November 2026). What each added is in the [CHANGELOG](../../CHANGELOG.md),
+and the decisions to publish them in the
+[decisions log](decisions.md#releases).
 Each was published without the remaining host checks and the
 independent walkthrough, which stay open; nobody has yet tried the new
 engine or the Windows window in a host, and LV2 only in PipeWire 1.6.8
@@ -144,18 +140,16 @@ an independent user successfully installs and uses an exact preview package,
 with the lifecycle regression fixed and the advertised workflows demonstrated.
 The first preview is macOS-only ([decisions](decisions.md#plug-in-behaviour)):
 the VST3 plug-in and the Audio Unit with the existing shared window and their
-Gain, Mix and Latency settings, the `convolver` CLI and the preset tool. The
-Windows window followed in the third, 0.13.12 (VST3-12), and the other
-gain modes in the fourth, 0.13.20 (PR #188); the Linux window and the meters
-come in later previews. LV2 joined the Linux package with its packaging and settings
-(LV2-5, LV2-7; [decisions](decisions.md#releases)). The
-Windows and Linux packages are published from the second preview (VST3
-with the host's controls and the tools; from 0.13.12 the Windows VST3 has
-its window and the Linux package holds LV2), after an automated run on clean machines
-([REL-9](../../TODO.md), [decisions](decisions.md#releases)). Until the
-first independent walkthrough, optional features and further hardening wait;
-crashes, lost state, wrong audio, ordinary compatibility failures and
-demonstrated dropouts are still fixed at once.
+Gain, Mix and Latency settings, the `convolver` CLI and the preset tool.
+Later previews added the Windows and Linux packages, after an automated run
+on clean machines (REL-9), the Windows window (VST3-12), LV2 in the Linux
+package (LV2-5, LV2-7) and the other gain modes (PR #188)
+([decisions](decisions.md#releases)); the Linux window and the meters come
+later. Since 10 November 2026 significant features come before corner and
+edge cases, and the items jrp parked wait for the walkthrough
+([TODO](../../TODO.md#execution-priorities)); crashes, lost state, wrong
+audio, ordinary compatibility failures and demonstrated dropouts are still
+fixed at once.
 
 The first preview is cut from a 0.12.x tag. The milestone's conditions
 already met are below; what still needs running is in
@@ -235,34 +229,13 @@ until after the first preview.
 
 ### Checks left before publication
 
-jrp decided to publish the first preview without running these
-([decision](decisions.md#releases)): they stay open as follow-up work after
-publication, not gates, and the release notes list them as not checked.
-Check 6, each preview's candidate run, still runs before publication.
-jrp decided on 9 November 2026 to publish the second preview, a 0.13.x tag for
-macOS, Windows and Linux, without them too, and without check 9
-([decision](decisions.md#releases)); they stay open as follow-up work, and
-its release notes say what was not checked. On 10 November 2026 he decided
-the same for a third preview, once the changes in flight are in
-(VST3-17 without a check in Audacity, the Windows window, LV2; all merged
-by 0.13.11) ([decision](decisions.md#releases)); he published it,
-[0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), on 11 November 2026. On 14 November 2026 he asked
-for a fourth on the same terms, from the tag that PR #192's release notes
-made ([decision](decisions.md#releases)); he published it,
-[0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20), on 16 November 2026. The same day he asked for a
-patch preview with LV2-9's fix, so that 0.13.20's Linux LV2 users get it,
-from the tag that PR #199's release notes made
-([decision](decisions.md#releases)); it changes only the LV2 plug-in. He
-published it, [0.13.24](https://github.com/jrp2014/convolver/releases/tag/v0.13.24), the same day. On 9 November 2026 he made the
-published 0.13 preview (0.13.2) the baseline, and on 11 November 2026 moved
-it to 0.13.12, which holds the Audacity fix, the Windows window and LV2: the
-checks left and REL-3 ran on 0.13.12's exact files. On 16 November 2026 he
-moved it to 0.13.20, which holds the PLUG-33 and PLUG-38 fixes and the Gain
-mode; before publishing 0.13.24 he asked to move it again, to 0.13.24, which
-differs from 0.13.20 only in the LV2 plug-in: the checks left and REL-3 run on
-0.13.24's exact files, and the
-v0.12.8 results in the table below are records of that build, not passes
-for 0.13 ([decision](decisions.md#releases)).
+jrp published each preview without running these
+([decisions](decisions.md#releases)): they stay open as follow-up work after
+publication, not gates, and each release's notes list them as not checked.
+Check 6, each preview's candidate run, still runs before publication. They
+run on the published 0.13.24 files, the baseline jrp chose on 16 November
+2026; the v0.12.8 results in the table below are records of that build, not
+passes for 0.13 ([decision](decisions.md#releases)).
 
 This is the one list of what remains (REL-7), from jrp's direction of
 8 November 2026: finish the genuinely missing listening, host and

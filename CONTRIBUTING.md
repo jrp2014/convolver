@@ -250,13 +250,16 @@ generation if needed; an unavailable cache must only affect build time.
 
 ## Scope and versions
 
-The portable CMake package, CLI and VST3 plug-in share `VERSION`. Source changes
+The portable CMake package, the tools and the plug-ins share `VERSION`. Source changes
 on `main` receive automatic patch versions and annotated Git tags; see
 [source versioning](docs/develop/versioning.md) for scope, deliberate minor/major bumps
 and recovery. The pre-1.0 API can evolve between minor versions; no stable binary
 ABI is promised. Archived releases retain their separate history.
-Installed dependency versions remain externally managed. A future
-binary-release milestone should pin baselines and define dependency bundling.
+A source build uses the dependency versions installed on the system. The
+preview packages build theirs from the latest stable releases, link them
+statically and record each release in the source bundle
+([preview recipe](docs/develop/build.md#preview-recipe),
+[candidates](docs/develop/releasing.md#candidates)).
 
 Compatibility changes need fixtures for the affected config/path or file
 semantics. PCM8/16/24/32 quantization, optional dither, noise shaping and valid bits follow
