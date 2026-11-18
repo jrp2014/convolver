@@ -13,8 +13,7 @@ runtime freeze of 9 November was lifted on 10 November; significant features
 come before corner and edge cases
 ([decision](docs/project/decisions.md#releases)). The
 [execution priorities](#execution-priorities) sort every open item by what it
-waits for: in progress, ready, depends on, needs a decision, or parked until
-REL-3. The next milestone is still an independent user running a published
+waits for: in progress, ready, depends on, needs a decision, or parked. The next milestone is still an independent user running a published
 preview (REL-3).
 [Status](docs/project/status.md) shows what users can run now and the checks
 left, and [decisions](docs/project/decisions.md) what jrp has decided. Open
@@ -53,7 +52,7 @@ changes can go ahead, with significant features before corner and edge cases
 what jrp parked by name, so each open item, or each part of one, is in one
 table below, by what it waits for: **in progress**, **ready** to start, waiting on something that
 **depends on** another person or item, **needs a decision** from jrp, or
-**parked until REL-3**. Within a table, the order is the suggested one. The
+**parked**. Within a table, the order is the suggested one. The
 item itself holds the detail and its progress.
 
 **Next milestone** (jrp's [guidance](docs/review-2026-10/release-readiness-guidance-2026-10-22.md),
@@ -108,7 +107,6 @@ open pull requests for the ID before starting.
 | **FFT-2**, **VST3-5**, **PLUG-11** | Optimisation | PERF-3 showing a need |
 | **VST3-13**, **VST3-2**, **VST3-6**, **HOST-2**, **LV2-3**, **LV2-6**; distribution packages and macOS or Windows LV2 bundles | The Linux window, switching filters from the host, replacing the old VST2 plug-in, CLAP, named LV2 layouts, an LV2 window | A stated user need, then acceptance tests first |
 | **IO-1** | Large files | A reproducible defect or a user need |
-| **CI-32** | The most extreme numerical cases less often | One of them setting a job's or a contributor's run time |
 
 ### Needs a decision
 
@@ -116,22 +114,25 @@ open pull requests for the ID before starting.
 | --- | --- | --- |
 | **REL-1**, **PLUG-20** | The one production checklist: Developer ID signing and notarization on macOS, Authenticode on Windows, verified minimum OS and CPU versions, the final licence and corresponding-source review; the VST logo in the window (optional) | jrp's remaining signing choices in the [signing plan](docs/project/plans/2026-11-09-macos-signing.md), then his setup. The previews are unsigned by decision ([releasing](docs/develop/releasing.md#production-gates)) |
 | **IO-2**, **EDGE-1** and the other **EDGE** items | First the limitations users cite: IO-2 (the rate-mismatch workflow; EDGE-1 only if offline conversion proves inadequate), EDGE-10, EDGE-3 and EDGE-13; then EDGE-12, EDGE-9, EDGE-2, EDGE-4 and EDGE-5; then EDGE-6 to EDGE-8; EDGE-14 and EDGE-15 | jrp's goal (6 November 2026), in the ranked order of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build): each starts with the owner's decision its plan row names and the plan's gate (a reproducible limitation, an affected workflow, a measurable criterion). Platform- and chip-level micro-optimisation (EDGE-10) waits for the walkthroughs (jrp, 7 November 2026). Feedback that asks for one (sample rates, true stereo, a filter's own delay, an output ceiling) moves it up |
-| **FFMPEG-2** to **FFMPEG-5**, **HOST-3** | A C API and FFmpeg filter; a Windows Media Foundation transform | Parked by owner decision; revisit only by his decision |
 
-### Parked until REL-3
+### Parked
 
-jrp, 8 November 2026: "park any non-essential corner or edge case robustness
+Until REL-3, from jrp, 8 November 2026: "park any non-essential corner or edge case robustness
 tests", then "Park both" (the items and CI-34's narrowing); PLUG-36 on
 12 November 2026 ("park until after REL-3")
 ([decision](docs/project/decisions.md#releases)). The freeze's lifting did
 not change this. No existing test is removed, and a reproduced crash, lost
-state, unsafe output or wrong audio reopens one at once.
+state, unsafe output or wrong audio reopens one at once. The FFmpeg and
+Media Foundation items are parked by owner decision instead, not until
+REL-3.
 
 | Items | Note |
 | --- | --- |
 | **ROBUST-1**, **ROBUST-8**, **PLUG-27**, **PLUG-29**, **PLUG-30**, **PLUG-36**, **HOST-6** | Robustness and lifecycle corner cases |
+| **CI-32** | The most extreme numerical cases less often; dormant as well (jrp, 12 November 2026) |
 | **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19** | Profiling and measurement-only optimisations |
 | The rest of **PLUG-25**, **CFG-3** and **CI-34** | Beyond the parts in progress above |
+| **FFMPEG-2** to **FFMPEG-5**, **HOST-3** | A C API and FFmpeg filter; a Windows Media Foundation transform. Parked by owner decision; revisit only by his decision |
 
 The ordering of the first preview's steps that this section held until
 9 November 2026 is in the history of this file; the dated
@@ -1098,7 +1099,9 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   **Worth doing when** a measured limitation on PERF-3's long-reverb
   workloads points at one; it is then measured and kept only if it reaches
   the gain the [plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#2-savings-in-todays-engine)
-  states. **Done when** PERF-3's results show no candidate is justified;
+  states. jrp brought exact idling forward on 18 November 2026, ahead of
+  that measurement ([execution priorities](#in-progress)). **Done when**
+  PERF-3's results show no candidate is justified;
   each one tried is kept or
   stopped with its numbers, with the oracle tests passing, the worst error
   reported and nothing new allocating or locking on the audio thread.
@@ -1156,8 +1159,9 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   The first step is done: a pull request builds the candidates only when it
   touches what they ship, or when started by hand
   ([CI triggers](docs/develop/testing.md#when-pull-requests-build-the-candidates)).
-  **Remains**, waiting for jrp's go-ahead: the fuzz triggers, the coverage
-  table and matched runs. **Done when** scope tests and affected CI pass,
+  **Remains:** the fuzz triggers, which jrp brought forward on 18 November
+  2026, then the coverage table and matched runs, which wait for his
+  go-ahead. **Done when** scope tests and affected CI pass,
   every configuration has a retained trigger, and matched runs show the
   waiting-time savings, with oracle, regression, validator, platform and
   release checks retained.
@@ -1223,7 +1227,7 @@ Items finished since then are listed here, one line each, until the next
 move to the archive.
 
 - [x] **DOC-16 — Reconcile the contributor guidance with current
-  decisions.** 18 November 2026, from jrp's review of `e89a9dc`: the
+  decisions.** 18 November 2026, PR #206, from jrp's review of `e89a9dc`: the
   [execution priorities](#execution-priorities) sort open work by what it
   waits for instead of by the lifted freeze; the
   [verification table](docs/develop/workflow.md#verification-for-each-kind-of-change)
@@ -1232,7 +1236,7 @@ move to the archive.
   ([plug-ins guide](docs/use/plugins.md#convolvers-window)); source comments state
   their constraint ([documentation](docs/develop/documentation.md#current-claims-and-dated-evidence)).
 - [x] **CI-40 — Static analysis covers every portable source.** 18
-  November 2026, from jrp's review of `e89a9dc`: CI and CONTRIBUTING ran
+  November 2026, PR #206, from jrp's review of `e89a9dc`: CI and CONTRIBUTING ran
   clang-tidy on a hand-kept list that had missed `portable/partitions.cpp`;
   both now take the portable sources from the build's
   `compile_commands.json`, leaving out the vendored `portable/third_party/`

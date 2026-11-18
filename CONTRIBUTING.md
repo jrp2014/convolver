@@ -71,17 +71,20 @@ Presets export `compile_commands.json`. Run the correctness-oriented checks in
 (CI-40):
 
 ```sh
-run-clang-tidy.py -quiet -p build/presets/release '/portable/(?!third_party/).+\.cpp$'
+run-clang-tidy.py -quiet -p build/presets/release "^$PWD/portable/[^/]+\.cpp$"
 ```
 
-The quoted argument is a pattern matched against the files in
-`compile_commands.json`, so the sources come from the build rather than
-from a list: a new portable file is analysed without editing this command
-or the workflow, the FFT backend and platform files the build uses are
-included (`fft_accelerate.cpp` and `audio_toolbox.cpp` in a macOS build,
+Run it from the repository's top folder. The quoted argument is a pattern
+matched against the absolute paths in `compile_commands.json`, so the
+sources come from the build rather than from a list: a new file in
+`portable/` is analysed without editing this command or the workflow, the
+FFT backend and platform files the build uses are included
+(`fft_accelerate.cpp` and `audio_toolbox.cpp` in a macOS build,
 `fft_ooura.cpp` in an Ooura one), and a file the build does not compile is
-skipped. `portable/third_party/` holds vendored code (Ooura's FFT) and is
-left out. The script analyses the files side by side, one per CPU, prints
+skipped. Only files directly in `portable/` match: its one subfolder,
+`portable/third_party/`, holds vendored code (Ooura's FFT) and is left
+out, so first-party code in a new subfolder would need this pattern
+widened. The script analyses the files side by side, one per CPU, prints
 each file's output whole and fails if any file did. `clang-tidy -p
 build/presets/release portable/FILE.cpp` checks one file. In a build with
 `-DCONVOLVER_BUILD_LV2=ON`, also run it on `plugins/lv2/plugin.cpp` (the

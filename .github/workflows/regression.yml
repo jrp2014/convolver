@@ -114,11 +114,12 @@ jobs:
         run: |
           python -m pip install --upgrade clang-tidy
           clang-tidy --version
-          # CI-40: every portable source this build compiles, chosen from its
-          # compile_commands.json, so a new file is analysed without editing a
-          # list; portable/third_party/ (vendored Ooura) is left out. The
-          # same command is in CONTRIBUTING.md.
-          run-clang-tidy.py -quiet -p build '/portable/(?!third_party/).+\.cpp$'
+          # CI-40: every source directly in portable/ that this build
+          # compiles, chosen from its compile_commands.json, so a new file is
+          # analysed without editing a list; the vendored Ooura code in
+          # portable/third_party/ is below it and left out. The same command
+          # is in CONTRIBUTING.md.
+          run-clang-tidy.py -quiet -p build "^$PWD/portable/[^/]+\.cpp$"
       - name: Linked versions
         run: ./build/convolver --version
       - name: Core-only preset without file or Python dependencies
