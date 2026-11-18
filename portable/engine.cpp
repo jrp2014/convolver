@@ -150,10 +150,14 @@ ConfigurationAnalysis validate(const Configuration& c, std::size_t latency) {
     return result;
 }
 detail::StageWorkProbe stage_work_probe = nullptr;
+bool idle_disabled = false;
 } // namespace
 
 void detail::probe_stage_work(StageWorkProbe p) noexcept {
     stage_work_probe = p;
+}
+void detail::disable_idle(bool disabled) noexcept {
+    idle_disabled = disabled;
 }
 
 ConfigurationAnalysis analyze_configuration(const Configuration& c, std::size_t latency) {
@@ -178,6 +182,22 @@ bool same_mix(const std::vector<Route>& a, const std::vector<Route>& b) noexcept
 // being produced, and each stage adds its blocks' results ahead of time, so a
 // frame leaves the ring complete. The output order of additions differs from
 // the uniform engine's, which changes results by float rounding only.
+//
+// EDGE-11: once the input has been exactly silent (every sample zero, of
+// either sign, or an empty span) for `idle_after` frames, every buffer that
+// can reach the output holds only zeros: the delay lines, the mixed input and
+// the direct sum's history, every stage's spectrum history (spectra of silent
+// blocks; `valid` has reached each ring's size) and the output rings. Each
+// further silent chunk then only advances `time` and writes +0, which is what
+// processing it would produce: the rings start every frame at +0 and adding a
+// zero of either sign to +0 gives +0. The spread work a stage had in progress
+// is dropped; it would only have added zeros, and its next block starts from
+// begin() at the same boundary, with the same `valid`, as without idling, so
+// the schedule, and the order of every later addition, is unchanged. The
+// output is therefore bit-identical to processing the silence. `idle_after`
+// is a structural bound (below), not the filter's mathematical tail, because
+// the transforms' rounding leaves tiny values up to a block past the last
+// tap. A filter with an infinite spectrum never idles: 0 x inf is NaN.
 struct Engine::Impl {
     // Per stage, the spectra of one input mix's recent blocks.
     struct MixStage {
@@ -226,7 +246,11 @@ struct Engine::Impl {
         double total = 0, done = 0;
     };
     std::size_t inputs, outputs, latency, tail, first, planned, ring_mask, recent_mask;
-    std::uint64_t time = 0;          // Frames processed since construction or reset.
+    std::uint64_t time = 0; // Frames processed since construction or reset.
+    // EDGE-11: exactly silent input frames since the last nonzero one (or
+    // since construction or reset), counted in whole chunks, and how many
+    // there must be before silent chunks are skipped.
+    std::uint64_t silent_run = 0, idle_after = 0;
     std::vector<float> delayed;      // Delayed input for the current chunk, per channel.
     std::vector<float> output_rings; // outputs x output_ring.
     std::vector<float> direct;       // One path's direct sum for a chunk.
@@ -271,6 +295,7 @@ struct Engine::Impl {
             stage.fft = std::make_unique<detail::RealFft>(2 * s.block, options);
         }
         paths.reserve(c.paths.size());
+        bool finite = true; // Every filter spectrum (EDGE-11).
         for (const auto& source : c.paths) {
             std::size_t m = 0;
             while (m < mixes.size() && !same_mix(mixes[m].routes, source.inputs))
@@ -302,8 +327,10 @@ struct Engine::Impl {
                     const auto count = std::min(stage.block, taps - from);
                     std::copy_n(source.impulse.data() + from, count, time_data);
                     stage.fft->forward();
-                    k.deinterleave(stage.fft->frequency(), own.filters.data() + p * 2 * stage.bins,
-                                   stage.bins, normalization);
+                    float* spectrum = own.filters.data() + p * 2 * stage.bins;
+                    k.deinterleave(stage.fft->frequency(), spectrum, stage.bins, normalization);
+                    finite = finite && std::all_of(spectrum, spectrum + 2 * stage.bins,
+                                                   [](float v) { return std::isfinite(v); });
                 }
             }
             paths.push_back(std::move(path));
@@ -315,6 +342,33 @@ struct Engine::Impl {
             for (std::size_t s = 0; s < stages.size(); ++s)
                 mix.stages[s].history.assign(mix.stages[s].partitions * 2 * stages[s].bins, 0.f);
         }
+        idle_after = finite && !idle_disabled ? quiet_frames(c, layout)
+                                              : std::numeric_limits<std::uint64_t>::max();
+    }
+    // EDGE-11: silent input frames after which every buffer that can reach
+    // the output holds only zeros. Delayed input frame t of a stage's block
+    // j = t / B reaches the blocks computed for jobs j to j + P - 1 (P the
+    // longest filter's partitions), whose results land at most offset + 2B
+    // frames after their job's block and are complete by (j + 2) B; so all
+    // its effects are in the rings by t + offset + (P + 2) B, and its
+    // spectrum has left the P-slot history by then too. The direct sum's
+    // reach is start + first, the mixed input ring's input_ring and the
+    // direct sum's history head + first. Input delays come before all this
+    // and output delays (with any latency beyond the planned one) after it;
+    // one first block more covers the chunked count of silent frames.
+    std::uint64_t quiet_frames(const Configuration& c,
+                               const detail::Partitioning& layout) const noexcept {
+        std::uint64_t reach =
+            std::max<std::uint64_t>({layout.input_ring, layout.head + first, layout.start + first});
+        for (const auto& stage : layout.stages)
+            reach =
+                std::max<std::uint64_t>(reach, stage.offset + (stage.partitions + 2) * stage.block);
+        const auto longest = [](const std::vector<std::size_t>& delays) {
+            return delays.empty() ? std::size_t(0)
+                                  : *std::max_element(delays.begin(), delays.end());
+        };
+        return longest(c.input_delays) + 1 + reach + longest(c.output_delays) + layout.extra + 1 +
+               first;
     }
 
     // Unit work of a stage's block `job`: the forward transform of one mix,
@@ -538,8 +592,18 @@ struct Engine::Impl {
         if (time % first == 0)
             boundary();
     }
+    // EDGE-11: a silent chunk once everything that reaches the output is
+    // zero: the same output as chunk(), without the work.
+    void idle(std::span<float> output, std::size_t at, std::size_t frames) noexcept {
+        std::fill_n(output.begin() + static_cast<std::ptrdiff_t>(at * outputs), frames * outputs,
+                    0.f);
+        for (auto& s : stages)
+            s.active = false;
+        time += frames;
+    }
     void reset() noexcept {
         time = 0;
+        silent_run = 0;
         std::fill(output_rings.begin(), output_rings.end(), 0.f);
         for (auto& d : input_delays)
             d.reset();
@@ -638,7 +702,18 @@ void Engine::process(std::span<const float> input, std::span<float> output, std:
     for (std::size_t done = 0; done < frames;) {
         const auto count =
             std::min(frames - done, s.first - static_cast<std::size_t>(s.time % s.first));
-        s.chunk(input, output, done, count);
+        // EDGE-11: stops at the first nonzero sample, so music costs little.
+        const bool silent =
+            input.empty() ||
+            std::all_of(input.begin() + static_cast<std::ptrdiff_t>(done * s.inputs),
+                        input.begin() + static_cast<std::ptrdiff_t>((done + count) * s.inputs),
+                        [](float v) { return v == 0; });
+        if (silent && s.silent_run >= s.idle_after) {
+            s.idle(output, done, count);
+        } else {
+            s.chunk(input, output, done, count);
+            s.silent_run = silent ? s.silent_run + count : 0;
+        }
         done += count;
     }
 }

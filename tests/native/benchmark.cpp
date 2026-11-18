@@ -61,11 +61,20 @@ int main(int argc, char** argv) {
             std::cout << std::size(cases) << '\n';
             return 0;
         }
-        if (argc == 4 && std::string(argv[3]) == "--baseline")
-            convolver::detail::force_baseline_kernels(true);
-        else if (argc != 3)
+        // --silent times silent input once the filter's tail has ended (EDGE-11).
+        bool silent = false;
+        for (int i = 3; i < argc; ++i) {
+            const std::string option = argv[i];
+            if (option == "--baseline")
+                convolver::detail::force_baseline_kernels(true);
+            else if (option == "--silent")
+                silent = true;
+            else
+                argc = 0;
+        }
+        if (argc < 3)
             throw std::invalid_argument(
-                "usage: convolver_benchmark CASE SECONDS [--baseline] (CASE=0.." +
+                "usage: convolver_benchmark CASE SECONDS [--baseline] [--silent] (CASE=0.." +
                 std::to_string(std::size(cases) - 1) + "), or convolver_benchmark --count");
         const auto index = std::stoul(argv[1]);
         const auto seconds = std::stod(argv[2]);
@@ -100,6 +109,12 @@ int main(int argc, char** argv) {
             std::chrono::duration<double, std::milli>(Clock::now() - setup_start).count();
         for (std::size_t i = 0; i < c.ir / c.block + 16; ++i)
             engine.process(input, output, c.block);
+        if (silent) {
+            // Music, then silence well past the tail and the largest blocks.
+            std::fill(input.begin(), input.end(), 0.f);
+            for (std::size_t i = 0; i < (2 * c.ir + 65536) / c.block + 16; ++i)
+                engine.process(input, output, c.block);
+        }
         std::size_t blocks = 0;
         double checksum = 0;
         const auto start = Clock::now();
@@ -124,15 +139,16 @@ int main(int argc, char** argv) {
         const auto percentile = [&](double q) {
             return latency[static_cast<std::size_t>(q * double(latency.size() - 1))];
         };
-        std::cout
-            << "backend,kernels,case,block,ir,channels,paths,setup_ms,ns_per_frame,p50_block_us,"
-               "p99_block_us,max_block_us,peak_rss_kib,frames,checksum\n"
-            << std::setprecision(10) << convolver::fft_backend_name() << ','
-            << convolver::detail::kernels().name << ',' << c.name << ',' << c.block << ',' << c.ir
-            << ',' << c.inputs << "->" << c.outputs << ',' << config.paths.size() << ',' << setup_ms
-            << ',' << elapsed * 1e9 / double(blocks * c.block) << ',' << percentile(.5) << ','
-            << percentile(.99) << ',' << latency.back() << ',' << peak_rss_kib() << ','
-            << blocks * c.block << ',' << checksum << '\n';
+        std::cout << "backend,kernels,case,input,block,ir,channels,paths,setup_ms,ns_per_frame,"
+                     "p50_block_us,"
+                     "p99_block_us,max_block_us,peak_rss_kib,frames,checksum\n"
+                  << std::setprecision(10) << convolver::fft_backend_name() << ','
+                  << convolver::detail::kernels().name << ',' << c.name << ','
+                  << (silent ? "silent" : "music") << ',' << c.block << ',' << c.ir << ','
+                  << c.inputs << "->" << c.outputs << ',' << config.paths.size() << ',' << setup_ms
+                  << ',' << elapsed * 1e9 / double(blocks * c.block) << ',' << percentile(.5) << ','
+                  << percentile(.99) << ',' << latency.back() << ',' << peak_rss_kib() << ','
+                  << blocks * c.block << ',' << checksum << '\n';
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';
         return 1;

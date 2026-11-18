@@ -111,6 +111,18 @@ workflow.
    spectra written since construction or reset, and paths multiply only those
    partitions (PERF-5), so neither reset nor the blocks after it pay for
    history known to be silence. It does not rebuild plans or read files.
+7. Once the input has been exactly silent (every sample zero, or an empty
+   span) for longer than anything can stay in the engine, `Engine::process`
+   writes zeros for each further silent chunk and does no other work
+   (EDGE-11). The bound is structural: the delays, the mixed input ring, and
+   for each stage its offset plus its partitions and two blocks, because the
+   transforms' rounding leaves tiny values up to a block beyond the filter's
+   last tap. By then every buffer that reaches the output holds zeros, so
+   the output is bit-identical to processing the silence; the next nonzero
+   sample resumes at the same block phase. `native.engine`'s
+   `idle_after_tail` compares an idling engine with one built under
+   `detail::disable_idle`. A filter whose spectrum overflows to infinity
+   never idles.
 
 ### Subnormal numbers
 

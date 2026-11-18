@@ -12,6 +12,17 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Engine (EDGE-11, first candidate): once the input has been exactly
+  silent for longer than anything can stay in the engine (the latency, the
+  filter and its delays, plus at most about half a second), each further
+  silent callback writes zeros without convolving. The output stays bit for
+  bit what processing the silence gives, and the next sound resumes at
+  once. On the Linux cloud VM silence after the tail costs 92 to 99% less
+  CPU (11 s stereo reverb: 168 to 2 ns per frame), with music unchanged
+  within the measurements' spread
+  ([measurements](docs/develop/fft-measurements.md#idle-after-the-tail)).
+  `convolver_benchmark` gained `--silent` to time it.
+
 - Tests (COMPAT-1, in progress): the example presets of the published
   0.13.24 and the audio its own CLI and VST3 plug-in rendered from them are
   kept in `tests/upgrade/0.13.24/`, beside those of 0.13.2, 0.13.12 and

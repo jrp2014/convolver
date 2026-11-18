@@ -1078,8 +1078,7 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   workload, hardware target or hypothesis, measured against the
   [24 October 2026 vDSP experiment](docs/archive/reviews/2026-10-24-apple-vdsp.md).
 - [ ] **EDGE-11 — Savings in today's engine.** Candidates, not obligations:
-  exact, with bit-identical output, idling once silent input has outlasted
-  the tail, skipping all-zero filter blocks, holding identical responses
+  exact, with bit-identical output, skipping all-zero filter blocks, holding identical responses
   once and reading each input history once for all its paths; rounding
   only, within `native.kernel_divergence`'s bound, spreading the older
   filter blocks' multiply-adds over the callbacks between engine blocks and
@@ -1091,6 +1090,13 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   each one tried is kept or
   stopped with its numbers, with the oracle tests passing, the worst error
   reported and nothing new allocating or locking on the audio thread.
+  Progress: idling once silent input has outlasted the tail, which jrp
+  approved on 18 November 2026 for his aim of a low system load with
+  complex setups, is kept: silence after the tail costs 92 to 99% less on
+  Linux, with music unchanged within the run-to-run spread
+  ([measurements](docs/develop/fft-measurements.md#idle-after-the-tail);
+  Apple silicon not yet measured). The other half of that plan row,
+  skipping silent input history while a tail still plays, was not tried.
 - [ ] **EDGE-12 — Filters larger than the saved-state limit.** Done when a
   plug-in accepts a filter whose samples exceed 64 MiB (such as a 60 s
   true-stereo filter at 96 kHz, about 88 MiB) through the storage jrp
