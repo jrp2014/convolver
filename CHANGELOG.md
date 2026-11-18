@@ -31,10 +31,11 @@ Until 1.0 the C++ API may change between minor versions.
   project, preset or undo step that holds the filter already accepted no
   longer analyses that filter again. Its peak bound and, under Estimate, its
   noise estimate are kept from when it was accepted, so a restore that
-  changes only the settings of a long filter does not filter seconds of
-  noise again; an estimate is found only when Estimate is chosen and the
-  filter has none yet. What plays, what is saved and the figures shown are
-  unchanged.
+  changes only the settings no longer filters ten filter lengths of noise
+  again: with a 10-second stereo filter under Estimate, the shared load step
+  took about 590 ms before and 2 to 5 ms after (Linux, optimised build). An
+  estimate is found only when Estimate is chosen and the filter has none
+  yet. What plays, what is saved and the figures shown are unchanged.
 - Documentation (DOC-15): the README's opening says what sets Convolver
   apart, in a "What sets it apart" section under jrp's four emphases:
   accurate (checked against an independent double-precision convolution),
