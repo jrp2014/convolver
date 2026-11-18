@@ -27,6 +27,16 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Documentation (DOC-15): the README's opening says what sets Convolver
+  apart, in a "What sets it apart" section under jrp's four emphases:
+  accurate (checked against an independent double-precision convolution),
+  light on the system (no added delay at a measured cost), robust (the
+  shared lifecycle tests, safe failure and upgrade checks) and behaves as
+  you'd expect (smoothed changes, exact latency, Status and log); then
+  routing, the Gain mode, measured dither defaults and free source for
+  macOS, Windows and Linux. Each claim links to the guide, test or
+  measurement behind it; the preview's limitations follow in their own
+  section.
 - CI (CI-38, jrp's request of 16 November 2026 for safe speedups without
   restructuring): `native.engine_stress`, `native.engine` and `native.host`,
   the longest core tests under sanitizers, carry a CTest `COST`, so they

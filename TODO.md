@@ -1211,6 +1211,11 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **DOC-15 — Say what sets Convolver apart in the README.** 17
+  November 2026, PR #201: the README's "What sets it apart" section, under
+  jrp's four emphases (accurate, light on the system, robust, behaves as
+  you'd expect), each claim linked to its evidence
+  ([README](README.md#what-sets-it-apart)).
 - [x] **CI-39 — Windows core-only steps fail when their build fails.** 17
   November 2026, from CI-38's independent review: the two core-only steps
   of the native Windows job stop at a failed configure or build

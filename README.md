@@ -6,10 +6,10 @@ unsigned developer preview; read [opening an unsigned preview](docs/use/install.
 first.
 
 Convolver applies finite impulse response (FIR) filters to multichannel audio:
-digital room correction, crossovers, and routing or mixing channels, using
-filters made by tools such as DRC, REW or Audiolense. It applies filters; it
-does not measure your room or design them. It runs on macOS, Linux and Windows
-as:
+digital room correction, crossovers, convolution reverb, and routing or mixing
+channels, using filters made by tools such as DRC, REW or Audiolense, or a
+reverb's impulse response. It applies filters; it does not measure your room
+or design them. It runs on macOS, Linux and Windows as:
 
 - a **command-line tool** that filters WAV files or raw audio streams;
 - **plug-ins** for audio programs: VST® 3 (Windows, macOS, Linux), Audio Unit
@@ -19,20 +19,109 @@ as:
 
 A filter is an IR file (a multichannel impulse response in a sound file such
 as WAV), a Convolver **`.cfg`** configuration describing filters and routes, or
-a configuration list naming several of them. Roon, JRiver and Audiolense use
-variants of the `.cfg` format ([other programs](docs/use/other-programs.md)).
-Coming from the old Windows Convolver? Your `.cfg` files may need a few
-edits ([how](docs/use/other-programs.md#configurations-from-the-old-windows-convolver)).
+a configuration list naming several of them.
+
+## What sets it apart
+
+Convolver's niche is playing a filter faithfully, to within float
+rounding: a room correction, a crossover or a reverb's impulse response,
+with no colouring of its own. Convolution itself is a well-known technique;
+the effort here has gone into making it accurate, light on the system,
+robust and unsurprising. Each point links to the guide, test or measurement
+behind it, and [preview status](#preview-status) says what has not yet been
+tried.
+
+- **Accurate.** Automated tests on Linux, macOS and Windows compare the
+  engine's output with a double-precision convolution written independently
+  of it. The recorded results for the current engine are a worst difference
+  of 5.2e-7 of the output's peak (about −126 dB) in those tests
+  ([changelog](CHANGELOG.md#0132---2026-11-09)), and within 4e-6 (about
+  −108 dB) in long stress and soak runs
+  ([testing](docs/develop/testing.md#native-production-tests)). Each
+  plug-in format gives the command-line tool's samples for the bundled
+  examples, and `convolver --compare` checks a host's render against the
+  expected file ([check a stereo filter in a host](docs/use/check-a-stereo-filter.md)).
+- **Light on the system.** By default Convolver adds no processing delay:
+  it sums a filter's first taps directly and spreads the work of its larger
+  blocks over the callbacks in between
+  ([latency and tail](docs/use/plugins.md#latency-and-tail)). In a
+  benchmark on a Linux cloud machine at Latency 0, a 30-second stereo
+  reverb used under 2% of one core and a 30-second 2→6 crossover, with six
+  paths, about 5.5%
+  ([measurements](docs/develop/fft-measurements.md#the-non-uniform-engine)).
+  In jrp's recorded comparison on an Apple silicon Mac (8 November 2026,
+  0.13.0), at a Latency of 256 frames, the engine used 15 to 17 times less
+  processor time for 30-second filters than the first preview's engine
+  ([measurements](docs/develop/fft-measurements.md#on-apple-silicon)). The
+  Latency setting trades delay for processor time when you are not
+  monitoring live.
+- **Robust.** Every plug-in format is held to the same lifecycle tests:
+  loading before and after the host starts, restoring saved projects,
+  replacing and refusing filters, bypass, reset, variable buffer sizes and
+  input that is not a finite number
+  ([plug-in comparisons](docs/develop/testing.md#plug-in-comparisons-plug-2)).
+  A first filter that cannot be loaded plays silence, not your unfiltered
+  audio, and a replacement that does not fit leaves the playing filter in
+  place. For filters with different input and output counts, such as a
+  2→6 crossover, Convolver's own bypass fades to silence instead of
+  passing unfiltered audio; a host that takes the plug-in out of the signal
+  path can still route audio around it, so check which kind of bypass your
+  host's button uses ([bypass](docs/use/plugins.md#bypass)). From 0.13.2
+  on, each published preview's example presets and renders are kept, and
+  every later build's command-line tool and VST3 plug-in must reproduce
+  them within a stated tolerance ([upgrade tests](tests/upgrade/README.md)).
+- **Behaves as you'd expect.** Changes are smoothed, with tails preserved
+  for settings-only updates: Gain and Mix ramp over 1.3 ms, and a new
+  filter crossfades in over 5.3 ms, starting with fresh history; a Latency
+  change restarts processing and leaves a gap
+  ([replacing a filter](docs/use/plugins.md#replacing-a-filter)). The host
+  is told the exact latency, and Mix delays the dry signal to line up with
+  the filtered one ([settings](docs/use/plugins.md#settings)). In VST3 and
+  the Audio Unit, a Status parameter and the Convolver log say why audio is
+  silent and what to do
+  ([status and log](docs/use/plugins.md#status-and-the-convolver-log)).
+
+Also:
+
+- **Routing for room correction and crossovers.** Convolver reads the
+  `.cfg` format of the old Windows Convolver (version 3.0 and later), with
+  matrix routing, fractional gains and delays; Roon, JRiver and Audiolense
+  use variants of it, though exchanging files with them has not yet been
+  tested, and old files may need a few edits
+  ([other programs](docs/use/other-programs.md)). Configuration lists
+  select a suitable filter for the host's sample rate and channels,
+  preferring an exact channel match ([channels](docs/use/plugins.md#channels)).
+  `convolver --validate` checks a configuration, and `--profile
+  portable-paths` warns about common portability problems
+  ([check a configuration](docs/use/other-programs.md#check-a-configuration)).
+- **A level that suits each filter.** The Gain mode plays your Gain, a
+  noise-based estimate, or the gain at which no input within full scale can
+  clip, worked out from the filter's taps ([settings](docs/use/plugins.md#settings));
+  the command-line tool has `--gain-db auto` and `no-clip`
+  ([gain](docs/use/command-line.md#gain-and-attenuation)).
+- **Dither defaults informed by measurement** for the command-line tool's
+  integer output ([dither](docs/use/command-line.md#integer-formats-dither-and-noise-shaping)).
+- **Free, on macOS, Windows and Linux:** GPL source, no copy protection or
+  account, and the same engine in every format.
+
+Convolver plays the response you give it as it is, so it brings no library
+of sampled spaces and no controls that reshape a reverb's decay or tone;
+you bring the filter.
+
+## Preview status
+
 Convolver is a developer preview: the latest, [0.13.24](https://github.com/jrp2014/convolver/releases/tag/v0.13.24), is an
 unsigned pre-release for macOS, Windows and Linux. Its VST3 plug-in has a
 window on macOS and Windows and uses the host's controls on Linux, and the
-Linux package holds the LV2 plug-in. 0.13.20 added a Gain mode setting (Estimate
-and No clipping as well as Set) and opening a Convolver preset from the window,
-and 0.13.24 makes a host crash in the LV2 plug-in much less likely. It was
-published before anyone listened to the new audio engine (since 0.13) or
-tried the Windows window, LV2 or 0.13.20's new features in a host, and
+Linux package holds the LV2 plug-in. 0.13.20 added the Gain mode and
+opening a Convolver preset from the window; 0.13.24 reduces the risk of an
+LV2 crash in hosts built on JUCE after a Gain mode change. These previews
+were published before anyone listened to the new audio engine (since 0.13)
+or tried the Windows window, LV2 or 0.13.20's new features in a host, and
 before an independent user's walkthrough, which are still to come
 ([status](docs/project/status.md)).
+Processing is single precision; [limits](docs/use/limits.md) lists what
+Convolver does not do.
 
 ## Start here
 
