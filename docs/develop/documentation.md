@@ -91,6 +91,8 @@ On pages in `docs/use/`:
   ("adapter", "candidate") without an explanation.
 - State behaviour, not evidence: "the plug-in plays silence if the preset does
   not match" belongs here; which test checks it belongs in [testing](testing.md).
+  A quantitative performance, accuracy or comparative claim is the exception:
+  it links its evidence ([current claims](#current-claims-and-dated-evidence)).
 - End each how-to with how to tell it worked and where to look if it did not.
 - Aim for fewer than about 150 lines; a longer page is usually two tasks.
 
@@ -196,14 +198,16 @@ compiler, dependency versions, planner mode and workload.
 Product claims in the README, user guides and release notes must stay current
 and match their evidence:
 
-- Each claim rests on the owning guide, a test or a dated measurement. The
-  README and release notes link to it; a page in `docs/use/` states the
-  behaviour and leaves the test to [testing](testing.md)
-  ([writing rules](#writing-rules)). Read the source behind the link: the
+- Substantiate product claims in the README and release notes with supporting
+  references: the owning guide, a test or a dated measurement. User guides
+  describe current behaviour without test-history clutter; link evidence where
+  they make quantitative performance, accuracy or comparative claims. An
+  ordinary instruction such as "Reload reads the filter again" needs no
+  evidence link. Read the source behind each link: the
   [link check](#automated-checks) proves only that the target exists.
-- When code, defaults, dependencies, measurements or a release change, search
-  for the claims they affect and update them, summaries included, in the same
-  change. Do not describe an unpublished build as released: download links
+- When code, defaults, dependencies, measurements or a release change, check
+  all affected descriptions against the implementation and update them,
+  summaries included, in the same change. Do not describe an unpublished build as released: download links
   name a published release. Before publication, check the download links and
   the generated release notes against the actual tag and packages (step 5 of
   [publishing](releasing.md#publishing-an-unsigned-preview)).

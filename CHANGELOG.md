@@ -78,9 +78,11 @@ Until 1.0 the C++ API may change between minor versions.
   19 November 2026): the documentation guide's
   [current claims](docs/develop/documentation.md#current-claims-and-dated-evidence)
   section says how claims in the README, user guides and release notes stay
-  current: each rests on a guide, test or dated measurement, keeps that
-  evidence's scope, is updated in the change that affects it and is narrowed
-  when the evidence no longer supports it. The workflow's while-working
+  current. The README and release notes cite a guide, test or dated
+  measurement; user guides do so only for quantitative performance,
+  accuracy or comparative claims. Each claim keeps its evidence's scope, is
+  updated in the change that affects it and is narrowed when the evidence
+  no longer supports it. The workflow's while-working
   list, the definition of done, the review checklist, the pull request
   template and AGENTS.md link to it, and the release steps check a draft's
   notes and download links against its tag and files before publishing.
