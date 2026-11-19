@@ -535,16 +535,15 @@ means a patched FFmpeg build with `--enable-gpl`.
   PLUG-2 tolerance (1e-5, scaled by the peak of a file louder than full
   scale; [decision](docs/project/decisions.md#releases)). Never regenerate a
   kept file; a deliberate incompatibility is jrp's decision. 0.13.2,
-  0.13.12, 0.13.20 and 0.13.24 are kept (PRs #170, #187, #197 and
-  #202), checked
+  0.13.12, 0.13.20, 0.13.24 and 0.14.0 are kept (PRs #170, #187, #197,
+  #202 and #218), checked
   by `upgrade.cli` and `vst3.upgrade`, and the capture step is in the
   [publication steps](docs/develop/releasing.md#publishing-an-unsigned-preview).
-  The four hold the same presets, filters, inputs and expected renders,
+  The five hold the same presets, filters, inputs and expected renders,
   byte for byte; only the manifests differ.
-  **Remains:** 0.14.0's presets and renders (the capture step above); a
-  REAPER project saved with 0.14.0, the baseline (jrp's Mac session),
-  with its state chunk restored through each adapter, and Audio Unit state
-  from a release. **Done when** all three are kept and checked. The guarantees
+  **Remains:** a REAPER project saved with 0.14.0, the baseline (jrp's Mac
+  session), with its state chunk restored through each adapter, and Audio
+  Unit state from a release. **Done when** both are kept and checked. The guarantees
   it protects are in [status](docs/project/status.md#compatibility-guarantees).
 - [ ] **IO-1 — Large files.** RF64, W64, CAF, FLAC and raw output have no
   4 GiB limit, and WAV and AIFF stop with an error at it (PR #60).
