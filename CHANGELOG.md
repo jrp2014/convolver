@@ -17,11 +17,14 @@ Until 1.0 the C++ API may change between minor versions.
   filter and its delays, plus at most about half a second), each further
   silent callback writes zeros without convolving. The output stays bit for
   bit what processing the silence gives, and the next sound resumes at
-  once. On the Linux cloud VM silence after the tail costs 92 to 99% less
-  CPU (11 s stereo reverb: 168 to 2 ns per frame), with music unchanged
+  once. On the Linux cloud VM silence after the tail costs 93 to 99% less
+  CPU (11 s stereo reverb: 173 to 2.2 ns per frame), with music unchanged
   within the measurements' spread
   ([measurements](docs/develop/fft-measurements.md#idle-after-the-tail)).
-  `convolver_benchmark` gained `--silent` to time it.
+  `convolver_benchmark` gained `--silent` to time it. So that this holds
+  exactly, the engine never outputs -0: where sound cancelled to a value
+  too small for a normal float, the frame used to come out as -0 and is now
+  +0, which is equal to it and inaudible.
 
 - Tests (COMPAT-1, in progress): the example presets of the published
   0.13.24 and the audio its own CLI and VST3 plug-in rendered from them are

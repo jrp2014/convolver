@@ -193,8 +193,14 @@ bool same_mix(const std::vector<Route>& a, const std::vector<Route>& b) noexcept
 // zero of either sign to +0 gives +0. The spread work a stage had in progress
 // is dropped; it would only have added zeros, and its next block starts from
 // begin() at the same boundary, with the same `valid`, as without idling, so
-// the schedule, and the order of every later addition, is unchanged. The
-// output is therefore bit-identical to processing the silence. `idle_after`
+// the schedule, and the order of every later addition, is unchanged. Those
+// zeros could matter in one way: with subnormals flushed, sound after the
+// silence can cancel in a ring frame to -0, which a dropped +0 would have
+// made +0. Frames leave the ring as their value + 0.f, which turns -0 into +0
+// and changes nothing else, so the sign of a zero never depends on dropped
+// work. The output is therefore bit-identical to processing the silence,
+// and differs from the engine before EDGE-11 only where that one gave -0 for
+// a ring frame, now +0. `idle_after`
 // is a structural bound (below), not the filter's mathematical tail, because
 // the transforms' rounding leaves tiny values up to a block past the last
 // tap. A filter with an infinite spectrum never idles: 0 x inf is NaN.
@@ -584,7 +590,8 @@ struct Engine::Impl {
         for (std::size_t c = 0; c < outputs; ++c) {
             float* out = output_rings.data() + c * ring + position;
             for (std::size_t t = 0; t < frames; ++t) {
-                output[(at + t) * outputs + c] = output_delays[c].push(out[t]);
+                // + 0.f makes a -0 +0 (EDGE-11, the comment above Impl).
+                output[(at + t) * outputs + c] = output_delays[c].push(out[t] + 0.f);
                 out[t] = 0;
             }
         }

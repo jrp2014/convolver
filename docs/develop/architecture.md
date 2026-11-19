@@ -119,7 +119,11 @@ workflow.
    transforms' rounding leaves tiny values up to a block beyond the filter's
    last tap. By then every buffer that reaches the output holds zeros, so
    the output is bit-identical to processing the silence; the next nonzero
-   sample resumes at the same block phase. `native.engine`'s
+   sample resumes at the same block phase. Work a larger stage had begun on
+   the silence is dropped, since it would only add zeros. A zero's sign was
+   the one thing it could change (sound that cancels to a subnormal in the
+   output ring is flushed to -0, and a later +0 makes it +0), so frames
+   leave the ring as their value plus +0 and the engine never outputs -0. `native.engine`'s
    `idle_after_tail` compares an idling engine with one built under
    `detail::disable_idle`. A filter whose spectrum overflows to infinity
    never idles.

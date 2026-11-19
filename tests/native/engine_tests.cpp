@@ -386,7 +386,9 @@ void layouts() {
 // included, with an engine built while idling is disabled. Bursts of noise
 // separate silences shorter and longer than the filter, made of +0, -0 or
 // empty spans, over random routing, delays, latencies, host callback sizes
-// and a reset that may come during a silence.
+// and a reset that may come during a silence. Some bursts are near the
+// smallest normal float, so that sums cancel to subnormals, which the engine
+// flushes to zero of either sign (found by the independent review).
 bool same_bits(const std::vector<float>& a, const std::vector<float>& b) {
     return std::equal(a.begin(), a.end(), b.begin(), b.end(), [](float x, float y) {
         return std::bit_cast<std::uint32_t>(x) == std::bit_cast<std::uint32_t>(y);
@@ -463,8 +465,12 @@ void idle_after_tail() {
         const auto reach = longest + latency + 8 * largest + 32;
         Gapped g;
         const auto add = [&](std::size_t frames, bool noise, float zero) {
+            const bool tiny = random() % 3 == 0;
             for (std::size_t t = 0; t < frames * c.input_channels; ++t)
-                g.input.push_back(noise ? sample(random) : zero);
+                g.input.push_back(!noise  ? zero
+                                  : !tiny ? sample(random)
+                                          : sample(random) * 0x1p-120f +
+                                                (random() % 2 ? 1.3e-38f : -1.3e-38f));
             g.silent.insert(g.silent.end(), frames, !noise);
             g.frames += frames;
         };
@@ -476,6 +482,28 @@ void idle_after_tail() {
         Engine idling = build(c, latency, true), reference = build(c, latency, false);
         const auto reset_at = trial % 3 ? random() % g.frames : g.frames;
         run_both(idling, reference, g, reset_at, random);
+    }
+    // The independent review's finding: sound after an idle can cancel in an
+    // output ring frame to a negative subnormal, which the flushing makes
+    // -0, where a spread block begun on the silence, still running without
+    // idling, would have added +0. The engine therefore never outputs -0.
+    // Two paths of one tap share a mix, with gains 1 and -(1 + 2^-22), so
+    // the direct sum leaves -x 2^-22 in each frame: flushed to -0 for tiny
+    // positive x.
+    {
+        const Configuration c{48000,
+                              1,
+                              1,
+                              0,
+                              {},
+                              {},
+                              {{{1}, {{0, 1}}, {{0, 1}}}, {{1}, {{0, 1}}, {{0, -(1 + 0x1p-22f)}}}}};
+        Engine engine(c, 0);
+        std::vector<float> in(64, 1e-32f), out(64, 1);
+        engine.process(in, out, 64);
+        require(std::all_of(out.begin(), out.end(),
+                            [](float x) { return std::bit_cast<std::uint32_t>(x) == 0; }),
+                "the engine output -0");
     }
     // A finite filter whose transform overflows: silence through it is NaN,
     // never the zeros an idle engine would write.

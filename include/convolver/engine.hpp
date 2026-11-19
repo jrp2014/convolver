@@ -147,6 +147,7 @@ class Engine {
     // Once silent input (all samples zero, or empty spans) has outlasted
     // everything that can reach the outputs, silent calls write zeros
     // without convolving, with output bit-identical to processing them.
+    // Output zeros are always +0, never -0.
     void process(std::span<const float> input, std::span<float> output, std::size_t frames);
 
   private:

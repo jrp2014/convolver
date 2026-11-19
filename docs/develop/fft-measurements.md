@@ -1172,42 +1172,49 @@ bit-identical to processing the silence
 ([how it works](architecture.md#processing-data-flow), step 7). The
 [plan](../project/plans/2026-11-06-edges-over-other-convolvers.md#2-savings-in-todays-engine)
 asked for 50% less CPU on silent input with no p99 regression on music.
-Kept: silent input after the tail costs 92 to 99% less, and music is
+Kept: silent input after the tail costs 93 to 99% less, and music is
 unchanged within the run-to-run spread.
 
-Baseline: `main` at `b08fe37`. Candidate: the EDGE-11 branch, the same
-`convolver_benchmark` source in both (it gained `--silent`, which feeds
-silence for twice the filter length plus 65,536 frames before timing).
-Machine: the 4-vCPU Intel Xeon cloud VM at 2.10 GHz, Ubuntu 24.04, Clang
-18.1, Release, Ubuntu FFTW 3.3.10, AVX2+FMA kernels. Each case at Latency
-256 in 256-frame callbacks, 1 s per run, five rounds alternating baseline
-and candidate; medians of the five
+Baseline: `main` at `b08fe37`. Candidate: the EDGE-11 branch after its
+independent review. Both were built with the branch's `convolver_benchmark`
+source, which gained `--silent`: it feeds silence for twice the filter
+length plus 65,536 frames before timing. Machine: the 4-vCPU Intel Xeon
+cloud VM at 2.10 GHz, Ubuntu 24.04, Clang 18.1, Release, Ubuntu FFTW
+3.3.10, AVX2+FMA kernels. Each case runs at Latency 256 in 256-frame
+callbacks, 1 s per run, for five rounds alternating baseline and
+candidate. The table gives medians of the five runs, with the lowest and
+highest run in brackets where the plan's music test needs the spread
 ([raw data](../benchmarks/2026-11-18-x86-edge11-idle.csv)).
 
-| Case | Music, ns per frame (baseline → candidate) | Silence after the tail, ns per frame | Saving on silence | Silence p99 callback, µs |
-| --- | --- | --- | --- | --- |
-| `mono_room` (4096 taps) | 14.7 → 14.5 | 12.6 → 1.0 | 92% | 3.6 → 0.3 |
-| `room_stereo_4k` | 27.1 → 29.2 | 27.2 → 1.9 | 93% | 13.1 → 0.5 |
-| `stereo_long` (65,536 taps) | 76.2 → 75.7 | 76.2 → 2.2 | 97% | 58.1 → 0.6 |
-| `room_true_stereo_64k` | 115.1 → 123.8 | 119.1 → 2.0 | 98% | 75.1 → 0.5 |
-| `room_crossover6_64k` (2 in, 6 out) | 173.9 → 165.1 | 178.5 → 2.2 | 99% | 92.1 → 0.6 |
-| `room_reverb_512k` (11 s at 48 kHz) | 160.5 → 163.6 | 168.1 → 2.0 | 99% | 99.4 → 0.6 |
+| Case | Music, ns per frame | Music p99 callback, µs | Silence after the tail, ns per frame | Saving on silence | Silence p99 callback, µs |
+| --- | --- | --- | --- | --- | --- |
+| `mono_room` (4096 taps) | 14.9 → 14.9 | 5.9 [4.2–7.5] → 7.6 [6.7–8.7] | 15.2 → 1.1 | 93% | 7.2 → 0.3 |
+| `room_stereo_4k` | 30.8 → 30.4 | 20.6 [15.4–36.7] → 19.0 [14.7–42.8] | 30.1 → 2.2 | 93% | 20.2 → 0.6 |
+| `stereo_long` (65,536 taps) | 79.1 → 80.8 | 55.7 [54.8–64.0] → 59.7 [54.1–61.4] | 79.0 → 2.2 | 97% | 61.1 → 0.7 |
+| `room_true_stereo_64k` | 130.0 → 126.8 | 80.1 [73.1–80.9] → 78.3 [70.0–83.4] | 125.3 → 2.2 | 98% | 75.2 → 0.6 |
+| `room_crossover6_64k` (2 in, 6 out) | 182.9 → 188.8 | 94.5 [81.6–129.2] → 98.0 [91.8–116.7] | 182.3 → 2.3 | 99% | 89.3 → 0.6 |
+| `room_reverb_512k` (11 s at 48 kHz) | 175.0 → 172.8 | 106.7 [104.6–127.7] → 111.5 [102.1–244.8] | 173.0 → 2.2 | 99% | 105.3 → 0.6 |
 
 Before the change silence cost as much as music, since every block was
-convolved. The music columns move both ways by up to 8%, inside the
-spread of single runs on this VM (for example 106 to 125 ns per frame for
-the baseline's true stereo, and p99 callbacks varying by 30% between
-rounds). The work added on music is one test of whether the input is
-zero, which stops at the first nonzero sample, per 64-frame chunk:
-Valgrind's instruction counts for 2,080 callbacks of 4096-tap stereo, and
-2,320 of 65,536-tap true stereo (each including the filter's preparation,
-which now checks that its spectra are finite), rose by 0.2% and 0.5%.
+convolved. On music the candidate's medians move both ways, by at most 3%
+in time per frame, and every p99 range overlaps the baseline's. The one
+case whose candidate p99 runs were all above the baseline's median,
+`mono_room`, was below it in an earlier run of the same comparison (4.5
+against 4.7 µs), before the review's one-line change. The work added on
+music is one test per 64-frame chunk of whether the input is zero, which
+stops at the first nonzero sample, and one addition of +0 per output
+sample. Valgrind counted instructions for 2,080 callbacks of 4096-tap
+stereo and 2,320 of 65,536-tap true stereo, each count including the
+filter's preparation, which now checks that its spectra are finite. The
+counts rose by 0.2% and 0.5%.
 
 The engine idles once the input has been silent for a structural bound
-rather than the filter's mathematical tail, so it keeps processing a little
-longer than the tail: about 12 ms beyond the latency and tail at 48 kHz for
-4096 taps, 170 to 250 ms for 65,536, and up to about 0.5 s for an 11 s or
-30 s reverb.
+rather than the filter's mathematical tail, so it keeps processing for a
+while after the tail. At 48 kHz and Latency 256 that is about 12 ms beyond
+the latency and tail for 4096 taps, 250 ms for 65,536 and 0.5 s for an
+11 s or 30 s reverb. Larger latencies lengthen it, to about 170 ms for
+4096 taps and 340 ms for 65,536 at Latency 16384. The longest found is
+just over 0.5 s (512k taps at Latency 64).
 
 ## Reproduce
 
@@ -1373,7 +1380,9 @@ python3 tests/native/benchmarks/compare_engines.py --baseline 5cc95cd \
 ### Idle after the tail
 
 Build `convolver_benchmark` (`-DCONVOLVER_BUILD_BENCHMARKS=ON`, Release)
-from each revision, then alternate them, music and silence, for each case:
+from each revision. Give a revision from before EDGE-11 the branch's
+`tests/native/benchmark.cpp` first, because its own has no `--silent`.
+Then alternate the two, music and silence, for each case:
 
 ```sh
 for round in 1 2 3 4 5; do for case in 1 3 13 14 17 18; do

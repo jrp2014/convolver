@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
             return 0;
         }
         // --silent times silent input once the filter's tail has ended (EDGE-11).
-        bool silent = false;
+        bool silent = false, usable = argc >= 3;
         for (int i = 3; i < argc; ++i) {
             const std::string option = argv[i];
             if (option == "--baseline")
@@ -70,9 +70,9 @@ int main(int argc, char** argv) {
             else if (option == "--silent")
                 silent = true;
             else
-                argc = 0;
+                usable = false;
         }
-        if (argc < 3)
+        if (!usable)
             throw std::invalid_argument(
                 "usage: convolver_benchmark CASE SECONDS [--baseline] [--silent] (CASE=0.." +
                 std::to_string(std::size(cases) - 1) + "), or convolver_benchmark --count");
