@@ -1214,6 +1214,12 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **DOC-17 — Keep product claims current and substantiated.** 19
+  November 2026, PR #216, from jrp's edits on `codex/maintain-product-claims`
+  (`c623b23`), reconciled with DOC-16: claims in the README, user guides and
+  release notes rest on dated evidence, keep its scope and are refreshed in
+  the change that affects them
+  ([documentation](docs/develop/documentation.md#current-claims-and-dated-evidence)).
 - [x] **DOC-16 — Reconcile the contributor guidance with current
   decisions.** 18 November 2026, PR #206, from jrp's review of `e89a9dc`: the
   [execution priorities](#execution-priorities) sort open work by what it
