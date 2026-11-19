@@ -365,7 +365,7 @@ LV2 (Linux first; also PipeWire system audio):
   of tests that reach into the machinery). Step 1a, in PR #205, decides
   once in `HostFilter::load()` whether a request holds the accepted filter
   and then reuses its peak and gains instead of analysing it again. Step
-  3a, in PR #PRNUM, adds the shared ownership of the playing processor
+  3a, in PR #213, adds the shared ownership of the playing processor
   (`PlayingProcessor`), which no adapter uses yet; jrp chose on
   19 November 2026 to take step 3 next. **Remains:** the
   [consolidation plan](docs/project/plans/2026-11-13-load-restore-consolidation.md)'s

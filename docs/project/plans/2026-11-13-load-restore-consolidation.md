@@ -400,7 +400,7 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
    Independent of steps 1 and 2, and taken next, before them (jrp,
    19 November 2026). Step 3a, the shared class (`PlayingProcessor` in
    `portable/playing_processor.hpp`, with `native.playing_processor`), is
-   in PR #PRNUM; no adapter uses it yet. It keeps a replaced processor in one
+   in PR #213; no adapter uses it yet. It keeps a replaced processor in one
    of `Readers + 1` places and frees it once a single reading of the marks,
    taken after it was replaced, finds none holding it; one reading per mark
    is what bounds the processors kept by the number of readers.
