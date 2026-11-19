@@ -252,21 +252,20 @@ def failure_message_tests(d):
 
 
 def other_writers_tests(d):
-    """IO-10: a WAV as Python's wave module writes it for mono 24-bit audio
-    with an odd number of frames (an odd data chunk with no pad byte) is
-    read whole, as the filter and as the input."""
+    """IO-10: a WAV as Python's wave module wrote it before Python 3.15 for
+    mono 24-bit audio with an odd number of frames (an odd data chunk with no
+    pad byte) is read whole, as the filter and as the input. The file is
+    written byte by byte, since Python 3.15's wave module adds the pad byte
+    (CI-43)."""
     taps = [4194304, -2097152, 0, 1048576, 524288]
     odd = d / 'odd-24.wav'
-    with wave.open(str(odd), 'wb') as f:
-        f.setnchannels(1)
-        f.setsampwidth(3)
-        f.setframerate(48000)
-        f.writeframes(b''.join(struct.pack('<i', v)[:3] for v in taps))
+    data = b''.join(struct.pack('<i', v)[:3] for v in taps)
+    # PCM, 1 channel, 48 kHz, 3 bytes a second per frame, 3-byte frames, 24 bits.
+    fmt = struct.pack('<HHIIHH', 1, 1, 48000, 48000 * 3, 3, 24)
+    body = b'WAVE' + b'fmt ' + struct.pack('<I', len(fmt)) + fmt + b'data' + struct.pack('<I', len(data)) + data
+    odd.write_bytes(b'RIFF' + struct.pack('<I', len(body)) + body)
     size = odd.stat().st_size
-    assert size % 2 == 1 and struct.unpack_from('<I', odd.read_bytes(), 4)[0] == size - 8, (
-        "Python's wave module no longer leaves out the pad byte, so this test no longer covers that",
-        size,
-    )
+    assert size % 2 == 1 and struct.unpack_from('<I', odd.read_bytes(), 4)[0] == size - 8, size
     other = d / 'odd-other.wav'
     values = [12000, -6000, 3000, 1500, -750, 0, 375]
     pcm(other, values)
