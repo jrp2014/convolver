@@ -894,14 +894,41 @@ Collection does not hold up pending changes. The tail is available before
 activation and includes routed delays; it can grow conservatively during a
 session, and reactivation recomputes it.
 
-A new Latency while active (the Audio Unit, and VST3 since VST3-16)
-replaces the whole `HostProcessor`, since the block size changes: the
-adapter builds it on the control side, then publishes it through an atomic
-pointer that the audio callback reads at the start of each call and marks
-as in use until the call returns; the previous processor is freed on the
-control side only once the callback no longer marks it, which takes at most
-one callback. The new processor starts with empty history, so the sound
-pauses for the new latency and a sounding tail is cut.
+A new Latency while active (the Audio Unit, VST3 since VST3-16, and LV2
+with a worker) replaces the whole `HostProcessor`, since the block size
+changes. The adapter builds it on the control side and offers it to the
+audio side. Who may use a processor, and when a replaced one is freed
+(PLUG-39 step 3, under jrp's conditions of 13 November 2026), as VST3 does
+it with `PlayingProcessor` ([implementation map](architecture.md)):
+
+- **Every reader is protected.** Each call that uses the processor
+  (`process()` and `setProcessing()`, which hosts may call on different
+  threads) adopts the newest offer when it starts and holds it, in a mark
+  of its own, until it returns. Nothing a mark holds is freed.
+- **The host reads the new latency at once.** The offered processor's
+  latency is what `getLatencySamples()` reports from the moment it is
+  offered, and the host is asked to restart in the same control call,
+  without waiting for a callback, which may never come while playback is
+  stopped (VST3-16).
+- **The control side never waits for audio.** A replaced processor is freed
+  by a later control call once no reader holds it; at most one replaced
+  processor per reader stays alive, an offer no reader adopted is freed by
+  the next control call, and deactivation and destruction, when no audio
+  runs, free them all. No thread of its own does this. The number kept is
+  bounded, not the time: a replaced processor and its buffers stay
+  allocated until the next control call after its reader lets go, however
+  long the host makes none.
+
+Until step 3c the Audio Unit marks the processor `Render` uses and its
+control side waits, at most one render call, for `Render` to let go
+before it frees the old one, reporting the new latency at once as VST3
+does. LV2 offers the new processor through `handover`, which `run()` takes
+at the start of its next call; the control side frees the one before
+(`retiring`) once `run()` has taken it (`retire()`), and the latency port
+follows from that call, since only `run()` writes ports.
+
+The new processor starts with empty history, so the sound pauses for the
+new latency and a sounding tail is cut.
 
 `Convolver::host` exports `HostProcessor`, `HostFilter` and the state codec
 without SDK or file I/O dependencies ([`host.hpp`](../../include/convolver/host.hpp)).
