@@ -154,17 +154,19 @@ it by which tool failed:
 
 ## Lint checks
 
-Use Python 3.12 and Node.js 24 for the same environment as the lint CI job.
-Install the pinned runner in an isolated environment:
+Use the newest stable Python and the current Node.js LTS release for the same
+environment as the lint CI job
+([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
+Install the newest pre-commit in an isolated environment:
 
 ```sh
 python3 -m venv .venv-lint
 . .venv-lint/bin/activate
-python -m pip install pre-commit==4.5.1
+python -m pip install --upgrade pre-commit
 pre-commit run --all-files --show-diff-on-failure
 ```
 
-On Windows, create the environment with `py -3.12 -m venv .venv-lint` and
+On Windows, create the environment with `py -3 -m venv .venv-lint` and
 activate it in PowerShell with `.venv-lint\Scripts\Activate.ps1`, then run the
 same pip and pre-commit commands. Run `pre-commit install` once so the checks,
 formatting included, run on staged files before each commit. The first run

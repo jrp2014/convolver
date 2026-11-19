@@ -1215,6 +1215,13 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **CI-43 — Keep compilers and CI machines on their newest releases.**
+  19 November 2026, PR #PRNUM, from jrp's question whether Convolver uses the
+  latest SDKs: the libraries already followed their newest releases, but the
+  compilers and runner images did not. CI now takes the newest generally
+  available images, GCC and Xcode, the newest LLVM release and the newest
+  stable Python; only the Linux and Windows packages keep older images, for
+  recorded reasons ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
 - [x] **PERF-20 — Compare engine revisions that differ outside
   `engine.cpp`.** 19 November 2026, PR #220, from jrp's audit of v0.14.0:
   `compare_engines.py` refused two revisions with the same `engine.cpp`, so a

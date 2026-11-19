@@ -155,6 +155,12 @@ Full rules: [source versioning](docs/develop/versioning.md).
   limitations in [TODO.md](TODO.md). Distinguish tests you ran from configured
   CI coverage, and preserve dated evidence and historical originals.
 
+- External dependencies: keep every one on its newest formal release (SDKs,
+  libraries, compilers, CI runner images, Python, tools and GitHub actions),
+  as [supporting libraries](docs/develop/build.md#supporting-libraries) and
+  [compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)
+  describe. Betas, release candidates and preview images run only as advice;
+  anything older needs its reason recorded beside it.
 - Platform optimisation: use each platform's built-in optimisation methods
   behind a portable interface with a portable fallback, adopting each only
   for a measured gain and keeping output the same or within its stated
