@@ -170,7 +170,8 @@ What this shows for the plan:
 - **Freeing is deferred.** All of them that keep building off the audio
   thread let the audio side take the new engine at a callback boundary and
   free the old one later, so the control side does not wait for the audio
-  thread to let go, as VST3's and the Audio Unit's `release_processor()` do.
+  thread to let go, as VST3's and the Audio Unit's `release_processor()`
+  did when this plan was written (VST3's no longer, since step 3b).
   This supports deferred reclamation, with a qualification: JUCE takes the
   engine with a try-lock and frees on the audio thread when its queue is
   full, and others use locks the audio thread shares. They are not evidence

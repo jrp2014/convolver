@@ -801,10 +801,11 @@ checks that the choice returns while the block is held, that the new
 latency is reported at once, that the old processor is not freed while the
 block holds it, even after `setProcessing()`, the other reader, has held and
 let go of the new one, or by a later control call
-(`freeing_processor_for_tests`, with AddressSanitizer as a second check), that the next control call frees
-it, and that the next block plays the new processor. And a filter at the saved-state
-limit (PLUG-13) that is restored, given Gain −6 dB, saved and restored in a
-second instance, with one sample more refused. And the window's messages
+(`freeing_processor_for_tests`, with AddressSanitizer as a second check),
+that the next control call frees it, and that the next blocks play the new
+processor (an impulse comes out 1024 frames later). And a filter at the
+saved-state limit (PLUG-13) that is restored, given Gain −6 dB, saved and
+restored in a second instance, with one sample more refused. And the window's messages
 (VST3-3): the report's fields, a fresh report on request after a Gain
 change, no request for the host to reread the parameters while the
 Status line stays the same, a chosen WAV accepted (the project marked changed, the status
@@ -894,8 +895,8 @@ instrumented bundle, so they do not run there, and `vst3.load_timing` skips
 itself; no job loads an FFTW bundle in them, since FFTW plug-ins are not
 distributed), and `vst3.adapter` alone under ThreadSanitizer with the shipped
 Ooura backend, where `latency_while_playing()` and
-`latency_handover_does_not_wait()` replace the processor while another thread calls
-`process()`. Every report is printed and any report fails the test; a step
+`latency_handover_does_not_wait()` replace the processor while another
+thread calls `process()`. Every report is printed and any report fails the test; a step
 first checks that the test program links the ThreadSanitizer runtime and
 that the adapter's compiled code calls into it, so an uninstrumented build
 cannot pass.

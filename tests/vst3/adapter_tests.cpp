@@ -2583,8 +2583,22 @@ void latency_handover_does_not_wait() {
     MemoryStream state;
     require(p.getState(&state) == kResultOk && handover::freed.load() == 1,
             "the replaced processor was not freed by the next control call");
-    require(p.process(d) == kResultOk && p.getLatencySamples() == 1024,
-            "the new processor does not play");
+    // An impulse comes out 1024 frames later, which only the new processor
+    // does (the old one delayed by none).
+    in.fill(0);
+    for (int b = 0; b < 4; ++b)
+        require(p.process(d) == kResultOk, "handover flush");
+    in[0] = 1;
+    int at = -1;
+    for (int b = 0; b < 4 && at < 0; ++b) {
+        require(p.process(d) == kResultOk, "handover impulse");
+        in[0] = 0;
+        for (int i = 0; i < 512; ++i)
+            if (at < 0 && std::abs(out[i]) > 1e-6)
+                at = b * 512 + i;
+    }
+    require(p.getLatencySamples() == 1024 && at == 1024,
+            "the next blocks did not play the new processor");
     p.setProcessing(false);
     p.setActive(false);
     p.disconnect(&c);

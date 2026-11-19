@@ -251,8 +251,9 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     }
     // control_, held for this object's lifetime. Taking it first frees the
     // replaced processors neither process() nor setProcessing() still
-    // holds, so a processor a new Latency replaced lives only until the next
-    // control call, and no control call waits for the audio thread.
+    // holds, so a processor a new Latency replaced lives until the first
+    // control call after its reader lets go. Only deactivation waits for a
+    // callback the host is still running (PlayingProcessor::clear()).
     struct Locked {
         explicit Locked(Processor& p) : lock(p.control_) {
             p.playing_.reclaim();

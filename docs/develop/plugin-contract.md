@@ -914,7 +914,10 @@ it with `PlayingProcessor` ([implementation map](architecture.md)):
   by a later control call once no reader holds it; at most one replaced
   processor per reader stays alive, an offer no reader adopted is freed by
   the next control call, and deactivation and destruction, when no audio
-  runs, free them all. No thread of its own does this.
+  runs, free them all. No thread of its own does this. The number kept is
+  bounded, not the time: a replaced processor and its buffers stay
+  allocated until the next control call after its reader lets go, however
+  long the host makes none.
 
 Until step 3c the Audio Unit marks the processor `Render` uses and its
 control side waits, at most one render call, for `Render` to let go
