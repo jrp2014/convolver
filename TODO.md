@@ -1207,7 +1207,7 @@ Items finished since then are listed here, one line each, until the next
 move to the archive.
 
 - [x] **DOC-17 — Keep product claims current and substantiated.** 19
-  November 2026, from jrp's edits on `codex/maintain-product-claims`
+  November 2026, PR #216, from jrp's edits on `codex/maintain-product-claims`
   (`c623b23`), reconciled with DOC-16: claims in the README, user guides and
   release notes rest on dated evidence, keep its scope and are refreshed in
   the change that affects them
