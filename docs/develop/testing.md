@@ -1721,9 +1721,11 @@ file to `RELEASE_SHARED` in `ci_scope.py`.
 The files kept from releases are read only by `upgrade.cli`, registered
 wherever the CLI is built, and `vst3.upgrade`, registered by the VST3
 build; no LV2 job runs either. The Audio Unit job's suite includes
-`upgrade.cli` as well, a second Release Accelerate run beside the VST3
-macOS job's, so a pull request that changes only these files leaves that
-run to `main` (CI-42). `tests/ci_scope_tests.py` lists, each with its
+`upgrade.cli` as well: the only Release Accelerate run with the Xcode of
+`macos-15`, the image the macOS candidates are built on, where the VST3
+macOS job uses the newer Xcode of `macos-latest`. A pull request that
+changes only these files leaves that run to `main` (CI-42); the other macOS
+runs check the same bound. `tests/ci_scope_tests.py` lists, each with its
 reason, the only files outside `tests/upgrade/` that may name them, and
 checks that those two are the only CTest entries that run the checker; when
 another build starts reading them, add its workflow to `UPGRADE_WORKFLOWS`

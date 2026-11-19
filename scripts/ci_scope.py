@@ -121,9 +121,11 @@ FORMAT_WORKFLOWS = {
 # plugins/vst3/CMakeLists.txt registers with convolver_vst3_render
 # (tests/upgrade/vst3_render.cpp). The native workflow runs upgrade.cli in
 # every job and the VST3 workflow runs both. The LV2 jobs run neither. The
-# Audio Unit job's suite includes upgrade.cli too, a second Release Accelerate
-# copy beside the VST3 macOS job's, so a change to these files alone leaves it
-# to that job, the native macOS builds and main (CI-42).
+# Audio Unit job's suite includes upgrade.cli too. It is the only Release
+# Accelerate run with the Xcode of macos-15, the image the macOS candidates
+# are built on; the VST3 macOS job's uses the newer Xcode of macos-latest. A
+# change to these files alone leaves that run to main, and every macOS run
+# checks the same bound (CI-42).
 UPGRADE = ('tests/upgrade/',)
 UPGRADE_WORKFLOWS = {'regression', 'vst3'}
 # Files only the candidate workflow uses (CI-34), apart from RELEASE_SHARED.

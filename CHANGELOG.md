@@ -162,9 +162,11 @@ Until 1.0 the C++ API may change between minor versions.
   only `tests/upgrade/`, the files kept from published releases and their
   checks, runs the native and VST3 workflows, whose `upgrade.cli` and
   `vst3.upgrade` read them, instead of every workflow: the Audio Unit and
-  LV2 builds no longer run for it. The Audio Unit job's second Release
-  Accelerate run of `upgrade.cli` is left to `main`; the VST3 macOS job and
-  the native macOS builds still run it. The saving was not measured
+  LV2 builds no longer run for it. The Audio Unit job's run of
+  `upgrade.cli`, the only Release Accelerate one with the Xcode of
+  `macos-15` (the macOS candidates' image), is left to `main`; the VST3
+  macOS job (newer Xcode) and the native macOS builds still run it against
+  the same bound. The saving was not measured
   ([CI triggers](docs/develop/testing.md#pull-requests-for-one-plug-in-format)).
 - CI (CI-41, from jrp's review of 19 November 2026): the load-timing
   harness's self-test, `native.load_timing_harness`, which no FFT backend

@@ -658,7 +658,10 @@ class UpgradeIsolation(unittest.TestCase):
     read them (CI-42)."""
 
     def test_only_listed_files_name_the_upgrade_files(self):
-        pattern = re.compile(r'tests/upgrade\b|\brun_upgrade\b|\bvst3_render\.cpp\b')
+        # A relative path such as parents[1] / 'upgrade/x' counts too.
+        pattern = re.compile(
+            r'tests/upgrade\b|(?<![\w./-])upgrade/|\brun_upgrade\b|\bvst3_render\.cpp\b|\bcapture\.py\b'
+        )
         own = (*ci_scope.UPGRADE, 'scripts/ci_scope.py', 'tests/ci_scope_tests.py')
         found = {path for path, contents in tracked() if not path.startswith(own) and pattern.search(contents)}
         self.assertEqual(found, set(UPGRADE_REFERENCES))

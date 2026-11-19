@@ -1216,8 +1216,8 @@ Items finished since then are listed here, one line each, until the next
 move to the archive.
 
 - [x] **CI-42 — Run only the workflows that read the files kept from
-  releases.** 19 November 2026, from jrp's audit of v0.14.0: `ci_scope.py`
-  counted `tests/upgrade/` as code, so changing one retained file ran every
+  releases.** 19 November 2026, PR #221, from jrp's audit of v0.14.0:
+  `ci_scope.py` counted `tests/upgrade/` as code, so changing one retained file ran every
   workflow; it now runs the native and VST3 ones, whose `upgrade.cli` and
   `vst3.upgrade` read them, and `tests/ci_scope_tests.py` checks that no
   other build reads them
