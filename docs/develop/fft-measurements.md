@@ -1173,7 +1173,9 @@ bit-identical to processing the silence
 [plan](../project/plans/2026-11-06-edges-over-other-convolvers.md#2-savings-in-todays-engine)
 asked for 50% less CPU on silent input with no p99 regression on music.
 Kept: silent input after the tail costs 93 to 99% less, and music is
-unchanged within the run-to-run spread.
+unchanged within the run-to-run spread. The saving is for silence after the
+tail has ended only; normal playback costs what it did. These figures are
+from Linux; Apple silicon and Windows are not yet measured.
 
 Baseline: `main` at `b08fe37`. Candidate: the EDGE-11 branch after its
 independent review. Both were built with the branch's `convolver_benchmark`
