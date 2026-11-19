@@ -83,7 +83,8 @@ exceed unity. Integer output clips to its representable range.
 After a render in which any sample went beyond full scale, a warning on
 stderr says so, with the number of samples clipped in each affected channel
 and that channel's peak in dBFS, and suggests `--gain-db no-clip` or how far
-to lower `--gain-db`. A float output keeps samples above full scale, so it
+to lower `--gain-db`. When no sample went beyond full scale and only
+rounding, dither or noise shaping took one over, it says that instead. A float output keeps samples above full scale, so it
 gets a note instead, since a later conversion to integer samples will clip
 them. Nothing is printed when every sample stayed within full scale, and the
 render's samples and exit status are the same either way. A sample of

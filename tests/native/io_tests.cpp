@@ -638,6 +638,15 @@ void quantizer_tests(const fs::path& dir) {
         require(q.clipped(0) == 3 && q.clipped(1) == 2, "clip counts accumulate across calls");
         q.reset();
         require(q.clipped(0) == 0 && q.clipped(1) == 0, "reset clears clip counts");
+        // Dither is counted: at 32767/32768 plain rounding never clips, but
+        // TPDF dither of up to one step takes some samples over and not others.
+        Quantizer plain(1, 16), dithered(1, 16, {Dither::triangular, 9});
+        const std::vector<float> edge(1000, static_cast<float>(32767.0 / 32768));
+        std::vector<std::int32_t> edge_out(edge.size());
+        plain.quantize(edge, edge_out);
+        dithered.quantize(edge, edge_out);
+        require(plain.clipped(0) == 0 && dithered.clipped(0) > 0 && dithered.clipped(0) < 1000,
+                "dithered clips counted after the dither");
         // The writer reports its quantizer's counts, still after close(), and
         // none for float output, which it never clips.
         const auto clips = dir / "clip-count.wav";

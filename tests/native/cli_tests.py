@@ -578,6 +578,21 @@ def clip_report_tests(d):
         ['--filter', mono_ir, '--input', mono_in, '--output', fixed, '--output-format', 'wav-pcm16', '--gain-db', '12']
     )
     assert f'{fixed} clipped 2 samples\n    channel 1: 2 of 2 samples clipped' in stderr_text(p.stderr), p.stderr
+    # Only negative samples clipped: written as the nearest value, not the largest.
+    float_wave(mono_in, [(-0.9,), (0.1,)])
+    args = ['--input', mono_in, '--output', fixed, '--output-format', 'wav-pcm16', '--dither', 'none']
+    err = stderr_text(call(['--filter', mono_ir, *args, '--gain-db', '12']).stderr)
+    assert 'clipped 1 sample\n' in err and 'written as the nearest value they can hold' in err, err
+    assert 'is too high' in err and 'largest value' not in err, err
+    # Rounding alone: +1.0 rounds one step past the largest positive value,
+    # so the cause names rounding rather than the gain.
+    unit_ir = d / 'clip-unit-ir.wav'
+    float_wave(unit_ir, [(1.0,)])
+    float_wave(mono_in, [(1.0,), (0.5,)])
+    err = stderr_text(call(['--filter', unit_ir, *args]).stderr)
+    assert 'clipped 1 sample\n    channel 1: 1 of 2 samples clipped, peak +0.00 dBFS' in err, err
+    assert 'Those samples were within full scale, but rounding took them just beyond' in err, err
+    assert 'leaves room for rounding' in err and 'is too high' not in err, err
     # With no-clip only input beyond full scale can clip, so the fix says so.
     loud = d / 'clip-loud.wav'
     float_wave(loud, [(1.5 * math.sin(i / 5), 0.1) for i in range(1000)], channels=2)

@@ -155,16 +155,17 @@ constexpr double no_clip_rounding = 1.0 / 65536;
 // the samples above full scale, which the file keeps but a later conversion
 // to integer samples clips. `peaks` are each channel's largest magnitude
 // after --gain-db and `frames` the frames written; `no_clip` says the gain
-// came from --gain-db no-clip, so only input beyond full scale can be the
-// cause. Empty when nothing went beyond full scale, so a clean render prints
-// nothing.
+// came from --gain-db no-clip, so only input beyond full scale can take a
+// sample beyond it. Empty when nothing went beyond full scale, so a clean
+// render prints nothing.
 std::string clip_report(const std::string& name, unsigned significant_bits,
+                        const convolver::QuantizationOptions& quantization,
                         const std::vector<float>& peaks, const std::vector<std::uint64_t>& counts,
                         std::uint64_t frames, bool no_clip) {
     const bool integer = significant_bits != 0;
     std::uint64_t total = 0;
     std::size_t affected = 0;
-    double loudest = 0;
+    float largest = 0;
     std::ostringstream lines;
     lines.imbue(std::locale::classic());
     for (std::size_t c = 0; c < counts.size() && c < peaks.size(); ++c) {
@@ -172,55 +173,79 @@ std::string clip_report(const std::string& name, unsigned significant_bits,
             continue;
         total += counts[c];
         ++affected;
-        const double db = 20 * std::log10(static_cast<double>(peaks[c]));
-        loudest = std::max(loudest, db);
-        lines << "\n    channel " << c + 1 << ": " << counts[c] << " of " << frames
+        largest = std::max(largest, peaks[c]);
+        lines << "\n  channel " << c + 1 << ": " << counts[c] << " of " << frames
               << (frames == 1 ? " sample " : " samples ")
               << (integer ? "clipped" : "above full scale") << ", peak " << std::fixed
-              << std::setprecision(2) << std::showpos << db << std::noshowpos << " dBFS";
+              << std::setprecision(2) << std::showpos
+              << 20 * std::log10(static_cast<double>(peaks[c])) << std::noshowpos << " dBFS";
     }
     if (!total)
         return {};
-    std::ostringstream text;
-    text.imbue(std::locale::classic());
     const auto samples = std::to_string(total) + (total == 1 ? " sample" : " samples");
     const auto channels = counts.size() == 1 ? std::string()
                                              : " in " + std::to_string(affected) + " of " +
                                                    std::to_string(counts.size()) + " channels";
+    // Whether the samples themselves went beyond full scale, or only
+    // rounding, dither and noise shaping took samples within it over (an
+    // integer output's largest positive value is one step short of +1.0).
+    const bool beyond = largest > 1;
+    const double loudest = 20 * std::log10(static_cast<double>(largest));
     std::ostringstream peak;
     peak.imbue(std::locale::classic());
     peak << std::fixed << std::setprecision(2) << loudest << " dB";
-    const bool above = loudest >= 0.005; // Otherwise rounding or dither took them over.
-    std::string fix;
-    if (no_clip)
-        fix = "Lower --gain-db below the no-clip figure reported above" +
-              (above ? " by more than the highest peak, " + peak.str() : std::string()) +
-              ": no-clip keeps full-scale input within full scale, and this input goes "
-              "beyond full scale.";
-    else
-        fix = "Render again with --gain-db no-clip, which keeps full-scale input within full "
-              "scale" +
-              (above ? ", or lower --gain-db by more than the highest peak, " + peak.str()
-                     : std::string()) +
-              ".";
+    // "By more than 0.00 dB" would say nothing.
+    const auto lower =
+        loudest >= 0.005 ? " by more than the highest peak, " + peak.str() : std::string();
+    convolver::Advice a;
     if (integer) {
-        text << "convolver: warning: " << name << " clipped " << samples << channels << lines.str()
-             << "\n  Cause: Those samples went beyond full scale after the "
-             << "filter and --gain-db, and " << significant_bits
-             << "-bit integer samples cannot hold them, so each was written as the largest "
-                "value instead. Clipping distorts the sound; the filter's gain, --gain-db or the "
-                "input's level is too high.\n  Fix: "
-             << fix << "\n  Note: The output is complete and the render succeeded.\n";
+        a.problem = name + " clipped " + samples + channels + lines.str();
+        const auto depth = std::to_string(significant_bits) + "-bit integer samples";
+        if (beyond) {
+            a.cause = "Those samples went beyond full scale after the filter and --gain-db, and " +
+                      depth +
+                      " cannot hold them, so each was written as the nearest value they can "
+                      "hold, which distorts the sound. " +
+                      (no_clip ? std::string("The input goes beyond full scale.")
+                               : std::string("The filter's gain, --gain-db or the input's level "
+                                             "is too high."));
+        } else {
+            const bool dithered = quantization.dither != convolver::Dither::none;
+            const bool shaped = quantization.noise_shaping != convolver::NoiseShaping::none;
+            a.cause = "Those samples were within full scale, but rounding" +
+                      std::string(dithered && shaped ? ", dither and noise shaping"
+                                  : dithered         ? " and dither"
+                                  : shaped           ? " and noise shaping"
+                                                     : "") +
+                      " took them just beyond what " + depth +
+                      " can hold, so each was written as the nearest value they can hold. The "
+                      "largest positive value is one step short of full scale, so a sample of "
+                      "+1.0 always clips.";
+        }
     } else {
-        text << "convolver: note: " << name << " has " << samples << " above full scale" << channels
-             << lines.str()
-             << "\n  Cause: Float samples keep values above full scale, so this output is not "
-                "clipped, but converting it to integer samples later (for a CD, a 24-bit file "
-                "or a playback device) will clip them.\n  Fix: To keep it within full scale: "
-             << static_cast<char>(std::tolower(static_cast<unsigned char>(fix[0]))) << fix.substr(1)
-             << '\n';
+        a.problem = name + " has " + samples + " above full scale" + channels + lines.str();
+        a.cause = "Float samples keep values above full scale, so this output is not clipped, "
+                  "but converting it to integer samples later (for a CD, a 24-bit file or a "
+                  "playback device) will clip them.";
     }
-    return text.str();
+    if (no_clip && beyond)
+        a.fix = "Lower --gain-db below the no-clip figure reported above" + lower +
+                ": no-clip keeps full-scale input within full scale, and this input goes beyond "
+                "full scale.";
+    else if (beyond)
+        a.fix = "Render again with --gain-db no-clip, which keeps full-scale input within full "
+                "scale" +
+                (lower.empty() ? std::string() : ", or lower --gain-db" + lower) + ".";
+    else
+        a.fix = "Render again with --gain-db no-clip, which leaves room for rounding, dither and "
+                "noise shaping, or lower --gain-db a little.";
+    if (!integer)
+        a.fix =
+            "To keep it within full scale: " +
+            std::string(1, static_cast<char>(std::tolower(static_cast<unsigned char>(a.fix[0])))) +
+            a.fix.substr(1);
+    return convolver::detail::cli_message("convolver", integer ? "warning" : "note",
+                                          convolver::detail::advice_text(a));
 }
 // CONTAINER-TYPE, for example wav-pcm24 or flac-pcm16.
 std::optional<convolver::OutputEncoding> parse_output_format(std::string_view name) {
@@ -802,8 +827,9 @@ int run(int argc, char** argv) {
             writer.close();
             std::cerr << clip_report(
                 output == "-" ? std::string("standard output") : utf8_string(output),
-                bits ? (quantization.valid_bits ? quantization.valid_bits : bits) : 0, peaks,
-                bits ? writer.clipped_samples() : above, written, automatic_gain == "no-clip");
+                bits ? (quantization.valid_bits ? quantization.valid_bits : bits) : 0, quantization,
+                peaks, bits ? writer.clipped_samples() : above, written,
+                automatic_gain == "no-clip");
         } catch (const std::exception& error) {
             auto advice = convolver::detail::parse_advice(error.what());
             const auto incomplete =
