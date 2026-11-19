@@ -154,6 +154,7 @@ CANDIDATES = (
     'tests/au/bundle_tests.py',  # package_smoke.py and macos_installer.py
     'tests/vst3/package_probe.cpp',  # Built only with CONVOLVER_PACKAGE_PLUGINS.
     '.gitattributes',  # git archive writes the source archive with it.
+    '.github/actions/newest-compiler/',  # Chooses the compiler that builds them (CI-43).
     'portable/third_party/',  # Shipped dependency (Ooura), with its licence.
 )
 # What the fuzz targets are built from (CI-34): for a pull request, the fuzz
@@ -167,6 +168,7 @@ FUZZED = (
     'scripts/fuzz_campaigns.sh',  # Runs the campaigns.
     'scripts/ci_scope.py',  # The workflow checks its sources with it.
     '.github/actions/use-every-cpu/',  # The workflow uses it.
+    '.github/actions/newest-compiler/',  # Chooses the Clang that builds them (CI-43).
     # Build options, compiler flags and the FFTW and libsndfile lookups.
     'CMakeLists.txt',
     'cmake/',

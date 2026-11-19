@@ -69,7 +69,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version: '3.x'
       - name: lilv and lv2 packages
         run: |
           read -ra packages <<< "$LV2_PACKAGES"
@@ -78,6 +78,10 @@ jobs:
             meson ninja-build pkg-config libelf-dev libsndfile1-dev xvfb libasound2t64
           lv2info --version
           python scripts/release/resolve.py packages "${packages[@]}"
+      # The newest compiler on this image (docs/develop/build.md#compilers-and-ci-machines).
+      - uses: ./.github/actions/newest-compiler
+        with:
+          compiler: gcc
       - name: Newest lv2 source
         run: >-
           python scripts/release/sources.py --latest --fetch
@@ -225,7 +229,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version: '3.x'
       - name: Ardour, lilv and lv2 packages
         run: |
           read -ra packages <<< "$LV2_PACKAGES"
@@ -233,6 +237,10 @@ jobs:
           sudo apt-get install -y --no-install-recommends "${packages[@]}" ardour \
             ninja-build pkg-config libsndfile1-dev
           python scripts/release/resolve.py packages ardour "${packages[@]}"
+      # The newest compiler on this image (docs/develop/build.md#compilers-and-ci-machines).
+      - uses: ./.github/actions/newest-compiler
+        with:
+          compiler: gcc
       # Release, as a host would load it; the preset tool makes the presets.
       - name: Convolver's LV2 bundle and preset tool (Release)
         run: |
@@ -288,7 +296,7 @@ jobs:
       - uses: ./.github/actions/use-every-cpu
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version: '3.x'
       # The same packages as the tools job.
       - name: lilv and lv2 packages
         run: |
@@ -298,6 +306,10 @@ jobs:
             meson ninja-build pkg-config libelf-dev libsndfile1-dev
           lv2info --version
           python scripts/release/resolve.py packages "${packages[@]}"
+      # The newest compiler on this image (docs/develop/build.md#compilers-and-ci-machines).
+      - uses: ./.github/actions/newest-compiler
+        with:
+          compiler: gcc
       # Compiler cache: pull requests restore it; main and manual runs also
       # save it (docs/develop/testing.md#compiler-cache).
       - name: Compiler cache
@@ -359,13 +371,19 @@ jobs:
       - uses: ./.github/actions/use-every-cpu
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version: '3.x'
       - name: Build tools
         id: tools
         continue-on-error: true
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends meson ninja-build pkg-config libsndfile1-dev
+      # The newest compiler on this image (docs/develop/build.md#compilers-and-ci-machines).
+      - if: steps.tools.outcome == 'success'
+        uses: ./.github/actions/newest-compiler
+        continue-on-error: true
+        with:
+          compiler: gcc
       - name: Newest upstream sources
         id: sources
         if: steps.tools.outcome == 'success'

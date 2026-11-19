@@ -70,10 +70,10 @@ jobs:
         # its in-process tests (no job loads an FFTW bundle in the validator
         # or pluginval, since FFTW plug-ins are not distributed).
         # The core suite runs here only where no other job builds the same
-        # compiler, flags and backend: on Linux the native g++ jobs do,
-        # so this one runs the VST3 tests alone. macos-latest has a newer
-        # Xcode than the Audio Unit job's macos-15, so it keeps the suite
-        # (docs/develop/testing.md#which-configurations-run-which-tests).
+        # compiler, flags and backend: on Linux the native g++ jobs do, and
+        # on macOS the Audio Unit job (Release Accelerate with the newest
+        # Xcode on the newest macOS image, CI-43), so these run the VST3 tests
+        # alone (docs/develop/testing.md#which-configurations-run-which-tests).
         # A job that runs only the VST3 tests builds only what they run (CI-9).
         include:
           - os: ubuntu-latest
@@ -82,7 +82,8 @@ jobs:
             targets: --target convolver_vst3_suite
           - os: macos-latest
             fft: AUTO
-            tests: -LE 'repository|consumer'
+            tests: -L vst3
+            targets: --target convolver_vst3_suite
           - os: windows-latest
             fft: AUTO
             tests: -LE 'repository|consumer'
@@ -94,7 +95,7 @@ jobs:
       - uses: ./.github/actions/use-every-cpu
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version: '3.x'
       - uses: actions/download-artifact@v8
         with:
           name: vst3-sdk-lock
@@ -116,6 +117,11 @@ jobs:
       - name: macOS libraries
         if: runner.os == 'macOS'
         run: brew install fftw libsndfile
+      # The newest compiler on this image (docs/develop/build.md#compilers-and-ci-machines).
+      - if: runner.os != 'Windows'
+        uses: ./.github/actions/newest-compiler
+        with:
+          compiler: ${{ runner.os == 'macOS' && 'xcode' || 'gcc' }}
       - name: Prepare vcpkg binary cache
         id: vcpkg-cache
         if: runner.os == 'Windows'
@@ -409,7 +415,7 @@ jobs:
       - uses: ./.github/actions/use-every-cpu
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version: '3.x'
       - uses: actions/download-artifact@v8
         with:
           name: vst3-sdk-lock
@@ -424,6 +430,10 @@ jobs:
           vst3sdk vst3-base vst3-cmake vst3-pluginterfaces vst3-public-sdk
       - name: Linux libraries
         run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libsndfile1-dev
+      # The newest compiler on this image (docs/develop/build.md#compilers-and-ci-machines).
+      - uses: ./.github/actions/newest-compiler
+        with:
+          compiler: clang
       # Compiler cache: pull requests restore it; main and manual runs also
       # save it (docs/develop/testing.md#compiler-cache).
       - name: Compiler cache
