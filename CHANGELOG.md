@@ -38,8 +38,10 @@ messages for a sample-rate refusal and a `.cfg` file name that is not UTF-8
 
 - Engine (EDGE-11, first candidate): once the input has been exactly
   silent for longer than anything can stay in the engine (the latency, the
-  filter and its delays, plus at most about half a second), each further
-  silent callback writes zeros without convolving. The output stays bit for
+  filter and its delays, plus an additional interval determined by the
+  partition layout; approximately half a second or less in the measured
+  48 kHz workloads), each further silent callback writes zeros without
+  convolving. The output stays bit for
   bit what processing the silence gives, and the next sound resumes at
   once. The saving applies only to silence after the tail has ended, not
   to normal playback: on the Linux cloud VM such silence costs 93 to 99%
