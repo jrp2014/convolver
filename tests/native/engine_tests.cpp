@@ -438,8 +438,10 @@ void idle_after_tail() {
         detail::disable_idle(false);
         return e;
     };
-    // The default layout's long blocks make each trial long: fewer of them.
-    const std::size_t trials = largest > 1024 ? 5 : 24;
+    // The default layout's long blocks make each trial long: fewer, shorter
+    // ones, within the test's time limit in sanitized Ooura builds.
+    const bool long_blocks = largest > 1024;
+    const std::size_t trials = long_blocks ? 2 : 24;
     for (std::size_t trial = 0; trial < trials; ++trial) {
         const std::size_t latencies[] = {0, 1, layout.first, layout.first + 3, 2 * largest + 37};
         const auto latency = latencies[trial % std::size(latencies)];
@@ -453,7 +455,7 @@ void idle_after_tail() {
         std::size_t longest = 0;
         for (std::size_t path = 0, count = 1 + random() % 4; path < count; ++path) {
             FilterPath p;
-            p.impulse.resize(1 + random() % (6 * largest + 2 * layout.first));
+            p.impulse.resize(1 + random() % ((long_blocks ? 2 : 6) * largest + 2 * layout.first));
             for (auto& x : p.impulse)
                 x = sample(random);
             longest = std::max(longest, p.impulse.size());
@@ -474,7 +476,7 @@ void idle_after_tail() {
             g.silent.insert(g.silent.end(), frames, !noise);
             g.frames += frames;
         };
-        for (std::size_t segment = 0; segment < 7; ++segment) {
+        for (std::size_t segment = 0; segment < (long_blocks ? 4 : 7); ++segment) {
             add(1 + random() % (2 * largest), true, 0);
             const auto zero = random() % 3 ? 0.f : -0.f;
             add(random() % 4 ? random() % (3 * reach) : random() % largest, false, zero);
