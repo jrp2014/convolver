@@ -62,4 +62,9 @@ using StageWorkProbe = void (*)(const StageWork&) noexcept;
 // Every engine calls `probe` with each stage's work; nullptr stops it. Not
 // thread-safe: set it before constructing engines.
 void probe_stage_work(StageWorkProbe probe) noexcept;
+// Tests and measurements only (EDGE-11): engines constructed while this is
+// true never skip silent input, so their output is the reference an idling
+// engine must match bit for bit. Not thread-safe: set it before constructing
+// engines.
+void disable_idle(bool disabled) noexcept;
 } // namespace convolver::detail
