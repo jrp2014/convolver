@@ -397,6 +397,14 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
    only if its worker and `run()` fit without losing what LV2 has; otherwise
    LV2 keeps `stage()` and `retire()` and the architecture page says why.
    Success is simpler ownership with unchanged audio and host behaviour.
+   Each adapter's pull request shows, by its tests, that the control call
+   returns while a callback still holds the old processor; that this
+   processor stays alive until the callback lets go; that the host sees
+   the new latency at once, stopped or playing; and that the next callback
+   adopts the replacement. It deletes the adapter's own ownership fields
+   and wait loops, which is what the step is judged by (jrp's review,
+   19 November 2026). The class protects lifetime, not concurrent use, and
+   its `hold()` is lock-free, not wait-free.
    Independent of steps 1 and 2, and taken next, before them (jrp,
    19 November 2026). Step 3a, the shared class (`PlayingProcessor` in
    `portable/playing_processor.hpp`, with `native.playing_processor`), is

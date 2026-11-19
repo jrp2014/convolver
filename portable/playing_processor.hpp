@@ -9,7 +9,13 @@
 // processor, at a callback boundary; and a later control call frees the old
 // one once no reader holds it. The control side never waits for audio, and
 // the audio side only loads and stores atomics: it never locks, allocates or
-// frees.
+// frees. hold() tries again each time a new offer arrives while it marks,
+// so it is lock-free but not wait-free: its time is not bounded, only short
+// unless the control side offers without pause.
+//
+// What this protects is lifetime, not use: two readers may hold the same
+// processor, and which of them may call what on it, and when, stays the
+// adapter's rules and the host's call order.
 //
 // The rules (jrp's conditions of 13 November 2026, step 3 of the
 // consolidation plan):

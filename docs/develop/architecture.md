@@ -20,7 +20,7 @@ For the audio vocabulary, start with [concepts](../use/concepts.md).
 | Subnormal flushing while processing (PERF-15) | [`denormals.hpp`](../../portable/denormals.hpp): `ScopedFlushDenormals`, entered by `Engine::process`, `HostProcessor::process`, the `Engine` constructor and the CLI's render | Private to core; header only; x86-64 and AArch64 controls, nothing elsewhere ([numerical policy](#subnormal-numbers)) |
 | FFT contract and implementations | [`fft.hpp`](../../portable/fft.hpp): `RealFft`, `fft_storage`; [`fft_fftw.cpp`](../../portable/fft_fftw.cpp), [`fft_accelerate.cpp`](../../portable/fft_accelerate.cpp), [`fft_ooura.cpp`](../../portable/fft_ooura.cpp) | One backend per build; plan/storage details stay private |
 | Host buffering, bypass and filter replacement | [`host.hpp`](../../include/convolver/host.hpp): `HostProcessor`; [`host.cpp`](../../portable/host.cpp) | `Convolver::host` depends on core; planar/in-place host buffers |
-| Ownership of the playing processor (PLUG-39 step 3) | [`playing_processor.hpp`](../../portable/playing_processor.hpp): `PlayingProcessor`, in which the control side offers a replacement and returns, each reader adopts the newest offer at its next call, and a later control call frees a replaced processor no reader's mark holds | Header only, private to the plug-ins; one mark per reader, at most one kept processor per reader, atomics only on the audio side; deactivation and destruction free everything (`native.playing_processor`). Not yet used: VST3 and the Audio Unit adopt it in the plan's steps 3b and 3c ([plan](../project/plans/2026-11-13-load-restore-consolidation.md#steps)) |
+| Ownership of the playing processor (PLUG-39 step 3) | [`playing_processor.hpp`](../../portable/playing_processor.hpp): `PlayingProcessor`, in which the control side offers a replacement and returns, each reader adopts the newest offer at its next call, and a later control call frees a replaced processor no reader's mark holds | Header only, private to the plug-ins; one mark per reader, at most one kept processor per reader, atomics only on the audio side (lock-free, not wait-free); it protects lifetime, not concurrent use; deactivation and destruction free everything (`native.playing_processor`). Not yet used: VST3 and the Audio Unit adopt it in the plan's steps 3b and 3c ([plan](../project/plans/2026-11-13-load-restore-consolidation.md#steps)) |
 | Shared adapter contract, control side | `HostFilter`, `HostLayout`, `HostPlayback` (a filter and whether it has a dry signal), `HostLoadCheck`, `unfiltered_configuration`, `speaker_notice`, `HostFailure` in [`host.hpp`](../../include/convolver/host.hpp); messages in their parts, `Advice` in [`advice.hpp`](../../include/convolver/advice.hpp), formatted for each surface by [`portable/advice.hpp`](../../portable/advice.hpp) (DIAG-4) | Which filter a load replaces, what is saved and what plays, and why a request failed (PLUG-8); every plug-in adapter uses it under its control lock |
 | Status and the Convolver log (DIAG-1) | `HostStatus`, `host_status`, processing faults (`HostFaults`, `HostProcessor::faults`, `HostFilter::observe`, `fault_message`) in [`host.hpp`](../../include/convolver/host.hpp); `host_log`, `host_log_written`, `execution_line`, `loaded_line`, `rejected_line`, `started_line`, `playing_words` (what plays, shared with the editor report), `unfiltered_sound` (what Gain and Mix let through with no filter heard), `host_log_recent` in [`host_log.hpp`](../../portable/host_log.hpp), [`host_log.cpp`](../../portable/host_log.cpp); the editor report (PLUG-9: `host_report`, `report_fields`, `report_text`, `diagnostics_text`) in [`host_report.hpp`](../../portable/host_report.hpp), [`host_report.cpp`](../../portable/host_report.cpp) | Part of `Convolver::host`; file I/O on the control thread only; the VST3 and AU adapters show the line as a read-only Status parameter ([contract](plugin-contract.md#status-and-log)) |
 | Embedded state | `HostState`, `encode_host_state`, `decode_host_state`; [`state.cpp`](../../portable/state.cpp) | Bounded wire format; control-side work |
@@ -112,6 +112,22 @@ workflow.
    spectra written since construction or reset, and paths multiply only those
    partitions (PERF-5), so neither reset nor the blocks after it pay for
    history known to be silence. It does not rebuild plans or read files.
+7. Once the input has been exactly silent (every sample zero, or an empty
+   span) for longer than anything can stay in the engine, `Engine::process`
+   writes zeros for each further silent chunk and does no other work
+   (EDGE-11). The bound is structural: the delays, the mixed input ring, and
+   for each stage its offset plus its partitions and two blocks, because the
+   transforms' rounding leaves tiny values up to a block beyond the filter's
+   last tap. By then every buffer that reaches the output holds zeros, so
+   the output is bit-identical to processing the silence; the next nonzero
+   sample resumes at the same block phase. Work a larger stage had begun on
+   the silence is dropped, since it would only add zeros. A zero's sign was
+   the one thing it could change (sound that cancels to a subnormal in the
+   output ring is flushed to -0, and a later +0 makes it +0), so frames
+   leave the ring as their value plus +0 and the engine never outputs -0. `native.engine`'s
+   `idle_after_tail` compares an idling engine with one built under
+   `detail::disable_idle`. A filter whose spectrum overflows to infinity
+   never idles.
 
 ### Subnormal numbers
 
