@@ -72,17 +72,17 @@ using Two = PlayingProcessor<Probe, 2>;
 void adopts_newest() {
     {
         One p;
-        require(!p.hold(0), "a reader got a processor before any was offered");
+        require(!p.hold<0>(), "a reader got a processor before any was offered");
         p.offer(std::make_unique<Probe>(1));
         require(p.newest() && p.newest()->generation == 1, "the control side lost the offer");
         {
-            const auto held = p.hold(0);
+            const auto held = p.hold<0>();
             require(held && held->generation == 1, "the reader did not adopt the offer");
         }
         p.offer(std::make_unique<Probe>(2));
         // Nothing held it: the replaced one is freed by the offer itself.
         require(alive == 1 && p.kept() == 0, "a replaced processor nobody held was kept");
-        const auto held = p.hold(0);
+        const auto held = p.hold<0>();
         require(held && held->generation == 2, "the reader did not adopt the newer offer");
     }
     require(alive == 0, "destruction left a processor alive");
@@ -100,7 +100,7 @@ void control_does_not_wait() {
     freeing_processor_for_tests = count_freeing;
     p.offer(std::make_unique<Probe>(1));
     {
-        const auto held = p.hold(0);
+        const auto held = p.hold<0>();
         // On this thread: an offer that waited for the reader would never return.
         p.offer(std::make_unique<Probe>(2));
         require(p.newest()->generation == 2, "the newer offer is not the newest");
@@ -115,7 +115,7 @@ void control_does_not_wait() {
     require(alive == 1 && p.kept() == 0, "reclaim() kept a processor nobody holds");
     require(freed == 1, "the test hook did not see the processor freed");
     freeing_processor_for_tests = nullptr;
-    require(p.hold(0)->generation == 2, "the next call did not play the newer offer");
+    require(p.hold<0>()->generation == 2, "the next call did not play the newer offer");
 }
 
 // An offer superseded before any reader adopted it is freed by the offer
@@ -123,7 +123,7 @@ void control_does_not_wait() {
 void superseded_offer_is_freed() {
     One p;
     p.offer(std::make_unique<Probe>(1));
-    const auto held = p.hold(0);
+    const auto held = p.hold<0>();
     for (std::uint64_t g = 2; g < 50; ++g) {
         p.offer(std::make_unique<Probe>(g));
         require(alive == 2 && p.kept() == 1,
@@ -138,10 +138,10 @@ void readers_hold_different_generations() {
     Two p;
     p.offer(std::make_unique<Probe>(1));
     {
-        const auto first = p.hold(0);
+        const auto first = p.hold<0>();
         p.offer(std::make_unique<Probe>(2));
         {
-            const auto second = p.hold(1);
+            const auto second = p.hold<1>();
             require(second->generation == 2, "the second reader did not adopt the newer offer");
             p.offer(std::make_unique<Probe>(3));
             require(alive == 3 && p.kept() == 2, "a held generation was not kept");
@@ -163,9 +163,9 @@ void readers_hold_different_generations() {
 void kept_is_bounded() {
     Two p;
     p.offer(std::make_unique<Probe>(1));
-    const auto first = p.hold(0);
+    const auto first = p.hold<0>();
     p.offer(std::make_unique<Probe>(2));
-    const auto second = p.hold(1);
+    const auto second = p.hold<1>();
     for (std::uint64_t g = 3; g < 200; ++g) {
         p.offer(g % 7 ? std::make_unique<Probe>(g) : nullptr);
         require(p.kept() <= 2 && alive <= 3, "more replaced processors were kept than readers");
@@ -179,14 +179,14 @@ void clear_frees_everything() {
     Two p;
     p.offer(std::make_unique<Probe>(1));
     {
-        const auto held = p.hold(0);
+        const auto held = p.hold<0>();
     }
     p.offer(std::make_unique<Probe>(2));
     p.clear();
     require(alive == 0 && p.kept() == 0 && !p.newest(), "clear() left a processor alive");
-    require(!p.hold(0) && !p.hold(1), "a reader got a processor after clear()");
+    require(!p.hold<0>() && !p.hold<1>(), "a reader got a processor after clear()");
     p.offer(std::make_unique<Probe>(3)); // Activated again.
-    require(p.hold(1)->generation == 3, "the next activation's processor did not play");
+    require(p.hold<1>()->generation == 3, "the next activation's processor did not play");
 }
 
 // A host that renders while it deactivates: clear() waits for that one call
@@ -196,7 +196,7 @@ void clear_waits_for_a_running_reader() {
     p.offer(std::make_unique<Probe>(1));
     std::atomic<bool> holding{false}, let_go{false};
     std::thread reader([&] {
-        const auto held = p.hold(0);
+        const auto held = p.hold<0>();
         holding = true;
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
         held->use();
@@ -221,12 +221,12 @@ void stress() {
     std::atomic<std::uint64_t> failures{0};
     std::array<std::uint64_t, 2> adopted{};
     std::atomic<int> started{0};
-    auto read = [&](std::size_t reader) {
+    auto read = [&]<std::size_t reader>() {
         audio_thread = true;
         ++started;
         std::uint64_t last = 0, count = 0;
         while (!stop.load(std::memory_order_relaxed)) {
-            const auto held = p.hold(reader);
+            const auto held = p.template hold<reader>();
             if (!held)
                 continue;
             if (held->magic.load() != Probe::live || held->generation < last)
@@ -239,7 +239,8 @@ void stress() {
         adopted[reader] = count;
     };
     p.offer(std::make_unique<Probe>(0));
-    std::thread a(read, 0), b(read, 1);
+    std::thread a([&] { read.template operator()<0>(); }),
+        b([&] { read.template operator()<1>(); });
     // The time counts from when both readers run, so a slow machine still
     // gives each one the whole run.
     while (started.load() < 2)

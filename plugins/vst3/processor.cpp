@@ -675,7 +675,7 @@ tresult PLUGIN_API Processor::setProcessing(TBool state) {
     // Not a place to explain faults: hosts may call this on the audio
     // thread, where nothing may lock, allocate or write the log.
     // VST3-16: a new Latency may replace it meanwhile.
-    const auto held = playing_.hold(starting_reader);
+    const auto held = playing_.hold<starting_reader>();
     if (state && held) {
         held->set_bypass(bypass_.load());
         held->reset();
@@ -993,7 +993,7 @@ tresult PLUGIN_API Processor::process(ProcessData& d) {
         return kInvalidArgument;
     // VST3-16: the processor this call plays, which a new Latency may
     // replace on another thread meanwhile (choose_latency()).
-    const auto held = playing_.hold(processing_reader);
+    const auto held = playing_.hold<processing_reader>();
     auto* host = held.get();
     if (holding_for_tests)
         holding_for_tests();

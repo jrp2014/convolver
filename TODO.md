@@ -86,7 +86,7 @@ starting.
 
 | Item | What to do | Note |
 | --- | --- | --- |
-| **PLUG-39** | The load and restore path, steps 1b to 6 in the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)'s order (step 0's protection tests are in, PR #200, and step 1a, PR #205): step 3 (the shared ownership of the playing processor, with ROBUST-8) first, then steps 1b (then PLUG-36), 2 and 4 (with PLUG-30) to 6 | Plan and order approved by jrp on 13 November 2026; step 3 first and the four items folded in on 19 November 2026 ([decision](docs/project/decisions.md#releases)). Each step is its own reviewed pull request, and step 3 (deferred reclamation) gets its own ownership review |
+| **PLUG-39** | The load and restore path, steps 1b to 6 in the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)'s order (step 0's protection tests are in, PR #200, and step 1a, PR #205): step 3 (the shared ownership of the playing processor) and then ROBUST-8 first, then steps 1b (then PLUG-36), 2 and 4 (with PLUG-30) to 6 | Plan and order approved by jrp on 13 November 2026; step 3 first and the four items folded in on 19 November 2026 ([decision](docs/project/decisions.md#releases)). Each step is its own reviewed pull request, and step 3 (deferred reclamation) gets its own ownership review |
 | **PLUG-24** | `HostProcessor` in its own source file | In PLUG-39's sequence, as its own pull request, never inside a step's or with a DSP change (jrp, 19 November 2026) |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the gain modes are in 0.13.20 (PR #188) |
 | **PERF-3** | One measurement exercise: resource budgets and supported workloads | Changes no shipped code; its results decide whether FFT-2, VST3-5, PLUG-11 and PERF-2's tuning are worth doing (EDGE-5 publishes them) |
@@ -381,7 +381,7 @@ LV2 (Linux first; also PipeWire system audio):
   control call until `process()` or `Render` lets go;
   jrp chose on 19 November 2026 to take step 3 next. **Remains:** the
   [consolidation plan](docs/project/plans/2026-11-13-load-restore-consolidation.md)'s
-  steps 1b, 2 and 4 to 6: the rest of one shared decision for each
+  ROBUST-8 next, then steps 1b, 2 and 4 to 6: the rest of one shared decision for each
   accepted request (building on PLUG-38's `HostPlayback::playing`), one
   rule for when the host has settled, diagnostics as a view of state, and
   typed reports and advice. Plan and order approved by jrp on 13 November
@@ -577,8 +577,9 @@ means a patched FFmpeg build with `--enable-gpl`.
   the host may read Active. Split `activate()` into a step that may throw
   and a commit that cannot, called only once the new processor plays, in
   both adapters, with a test of each case. Only reachable when memory runs
-  out. Taken up with PLUG-39's steps 3b and 3c, where the commit follows
-  the offer of the new processor (jrp, 19 November 2026).
+  out. Taken up in PLUG-39's sequence right after step 3c, as its own pull
+  request covering both adapters, now that the commit can follow the offer
+  of the new processor (jrp, 19 November 2026).
 
 ## VST3 SDK features not yet used
 

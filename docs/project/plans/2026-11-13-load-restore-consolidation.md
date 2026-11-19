@@ -482,7 +482,8 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
   up with step 4 (jrp, 19 November 2026), which removes the Audio Unit's
   report cache from its list.
 - **ROBUST-8** (the fault record after a failed Latency change) is taken up
-  with steps 3b and 3c (jrp, 19 November 2026): once the shared ownership
+  right after steps 3b and 3c, as its own pull request for both adapters
+  (jrp, 19 November 2026): now that the shared ownership
   offers the new processor, `HostFilter::activate()`'s commit can follow
   the offer, so a processor that cannot be built leaves the record as it
   was.

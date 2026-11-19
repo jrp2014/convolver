@@ -164,11 +164,13 @@ template <class Processor, std::size_t Readers> class PlayingProcessor {
         std::atomic<Processor*>& mark_;
         Processor* processor_;
     };
-    // Adopts the newest offer (null if none) for reader `reader`, which is
-    // less than `Readers`. Nothing here may call outside the class: the
-    // Audio Unit's Render is checked as real-time safe (AUSDK_RTSAFE).
-    Held hold(std::size_t reader) noexcept {
-        auto& mark = marks_[reader];
+    // Adopts the newest offer (null if none) for reader `Reader`, checked at
+    // compile time to be less than `Readers`. Nothing here may call outside
+    // the class: the Audio Unit's Render is checked as real-time safe
+    // (AUSDK_RTSAFE).
+    template <std::size_t Reader> Held hold() noexcept {
+        static_assert(Reader < Readers, "no such reader");
+        auto& mark = marks_[Reader];
         Processor* processor = nullptr;
         do {
             processor = offered_.load();

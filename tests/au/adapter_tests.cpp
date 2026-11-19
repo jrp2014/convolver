@@ -1132,9 +1132,14 @@ void latency_parameter() {
         } release{leave, audio};
         while (!inside.load())
             std::this_thread::yield();
+        seen.clear();
         set_parameter(unit, au::latency_parameter, 5);
-        // A choice that waited for the render would never be applied.
+        // The Latency work finishes, and the host is told, while the render
+        // still holds the old processor: work that waited for the render to
+        // let go would not finish until it did.
         const bool applied = reports(unit, 1024);
+        const bool finished = latency_settled(unit, std::chrono::seconds(5));
+        const auto told = seen.of(kAudioUnitProperty_Latency);
         CFRelease(unit.class_info_now()); // Another control call meanwhile.
         const int freed_while_held = replaced_freed.load();
         leave = true;
@@ -1142,6 +1147,8 @@ void latency_parameter() {
         unit.while_pulling = nullptr;
         check(held, "the held render");
         require(applied, "a Latency chosen while a render held the processor was not reported");
+        require(finished && told == 1,
+                "the Latency work waited for the render, or the host was not told at once");
         require(freed_while_held == 0, "a replaced processor was freed while a render held it");
         CFRelease(unit.class_info_now());
         require(replaced_freed.load() == 1,

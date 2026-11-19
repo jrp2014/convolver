@@ -298,6 +298,9 @@ void Effect::Cleanup() {
         // processor is freed here; were Render still running, it would be
         // freed by the next control call instead, without waiting under the
         // lock for a render whose input callback may call into the unit.
+        // Such a render, which breaks the host's side of the contract, can
+        // still set rendered_ or take a reset meant for the next
+        // initialization; it can no longer use a freed processor.
         playing_.offer(nullptr);
         latency_.store(settings().latency); // What the next initialization uses.
         update_status(); // Read when the host next asks; no notification while it tears down.
@@ -526,7 +529,7 @@ OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp&
     // The processor to use: the newest offer, held for the length of this
     // call so that the control side does not free it (PlayingProcessor).
     // Atomic loads and stores only.
-    const auto held = playing_.hold(0);
+    const auto held = playing_.hold<0>();
     auto* const host = held.get();
     if (!host)
         return kAudioUnitErr_Uninitialized;
