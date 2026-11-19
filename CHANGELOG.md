@@ -53,6 +53,27 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Documentation (DOC-16, from jrp's review of 18 November 2026): the
+  plug-ins guide no longer promises that Reload when the file changes never
+  reads a file part-way: waiting until a change has held for a second makes
+  it less likely, and the guide recommends that tools writing filters
+  write each file under a temporary name and rename it into place. For
+  contributors, TODO's execution priorities sort open work as in progress,
+  ready, depends on, needs a decision or parked, in place of
+  columns written for the freeze lifted on 10 November, with jrp's parking
+  decisions kept and the items he brought forward that day shown in
+  progress until they are done. jrp
+  decided that day that lifting the freeze also ended the hold of
+  6 November on optional features
+  ([decision](docs/project/decisions.md#releases)). The
+  workflow guide's verification table decides what to run when starting,
+  picking up and finishing work, with results for an exact commit carried
+  forward; a review's later rounds read the commits since the reviewed one;
+  older CI failures that a later commit explains need only a line. The
+  status page and TODO point to the changelog and decisions log instead of
+  retelling each preview's publication, CONTRIBUTING no longer calls
+  bundled dependencies future work, and the documentation guide says what
+  a source comment should hold.
 - Configurations (CFG-3, first part): a file name in a `.cfg` or list that
   is not UTF-8 text, as in a file saved in Windows-1252 (Notepad's old
   "ANSI"), now stops with an error that says so: its line, the byte that is
@@ -110,6 +131,13 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- CI (CI-40, from jrp's review of 18 November 2026): clang-tidy ran on a
+  hand-kept list of portable sources, repeated in CONTRIBUTING, that had
+  missed `portable/partitions.cpp`. CI and the documented command now
+  analyse every portable source the build compiles, chosen from its
+  `compile_commands.json` with the vendored `portable/third_party/` left
+  out, so a new file is covered without editing a list
+  ([lint checks](CONTRIBUTING.md#formatting-and-analysis)).
 - CI (CI-39): the native Windows job's two core-only steps run configure,
   build and CTest in one PowerShell script, which went on after a failed
   command, so a failed configure (leaving no tests) or a failed build of a

@@ -66,27 +66,33 @@ it does not install software or query the network. Installation and CI choose
 the latest release, rather than a hard-coded major-version test in the checker.
 
 Presets export `compile_commands.json`. Run the correctness-oriented checks in
-`.clang-tidy` against the translation units present in that build:
+`.clang-tidy` on every portable source that build compiles, with LLVM's
+`run-clang-tidy.py` (installed with the clang-tidy package), as CI does
+(CI-40):
 
 ```sh
-clang-tidy -p build/presets/release portable/engine.cpp portable/kernels.cpp portable/kernels_avx2.cpp portable/attenuation.cpp portable/config.cpp portable/config_parse.cpp portable/sound_files.cpp portable/inspection.cpp portable/inspection_cli.cpp portable/compare_cli.cpp portable/dither_advice.cpp portable/io.cpp portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/host_log.cpp portable/host_report.cpp portable/recent_files.cpp portable/window_model.cpp portable/filter_file.cpp portable/chosen_file.cpp portable/state.cpp portable/presets.cpp portable/preset_main.cpp portable/equalizer_apo.cpp portable/equalizer_apo_main.cpp
+run-clang-tidy.py -quiet -p build/presets/release "^$PWD/portable/[^/]+\.cpp$"
 ```
 
-Replace `fft_fftw.cpp` with `fft_accelerate.cpp` or `fft_ooura.cpp` for the
-corresponding backend. In a build with `-DCONVOLVER_BUILD_LV2=ON`, add
-`plugins/lv2/plugin.cpp` (the [LV2 workflow](.github/workflows/lv2.yml) checks
-it). Match
+Run it from the repository's top folder. The quoted argument is a pattern
+matched against the absolute paths in `compile_commands.json`, so the
+sources come from the build rather than from a list: a new file in
+`portable/` is analysed without editing this command or the workflow, the
+FFT backend and platform files the build uses are included
+(`fft_accelerate.cpp` and `audio_toolbox.cpp` in a macOS build,
+`fft_ooura.cpp` in an Ooura one), and a file the build does not compile is
+skipped. Only files directly in `portable/` match: its one subfolder,
+`portable/third_party/`, holds vendored code (Ooura's FFT) and is left
+out, so first-party code in a new subfolder would need this pattern
+widened. The script analyses the files side by side, one per CPU, prints
+each file's output whole and fails if any file did. `clang-tidy -p
+build/presets/release portable/FILE.cpp` checks one file. In a build with
+`-DCONVOLVER_BUILD_LV2=ON`, also run it on `plugins/lv2/plugin.cpp` (the
+[LV2 workflow](.github/workflows/lv2.yml) checks it). Match
 the analyzer to the compiler/SDK headers: older analyzers may not parse newer
 Apple SDKs. CI upgrades the standalone clang-tidy package before each analysis
 run and prints its version. Fix real diagnostics rather than adding blanket suppressions. These tools are development dependencies;
 library consumers need neither tool.
-
-To analyse the files side by side, one per CPU, run LLVM's
-`run-clang-tidy.py` (installed with the clang-tidy package) with `-quiet` and
-the same `-p` and file list; CI runs the portable list this way. It prints
-each file's output whole and fails if any file did. Each name is a pattern
-matched against `compile_commands.json`, so a file the build does not compile
-is skipped rather than reported.
 
 ### Python formatting and lint
 
@@ -247,13 +253,16 @@ generation if needed; an unavailable cache must only affect build time.
 
 ## Scope and versions
 
-The portable CMake package, CLI and VST3 plug-in share `VERSION`. Source changes
+The portable CMake package, the tools and the plug-ins share `VERSION`. Source changes
 on `main` receive automatic patch versions and annotated Git tags; see
 [source versioning](docs/develop/versioning.md) for scope, deliberate minor/major bumps
 and recovery. The pre-1.0 API can evolve between minor versions; no stable binary
 ABI is promised. Archived releases retain their separate history.
-Installed dependency versions remain externally managed. A future
-binary-release milestone should pin baselines and define dependency bundling.
+A source build uses the dependency versions installed on the system. The
+preview packages build theirs from the latest stable releases, link them
+statically and record each release in the source bundle
+([preview recipe](docs/develop/build.md#preview-recipe),
+[candidates](docs/develop/releasing.md#candidates)).
 
 Compatibility changes need fixtures for the affected config/path or file
 semantics. PCM8/16/24/32 quantization, optional dither, noise shaping and valid bits follow
