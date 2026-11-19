@@ -1221,7 +1221,8 @@ move to the archive.
   change to the partitioner, kernels or an FFT backend got "nothing to
   compare". It now compares any two commits, warns when nothing under
   `portable/` or `include/`, nor the CMake files or the benchmark's source,
-  differs, and refuses the same commit before building
+  differs (without concluding that the timings are noise, since the
+  latencies may differ), and refuses the same commit before building
   ([the script](tests/native/benchmarks/compare_engines.py)).
 - [x] **CI-41 — Run the timing harness's self-test once per build type.**
   19 November 2026, from jrp's review of `212fe6e`: `native.load_timing_harness`

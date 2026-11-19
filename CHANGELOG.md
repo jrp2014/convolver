@@ -179,8 +179,8 @@ Until 1.0 the C++ API may change between minor versions.
   the partitioner, the kernels or an FFT backend could not be measured
   against its baseline. It now compares any two commits, warns when nothing
   under `portable/` or `include/`, nor the CMake files or the benchmark's
-  source, differs between them (the timings can then differ only by noise),
-  and refuses the same commit before building either revision instead of
+  source, differs between them (the warning asks to check the latency
+  settings and benchmark changes when reading the timings), and refuses the same commit before building either revision instead of
   after building both.
 - CLI (DIAG-8, from jrp's review of 19 November 2026): the clipping report
   after a render said that a sample of +1.0 always clips, which is not so

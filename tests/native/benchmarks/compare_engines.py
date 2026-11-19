@@ -28,8 +28,9 @@ Two revisions of the same commit are refused before anything is built. Any
 other pair is compared: a change to the partitioner, the kernels or an FFT
 backend changes the engine as much as one to engine.cpp. When nothing under
 portable/ or include/, nor the CMake files or the benchmark's own source,
-differs between them, a warning says so, since the timings can then differ only by noise (which such a run
-measures).
+differs between them, a warning says so. Timings can still differ for other
+reasons, such as the baseline and candidate latencies, so read them with
+those settings in mind.
 
 The baseline runs at its own Latency (--baseline-latency, default 256, the
 plug-ins' default before PERF-2); the candidate at each --latency. Extra CMake
@@ -213,8 +214,8 @@ def main():
         sys.exit('git diff could not compare the two revisions')
     if changed == 0:
         print(
-            'warning: nothing under portable/ or include/, nor the CMake files or the benchmark, differs '
-            'between the two revisions; their timings can differ only by noise',
+            'warning: No changes were found in the selected core and build sources. Check latency settings '
+            'and benchmark changes when interpreting timing differences.',
             file=sys.stderr,
         )
     for build in builds:
