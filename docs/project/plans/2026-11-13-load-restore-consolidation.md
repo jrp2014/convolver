@@ -85,7 +85,7 @@ checked", where the adapter has no choice to make, do not count:
 
 | Mechanism | Implementations today | Target |
 | --- | --- | --- |
-| Ownership of the playing processor: who may use it, and when a replaced one is freed | VST3: `host_`, `played_host_`, and a mark for each of its two readers (`processing_host_` for `process()`, `starting_host_` for `setProcessing()`, which also resets the processor), with `install_processor()`, `release_processor()` and `hold()`; the control side waits until neither mark holds the old processor. Audio Unit: `host_`, `playing_`, `rendering_`, the same two functions and the mark in `Render()`; the control side waits. LV2: `host`, `retiring`, `handover`, `playing`, with `stage()`, `retire()` and `drop_processors()`; `run()` adopts and nothing waits | One, with every reader protected ([step 3](#steps)); a format it cannot cover keeps its own with the reason recorded |
+| Ownership of the playing processor: who may use it, and when a replaced one is freed | VST3, since step 3b: `PlayingProcessor` with a reader for `process()` and one for `setProcessing()` (which also resets the processor), freed in every control call (`Locked`); before it, `host_`, `played_host_`, `processing_host_`, `starting_host_`, `install_processor()`, `release_processor()` and `hold()`, and the control side waited. Audio Unit: `host_`, `playing_`, `rendering_`, the same two functions and the mark in `Render()`; the control side waits. LV2: `host`, `retiring`, `handover`, `playing`, with `stage()`, `retire()` and `drop_processors()`; `run()` adopts and nothing waits | One, with every reader protected ([step 3](#steps)); a format it cannot cover keeps its own with the reason recorded |
 | When the host's rate and channels count as settled | VST3: `activated_`, `active_`, `played_`, `known_layout()`, `load_check()`. Audio Unit: `initialized_`, `rendered_`, `committed_`, `known_layout()`. They differ for a file chosen while inactive after an activation that never played | One shared rule fed with the same events (step 2) |
 | The status ordering (a load failure, then a fault, then the filter) | `host_status()` for VST3 and the Audio Unit; LV2 orders them again in `update_status()` and `shown_status()` | One (step 4) |
 | A filter's name shows only while that filter plays | `HostRequest::name` in `HostFilter::accepted()` for the Audio Unit; VST3's processor and controller each keep their own rule with a second, "kept" name pair, so that a refused preset does not rename the playing filter | One, in `HostFilter` (step 4) |
@@ -170,7 +170,8 @@ What this shows for the plan:
 - **Freeing is deferred.** All of them that keep building off the audio
   thread let the audio side take the new engine at a callback boundary and
   free the old one later, so the control side does not wait for the audio
-  thread to let go, as VST3's and the Audio Unit's `release_processor()` do.
+  thread to let go, as VST3's and the Audio Unit's `release_processor()`
+  did when this plan was written (VST3's no longer, since step 3b).
   This supports deferred reclamation, with a qualification: JUCE takes the
   engine with a try-lock and frees on the audio thread when its queue is
   full, and others use locks the audio thread shares. They are not evidence
@@ -248,7 +249,7 @@ the [success criterion](#success-criterion) allows:
 
 | Test | Hook it uses | What the hook reaches | Step |
 | --- | --- | --- | --- |
-| `vst3.adapter` `latency_handover_waits()` | `holding_for_tests`, `releasing_for_tests` | `process()` holding its processor, and the control side waiting in `release_processor()` | 3: the assertion that the control call waits becomes the safety requirement, as above |
+| `vst3.adapter` `latency_handover_waits()`, since step 3b `latency_handover_does_not_wait()` | `holding_for_tests`, and `releasing_for_tests` until step 3b replaced it with `freeing_processor_for_tests` | `process()` holding its processor, and the control side waiting in `release_processor()` (since step 3b, a replaced processor being freed) | 3: the assertion that the control call waits became the safety requirement in step 3b, as above |
 | `vst3.adapter` `settings_parameters()`, `vst3.editor` `window` | `latency_preparation_for_tests` | Building the processor for a new Latency while active fails | 3: the hook moves to where the shared mechanism builds the processor it offers |
 | `au.adapter` `bypass_while_latency_work_holds_lock()` | `latency_locked_for_tests`, with the waits below | The Latency work holding the control lock, and the Status's `status_bypassed_` copy | 4: the Status becomes a view of state; the hold stays, since the queue does |
 | `au.adapter` `latency_queue_lifetime()`, `latency_witness_per_unit()`, `latency_staged_closing()`; `latency_parameter()`, `status_parameter()`, `timing_in_seconds()`, `listeners_on_main_thread()`, which wait through `latency_settled()` | `latency_queue_failure_for_tests`, `latency_progress_for_tests`, `latency_started_for_tests`, `latency_closing_for_tests` | The Audio Unit's Latency queue: its requests, runs and closing | 3, only where it changes how the queue hands over the processor; the queue itself stays ([what stays](#what-stays-and-why)) |
@@ -407,8 +408,12 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
    its `hold()` is lock-free, not wait-free.
    Independent of steps 1 and 2, and taken next, before them (jrp,
    19 November 2026). Step 3a, the shared class (`PlayingProcessor` in
-   `portable/playing_processor.hpp`, with `native.playing_processor`), is
-   in PR #213; no adapter uses it yet.
+   `portable/playing_processor.hpp`, with `native.playing_processor`), was
+   merged in PR #213. Step 3b moves VST3 to it, in PR #217: the control
+   side's wait and VST3's own marks go, every control call frees what no
+   reader holds, `latency_handover_waits()` becomes
+   `latency_handover_does_not_wait()` as condition 4 says, and the ownership
+   rules are now in the adapter contract.
 4. **Diagnostics as a view of state.** In three pull requests, one per
    format, each removing copies:
    - The Audio Unit keeps one snapshot of what the control side knows (the

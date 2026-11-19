@@ -145,6 +145,12 @@ messages for a sample-rate refusal and a `.cfg` file name that is not UTF-8
   exports at.", in every format and wherever the Fix is shown: the window,
   Status details and the Convolver log, or LV2's host log. Audacity, for
   one, plays at its Default sample rate while it exports at the project's.
+- VST3 plug-in (PLUG-39 step 3b): choosing a new Latency while audio plays
+  no longer holds the host's control call until the audio thread finishes
+  its block. The new processor is offered and reported at once, as before;
+  the one it replaces is freed by the plug-in's next control call once the
+  audio thread has let it go. What plays, the latency reported and the
+  pause while the new processor fills are unchanged.
 - Plug-ins (PLUG-39 step 1a, from jrp's review of 0.13.28): a restored
   project, preset or undo step that holds the filter already accepted no
   longer analyses that filter again. Its peak bound and, under Estimate, its
