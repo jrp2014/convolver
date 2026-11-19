@@ -89,7 +89,7 @@ open pull requests for the ID before starting.
 
 | Item | What to do | Note |
 | --- | --- | --- |
-| **PLUG-39** | The load and restore path, steps 1 to 6 in the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)'s order (step 0's protection tests are in, PR #200) | Plan and order approved by jrp on 13 November 2026; each step is its own reviewed pull request, and step 3 (deferred reclamation) gets its own ownership review |
+| **PLUG-39** | The load and restore path, steps 1b to 6 in the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)'s order (step 0's protection tests are in, PR #200, and step 1a, PR #205) | Plan and order approved by jrp on 13 November 2026; each step is its own reviewed pull request, and step 3 (deferred reclamation) gets its own ownership review |
 | **PLUG-24** | `HostProcessor` in its own source file | When `host.cpp` next changes for another reason, such as PLUG-39's processor work; never with a DSP change |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the gain modes are in 0.13.20 (PR #188) |
 | **PERF-3** | One measurement exercise: resource budgets and supported workloads | Changes no shipped code; its results decide whether FFT-2, VST3-5, PLUG-11 and PERF-2's tuning are worth doing (EDGE-5 publishes them) |
@@ -375,9 +375,12 @@ LV2 (Linux first; also PipeWire system audio):
   0's protection tests are in PR #200 (the lifecycle runner's Gain and
   Latency, the harness's `same-filter-new-latency`, and the
   [list](docs/project/plans/2026-11-13-load-restore-consolidation.md#protection-for-every-step)
-  of tests that reach into the machinery). **Remains:** the
+  of tests that reach into the machinery). Step 1a, in PR #205, decides
+  once in `HostFilter::load()` whether a request holds the accepted filter
+  and then reuses its peak and gains instead of analysing it again.
+  **Remains:** the
   [consolidation plan](docs/project/plans/2026-11-13-load-restore-consolidation.md)'s
-  steps 1 to 6: one shared decision for each
+  steps 1b to 6: the rest of one shared decision for each
   accepted request (building on PLUG-38's `HostPlayback::playing`), one rule
   for when the host has settled, deferred reclamation of the playing
   processor under jrp's four conditions (approved in principle, its own

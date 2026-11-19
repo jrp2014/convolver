@@ -33,7 +33,7 @@ Until 1.0 the C++ API may change between minor versions.
   it less likely, and the guide recommends that tools writing filters
   write each file under a temporary name and rename it into place. For
   contributors, TODO's execution priorities sort open work as in progress,
-  ready, depends on, needs a decision or parked until REL-3, in place of
+  ready, depends on, needs a decision or parked, in place of
   columns written for the freeze lifted on 10 November, with jrp's parking
   decisions kept and the five items he brought forward that day (DIAG-5,
   CI-34, and parts of PLUG-25, CFG-3 and EDGE-11) shown in progress. jrp
@@ -48,6 +48,15 @@ Until 1.0 the C++ API may change between minor versions.
   retelling each preview's publication, CONTRIBUTING no longer calls
   bundled dependencies future work, and the documentation guide says what
   a source comment should hold.
+- Plug-ins (PLUG-39 step 1a, from jrp's review of 0.13.28): a restored
+  project, preset or undo step that holds the filter already accepted no
+  longer analyses that filter again. Its peak bound and, under Estimate, its
+  noise estimate are kept from when it was accepted, so a restore that
+  changes only the settings no longer filters ten filter lengths of noise
+  again: with a 10-second stereo filter under Estimate, the shared load step
+  took about 590 ms before and 2 to 5 ms after (Linux, optimised build). An
+  estimate is found only when Estimate is chosen and the filter has none
+  yet. What plays, what is saved and the figures shown are unchanged.
 - Documentation (DOC-15): the README's opening says what sets Convolver
   apart, in a "What sets it apart" section under jrp's four emphases:
   accurate (checked against an independent double-precision convolution),
