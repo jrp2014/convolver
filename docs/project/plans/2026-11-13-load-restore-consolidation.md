@@ -397,7 +397,13 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
    only if its worker and `run()` fit without losing what LV2 has; otherwise
    LV2 keeps `stage()` and `retire()` and the architecture page says why.
    Success is simpler ownership with unchanged audio and host behaviour.
-   Independent of steps 1 and 2.
+   Independent of steps 1 and 2, and taken next, before them (jrp,
+   19 November 2026). Step 3a, the shared class (`PlayingProcessor` in
+   `portable/playing_processor.hpp`, with `native.playing_processor`), is
+   in PR #PRNUM; no adapter uses it yet. It keeps a replaced processor in one
+   of `Readers + 1` places and frees it once a single reading of the marks,
+   taken after it was replaced, finds none holding it; one reading per mark
+   is what bounds the processors kept by the number of readers.
 4. **Diagnostics as a view of state.** In three pull requests, one per
    format, each removing copies:
    - The Audio Unit keeps one snapshot of what the control side knows (the
