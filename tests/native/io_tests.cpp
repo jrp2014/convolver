@@ -1702,9 +1702,10 @@ void run(const fs::path& dir) {
         text_file(dir / "ansi-first.txt", "ansi44.cfg\ngood48.cfg\n");
         require(load_configuration(dir / "ansi-first.txt", 48000, 1).sample_rate == 48000,
                 "an unchosen entry's name that is not UTF-8 stops the list");
-#ifndef _WIN32
-        // On macOS and Linux a file with exactly those bytes in its name
-        // still loads, as it did before.
+#if !defined(_WIN32) && !defined(__APPLE__)
+        // On Linux a file with exactly those bytes in its name still loads, as
+        // it did before. macOS file systems refuse such a name ("Illegal byte
+        // sequence"), so no such file can exist there.
         const fs::path latin1 = dir / fs::path(std::string("ir_\xfc.wav"));
         wave(latin1, 48000, 1, {1.0f});
         require(load_configuration(dir / "ansi.cfg", 48000, 1).paths.size() == 1,

@@ -217,7 +217,8 @@ std::filesystem::path resolve_reference(const std::filesystem::path& owner,
     // CFG-3: Windows names are UTF-16, so no file has a name that is not
     // UTF-8 text. On macOS and Linux names are bytes: such a name resolves as
     // its bytes, as it always has, and is reported only when no file has it
-    // (decode_impulses(), Resolver::visit()).
+    // (decode_impulses(), Resolver::visit()). macOS file systems refuse such
+    // names, so there it is always reported.
     if (!valid_utf8(normalized))
         throw ConfigurationError("not-utf8", ref.location,
                                  not_utf8_advice(owner, name, ref.location));

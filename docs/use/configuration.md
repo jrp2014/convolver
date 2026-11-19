@@ -92,7 +92,8 @@ is wrong, shown as `\xFC`, for example; an IR of a list entry that is not
 chosen need not exist, as usual. Such a file was most likely saved in a Windows code page
 such as Windows-1252, as older versions of Notepad and the original Windows
 Convolver did; save it again as UTF-8. Convolver does not guess the code page.
-On macOS and Linux a file whose name has exactly those bytes still loads.
+On Linux a file whose name has exactly those bytes still loads; macOS and
+Windows can't hold such a name.
 
 Delays must be nonnegative. Milliseconds are converted using the parser's
 single-precision arithmetic, then truncated to whole frames, not rounded.
