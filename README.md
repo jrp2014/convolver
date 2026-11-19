@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Convolver
 
-**Download:** [Convolver 0.13.24 for macOS, Windows and Linux](https://github.com/jrp2014/convolver/releases/tag/v0.13.24), an
+**Download:** [Convolver 0.14.0 for macOS, Windows and Linux](https://github.com/jrp2014/convolver/releases/tag/v0.14.0), an
 unsigned developer preview; read [opening an unsigned preview](docs/use/install.md#unsigned-previews)
 first.
 
@@ -110,14 +110,16 @@ you bring the filter.
 
 ## Preview status
 
-Convolver is a developer preview: the latest, [0.13.24](https://github.com/jrp2014/convolver/releases/tag/v0.13.24), is an
+Convolver is a developer preview: the latest, [0.14.0](https://github.com/jrp2014/convolver/releases/tag/v0.14.0), is an
 unsigned pre-release for macOS, Windows and Linux. Its VST3 plug-in has a
 window on macOS and Windows and uses the host's controls on Linux, and the
 Linux package holds the LV2 plug-in. 0.13.20 added the Gain mode and
 opening a Convolver preset from the window; 0.13.24 reduces the risk of an
-LV2 crash in hosts built on JUCE after a Gain mode change. These previews
+LV2 crash in hosts built on JUCE after a Gain mode change; 0.14.0 restores
+the playing filter more quickly, uses less CPU once the sound has stopped
+and reports clipping after a command-line render. These previews
 were published before anyone listened to the new audio engine (since 0.13)
-or tried the Windows window, LV2 or 0.13.20's new features in a host, and
+or tried the Windows window, LV2 or the features new since 0.13.20 in a host, and
 before an independent user's walkthrough, which are still to come
 ([status](docs/project/status.md)).
 Processing is single precision; [limits](docs/use/limits.md) lists what
@@ -128,7 +130,7 @@ Convolver does not do.
 | I want to… | Read |
 | --- | --- |
 | Use Convolver | [Using Convolver](docs/use/README.md), then [your first filter](docs/use/first-filter.md) |
-| Download the preview (macOS, Windows, Linux) | [0.13.24 pre-release](https://github.com/jrp2014/convolver/releases/tag/v0.13.24) |
+| Download the preview (macOS, Windows, Linux) | [0.14.0 pre-release](https://github.com/jrp2014/convolver/releases/tag/v0.14.0) |
 | Use the plug-ins | [Install](docs/use/install.md) and [your first sound in a host](docs/use/first-sound-in-a-host.md) |
 | Build it, embed it or change it | [Build from source](docs/develop/build.md), [library guide](docs/develop/library.md), [implementation map](docs/develop/architecture.md), [contributing](CONTRIBUTING.md) |
 | Find any page | [Documentation index](docs/README.md) |

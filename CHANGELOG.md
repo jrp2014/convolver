@@ -12,6 +12,23 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Releases: jrp published Convolver 0.14.0, the sixth unsigned developer
+  preview, on 19 November 2026
+  ([release](https://github.com/jrp2014/convolver/releases/tag/v0.14.0)).
+  After publishing it he asked to move the baseline for the checks left,
+  REL-3's walkthrough and COMPAT-1's REAPER project from 0.13.24 to 0.14.0
+  ([decision](docs/project/decisions.md#releases)).
+
+## [0.14.0] - 2026-11-19
+
+The sixth published preview, for macOS, Windows and Linux, unsigned:
+quicker restores of the playing filter, less CPU once the input has been
+silent past the tail, the command-line tool's clipping report and clearer
+messages for a sample-rate refusal and a `.cfg` file name that is not UTF-8
+([release](https://github.com/jrp2014/convolver/releases/tag/v0.14.0)).
+
+### Added
+
 - Engine (EDGE-11, first candidate): once the input has been exactly
   silent for longer than anything can stay in the engine (the latency, the
   filter and its delays, plus at most about half a second), each further

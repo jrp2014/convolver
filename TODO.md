@@ -6,9 +6,9 @@ item. This is the shared backlog, not a promise that every idea will be
 implemented. Finished items are listed briefly under [done](#done); what they
 delivered is described in the guides and the [CHANGELOG](CHANGELOG.md).
 
-**In short:** jrp has published five unsigned developer previews, the
-latest [0.13.24](https://github.com/jrp2014/convolver/releases/tag/v0.13.24)
-(16 November 2026); the [CHANGELOG](CHANGELOG.md) says what each added. The
+**In short:** jrp has published six unsigned developer previews, the
+latest [0.14.0](https://github.com/jrp2014/convolver/releases/tag/v0.14.0)
+(19 November 2026); the [CHANGELOG](CHANGELOG.md) says what each added. The
 runtime freeze of 9 November was lifted on 10 November; significant features
 come before corner and edge cases
 ([decision](docs/project/decisions.md#releases)). The
@@ -60,8 +60,8 @@ item itself holds the detail and its progress.
 22 October 2026): an independent user installs and uses an exact preview
 package, following only the documentation (REL-3). jrp published the
 previews before it ([decisions](docs/project/decisions.md#releases)), so
-the walkthrough and the host checks left run on the published 0.13.24
-files, the baseline he chose on 16 November 2026; results recorded on
+the walkthrough and the host checks left run on the published 0.14.0
+files, the baseline he chose on 19 November 2026; results recorded on
 0.12.x builds are records of those builds, not passes for 0.13.
 Finishing a dependable product matters more than another substantial
 refactor: move code into shared layers only when two formats need the same
@@ -96,8 +96,8 @@ starting.
 
 | Item | What remains | Waits for |
 | --- | --- | --- |
-| **REL-3** | The independent walkthrough of the published 0.13.24 files | A tester, whom jrp chooses. A finding that is a correctness regression is fixed at once; the rest joins the preview feedback |
-| **HOST-1**, **VST3-11**, **AU-4**, **AU-6**, **VST3-17**, **PERF-2**, **COMPAT-1** | [Checks left](docs/project/status.md#checks-left-before-publication) 1 to 5 and 8 to 10, the one list of the host steps that remain; COMPAT-1's REAPER project saved with 0.13.24 and Audio Unit state from a release | jrp's Mac session on 0.13.24. Until check 10 passes, the guides keep Audacity's preset menu as the checked route for VST3-17's fix |
+| **REL-3** | The independent walkthrough of the published 0.14.0 files | A tester, whom jrp chooses. A finding that is a correctness regression is fixed at once; the rest joins the preview feedback |
+| **HOST-1**, **VST3-11**, **AU-4**, **AU-6**, **VST3-17**, **PERF-2**, **COMPAT-1** | [Checks left](docs/project/status.md#checks-left-before-publication) 1 to 5 and 8 to 10, the one list of the host steps that remain; COMPAT-1's REAPER project saved with 0.14.0 and Audio Unit state from a release | jrp's Mac session on 0.14.0. Until check 10 passes, the guides keep Audacity's preset menu as the checked route for VST3-17's fix |
 | **PERF-2**, after its session | The CPU indication beside the Latency menu and block sizes tuned on Apple silicon | Its session (check 9) and PERF-3's measurements on jrp's Mac |
 | **VST3-12**, **HOST-4** | The Windows window in REAPER, another host and a screen reader; Equalizer APO on a real device | A Windows tester or device |
 | **LV2-4** | Desktop LV2 hosts and PipeWire on a real sound card | A Linux tester |
@@ -161,7 +161,7 @@ is superseded.
   passed, and jrp publishes it.
 - [ ] **REL-3 — Independent walkthrough of an exact preview.** Someone who
   did not write the code or the guides follows the REL-2 journeys from the
-  published 0.13.24 files (identified by their SHA-256 sums), on their own
+  published 0.14.0 files (identified by their SHA-256 sums), on their own
   machine, using only the documentation; first, as jrp asked on
   8 November 2026, "installing, loading their own filter, saving and
   reopening with only the supplied instructions". jrp chooses the tester.
@@ -191,7 +191,7 @@ is superseded.
   ([host qualification](docs/develop/host-testing.md#steinbergs-sdk-hosts)).
   **Remains:** REAPER and Audacity on jrp's Mac, checks 1 to 4 and 10 in
   [checks left](docs/project/status.md#checks-left-before-publication), on
-  the published 0.13.24 files; then Windows hosts. **Worth doing because**
+  the published 0.14.0 files; then Windows hosts. **Worth doing because**
   a preview's notes can claim only what a host has shown. **Done when**
   each check passes or jrp narrows it, each record keeping what
   [every report](docs/develop/host-testing.md#every-report) lists (package
@@ -253,7 +253,7 @@ Shared work, done once for all three formats:
   [settings](docs/develop/plugin-contract.md#settings)); their host checks
   are in [checks left](docs/project/status.md#checks-left-before-publication)
   with HOST-1's and AU-4's, except the Gain mode, first published in
-  0.13.20 and not yet tried in a host: its check joins them on 0.13.24's
+  0.13.20 and not yet tried in a host: its check joins them on 0.14.0's
   files. **Remains:** meters, starting with the output
   peak and a count of clipped samples, kept as audio-thread counters and
   shown in each window and in Copy Diagnostics; a callback-load meter only
@@ -438,7 +438,7 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   written (`docs/use/plugins.md`, `docs/use/install.md`). **Remains:**
   GarageBand, checks 5 and 8 in
   [checks left](docs/project/status.md#checks-left-before-publication), on
-  the published 0.13.24 files: listening to the presets, Gain and Mix, a
+  the published 0.14.0 files: listening to the presets, Gain and Mix, a
   click on bypass, the track in time after a Latency change, Latency with
   the window open, and VoiceOver; Logic, SoundSource, Live, REAPER and FL
   Studio (with an `.aupreset` from each host's preset menu) only on
@@ -541,7 +541,8 @@ means a patched FFmpeg build with `--enable-gpl`.
   [publication steps](docs/develop/releasing.md#publishing-an-unsigned-preview).
   The four hold the same presets, filters, inputs and expected renders,
   byte for byte; only the manifests differ.
-  **Remains:** a REAPER project saved with 0.13.24, the baseline (jrp's Mac session),
+  **Remains:** 0.14.0's presets and renders (the capture step above); a
+  REAPER project saved with 0.14.0, the baseline (jrp's Mac session),
   with its state chunk restored through each adapter, and Audio Unit state
   from a release. **Done when** both are kept and checked. The guarantees
   it protects are in [status](docs/project/status.md#compatibility-guarantees).
@@ -1425,7 +1426,8 @@ move to the archive.
   [decision](docs/project/decisions.md#releases)). jrp published the first
   such preview, [0.13.2](https://github.com/jrp2014/convolver/releases/tag/v0.13.2), on 9 November 2026, and the
   next, [0.13.12](https://github.com/jrp2014/convolver/releases/tag/v0.13.12), on 11 November 2026, then
-  [0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20) and [0.13.24](https://github.com/jrp2014/convolver/releases/tag/v0.13.24) on 16 November 2026.
+  [0.13.20](https://github.com/jrp2014/convolver/releases/tag/v0.13.20) and [0.13.24](https://github.com/jrp2014/convolver/releases/tag/v0.13.24) on 16 November 2026,
+  and [0.14.0](https://github.com/jrp2014/convolver/releases/tag/v0.14.0) on 19 November 2026.
 - [x] **REL-7 — Apply bounded preview acceptance.** 8 November 2026,
   PRs #156 and #159; jrp published [0.12.12](https://github.com/jrp2014/convolver/releases/tag/v0.12.12) without the remaining
   host checks and REL-3, which stay open under HOST-1, AU-4 and REL-3
