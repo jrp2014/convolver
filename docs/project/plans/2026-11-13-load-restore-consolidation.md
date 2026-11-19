@@ -280,8 +280,8 @@ per step.
 
 ## Steps
 
-Each step is one pull request titled `PLUG-39 step N: …` (steps 3 and 4 as
-substeps `3a` to `3c` and `4a` to `4c`), merged as one commit so that reverting it undoes it alone, with the
+Each step is one pull request titled `PLUG-39 step N: …` (steps 1, 3 and 4
+as substeps `1a` and `1b`, `3a` to `3c` and `4a` to `4c`), merged as one commit so that reverting it undoes it alone, with the
 independent review asking the
 [question on special cases](../../develop/workflow.md#check). The order puts
 the step that removes the most decisions first; the dependencies are
@@ -296,7 +296,15 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
    holding the playing filter with a different Latency builds a new
    processor. List the tests that reach into the machinery each later step
    replaces. No production change.
-1. **One decision for each accepted request.** `HostFilter::load()` hands
+1. **One decision for each accepted request.** Step 1a comes first: `load()`
+   decides once, before analysing anything, whether the request holds the
+   accepted filter, equal in full as PLUG-38 compares it, and then keeps
+   that filter's peak and gains, finding only an estimate newly needed,
+   instead of finding the peak, the identity and the noise estimate again
+   and comparing afterwards; PLUG-38's keep-or-replace answer comes from
+   the same decision. Nothing heard or saved changes; a restore that changes
+   only the settings stops filtering noise again for a long filter. Step 1b
+   is the rest of this step. `HostFilter::load()` hands
    the install callback one plain value, provisionally `HostChange`, saying
    what the request requires: keep the playing filter or replace it, the
    settings to apply (none, the state's, or a chosen preset's), whether the
@@ -491,7 +499,10 @@ jrp's decisions of 13 November 2026 ([decisions log](../decisions.md#direction))
    change.
 3. **One TODO item, PLUG-39,** with numbered step pull requests, each
    independently reviewable and revertible, and substeps (`step 3a`, `3b`,
-   `3c`; `4a`, `4b`, `4c`) where the plan already calls for several.
+   `3c`; `4a`, `4b`, `4c`) where the plan already calls for several. On
+   18 November 2026 jrp chose to start step 1 with the redundant analysis on
+   a restore, so step 1 has substeps `1a` and `1b`
+   ([decisions log](../decisions.md#direction)).
 4. **LV2 is aligned with VST3 and the Audio Unit** for a re-chosen file
    whose decoded configuration is unchanged (step 1, its own commit), and
    the VST3 and Audio Unit difference in when the host counts as settled is

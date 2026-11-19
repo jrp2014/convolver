@@ -372,7 +372,9 @@ class HostFilter {
         return peak_;
     }
     // PLUG-10: filter_gains() of filter(), found when it was accepted (the
-    // estimate only while estimating()); 0 dB for both without one.
+    // estimate once found while estimating()); 0 dB for both without one.
+    // Accepting the same filter again keeps them, finding only an estimate
+    // newly needed (PLUG-39).
     // HostPlayback carries them to the processor.
     const FilterGains& gains() const noexcept {
         return gains_;
