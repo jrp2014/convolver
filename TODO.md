@@ -116,11 +116,11 @@ the suggested one.
 
 | Group | Items | Note |
 | --- | --- | --- |
-| Parked by jrp until after REL-3 | **ROBUST-1**, **ROBUST-8**, **PLUG-25**, **PLUG-27**, **PLUG-29**, **PLUG-30**, **PLUG-36**, **HOST-6**, **CFG-3**, **CI-32**; **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19**; and **CI-34** apart from its first step (done) | jrp, 8 November 2026: "park any non-essential corner or edge case robustness tests", and "Park both"; PLUG-36 on 12 November 2026 ("park until after REL-3") for the items and CI-34's narrowing ([decision](docs/project/decisions.md#releases)); CI-34's remaining steps wait for his go-ahead. No existing test is removed, and a reproduced crash, lost state, unsafe output or wrong audio reopens one at once. On 18 November 2026 jrp brought back the parts that can be done unattended: DIAG-5 (done), PLUG-25's Fix line, CFG-3's report, CI-34's fuzz triggers and EDGE-11's exact idle ([decision](docs/project/decisions.md#releases)); the rest of those items stays parked |
+| Parked by jrp until after REL-3 | **ROBUST-1**, **PLUG-25**, **PLUG-27**, **PLUG-29**, **HOST-6**, **CFG-3**, **CI-32**; **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19**; and **CI-34** apart from its first step (done) | jrp, 8 November 2026: "park any non-essential corner or edge case robustness tests", and "Park both"; PLUG-36 on 12 November 2026 ("park until after REL-3") for the items and CI-34's narrowing ([decision](docs/project/decisions.md#releases)); CI-34's remaining steps wait for his go-ahead. No existing test is removed, and a reproduced crash, lost state, unsafe output or wrong audio reopens one at once. On 18 November 2026 jrp brought back the parts that can be done unattended: DIAG-5 (done), PLUG-25's Fix line, CFG-3's report, CI-34's fuzz triggers and EDGE-11's exact idle ([decision](docs/project/decisions.md#releases)); the rest of those items stays parked. On 19 November 2026 ROBUST-8, PLUG-30 and PLUG-36 moved into PLUG-39's sequence ([decision](docs/project/decisions.md#direction)) |
 | The production gate | **REL-1**, the one production checklist (PLUG-5 and AU-5 joined it): Developer ID signing and notarization on macOS, Authenticode on Windows, verified minimum OS and CPU versions, the final licence and corresponding-source review; **PLUG-20** (the VST logo in the window, optional) | The previews are unsigned by decision ([releasing](docs/develop/releasing.md#production-gates)). Planning it changes nothing shipped |
 | Edges over other convolvers | First the limitations users cite: **IO-2** (the rate-mismatch workflow; **EDGE-1** only if offline conversion proves inadequate), **EDGE-11** and **EDGE-10** (a candidate only when a measured limitation justifies it), then **EDGE-3** and **EDGE-13**; then **EDGE-12**, **EDGE-9**, **EDGE-2**, **EDGE-4** and **EDGE-5**; then **EDGE-6** to **EDGE-8**; **EDGE-14** and **EDGE-15** | jrp's goal (6 November 2026): be better than the most popular reverb plug-ins, in the ranked order of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build), keeping its non-negotiables; each starts with the owner's decision its plan row names. Waits for REL-3 unless jrp lifts the freeze; feedback that asks for one of them (sample rates, true stereo, a filter's own delay, an output ceiling) moves it up |
 | Supporting work | **IO-1** (large files) | Take it up when a reproducible defect or a user need calls for it |
-| Code organisation | **PLUG-24** (`HostProcessor` in its own source file) | When `host.cpp` next changes for another reason; a runtime change, so not during the freeze |
+| Code organisation | **PLUG-24** (`HostProcessor` in its own source file) | In PLUG-39's sequence, as its own pull request (jrp, 19 November 2026) |
 | Parked by owner decision | **FFMPEG-2** to **FFMPEG-5**, **HOST-3** | Revisit only by an owner decision |
 
 The ordering of the first preview's steps that this section held until
@@ -352,7 +352,8 @@ LV2 (Linux first; also PipeWire system audio):
   control lock acts on, or all Audio Unit control work on the one serial
   queue. Done when each adapter's skip paths either follow that rule or
   are listed with why they are safe, with a held-lock test for each, as
-  AU-16's. Waits for the freeze.
+  AU-16's. Taken up with PLUG-39's step 4, which removes the Audio Unit's
+  report cache from the list (jrp, 19 November 2026).
 - [ ] **PLUG-39 — One consolidation of the load and restore path.** From
   jrp's review of 13 November 2026: individually reasonable fixes have left
   each adapter deciding for itself what an accepted request requires (six
@@ -397,7 +398,9 @@ LV2 (Linux first; also PipeWire system audio):
   adapter test, and add a test only for a missing rule or a reproduced
   defect; the expected result must not come from production decision
   functions. Any unclear rule goes to jrp. Parked until after REL-3 (jrp,
-  12 November 2026).
+  12 November 2026), then moved into PLUG-39's sequence after step 1b,
+  whose single decision its load and restore rows map onto (jrp,
+  19 November 2026).
 - [ ] **LV2-3 — Named layouts.** The eight discrete plug-in URIs, `lv2lint`
   and pluginval at strictness 10 run in CI (PR #43;
   [pluginval](docs/develop/testing.md#pluginval)). **Remains:** URIs for the
@@ -566,7 +569,8 @@ means a patched FFmpeg build with `--enable-gpl`.
   the host may read Active. Split `activate()` into a step that may throw
   and a commit that cannot, called only once the new processor plays, in
   both adapters, with a test of each case. Only reachable when memory runs
-  out; waits for the freeze.
+  out. Taken up with PLUG-39's steps 3b and 3c, where the commit follows
+  the offer of the new processor (jrp, 19 November 2026).
 
 ## VST3 SDK features not yet used
 
@@ -981,7 +985,8 @@ project of its own, and none changes a message a user reads. PLUG-39's
   dry-signal answer (`HostPlayback`) in one place each. No new general
   framework. The move keeps saved state, diagnostic text, allocation guards
   and numerical results unchanged, and never shares a pull request with a
-  DSP change. Waits for the freeze.
+  DSP change. In PLUG-39's sequence as its own pull request, never inside
+  a step's (jrp, 19 November 2026).
 
 ## Edges over other convolvers
 

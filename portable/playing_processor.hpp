@@ -25,11 +25,12 @@
 //
 // Why a reader can never use a freed processor: hold() stores its mark and
 // then checks that the processor is still the newest offer, and offer()
-// publishes the newest offer and then reads every mark (all sequentially
-// consistent). So either the control side sees the mark and keeps the
-// processor, or the reader sees the newer offer and tries again before it
-// touches the old one. A retired processor is freed only when a reading of
-// the marks, taken after it was replaced, found none holding it.
+// publishes the newest offer and then reads every mark (those stores and
+// loads are sequentially consistent; a reader letting go stores with release,
+// so its last use comes before the control side frees what it held). So either the control side
+// sees the mark and keeps the processor, or the reader sees the newer offer and tries again before
+// it touches the old one. A retired processor is freed only when a reading of the marks, taken
+// after it was replaced, found none holding it.
 #pragma once
 #include <array>
 #include <atomic>
@@ -39,6 +40,9 @@
 #include <thread>
 
 namespace convolver {
+
+// PLUG-39, for tests: called just before a replaced processor is freed.
+inline void (*freeing_processor_for_tests)() = nullptr;
 
 template <class Processor, std::size_t Readers> class PlayingProcessor {
     static_assert(Readers >= 1, "a processor nobody reads needs no handover");
@@ -66,15 +70,20 @@ template <class Processor, std::size_t Readers> class PlayingProcessor {
         auto previous = std::move(newest_);
         newest_ = std::move(next);
         offered_.store(newest_.get());
-        if (previous) {
-            // A place is always free: after the last reclaim() at most
-            // `Readers` replaced processors were kept.
+        // A place is always free: after the last reclaim() at most `Readers`
+        // replaced processors were kept. Were that ever broken, waiting for
+        // a reader to let go is safe where freeing would not be.
+        while (previous) {
             for (auto& place : retired_)
                 if (!place) {
                     place = std::move(previous);
                     break;
                 }
             assert(!previous);
+            if (previous) {
+                std::this_thread::yield();
+                reclaim();
+            }
         }
         reclaim();
     }
@@ -93,12 +102,16 @@ template <class Processor, std::size_t Readers> class PlayingProcessor {
             bool holding = false;
             for (const auto* h : held)
                 holding = holding || h == place.get();
-            if (!holding)
+            if (!holding) {
+                if (const auto hook = freeing_processor_for_tests)
+                    hook();
                 place.reset();
+            }
         }
     }
     // Deactivation and destruction, when no audio runs: offers none and
-    // frees every processor. A host that still runs a reader meanwhile is
+    // frees every processor, under the adapter's control lock (no reader
+    // takes that lock). A host that still runs a reader meanwhile is
     // waited for, as long as that one call lasts, rather than have its
     // processor freed under it.
     void clear() noexcept {

@@ -90,8 +90,14 @@ void adopts_newest() {
 
 // The control side returns at once while a reader holds the old processor,
 // which stays alive until the reader lets it go and a later call frees it.
+std::atomic<int> freed{0};
+void count_freeing() {
+    ++freed;
+}
 void control_does_not_wait() {
     One p;
+    freed = 0;
+    freeing_processor_for_tests = count_freeing;
     p.offer(std::make_unique<Probe>(1));
     {
         const auto held = p.hold(0);
@@ -104,9 +110,11 @@ void control_does_not_wait() {
         p.reclaim();
         require(alive == 2, "reclaim() freed a processor a reader holds");
     }
-    require(alive == 2, "letting go freed the processor without a control call");
+    require(alive == 2 && freed == 0, "letting go freed the processor without a control call");
     p.reclaim();
     require(alive == 1 && p.kept() == 0, "reclaim() kept a processor nobody holds");
+    require(freed == 1, "the test hook did not see the processor freed");
+    freeing_processor_for_tests = nullptr;
     require(p.hold(0)->generation == 2, "the next call did not play the newer offer");
 }
 
@@ -148,7 +156,10 @@ void readers_hold_different_generations() {
 }
 
 // However often the control side offers, no more processors stay alive than
-// the newest and one for each reader.
+// the newest and one for each reader. With the readers' marks fixed, this
+// cannot see a reader move between marks during one reclaim(); that the
+// marks are read once per call, which bounds what is kept, rests on the
+// argument in playing_processor.hpp, and the stress test checks the bound.
 void kept_is_bounded() {
     Two p;
     p.offer(std::make_unique<Probe>(1));
@@ -209,8 +220,10 @@ void stress() {
     std::atomic<bool> stop{false};
     std::atomic<std::uint64_t> failures{0};
     std::array<std::uint64_t, 2> adopted{};
+    std::atomic<int> started{0};
     auto read = [&](std::size_t reader) {
         audio_thread = true;
+        ++started;
         std::uint64_t last = 0, count = 0;
         while (!stop.load(std::memory_order_relaxed)) {
             const auto held = p.hold(reader);
@@ -225,7 +238,12 @@ void stress() {
         audio_thread = false;
         adopted[reader] = count;
     };
+    p.offer(std::make_unique<Probe>(0));
     std::thread a(read, 0), b(read, 1);
+    // The time counts from when both readers run, so a slow machine still
+    // gives each one the whole run.
+    while (started.load() < 2)
+        std::this_thread::yield();
     std::uint64_t generation = 0, too_many = 0;
     const auto end = std::chrono::steady_clock::now() + std::chrono::milliseconds(400);
     while (std::chrono::steady_clock::now() < end) {
@@ -264,6 +282,7 @@ int main() {
         },
         [] {
             audio_thread = false;
+            freeing_processor_for_tests = nullptr;
             alive = 0;
         });
     if (failed)
