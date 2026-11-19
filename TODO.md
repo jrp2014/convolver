@@ -78,7 +78,7 @@ be done unattended ([decision](docs/project/decisions.md#releases)). All
 five are done in the parts he named: DIAG-5 and CI-34 whole, and the first
 parts of PLUG-25, CFG-3 and EDGE-11 (PRs #207 to #211). The rest of PLUG-25
 and CFG-3 is under [parked](#parked), and EDGE-11's other candidates under
-[needs a decision](#needs-a-decision). PLUG-39's step 3b is in PR #217.
+[needs a decision](#needs-a-decision). PLUG-39's step 3c is in PR #219.
 Nothing else is claimed: check the open pull requests for an ID before
 starting.
 
@@ -376,7 +376,7 @@ LV2 (Linux first; also PipeWire system audio):
   once in `HostFilter::load()` whether a request holds the accepted filter
   and then reuses its peak and gains instead of analysing it again. Step
   3a, in PR #213, adds the shared ownership of the playing processor
-  (`PlayingProcessor`), and steps 3b, in PR #217, and 3c, in PR #STEP3C,
+  (`PlayingProcessor`), and steps 3b, in PR #217, and 3c, in PR #219,
   move VST3 and the Audio Unit to it, so a new Latency no longer holds the
   control call until `process()` or `Render` lets go;
   jrp chose on 19 November 2026 to take step 3 next. **Remains:** the

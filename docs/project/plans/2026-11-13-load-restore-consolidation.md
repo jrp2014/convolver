@@ -415,7 +415,7 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
    reader holds, `latency_handover_waits()` becomes
    `latency_handover_does_not_wait()` as condition 4 says, and the ownership
    rules are now in the adapter contract. Step 3c moves the Audio Unit to it,
-   in PR #STEP3C: `Render` is its one reader, uninitializing offers no
+   in PR #219: `Render` is its one reader, uninitializing offers no
    processor rather than wait under the lock, and `latency_parameter()`
    shows the same outcomes for it, holding `Render` in its input callback. LV2 keeps `stage()` and
    `retire()`: its worker and `run()` already defer freeing, with one
