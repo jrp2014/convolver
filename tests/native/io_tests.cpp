@@ -618,6 +618,49 @@ void quantizer_tests(const fs::path& dir) {
         const auto narrow = quantize(d, 3, ramp, 2);
         require(std::equal(wide.begin(), wide.end(), narrow.begin()), "PCM16 wrapper");
     }
+    // DIAG-5: the clip count per channel. +1 rounds to 2^(B-1), one step past
+    // the largest value, so it clips; -1 and a sample that rounds to exactly
+    // the largest value do not. Infinity counts, NaN does not; reset() clears.
+    {
+        Quantizer q(2, 16);
+        const std::vector<float> x{1,
+                                   -1,
+                                   static_cast<float>(32767.0 / 32768),
+                                   -2,
+                                   2,
+                                   std::numeric_limits<float>::infinity(),
+                                   std::numeric_limits<float>::quiet_NaN(),
+                                   0.5f};
+        std::vector<std::int32_t> out(x.size());
+        q.quantize(x, out);
+        require(q.clipped(0) == 2 && q.clipped(1) == 2 && q.clipped(2) == 0,
+                "clip counts per channel");
+        q.quantize(std::span<const float>(x).first(2), std::span(out).first(2));
+        require(q.clipped(0) == 3 && q.clipped(1) == 2, "clip counts accumulate across calls");
+        q.reset();
+        require(q.clipped(0) == 0 && q.clipped(1) == 0, "reset clears clip counts");
+        // Dither is counted: at 32767/32768 plain rounding never clips, but
+        // TPDF dither of up to one step takes some samples over and not others.
+        Quantizer plain(1, 16), dithered(1, 16, {Dither::triangular, 9});
+        const std::vector<float> edge(1000, static_cast<float>(32767.0 / 32768));
+        std::vector<std::int32_t> edge_out(edge.size());
+        plain.quantize(edge, edge_out);
+        dithered.quantize(edge, edge_out);
+        require(plain.clipped(0) == 0 && dithered.clipped(0) > 0 && dithered.clipped(0) < 1000,
+                "dithered clips counted after the dither");
+        // The writer reports its quantizer's counts, still after close(), and
+        // none for float output, which it never clips.
+        const auto clips = dir / "clip-count.wav";
+        AudioWriter pcm(clips, {48000, 2}, OutputFormat::wav_pcm16);
+        pcm.write(std::vector<float>{1.5f, 0.25f, -1.5f, 0.25f, 0.5f, 1.0f});
+        pcm.close();
+        require(pcm.clipped_samples() == std::vector<std::uint64_t>{2, 1},
+                "writer clip counts per channel");
+        AudioWriter real(clips, {48000, 2}, OutputFormat::wav_float);
+        real.write(std::vector<float>{1.5f, 0.25f});
+        real.close();
+        require(real.clipped_samples().empty(), "float writer has no clip counts");
+    }
     rejects([&] { Quantizer q(1, 7); });
     rejects([&] { Quantizer q(1, 33); });
     rejects([&] { Quantizer q(1, 16, {{}, 0, static_cast<NoiseShaping>(42)}); });
