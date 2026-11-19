@@ -144,6 +144,10 @@ class Engine {
     // Exact interleaved frame counts; empty input means silence (drain).
     // Nonempty spans must contain at least frames * channels samples.
     // Input and output must not overlap. No allocation/planning in processing.
+    // Once silent input (all samples zero, or empty spans) has outlasted
+    // everything that can reach the outputs, silent calls write zeros
+    // without convolving, with output bit-identical to processing them.
+    // Output zeros are always +0, never -0.
     void process(std::span<const float> input, std::span<float> output, std::size_t frames);
 
   private:

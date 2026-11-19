@@ -69,19 +69,17 @@ behaviour (as with `HostFilter`), do not generalise host lifecycle or
 release machinery beyond the requirements in hand, and keep libsndfile at
 the I/O boundary and C++20 in the core.
 
-Triaged on 18 November 2026 against `main` at `b08fe37` (0.13.28), and brought up to date with `main` at `47110ae` (0.13.33).
+Triaged on 18 November 2026 against `main` at `b08fe37` (0.13.28), and brought up to date with `main` at `024bca9` (0.13.34).
 
 ### In progress
 
 jrp brought five parked items forward on 18 November 2026 because they can
-be done unattended ([decision](docs/project/decisions.md#releases)). DIAG-5
-and CI-34 are done, and so are the first parts of PLUG-25 and CFG-3
-(PRs #208, #207, #210 and #211); their remaining parts are under
-[parked](#parked). Check the open pull requests for the ID before starting.
-
-| Item | The part in progress | The rest |
-| --- | --- | --- |
-| **EDGE-11** | Exact idling once silent input has outlasted the tail | The other candidates wait for a measured limitation, as the EDGE items under [needs a decision](#needs-a-decision) do |
+be done unattended ([decision](docs/project/decisions.md#releases)). All
+five are done in the parts he named: DIAG-5 and CI-34 whole, and the first
+parts of PLUG-25, CFG-3 and EDGE-11 (PRs #207 to #211). The rest of PLUG-25
+and CFG-3 is under [parked](#parked), and EDGE-11's other candidates under
+[needs a decision](#needs-a-decision). Nothing else is claimed: check the
+open pull requests for an ID before starting.
 
 ### Ready
 
@@ -112,7 +110,7 @@ and CI-34 are done, and so are the first parts of PLUG-25 and CFG-3
 | Item | What remains | The decision |
 | --- | --- | --- |
 | **REL-1**, **PLUG-20** | The one production checklist: Developer ID signing and notarization on macOS, Authenticode on Windows, verified minimum OS and CPU versions, the final licence and corresponding-source review; the VST logo in the window (optional) | jrp's remaining signing choices in the [signing plan](docs/project/plans/2026-11-09-macos-signing.md), then his setup. The previews are unsigned by decision ([releasing](docs/develop/releasing.md#production-gates)) |
-| **IO-2**, **EDGE-1** and the other **EDGE** items | First the limitations users cite: IO-2 (the rate-mismatch workflow; EDGE-1 only if offline conversion proves inadequate), EDGE-10, EDGE-3 and EDGE-13; then EDGE-12, EDGE-9, EDGE-2, EDGE-4 and EDGE-5; then EDGE-6 to EDGE-8; EDGE-14 and EDGE-15 | jrp's goal (6 November 2026), in the ranked order of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build): each starts with the owner's decision its plan row names and the plan's gate (a reproducible limitation, an affected workflow, a measurable criterion). Platform- and chip-level micro-optimisation (EDGE-10) waits for the walkthroughs (jrp, 7 November 2026). Feedback that asks for one (sample rates, true stereo, a filter's own delay, an output ceiling) moves it up |
+| **IO-2**, **EDGE-1** and the other **EDGE** items | First the limitations users cite: IO-2 (the rate-mismatch workflow; EDGE-1 only if offline conversion proves inadequate), EDGE-11's remaining candidates and EDGE-10 (each only when a measured limitation justifies it), EDGE-3 and EDGE-13; then EDGE-12, EDGE-9, EDGE-2, EDGE-4 and EDGE-5; then EDGE-6 to EDGE-8; EDGE-14 and EDGE-15 | jrp's goal (6 November 2026), in the ranked order of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build): each starts with the owner's decision its plan row names and the plan's gate (a reproducible limitation, an affected workflow, a measurable criterion). Platform- and chip-level micro-optimisation (EDGE-10) waits for the walkthroughs (jrp, 7 November 2026). Feedback that asks for one (sample rates, true stereo, a filter's own delay, an output ceiling) moves it up |
 
 ### Parked
 
@@ -1078,21 +1076,27 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
   workload, hardware target or hypothesis, measured against the
   [24 October 2026 vDSP experiment](docs/archive/reviews/2026-10-24-apple-vdsp.md).
 - [ ] **EDGE-11 — Savings in today's engine.** Candidates, not obligations:
-  exact, with bit-identical output, idling once silent input has outlasted
-  the tail, skipping all-zero filter blocks, holding identical responses
-  once and reading each input history once for all its paths; rounding
+  exact, with bit-identical output, skipping all-zero filter blocks,
+  holding identical responses once and reading each input history once
+  for all its paths; rounding
   only, within `native.kernel_divergence`'s bound, spreading the older
   filter blocks' multiply-adds over the callbacks between engine blocks and
   one inverse transform per output where outputs are fewer than paths.
   **Worth doing when** a measured limitation on PERF-3's long-reverb
   workloads points at one; it is then measured and kept only if it reaches
   the gain the [plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#2-savings-in-todays-engine)
-  states. jrp brought exact idling forward on 18 November 2026, ahead of
-  that measurement ([execution priorities](#in-progress)). **Done when**
-  PERF-3's results show no candidate is justified;
+  states. **Done when** PERF-3's results show no candidate is justified;
   each one tried is kept or
   stopped with its numbers, with the oracle tests passing, the worst error
   reported and nothing new allocating or locking on the audio thread.
+  Progress: idling once silent input has outlasted the tail, which jrp
+  approved on 18 November 2026 for his aim of a low system load with
+  complex setups ([decision](docs/project/decisions.md#releases)), is
+  kept: silence after the tail costs 93 to 99% less on Linux, with music
+  unchanged within the run-to-run spread
+  ([measurements](docs/develop/fft-measurements.md#idle-after-the-tail);
+  Apple silicon not yet measured). The other half of that plan row,
+  skipping silent input history while a tail still plays, was not tried.
 - [ ] **EDGE-12 — Filters larger than the saved-state limit.** Done when a
   plug-in accepts a filter whose samples exceed 64 MiB (such as a 60 s
   true-stereo filter at 96 kHz, about 88 MiB) through the storage jrp
