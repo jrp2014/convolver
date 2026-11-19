@@ -143,6 +143,15 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- CLI (DIAG-8, from jrp's review of 19 November 2026): the clipping report
+  after a render said that a sample of +1.0 always clips, which is not so
+  with dither: dither can take such a sample down within range, and jrp's
+  render of 4,096 samples at +1.0 with triangular dither counted 3,556
+  clipped yet still printed that sentence. It now says that +1.0 is above the
+  largest representable positive integer sample, so leave headroom for
+  quantization. Only the wording changed; the counts, samples and exit
+  status are as before
+  ([file rendering](docs/use/command-line.md#file-rendering)).
 - CI (CI-40, from jrp's review of 18 November 2026): clang-tidy ran on a
   hand-kept list of portable sources, repeated in CONTRIBUTING, that had
   missed `portable/partitions.cpp`. CI and the documented command now
