@@ -83,8 +83,7 @@ void run(const fs::path& dir) {
                                   why) &&
                     has(why.message.fix, "set the host's project or audio device to 48000 Hz. "
                                          "The host may play at a different rate from the one it "
-                                         "exports at: the \"Started at\" line in the log gives "
-                                         "the rate it plays at."),
+                                         "exports at."),
                 "chosen file's rate refusal without the playback-rate line: " + why.message.fix);
         require(!read_filter_file((dir / "mono.wav").string(), stereo, detail::libsndfile_files(),
                                   why) &&
@@ -135,8 +134,7 @@ void run(const fs::path& dir) {
                         "the filter is for 48000 Hz, and the host runs at 47952.04795 Hz") &&
                     why.message.fix ==
                         "Set the host's project or audio device to 48000 Hz. The host may play at "
-                        "a different rate from the one it exports at: the \"Started at\" line in "
-                        "the log gives the rate it plays at.",
+                        "a different rate from the one it exports at.",
                 "a file at a fractional rate not refused with both rates");
         // A filter for the rate's whole part is refused when the file is
         // read, so it cannot slip in before the host is known (when a load
@@ -164,8 +162,7 @@ void run(const fs::path& dir) {
                     why.kind == HostFailureKind::sample_rate &&
                     why.message.fix ==
                         "Set the host's project or audio device to 47952 Hz. The host may play at "
-                        "a different rate from the one it exports at: the \"Started at\" line in "
-                        "the log gives the rate it plays at.",
+                        "a different rate from the one it exports at.",
                 "a mono filter for the whole part not refused for its rate");
     }
 

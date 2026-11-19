@@ -131,14 +131,12 @@ inline std::string as_sentence(std::string_view phrase) {
 }
 
 // PLUG-25 (decisions log, 8 November 2026): the sentence every refusal for
-// the host's sample rate adds to its fix, in the window, Status details and
-// the log. Audacity 4 played real-time effects at its Default sample rate
-// while it exported at the project's, so a filter that exported well was
-// refused during playback. The log's "Started at" line (host_log.cpp) is the
-// playing copy's rate; LV2 writes it to the host's log.
+// the host's sample rate adds to its fix, wherever the fix is shown (the
+// window, Status details, the Convolver log, LV2's host log). Audacity 4
+// played real-time effects at its Default sample rate while it exported at
+// the project's, so a filter that exported well was refused during playback.
 inline constexpr std::string_view host_playback_rate_fix =
-    "The host may play at a different rate from the one it exports at: the "
-    "\"Started at\" line in the log gives the rate it plays at.";
+    "The host may play at a different rate from the one it exports at.";
 
 // What a command-line tool prints: "program: error: problem", then each
 // further line indented by two spaces.

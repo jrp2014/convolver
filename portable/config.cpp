@@ -241,7 +241,12 @@ std::string resample_fix(int wanted, const std::string& available, bool list, Ch
            (who == Chooser::host      ? "set the host's project or audio device to " + available
             : who == Chooser::options ? "choose " + available + " with --sample-rate"
                                       : "convert the audio to " + available + " first") +
-           "." + (who == Chooser::host ? " " + std::string(host_playback_rate_fix) : std::string());
+           ".";
+}
+// PLUG-25: a plug-in's refusal for the host's rate ends its fix with the
+// sentence jrp agreed (advice.hpp).
+std::string playback_rate_fix(Chooser who) {
+    return who == Chooser::host ? " " + std::string(host_playback_rate_fix) : std::string();
 }
 std::string resample_note(bool list) {
     return std::string("Convolver never resamples, so a filter only fits audio at the rate it "
@@ -380,6 +385,9 @@ std::string explain_one(const std::filesystem::path& filter, const SelectionCand
                                    : "Use a configuration with that output count (its third header "
                                      "number), or omit --output-channels.");
     }
+    // After the channel advice, so the fix's own steps come first.
+    if (w.sample_rate && w.sample_rate != c.sample_rate)
+        a.fix += playback_rate_fix(who);
     // The example goes on from the fix that introduces it, before the note.
     if (!example.empty()) {
         auto text = advice_text({a.problem, a.cause, a.fix, {}}) + example;
@@ -445,7 +453,7 @@ std::string explain_no_match(const std::filesystem::path& filter, bool list,
         else if (others > 1)
             available += " or one of the list's " + std::to_string(others) + " other rates";
         a.fix = "No entry is for " + hertz(w.sample_rate) + ". " +
-                resample_fix(w.sample_rate, available, true, who);
+                resample_fix(w.sample_rate, available, true, who) + playback_rate_fix(who);
         a.note = resample_note(true);
     } else if (w.input_channels && !any([&](const SelectionCandidate& c) {
                    return matches(c.sample_rate, c.input_channels, c.output_channels,

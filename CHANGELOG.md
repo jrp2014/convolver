@@ -28,15 +28,11 @@ Until 1.0 the C++ API may change between minor versions.
 ### Changed
 
 - Plug-ins (PLUG-25, first part): a refusal because the filter's rate
-  differs from the host's adds to its Fix the line jrp agreed on 8 November
-  2026, that the host may play at a different rate from the one it exports
-  at, with where to find the rate it plays at, in every format's window,
-  Status details and log: "The host may play at a different rate from the
-  one it exports at: the "Started at" line in the log gives the rate it
-  plays at." Audacity, for one, plays at its Default sample rate while it
-  exports at the project's. Whether the window
-  should mark a rate from a copy that has not yet played as unconfirmed is
-  still open.
+  differs from the host's ends its Fix with the sentence jrp agreed on 8
+  November 2026, "The host may play at a different rate from the one it
+  exports at.", in every format and wherever the Fix is shown: the window,
+  Status details and the Convolver log, or LV2's host log. Audacity, for
+  one, plays at its Default sample rate while it exports at the project's.
 - Documentation (DOC-15): the README's opening says what sets Convolver
   apart, in a "What sets it apart" section under jrp's four emphases:
   accurate (checked against an independent double-precision convolution),

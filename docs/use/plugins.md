@@ -306,10 +306,9 @@ effects at the rate in *Audio setup › Audio settings › Default sample rate*
 (44100 Hz unless changed). Check the playing copy's `Started at` line in
 the log for the rate it runs at (in Audacity the window's Host sample rate
 can belong to a copy that does not play), and set the host's playback rate
-to the filter's. Every refusal for the rate says this in its Fix, in the
-window, Status details and the log: "The host may play at a different rate
-from the one it exports at: the "Started at" line in the log gives the rate
-it plays at."
+to the filter's. Every refusal for the rate ends its Fix with "The host may
+play at a different rate from the one it exports at.", wherever the Fix is
+shown: the window, Status details and the Convolver log, or LV2's host log.
 
 **The Convolver log** is a text file with one line for each filter loaded,
 each time the host sends its audio settings (the sample rate, channels and block
@@ -321,7 +320,7 @@ one line: what plays instead, the problem, then its `Cause:`, `Fix:` and
 `Note:`, as the window shows them, for example:
 
 ```text
-Request 2: Not loaded; the previous filter keeps playing: the filter is for 44100 Hz, and the host runs at 48000 Hz. Cause: Convolver never resamples, so a filter plays only at the rate it was made for. Fix: Load a filter made for 48000 Hz, or set the host's project or audio device to 44100 Hz.
+Request 2: Not loaded; the previous filter keeps playing: the filter is for 44100 Hz, and the host runs at 48000 Hz. Cause: Convolver never resamples, so a filter plays only at the rate it was made for. Fix: Load a filter made for 48000 Hz, or set the host's project or audio device to 44100 Hz. The host may play at a different rate from the one it exports at.
 ```
 
 The VST3 plug-in

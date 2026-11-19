@@ -386,8 +386,7 @@ void filter_contract() {
     // the export's (decisions log, 8 November 2026); a channel refusal's does not.
     const std::string playback_rate =
         "or set the host's project or audio device to 44100 Hz. The host may play at a "
-        "different rate from the one it exports at: the \"Started at\" line in the log gives "
-        "the rate it plays at.";
+        "different rate from the one it exports at.";
     require(first.error().find(playback_rate) != std::string::npos,
             "rate refusal without the playback-rate line: " + first.error());
     require(first.activate(stereo).filter.paths[0].impulse == std::vector<float>{0},
