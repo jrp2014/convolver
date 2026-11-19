@@ -361,6 +361,9 @@ def message_tests(root):
         assert message.startswith('convolver-preset: '), (args, message)
         for text in texts:
             assert text in message, (args, text, message)
+    # PLUG-25's sentence about a host's export rate is for plug-in hosts only.
+    message = run('--sample-rate', 44100, cfg, root / 'g.vstpreset', ok=False).stderr
+    assert 'exports at' not in message, message
     # The CLI hint belongs to the channel limit only.
     message = run('--name', 'a\tb', nine, root / 'g.aupreset', ok=False).stderr
     assert 'control characters' in message and 'command-line tool' not in message, message

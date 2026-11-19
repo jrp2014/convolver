@@ -146,7 +146,7 @@ void cases() {
          {"The saved filter is for 48000 Hz, and the host runs at 44100 Hz.",
           "Cause: Convolver never resamples",
           "Fix: Load a filter made for 44100 Hz, or set the host's project or audio device to "
-          "48000 Hz."},
+          "48000 Hz. The host may play at a different rate from the one it exports at."},
          {"stereo track"}},
         // jrp's review of 0.5.5: the report says what a rejected first load at
         // Mix 50% plays. PLUG-23 (jrp, 7 November 2026): with no filter kept
