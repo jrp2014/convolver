@@ -89,9 +89,10 @@ gets a note instead, since a later conversion to integer samples will clip
 them. Nothing is printed when every sample stayed within full scale, and the
 render's samples and exit status are the same either way. A sample of
 exactly +1.0 is above the largest representable positive integer sample, which
-is one step short of full scale (below): without dither it always clips,
-while dither can take some such samples down within range, so leave headroom
-for quantization. Without dither −1.0 does not clip.
+is one step short of full scale (below). Without dither or noise shaping +1.0
+always clips and −1.0 never does; dither and noise shaping can take some +1.0
+samples down within range and some −1.0 samples below the lowest value. So
+leave headroom for quantization.
 
 ### Gain and attenuation
 

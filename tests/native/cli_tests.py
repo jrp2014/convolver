@@ -597,6 +597,14 @@ def clip_report_tests(d):
     # says why to leave headroom rather than that +1.0 always clips.
     assert '+1.0 is above the largest representable positive integer sample' in err, err
     assert 'always clips' not in err, err
+    # With triangular dither most, but not all, +1.0 samples clip (7 in 8 on
+    # average), and the count says so.
+    float_wave(mono_in, [(1.0,)] * 4096)
+    dithered = ['--input', mono_in, '--output', fixed, '--output-format', 'wav-pcm16', '--dither', 'triangular']
+    err = stderr_text(call(['--filter', unit_ir, *dithered]).stderr)
+    count = re.search(r'channel 1: (\d+) of 4096 samples clipped', err)
+    assert count and 3000 < int(count.group(1)) < 4096, err
+    assert '+1.0 is above the largest representable positive integer sample' in err, err
     # With no-clip only input beyond full scale can clip, so the fix says so.
     loud = d / 'clip-loud.wav'
     float_wave(loud, [(1.5 * math.sin(i / 5), 0.1) for i in range(1000)], channels=2)

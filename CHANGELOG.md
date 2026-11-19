@@ -135,7 +135,7 @@ Until 1.0 the C++ API may change between minor versions.
   after a render said that a sample of +1.0 always clips, which is not so
   with dither: dither can take such a sample down within range, and jrp's
   render of 4,096 samples at +1.0 with triangular dither counted 3,556
-  clipped, followed by that sentence. It now says that +1.0 is above the
+  clipped yet still printed that sentence. It now says that +1.0 is above the
   largest representable positive integer sample, so leave headroom for
   quantization. Only the wording changed; the counts, samples and exit
   status are as before
