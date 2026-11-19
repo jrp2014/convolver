@@ -31,8 +31,9 @@ permissions:
   contents: read
 
 # lilv and its libraries (serd, sord, sratom, zix) and the lv2 headers come
-# from the runner image's Ubuntu packages, the newest that Ubuntu 24.04 and its
-# updates offer; each job lists the versions it installed.
+# from the runner image's Ubuntu packages, the newest that the newest
+# generally available Ubuntu image (ubuntu-latest) and its updates offer; each
+# job lists the versions it installed.
 env:
   LV2_PACKAGES: >-
     lv2-dev liblilv-dev liblilv-0-0 lilv-utils libserd-dev libserd-0-0 libsord-dev libsord-0-0
@@ -63,7 +64,7 @@ jobs:
     needs: scope
     if: needs.scope.outputs.build == 'true'
     name: Newest tools and Release bundle
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -217,13 +218,13 @@ jobs:
   # its own code, not lilv's or JUCE's: it loads a preset from its preset
   # list, records, saves the session, restores it in a second process and
   # exports it with latency compensation; the export must match the oracle
-  # (tests/lv2/ardour_tests.py). Ardour is Ubuntu 24.04's package, the
-  # newest the runner image offers.
+  # (tests/lv2/ardour_tests.py). Ardour is the runner image's Ubuntu
+  # package, the newest that image offers.
   ardour:
     needs: scope
     if: needs.scope.outputs.build == 'true'
     name: Ardour (headless)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -264,7 +265,7 @@ jobs:
     needs: scope
     if: needs.scope.outputs.build == 'true'
     name: ${{ matrix.name }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -353,7 +354,7 @@ jobs:
         if: success() && github.run_attempt != '1'
         uses: ./.github/actions/note-retry
 
-  # The formal tests above use Ubuntu 24.04's lilv packages. This job builds
+  # The formal tests above use the runner image's lilv packages. This job builds
   # the newest upstream releases of lilv and the libraries under it (zix,
   # serd, sord, sratom; a newer pre-release where there is one) with the
   # newest lv2 headers and runs the same LV2
@@ -363,7 +364,7 @@ jobs:
     needs: scope
     if: needs.scope.outputs.build == 'true'
     name: Newest upstream lilv (advisory)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7

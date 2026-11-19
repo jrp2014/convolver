@@ -1220,7 +1220,8 @@ move to the archive.
   latest SDKs: the libraries already followed their newest releases, but the
   compilers and runner images did not. CI now takes the newest generally
   available images, GCC and Xcode, the newest LLVM release and the newest
-  stable Python; only the Linux and Windows packages keep older images, for
+  stable Python, and the LV2 tests use the newest Ubuntu image's lilv and
+  Ardour; only the Linux and Windows packages keep older images, for
   recorded reasons ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
 - [x] **CI-42 — Run only the workflows that read the files kept from
   releases.** 19 November 2026, PR #221, from jrp's audit of v0.14.0:

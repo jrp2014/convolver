@@ -5,8 +5,8 @@ description: >-
   Puts the newest formal release of a compiler first on PATH, so the job's
   plain `clang++`, `g++`, `c++` or Xcode commands use it
   (docs/develop/build.md#compilers-and-ci-machines). `gcc` takes the newest
-  `g++-N` the runner image has; `clang` installs the newest LLVM release from
-  apt.llvm.org (Linux), falling back to the image's Clang with a warning when
+  `g++-N` the runner image has; `clang` installs the newest LLVM release branch
+  from apt.llvm.org (Linux), falling back to the image's Clang with a warning when
   that fails; `xcode` selects the newest released Xcode on the image (macOS).
 inputs:
   compiler:
@@ -78,7 +78,10 @@ runs:
             app=$(printf '%s\n' /Applications/Xcode_*.app |
               grep -E '/Xcode_[0-9]+(\.[0-9]+)*\.app$' | sort -V | tail -1)
             sudo xcode-select -s "$app/Contents/Developer"
-            version=$(xcodebuild -version | head -1)
+            version=$(xcodebuild -version | paste -sd ' ' -)
+            # CMake records /usr/bin/clang++, a shim whose time stamp does not
+            # change with xcode-select, so ccache compares the Xcode instead.
+            echo "CCACHE_COMPILERCHECK=string:$version" >> "$GITHUB_ENV"
             ;;
           *)
             echo "::error::Unknown compiler '$COMPILER' (gcc, clang or xcode)"

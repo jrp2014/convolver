@@ -44,7 +44,7 @@ jobs:
   sources:
     needs: scope
     if: needs.scope.outputs.package == 'true'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -84,9 +84,10 @@ jobs:
       matrix:
         include:
           # Older images on purpose: Ubuntu 22.04 keeps the Linux package
-          # loading with glibc 2.35, and Windows Server 2022's Visual Studio
-          # 2022 keeps the Windows package on the Microsoft C++ runtime users
-          # already have (docs/develop/build.md#compilers-and-ci-machines).
+          # loading with glibc 2.35 and libstdc++ 12, and Windows Server
+          # 2022's Visual Studio 2022 keeps the Windows package from needing
+          # the 2026 Microsoft C++ runtime, which jrp chose to keep for now
+          # (docs/develop/build.md#compilers-and-ci-machines).
           - os: ubuntu-22.04
             platform: linux-x86_64
           - os: windows-2022
@@ -229,7 +230,7 @@ jobs:
 
   collect:
     needs: candidates
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7

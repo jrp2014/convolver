@@ -260,7 +260,7 @@ def other_writers_tests(d):
     taps = [4194304, -2097152, 0, 1048576, 524288]
     odd = d / 'odd-24.wav'
     data = b''.join(struct.pack('<i', v)[:3] for v in taps)
-    # PCM, 1 channel, 48 kHz, 3 bytes a second per frame, 3-byte frames, 24 bits.
+    # PCM, 1 channel, 48 kHz, 144000 bytes a second, 3-byte frames, 24 bits.
     fmt = struct.pack('<HHIIHH', 1, 1, 48000, 48000 * 3, 3, 24)
     body = b'WAVE' + b'fmt ' + struct.pack('<I', len(fmt)) + fmt + b'data' + struct.pack('<I', len(data)) + data
     odd.write_bytes(b'RIFF' + struct.pack('<I', len(body)) + body)

@@ -453,7 +453,7 @@ releases, and where its archive is downloaded.
 | NSIS | `kichik/nsis` tags (`v313` is 3.13); the archive from SourceForge | The Windows installer | Job summary, candidate record |
 | pluginval | `Tracktion/pluginval` tags (1.0.4 in October 2026); the newest 2.0 beta in an advisory run | VST3 validation, later LV2 and AU | Job summary |
 | `lv2lint` | Its own Git host; when that does not answer, the newest version FreeBSD's ports list | LV2 validation | Job summary |
-| `lilv` (test host) and its libraries | The runner image's Ubuntu 24.04 packages, with updates; the newest upstream releases in an advisory job | LV2 tests | Job summary |
+| `lilv` (test host) and its libraries | The newest Ubuntu runner image's packages, with updates; the newest upstream releases in an advisory job | LV2 tests | Job summary |
 | `auval` | Ships with macOS on the `macos-26` image | AU validation | Each run logs the macOS and Xcode versions |
 
 The other CI jobs (native, VST3, LV2 and regression) take FFTW and libsndfile
@@ -546,7 +546,8 @@ exception below).
   (CI-38), so it neither tries the pre-release with the Audio Unit or LV2
   plug-ins nor raises the release-notes warning for it, and macOS's
   `--rtcheck relaxed` runs only after merge.
-- lilv: the formal LV2 tests use Ubuntu 24.04's packages. The **Newest upstream
+- lilv: the formal LV2 tests use the packages of the newest Ubuntu runner
+  image (`ubuntu-latest`). The **Newest upstream
   lilv (advisory)** job builds the newest versions of lilv, zix, serd, sord
   and sratom (`resolve.py checkout`, from the policy's `test_sources`; a
   pre-release when it is newer than the newest release) with the newest lv2
@@ -600,14 +601,21 @@ with a newer compiler, within the stated tolerance
   [newest-compiler action](../../.github/actions/newest-compiler/action.yml)
   puts the newest compiler first on `PATH`, so the jobs' plain `clang++`,
   `g++`, `c++` and Xcode commands use it, and writes the version into the job
-  summary. On Linux GCC is the newest `g++-N` the image has, and Clang is the
-  newest LLVM release from [apt.llvm.org](https://apt.llvm.org), because the
-  images carry an older one; when that host does not answer, the job warns
-  and uses the image's Clang. On macOS it selects the newest released Xcode on
-  the image. Windows jobs use the image's newest Visual Studio.
+  summary. On Linux GCC is the newest `g++-N` the image has: a newer GCC release
+  reaches Ubuntu only in a later Ubuntu, and building GCC in every job would
+  take longer than the job itself. Clang is the newest LLVM release branch
+  from [apt.llvm.org](https://apt.llvm.org), because the images carry an
+  older one; that site builds the branch every few days, so the compiler can
+  be a few commits past the release tag, and the job summary gives the exact
+  version. When that host does not answer, the job warns and uses the
+  image's Clang. On macOS it selects the newest released Xcode on the image,
+  the only place a CI job can get Xcode, and makes ccache tell Xcodes apart.
+  Windows jobs use the image's newest Visual Studio.
 - **Python and Node.js:** `actions/setup-python` with `3.x`, its newest
   stable release, and `actions/setup-node` with `lts/*`, the current LTS
-  release. The scripts still run on Python 3.8 (`ruff.toml`'s target), the
+  release: Node.js only runs markdownlint here, and its other even-numbered
+  releases become LTS within six months while odd-numbered ones are
+  supported for only six. The scripts still run on Python 3.8 (`ruff.toml`'s target), the
   oldest a contributor may have.
 - **Lint tools:** pre-commit itself, ruff and clang-format are installed at
   their newest releases. pre-commit pins the other hook repositories by
@@ -618,12 +626,12 @@ with a newer compiler, within the stated tolerance
   see a newer release.
 
 An older image or compiler is allowed only for a reason recorded beside it in
-the workflow. The release candidates have two:
+the workflow. Only the release candidates have one:
 
 | Package | Built on | Why not newer |
 | --- | --- | --- |
-| Linux | `ubuntu-22.04`, newest GCC on it | A newer Ubuntu's glibc would stop the package loading on Ubuntu 22.04 and other glibc 2.35 systems (`max_glibc` in the release policy) |
-| Windows | `windows-2022`, Visual Studio 2022 | The packages use the Microsoft C++ runtime installed on the user's machine (`MultiThreadedDLL`); a Visual Studio 2026 build would need that runtime's 2026 update there too |
+| Linux | `ubuntu-22.04`, newest GCC on it (GCC 12) | A newer Ubuntu's glibc would stop the package loading on Ubuntu 22.04 and other glibc 2.35 systems (`max_glibc` in the release policy); GCC 12 also needs no newer libstdc++ than Ubuntu 22.04 and Debian 12 ship (GLIBCXX_3.4.30) |
+| Windows | `windows-2022`, Visual Studio 2022 | The packages use the Microsoft C++ runtime installed on the user's machine (`MultiThreadedDLL`); a Visual Studio 2026 build would need that runtime's 2026 version there. jrp kept Visual Studio 2022 for the packages when he chose the CI-43 changes (19 November 2026) |
 
 Contributors' own machines are not held to this; the
 [dependencies](#dependencies) above say what a source build needs.
