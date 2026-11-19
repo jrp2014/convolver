@@ -116,7 +116,7 @@ the suggested one.
 
 | Group | Items | Note |
 | --- | --- | --- |
-| Parked by jrp until after REL-3 | **ROBUST-1**, **ROBUST-8**, **PLUG-25**, **PLUG-27**, **PLUG-29**, **PLUG-30**, **PLUG-36**, **HOST-6**, **CFG-3**, **DIAG-5**, **CI-32**; **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19** | jrp, 8 November 2026: "park any non-essential corner or edge case robustness tests", and "Park both"; PLUG-36 on 12 November 2026 ("park until after REL-3") ([decision](docs/project/decisions.md#releases)). No existing test is removed, and a reproduced crash, lost state, unsafe output or wrong audio reopens one at once |
+| Parked by jrp until after REL-3 | **ROBUST-1**, **ROBUST-8**, **PLUG-25**, **PLUG-27**, **PLUG-29**, **PLUG-30**, **PLUG-36**, **HOST-6**, **CFG-3**, **CI-32**; **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19** | jrp, 8 November 2026: "park any non-essential corner or edge case robustness tests", and "Park both"; PLUG-36 on 12 November 2026 ("park until after REL-3") ([decision](docs/project/decisions.md#releases)). No existing test is removed, and a reproduced crash, lost state, unsafe output or wrong audio reopens one at once. On 18 November 2026 jrp brought back the parts that can be done unattended: DIAG-5 (done), PLUG-25's Fix line, CFG-3's report, CI-34's fuzz triggers (done) and EDGE-11's exact idle ([decision](docs/project/decisions.md#releases)); the rest of those items stays parked |
 | The production gate | **REL-1**, the one production checklist (PLUG-5 and AU-5 joined it): Developer ID signing and notarization on macOS, Authenticode on Windows, verified minimum OS and CPU versions, the final licence and corresponding-source review; **PLUG-20** (the VST logo in the window, optional) | The previews are unsigned by decision ([releasing](docs/develop/releasing.md#production-gates)). Planning it changes nothing shipped |
 | Edges over other convolvers | First the limitations users cite: **IO-2** (the rate-mismatch workflow; **EDGE-1** only if offline conversion proves inadequate), **EDGE-11** and **EDGE-10** (a candidate only when a measured limitation justifies it), then **EDGE-3** and **EDGE-13**; then **EDGE-12**, **EDGE-9**, **EDGE-2**, **EDGE-4** and **EDGE-5**; then **EDGE-6** to **EDGE-8**; **EDGE-14** and **EDGE-15** | jrp's goal (6 November 2026): be better than the most popular reverb plug-ins, in the ranked order of the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build), keeping its non-negotiables; each starts with the owner's decision its plan row names. Waits for REL-3 unless jrp lifts the freeze; feedback that asks for one of them (sample rates, true stereo, a filter's own delay, an output ceiling) moves it up |
 | Supporting work | **IO-1** (large files) | Take it up when a reproducible defect or a user need calls for it |
@@ -530,20 +530,6 @@ means a patched FFmpeg build with `--enable-gpl`.
   with its state chunk restored through each adapter, and Audio Unit state
   from a release. **Done when** both are kept and checked. The guarantees
   it protects are in [status](docs/project/status.md#compatibility-guarantees).
-- [ ] **DIAG-5 — Report clipping after a command-line render.** From the
-  BruteFIR comparison (8 November 2026): BruteFIR has printed each output's
-  count of overflowed samples and its peak by default since 0.99
-  (`overflow_warnings`). The `convolver` CLI clips integer output silently,
-  as [file rendering](docs/use/command-line.md#file-rendering) states,
-  and stops only for samples that are not finite: at `8ba79fb`, `--gain-db 20`
-  with `wav-pcm24` clipped 4,800 of 4,863 samples, printed nothing and
-  exited 0. Done when, after a render to integer output in which any sample
-  clipped, stderr gives the clipped-sample count and the peak in dBFS for
-  each affected output and suggests `--gain-db no-clip`; float output whose
-  peak exceeds full scale gets a note, since a later integer conversion
-  will clip it; nothing is printed when nothing clipped; the exit status is
-  unchanged; and CLI tests cover each case. The plug-ins' clip counts stay
-  with PLUG-10's meters.
 - [ ] **IO-1 — Large files.** RF64, W64, CAF, FLAC and raw output have no
   4 GiB limit, and WAV and AIFF stop with an error at it (PR #60).
   **Remains:** tests at the boundary sizes and of pipe behaviour beyond
@@ -1209,6 +1195,12 @@ move to the archive.
   change what those are built from; `main`, weekly and manual runs keep
   both ([CI triggers](docs/develop/testing.md#when-pull-requests-run-the-fuzz-targets),
   [plan](docs/archive/plans/2026-11-08-ci-scheduling.md)).
+- [x] **DIAG-5 — Report clipping after a command-line render.** 18
+  November 2026, PR #208, from the BruteFIR comparison: after a render, stderr gives
+  each affected channel's clipped-sample count and peak in dBFS and
+  suggests `--gain-db no-clip`; float output above full scale gets a note;
+  the samples and exit status are unchanged
+  ([file rendering](docs/use/command-line.md#file-rendering)).
 - [x] **DOC-15 — Say what sets Convolver apart in the README.** 17
   November 2026, PR #201: the README's "What sets it apart" section, under
   jrp's four emphases (accurate, light on the system, robust, behaves as
