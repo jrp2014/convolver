@@ -218,9 +218,9 @@ std::string clip_report(const std::string& name, unsigned significant_bits,
                                   : shaped           ? " and noise shaping"
                                                      : "") +
                       " took them just beyond what " + depth +
-                      " can hold, so each was written as the nearest value they can hold. The "
-                      "largest positive value is one step short of full scale, so a sample of "
-                      "+1.0 always clips.";
+                      " can hold, so each was written as the nearest value they can hold. +1.0 "
+                      "is above the largest representable positive integer sample, so leave "
+                      "headroom for quantization.";
         }
     } else {
         a.problem = name + " has " + samples + " above full scale" + channels + lines.str();

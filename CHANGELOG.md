@@ -92,6 +92,18 @@ Until 1.0 the C++ API may change between minor versions.
   retelling each preview's publication, CONTRIBUTING no longer calls
   bundled dependencies future work, and the documentation guide says what
   a source comment should hold.
+- Documentation, for contributors (DOC-17, from jrp's edits of
+  19 November 2026): the documentation guide's
+  [current claims](docs/develop/documentation.md#current-claims-and-dated-evidence)
+  section says how claims in the README, user guides and release notes stay
+  current. The README and release notes cite a guide, test or dated
+  measurement; user guides do so only for quantitative performance,
+  accuracy or comparative claims. Each claim keeps its evidence's scope, is
+  updated in the change that affects it and is narrowed when the evidence
+  no longer supports it. The workflow's while-working
+  list, the definition of done, the review checklist, the pull request
+  template and AGENTS.md link to it, and the release steps check a draft's
+  notes and download links against its tag and files before publishing.
 - Configurations (CFG-3, first part): a file name in a `.cfg` or list that
   is not UTF-8 text, as in a file saved in Windows-1252 (Notepad's old
   "ANSI"), now stops with an error that says so: its line, the byte that is
@@ -149,6 +161,15 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- CLI (DIAG-8, from jrp's review of 19 November 2026): the clipping report
+  after a render said that a sample of +1.0 always clips, which is not so
+  with dither: dither can take such a sample down within range, and jrp's
+  render of 4,096 samples at +1.0 with triangular dither counted 3,556
+  clipped yet still printed that sentence. It now says that +1.0 is above the
+  largest representable positive integer sample, so leave headroom for
+  quantization. Only the wording changed; the counts, samples and exit
+  status are as before
+  ([file rendering](docs/use/command-line.md#file-rendering)).
 - CI (CI-40, from jrp's review of 18 November 2026): clang-tidy ran on a
   hand-kept list of portable sources, repeated in CONTRIBUTING, that had
   missed `portable/partitions.cpp`. CI and the documented command now

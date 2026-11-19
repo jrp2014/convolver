@@ -78,15 +78,16 @@ be done unattended ([decision](docs/project/decisions.md#releases)). All
 five are done in the parts he named: DIAG-5 and CI-34 whole, and the first
 parts of PLUG-25, CFG-3 and EDGE-11 (PRs #207 to #211). The rest of PLUG-25
 and CFG-3 is under [parked](#parked), and EDGE-11's other candidates under
-[needs a decision](#needs-a-decision). Nothing else is claimed: check the
-open pull requests for an ID before starting.
+[needs a decision](#needs-a-decision). PLUG-39's step 3 is in PR #213.
+Nothing else is claimed: check the open pull requests for an ID before
+starting.
 
 ### Ready
 
 | Item | What to do | Note |
 | --- | --- | --- |
-| **PLUG-39** | The load and restore path, steps 1b to 6 in the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)'s order (step 0's protection tests are in, PR #200, and step 1a, PR #205) | Plan and order approved by jrp on 13 November 2026; each step is its own reviewed pull request, and step 3 (deferred reclamation) gets its own ownership review |
-| **PLUG-24** | `HostProcessor` in its own source file | When `host.cpp` next changes for another reason, such as PLUG-39's processor work; never with a DSP change |
+| **PLUG-39** | The load and restore path, steps 1b to 6 in the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)'s order (step 0's protection tests are in, PR #200, and step 1a, PR #205): step 3 (the shared ownership of the playing processor, with ROBUST-8) first, then steps 1b (then PLUG-36), 2 and 4 (with PLUG-30) to 6 | Plan and order approved by jrp on 13 November 2026; step 3 first and the four items folded in on 19 November 2026 ([decision](docs/project/decisions.md#releases)). Each step is its own reviewed pull request, and step 3 (deferred reclamation) gets its own ownership review |
+| **PLUG-24** | `HostProcessor` in its own source file | In PLUG-39's sequence, as its own pull request, never inside a step's or with a DSP change (jrp, 19 November 2026) |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the gain modes are in 0.13.20 (PR #188) |
 | **PERF-3** | One measurement exercise: resource budgets and supported workloads | Changes no shipped code; its results decide whether FFT-2, VST3-5, PLUG-11 and PERF-2's tuning are worth doing (EDGE-5 publishes them) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
@@ -126,7 +127,7 @@ REL-3.
 
 | Items | Note |
 | --- | --- |
-| **ROBUST-1**, **ROBUST-8**, **PLUG-27**, **PLUG-29**, **PLUG-30**, **PLUG-36**, **HOST-6** | Robustness and lifecycle corner cases |
+| **ROBUST-1**, **PLUG-27**, **PLUG-29**, **HOST-6** | Robustness and lifecycle corner cases (ROBUST-8, PLUG-30 and PLUG-36 moved into PLUG-39's sequence on 19 November 2026, [decision](docs/project/decisions.md#releases)) |
 | **CI-32** | The most extreme numerical cases less often; dormant as well (jrp, 12 November 2026) |
 | **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19** | Profiling and measurement-only optimisations |
 | The rest of **PLUG-25** and **CFG-3** | Marking a host rate as not yet confirmed, and reading Windows-1252 names; each also needs jrp's decision |
@@ -360,7 +361,8 @@ LV2 (Linux first; also PipeWire system audio):
   control lock acts on, or all Audio Unit control work on the one serial
   queue. Done when each adapter's skip paths either follow that rule or
   are listed with why they are safe, with a held-lock test for each, as
-  AU-16's. Parked until REL-3.
+  AU-16's. Taken up with PLUG-39's step 4, which removes the Audio Unit's
+  report cache from the list (jrp, 19 November 2026).
 - [ ] **PLUG-39 — One consolidation of the load and restore path.** From
   jrp's review of 13 November 2026: individually reasonable fixes have left
   each adapter deciding for itself what an accepted request requires (six
@@ -372,10 +374,13 @@ LV2 (Linux first; also PipeWire system audio):
   [list](docs/project/plans/2026-11-13-load-restore-consolidation.md#protection-for-every-step)
   of tests that reach into the machinery). Step 1a, in PR #205, decides
   once in `HostFilter::load()` whether a request holds the accepted filter
-  and then reuses its peak and gains instead of analysing it again.
-  **Remains:** the
+  and then reuses its peak and gains instead of analysing it again. Step
+  3a, in PR #213, adds the shared ownership of the playing processor
+  (`PlayingProcessor`), which no adapter uses yet; jrp chose on
+  19 November 2026 to take step 3 next. **Remains:** the
   [consolidation plan](docs/project/plans/2026-11-13-load-restore-consolidation.md)'s
-  steps 1b to 6: the rest of one shared decision for each
+  steps 1b to 6 (3b and 3c: VST3 and the Audio Unit adopt the shared
+  ownership): the rest of one shared decision for each
   accepted request (building on PLUG-38's `HostPlayback::playing`), one rule
   for when the host has settled, deferred reclamation of the playing
   processor under jrp's four conditions (approved in principle, its own
@@ -402,7 +407,9 @@ LV2 (Linux first; also PipeWire system audio):
   adapter test, and add a test only for a missing rule or a reproduced
   defect; the expected result must not come from production decision
   functions. Any unclear rule goes to jrp. Parked until after REL-3 (jrp,
-  12 November 2026).
+  12 November 2026), then moved into PLUG-39's sequence after step 1b,
+  whose single decision its load and restore rows map onto (jrp,
+  19 November 2026).
 - [ ] **LV2-3 — Named layouts.** The eight discrete plug-in URIs, `lv2lint`
   and pluginval at strictness 10 run in CI (PR #43;
   [pluginval](docs/develop/testing.md#pluginval)). **Remains:** URIs for the
@@ -571,7 +578,8 @@ means a patched FFmpeg build with `--enable-gpl`.
   the host may read Active. Split `activate()` into a step that may throw
   and a commit that cannot, called only once the new processor plays, in
   both adapters, with a test of each case. Only reachable when memory runs
-  out; parked until REL-3.
+  out. Taken up with PLUG-39's steps 3b and 3c, where the commit follows
+  the offer of the new processor (jrp, 19 November 2026).
 
 ## VST3 SDK features not yet used
 
@@ -986,8 +994,8 @@ project of its own, and none changes a message a user reads. PLUG-39's
   dry-signal answer (`HostPlayback`) in one place each. No new general
   framework. The move keeps saved state, diagnostic text, allocation guards
   and numerical results unchanged, and never shares a pull request with a
-  DSP change. Take it up when `host.cpp` next changes for another reason,
-  such as PLUG-39's processor work.
+  DSP change. In PLUG-39's sequence as its own pull request, never inside
+  a step's (jrp, 19 November 2026).
 
 ## Edges over other convolvers
 
@@ -1207,6 +1215,17 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **DIAG-8 — Say why +1.0 clips without claiming it always does.** 19
+  November 2026, from jrp's review of `212fe6e`: DIAG-5's clipping report
+  said "+1.0 always clips", untrue with dither; it now says +1.0 is above
+  the largest representable positive integer sample, so leave headroom for
+  quantization ([file rendering](docs/use/command-line.md#file-rendering)).
+- [x] **DOC-17 — Keep product claims current and substantiated.** 19
+  November 2026, PR #216, from jrp's edits on `codex/maintain-product-claims`
+  (`c623b23`), reconciled with DOC-16: claims in the README, user guides and
+  release notes rest on dated evidence, keep its scope and are refreshed in
+  the change that affects them
+  ([documentation](docs/develop/documentation.md#current-claims-and-dated-evidence)).
 - [x] **DOC-16 — Reconcile the contributor guidance with current
   decisions.** 18 November 2026, PR #206, from jrp's review of `e89a9dc`: the
   [execution priorities](#execution-priorities) sort open work by what it
