@@ -6,9 +6,9 @@ jrp's review of c2edf84: a baseline must be its own build of a pinned revision,
 never a copy kept in the current source, so that changing the engine cannot
 silently change the baseline. This script checks out each revision into its own
 worktree, builds it (Release, benchmarks on), checks both against the direct
-double-precision references of the first-use fixtures (the stereo cross-feed and
-the 2-to-6 crossover), and then times convolver_callback_benchmark's warmed processing with production
-routing in one engine (each row gives the number of timed callbacks behind
+double-precision references of the first-use fixtures (the stereo cross-feed
+and the 2-to-6 crossover), and then times convolver_callback_benchmark's
+warmed processing with production routing in one engine (each row gives the number of timed callbacks behind
 its percentiles; before 0.13.0 the benchmark counted preparation and warm-up
 in --seconds, so a slow baseline case can have as few as 64):
 
@@ -27,8 +27,8 @@ background load) affects both alike.
 Two revisions of the same commit are refused before anything is built. Any
 other pair is compared: a change to the partitioner, the kernels or an FFT
 backend changes the engine as much as one to engine.cpp. When nothing under
-portable/ or include/, nor the CMake files, differs between them, a warning
-says so, since the timings can then differ only by noise (which such a run
+portable/ or include/, nor the CMake files or the benchmark's own source,
+differs between them, a warning says so, since the timings can then differ only by noise (which such a run
 measures).
 
 The baseline runs at its own Latency (--baseline-latency, default 256, the
@@ -51,7 +51,7 @@ sys.path.insert(0, str(REPOSITORY / 'tests' / 'plugins'))
 from fixtures import TOLERANCE, read_float_wav, worst_error  # noqa: E402
 
 # What the engine and the benchmark are built from, for the warning above.
-BUILT_FROM = ('portable', 'include', 'CMakeLists.txt', 'cmake')
+BUILT_FROM = ('portable', 'include', 'CMakeLists.txt', 'cmake', 'tests/native/callback_benchmark.cpp')
 LAYOUTS = {'stereo': ('diagonal', 2, 2), 'true': ('matrix', 2, 2), 'crossover': ('crossover', 2, 6)}
 FIXTURES = ('stereo', 'crossover')
 
@@ -213,8 +213,8 @@ def main():
         sys.exit('git diff could not compare the two revisions')
     if changed == 0:
         print(
-            'warning: nothing under portable/ or include/, nor the CMake files, differs between the two '
-            'revisions; their timings can differ only by noise',
+            'warning: nothing under portable/ or include/, nor the CMake files or the benchmark, differs '
+            'between the two revisions; their timings can differ only by noise',
             file=sys.stderr,
         )
     for build in builds:
