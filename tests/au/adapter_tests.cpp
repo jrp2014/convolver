@@ -1150,6 +1150,9 @@ void latency_parameter() {
                 "the render after the handover did not play the new processor");
         set_parameter(unit, au::latency_parameter, 1);
         require(reports(unit, 64), "Latency back to 64 frames");
+        // The Latency work reads the hook: let it finish before the hook is
+        // cleared (ThreadSanitizer saw the two race).
+        require(latency_settled(unit), "the Latency work after the handover did not finish");
     }
 
     // Choices from two threads at once while this one renders (john's review
