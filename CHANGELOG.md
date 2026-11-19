@@ -2553,7 +2553,8 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.13.24...HEAD
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/jrp2014/convolver/releases/tag/v0.14.0
 [0.13.24]: https://github.com/jrp2014/convolver/releases/tag/v0.13.24
 [0.13.20]: https://github.com/jrp2014/convolver/releases/tag/v0.13.20
 [0.13.12]: https://github.com/jrp2014/convolver/releases/tag/v0.13.12

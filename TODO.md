@@ -544,7 +544,7 @@ means a patched FFmpeg build with `--enable-gpl`.
   **Remains:** 0.14.0's presets and renders (the capture step above); a
   REAPER project saved with 0.14.0, the baseline (jrp's Mac session),
   with its state chunk restored through each adapter, and Audio Unit state
-  from a release. **Done when** both are kept and checked. The guarantees
+  from a release. **Done when** all three are kept and checked. The guarantees
   it protects are in [status](docs/project/status.md#compatibility-guarantees).
 - [ ] **IO-1 — Large files.** RF64, W64, CAF, FLAC and raw output have no
   4 GiB limit, and WAV and AIFF stop with an error at it (PR #60).
