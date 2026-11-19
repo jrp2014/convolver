@@ -376,15 +376,14 @@ LV2 (Linux first; also PipeWire system audio):
   once in `HostFilter::load()` whether a request holds the accepted filter
   and then reuses its peak and gains instead of analysing it again. Step
   3a, in PR #213, adds the shared ownership of the playing processor
-  (`PlayingProcessor`), and step 3b, in PR #217, moves VST3 to it, so
-  a new Latency no longer holds the control call until `process()` lets go;
+  (`PlayingProcessor`), and steps 3b, in PR #217, and 3c, in PR #STEP3C,
+  move VST3 and the Audio Unit to it, so a new Latency no longer holds the
+  control call until `process()` or `Render` lets go;
   jrp chose on 19 November 2026 to take step 3 next. **Remains:** the
   [consolidation plan](docs/project/plans/2026-11-13-load-restore-consolidation.md)'s
-  steps 1b, 2, 3c and 4 to 6: the rest of one shared decision for each
+  steps 1b, 2 and 4 to 6: the rest of one shared decision for each
   accepted request (building on PLUG-38's `HostPlayback::playing`), one
-  rule for when the host has settled, the Audio Unit's move to the shared
-  ownership of the playing processor (3c), diagnostics as a view of state,
-  and
+  rule for when the host has settled, diagnostics as a view of state, and
   typed reports and advice. Plan and order approved by jrp on 13 November
   2026, not the implementation: each step's pull request is reviewed and
   tested on its own. **Worth doing** now that 0.13.20 is published

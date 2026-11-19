@@ -119,6 +119,10 @@ Until 1.0 the C++ API may change between minor versions.
   exports at.", in every format and wherever the Fix is shown: the window,
   Status details and the Convolver log, or LV2's host log. Audacity, for
   one, plays at its Default sample rate while it exports at the project's.
+- Audio Unit (PLUG-39 step 3c): as in VST3, a new Latency and
+  uninitializing no longer wait for `Render` to let go of the processor
+  they replace; the next control call frees it. Nothing heard or reported
+  changes.
 - VST3 plug-in (PLUG-39 step 3b): choosing a new Latency while audio plays
   no longer holds the host's control call until the audio thread finishes
   its block. The new processor is offered and reported at once, as before;

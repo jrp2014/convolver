@@ -209,7 +209,7 @@ HostLayout Effect::layout() {
 // default format (44.1 kHz stereo) is not a choice the host has made.
 std::optional<HostLayout> Effect::known_layout() {
     const auto now = layout();
-    if (host_ || (committed_ && same_configuration(*committed_, now)))
+    if (host() || (committed_ && same_configuration(*committed_, now)))
         return now;
     return std::nullopt;
 }
@@ -227,24 +227,23 @@ OSStatus Effect::Initialize() {
     std::string message, faults;
     bool started = false, problem = true;
     HostSettings current;
-    std::unique_ptr<HostProcessor> previous; // None after Cleanup.
     {
-        std::lock_guard lock(control_);
+        const Locked lock(*this);
         faults = observe_faults(); // Before the processor that counted them goes.
         try {
-            const auto host = layout();
+            const auto now = layout();
             current = settings();
             // A filter that does not suit the host plays silence, and is kept so
             // that correcting the rate or channels brings it back. Gain and Mix
             // apply from the first frame, and the Latency is the block size.
             auto next = std::make_unique<HostProcessor>(
-                filter_.activate(host), GetMaxFramesPerSlice(), current, host.inputs);
+                filter_.activate(now), GetMaxFramesPerSlice(), current, now.inputs);
             next->set_bypass(bypass_.load());
             next->reset();
             tail_.store(next->tail_frames());
             latency_.store(next->latency_frames());
-            previous = install_processor(std::move(next));
-            initialized_ = host;
+            playing_.offer(std::move(next));
+            initialized_ = now;
             rendered_.store(false);
             reset_requested_.store(false);
             started = true;
@@ -266,7 +265,6 @@ OSStatus Effect::Initialize() {
         }
         update_status();
     }
-    release_processor(std::move(previous));
     log_faults(faults);
     log(message, problem);
     notify_status();
@@ -291,19 +289,19 @@ std::string Effect::activation_failed(const char* why) noexcept {
 // counting that probe would turn a 48 kHz project's filter into a failed load.
 void Effect::Cleanup() {
     std::string faults;
-    std::unique_ptr<HostProcessor> previous;
     {
-        std::lock_guard lock(control_);
+        const Locked lock(*this);
         faults = observe_faults(); // Before the processor that counted them goes.
         if (rendered_.load())
             committed_ = initialized_;
-        previous = install_processor(nullptr);
+        // The host does not render while it uninitializes the unit, so the
+        // processor is freed here; were Render still running, it would be
+        // freed by the next control call instead, without waiting under the
+        // lock for a render whose input callback may call into the unit.
+        playing_.offer(nullptr);
         latency_.store(settings().latency); // What the next initialization uses.
         update_status(); // Read when the host next asks; no notification while it tears down.
     }
-    // The host does not render while it uninitializes the unit; if it did,
-    // this waits for the render call to finish.
-    release_processor(std::move(previous));
     log_faults(faults);
 }
 
@@ -339,7 +337,7 @@ OSStatus Effect::ChangeStreamFormat(AudioUnitScope scope, AudioUnitElement eleme
         timing_changed(); // Seconds depend on the rate.
     {
         // Whether the filter counts as checked depends on the formats.
-        std::lock_guard lock(control_);
+        const Locked lock(*this);
         update_status();
     }
     notify_status();
@@ -363,21 +361,6 @@ Float64 Effect::GetTailTime() noexcept AUSDK_RTSAFE {
     return rate > 0 ? static_cast<Float64>(tail_.load()) / rate : 0;
 }
 
-std::unique_ptr<HostProcessor>
-Effect::install_processor(std::unique_ptr<HostProcessor> next) noexcept {
-    playing_.store(next.get());
-    std::swap(host_, next);
-    return next; // The previous processor.
-}
-
-void Effect::release_processor(std::unique_ptr<HostProcessor> previous) noexcept {
-    // Render marks its processor in `rendering_` and then checks that it is
-    // still `playing_` (sequentially consistent), so once the previous one is
-    // no longer marked, Render is not using it and never will again.
-    while (previous && rendering_.load() == previous.get())
-        std::this_thread::yield();
-}
-
 void Effect::wake(std::uintptr_t why) noexcept {
     // Numbered before the wake-up, which the run follows.
     const auto number = latency_requests_.fetch_add(1) + 1;
@@ -394,9 +377,8 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
     const auto seen = latency_requests_.load();
     std::string message, faults, bypass_faults, mode_message;
     bool changed = false, problem = false, bypass_shown = false, mode_problem = false;
-    std::unique_ptr<HostProcessor> previous;
     {
-        std::lock_guard lock(control_);
+        const Locked lock(*this);
         // The settings are read once: what is built and what is reported
         // both come from this one reading, even if the host changes the
         // parameter meanwhile (that wakes the queue again).
@@ -405,10 +387,10 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
         if (!(wakes & latency_wake)) {
             // Only a bypass to show (request_status()): a Latency that could
             // not be built is not tried again for it.
-        } else if (!host_) {
+        } else if (!host()) {
             changed = latency_.exchange(chosen) != chosen; // The next Initialize uses it.
-        } else if (host_->latency_frames() != chosen && initialized_) {
-            const auto before = host_->latency_frames();
+        } else if (host()->latency_frames() != chosen && initialized_) {
+            const auto before = host()->latency_frames();
             faults = observe_faults(); // Before the processor that counted them goes.
             std::unique_ptr<HostProcessor> next;
             std::string why;
@@ -433,7 +415,9 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
                 // change together, from the processor that now plays.
                 tail_.store(next->tail_frames());
                 latency_.store(next->latency_frames());
-                previous = install_processor(std::move(next));
+                // Render plays it from its next call; the one it replaces is
+                // freed by a later control call once Render has let it go.
+                playing_.offer(std::move(next));
                 changed = true;
             } else {
                 // The previous processor keeps playing at its latency, and
@@ -442,7 +426,7 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
                 // processor, so count from the old one's totals (already
                 // logged above) rather than logging them all again.
                 problem = true;
-                (void)filter_.observe(host_->faults());
+                (void)filter_.observe(host()->faults());
             }
             try { // Best effort: out of memory for the message changes nothing else.
                 message = changed ? "Latency changed from " + std::to_string(before) + " to " +
@@ -467,8 +451,8 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
             std::string why;
             try {
                 filter_.estimate(estimate, [&](const FilterGains& gains) {
-                    if (host_)
-                        host_->update_gains(gains);
+                    if (host())
+                        host()->update_gains(gains);
                 });
             } catch (const std::exception& e) {
                 try {
@@ -499,7 +483,6 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
         if (const auto hook = latency_locked_for_tests)
             hook(GetComponentInstance());
     }
-    release_processor(std::move(previous));
     log_faults(faults);
     log_faults(bypass_faults);
     log(message, problem);
@@ -540,20 +523,11 @@ void Effect::deliver_notices(std::uintptr_t notices) noexcept {
 
 OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp& time,
                         UInt32 frames) noexcept AUSDK_RTSAFE {
-    // The processor to use, marked for the length of this call so that the
-    // control side does not free it (release_processor()): marked, then checked to be
-    // still the one playing. Atomic loads and stores only.
-    HostProcessor* host = nullptr;
-    do {
-        host = playing_.load();
-        rendering_.store(host);
-    } while (host != playing_.load());
-    struct Unmark {
-        std::atomic<HostProcessor*>& marked;
-        ~Unmark() {
-            marked.store(nullptr, std::memory_order_release);
-        }
-    } unmark{rendering_};
+    // The processor to use: the newest offer, held for the length of this
+    // call so that the control side does not free it (PlayingProcessor).
+    // Atomic loads and stores only.
+    const auto held = playing_.hold(0);
+    auto* const host = held.get();
     if (!host)
         return kAudioUnitErr_Uninitialized;
     auto& input = GetInput0();
