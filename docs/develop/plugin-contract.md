@@ -682,7 +682,11 @@ the plan's Gain modes (12 November 2026); its meters follow later
   which filters noise for ten filter lengths (at least 65536 frames, about
   0.2 s for a 5-second stereo filter and 0.6 s for a 10-second one on the
   cloud machine), only while an adapter has Estimate chosen
-  (`HostFilter::estimating()`). Choosing Estimate plays the bound at once;
+  (`HostFilter::estimating()`). A request holding the accepted filter
+  again, equal in every stored value, keeps its bound and any estimate
+  already found, and finds an estimate only if Estimate is chosen and there
+  is none yet, so a restore that changes only the settings does not filter
+  the noise again (PLUG-39 step 1a). Choosing Estimate plays the bound at once;
   `HostFilter::estimate()` then finds the estimate for the filter already
   accepted, on the adapter's control side (VST3's message thread, the Audio
   Unit's Latency worker, LV2's worker), and the adapter gives it to the

@@ -36,6 +36,15 @@ Until 1.0 the C++ API may change between minor versions.
   `unreadable` for a list entry). On Linux a file with exactly those bytes
   in its name still loads. Convolver still reads only UTF-8; whether it should
   also read Windows-1252 is open for jrp.
+- Plug-ins (PLUG-39 step 1a, from jrp's review of 0.13.28): a restored
+  project, preset or undo step that holds the filter already accepted no
+  longer analyses that filter again. Its peak bound and, under Estimate, its
+  noise estimate are kept from when it was accepted, so a restore that
+  changes only the settings no longer filters ten filter lengths of noise
+  again: with a 10-second stereo filter under Estimate, the shared load step
+  took about 590 ms before and 2 to 5 ms after (Linux, optimised build). An
+  estimate is found only when Estimate is chosen and the filter has none
+  yet. What plays, what is saved and the figures shown are unchanged.
 - Documentation (DOC-15): the README's opening says what sets Convolver
   apart, in a "What sets it apart" section under jrp's four emphases:
   accurate (checked against an independent double-precision convolution),

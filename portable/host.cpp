@@ -549,11 +549,26 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
                 notice = speaker_notice(*next, *host);
             }
         }
+        // PLUG-39: whether the request holds the accepted filter, equal in
+        // every stored value, not by name or identity alone (PLUG-38). Decided
+        // once, before any analysis: the peak and gains depend on the filter
+        // alone, so the accepted filter's figures stand, and only an estimate newly
+        // needed is found. A restore that changes only the settings no longer
+        // filters noise again for a long filter.
+        bool same = false;
+        if (next) {
+            identity = configuration_identity(*next);
+            same = filter_ && identity == identity_ && same_configuration(*filter_, *next);
+        }
         // For the window's Loudest peak; on the control side with the rest of
         // the preparation, so a report never has to compute it.
-        if (next) {
+        if (same) {
+            peak = peak_;
+            gains = gains_;
+            if (estimating_ && !gains.estimate_db && !gains.estimate_failed)
+                find_estimate(gains, *next);
+        } else if (next) {
             peak = worst_case_peak(*next);
-            identity = configuration_identity(*next);
             gains = gains_for(*next, peak, estimating_);
         }
         if (state.failed) {
@@ -586,9 +601,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
                     // on with its history: one accepted, suiting the host
                     // (no failure found at activation keeps it silent), and
                     // equal in full, not by name or identity alone.
-                    const bool unchanged = filter_ && !failed_ && !activation_failure_ &&
-                                           identity == identity_ &&
-                                           same_configuration(*filter_, *next);
+                    const bool unchanged = same && !failed_ && !activation_failure_;
                     HostPlayback playing{std::move(*next), dry, gains, unchanged};
                     install(playing);
                     *next = std::move(playing.filter);
