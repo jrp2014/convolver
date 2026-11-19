@@ -1216,7 +1216,7 @@ Items finished since then are listed here, one line each, until the next
 move to the archive.
 
 - [x] **CI-43 — Keep compilers and CI machines on their newest releases.**
-  19 November 2026, PR #PRNUM, from jrp's question whether Convolver uses the
+  19 November 2026, PR #222, from jrp's question whether Convolver uses the
   latest SDKs: the libraries already followed their newest releases, but the
   compilers and runner images did not. CI now takes the newest generally
   available images, GCC and Xcode, the newest LLVM release and the newest
