@@ -593,6 +593,10 @@ def clip_report_tests(d):
     assert 'clipped 1 sample\n    channel 1: 1 of 2 samples clipped, peak +0.00 dBFS' in err, err
     assert 'Those samples were within full scale, but rounding took them just beyond' in err, err
     assert 'leaves room for rounding' in err and 'is too high' not in err, err
+    # DIAG-8: dither can take a +1.0 sample down within range, so the cause
+    # says why to leave headroom rather than that +1.0 always clips.
+    assert '+1.0 is above the largest representable positive integer sample' in err, err
+    assert 'always clips' not in err, err
     # With no-clip only input beyond full scale can clip, so the fix says so.
     loud = d / 'clip-loud.wav'
     float_wave(loud, [(1.5 * math.sin(i / 5), 0.1) for i in range(1000)], channels=2)

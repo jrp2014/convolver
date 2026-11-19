@@ -1206,6 +1206,11 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **DIAG-8 — Say why +1.0 clips without claiming it always does.** 19
+  November 2026, from jrp's review of `212fe6e`: DIAG-5's clipping report
+  said "+1.0 always clips", untrue with dither; it now says +1.0 is above
+  the largest representable positive integer sample, so leave headroom for
+  quantization ([file rendering](docs/use/command-line.md#file-rendering)).
 - [x] **DOC-16 — Reconcile the contributor guidance with current
   decisions.** 18 November 2026, PR #206, from jrp's review of `e89a9dc`: the
   [execution priorities](#execution-priorities) sort open work by what it

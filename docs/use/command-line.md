@@ -88,8 +88,10 @@ rounding, dither or noise shaping took one over, it says that instead. A float o
 gets a note instead, since a later conversion to integer samples will clip
 them. Nothing is printed when every sample stayed within full scale, and the
 render's samples and exit status are the same either way. A sample of
-exactly +1.0 counts as clipped in integer output, since the largest positive
-integer is one step short of full scale (below); −1.0 does not.
+exactly +1.0 is above the largest representable positive integer sample, which
+is one step short of full scale (below): without dither it always clips,
+while dither can take some such samples down within range, so leave headroom
+for quantization. Without dither −1.0 does not clip.
 
 ### Gain and attenuation
 
