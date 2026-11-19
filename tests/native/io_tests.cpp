@@ -1694,6 +1694,14 @@ void run(const fs::path& dir) {
             contains(entry, "ansi.txt:2:1: the file name 'filter_\\xE9.cfg' is not UTF-8 text") &&
                 contains(entry, "byte 0xE9"),
             "a list entry that is not UTF-8 is not explained");
+        // A list entry that is not chosen may name an IR that is not there,
+        // so a name that is not UTF-8 in it does not stop the list.
+        wave(dir / "u8-ir.wav", 48000, 1, {1.0f});
+        text_file(dir / "ansi44.cfg", "44100 1 1 0\n0\n0\nir_\xfc.wav\n0\n0\n0\n");
+        text_file(dir / "good48.cfg", "48000 1 1 0\n0\n0\nu8-ir.wav\n0\n0\n0\n");
+        text_file(dir / "ansi-first.txt", "ansi44.cfg\ngood48.cfg\n");
+        require(load_configuration(dir / "ansi-first.txt", 48000, 1).sample_rate == 48000,
+                "an unchosen entry's name that is not UTF-8 stops the list");
 #ifndef _WIN32
         // On macOS and Linux a file with exactly those bytes in its name
         // still loads, as it did before.

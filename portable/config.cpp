@@ -213,19 +213,20 @@ std::filesystem::path resolve_reference(const std::filesystem::path& owner,
 #endif
     auto normalized = name;
     std::replace(normalized.begin(), normalized.end(), '\\', '/');
-    if (!valid_utf8(normalized)) {
-#ifndef _WIN32
-        // macOS and Linux names are bytes: a file that has exactly this name
-        // still opens, as it always has.
-        const std::filesystem::path bytes(normalized);
-        const auto found = bytes.is_absolute() ? bytes : owner.parent_path() / bytes;
-        std::error_code ec;
-        if (exists ? exists(found) : std::filesystem::exists(found, ec))
-            return found;
-#endif
+#ifdef _WIN32
+    // CFG-3: Windows names are UTF-16, so no file has a name that is not
+    // UTF-8 text. On macOS and Linux names are bytes: such a name resolves as
+    // its bytes, as it always has, and is reported only when no file has it
+    // (decode_impulses(), Resolver::visit()).
+    if (!valid_utf8(normalized))
         throw ConfigurationError("not-utf8", ref.location,
                                  not_utf8_advice(owner, name, ref.location));
+#else
+    if (!valid_utf8(normalized)) {
+        const std::filesystem::path bytes(normalized);
+        return bytes.is_absolute() ? bytes : owner.parent_path() / bytes;
     }
+#endif
     const auto p = utf8_path(normalized);
     return p.is_absolute() ? p : owner.parent_path() / p;
 }
@@ -626,6 +627,11 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
                 throw ConfigurationError(
                     "unreadable-asset", path.ir.location,
                     about_filter("filter '" + path.ir.spelling + "': ", e.what(), read_as_sound));
+            // CFG-3: a name that is not UTF-8, which no file has.
+            if (!valid_utf8(path.ir.spelling))
+                throw ConfigurationError(
+                    "not-utf8", path.ir.location,
+                    not_utf8_advice(doc.source, path.ir.spelling, path.ir.location));
             // Includes a bare "-": standard input cannot be a filter.
             if (path.ir.spelling == "-")
                 throw ConfigurationError(
@@ -841,9 +847,20 @@ bool Resolver::visit(const std::filesystem::path& path) {
     const auto doc = parse_configuration_text(text, path);
     if (doc.kind == ParsedDocument::Kind::configuration) {
         const auto irs = sources_.size();
-        for (const auto& p : doc.configuration.paths)
-            sources_.push_back(
-                canonical(resolve_reference(path, p.ir, files_.exists), p.ir.location));
+        for (const auto& p : doc.configuration.paths) {
+            std::filesystem::path ir;
+            try {
+                ir = resolve_reference(path, p.ir, files_.exists);
+            } catch (const ConfigurationError& e) {
+                // CFG-3: on Windows a name that is not UTF-8 names no file.
+                // IRs of an entry that is not chosen need not be there, so
+                // it is reported only when this configuration is decoded.
+                if (e.code() != "not-utf8")
+                    throw;
+                continue;
+            }
+            sources_.push_back(canonical(ir, p.ir.location));
+        }
         if (!visitor_({path, chain_, &doc, nullptr}))
             return false;
         chosen_sources_.insert(chosen_sources_.end(), sources_.begin() + irs, sources_.end());
@@ -865,6 +882,14 @@ bool Resolver::visit(const std::filesystem::path& path) {
         std::filesystem::path child;
         try {
             child = resolve_reference(path, entry, files_.exists);
+            // CFG-3: a name that is not UTF-8 and that no file has, reported
+            // where a missing entry would be (macOS and Linux; Windows
+            // refuses it in resolve_reference()).
+            std::error_code ec;
+            if (!valid_utf8(entry.spelling) &&
+                !(files_.exists ? files_.exists(child) : std::filesystem::exists(child, ec)))
+                throw ConfigurationError("not-utf8", entry.location,
+                                         not_utf8_advice(path, entry.spelling, entry.location));
         } catch (const ConfigurationError& e) {
             // Located at the entry itself, so this list is not added to the chain.
             if (handled(e, chain_.size()))

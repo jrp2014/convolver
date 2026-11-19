@@ -87,8 +87,9 @@ spaces in a name need no quotes. Quotes would become part of the name. `//`
 starts a comment even on a filename line. Use a dot for decimal numbers.
 UTF-8 text, a UTF-8 byte-order mark, and LF or CRLF line endings are accepted.
 A file name that is not UTF-8, in a configuration or a list, stops with an
-error (`not-utf8`) that names its line and the byte that is wrong, shown as
-`\xFC`, for example. Such a file was most likely saved in a Windows code page
+error (`not-utf8`) when that file is needed, naming its line and the byte that
+is wrong, shown as `\xFC`, for example; an IR of a list entry that is not
+chosen need not exist, as usual. Such a file was most likely saved in a Windows code page
 such as Windows-1252, as older versions of Notepad and the original Windows
 Convolver did; save it again as UTF-8. Convolver does not guess the code page.
 On macOS and Linux a file whose name has exactly those bytes still loads.

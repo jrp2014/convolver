@@ -135,7 +135,10 @@ std::string read_configuration_text(const std::filesystem::path&);
 // How a reference spelled in owner resolves on this platform, without opening it.
 // Throws ConfigurationError (code "nonportable-path") for Windows drive, UNC and
 // rooted references on non-Windows platforms; the reason names any existing
-// relative replacement beside the owner.
+// relative replacement beside the owner. A reference that is not UTF-8 text
+// (CFG-3) throws "not-utf8" on Windows, where no file can have that name; on
+// macOS and Linux it resolves as its bytes, and the caller reports it as
+// "not-utf8" only when no file has that name.
 // file_exists replaces the filesystem check used for that suggestion.
 using FileExists = std::function<bool(const std::filesystem::path&)>;
 std::filesystem::path resolve_reference(const std::filesystem::path& owner, const ParsedReference&,
