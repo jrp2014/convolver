@@ -14,8 +14,8 @@ Until 1.0 the C++ API may change between minor versions.
 
 - Tests (COMPAT-1, in progress): the example presets of the published
   0.14.0 and the audio its own CLI and VST3 plug-in rendered from them are
-  kept in `tests/upgrade/0.14.0/`, beside those of the four earlier
-  previews; `upgrade.cli` and `vst3.upgrade` check later builds against all
+  kept in `tests/upgrade/0.14.0/`, beside those of 0.13.2, 0.13.12,
+  0.13.20 and 0.13.24; `upgrade.cli` and `vst3.upgrade` check later builds against all
   five. Every preset, filter, input and expected render matches 0.13.24's
   byte for byte: EDGE-11's change of a -0 sample to +0 did not occur in
   these renders.
