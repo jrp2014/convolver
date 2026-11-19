@@ -37,6 +37,12 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Plug-ins (PLUG-25, first part): a refusal because the filter's rate
+  differs from the host's ends its Fix with the sentence jrp agreed on 8
+  November 2026, "The host may play at a different rate from the one it
+  exports at.", in every format and wherever the Fix is shown: the window,
+  Status details and the Convolver log, or LV2's host log. Audacity, for
+  one, plays at its Default sample rate while it exports at the project's.
 - Plug-ins (PLUG-39 step 1a, from jrp's review of 0.13.28): a restored
   project, preset or undo step that holds the filter already accepted no
   longer analyses that filter again. Its peak bound and, under Estimate, its
@@ -56,6 +62,15 @@ Until 1.0 the C++ API may change between minor versions.
   macOS, Windows and Linux. Each claim links to the guide, test or
   measurement behind it; the preview's limitations follow in their own
   section.
+- CI (CI-34, finished; chosen by jrp on 18 November 2026): a pull request
+  runs the fuzz workflow only when it changes what the four fuzz targets are
+  built from: their harnesses, seeds and regression inputs, the parsers,
+  audio reader and state decoder with the code compiled in with them, the
+  build configuration or the workflow. Pushes to `main` and manual runs
+  still run it, a new Monday run gives each target 600 seconds, and every
+  native build still replays the committed fuzz inputs. Each run checks
+  that the list names every repository file compiled into the targets
+  ([when pull requests run the fuzz targets](docs/develop/testing.md#when-pull-requests-run-the-fuzz-targets)).
 - CI (CI-38, jrp's request of 16 November 2026 for safe speedups without
   restructuring): `native.engine_stress`, `native.engine` and `native.host`,
   the longest core tests under sanitizers, carry a CTest `COST`, so they
