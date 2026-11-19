@@ -1214,6 +1214,12 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **CI-41 — Run the timing harness's self-test once per build type.**
+  19 November 2026, from jrp's review of `212fe6e`: `native.load_timing_harness`
+  carries the CTest label `backend-independent`, which the native jobs'
+  Accelerate and Ooura builds, and the g++ and MSVC core-only builds,
+  leave out
+  ([which configurations run which tests](docs/develop/testing.md#which-configurations-run-which-tests)).
 - [x] **DIAG-8 — Say why +1.0 clips without claiming it always does.** 19
   November 2026, from jrp's review of `212fe6e`: DIAG-5's clipping report
   said "+1.0 always clips", untrue with dither; it now says +1.0 is above

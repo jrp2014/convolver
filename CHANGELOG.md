@@ -140,6 +140,18 @@ Until 1.0 the C++ API may change between minor versions.
   still do, and a VST3 pull request still runs the required acceptance test
   with it ([pre-releases](docs/develop/build.md#pre-releases-and-newer-upstream-versions)).
   Parallel MSVC compiles (`CL=/MP`) were tried and dropped: no measured gain.
+- CI (CI-41, from jrp's review of 19 November 2026): the load-timing
+  harness's self-test, `native.load_timing_harness`, which no FFT backend
+  or core-only shape changes, runs once for each compiler and build type
+  in a native job instead of in every build: no longer in the Accelerate
+  and Ooura builds, nor in the core-only builds of g++ and MSVC, whose
+  full builds are already Release. The Clang jobs keep it in their
+  core-only Release build. On `main`'s run of 19 November it ran four
+  times in the macOS job (20.7 to 23.8 s each) and now runs twice, saving
+  about 45 s of test time there; how much of it shortens the job depends
+  on the tests running beside it. Every FFT-dependent test, backend
+  comparison and plug-in timing test still runs where it did
+  ([which configurations run which tests](docs/develop/testing.md#which-configurations-run-which-tests)).
 
 ### Fixed
 
