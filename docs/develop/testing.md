@@ -794,11 +794,15 @@ a restored state with another Latency plays it at once.
 filter 8 times while another thread calls `process()`, waiting for a block
 between changes, then checks the last filter at the last Latency; the
 sanitizer build reports a use after free if the control side frees a
-processor `process()` is still using. `latency_handover_waits()` does the
-same step by step: it holds `process()` inside a block through a test hook
-while another thread chooses a Latency, and checks that the new latency is
-reported at once and that the choice returns only after the held block
-ends. And a filter at the saved-state
+processor `process()` is still using. `latency_handover_does_not_wait()`
+does the same step by step (PLUG-39 step 3): it holds `process()` inside a
+block through a test hook while another thread chooses a Latency, and
+checks that the choice returns while the block is held, that the new
+latency is reported at once, that the old processor is not freed while the
+block holds it, even after `setProcessing()`, the other reader, has held and
+let go of the new one, or by a later control call
+(`freeing_processor_for_tests`, with AddressSanitizer as a second check), that the next control call frees
+it, and that the next block plays the new processor. And a filter at the saved-state
 limit (PLUG-13) that is restored, given Gain −6 dB, saved and restored in a
 second instance, with one sample more refused. And the window's messages
 (VST3-3): the report's fields, a fresh report on request after a Gain
@@ -890,7 +894,7 @@ instrumented bundle, so they do not run there, and `vst3.load_timing` skips
 itself; no job loads an FFTW bundle in them, since FFTW plug-ins are not
 distributed), and `vst3.adapter` alone under ThreadSanitizer with the shipped
 Ooura backend, where `latency_while_playing()` and
-`latency_handover_waits()` replace the processor while another thread calls
+`latency_handover_does_not_wait()` replace the processor while another thread calls
 `process()`. Every report is printed and any report fails the test; a step
 first checks that the test program links the ThreadSanitizer runtime and
 that the adapter's compiled code calls into it, so an uninstrumented build

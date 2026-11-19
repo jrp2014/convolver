@@ -3,6 +3,7 @@
 #include "convolver/host.hpp"
 #include "convolver_identities.hpp"
 #include "host_report.hpp"
+#include "playing_processor.hpp"
 #include "pluginterfaces/vst/ivstparameterfunctionname.h"
 #include "public.sdk/source/vst/vstaudioeffect.h"
 #include "public.sdk/source/vst/vsteditcontroller.h"
@@ -92,11 +93,8 @@ std::vector<std::pair<std::string, std::string>> decode_report(std::string_view)
 // VST3-16, for tests: called before the processor for a new Latency is
 // built while active; throwing from it makes that preparation fail.
 inline void (*latency_preparation_for_tests)() = nullptr;
-// VST3-16, for tests: process() calls the first once it holds its processor;
-// the control side calls the second each time it waits for process() to
-// leave a replaced processor (release_processor()).
+// VST3-16, for tests: process() calls it once it holds its processor.
 inline void (*holding_for_tests)() = nullptr;
-inline void (*releasing_for_tests)() = nullptr;
 // DIAG-1: the controller asks the processor to collect processing faults
 // when the host shows it the Fault value the audio thread wrote (an output
 // parameter change), so the log explains and the status text follows.
@@ -245,27 +243,22 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // If finding it fails, Estimate plays the no-clipping figure and the log
     // says why. Never throws.
     void choose_gain_mode(GainMode) noexcept;
-    // VST3-16: the processor the audio thread plays. Under control_,
-    // install_processor() makes `next` the one played and returns the
-    // previous one; release_processor() then waits until process() or
-    // setProcessing() is no longer using it, which takes at most one block,
-    // before it is freed. process() and setProcessing() each mark the
-    // processor they use in their own marker (hold()) for as long as the
-    // returned guard lives, so one ending never clears the other's mark.
-    std::unique_ptr<HostProcessor> install_processor(std::unique_ptr<HostProcessor> next) noexcept;
-    void release_processor(std::unique_ptr<HostProcessor> previous) noexcept;
-    struct Held {
-        Held(std::atomic<HostProcessor*>& marked, HostProcessor* held) noexcept
-            : mark(marked), host(held) {}
-        std::atomic<HostProcessor*>& mark;
-        HostProcessor* host;
-        Held(const Held&) = delete;
-        Held& operator=(const Held&) = delete;
-        ~Held() {
-            mark.store(nullptr);
+    // The newest processor (null while inactive), which control calls use
+    // under control_; process() may still play the one it replaced until its
+    // next block (playing_).
+    HostProcessor* host() const noexcept {
+        return playing_.newest();
+    }
+    // control_, held for this object's lifetime. Taking it first frees the
+    // replaced processors neither process() nor setProcessing() still
+    // holds, so a processor a new Latency replaced lives only until the next
+    // control call, and no control call waits for the audio thread.
+    struct Locked {
+        explicit Locked(Processor& p) : lock(p.control_) {
+            p.playing_.reclaim();
         }
+        std::lock_guard<std::mutex> lock;
     };
-    Held hold(std::atomic<HostProcessor*>& marker) noexcept;
     // Where a load comes from: a file chosen in the window, state the host
     // restores (setState), or state the host says (IStreamAttributes) is a
     // project being restored.
@@ -301,11 +294,14 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     const detail::SoundFiles* files_ = nullptr; // The reader, or none.
     std::mutex control_;
     HostFilter filter_{max_bus_channels}; // The shared adapter contract's control side.
-    std::unique_ptr<HostProcessor> host_; // Under control_; played_host_ is the same.
-    // VST3-16: host_ as the audio thread reads it, and the processor
-    // process() and setProcessing() are using (hold()).
-    std::atomic<HostProcessor*> played_host_{nullptr}, processing_host_{nullptr},
-        starting_host_{nullptr};
+    // PLUG-39 step 3 (VST3-16): the processor the audio side plays. The
+    // control side offers a replacement and returns; process() and
+    // setProcessing(), which hosts may call on different threads, each
+    // adopt the newest offer at their next call, holding it in their own
+    // mark for the length of that call; a later control call (Locked) frees
+    // a replaced one that neither holds.
+    enum Reader : std::size_t { processing_reader, starting_reader, readers };
+    PlayingProcessor<HostProcessor, readers> playing_;
     std::atomic<bool> bypass_{false};
     // PLUG-22: Bypass as the Status and the report show it: the audio
     // thread's value, or the controller's when it told the processor first

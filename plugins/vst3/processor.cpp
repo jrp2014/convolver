@@ -155,7 +155,7 @@ tresult PLUGIN_API Processor::setBusArrangements(SpeakerArrangement* in, int32 n
     return result;
 }
 tresult Processor::arrange(SpeakerArrangement* in, int32 ni, SpeakerArrangement* out, int32 no) {
-    std::lock_guard lock(control_);
+    const Locked lock(*this);
     // DIAG-1: say why. A layout Convolver cannot take is logged once per
     // instance: hosts offer layouts one after another until one is accepted,
     // and only the first refusal is news. log() skips a repeated line.
@@ -219,7 +219,7 @@ tresult PLUGIN_API Processor::canProcessSampleSize(int32 size) {
 tresult PLUGIN_API Processor::setupProcessing(ProcessSetup& setup) {
     tresult result = kInvalidArgument;
     {
-        std::lock_guard lock(control_);
+        const Locked lock(*this);
         // DIAG-1: say why the host's settings were refused (log() skips a
         // repeat of the same line, as hosts retry).
         std::string why;
@@ -285,26 +285,26 @@ tresult PLUGIN_API Processor::setActive(TBool state) {
     return result;
 }
 tresult Processor::activate(TBool state) {
-    std::lock_guard lock(control_);
+    const Locked lock(*this);
     try {
         observe_faults(); // Before the processor that counted them goes.
         if (state) {
             // A filter that does not suit the host plays silence, and is kept so
             // that correcting the rate or layout brings it back.
             const auto chosen = settings();
-            const auto host = layout();
+            const auto now = layout();
             auto next = std::make_unique<HostProcessor>(
-                filter_.activate(host), processSetup.maxSamplesPerBlock, chosen, host.inputs);
+                filter_.activate(now), processSetup.maxSamplesPerBlock, chosen, now.inputs);
             tail_.store(static_cast<uint32>(next->tail_frames()));
             next->set_bypass(bypass_.load());
             next->reset();
             // Audio played with these rate and buses before still counts:
             // only a new configuration needs the host to play again.
-            if (!activated_ || !same_configuration(*activated_, host))
+            if (!activated_ || !same_configuration(*activated_, now))
                 played_.store(false);
             // Not playing: the host does not process while it activates.
-            release_processor(install_processor(std::move(next)));
-            active_latency_.store(host_->latency_frames());
+            playing_.offer(std::move(next));
+            active_latency_.store(host()->latency_frames());
             hold_fault_signal();
             activated_ = layout();
             // What plays and why: a filter restored before the host's rate
@@ -318,7 +318,8 @@ tresult Processor::activate(TBool state) {
             } catch (...) { // Out of memory for the line: it is dropped.
             }
         } else {
-            release_processor(install_processor(nullptr));
+            // No audio runs while inactive: every processor is freed.
+            playing_.clear();
             active_latency_.store(inactive);
         }
         active_ = state != 0;
@@ -349,9 +350,9 @@ void Processor::log(const std::string& message, bool problem) noexcept {
     }
 }
 bool Processor::observe_faults() noexcept {
-    if (!host_)
+    if (!host())
         return false;
-    const auto fresh = filter_.observe(host_->faults());
+    const auto fresh = filter_.observe(host()->faults());
     if (!fresh.any())
         return false;
     try {
@@ -362,13 +363,13 @@ bool Processor::observe_faults() noexcept {
     return true;
 }
 void Processor::hold_fault_signal() const noexcept {
-    if (host_)
-        host_->hold_fault_signal(filter_.failure_shown());
+    if (host())
+        host()->hold_fault_signal(filter_.failure_shown());
 }
 void Processor::write_log() noexcept {
     std::vector<std::pair<std::string, bool>> lines;
     {
-        std::lock_guard lock(control_);
+        const Locked lock(*this);
         lines.swap(unlogged_);
     }
     for (const auto& [line, problem] : lines)
@@ -378,20 +379,20 @@ bool Processor::chooses_files() const noexcept {
     return files_ != nullptr && has_editor();
 }
 HostStatusLine Processor::status_locked() const {
-    return host_status(filter_, host_ ? std::optional(layout()) : known_layout(),
+    return host_status(filter_, host() ? std::optional(layout()) : known_layout(),
                        host_log_written(), settings(), shown_bypass_.load(), chooses_files());
 }
 HostStatusLine Processor::status() {
-    std::lock_guard lock(control_);
+    const Locked lock(*this);
     return status_locked();
 }
 HostReport Processor::report_locked() const {
     HostReportFacts facts;
     facts.format = tag_;
-    facts.host = host_ ? std::optional(layout()) : known_layout();
-    facts.max_frames = host_ ? static_cast<std::size_t>(processSetup.maxSamplesPerBlock) : 0;
+    facts.host = host() ? std::optional(layout()) : known_layout();
+    facts.max_frames = host() ? static_cast<std::size_t>(processSetup.maxSamplesPerBlock) : 0;
     facts.settings = settings();
-    facts.latency_frames = host_ ? host_->latency_frames() : facts.settings.latency;
+    facts.latency_frames = host() ? host()->latency_frames() : facts.settings.latency;
     facts.tail_frames = tail_.load();
     facts.bypassed = shown_bypass_.load();
     facts.log_written = host_log_written();
@@ -417,7 +418,7 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
         HostStatusLine line;
         std::string fields, text;
         {
-            std::lock_guard lock(control_);
+            const Locked lock(*this);
             line = status_locked();
             const auto report = report_locked();
             fields = encode_report(report_fields(report));
@@ -472,7 +473,7 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
         int64 request = 0;
         attributes->getInt("request", request);
         {
-            std::lock_guard lock(control_);
+            const Locked lock(*this);
             choose_latency(static_cast<std::size_t>(frames));
         }
         write_log();
@@ -486,7 +487,7 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
             mode >= static_cast<int64>(gain_mode_count))
             return kInvalidArgument;
         {
-            std::lock_guard lock(control_);
+            const Locked lock(*this);
             choose_gain_mode(static_cast<GainMode>(mode));
         }
         write_log();
@@ -510,7 +511,7 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
     if (id == report_message) {
         bool faulted = false;
         {
-            std::lock_guard lock(control_);
+            const Locked lock(*this);
             const auto now = std::chrono::steady_clock::now();
             if (now - report_faults_at_ >= report_fault_interval) {
                 faulted = observe_faults();
@@ -538,7 +539,7 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
             name_size > max_filter_name_bytes || identity_size > max_controller_identity_bytes)
             return kInvalidArgument;
         try {
-            std::lock_guard lock(control_);
+            const Locked lock(*this);
             // The pair that names the playing filter is kept: a host sends
             // a refused preset's controller state too, and that names a
             // filter that does not play.
@@ -567,7 +568,7 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
     if (id != faults_message)
         return AudioEffect::notify(message);
     {
-        std::lock_guard lock(control_);
+        const Locked lock(*this);
         observe_faults();
     }
     write_log();
@@ -584,8 +585,8 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
 void Processor::choose_latency(std::size_t frames) noexcept {
     if (latency_.exchange(frames) == frames)
         return;
-    const auto before = host_ ? host_->latency_frames() : frames;
-    if (!host_ || !activated_ || before == frames) {
+    const auto before = host() ? host()->latency_frames() : frames;
+    if (!host() || !activated_ || before == frames) {
         try {
             log("Latency set to " + std::to_string(frames) + " frames.", false);
         } catch (...) { // Out of memory for the line: the choice stands.
@@ -593,7 +594,7 @@ void Processor::choose_latency(std::size_t frames) noexcept {
         return;
     }
     observe_faults(); // Before the processor that counted them goes.
-    std::unique_ptr<HostProcessor> previous;
+    bool changed = false;
     std::string why;
     try {
         const auto playback = filter_.activate(*activated_);
@@ -610,7 +611,10 @@ void Processor::choose_latency(std::size_t frames) noexcept {
         // together.
         tail_.store(static_cast<uint32>(next->tail_frames()));
         active_latency_.store(next->latency_frames());
-        previous = install_processor(std::move(next));
+        // process() plays it from its next block; the one it replaces is
+        // freed by a later control call once process() has let it go.
+        playing_.offer(std::move(next));
+        changed = true;
     } catch (const std::exception& e) {
         try {
             why = e.what();
@@ -618,15 +622,12 @@ void Processor::choose_latency(std::size_t frames) noexcept {
         }
     } catch (...) {
     }
-    const bool changed = previous != nullptr;
-    // The previous processor plays until process() has switched.
-    release_processor(std::move(previous));
     if (!changed) {
         // The running processor keeps playing at its latency, and the
         // window's report says the chosen one is not in use. activate()
         // started the fault count again for a new processor, so count from
         // the running one's totals (logged above) rather than log them again.
-        (void)filter_.observe(host_->faults());
+        (void)filter_.observe(host()->faults());
     }
     try { // Best effort: out of memory for the line changes nothing else.
         log(changed ? "Latency changed from " + std::to_string(before) + " to " +
@@ -653,8 +654,8 @@ void Processor::choose_gain_mode(GainMode mode) noexcept {
         // given to the playing filter in place, which keeps its history and
         // ramps to it.
         filter_.estimate(estimate, [&](const FilterGains& gains) {
-            if (host_)
-                host_->update_gains(gains);
+            if (host())
+                host()->update_gains(gains);
         });
     } catch (const std::exception& e) {
         try {
@@ -670,40 +671,14 @@ void Processor::choose_gain_mode(GainMode mode) noexcept {
     } catch (...) {
     }
 }
-std::unique_ptr<HostProcessor>
-Processor::install_processor(std::unique_ptr<HostProcessor> next) noexcept {
-    played_host_.store(next.get());
-    std::swap(host_, next);
-    return next; // The previous processor.
-}
-void Processor::release_processor(std::unique_ptr<HostProcessor> previous) noexcept {
-    // hold() marks its processor and then checks that it is still
-    // played_host_ (sequentially consistent), so once the previous one is
-    // marked by neither, process() and setProcessing() are not using it and
-    // never will.
-    while (previous &&
-           (processing_host_.load() == previous.get() || starting_host_.load() == previous.get())) {
-        if (releasing_for_tests)
-            releasing_for_tests();
-        std::this_thread::yield();
-    }
-}
-Processor::Held Processor::hold(std::atomic<HostProcessor*>& marker) noexcept {
-    HostProcessor* host = nullptr;
-    do {
-        host = played_host_.load();
-        marker.store(host);
-    } while (host != played_host_.load());
-    return {marker, host};
-}
 tresult PLUGIN_API Processor::setProcessing(TBool state) {
     // Not a place to explain faults: hosts may call this on the audio
     // thread, where nothing may lock, allocate or write the log.
     // VST3-16: a new Latency may replace it meanwhile.
-    const auto held = hold(starting_host_);
-    if (state && held.host) {
-        held.host->set_bypass(bypass_.load());
-        held.host->reset();
+    const auto held = playing_.hold(starting_reader);
+    if (state && held) {
+        held->set_bypass(bypass_.load());
+        held->reset();
     }
     return kResultOk;
 }
@@ -730,7 +705,7 @@ std::string state_type(IBStream* stream) {
 }
 } // namespace
 tresult Processor::load_state(IBStream* stream) {
-    std::lock_guard lock(control_);
+    const Locked lock(*this);
     observe_faults(); // Explained under the filter that played; an accepted load clears them.
     const bool was_failed = filter_.failed();
     try {
@@ -778,7 +753,7 @@ void Processor::install(HostState next, const HostRequest& request, Origin origi
     // suit the host means.
     const bool restore = origin != Origin::chosen_file;
     const auto check = load_check(origin);
-    const auto host = host_ ? std::optional(layout()) : known_layout();
+    const auto known = host() ? std::optional(layout()) : known_layout();
     const bool bypass = next.bypass;
     // VST3-4: the state's settings, or the defaults for a state without
     // them (an older state, or a preset from convolver-preset). PLUG-26: a
@@ -788,7 +763,7 @@ void Processor::install(HostState next, const HostRequest& request, Origin origi
     // The inactive tail is worked out before anything changes: it needs
     // memory, and a request that runs out is rejected whole (PLUG-7).
     uint32 inactive_tail = 0;
-    if (!host_ && next.configuration) {
+    if (!host() && next.configuration) {
         try {
             inactive_tail = static_cast<uint32>(configuration_tail_frames(*next.configuration));
         } catch (...) {
@@ -804,23 +779,23 @@ void Processor::install(HostState next, const HostRequest& request, Origin origi
         filter_.set_estimating(saved.gain_mode == GainMode::estimate);
     try {
         filter_.load(
-            std::move(next), host,
+            std::move(next), known,
             [&](const HostPlayback& c) {
                 // PLUG-38: state or a preset holding the filter that plays
                 // keeps it and its history, and the settings below ramp to
                 // theirs; a project the host says it is opening starts
                 // clean, keeping nothing from the session before.
-                if (host_ && (origin == Origin::project || !host_->keep(c)))
-                    host_->replace(c);
+                if (host() && (origin == Origin::project || !host()->keep(c)))
+                    host()->replace(c);
             },
-            request, host_.get(), check);
+            request, host(), check);
     } catch (...) {
         filter_.set_estimating(was_estimating);
         throw;
     }
     // Nothing from here on can throw: the request is accepted.
     hold_fault_signal();
-    tail_.store(host_ ? static_cast<uint32>(host_->tail_frames()) : inactive_tail);
+    tail_.store(host() ? static_cast<uint32>(host()->tail_frames()) : inactive_tail);
     if (restore) {
         bypass_.store(bypass);
         shown_bypass_.store(bypass);
@@ -840,15 +815,15 @@ void Processor::install(HostState next, const HostRequest& request, Origin origi
     logged_.clear(); // A later failure is logged even if it repeats an earlier one.
     try {            // Accepted: nothing here may turn that into a rejection.
         // A restored failed load says why it plays silence.
-        auto line = loaded_line(filter_, host);
+        auto line = loaded_line(filter_, known);
         if (chosen_settings) // PLUG-26, as the Audio Unit says it.
             line += " Settings from the preset: " +
-                    settings_words(settings(), dry_signal_rule(filter_, host.value_or(layout())),
+                    settings_words(settings(), dry_signal_rule(filter_, known.value_or(layout())),
                                    filter_.filter() ? &filter_.gains() : nullptr) +
                     ".";
         const auto& f = filter_.failure();
         const bool kept = check == HostLoadCheck::keep_until_suited;
-        if (kept && host && f && f->silent && filter_.filter())
+        if (kept && known && f && f->silent && filter_.filter())
             line += " It does not suit the host's present configuration, so it is kept and plays "
                     "silence until it does: " +
                     detail::advice_line(f->message);
@@ -867,19 +842,19 @@ void Processor::refused(bool was_failed) noexcept {
     // without allocating: memory may have run out (ROBUST-3), maybe before
     // the failure could be recorded (ROBUST-7).
     filter_.fail_request();
-    if (host_ && filter_.failed() && !was_failed)
-        host_->silence();
-    if (!host_ && filter_.failed())
+    if (host() && filter_.failed() && !was_failed)
+        host()->silence();
+    if (!host() && filter_.failed())
         tail_.store(0);
     hold_fault_signal();
     try {
-        log(rejected_line(filter_, host_ != nullptr));
+        log(rejected_line(filter_, host() != nullptr));
     } catch (...) { // Out of memory for the line: it is dropped.
     }
 }
 bool Processor::load_file(std::string_view chosen, std::optional<HostSettings>& settings) {
     settings.reset();
-    std::lock_guard lock(control_);
+    const Locked lock(*this);
     observe_faults();
     const bool was_failed = filter_.failed();
     try { // Copying the path needs memory too: a first load that runs out fails (ROBUST-7).
@@ -934,18 +909,18 @@ bool Processor::load_file(std::string_view chosen, std::optional<HostSettings>& 
     return true;
 }
 Advice Processor::notice() {
-    std::lock_guard lock(control_);
+    const Locked lock(*this);
     return filter_.notice();
 }
 std::optional<HostFailure> Processor::failure() {
-    std::lock_guard lock(control_);
+    const Locked lock(*this);
     return filter_.failure();
 }
 tresult PLUGIN_API Processor::getState(IBStream* stream) {
     bool faulted = false;
     tresult result = kResultFalse;
     {
-        std::lock_guard lock(control_);
+        const Locked lock(*this);
         // Hosts save often (autosave too): faults are explained here as well.
         faulted = observe_faults();
         try {
@@ -954,8 +929,8 @@ tresult PLUGIN_API Processor::getState(IBStream* stream) {
             state.bypass = bypass_.load();
             state.failed = filter_.failed(); // Reopening stays silent (state version 2).
             state.settings = settings();     // Version 3, defaults included (PLUG-35).
-            if (host_)
-                host_->collect();
+            if (host())
+                host()->collect();
             result = write_state(stream, state) ? kResultOk : kResultFalse;
         } catch (...) {
         }
@@ -1018,8 +993,8 @@ tresult PLUGIN_API Processor::process(ProcessData& d) {
         return kInvalidArgument;
     // VST3-16: the processor this call plays, which a new Latency may
     // replace on another thread meanwhile (choose_latency()).
-    const auto held = hold(processing_host_);
-    auto* host = held.host;
+    const auto held = playing_.hold(processing_reader);
+    auto* host = held.get();
     if (holding_for_tests)
         holding_for_tests();
     if (d.numSamples && (!host || canProcessSampleSize(d.symbolicSampleSize) != kResultOk))
