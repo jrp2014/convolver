@@ -12,6 +12,16 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- CLI (DIAG-5, from the BruteFIR comparison): after a render in which any
+  sample went beyond full scale, `convolver` warns on stderr with each
+  affected channel's clipped-sample count and peak in dBFS, and suggests
+  `--gain-db no-clip` or how far to lower `--gain-db`. Before, `--gain-db 20`
+  could clip most of a 24-bit output without a word. Float output, which
+  keeps such samples, gets a note that a later conversion to integer samples
+  will clip them. A clean render prints nothing, and the samples and exit
+  status are unchanged. The C++ API gains `Quantizer::clipped()` and
+  `AudioWriter::clipped_samples()`, which count the clipped samples of each
+  channel.
 - Tests (COMPAT-1, in progress): the example presets of the published
   0.13.24 and the audio its own CLI and VST3 plug-in rendered from them are
   kept in `tests/upgrade/0.13.24/`, beside those of 0.13.2, 0.13.12 and

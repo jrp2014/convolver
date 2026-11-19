@@ -515,6 +515,95 @@ def no_clip_headroom_tests(d):
     assert b'headroom' not in err, err
 
 
+def stderr_text(stderr):
+    """Standard error as text with LF line ends (Windows writes CRLF)."""
+    return stderr.decode().replace('\r\n', '\n')
+
+
+def clip_report_tests(d):
+    """DIAG-5: after a render, stderr reports what went beyond full scale.
+
+    Integer output gives each affected channel's clipped-sample count, the
+    quantizer's own, and its peak in dBFS, and suggests --gain-db no-clip;
+    float output, which keeps such samples, gets a note instead. A clean
+    render says nothing, and the exit status and samples are unchanged.
+    """
+    ir = d / 'clip-ir.wav'
+    pcm(ir, [16384, 0], channels=2)  # 0.5 on the left, silence on the right.
+    (d / 'clip.cfg').write_text('48000 2 2 0\n0 0\n0 0\nclip-ir.wav\n0\n0\n0\nclip-ir.wav\n1\n1\n1\n')
+    cfg = d / 'clip.cfg'
+    src = d / 'clip-in.wav'
+    float_wave(src, [(0.9 * math.sin(i / 7), 0.9) for i in range(4800)], channels=2)
+    real, fixed = d / 'clip-float.wav', d / 'clip-pcm24.wav'
+    # +12 dB on a peak of 0.45 reaches about 1.8 (+5.1 dBFS) on the left;
+    # the right channel is silent.
+    p = call(['--filter', cfg, '--input', src, '--output', real, '--gain-db', '12'])
+    _, _, values = floats(real)
+    left = values[0::2]
+    peak = max(abs(v) for v in left)
+    above = sum(abs(v) > 1 for v in left)
+    peak_text = f'peak {20 * math.log10(peak):+.2f} dBFS'
+    err = stderr_text(p.stderr)
+    assert f'convolver: note: {real} has {above} samples above full scale in 1 of 2 channels' in err, err
+    assert f'channel 1: {above} of {len(left)} samples above full scale, {peak_text}' in err, err
+    assert 'channel 2' not in err and 'converting it to integer samples later' in err, err
+    assert 'samples clipped' not in err and '--gain-db no-clip' in err, err
+    # The same render to 24-bit integers clips exactly the samples that round
+    # beyond the range (no dither at 24 bits), and the file holds the clipped
+    # values: the report changes nothing else.
+    p = call(['--filter', cfg, '--input', src, '--output', fixed, '--gain-db', '12', '--output-format', 'wav-pcm24'])
+    clipped = sum(not -(2**23) <= math.floor(v * 2**23 + 0.5) <= 2**23 - 1 for v in left)
+    assert clipped > 1000, clipped
+    err = stderr_text(p.stderr)
+    assert f'convolver: warning: {fixed} clipped {clipped} samples in 1 of 2 channels' in err, err
+    assert f'channel 1: {clipped} of {len(left)} samples clipped, {peak_text}' in err, err
+    assert '24-bit integer samples cannot hold them' in err and 'channel 2' not in err, err
+    assert f'lower --gain-db by more than the highest peak, {20 * math.log10(peak):.2f} dB' in err, err
+    assert 'Render again with --gain-db no-clip' in err, err
+    _, samples, _ = wav_audio(fixed)
+    want = [max(-(2**23), min(2**23 - 1, math.floor(v * 2**23 + 0.5))) for v in values]
+    assert list(samples) == want
+    # To standard output, by the same name the failure messages use.
+    p = call(['--filter', cfg, '--input', src, '--output', '-', '--output-format', 'raw-pcm16', '--gain-db', '12'])
+    assert b'convolver: warning: standard output clipped' in p.stderr, p.stderr
+    # Within full scale, nothing is said, whatever the sample type.
+    for fmt in ('wav-float', 'wav-pcm24', 'wav-pcm16'):
+        p = call(['--filter', cfg, '--input', src, '--output', fixed, '--output-format', fmt])
+        assert b'full scale' not in p.stderr and b'samples clipped' not in p.stderr, (fmt, p.stderr)
+    # Mono output names no channel count.
+    mono_ir, mono_in = d / 'clip-mono-ir.wav', d / 'clip-mono-in.wav'
+    pcm(mono_ir, [16384])
+    float_wave(mono_in, [(0.9,), (-0.9,)])
+    p = call(
+        ['--filter', mono_ir, '--input', mono_in, '--output', fixed, '--output-format', 'wav-pcm16', '--gain-db', '12']
+    )
+    assert f'{fixed} clipped 2 samples\n    channel 1: 2 of 2 samples clipped' in stderr_text(p.stderr), p.stderr
+    # Only negative samples clipped: written as the nearest value, not the largest.
+    float_wave(mono_in, [(-0.9,), (0.1,)])
+    args = ['--input', mono_in, '--output', fixed, '--output-format', 'wav-pcm16', '--dither', 'none']
+    err = stderr_text(call(['--filter', mono_ir, *args, '--gain-db', '12']).stderr)
+    assert 'clipped 1 sample\n' in err and 'written as the nearest value they can hold' in err, err
+    assert 'is too high' in err and 'largest value' not in err, err
+    # Rounding alone: +1.0 rounds one step past the largest positive value,
+    # so the cause names rounding rather than the gain.
+    unit_ir = d / 'clip-unit-ir.wav'
+    float_wave(unit_ir, [(1.0,)])
+    float_wave(mono_in, [(1.0,), (0.5,)])
+    err = stderr_text(call(['--filter', unit_ir, *args]).stderr)
+    assert 'clipped 1 sample\n    channel 1: 1 of 2 samples clipped, peak +0.00 dBFS' in err, err
+    assert 'Those samples were within full scale, but rounding took them just beyond' in err, err
+    assert 'leaves room for rounding' in err and 'is too high' not in err, err
+    # With no-clip only input beyond full scale can clip, so the fix says so.
+    loud = d / 'clip-loud.wav'
+    float_wave(loud, [(1.5 * math.sin(i / 5), 0.1) for i in range(1000)], channels=2)
+    p = call(
+        ['--filter', cfg, '--input', loud, '--output', fixed, '--output-format', 'wav-pcm24', '--gain-db', 'no-clip']
+    )
+    err = stderr_text(p.stderr)
+    assert 'clipped' in err and 'Lower --gain-db below the no-clip figure reported above' in err, err
+    assert 'this input goes beyond full scale' in err and 'Render again' not in err, err
+
+
 def output_selection_tests(d):
     """--output-channels selects list entries by output count, as the historical engine did."""
     ir = d / 'os-ir.wav'
@@ -1067,6 +1156,7 @@ def main():
         integer_format_tests(d)
         automatic_gain_tests(d)
         no_clip_headroom_tests(d)
+        clip_report_tests(d)
         output_selection_tests(d)
         # Errors must be failures, not successful silent output.
         for extra in (['--block-size', '1048577'], ['--block-size', '-1'], ['--gain-db', 'nan'], ['--unknown']):

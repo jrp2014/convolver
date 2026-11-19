@@ -138,15 +138,19 @@ inline std::string as_sentence(std::string_view phrase) {
 inline constexpr std::string_view host_playback_rate_fix =
     "The host may play at a different rate from the one it exports at.";
 
-// What a command-line tool prints: "program: error: problem", then each
-// further line indented by two spaces.
-inline std::string cli_error(std::string_view program, std::string_view text) {
-    std::string out = std::string(program) + ": error: ";
+// What a command-line tool prints: "program: KIND: problem" (KIND is error,
+// warning or note), then each further line indented by two spaces.
+inline std::string cli_message(std::string_view program, std::string_view kind,
+                               std::string_view text) {
+    std::string out = std::string(program) + ": " + std::string(kind) + ": ";
     for (std::size_t i = 0; i < text.size(); ++i) {
         out += text[i];
         if (text[i] == '\n')
             out += "  ";
     }
     return out + "\n";
+}
+inline std::string cli_error(std::string_view program, std::string_view text) {
+    return cli_message(program, "error", text);
 }
 } // namespace convolver::detail
