@@ -1206,6 +1206,11 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **CI-41 — Run the timing harness's self-test once per job.** 19
+  November 2026, from jrp's review of `212fe6e`: `native.load_timing_harness`
+  carries the CTest label `backend-independent`, which the native jobs'
+  core-only, Accelerate and Ooura builds leave out
+  ([which configurations run which tests](docs/develop/testing.md#which-configurations-run-which-tests)).
 - [x] **DOC-16 — Reconcile the contributor guidance with current
   decisions.** 18 November 2026, PR #206, from jrp's review of `e89a9dc`: the
   [execution priorities](#execution-priorities) sort open work by what it
