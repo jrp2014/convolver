@@ -37,7 +37,7 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
-- Releases: version 0.14.0, a minor step after 0.13.30, for the sixth
+- Releases: version 0.14.0, a minor step in place of the next 0.13.x patch, for the sixth
   unsigned developer preview, which jrp asked for on 19 November 2026
   ([decision](docs/project/decisions.md#releases)). Its draft notes list
   what changed for users since 0.13.24: faster reopening of a project that
@@ -49,6 +49,21 @@ Until 1.0 the C++ API may change between minor versions.
   limitations say that the faster reopening and the saving once the sound
   has stopped are checked only by automated tests. No change to what the
   packages run or hold beyond the version number.
+- Configurations (CFG-3, first part): a file name in a `.cfg` or list that
+  is not UTF-8 text, as in a file saved in Windows-1252 (Notepad's old
+  "ANSI"), now stops with an error that says so: its line, the byte that is
+  wrong, the likely cause and how to save the file as UTF-8. Before, on
+  Linux, it stopped with "IR file not found" and a garbled name. Its
+  inspection code is the new `not-utf8`, where it was `missing-asset` (or
+  `unreadable` for a list entry). On Linux a file with exactly those bytes
+  in its name still loads. Convolver still reads only UTF-8; whether it should
+  also read Windows-1252 is open for jrp.
+- Plug-ins (PLUG-25, first part): a refusal because the filter's rate
+  differs from the host's ends its Fix with the sentence jrp agreed on 8
+  November 2026, "The host may play at a different rate from the one it
+  exports at.", in every format and wherever the Fix is shown: the window,
+  Status details and the Convolver log, or LV2's host log. Audacity, for
+  one, plays at its Default sample rate while it exports at the project's.
 - Plug-ins (PLUG-39 step 1a, from jrp's review of 0.13.28): a restored
   project, preset or undo step that holds the filter already accepted no
   longer analyses that filter again. Its peak bound and, under Estimate, its
@@ -68,6 +83,15 @@ Until 1.0 the C++ API may change between minor versions.
   macOS, Windows and Linux. Each claim links to the guide, test or
   measurement behind it; the preview's limitations follow in their own
   section.
+- CI (CI-34, finished; chosen by jrp on 18 November 2026): a pull request
+  runs the fuzz workflow only when it changes what the four fuzz targets are
+  built from: their harnesses, seeds and regression inputs, the parsers,
+  audio reader and state decoder with the code compiled in with them, the
+  build configuration or the workflow. Pushes to `main` and manual runs
+  still run it, a new Monday run gives each target 600 seconds, and every
+  native build still replays the committed fuzz inputs. Each run checks
+  that the list names every repository file compiled into the targets
+  ([when pull requests run the fuzz targets](docs/develop/testing.md#when-pull-requests-run-the-fuzz-targets)).
 - CI (CI-38, jrp's request of 16 November 2026 for safe speedups without
   restructuring): `native.engine_stress`, `native.engine` and `native.host`,
   the longest core tests under sanitizers, carry a CTest `COST`, so they

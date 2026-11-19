@@ -1144,7 +1144,8 @@ void fractional_rates() {
     require(f && f->kind == convolver::HostFailureKind::sample_rate && f->silent &&
                 f->message.problem ==
                     "the saved filter is for 48000 Hz, and the host runs at 47952.04795 Hz" &&
-                f->message.fix == "Set the host's project or audio device to 48000 Hz." &&
+                f->message.fix == "Set the host's project or audio device to 48000 Hz. The host "
+                                  "may play at a different rate from the one it exports at." &&
                 f->message.cause.find("whole number of hertz") != std::string::npos,
             "fractional rate mismatch not explained with both rates");
     require(logged("Started at 47952.04795 Hz, 2 in, 2 out"), "fractional rate not logged");

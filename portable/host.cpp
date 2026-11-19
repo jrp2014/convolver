@@ -44,14 +44,15 @@ std::optional<Mismatch> mismatch(const Configuration& c, const HostLayout& host,
                 {filter + " is for " + made + ", and the host runs at " + runs,
                  "Convolver never resamples, and filters are made for a whole number of hertz, "
                  "so none plays at the host's rate.",
-                 "Set the host's project or audio device to " + made + ".",
+                 "Set the host's project or audio device to " + made + ". " +
+                     std::string(detail::host_playback_rate_fix),
                  {}}};
         return Mismatch{
             HostFailureKind::sample_rate,
             {filter + " is for " + made + ", and the host runs at " + runs,
              "Convolver never resamples, so a filter plays only at the rate it was made for.",
              "Load a filter made for " + runs + ", or set the host's project or audio device to " +
-                 made + ".",
+                 made + ". " + std::string(detail::host_playback_rate_fix),
              {}}};
     }
     // PLUG-23: more inputs than the filter's are fine (it reads the first
