@@ -158,6 +158,14 @@ Until 1.0 the C++ API may change between minor versions.
   still do, and a VST3 pull request still runs the required acceptance test
   with it ([pre-releases](docs/develop/build.md#pre-releases-and-newer-upstream-versions)).
   Parallel MSVC compiles (`CL=/MP`) were tried and dropped: no measured gain.
+- CI (CI-42, from jrp's audit of v0.14.0): a pull request that changes
+  only `tests/upgrade/`, the files kept from published releases and their
+  checks, runs the native and VST3 workflows, whose `upgrade.cli` and
+  `vst3.upgrade` read them, instead of every workflow: the Audio Unit and
+  LV2 builds no longer run for it. The Audio Unit job's second Release
+  Accelerate run of `upgrade.cli` is left to `main`; the VST3 macOS job and
+  the native macOS builds still run it. The saving was not measured
+  ([CI triggers](docs/develop/testing.md#pull-requests-for-one-plug-in-format)).
 - CI (CI-41, from jrp's review of 19 November 2026): the load-timing
   harness's self-test, `native.load_timing_harness`, which no FFT backend
   or core-only shape changes, runs once for each compiler and build type
