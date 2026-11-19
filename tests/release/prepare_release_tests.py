@@ -172,7 +172,7 @@ class PrepareReleaseTests(unittest.TestCase):
         self.assertIn('refused as damaged by the first preview, 0.12.12', text)
         self.assertIn('Gain mode Estimate or No clipping is refused by every preview before 0.13.20', text)
         # What each preview added that only automated tests have checked (0.13.20, 0.14).
-        self.assertIn('Checked only by automated tests: new in 0.14, the faster reopening', text)
+        self.assertIn('Checked only by automated tests: new in 0.14, the quicker restore of the playing filter', text)
         self.assertIn('new in 0.13.20, the Gain mode', text)
         # What changed since the previous preview, one line per change.
         self.assertIn(f'Since {prepare_release.PREVIOUS_PREVIEW}:', text)

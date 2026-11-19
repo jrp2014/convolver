@@ -35,20 +35,22 @@ CANDIDATE_WORKFLOW = '.github/workflows/release.yml'
 PREVIOUS_PREVIEW = '0.13.24'
 CHANGES = (
     (
-        'Faster reopening: a project, preset or undo step that holds the filter already playing no longer analyses '
-        'that filter again, so a restore that changes only the settings applies almost at once. With a 10-second '
-        'stereo filter under Gain mode Estimate, that step took about 590 ms before and 2 to 5 ms now (measured on '
-        'Linux). What plays, what is saved and the figures shown are unchanged.'
+        'Quicker restores of the playing filter: a preset, undo step or saved state restored into a plug-in that is '
+        'already playing the same filter no longer analyses that filter again. With a 10-second stereo filter under '
+        'Gain mode Estimate, that analysis step took about 590 ms before and 2 to 5 ms now (measured on Linux). '
+        'Opening a project in a fresh session still analyses its filter once. What plays, what is saved and the '
+        'figures shown are unchanged.'
     ),
     (
-        'Less CPU once the sound has stopped: when the input has been silent for longer than anything can stay in '
+        'Less CPU once the sound has stopped: when the input has been exactly silent (every sample zero, as a '
+        'stopped transport gives) for longer than anything can stay in '
         'the engine (the latency, the filter and its delays, plus at most about half a second), each further silent '
         'callback writes silence without convolving, and the next sound starts at once. The saving applies only to '
         'that silence, not to playback: on a Linux test machine such silence cost 93 to 99% less CPU, and music cost '
         'the same as before. Only Linux was measured; macOS and Windows are not yet. The output is what it was, '
         'except that a sample where sound cancelled to a value too small for a normal float, which used to come out '
-        'as -0, now comes out as +0. The two are numerically equal and inaudible, but a bit-for-bit comparison with '
-        'an earlier version can show the difference.'
+        'as -0, now comes out as +0. The two are numerically equal and inaudible, but a bit-for-bit comparison of '
+        'float output with an earlier version can show the difference; integer output is unchanged.'
     ),
     (
         'The `convolver` command-line tool now warns after a render in which samples went beyond full scale, with '
@@ -63,8 +65,10 @@ CHANGES = (
     ),
     (
         'A `.cfg` file or list whose file names are not UTF-8 text, as Notepad\'s old "ANSI" encoding saves them, '
-        'now stops with an error that names the line and the byte and says how to save the file as UTF-8. Before, '
-        'on Linux, it said the file was not found and showed a garbled name. Convolver still reads only UTF-8.'
+        'now stops with an error that names the line and the byte and says how to save the file as UTF-8, unless a '
+        'file with exactly that name exists (possible on Linux). Before, on Linux, it said the file was not found '
+        'and showed a garbled name. `convolver --inspect` and `--validate` report it with the new code `not-utf8`, '
+        'where they reported `missing-asset` or `unreadable`. Convolver still reads only UTF-8.'
     ),
     (
         'The plug-ins guide no longer promises that Reload when the file changes never reads a half-written file, '
@@ -208,7 +212,8 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             "- In Audacity, Convolver's window (Choose…, Recent or Reload) should now keep the filter for exports and "
             "saved projects, but this has been checked only by automated tests, not yet in Audacity. Audacity's own "
             'preset menu is the route that has been checked.\n'
-            '- Checked only by automated tests: new in 0.14, the faster reopening and the saving once the sound '
+            '- Checked only by automated tests: new in 0.14, the quicker restore of the playing filter and the '
+            'saving once the sound '
             'has stopped; new in 0.13.20, the Gain mode, a `.vstpreset` chosen in the window, Choose… on a track '
             "with more inputs than the filter's, and a preset or undo that keeps the playing filter.\n"
             '- Since 0.13, Latency starts at 0 frames. Some projects saved with 0.12.12 at its default of 256 frames '
