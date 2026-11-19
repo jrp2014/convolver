@@ -91,6 +91,8 @@ On pages in `docs/use/`:
   ("adapter", "candidate") without an explanation.
 - State behaviour, not evidence: "the plug-in plays silence if the preset does
   not match" belongs here; which test checks it belongs in [testing](testing.md).
+  A quantitative performance, accuracy or comparative claim is the exception:
+  it links its evidence ([current claims](#current-claims-and-dated-evidence)).
 - End each how-to with how to tell it worked and where to look if it did not.
 - Aim for fewer than about 150 lines; a longer page is usually two tasks.
 
@@ -152,6 +154,7 @@ can act on it without a separate copy of the rules:
 | Open work | [TODO](../../TODO.md) | Current source and linked issues/plans |
 | Claiming, handing over and reviewing work | [Workflow](workflow.md) | Pull request template, repository checks, `.claude/skills/` (pointers only) |
 | How documentation is organised and written | This page | The index, the link and repository checks |
+| Product claims in the README, user guides and release notes | [Current claims](#current-claims-and-dated-evidence) on this page; the workflow, the pull request template and AGENTS.md link to it | The guide, test or dated measurement behind each claim; the published release |
 | Past releases and provenance | [History](../project/history.md) and dated records | Recorded evidence; never rewrite a past result as current |
 
 Short summaries may link to these pages; avoid copying their option lists,
@@ -190,8 +193,39 @@ For contributors and agents:
 
 A source map can state a review date and commit. A test result needs its actual
 revision, configuration and outcome. Benchmark results additionally need machine,
-compiler, dependency versions, planner mode and workload. Avoid words such as
-"latest", "all platforms" and "fully tested" without a defined scope.
+compiler, dependency versions, planner mode and workload.
+
+Product claims in the README, user guides and release notes must stay current
+and match their evidence:
+
+- Substantiate product claims in the README and release notes with supporting
+  references: the owning guide, a test or a dated measurement. User guides
+  describe current behaviour without test-history clutter; link evidence where
+  they make quantitative performance, accuracy or comparative claims. An
+  ordinary instruction such as "Reload reads the filter again" needs no
+  evidence link. Read the source behind each link: the
+  [link check](#automated-checks) proves only that the target exists.
+- When code, defaults, dependencies, measurements or a release change, check
+  all affected descriptions against the implementation and update them,
+  summaries included, in the same change. Do not describe an unpublished build as released: download links
+  name a published release. Before publication, check the download links and
+  the generated release notes against the actual tag and packages (step 5 of
+  [publishing](releasing.md#publishing-an-unsigned-preview)).
+- Keep the scope of the evidence: format, host, platform, settings and workload.
+  Avoid words such as "latest", "all platforms" and "fully tested" without a
+  defined scope. Benchmarks describe a named build and machine, not a universal
+  speed or CPU guarantee. Keep the metric, baseline and material measurement
+  limitations; average CPU, callback percentiles and worst callbacks are
+  different claims.
+- Distinguish implemented behaviour, automated checks and real-host results.
+  Do not turn a test tolerance, a portability warning or a hearing model into
+  a guarantee of exact output, portable files or inaudibility. Comparisons with
+  other products need dated primary sources and must not generalise beyond them.
+- If evidence no longer supports a current claim, narrow, qualify or remove the
+  claim, and record any useful follow-up in TODO; the dated evidence stays as
+  recorded (below). Refreshing wording needs only what the
+  [verification table](workflow.md#verification-for-each-kind-of-change) asks
+  for, not a rerun of a benchmark or host campaign.
 
 Keep the historical website under `docs/historical/` byte-identical. Mark dated
 reviews and plans as records rather than updating their results in place. Plans

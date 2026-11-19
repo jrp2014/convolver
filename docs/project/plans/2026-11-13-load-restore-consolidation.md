@@ -397,7 +397,18 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
    only if its worker and `run()` fit without losing what LV2 has; otherwise
    LV2 keeps `stage()` and `retire()` and the architecture page says why.
    Success is simpler ownership with unchanged audio and host behaviour.
-   Independent of steps 1 and 2.
+   Each adapter's pull request shows, by its tests, that the control call
+   returns while a callback still holds the old processor; that this
+   processor stays alive until the callback lets go; that the host sees
+   the new latency at once, stopped or playing; and that the next callback
+   adopts the replacement. It deletes the adapter's own ownership fields
+   and wait loops, which is what the step is judged by (jrp's review,
+   19 November 2026). The class protects lifetime, not concurrent use, and
+   its `hold()` is lock-free, not wait-free.
+   Independent of steps 1 and 2, and taken next, before them (jrp,
+   19 November 2026). Step 3a, the shared class (`PlayingProcessor` in
+   `portable/playing_processor.hpp`, with `native.playing_processor`), is
+   in PR #213; no adapter uses it yet.
 4. **Diagnostics as a view of state.** In three pull requests, one per
    format, each removing copies:
    - The Audio Unit keeps one snapshot of what the control side knows (the
@@ -447,21 +458,29 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
   [adapter contract](../../develop/plugin-contract.md#scope-of-each-change) is
   the specification step 1 implements: each row of its table becomes one
   part of the decision value.
-- **PLUG-36** (the loading-and-failure table for each transition) stays
-  parked until after REL-3, as jrp decided. This plan does not need it
+- **PLUG-36** (the loading-and-failure table for each transition) was
+  parked until after REL-3, and on 19 November 2026 jrp moved it into this
+  sequence, after step 1b. This plan does not need it
   first: step 0 adds only the settings the lifecycle model lacks, and the
   harness and lifecycle model already state their expected results apart
   from the production code. When PLUG-36 is taken up, its load and restore
   rows map onto step 1's single decision instead of three adapters, which
   makes its table shorter to write and check.
-- **PLUG-30** (one rule for state a busy lock makes a call skip) stays
-  parked; step 4 removes the Audio Unit's report cache from its list.
+- **PLUG-30** (one rule for state a busy lock makes a call skip) is taken
+  up with step 4 (jrp, 19 November 2026), which removes the Audio Unit's
+  report cache from its list.
+- **ROBUST-8** (the fault record after a failed Latency change) is taken up
+  with steps 3b and 3c (jrp, 19 November 2026): once the shared ownership
+  offers the new processor, `HostFilter::activate()`'s commit can follow
+  the offer, so a processor that cannot be built leaves the record as it
+  was.
 - **PLUG-27** (reading a chosen file before the host's audio settings are
   known) stays as it is; step 2 gathers the rule it would change into one
   place in both formats, so PLUG-27 becomes a change there.
 - **PLUG-24** (`HostProcessor` in its own source file) is navigation only,
-  which jrp noted does not resolve these issues on its own. It stays its
-  own item, never in a step's pull request.
+  which jrp noted does not resolve these issues on its own. It is in this
+  sequence (jrp, 19 November 2026) as its own pull request, never in a
+  step's.
 - **[Keeping `host.cpp` manageable](../../../TODO.md#keeping-hostcpp-manageable)**:
   its three narrow simplifications are carried out by steps 1 and 5.
 - **The host sessions and the next preview (PR #192)** come first. Steps 1

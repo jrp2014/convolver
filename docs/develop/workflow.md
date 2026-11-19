@@ -79,6 +79,9 @@ repository; recording a review's or a host test's results in it is a change.
 - **Keep commits focused.** State the audible or numerical effect of a DSP
   change in its commit message ([AGENTS.md](../../AGENTS.md#rules)).
 - **Update the handoff note** whenever you stop, even for a short break.
+- **Keep product claims in step.** When your change affects a claim in the
+  README, a user guide or the release notes, update it, summaries included,
+  in the same change ([claims rule](documentation.md#current-claims-and-dated-evidence)).
 - **Do not make the owner's decisions.** Ask jrp before changing anything that
   is permanent or changes what users get: plug-in identities (IDs, URIs, AU
   codes), state or preset formats, `.cfg` syntax, licences, defaults that
@@ -191,7 +194,8 @@ checklist says so:
   ([page ownership](documentation.md#one-home-for-each-topic)); a new page is in
   the [index](../README.md); user-visible changes and every finished TODO
   item, contributor-only ones included, are in the
-  [CHANGELOG](../../CHANGELOG.md) under its ID.
+  [CHANGELOG](../../CHANGELOG.md) under its ID. Affected product claims and
+  their summaries follow the [claims rule](documentation.md#current-claims-and-dated-evidence).
 - **TODO:** the item is ticked with its evidence, or says what remains,
   what would justify it and when it is done. A plan that is now fully implemented, or superseded,
   moves to [`archive/plans/`](../archive/plans/README.md)
@@ -260,7 +264,10 @@ Report only problems you can point to in the diff, with file and line.
   incidental metadata, such as a time stamp a library writes into a file,
   does not.
 - [ ] **Claims:** commands and results in the description match what was run;
-  "passes" means it was run, on the stated platform.
+  "passes" means it was run, on the stated platform. Check affected product
+  claims against their source evidence and current behaviour, including the
+  README and release notes, using the
+  [claims rule](documentation.md#current-claims-and-dated-evidence).
 - [ ] **Documentation and tracking:** as in the [definition of done](#definition-of-done),
   and the pages follow the [documentation rules](documentation.md#writing-rules)
   for their reader.

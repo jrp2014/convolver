@@ -64,7 +64,8 @@ with `run_cases()` from [`tests/native/cases.hpp`](../../tests/native/cases.hpp)
 case's name and reason and goes on, and the program fails at the end, so one
 failure does not hide the next. Give `run_cases()` a function to undo what a
 failed case can leave set, such as an allocation guard. `native.engine`,
-`native.host`, `native.host_settings`, `native.host_report`,
+`native.host`, `native.host_settings`, `native.playing_processor`,
+`native.host_report`,
 `native.denormals`, `native.io`, `native.utilities`, `native.filter_file`,
 `vst3.adapter` and `au.adapter` use it. The lifecycle tests and
 `lv2.adapter` count their failed sequences themselves; the other programs
@@ -359,6 +360,18 @@ cases.
   (PLUG-17); clamping; the mix with
   unequal counts; and the log's settings words.
   The audio thread is checked for allocation throughout.
+- `native.playing_processor`: the playing processor's ownership
+  (`PlayingProcessor`, PLUG-39 step 3) with a probe that records its own
+  destruction: a reader adopts the newest offer; the control side returns
+  while a reader holds the old processor, which stays alive until that
+  reader lets go and a later control call frees it; an offer no reader
+  adopted is freed by the next offer; two readers holding different
+  generations each keep their own; no more processors stay alive than the
+  newest and one for each reader; deactivation frees everything, waiting
+  for a reader a host still runs. A 0.4 s stress test offers continuously,
+  sometimes none, while two readers adopt under an allocation guard,
+  checking that each sees generations only increase and never uses a freed
+  processor (AddressSanitizer checks that too in the sanitizer build).
 - `native.host_report`: the editor report (PLUG-9), one case per state a
   window shows (no filter, before and after the host starts; Gain −20 dB
   with no filter; a stereo filter on a mono track; a wrong rate; a failed

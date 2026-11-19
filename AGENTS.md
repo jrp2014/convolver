@@ -148,7 +148,9 @@ Full rules: [source versioning](docs/develop/versioning.md).
 ## Rules
 
 - Documentation: follow the [documentation guide](docs/develop/documentation.md)
-  (readers, kinds of page, writing rules, which page owns each topic). Update
+  (readers, kinds of page, writing rules, which page owns each topic), and
+  keep [product claims current and substantiated](docs/develop/documentation.md#current-claims-and-dated-evidence)
+  in the same change that affects them. Update
   the owning page when behaviour changes; keep open work and documented
   limitations in [TODO.md](TODO.md). Distinguish tests you ran from configured
   CI coverage, and preserve dated evidence and historical originals.
