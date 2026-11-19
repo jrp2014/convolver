@@ -1108,6 +1108,11 @@ void latency_parameter() {
                 convolver::freeing_processor_for_tests = nullptr;
             }
         } unhook;
+        // The render above held the processor its Latency replaced, which
+        // the next control call frees: free it now, so that only this
+        // handover's processor is counted.
+        require(latency_settled(unit), "the Latency work before the handover did not finish");
+        CFRelease(unit.class_info_now());
         replaced_freed = 0;
         convolver::freeing_processor_for_tests = note_replaced_freed;
         OSStatus held = noErr;
