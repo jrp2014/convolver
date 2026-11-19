@@ -70,10 +70,13 @@ jobs:
         # its in-process tests (no job loads an FFTW bundle in the validator
         # or pluginval, since FFTW plug-ins are not distributed).
         # The core suite runs here only where no other job builds the same
-        # compiler, flags and backend: on Linux the native g++ jobs do, and
-        # on macOS the Audio Unit job (Release Accelerate with the newest
-        # Xcode on the newest macOS image, CI-43), so these run the VST3 tests
-        # alone (docs/develop/testing.md#which-configurations-run-which-tests).
+        # compiler, flags and backend: on Linux the native g++ jobs do,
+        # so this one runs the VST3 tests alone. On macOS the Audio Unit job
+        # builds the same today (the newest Xcode on macos-26, which
+        # macos-latest also is), but this job keeps the suite: a pull request
+        # that changes only the files kept from releases runs this workflow
+        # and not the Audio Unit one (CI-42), and macos-latest moves to a
+        # newer macOS first (docs/develop/testing.md#which-configurations-run-which-tests).
         # A job that runs only the VST3 tests builds only what they run (CI-9).
         include:
           - os: ubuntu-latest
@@ -82,8 +85,7 @@ jobs:
             targets: --target convolver_vst3_suite
           - os: macos-latest
             fft: AUTO
-            tests: -L vst3
-            targets: --target convolver_vst3_suite
+            tests: -LE 'repository|consumer'
           - os: windows-latest
             fft: AUTO
             tests: -LE 'repository|consumer'

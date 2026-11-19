@@ -58,8 +58,12 @@ class Classification(unittest.TestCase):
             'docs/use/first-filter.md': 'code',
             'docs/historical/convolver-4.4/index.html': 'code',
             'docs/review-2026-10/archive-documentation.json': 'code',
-            'tests/upgrade/0.13.2/package/presets/README.md': 'code',
-            'tests/upgrade/README.md': 'code',
+            # The files kept from releases, Markdown included, and their checks (CI-42).
+            'tests/upgrade/0.13.2/package/presets/README.md': 'upgrade',
+            'tests/upgrade/0.13.2/expected/echo-44100-mono.wav': 'upgrade',
+            'tests/upgrade/README.md': 'upgrade',
+            'tests/upgrade/run_upgrade.py': 'upgrade',
+            'tests/upgrade/vst3_render.cpp': 'upgrade',
             'portable/third_party/ooura/README.md': 'packaged',
             'portable/engine.cpp': 'code',
             'COPYING': 'code',
@@ -198,6 +202,17 @@ class Classification(unittest.TestCase):
         self.assertEqual(runs(['scripts/release/resolve.py']), unfuzzed)
         self.assertEqual(runs(['packaging/release-policy.json']), unfuzzed)
         self.assertEqual(runs(['scripts/release/candidate.py', 'plugins/au/effect.hpp']), {'au', 'release'})
+        # The files kept from releases run the native and VST3 workflows,
+        # whose upgrade.cli and vst3.upgrade read them, and not the Audio
+        # Unit or LV2 ones (CI-42).
+        upgrade = {'regression', 'vst3'}
+        self.assertEqual(runs(['tests/upgrade/0.13.2/expected/echo-44100-mono.wav']), upgrade)
+        self.assertEqual(runs(['tests/upgrade/0.14.0/manifest.json', 'tests/upgrade/README.md', 'TODO.md']), upgrade)
+        self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'tests/upgrade/vst3_render.cpp']), upgrade)
+        self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'plugins/au/effect.hpp']), upgrade | {'au'})
+        self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'plugins/lv2/plugin.cpp']), upgrade | {'lv2'})
+        self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'portable/engine.cpp']), builds)
+        self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'cmake/X.cmake']), everything)
         self.assertEqual(ci_scope.decide(['plugins/au/effect.hpp'], 'release'), {'build': False, 'package': False})
         self.assertEqual(ci_scope.decide(['plugins/lv2/plugin.cpp'], 'release'), {'build': False, 'package': False})
         self.assertEqual(ci_scope.decide(['cmake/X.cmake'], 'release'), {'build': True, 'package': True})
@@ -625,6 +640,49 @@ class ReleaseIsolation(unittest.TestCase):
             with self.subTest(module=shared):
                 for name in imported:
                     self.assertIn(f'scripts/release/{name}.py', ci_scope.RELEASE_SHARED)
+
+
+# Files outside tests/upgrade/ that name its files, and the workflows whose
+# builds they put them in (CI-42). Documentation, historical code and this
+# script and its tests are not checked.
+UPGRADE_REFERENCES = {
+    'CMakeLists.txt': 'registers upgrade.cli wherever the CLI is built',
+    'plugins/vst3/CMakeLists.txt': 'registers vst3.upgrade and builds convolver_vst3_render',
+    '.gitattributes': 'keeps the version folders byte for byte; builds nothing',
+    '.markdownlint-cli2.yaml': 'Lint leaves the version folders alone',
+    '.pre-commit-config.yaml': 'Lint leaves the version folders alone',
+}
+
+
+class UpgradeIsolation(unittest.TestCase):
+    """A pull request that changes only the files kept from releases runs
+    the native and VST3 workflows, so only the tests those workflows run may
+    read them (CI-42)."""
+
+    def test_only_listed_files_name_the_upgrade_files(self):
+        # A relative path such as parents[1] / 'upgrade/x' counts too.
+        pattern = re.compile(
+            r'tests/upgrade\b|(?<![\w./-])upgrade/|\brun_upgrade\b|\bvst3_render\.cpp\b|\bcapture\.py\b'
+        )
+        own = (*ci_scope.UPGRADE, 'scripts/ci_scope.py', 'tests/ci_scope_tests.py')
+        found = {path for path, contents in tracked() if not path.startswith(own) and pattern.search(contents)}
+        self.assertEqual(found, set(UPGRADE_REFERENCES))
+
+    def test_the_tests_that_read_them(self):
+        """upgrade.cli is registered with the CLI, which the native jobs
+        build, and vst3.upgrade with the VST3 plug-in; no other CTest entry
+        runs the checker."""
+        registered = {}
+        for path in UPGRADE_REFERENCES:
+            text = (ROOT / path).read_text(encoding='utf-8')
+            for name, body in re.findall(r'add_test\(NAME (\S+) (.*?)\)\n', text, re.DOTALL):
+                if 'run_upgrade.py' in body:
+                    registered[name] = path
+        self.assertEqual(registered, {'upgrade.cli': 'CMakeLists.txt', 'vst3.upgrade': 'plugins/vst3/CMakeLists.txt'})
+        self.assertEqual(ci_scope.classify('plugins/vst3/CMakeLists.txt'), 'format:vst3')
+        self.assertLessEqual(ci_scope.UPGRADE_WORKFLOWS, set(ci_scope.WORKFLOWS))
+        self.assertIn('vst3', ci_scope.UPGRADE_WORKFLOWS)
+        self.assertIn('regression', ci_scope.UPGRADE_WORKFLOWS)
 
 
 class Command(unittest.TestCase):

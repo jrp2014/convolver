@@ -86,8 +86,9 @@ so.
 
 - Never regenerate or edit a retained file; the runner fails if one changes.
   The version folders are checked out byte for byte (`.gitattributes`), left
-  alone by the formatters and markdownlint, and any change to them runs the
-  full CI ([CI triggers](../../docs/develop/testing.md#ci-triggers)).
+  alone by the formatters and markdownlint, and any change in this folder
+  runs the native and VST3 workflows, the two whose tests read it
+  ([CI triggers](../../docs/develop/testing.md#pull-requests-for-one-plug-in-format)).
   A deliberate incompatibility is jrp's decision, recorded in the
   [decisions log](../../docs/project/decisions.md), and the check it breaks is
   changed in the same pull request, not the file. So is a deliberate

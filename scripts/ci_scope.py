@@ -22,6 +22,10 @@ changed file is one of these kinds:
 - release files (CI-34): scripts/release/, tests/release/ and packaging/,
   apart from the few that other workflows use. Only the candidate workflow
   uses them.
+- upgrade files (CI-42): tests/upgrade/, the files kept from published
+  releases (Markdown included, as the version folders hash it) and the
+  programs that check them. Only upgrade.cli and vst3.upgrade read them, so
+  they need the native and VST3 workflows, not the Audio Unit or LV2 ones.
 - one workflow file: that workflow alone.
 - everything else, including documentation that a build test reads or runs.
   Every workflow but the candidates and the fuzz targets runs.
@@ -55,8 +59,8 @@ from pathlib import Path, PurePosixPath
 
 # Pages whose commands the examples.first_use CTest entry runs as written
 # (tests/plugins/fixtures.py DOCUMENTED), and the archive and records that the
-# documentation CTest entry checks (tests/regression/documentation_regressions.py),
-# and the files kept from releases, which upgrade.cli hashes (COMPAT-1).
+# documentation CTest entry checks (tests/regression/documentation_regressions.py).
+# The files kept from releases, which upgrade.cli hashes, are UPGRADE below.
 TESTED = (
     'README.md',
     'examples/first-use/README.md',
@@ -64,7 +68,6 @@ TESTED = (
     'docs/historical/',
     'docs/review-2026-10/archive-documentation.json',
     'docs/review-2026-10/sourceforge-documentation-check.json',
-    'tests/upgrade/',
 )
 # Pages installed into the preview packages (cmake/ConvolverPluginPackaging.cmake).
 PACKAGED = (
@@ -112,6 +115,18 @@ FORMAT_WORKFLOWS = {
     'lv2': {'lv2'},
     'editor': {'vst3', 'au'},
 }
+# The files kept from published releases and the programs that check them
+# (COMPAT-1, CI-42). Two CTest entries read them: upgrade.cli, which the root
+# CMakeLists.txt registers wherever the CLI is built, and vst3.upgrade, which
+# plugins/vst3/CMakeLists.txt registers with convolver_vst3_render
+# (tests/upgrade/vst3_render.cpp). The native workflow runs upgrade.cli in
+# every job and the VST3 workflow runs both. The LV2 jobs run neither. The
+# Audio Unit job's suite includes upgrade.cli too; a change to these files
+# alone leaves that run to main (CI-42). Since CI-43 the VST3 macOS job's
+# suite runs it with the same compiler (the newest Xcode on macos-26, which
+# macos-latest also is today), and every macOS run checks the same bound.
+UPGRADE = ('tests/upgrade/',)
+UPGRADE_WORKFLOWS = {'regression', 'vst3'}
 # Files only the candidate workflow uses (CI-34), apart from RELEASE_SHARED.
 RELEASE = ('scripts/release/', 'tests/release/', 'packaging/')
 # Release files that other workflows use too: they count as code.
@@ -216,7 +231,9 @@ def matches(path, entries):
 
 def classify(path):
     """Return 'documentation', 'packaged', 'format:NAME', 'release',
-    'workflow:NAME' or 'code' for a repository path."""
+    'upgrade', 'workflow:NAME' or 'code' for a repository path."""
+    if matches(path, UPGRADE):
+        return 'upgrade'
     if matches(path, TESTED):
         return 'code'
     if matches(path, PACKAGED):
@@ -326,6 +343,8 @@ def needed(paths):
         for kind in kinds:
             if kind.startswith('format:'):
                 workflows |= FORMAT_WORKFLOWS[kind.split(':', 1)[1]]
+            elif kind == 'upgrade':
+                workflows |= UPGRADE_WORKFLOWS
             elif kind.startswith('workflow:'):
                 workflows.add(kind.split(':', 1)[1])
     workflows.discard('release')
