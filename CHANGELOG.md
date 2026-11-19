@@ -208,6 +208,15 @@ messages for a sample-rate refusal and a `.cfg` file name that is not UTF-8
 
 ### Fixed
 
+- Benchmarks (PERF-20, from jrp's audit of v0.14.0):
+  `tests/native/benchmarks/compare_engines.py` refused to compare two
+  revisions whose `portable/engine.cpp` was the same, so a change confined to
+  the partitioner, the kernels or an FFT backend could not be measured
+  against its baseline. It now compares any two commits, warns when nothing
+  under `portable/` or `include/`, nor the CMake files or the benchmark's
+  source, differs between them (the warning asks to check the latency
+  settings and benchmark changes when reading the timings), and refuses the same commit before building either revision instead of
+  after building both.
 - CLI (DIAG-8, from jrp's review of 19 November 2026): the clipping report
   after a render said that a sample of +1.0 always clips, which is not so
   with dither: dither can take such a sample down within range, and jrp's

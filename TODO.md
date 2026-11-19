@@ -1215,6 +1215,15 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **PERF-20 — Compare engine revisions that differ outside
+  `engine.cpp`.** 19 November 2026, PR #220, from jrp's audit of v0.14.0:
+  `compare_engines.py` refused two revisions with the same `engine.cpp`, so a
+  change to the partitioner, kernels or an FFT backend got "nothing to
+  compare". It now compares any two commits, warns when nothing under
+  `portable/` or `include/`, nor the CMake files or the benchmark's source,
+  differs (without concluding that the timings are noise, since the
+  latencies may differ), and refuses the same commit before building
+  ([the script](tests/native/benchmarks/compare_engines.py)).
 - [x] **CI-41 — Run the timing harness's self-test once per build type.**
   19 November 2026, from jrp's review of `212fe6e`: `native.load_timing_harness`
   carries the CTest label `backend-independent`, which the native jobs'
