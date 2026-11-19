@@ -138,23 +138,29 @@ rather than appending, so it always describes the branch as it is now:
 
 1. Read the pull request description, its review comments and its CI results.
 2. Read `git log main..BRANCH` and the diff.
-3. Rebuild and rerun the tests ([build from source](build.md#sanitizer-build-for-changes))
-   before relying on the earlier results.
+3. Verify in proportion to what the branch changes, as the
+   [verification table](#verification-for-each-kind-of-change) says: a
+   branch that changes only prose needs pre-commit, not a native build.
+   Results recorded for the branch's exact head commit, with the platform,
+   compiler, options and commands, carry forward; rerun what later commits
+   or a different environment could affect before relying on them.
 4. Continue on the same branch where you can. If your tooling requires its own
    branch, start it from theirs, and say in both pull requests which one
    replaces the other, then ask jrp to close the old one.
 
 ## Verification for each kind of change
 
-Verify in proportion to the change. Every push runs `pre-commit run --all-files`;
+Verify in proportion to the change. This table decides what to run when you
+start an item, when you pick up a branch and before you mark it ready; no
+other step asks for more. Every push runs `pre-commit run --all-files`;
 the rest depends on what changed. A change that spans several rows needs every
 row it touches, and when unsure which row applies, take the later one. Say in
 the pull request which rows you followed and what you ran.
 
 | What changed | Run before pushing | Not needed |
 | --- | --- | --- |
-| **Prose:** Markdown whose commands no test runs (most of `docs/develop/`, `docs/project/`, `TODO.md`, `CHANGELOG.md`, `AGENTS.md`, `.claude/skills/`, and pages in `docs/use/` whose marked commands did not change) | `pre-commit run --all-files`: Markdown lint, links and anchors, the repository rules | A native build, CTest or clang-tidy. CI runs only Lint, and for a `docs/use/` page with marked commands, which the packages ship and run, the candidate workflow too ([documentation-only pull requests](testing.md#documentation-only-pull-requests)) |
-| **Executable examples:** `README.md`, `examples/first-use/README.md` and `docs/use/first-filter.md` (`examples.first_use` runs their commands), or a command marked `<!-- executable-example -->` or `<!-- refused-example -->` in `docs/use/` | An [everyday build](build.md#everyday-build) and `ctest --test-dir build -R '^examples\.first_use$' --output-on-failure`; run each changed marked command with that build's `convolver` and check its output against the page (the [candidate workflow](testing.md#plug-in-candidate-checks) runs them from a package) | The sanitizer build and clang-tidy, unless code changed too |
+| **Prose:** Markdown whose commands no test runs (most of `docs/develop/`, `docs/project/`, `TODO.md`, `CHANGELOG.md`, `AGENTS.md`, `.claude/skills/`, and pages with marked commands where none of those commands changed, `README.md` included) | `pre-commit run --all-files`: Markdown lint, links and anchors, the repository rules | A native build, CTest or clang-tidy. CI runs only Lint, and for a `docs/use/` page with marked commands, which the packages ship and run, the candidate workflow too ([documentation-only pull requests](testing.md#documentation-only-pull-requests)) |
+| **Executable examples:** a command marked `<!-- first-use-example -->` in `README.md`, `examples/first-use/README.md` or `docs/use/first-filter.md` (`examples.first_use` runs them), or a command marked `<!-- executable-example -->` or `<!-- refused-example -->` in `docs/use/`. For the three first-use pages this is the split CI's [scope check](testing.md#documentation-only-pull-requests) makes; CI builds the candidates for any edit to a `docs/use/` page with marked commands | An [everyday build](build.md#everyday-build) and `ctest --test-dir build -R '^examples\.first_use$' --output-on-failure`; run each changed marked command with that build's `convolver` and check its output against the page (the [candidate workflow](testing.md#plug-in-candidate-checks) runs them from a package) | The sanitizer build and clang-tidy, unless code changed too |
 | **Tooling:** Python under `scripts/` or `tests/` that CTest does not run, `.pre-commit-config.yaml`, `.github/`, `.claude/hooks/` | pre-commit (ruff, actionlint, and the checkers' own tests); the script's own tests, such as `python3 tests/repository_checks_tests.py`; for a workflow, the CI run on the draft pull request | A native build, unless the script is run by CTest or builds something |
 | **Code:** C++, CMake, or a test CTest runs, outside the DSP path (CLI, I/O, configuration, presets, host lifecycle) | The [sanitizer build](build.md#sanitizer-build-for-changes) with the full CTest configuration; clang-tidy on the changed portable sources ([CONTRIBUTING](../../CONTRIBUTING.md#formatting-and-analysis)); the focused tests in the [change and test map](architecture.md#change-and-test-map) | |
 | **DSP:** convolution, routes, delays, FFT backends, kernels, dither | As for code, and report the worst error of the direct double-precision oracle tests in `tests/native/engine_tests.cpp`; measure any speed claim in a separate Release build ([how to measure](fft-measurements.md#reproduce)) | |
@@ -262,7 +268,10 @@ Report only problems you can point to in the diff, with file and line.
   `python3 scripts/check_format.py`, `python3 scripts/check_repository.py` and
   `python3 scripts/check_doc_links.py` (or `pre-commit run --all-files` on a
   clean tree, then report any diff it leaves, since its formatter edits files).
-  Report any red CI run on the branch, including formatting on an older commit.
+  Report every CI failure on the branch's latest commit, and any failure on
+  an earlier commit that no later commit explains. A failure a later commit
+  fixed, or one the pull request caused on purpose (a deliberately broken
+  build that shows a failure is reported), needs only a line saying so.
 
 If you can build, run the tests yourself ([sanitizer build](build.md#sanitizer-build-for-changes))
 and say what you ran.
@@ -272,7 +281,11 @@ and say what you ran.
 Post the review on the pull request it reviews: each finding with file and
 line, why it matters and a suggested fix; then a short list of what you checked
 and found sound. Change no files and push nothing: the author fixes the
-findings. A review that is not this step, such as a review of `main` or of
+findings. Once the author has answered, a further round reviews the commits
+since the reviewed one (`git diff -M REVIEWED..HEAD`) and whether each
+finding is resolved, not the whole pull request again; review it whole only
+when those commits change its approach or reach files the first round did
+not read. A review that is not this step, such as a review of `main` or of
 another contributor's draft, goes to whoever asked for it, and onto GitHub
 only if they ask. Say plainly if you found nothing. The author answers each
 finding: fixed (with the commit), or not fixed and why. Reviewers do not

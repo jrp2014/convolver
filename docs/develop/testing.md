@@ -1873,8 +1873,8 @@ carry a `COST` of about their longest CI time in seconds, so they start at
 once instead of last. Plug-in tests set it where they are defined; the core's
 are one list in the top-level `CMakeLists.txt`, before the `check` target,
 which skips a name no longer defined, so rename a test there too. Static
-analysis runs LLVM's `run-clang-tidy.py`, which analyses the same file list
-one file per CPU and fails if any file did
+analysis runs LLVM's `run-clang-tidy.py` on every portable source the build
+compiles, one file per CPU, and fails if any file did
 ([lint checks](../../CONTRIBUTING.md#formatting-and-analysis)).
 
 ### Compiler cache

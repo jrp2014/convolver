@@ -12,6 +12,22 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Engine (EDGE-11, first candidate): once the input has been exactly
+  silent for longer than anything can stay in the engine (the latency, the
+  filter and its delays, plus at most about half a second), each further
+  silent callback writes zeros without convolving. The output stays bit for
+  bit what processing the silence gives, and the next sound resumes at
+  once. The saving applies only to silence after the tail has ended, not
+  to normal playback: on the Linux cloud VM such silence costs 93 to 99%
+  less CPU (11 s stereo reverb: 173 to 2.2 ns per frame), and music costs
+  the same as before within the measurements' spread
+  ([measurements](docs/develop/fft-measurements.md#idle-after-the-tail)).
+  Only Linux was measured; Apple silicon and Windows are not yet.
+  `convolver_benchmark` gained `--silent` to time it. So that this holds
+  exactly, the engine never outputs -0: where sound cancelled to a value
+  too small for a normal float, the frame used to come out as -0 and is now
+  +0. The two are numerically equal and inaudible, but those output bits
+  differ from earlier versions.
 - CLI (DIAG-5, from the BruteFIR comparison): after a render in which any
   sample went beyond full scale, `convolver` warns on stderr with each
   affected channel's clipped-sample count and peak in dBFS, and suggests
@@ -37,6 +53,36 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Documentation (DOC-16, from jrp's review of 18 November 2026): the
+  plug-ins guide no longer promises that Reload when the file changes never
+  reads a file part-way: waiting until a change has held for a second makes
+  it less likely, and the guide recommends that tools writing filters
+  write each file under a temporary name and rename it into place. For
+  contributors, TODO's execution priorities sort open work as in progress,
+  ready, depends on, needs a decision or parked, in place of
+  columns written for the freeze lifted on 10 November, with jrp's parking
+  decisions kept and the items he brought forward that day shown in
+  progress until they are done. jrp
+  decided that day that lifting the freeze also ended the hold of
+  6 November on optional features
+  ([decision](docs/project/decisions.md#releases)). The
+  workflow guide's verification table decides what to run when starting,
+  picking up and finishing work, with results for an exact commit carried
+  forward; a review's later rounds read the commits since the reviewed one;
+  older CI failures that a later commit explains need only a line. The
+  status page and TODO point to the changelog and decisions log instead of
+  retelling each preview's publication, CONTRIBUTING no longer calls
+  bundled dependencies future work, and the documentation guide says what
+  a source comment should hold.
+- Configurations (CFG-3, first part): a file name in a `.cfg` or list that
+  is not UTF-8 text, as in a file saved in Windows-1252 (Notepad's old
+  "ANSI"), now stops with an error that says so: its line, the byte that is
+  wrong, the likely cause and how to save the file as UTF-8. Before, on
+  Linux, it stopped with "IR file not found" and a garbled name. Its
+  inspection code is the new `not-utf8`, where it was `missing-asset` (or
+  `unreadable` for a list entry). On Linux a file with exactly those bytes
+  in its name still loads. Convolver still reads only UTF-8; whether it should
+  also read Windows-1252 is open for jrp.
 - Plug-ins (PLUG-25, first part): a refusal because the filter's rate
   differs from the host's ends its Fix with the sentence jrp agreed on 8
   November 2026, "The host may play at a different rate from the one it
@@ -85,6 +131,13 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- CI (CI-40, from jrp's review of 18 November 2026): clang-tidy ran on a
+  hand-kept list of portable sources, repeated in CONTRIBUTING, that had
+  missed `portable/partitions.cpp`. CI and the documented command now
+  analyse every portable source the build compiles, chosen from its
+  `compile_commands.json` with the vendored `portable/third_party/` left
+  out, so a new file is covered without editing a list
+  ([lint checks](CONTRIBUTING.md#formatting-and-analysis)).
 - CI (CI-39): the native Windows job's two core-only steps run configure,
   build and CTest in one PowerShell script, which went on after a failed
   command, so a failed configure (leaving no tests) or a failed build of a

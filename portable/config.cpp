@@ -150,6 +150,40 @@ std::string read_configuration_text(const std::filesystem::path& path) {
     return text;
 }
 
+namespace {
+// CFG-3: a file name that is not UTF-8 text. The historical Convolver read
+// .cfg text in the Windows ANSI code page, so a name with an accented letter
+// saved that way (ir_\xFC.wav for ir_ü.wav in Windows-1252) reaches here.
+// Convolver does not guess the code page; whether it should read
+// Windows-1252 is jrp's .cfg decision (CFG-3 in TODO).
+std::string not_utf8_advice(const std::filesystem::path& owner, const std::string& name,
+                            const SourceLocation& where) {
+    std::string_view rest = name;
+    while (const auto length = utf8_character_length(rest))
+        rest.remove_prefix(length);
+    constexpr char digits[] = "0123456789ABCDEF";
+    const auto first = static_cast<unsigned char>(rest.front());
+    const std::string hex{'0', 'x', digits[first >> 4], digits[first & 15]};
+    return advice_text(
+        {"the file name '" + utf8_escaped(name) + "' is not UTF-8 text",
+         "Convolver reads configurations and lists as UTF-8 text, and byte " + hex +
+             " (shown as \\x" + hex.substr(2) +
+             ") cannot appear where it does in UTF-8. The file was most likely saved in a "
+             "Windows code page such as Windows-1252 (often called ANSI), as older versions of "
+             "Windows Notepad and the original Windows Convolver did. That turns accented "
+             "letters such as \xC3\xBC into bytes that are not UTF-8, so the name cannot match "
+             "the file.",
+         "Open " + utf8_string(owner.filename()) +
+             " in a text editor and save it again as UTF-8 (in Windows Notepad: "
+             "File > Save As, Encoding: UTF-8), then check that the name on line " +
+             std::to_string(where.line) +
+             " reads correctly. Or rename the file it names using only unaccented letters, "
+             "digits and punctuation, and change line " +
+             std::to_string(where.line) + " to match.",
+         {}});
+}
+} // namespace
+
 std::filesystem::path resolve_reference(const std::filesystem::path& owner,
                                         const ParsedReference& ref,
                                         [[maybe_unused]] const FileExists& exists) {
@@ -179,6 +213,21 @@ std::filesystem::path resolve_reference(const std::filesystem::path& owner,
 #endif
     auto normalized = name;
     std::replace(normalized.begin(), normalized.end(), '\\', '/');
+#ifdef _WIN32
+    // CFG-3: Windows names are UTF-16, so no file has a name that is not
+    // UTF-8 text. On macOS and Linux names are bytes: such a name resolves as
+    // its bytes, as it always has, and is reported only when no file has it
+    // (decode_impulses(), Resolver::visit()). macOS file systems refuse such
+    // names, so there it is always reported.
+    if (!valid_utf8(normalized))
+        throw ConfigurationError("not-utf8", ref.location,
+                                 not_utf8_advice(owner, name, ref.location));
+#else
+    if (!valid_utf8(normalized)) {
+        const std::filesystem::path bytes(normalized);
+        return bytes.is_absolute() ? bytes : owner.parent_path() / bytes;
+    }
+#endif
     const auto p = utf8_path(normalized);
     return p.is_absolute() ? p : owner.parent_path() / p;
 }
@@ -587,6 +636,11 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
                 throw ConfigurationError(
                     "unreadable-asset", path.ir.location,
                     about_filter("filter '" + path.ir.spelling + "': ", e.what(), read_as_sound));
+            // CFG-3: a name that is not UTF-8, which no file has.
+            if (!valid_utf8(path.ir.spelling))
+                throw ConfigurationError(
+                    "not-utf8", path.ir.location,
+                    not_utf8_advice(doc.source, path.ir.spelling, path.ir.location));
             // Includes a bare "-": standard input cannot be a filter.
             if (path.ir.spelling == "-")
                 throw ConfigurationError(
@@ -802,9 +856,20 @@ bool Resolver::visit(const std::filesystem::path& path) {
     const auto doc = parse_configuration_text(text, path);
     if (doc.kind == ParsedDocument::Kind::configuration) {
         const auto irs = sources_.size();
-        for (const auto& p : doc.configuration.paths)
-            sources_.push_back(
-                canonical(resolve_reference(path, p.ir, files_.exists), p.ir.location));
+        for (const auto& p : doc.configuration.paths) {
+            std::filesystem::path ir;
+            try {
+                ir = resolve_reference(path, p.ir, files_.exists);
+            } catch (const ConfigurationError& e) {
+                // CFG-3: on Windows a name that is not UTF-8 names no file.
+                // IRs of an entry that is not chosen need not be there, so
+                // it is reported only when this configuration is decoded.
+                if (e.code() != "not-utf8")
+                    throw;
+                continue;
+            }
+            sources_.push_back(canonical(ir, p.ir.location));
+        }
         if (!visitor_({path, chain_, &doc, nullptr}))
             return false;
         chosen_sources_.insert(chosen_sources_.end(), sources_.begin() + irs, sources_.end());
@@ -826,6 +891,14 @@ bool Resolver::visit(const std::filesystem::path& path) {
         std::filesystem::path child;
         try {
             child = resolve_reference(path, entry, files_.exists);
+            // CFG-3: a name that is not UTF-8 and that no file has, reported
+            // where a missing entry would be (macOS and Linux; Windows
+            // refuses it in resolve_reference()).
+            std::error_code ec;
+            if (!valid_utf8(entry.spelling) &&
+                !(files_.exists ? files_.exists(child) : std::filesystem::exists(child, ec)))
+                throw ConfigurationError("not-utf8", entry.location,
+                                         not_utf8_advice(path, entry.spelling, entry.location));
         } catch (const ConfigurationError& e) {
             // Located at the entry itself, so this list is not added to the chain.
             if (handled(e, chain_.size()))

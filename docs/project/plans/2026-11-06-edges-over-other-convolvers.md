@@ -4,14 +4,15 @@
 Status: written on 6 November 2026 against Convolver `f6895f3` (0.10.x), at
 jrp's request: "Make it a goal of this project to be superior to the existing
 most popular reverb plug-ins. Identify those edges and move towards them."
-Nothing here is implemented. Optional features wait until the first
-independent walkthrough (REL-3, [decided](../decisions.md#plug-in-behaviour)),
-and platform- and chip-level micro-optimisation waits for the walkthroughs
-(jrp, 7 November 2026). This plan names the edges, ranks them and turns them
+Of what it ranks, only the non-uniform engine of rank 3 is in (PERF-2, in
+0.13.0). Each edge starts with the owner's decision its row names and the
+[gate](#before-an-item-starts) below, and platform- and chip-level
+micro-optimisation waits for the walkthroughs (jrp, 7 November 2026). This plan names the edges, ranks them and turns them
 into TODO items (EDGE-1 to EDGE-14, with PERF-2, PERF-3 and IO-2) to take
 up afterwards in the order given here, unless jrp
 [decides otherwise](#decisions-for-jrp). Last revised on 7 November 2026
-after jrp's review of `ecd087a`; his decisions along the way are in
+after jrp's review of `ecd087a`, with its status brought up to date on
+18 November 2026 (DOC-16); his decisions along the way are in
 [decisions](../decisions.md#direction), and the earlier versions in git.
 Rationale and measurements live here; TODO holds each item's acceptance
 criteria.
@@ -193,8 +194,10 @@ the reverb features (ranks 11 to 13). Within each group, by value to users,
 how clearly the gap shows and effort. The rank is an order of work once an
 item passes the [gate](#before-an-item-starts), not a promise to build it.
 Effort: **S** about a pull request, **M** a few, **L** a design and several.
-Nothing starts before REL-3 unless jrp lifts the freeze
-([decisions for jrp](#decisions-for-jrp)); platform- and chip-level
+Each item starts with the owner's decision its row names
+([decisions for jrp](#decisions-for-jrp)); the hold on optional features
+until REL-3 ended with the freeze on 10 November
+([decision](../decisions.md#releases)), and platform- and chip-level
 micro-optimisation waits for the walkthroughs (jrp, 7 November 2026). Each
 row links to its section, which holds the gap, the approach and jrp's
 question; TODO holds the acceptance criteria.

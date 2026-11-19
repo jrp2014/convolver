@@ -41,14 +41,17 @@
 // from the next activation. One Latency request waits at a time, and work()
 // builds the newest Latency, so automating it does not flood the worker.
 //
-// cleanup() waits (up to 100 ms) for the requests run() queues one at a time
-// by itself: a Latency, a Gain mode (LV2-9) or a fault report. JUCE's LV2
-// host (pluginval, and hosts built on JUCE) runs queued work even after it
-// has destroyed the instance, and destroys it whenever the sample rate or
-// block size is set, so automating Latency or the Gain mode there could
-// crash. File requests are not waited for: they follow a person's choice,
-// several can be queued, and other hosts drop queued work when they close a
-// plug-in.
+// A bounded mitigation, not a lifetime guarantee: cleanup() waits at most
+// 100 ms for the requests run() queues one at a time by itself (a Latency, a
+// Gain mode (LV2-9) or a fault report). JUCE's LV2 host (pluginval, and hosts
+// built on JUCE) runs queued work even after it has destroyed the instance,
+// and destroys it whenever the sample rate or block size is set, so
+// automating Latency or the Gain mode there could crash. A request the host
+// has not worked within that time, or a file request, can still run on the
+// freed instance; only the host can cancel its queue (the LV2 notes in
+// docs/develop/plugin-contract.md). File requests are not waited for: they
+// follow a person's choice, several can be queued, and other hosts drop
+// queued work when they close a plug-in.
 #include "plugin.hpp"
 #include "convolver/host.hpp"
 #include "convolver/io.hpp"

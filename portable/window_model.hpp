@@ -148,9 +148,12 @@ std::vector<RecentEntry> recent_entries(const std::vector<std::string>& files);
 // Reload When the File Changes: follows the filter that plays, as the report
 // names it, with its files' modification times and sizes when it was
 // loaded. Once a second the window asks due(): the files changed and the
-// change has stayed the same for one check, so a file still being written
-// is not read half way. The window keeps the timer, the checkbox and the
-// loading.
+// change has stayed the same for one check. That debounce makes reading a
+// file still being written less likely; it cannot rule it out, since a
+// writer may pause for longer than a check or write a filter's files one
+// after another. The user guide recommends writing each file under another
+// name and renaming it into place. The window keeps the timer, the checkbox
+// and the loading.
 class FileWatch {
   public:
     // The playing filter as the report gives it now (empty strings when
