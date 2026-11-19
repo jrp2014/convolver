@@ -152,6 +152,7 @@ can act on it without a separate copy of the rules:
 | Open work | [TODO](../../TODO.md) | Current source and linked issues/plans |
 | Claiming, handing over and reviewing work | [Workflow](workflow.md) | Pull request template, repository checks, `.claude/skills/` (pointers only) |
 | How documentation is organised and written | This page | The index, the link and repository checks |
+| Product claims in the README, user guides and release notes | [Current claims](#current-claims-and-dated-evidence) on this page; the workflow and the pull request template link to it | The guide, test or dated measurement behind each claim; the published release |
 | Past releases and provenance | [History](../project/history.md) and dated records | Recorded evidence; never rewrite a past result as current |
 
 Short summaries may link to these pages; avoid copying their option lists,
@@ -190,8 +191,36 @@ For contributors and agents:
 
 A source map can state a review date and commit. A test result needs its actual
 revision, configuration and outcome. Benchmark results additionally need machine,
-compiler, dependency versions, planner mode and workload. Avoid words such as
-"latest", "all platforms" and "fully tested" without a defined scope.
+compiler, dependency versions, planner mode and workload.
+
+Product claims in the README, user guides and release notes must stay current
+and match their evidence:
+
+- Each claim rests on the owning guide, a test or a dated measurement. The
+  README and release notes link to it; a page in `docs/use/` states the
+  behaviour and leaves the test to [testing](testing.md)
+  ([writing rules](#writing-rules)). Read the source behind the link: the
+  [link check](#automated-checks) proves only that the target exists.
+- When code, defaults, dependencies, measurements or a release change, search
+  for the claims they affect and update them, summaries included, in the same
+  change. Do not describe an unpublished build as released: download links
+  name a published release, and a draft's notes are read against its tag and
+  files before jrp publishes ([publishing](releasing.md#publishing-an-unsigned-preview)).
+- Keep the scope of the evidence: format, host, platform, settings and workload.
+  Avoid words such as "latest", "all platforms" and "fully tested" without a
+  defined scope. Benchmarks describe a named build and machine, not a universal
+  speed or CPU guarantee. Keep the metric, baseline and material measurement
+  limitations; average CPU, callback percentiles and worst callbacks are
+  different claims.
+- Distinguish implemented behaviour, automated checks and real-host results.
+  Do not turn a test tolerance, a portability warning or a hearing model into
+  a guarantee of exact output, portable files or inaudibility. Comparisons with
+  other products need dated primary sources and must not generalise beyond them.
+- If evidence no longer supports a current claim, narrow, qualify or remove the
+  claim, and record any useful follow-up in TODO; the dated evidence stays as
+  recorded (below). Refreshing wording needs only what the
+  [verification table](workflow.md#verification-for-each-kind-of-change) asks
+  for, not a rerun of a benchmark or host campaign.
 
 Keep the historical website under `docs/historical/` byte-identical. Mark dated
 reviews and plans as records rather than updating their results in place. Plans

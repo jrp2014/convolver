@@ -74,6 +74,14 @@ Until 1.0 the C++ API may change between minor versions.
   retelling each preview's publication, CONTRIBUTING no longer calls
   bundled dependencies future work, and the documentation guide says what
   a source comment should hold.
+- Documentation, for contributors (DOC-17, from jrp's edits of
+  19 November 2026): the documentation guide's
+  [current claims](docs/develop/documentation.md#current-claims-and-dated-evidence)
+  section says how claims in the README, user guides and release notes stay
+  current: each rests on a guide, test or dated measurement, keeps that
+  evidence's scope, is updated in the change that affects it and is narrowed
+  when the evidence no longer supports it. The definition of done, the
+  review checklist, the pull request template and AGENTS.md link to it.
 - Configurations (CFG-3, first part): a file name in a `.cfg` or list that
   is not UTF-8 text, as in a file saved in Windows-1252 (Notepad's old
   "ANSI"), now stops with an error that says so: its line, the byte that is

@@ -191,7 +191,8 @@ checklist says so:
   ([page ownership](documentation.md#one-home-for-each-topic)); a new page is in
   the [index](../README.md); user-visible changes and every finished TODO
   item, contributor-only ones included, are in the
-  [CHANGELOG](../../CHANGELOG.md) under its ID.
+  [CHANGELOG](../../CHANGELOG.md) under its ID. Affected product claims and
+  their summaries follow the [claims rule](documentation.md#current-claims-and-dated-evidence).
 - **TODO:** the item is ticked with its evidence, or says what remains,
   what would justify it and when it is done. A plan that is now fully implemented, or superseded,
   moves to [`archive/plans/`](../archive/plans/README.md)
@@ -260,7 +261,10 @@ Report only problems you can point to in the diff, with file and line.
   incidental metadata, such as a time stamp a library writes into a file,
   does not.
 - [ ] **Claims:** commands and results in the description match what was run;
-  "passes" means it was run, on the stated platform.
+  "passes" means it was run, on the stated platform. Check affected product
+  claims against their source evidence and current behaviour, including the
+  README and release notes, using the
+  [claims rule](documentation.md#current-claims-and-dated-evidence).
 - [ ] **Documentation and tracking:** as in the [definition of done](#definition-of-done),
   and the pages follow the [documentation rules](documentation.md#writing-rules)
   for their reader.
