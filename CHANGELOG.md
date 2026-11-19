@@ -37,6 +37,18 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Releases: version 0.14.0, a minor step after 0.13.30, for the sixth
+  unsigned developer preview, which jrp asked for on 19 November 2026
+  ([decision](docs/project/decisions.md#releases)). Its draft notes list
+  what changed for users since 0.13.24: faster reopening of a project that
+  holds the playing filter, less CPU once the sound has stopped (measured
+  on Linux only, with -0 output samples now +0), the command-line tool's
+  clipping report, the Fix line of a sample-rate refusal, the error for a
+  `.cfg` file name that is not UTF-8, the plug-ins guide on Reload when the
+  file changes, and the wider static analysis and fuzzing. The known
+  limitations say that the faster reopening and the saving once the sound
+  has stopped are checked only by automated tests. No change to what the
+  packages run or hold beyond the version number.
 - Plug-ins (PLUG-39 step 1a, from jrp's review of 0.13.28): a restored
   project, preset or undo step that holds the filter already accepted no
   longer analyses that filter again. Its peak bound and, under Estimate, its
