@@ -2,6 +2,7 @@
 #include "cases.hpp"
 #include "convolver/io.hpp"
 #include "sound_files.hpp"
+#include "utf8.hpp"
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -616,6 +617,49 @@ void quantizer_tests(const fs::path& dir) {
         const auto wide = quantize_bits(16, {d, 3}, ramp, 2);
         const auto narrow = quantize(d, 3, ramp, 2);
         require(std::equal(wide.begin(), wide.end(), narrow.begin()), "PCM16 wrapper");
+    }
+    // DIAG-5: the clip count per channel. +1 rounds to 2^(B-1), one step past
+    // the largest value, so it clips; -1 and a sample that rounds to exactly
+    // the largest value do not. Infinity counts, NaN does not; reset() clears.
+    {
+        Quantizer q(2, 16);
+        const std::vector<float> x{1,
+                                   -1,
+                                   static_cast<float>(32767.0 / 32768),
+                                   -2,
+                                   2,
+                                   std::numeric_limits<float>::infinity(),
+                                   std::numeric_limits<float>::quiet_NaN(),
+                                   0.5f};
+        std::vector<std::int32_t> out(x.size());
+        q.quantize(x, out);
+        require(q.clipped(0) == 2 && q.clipped(1) == 2 && q.clipped(2) == 0,
+                "clip counts per channel");
+        q.quantize(std::span<const float>(x).first(2), std::span(out).first(2));
+        require(q.clipped(0) == 3 && q.clipped(1) == 2, "clip counts accumulate across calls");
+        q.reset();
+        require(q.clipped(0) == 0 && q.clipped(1) == 0, "reset clears clip counts");
+        // Dither is counted: at 32767/32768 plain rounding never clips, but
+        // TPDF dither of up to one step takes some samples over and not others.
+        Quantizer plain(1, 16), dithered(1, 16, {Dither::triangular, 9});
+        const std::vector<float> edge(1000, static_cast<float>(32767.0 / 32768));
+        std::vector<std::int32_t> edge_out(edge.size());
+        plain.quantize(edge, edge_out);
+        dithered.quantize(edge, edge_out);
+        require(plain.clipped(0) == 0 && dithered.clipped(0) > 0 && dithered.clipped(0) < 1000,
+                "dithered clips counted after the dither");
+        // The writer reports its quantizer's counts, still after close(), and
+        // none for float output, which it never clips.
+        const auto clips = dir / "clip-count.wav";
+        AudioWriter pcm(clips, {48000, 2}, OutputFormat::wav_pcm16);
+        pcm.write(std::vector<float>{1.5f, 0.25f, -1.5f, 0.25f, 0.5f, 1.0f});
+        pcm.close();
+        require(pcm.clipped_samples() == std::vector<std::uint64_t>{2, 1},
+                "writer clip counts per channel");
+        AudioWriter real(clips, {48000, 2}, OutputFormat::wav_float);
+        real.write(std::vector<float>{1.5f, 0.25f});
+        real.close();
+        require(real.clipped_samples().empty(), "float writer has no clip counts");
     }
     rejects([&] { Quantizer q(1, 7); });
     rejects([&] { Quantizer q(1, 33); });
@@ -1373,6 +1417,8 @@ void run(const fs::path& dir) {
         require(has(unrated, "No entry is for 96000 Hz") &&
                     has(unrated, "convert the audio to 44100 Hz or 48000 Hz"),
                 "list rate mismatch names the rates available");
+        // PLUG-25's sentence is for plug-in hosts only.
+        require(!has(unrated, "exports at"), "the command line names a host's export rate");
     }
     text_file(dir / "unrelated.cfg", "44100 1 1 0\n0\n0\nmissing-unused.wav\n0\n0\n0\n");
     text_file(dir / "list.txt", "unrelated.cfg\ngood.cfg\n");
@@ -1675,6 +1721,41 @@ void run(const fs::path& dir) {
         require(contains(drive, "drive.cfg:4:1: Windows drive/rooted paths") &&
                     contains(drive, "Fix: A file exists at 'irs/ir ü.wav'"),
                 "nonportable path diagnostics name the line and an existing replacement");
+#endif
+        // CFG-3: a name saved in Windows-1252 (ir_\xFC.wav for ir_u-umlaut.wav)
+        // is reported as not UTF-8 on its line, with the likely cause and the
+        // fix, for an IR file and for a list entry, not as a missing file.
+        text_file(dir / "ansi.cfg", "48000 1 1 0\n0\n0\nir_\xfc.wav\n0\n0\n0\n");
+        const auto ansi = message(dir / "ansi.cfg");
+        require(contains(ansi, "ansi.cfg:4:1: the file name 'ir_\\xFC.wav' is not UTF-8 text") &&
+                    contains(ansi, "byte 0xFC") && contains(ansi, "Windows-1252") &&
+                    contains(ansi, "save it again as UTF-8") &&
+                    contains(ansi, "the name on line 4 reads correctly") &&
+                    !contains(ansi, "not found") && convolver::detail::valid_utf8(ansi),
+                "a name that is not UTF-8 is not explained");
+        text_file(dir / "ansi.txt", "// list\nfilter_\xe9.cfg\n");
+        const auto entry = message(dir / "ansi.txt");
+        require(
+            contains(entry, "ansi.txt:2:1: the file name 'filter_\\xE9.cfg' is not UTF-8 text") &&
+                contains(entry, "byte 0xE9"),
+            "a list entry that is not UTF-8 is not explained");
+        // A list entry that is not chosen may name an IR that is not there,
+        // so a name that is not UTF-8 in it does not stop the list.
+        wave(dir / "u8-ir.wav", 48000, 1, {1.0f});
+        text_file(dir / "ansi44.cfg", "44100 1 1 0\n0\n0\nir_\xfc.wav\n0\n0\n0\n");
+        text_file(dir / "good48.cfg", "48000 1 1 0\n0\n0\nu8-ir.wav\n0\n0\n0\n");
+        text_file(dir / "ansi-first.txt", "ansi44.cfg\ngood48.cfg\n");
+        require(load_configuration(dir / "ansi-first.txt", 48000, 1).sample_rate == 48000,
+                "an unchosen entry's name that is not UTF-8 stops the list");
+#if !defined(_WIN32) && !defined(__APPLE__)
+        // On Linux a file with exactly those bytes in its name still loads, as
+        // it did before. macOS file systems refuse such a name ("Illegal byte
+        // sequence"), so no such file can exist there.
+        const fs::path latin1 = dir / fs::path(std::string("ir_\xfc.wav"));
+        wave(latin1, 48000, 1, {1.0f});
+        require(load_configuration(dir / "ansi.cfg", 48000, 1).paths.size() == 1,
+                "an existing file named by the same bytes no longer loads");
+        fs::remove(latin1);
 #endif
         // Overwrite protection sees every visited text file and referenced IR, including
         // unselected entries whose IRs are absent, in visiting order.

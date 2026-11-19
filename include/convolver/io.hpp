@@ -118,6 +118,13 @@ class Quantizer {
     unsigned bits() const noexcept {
         return bits_;
     }
+    // DIAG-5: samples of this channel (from 0) that fell outside the B-bit
+    // range and were clipped since construction or reset(), counting
+    // infinities but not NaN. A sample that rounds to exactly the largest or
+    // smallest value is not clipped.
+    std::uint64_t clipped(std::size_t channel) const noexcept {
+        return channel < clipped_.size() ? clipped_[channel] : 0;
+    }
 
   private:
     float uniform() noexcept;
@@ -129,6 +136,7 @@ class Quantizer {
     std::uint64_t state_;
     std::vector<float> previous_;
     std::vector<double> coefficients_, errors_; // errors_: channels x order, newest first
+    std::vector<std::uint64_t> clipped_;        // One count per channel.
 };
 // The 16-bit case of Quantizer, kept for existing callers.
 class Pcm16Quantizer {
@@ -185,6 +193,10 @@ class AudioWriter {
     AudioWriter& operator=(const AudioWriter&) = delete;
     void write(std::span<const float> interleaved);
     void close();
+    // DIAG-5: for integer sample types, the samples of each channel that
+    // Quantizer clipped so far (Quantizer::clipped()); empty for float
+    // types, which the writer never clips.
+    std::vector<std::uint64_t> clipped_samples() const;
 
   private:
     struct Impl;

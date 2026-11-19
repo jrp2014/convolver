@@ -149,9 +149,6 @@ guides and TODO.
   (PLUG-34, VST3-12, VST3-13, Reference): what any route needs first (a sound-file
   reader and the window's behaviour in shared code), the routes compared, and
   the chosen order (Windows first, Linux later); no code changes yet.
-- [Reduce CI waiting without losing useful coverage](project/plans/2026-11-08-ci-scheduling.md)
-  (CI-34, Reference): separate proposed scheduling work with coverage and
-  measurement requirements; no workflow changes yet.
 - [Edges over the leading convolution plug-ins](project/plans/2026-11-06-edges-over-other-convolvers.md)
   (EDGE-1 to EDGE-13, PERF-2, PERF-3, IO-2): how Convolver compares with Altiverb,
   Reverberate, Space Designer, Hang Loose Convolver, CamillaDSP and X-MCFX,

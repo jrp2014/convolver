@@ -12,6 +12,16 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- CLI (DIAG-5, from the BruteFIR comparison): after a render in which any
+  sample went beyond full scale, `convolver` warns on stderr with each
+  affected channel's clipped-sample count and peak in dBFS, and suggests
+  `--gain-db no-clip` or how far to lower `--gain-db`. Before, `--gain-db 20`
+  could clip most of a 24-bit output without a word. Float output, which
+  keeps such samples, gets a note that a later conversion to integer samples
+  will clip them. A clean render prints nothing, and the samples and exit
+  status are unchanged. The C++ API gains `Quantizer::clipped()` and
+  `AudioWriter::clipped_samples()`, which count the clipped samples of each
+  channel.
 - Tests (COMPAT-1, in progress): the example presets of the published
   0.13.24 and the audio its own CLI and VST3 plug-in rendered from them are
   kept in `tests/upgrade/0.13.24/`, beside those of 0.13.2, 0.13.12 and
@@ -35,8 +45,8 @@ Until 1.0 the C++ API may change between minor versions.
   contributors, TODO's execution priorities sort open work as in progress,
   ready, depends on, needs a decision or parked, in place of
   columns written for the freeze lifted on 10 November, with jrp's parking
-  decisions kept and the five items he brought forward that day (DIAG-5,
-  CI-34, and parts of PLUG-25, CFG-3 and EDGE-11) shown in progress. jrp
+  decisions kept and the items he brought forward that day shown in
+  progress until they are done. jrp
   decided that day that lifting the freeze also ended the hold of
   6 November on optional features
   ([decision](docs/project/decisions.md#releases)). The
@@ -48,6 +58,21 @@ Until 1.0 the C++ API may change between minor versions.
   retelling each preview's publication, CONTRIBUTING no longer calls
   bundled dependencies future work, and the documentation guide says what
   a source comment should hold.
+- Configurations (CFG-3, first part): a file name in a `.cfg` or list that
+  is not UTF-8 text, as in a file saved in Windows-1252 (Notepad's old
+  "ANSI"), now stops with an error that says so: its line, the byte that is
+  wrong, the likely cause and how to save the file as UTF-8. Before, on
+  Linux, it stopped with "IR file not found" and a garbled name. Its
+  inspection code is the new `not-utf8`, where it was `missing-asset` (or
+  `unreadable` for a list entry). On Linux a file with exactly those bytes
+  in its name still loads. Convolver still reads only UTF-8; whether it should
+  also read Windows-1252 is open for jrp.
+- Plug-ins (PLUG-25, first part): a refusal because the filter's rate
+  differs from the host's ends its Fix with the sentence jrp agreed on 8
+  November 2026, "The host may play at a different rate from the one it
+  exports at.", in every format and wherever the Fix is shown: the window,
+  Status details and the Convolver log, or LV2's host log. Audacity, for
+  one, plays at its Default sample rate while it exports at the project's.
 - Plug-ins (PLUG-39 step 1a, from jrp's review of 0.13.28): a restored
   project, preset or undo step that holds the filter already accepted no
   longer analyses that filter again. Its peak bound and, under Estimate, its
@@ -67,6 +92,15 @@ Until 1.0 the C++ API may change between minor versions.
   macOS, Windows and Linux. Each claim links to the guide, test or
   measurement behind it; the preview's limitations follow in their own
   section.
+- CI (CI-34, finished; chosen by jrp on 18 November 2026): a pull request
+  runs the fuzz workflow only when it changes what the four fuzz targets are
+  built from: their harnesses, seeds and regression inputs, the parsers,
+  audio reader and state decoder with the code compiled in with them, the
+  build configuration or the workflow. Pushes to `main` and manual runs
+  still run it, a new Monday run gives each target 600 seconds, and every
+  native build still replays the committed fuzz inputs. Each run checks
+  that the list names every repository file compiled into the targets
+  ([when pull requests run the fuzz targets](docs/develop/testing.md#when-pull-requests-run-the-fuzz-targets)).
 - CI (CI-38, jrp's request of 16 November 2026 for safe speedups without
   restructuring): `native.engine_stress`, `native.engine` and `native.host`,
   the longest core tests under sanitizers, carry a CTest `COST`, so they

@@ -37,7 +37,8 @@ Advice fractional_rate_refusal(const std::string& path, const HostLayout& host,
                          : ": the filter is for " + made + ", and the host runs at " + runs),
             "Convolver never resamples, and filters are made for a whole number of hertz, so none "
             "plays at the host's rate.",
-            "Set the host's project or audio device to " + made + ".",
+            "Set the host's project or audio device to " + made + ". " +
+                std::string(detail::host_playback_rate_fix),
             {}};
 }
 // PLUG-33: on a host with more inputs than any candidate for its rate and

@@ -69,20 +69,18 @@ behaviour (as with `HostFilter`), do not generalise host lifecycle or
 release machinery beyond the requirements in hand, and keep libsndfile at
 the I/O boundary and C++20 in the core.
 
-Triaged on 18 November 2026 against `main` at `b08fe37` (0.13.28).
+Triaged on 18 November 2026 against `main` at `b08fe37` (0.13.28), and brought up to date with `main` at `47110ae` (0.13.33).
 
 ### In progress
 
-jrp brought these forward on 18 November 2026, each only in the part named
-here; the rest of each item stays where the other tables put it. Check the
-open pull requests for the ID before starting.
+jrp brought five parked items forward on 18 November 2026 because they can
+be done unattended ([decision](docs/project/decisions.md#releases)). DIAG-5
+and CI-34 are done, and so are the first parts of PLUG-25 and CFG-3
+(PRs #208, #207, #210 and #211); their remaining parts are under
+[parked](#parked). Check the open pull requests for the ID before starting.
 
 | Item | The part in progress | The rest |
 | --- | --- | --- |
-| **DIAG-5** | Reporting clipping after a command-line render | Nothing |
-| **PLUG-25** | The decided Fix line for a rate refusal | Parked until REL-3: marking a host rate as not yet confirmed, which also needs jrp's decision (PLUG-27 overlaps it) |
-| **CFG-3** | Reporting a filename line that is not valid UTF-8 | Parked until REL-3: whether to read Windows-1252 names, which is also a `.cfg` decision for jrp |
-| **CI-34** | The rest of it: the fuzz triggers, the coverage table and matched runs | Nothing |
 | **EDGE-11** | Exact idling once silent input has outlasted the tail | The other candidates wait for a measured limitation, as the EDGE items under [needs a decision](#needs-a-decision) do |
 
 ### Ready
@@ -133,7 +131,7 @@ REL-3.
 | **ROBUST-1**, **ROBUST-8**, **PLUG-27**, **PLUG-29**, **PLUG-30**, **PLUG-36**, **HOST-6** | Robustness and lifecycle corner cases |
 | **CI-32** | The most extreme numerical cases less often; dormant as well (jrp, 12 November 2026) |
 | **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19** | Profiling and measurement-only optimisations |
-| The rest of **PLUG-25** and **CFG-3** | Beyond the parts in progress above |
+| The rest of **PLUG-25** and **CFG-3** | Marking a host rate as not yet confirmed, and reading Windows-1252 names; each also needs jrp's decision |
 | **FFMPEG-2** to **FFMPEG-5**, **HOST-3** | A C API and FFmpeg filter; a Windows Media Foundation transform. Parked by owner decision; revisit only by his decision |
 
 The ordering of the first preview's steps that this section held until
@@ -298,19 +296,18 @@ LV2 (Linux first; also PipeWire system audio):
   project ran at 48000 Hz, so a 48 kHz `.cfg` was refused during playback
   and the exports passed. Refusing the filter is correct; what was hard was
   telling the rate the playing copy runs at from the export's rate. The
-  guides now say so ([plug-ins](docs/use/plugins.md#status-and-the-convolver-log),
-  [Audacity steps](docs/develop/host-testing.md#audacity-vst3)). A refusal
-  for the rate adds one line to its Fix, that the host may play at a
-  different rate from the one it exports at
-  ([decided](docs/project/decisions.md#diagnostics)). Still
-  to decide with jrp: whether the window should mark a host rate as not
-  yet confirmed when it comes from a copy that has not processed audio
-  (the copy in Audacity's effect window, which a host may start briefly at
-  another rate); PLUG-27 overlaps it. Done when every format's rate
-  refusal carries the agreed line, in the window, Status details and the
-  log, and the message tests cover it. Diagnostic text only, no sound
-  change. jrp brought the Fix line forward on 18 November 2026; the rest
-  is parked until REL-3.
+  guides say so ([plug-ins](docs/use/plugins.md#status-and-the-convolver-log),
+  [Audacity steps](docs/develop/host-testing.md#audacity-vst3)), and since
+  PR #210 every format's rate refusal, for a preset or a chosen file, adds
+  the agreed line to its Fix ([decided](docs/project/decisions.md#diagnostics)),
+  checked by `native.host`, `native.filter_file` and `vst3.adapter`.
+  **Remains:** whether the window should mark a host rate as not yet
+  confirmed when it comes from a copy that has not processed audio (the
+  copy in Audacity's effect window, which a host may start briefly at
+  another rate); PLUG-27 overlaps it. **Done when** jrp has decided, and
+  the marking, if he wants it, is shown and its message tests cover it.
+  Diagnostic text only, no sound change; parked until after REL-3 unless
+  jrp brings it forward.
 - [ ] **PLUG-27 — Read a chosen filter before the host's audio settings
   are known.** From the same review: before the host has started audio,
   the VST3 plug-in reads a chosen file for the rate and channels the host
@@ -505,21 +502,21 @@ means a patched FFmpeg build with `--enable-gpl`.
   documentation or sources, states what it cannot represent (per-channel EQ,
   mixers with gains above unity, resampling) and fails rather than guess.
   Optional; after CFG-1 shows which readers matter.
-- [ ] **CFG-3 — Say when a configuration is not UTF-8.** From the BruteFIR
-  comparison (8 November 2026; BruteFIR fixed non-ASCII configuration text
-  in 0.99g). The historical Convolver read `.cfg` text in the Windows ANSI
-  code page (`channelpaths.cpp` reads it through `basic_ifstream<TCHAR>`
-  and `wavefile.h` opens `CT2CA(path)`); the portable parser reads UTF-8
-  only. A `.cfg` saved in Windows-1252 that names `ir_ü.wav` stops with "IR
-  file not found" and a garbled name, and nothing mentions the encoding
-  (tried on Linux at `8ba79fb`; not checked on Windows). Done when a filename
-  line that is not valid UTF-8 is reported as such, with the line, the
-  likely cause (saved in a Windows code page) and how to save it as UTF-8,
-  and a test covers it. Whether Convolver should also read Windows-1252
-  names is a `.cfg` compatibility decision for jrp, recorded in the
-  decisions log either way. Which encoding Roon, JRiver and Audiolense write
-  is unknown (CFG-1). jrp brought the reporting forward on 18 November
-  2026; reading Windows-1252 is parked until REL-3.
+- [ ] **CFG-3 — Read configurations saved in Windows-1252.** From the
+  BruteFIR comparison (8 November 2026; BruteFIR fixed non-ASCII
+  configuration text in 0.99g). The historical Convolver read `.cfg` text in
+  the Windows ANSI code page (`channelpaths.cpp` reads it through
+  `basic_ifstream<TCHAR>` and `wavefile.h` opens `CT2CA(path)`); the
+  portable parser reads UTF-8 only. Since PR #211 a file name that is not
+  UTF-8 stops with `not-utf8`, naming the line, the byte, the likely cause
+  and how to save the file as UTF-8, instead of "IR file not found" with a
+  garbled name ([configuration](docs/use/configuration.md#file-layout)).
+  **Remains:** whether Convolver should also read Windows-1252 names, a
+  `.cfg` compatibility decision for jrp, recorded in the decisions log
+  either way. Which encoding Roon, JRiver and Audiolense write is unknown
+  (CFG-1), and the Windows case is not checked by hand. **Worth doing
+  when** a user's `.cfg` from another program meets it. **Done when** jrp
+  has decided, and, if he wants it, such names load with a test.
 - [ ] **COMPAT-1 — Files from released builds.** Round-trip tests with
   today's writer and reader can agree with each other while both break
   yesterday's files, so each published preview leaves a small collection
@@ -543,20 +540,6 @@ means a patched FFmpeg build with `--enable-gpl`.
   with its state chunk restored through each adapter, and Audio Unit state
   from a release. **Done when** both are kept and checked. The guarantees
   it protects are in [status](docs/project/status.md#compatibility-guarantees).
-- [ ] **DIAG-5 — Report clipping after a command-line render.** From the
-  BruteFIR comparison (8 November 2026): BruteFIR has printed each output's
-  count of overflowed samples and its peak by default since 0.99
-  (`overflow_warnings`). The `convolver` CLI clips integer output silently,
-  as [file rendering](docs/use/command-line.md#file-rendering) states,
-  and stops only for samples that are not finite: at `8ba79fb`, `--gain-db 20`
-  with `wav-pcm24` clipped 4,800 of 4,863 samples, printed nothing and
-  exited 0. Done when, after a render to integer output in which any sample
-  clipped, stderr gives the clipped-sample count and the peak in dBFS for
-  each affected output and suggests `--gain-db no-clip`; float output whose
-  peak exceeds full scale gets a note, since a later integer conversion
-  will clip it; nothing is printed when nothing clipped; the exit status is
-  unchanged; and CLI tests cover each case. The plug-ins' clip counts stay
-  with PLUG-10's meters.
 - [ ] **IO-1 — Large files.** RF64, W64, CAF, FLAC and raw output have no
   4 GiB limit, and WAV and AIFF stop with an error at it (PR #60).
   **Remains:** tests at the boundary sizes and of pipe behaviour beyond
@@ -1159,17 +1142,6 @@ keeps the plan's [non-negotiables](docs/project/plans/2026-11-06-edges-over-othe
 
 ## Developer tooling
 
-- [ ] **CI-34 — Reduce duplicate CI scheduling, preserving coverage.**
-  Following the [CI plan](docs/project/plans/2026-11-08-ci-scheduling.md).
-  The first step is done: a pull request builds the candidates only when it
-  touches what they ship, or when started by hand
-  ([CI triggers](docs/develop/testing.md#when-pull-requests-build-the-candidates)).
-  **Remains**, brought forward by jrp on 18 November 2026: the fuzz
-  triggers, the coverage table and matched runs. **Done when** scope tests and affected CI pass,
-  every configuration has a retained trigger, and matched runs show the
-  waiting-time savings, with oracle, regression, validator, platform and
-  release checks retained.
-
 - [ ] **CI-32 — Run the most extreme numerical cases less often.** Dormant.
   From jrp's review of 5 November 2026: the largest and most extreme cases
   (`native.kernel_divergence`'s 128k to 512k filters and its noise near
@@ -1245,6 +1217,18 @@ move to the archive.
   both now take the portable sources from the build's
   `compile_commands.json`, leaving out the vendored `portable/third_party/`
   ([lint checks](CONTRIBUTING.md#formatting-and-analysis)).
+- [x] **CI-34 — Reduce duplicate CI scheduling, preserving coverage.** 18
+  November 2026, PR #207 (the first step, the candidates, in PR #154): pull
+  requests build the candidates and run the fuzz targets only when they
+  change what those are built from; `main`, weekly and manual runs keep
+  both ([CI triggers](docs/develop/testing.md#when-pull-requests-run-the-fuzz-targets),
+  [plan](docs/archive/plans/2026-11-08-ci-scheduling.md)).
+- [x] **DIAG-5 — Report clipping after a command-line render.** 18
+  November 2026, PR #208, from the BruteFIR comparison: after a render, stderr gives
+  each affected channel's clipped-sample count and peak in dBFS and
+  suggests `--gain-db no-clip`; float output above full scale gets a note;
+  the samples and exit status are unchanged
+  ([file rendering](docs/use/command-line.md#file-rendering)).
 - [x] **DOC-15 — Say what sets Convolver apart in the README.** 17
   November 2026, PR #201: the README's "What sets it apart" section, under
   jrp's four emphases (accurate, light on the system, robust, behaves as

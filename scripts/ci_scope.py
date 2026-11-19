@@ -24,13 +24,22 @@ changed file is one of these kinds:
   uses them.
 - one workflow file: that workflow alone.
 - everything else, including documentation that a build test reads or runs.
-  Every workflow but the candidates runs.
+  Every workflow but the candidates and the fuzz targets runs.
 
 The candidate workflow, the slowest (up to about 25 minutes), runs for a
 pull request only when it changes what the packages are built from or hold
 (CI-34): release files, packaged documentation, the macOS window, the build
 configuration, the shipped dependencies and the other files in CANDIDATES.
 For any other change it runs when started by hand on the branch.
+
+The fuzz workflow runs for a pull request only when it changes what the
+fuzz targets are built from (CI-34): their harnesses, seeds and regression
+inputs, the production sources compiled into them (the parsers, the state
+decoder, the audio reader and the code they call), the build configuration
+and the files the workflow runs (FUZZED). The workflow checks, on every run,
+that FUZZED names every repository file compiled into the targets
+(--fuzz-sources), so a new dependency is caught on the pull request that
+adds it, which has to change a file already listed.
 
 Pushes to main, scheduled and manual runs always get everything, and so does
 a pull request whose changed files cannot be listed. See
@@ -147,6 +156,54 @@ CANDIDATES = (
     '.gitattributes',  # git archive writes the source archive with it.
     'portable/third_party/',  # Shipped dependency (Ooura), with its licence.
 )
+# What the fuzz targets are built from (CI-34): for a pull request, the fuzz
+# workflow runs only when one of these changes, or the workflow itself. The
+# sources are those compiled into the four targets on the Linux runner, as
+# `llvm-dwarfdump --show-sources` lists them; the workflow checks that list
+# against this one on every run (fuzz_sources()). Markdown here is still
+# documentation.
+FUZZED = (
+    'tests/fuzz/',  # Harnesses, seeds, regression inputs and the scheduler's tests.
+    'scripts/fuzz_campaigns.sh',  # Runs the campaigns.
+    'scripts/ci_scope.py',  # The workflow checks its sources with it.
+    '.github/actions/use-every-cpu/',  # The workflow uses it.
+    # Build options, compiler flags and the FFTW and libsndfile lookups.
+    'CMakeLists.txt',
+    'cmake/',
+    # Compiled into the targets. The configuration parsers and the audio
+    # reader (config_text, config_list, ir_file):
+    'portable/config.cpp',
+    'portable/config_parse.cpp',
+    'portable/config_parse.hpp',
+    'portable/sound_files.cpp',
+    'portable/sound_files.hpp',
+    'portable/io.cpp',
+    'include/convolver/io.hpp',
+    'portable/utf8.hpp',
+    # The state decoder (host_state):
+    'portable/state.cpp',
+    'portable/bytes.hpp',
+    'include/convolver/host.hpp',
+    'include/convolver/advice.hpp',
+    'portable/advice.hpp',
+    # The engine, which holds validate_configuration() that the state decoder
+    # calls, and what its object file brings with it:
+    'include/convolver/engine.hpp',
+    'portable/engine.cpp',
+    'portable/partitions.cpp',
+    'portable/partitions.hpp',
+    'portable/kernels.cpp',
+    'portable/kernels.hpp',
+    'portable/kernels.inc',
+    'portable/kernels_avx2.cpp',
+    'portable/fft.hpp',
+    'portable/fft_fftw.cpp',  # The runner's FFT backend.
+    'portable/denormals.hpp',
+)
+# Files the build writes that may be compiled into the fuzz targets, by name,
+# once the files each is made from are in FUZZED. None is today; the check
+# fails on any other written file it finds (CI-34).
+FUZZED_GENERATED = ()
 # Workflows gated by this script, named by their file in .github/workflows/.
 WORKFLOWS = ('regression', 'fuzz', 'vst3', 'au', 'lv2', 'release')
 
@@ -249,6 +306,11 @@ def candidates(paths):
     return False
 
 
+def fuzzed(paths):
+    """Whether a pull request changing these paths runs the fuzz targets."""
+    return any(matches(path, FUZZED) and page_kind(path) == 'code' for path in paths)
+
+
 def needed(paths):
     """The workflows that must run for a pull request's changed paths. An
     empty list (a merge that changes nothing) runs everything."""
@@ -267,6 +329,8 @@ def needed(paths):
     workflows.discard('release')
     if candidates(paths):
         workflows.add('release')
+    if 'workflow:fuzz' not in kinds and not fuzzed(paths):
+        workflows.discard('fuzz')
     # Lint and the version workflow are not gated; changing them builds nothing.
     return workflows & set(WORKFLOWS)
 
@@ -304,6 +368,80 @@ def changed_files():
     return [line for line in output.splitlines() if line]
 
 
+def fuzz_sources(lines, root):
+    """Check the source paths compiled into the fuzz targets (one per line,
+    as llvm-dwarfdump --show-sources prints them) against FUZZED. Returns the
+    repository files FUZZED does not name, the files inside the repository
+    that are not tracked (written by the build, such as a generated header)
+    and not in FUZZED_GENERATED, and the harnesses (tests/fuzz/fuzz_*.cpp)
+    that are missing from the list. Paths outside the repository, and names
+    that are not files (such as <stdin>), are left out."""
+    root = Path(root).resolve()
+    tracked = set(
+        subprocess.run(
+            ['git', '-c', 'core.quotePath=false', 'ls-files'], cwd=root, check=True, capture_output=True, text=True
+        ).stdout.splitlines()
+    )
+    sources, generated = set(), set()
+    for line in lines:
+        name = line.strip()
+        if not name:
+            continue
+        path = Path(name)
+        path = (path if path.is_absolute() else root / path).resolve()
+        try:
+            relative = path.relative_to(root).as_posix()
+        except ValueError:
+            continue  # Outside the repository.
+        if relative in tracked:
+            sources.add(relative)
+        elif path.is_file() and path.name not in FUZZED_GENERATED:
+            generated.add(relative)
+    harnesses = {path for path in tracked if re.fullmatch(r'tests/fuzz/fuzz_[^/]*\.cpp', path)}
+    missing = sorted(path for path in sources if not matches(path, FUZZED))
+    return missing, sorted(generated), sorted(harnesses - sources)
+
+
+def check_fuzz_sources(source):
+    """--fuzz-sources: fail when a repository file compiled into the fuzz
+    targets is missing from FUZZED, when a file the build wrote is compiled
+    in, or when a harness is missing from the list (it did not come from all
+    the targets)."""
+    lines = sys.stdin.readlines() if source == '-' else Path(source).read_text(encoding='utf-8').splitlines()
+    missing, generated, absent = fuzz_sources(lines, Path(__file__).resolve().parents[1])
+    failed = False
+    if absent:
+        print(
+            'CI scope: these harnesses are not among the sources; were they read from all the fuzz targets?',
+            *(f'  {path}' for path in absent),
+            sep='\n',
+            file=sys.stderr,
+        )
+        failed = True
+    if missing:
+        print(
+            'CI scope: these files are compiled into the fuzz targets, but a pull request that changes them\n'
+            'would not run the fuzz workflow. Add them to FUZZED in scripts/ci_scope.py (CI-34):',
+            *(f'  {path}' for path in missing),
+            sep='\n',
+            file=sys.stderr,
+        )
+        failed = True
+    if generated:
+        print(
+            'CI scope: these files, written by the build, are compiled into the fuzz targets. Add the files\n'
+            'each is made from to FUZZED, and its name to FUZZED_GENERATED, in scripts/ci_scope.py (CI-34):',
+            *(f'  {path}' for path in generated),
+            sep='\n',
+            file=sys.stderr,
+        )
+        failed = True
+    if failed:
+        return 1
+    print('CI scope: FUZZED names every repository file compiled into the fuzz targets.')
+    return 0
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n', 1)[0])
     parser.add_argument(
@@ -315,8 +453,16 @@ def main(argv=None):
         '--workflow', choices=WORKFLOWS, help='the workflow asking, by file name (default: any workflow)'
     )
     parser.add_argument('--github-output', help='append build=… and package=… here')
+    parser.add_argument(
+        '--fuzz-sources',
+        metavar='FILE',
+        help="check that FUZZED names every repository file in this list of the fuzz targets' sources "
+        '(one per line, - for standard input), and do nothing else',
+    )
     parser.add_argument('paths', nargs='*', help='changed paths, instead of asking git')
     args = parser.parse_args(argv)
+    if args.fuzz_sources:
+        return check_fuzz_sources(args.fuzz_sources)
 
     if args.paths:
         paths, reason = args.paths, 'paths given on the command line'
@@ -338,6 +484,11 @@ def main(argv=None):
             lines.append(
                 'The candidates are not built: nothing that changed needs them (CI-34). '
                 'To build them for this branch, start "Plug-in distribution candidates" by hand on it.'
+            )
+        if workflows and 'fuzz' not in workflows:
+            lines.append(
+                'The fuzz targets do not run: nothing they are built from changed (CI-34). '
+                'To run them for this branch, start "Fuzz smoke tests" by hand on it.'
             )
         if args.workflow:
             lines.append(

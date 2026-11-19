@@ -445,6 +445,7 @@ Quantizer::Quantizer(std::size_t channels, unsigned bits, QuantizationOptions op
     // All storage is allocated here, where failure can throw; reset() only refills it.
     previous_.resize(options.dither == Dither::triangular_highpass ? channels : 0);
     errors_.resize(channels * coefficients_.size());
+    clipped_.resize(channels);
     reset();
 }
 float Quantizer::uniform() noexcept {
@@ -478,6 +479,7 @@ void Quantizer::reset() noexcept {
     for (auto& v : previous_)
         v = uniform();
     std::fill(errors_.begin(), errors_.end(), 0.0);
+    std::fill(clipped_.begin(), clipped_.end(), 0);
 }
 void Quantizer::quantize(std::span<const float> in, std::span<std::int32_t> out) noexcept {
     const auto count = std::min(in.size(), out.size());
@@ -485,6 +487,7 @@ void Quantizer::quantize(std::span<const float> in, std::span<std::int32_t> out)
     for (std::size_t i = 0; i < count; ++i) {
         const double d = dither();
         double* const e = errors_.data() + channel_ * order;
+        std::uint64_t& clips = clipped_[channel_];
         double feedback = 0;
         for (std::size_t k = 0; k < order; ++k)
             feedback += coefficients_[k] * e[k];
@@ -504,10 +507,14 @@ void Quantizer::quantize(std::span<const float> in, std::span<std::int32_t> out)
         }
         if (std::isnan(x))
             out[i] = 0;
-        else
+        else {
+            // DIAG-5: only a value beyond the range is clipped.
+            if (x > high_ || x < low_)
+                ++clips;
             out[i] = x >= high_  ? static_cast<std::int32_t>(high_)
                      : x <= low_ ? static_cast<std::int32_t>(low_)
                                  : static_cast<std::int32_t>(x);
+        }
     }
 }
 Pcm16Quantizer::Pcm16Quantizer(std::size_t channels, QuantizationOptions options)
@@ -873,6 +880,13 @@ void AudioWriter::write(std::span<const float> data) {
         throw error("audio write failed or was short", file);
     if (impl_->limited)
         impl_->wav_remaining -= static_cast<std::uint64_t>(count) * impl_->frame_bytes;
+}
+std::vector<std::uint64_t> AudioWriter::clipped_samples() const {
+    std::vector<std::uint64_t> counts;
+    if (impl_->quantizer)
+        for (std::size_t c = 0; c < impl_->info.channels; ++c)
+            counts.push_back(impl_->quantizer->clipped(c));
+    return counts;
 }
 void AudioWriter::close() {
     // Some libsndfile versions discard a container-header error during

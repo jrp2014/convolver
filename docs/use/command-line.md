@@ -80,6 +80,17 @@ it for callers that need the untrimmed stream. No input frames means no
 output audio frames. Gain is a finite decibel value; finite float output can
 exceed unity. Integer output clips to its representable range.
 
+After a render in which any sample went beyond full scale, a warning on
+stderr says so, with the number of samples clipped in each affected channel
+and that channel's peak in dBFS, and suggests `--gain-db no-clip` or how far
+to lower `--gain-db`. When no sample went beyond full scale and only
+rounding, dither or noise shaping took one over, it says that instead. A float output keeps samples above full scale, so it
+gets a note instead, since a later conversion to integer samples will clip
+them. Nothing is printed when every sample stayed within full scale, and the
+render's samples and exit status are the same either way. A sample of
+exactly +1.0 counts as clipped in integer output, since the largest positive
+integer is one step short of full scale (below); −1.0 does not.
+
 ### Gain and attenuation
 
 `--gain-db NUMBER` applies a fixed decibel gain. Negative values attenuate;
@@ -551,6 +562,7 @@ The error codes are:
 | `ir-channel` | A path names a channel its IR file does not have |
 | `rate-mismatch` | An IR file's sample rate is not the configuration's |
 | `nonportable-path` | A Windows drive, UNC or `\`-rooted path on macOS or Linux |
+| `not-utf8` | A file name in a configuration or list is not UTF-8 text (saved in a Windows code page, most likely) and no file has exactly that name |
 | `cycle` | A list includes itself |
 | `no-match` | No entry suits the requested rate and channels |
 | `limit` | A size or count limit was reached |
