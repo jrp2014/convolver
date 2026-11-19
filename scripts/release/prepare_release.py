@@ -32,15 +32,52 @@ CANDIDATE_WORKFLOW = '.github/workflows/release.yml'
 # in their words; each preview's release-notes change updates both
 # (docs/develop/releasing.md#publishing-an-unsigned-preview). The changelog
 # holds every change.
-PREVIOUS_PREVIEW = '0.13.20'
+PREVIOUS_PREVIEW = '0.13.24'
 CHANGES = (
     (
-        'A fix for the LV2 plug-in (Linux): in hosts built on JUCE, pluginval among them, changing the Gain mode '
-        'just before the host closed the plug-in (which such a host does whenever the sample rate or block size is '
-        'set) could crash the host. Closing now waits up to 100 ms for the change, as it already did for a Latency '
-        'change. This mitigates the crash rather than ruling it out: a host that runs the change more than 100 ms '
-        'later can still crash. No change to the sound or to saved state. The VST3 plug-in, the Audio Unit and the '
-        'tools are unchanged from 0.13.20 apart from the version number.'
+        'Quicker restores of the playing filter: a preset, undo step or saved state restored into a plug-in that is '
+        'already playing the same filter no longer analyses that filter again. With a 10-second stereo filter under '
+        'Gain mode Estimate, that analysis step took about 590 ms before and 2 to 5 ms now (measured on Linux). '
+        'Opening a project in a fresh session still analyses its filter once. What plays, what is saved and the '
+        'figures shown are unchanged.'
+    ),
+    (
+        'Less CPU once the sound has stopped: when the input has been exactly silent (every sample zero, as a '
+        'stopped transport gives) for longer than anything can stay in '
+        'the engine (the latency, the filter and its delays, plus an additional interval determined by the partition '
+        'layout; approximately half a second or less in the measured 48 kHz workloads), each further silent '
+        'callback writes silence without convolving, and the next sound starts at once. The saving applies only to '
+        'that silence, not to playback: on a Linux test machine such silence cost 93 to 99% less CPU, and music cost '
+        'the same as before. Only Linux was measured; macOS and Windows are not yet. The output is what it was, '
+        'except that a sample where sound cancelled to a value too small for a normal float, which used to come out '
+        'as -0, now comes out as +0. The two are numerically equal and inaudible, but a bit-for-bit comparison of '
+        'float output with an earlier version can show the difference; integer output is unchanged.'
+    ),
+    (
+        'The `convolver` command-line tool now warns after a render in which samples went beyond full scale, with '
+        "each affected channel's count of clipped samples and its peak in dBFS, and suggests `--gain-db no-clip` or "
+        'how far to lower `--gain-db`. Float output, which keeps such samples, gets a note that a later conversion '
+        'to integer samples will clip them. The samples written are unchanged.'
+    ),
+    (
+        "When a filter is refused because its sample rate differs from the host's, the suggested fix now adds: "
+        '"The host may play at a different rate from the one it exports at." Audacity, for one, plays at its '
+        "Default sample rate while it exports at the project's."
+    ),
+    (
+        'A `.cfg` file or list whose file names are not UTF-8 text, as Notepad\'s old "ANSI" encoding saves them, '
+        'now stops with an error that names the line and the byte and says how to save the file as UTF-8, unless a '
+        'file with exactly that name exists (possible on Linux). Before, on Linux, it said the file was not found '
+        'and showed a garbled name. `convolver --inspect` and `--validate` report it with the new code `not-utf8`, '
+        'where they reported `missing-asset` or `unreadable`. Convolver still reads only UTF-8.'
+    ),
+    (
+        'The plug-ins guide no longer promises that Reload when the file changes never reads a half-written file, '
+        'and recommends that tools which write filters write each file under a temporary name and then rename it.'
+    ),
+    (
+        'Behind the scenes: static analysis now covers every portable source file, and fuzz testing runs whenever '
+        'the code it covers changes, with a longer run each week.'
     ),
 )
 TAG = re.compile(r'v(\d+\.\d+\.\d+)')
@@ -154,7 +191,10 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             "Mix and Latency with the host's own controls. Each channel layout is "
             'its own plug-in. It was checked automatically, with lilv, lv2lint, pluginval and a headless Ardour '
             'session, and from a source build in PipeWire 1.6.8 on virtual devices; nobody has used it in a '
-            'desktop host yet.\n'
+            'desktop host yet. In hosts built on JUCE, pluginval among them, closing the plug-in waits up to '
+            '100 ms for a queued Latency, Gain mode or fault report. Since 0.13.24 this mitigates a host crash '
+            'rather than ruling it out: a file request the host works after closing, or a request delayed over '
+            "100 ms by another plug-in's work, can still reach the closed plug-in and crash the host.\n"
             '- The Windows window has been checked only automatically, on Windows CI machines: it opens, '
             "and the plug-in validator's window tests pass. Nobody has tried it in a Windows host or with a screen "
             'reader yet.\n'
@@ -176,9 +216,10 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             "- In Audacity, Convolver's window (Choose…, Recent or Reload) should now keep the filter for exports and "
             "saved projects, but this has been checked only by automated tests, not yet in Audacity. Audacity's own "
             'preset menu is the route that has been checked.\n'
-            '- New in 0.13.20 and checked only by automated tests: the Gain mode, a `.vstpreset` chosen in the '
-            "window, Choose… on a track with more inputs than the filter's, and a preset or undo that keeps the "
-            'playing filter.\n'
+            '- Checked only by automated tests: new in 0.14, the quicker restore of the playing filter and the '
+            'saving once the sound '
+            'has stopped; new in 0.13.20, the Gain mode, a `.vstpreset` chosen in the window, Choose… on a track '
+            "with more inputs than the filter's, and a preset or undo that keeps the playing filter.\n"
             '- Since 0.13, Latency starts at 0 frames. Some projects saved with 0.12.12 at its default of 256 frames '
             'open at 0; choose 256 again if you want its delay back '
             f'([projects from earlier versions]({docs}/plugins.md#settings)).\n'

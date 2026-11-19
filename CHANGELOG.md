@@ -53,6 +53,24 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Releases: version 0.14.0, a minor step in place of the next 0.13.x
+  patch, for the sixth unsigned developer preview, which jrp asked for on
+  19 November 2026 ([decision](docs/project/decisions.md#releases)); C++
+  consumers request `find_package(Convolver 0.14)`. Its draft notes list
+  what changed for users since 0.13.24: quicker restores of a filter that
+  is already playing, less CPU once the sound has stopped (measured on
+  Linux only, with -0 output samples now +0), the command-line tool's
+  clipping report, the Fix line of a sample-rate refusal, the error and
+  inspection code for a `.cfg` file name that is not UTF-8, the plug-ins
+  guide on Reload when the file changes, the wider static analysis and the
+  longer weekly fuzz run. The known limitations say that the quicker
+  restores and the saving once the sound has stopped are checked only by
+  automated tests. After jrp's review of 19 November 2026, they also say
+  that LV2-9's 100 ms wait on closing mitigates the JUCE host crash rather
+  than ruling it out (also now in TODO's documented limitations), and that
+  the idle starts after an interval set by the partition layout, about
+  half a second or less in the measured 48 kHz workloads. No change to
+  what the packages run or hold beyond the version number.
 - Documentation (DOC-16, from jrp's review of 18 November 2026): the
   plug-ins guide no longer promises that Reload when the file changes never
   reads a file part-way: waiting until a change has held for a second makes
