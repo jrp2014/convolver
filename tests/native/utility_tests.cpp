@@ -2,6 +2,7 @@
 #include "bytes.hpp"
 #include "cases.hpp"
 #include "file.hpp"
+#include "utf8.hpp"
 #include <array>
 #include <chrono>
 #include <filesystem>
@@ -102,12 +103,26 @@ void files_test(const fs::path& dir) {
     require(created[0] != created[1] && contents(race) == data,
             "exactly one concurrent exclusive creator must succeed");
 }
+// CFG-3: well-formed UTF-8 (RFC 3629) and the escaped form messages use.
+void utf8_test() {
+    for (const char* good : {"", "ir.wav", "ir \xc3\xbc.wav", "\xe2\x82\xac", "\xed\x9f\xbf",
+                             "\xf0\x9f\x8e\xb5", "\xf4\x8f\xbf\xbf"})
+        require(valid_utf8(good), "well-formed UTF-8 refused");
+    for (const char* bad :
+         {"ir_\xfc.wav", "\x80", "\xc0\xaf", "\xc1\xbf", "\xe0\x80\xaf", "\xed\xa0\x80",
+          "\xf0\x80\x80\xaf", "\xf4\x90\x80\x80", "\xf5\x80\x80\x80", "\xc3", "\xe2\x82", "\xff"})
+        require(!valid_utf8(bad), "malformed UTF-8 accepted");
+    require(utf8_escaped("ir_\xfc.wav") == "ir_\\xFC.wav", "a stray byte is escaped");
+    require(utf8_escaped("\xc3\xbc\xe9\xc3") == "\xc3\xbc\\xE9\\xC3",
+            "only bytes outside well-formed characters are escaped");
+}
 int main() {
     const auto dir = fs::temp_directory_path() /
                      ("convolver-utilities-" +
                       std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     const auto failed = convolver::test::run_cases({
         {"bytes_test", bytes_test},
+        {"utf8_test", utf8_test},
         {"files_test",
          [&] {
              require(fs::create_directory(dir), "create temporary directory");

@@ -181,18 +181,7 @@ class Json {
     }
     // Length of one well-formed UTF-8 sequence at the start of s, or zero.
     static std::size_t utf8_length(std::string_view s) {
-        const auto b = [&](std::size_t i) { return static_cast<unsigned char>(s[i]); };
-        const auto c0 = b(0);
-        std::size_t n = c0 >= 0xf0 ? 4 : c0 >= 0xe0 ? 3 : c0 >= 0xc2 ? 2 : 0;
-        if (!n || c0 > 0xf4 || s.size() < n)
-            return 0;
-        for (std::size_t i = 1; i < n; ++i)
-            if ((b(i) & 0xc0) != 0x80)
-                return 0;
-        if ((c0 == 0xe0 && b(1) < 0xa0) || (c0 == 0xed && b(1) > 0x9f) ||
-            (c0 == 0xf0 && b(1) < 0x90) || (c0 == 0xf4 && b(1) > 0x8f))
-            return 0; // Overlong, surrogate or beyond U+10FFFF.
-        return n;
+        return detail::utf8_character_length(s);
     }
     std::vector<bool> first_;
     bool pending_ = false;

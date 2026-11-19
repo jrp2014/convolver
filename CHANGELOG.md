@@ -37,6 +37,15 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Configurations (CFG-3, first part): a file name in a `.cfg` or list that
+  is not UTF-8 text, as in a file saved in Windows-1252 (Notepad's old
+  "ANSI"), now stops with an error that says so: its line, the byte that is
+  wrong, the likely cause and how to save the file as UTF-8. Before, on
+  Linux, it stopped with "IR file not found" and a garbled name. Its
+  inspection code is the new `not-utf8`, where it was `missing-asset` (or
+  `unreadable` for a list entry). On Linux a file with exactly those bytes
+  in its name still loads. Convolver still reads only UTF-8; whether it should
+  also read Windows-1252 is open for jrp.
 - Plug-ins (PLUG-25, first part): a refusal because the filter's rate
   differs from the host's ends its Fix with the sentence jrp agreed on 8
   November 2026, "The host may play at a different rate from the one it
