@@ -1220,6 +1220,11 @@ move to the archive.
   Accelerate and Ooura builds, and the g++ and MSVC core-only builds,
   leave out
   ([which configurations run which tests](docs/develop/testing.md#which-configurations-run-which-tests)).
+- [x] **DIAG-8 — Say why +1.0 clips without claiming it always does.** 19
+  November 2026, from jrp's review of `212fe6e`: DIAG-5's clipping report
+  said "+1.0 always clips", untrue with dither; it now says +1.0 is above
+  the largest representable positive integer sample, so leave headroom for
+  quantization ([file rendering](docs/use/command-line.md#file-rendering)).
 - [x] **DOC-17 — Keep product claims current and substantiated.** 19
   November 2026, PR #216, from jrp's edits on `codex/maintain-product-claims`
   (`c623b23`), reconciled with DOC-16: claims in the README, user guides and
