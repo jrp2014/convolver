@@ -80,8 +80,10 @@ Until 1.0 the C++ API may change between minor versions.
   section says how claims in the README, user guides and release notes stay
   current: each rests on a guide, test or dated measurement, keeps that
   evidence's scope, is updated in the change that affects it and is narrowed
-  when the evidence no longer supports it. The definition of done, the
-  review checklist, the pull request template and AGENTS.md link to it.
+  when the evidence no longer supports it. The workflow's while-working
+  list, the definition of done, the review checklist, the pull request
+  template and AGENTS.md link to it, and the release steps check a draft's
+  notes and download links against its tag and files before publishing.
 - Configurations (CFG-3, first part): a file name in a `.cfg` or list that
   is not UTF-8 text, as in a file saved in Windows-1252 (Notepad's old
   "ANSI"), now stops with an error that says so: its line, the byte that is

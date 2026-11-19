@@ -79,6 +79,9 @@ repository; recording a review's or a host test's results in it is a change.
 - **Keep commits focused.** State the audible or numerical effect of a DSP
   change in its commit message ([AGENTS.md](../../AGENTS.md#rules)).
 - **Update the handoff note** whenever you stop, even for a short break.
+- **Keep product claims in step.** When your change affects a claim in the
+  README, a user guide or the release notes, update it, summaries included,
+  in the same change ([claims rule](documentation.md#current-claims-and-dated-evidence)).
 - **Do not make the owner's decisions.** Ask jrp before changing anything that
   is permanent or changes what users get: plug-in identities (IDs, URIs, AU
   codes), state or preset formats, `.cfg` syntax, licences, defaults that

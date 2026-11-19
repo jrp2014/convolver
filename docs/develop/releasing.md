@@ -337,8 +337,10 @@ limitation that no longer holds is removed. Its merge makes the tag.
    shows the notes and links to the draft. A pull request that changes the
    workflow or its scripts runs a dry run on the newest candidate run on a
    tag: every check, the clean-machine jobs and the notes, but no draft.
-5. Read the draft as a user would, edit its notes if needed (a draft's notes
-   can change; its files must not), then press **Publish release**. To start
+5. Read the draft as a user would, and check its notes against the tag and
+   the attached files: the version, what changed, the known limitations and
+   the download links. Edit its notes if needed (a draft's notes can change;
+   its files must not), then press **Publish release**. To start
    again, delete the draft and run step 4 again. Never replace or edit an
    asset after publication; a fix gets a new version.
 6. Download one asset from the published page and compare it with its line

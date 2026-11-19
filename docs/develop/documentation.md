@@ -152,7 +152,7 @@ can act on it without a separate copy of the rules:
 | Open work | [TODO](../../TODO.md) | Current source and linked issues/plans |
 | Claiming, handing over and reviewing work | [Workflow](workflow.md) | Pull request template, repository checks, `.claude/skills/` (pointers only) |
 | How documentation is organised and written | This page | The index, the link and repository checks |
-| Product claims in the README, user guides and release notes | [Current claims](#current-claims-and-dated-evidence) on this page; the workflow and the pull request template link to it | The guide, test or dated measurement behind each claim; the published release |
+| Product claims in the README, user guides and release notes | [Current claims](#current-claims-and-dated-evidence) on this page; the workflow, the pull request template and AGENTS.md link to it | The guide, test or dated measurement behind each claim; the published release |
 | Past releases and provenance | [History](../project/history.md) and dated records | Recorded evidence; never rewrite a past result as current |
 
 Short summaries may link to these pages; avoid copying their option lists,
@@ -204,8 +204,9 @@ and match their evidence:
 - When code, defaults, dependencies, measurements or a release change, search
   for the claims they affect and update them, summaries included, in the same
   change. Do not describe an unpublished build as released: download links
-  name a published release, and a draft's notes are read against its tag and
-  files before jrp publishes ([publishing](releasing.md#publishing-an-unsigned-preview)).
+  name a published release. Before publication, check the download links and
+  the generated release notes against the actual tag and packages (step 5 of
+  [publishing](releasing.md#publishing-an-unsigned-preview)).
 - Keep the scope of the evidence: format, host, platform, settings and workload.
   Avoid words such as "latest", "all platforms" and "fully tested" without a
   defined scope. Benchmarks describe a named build and machine, not a universal
