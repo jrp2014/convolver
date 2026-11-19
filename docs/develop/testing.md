@@ -1406,8 +1406,10 @@ against the current program as well as checking links.
 ## Fuzz smoke tests and longer campaigns
 
 [The fuzz guide](../../tests/fuzz/README.md) describes the four harnesses and corpus
-replay. CI runs each libFuzzer target for 60 seconds on pull requests and
-`main`, with ASan/UBSan and resource bounds. The campaigns run side by side,
+replay. CI runs each libFuzzer target for 60 seconds on `main` and on pull
+requests that change what the targets are built from
+([when](#when-pull-requests-run-the-fuzz-targets)), and for 600 seconds each
+Monday, with ASan/UBSan and resource bounds. The campaigns run side by side,
 at most one per physical core, so each keeps a core to itself for its whole
 budget; each log ends with the campaign's `Done N runs` count. The Linux
 runner's 4 CPUs are 2 cores with 2 hardware threads each, so two campaigns
@@ -1593,7 +1595,9 @@ when started by hand; a pull request that changes only documentation skips
 their builds and tests ([below](#documentation-only-pull-requests)). The
 candidate workflow runs for a pull request only when it changes what the
 packages are built from or hold
-([below](#when-pull-requests-build-the-candidates)). A commit pushed to a branch that has a pull request runs
+([below](#when-pull-requests-build-the-candidates)), and the fuzz workflow
+only when it changes what the fuzz targets are built from
+([below](#when-pull-requests-run-the-fuzz-targets)). A commit pushed to a branch that has a pull request runs
 once, as part of that pull request; a branch without one gets no automatic
 run, so open the draft pull request early ([workflow](workflow.md#before-you-start))
 or use Actions, then "Run workflow" on the branch. A new commit on a pull request
@@ -1663,7 +1667,10 @@ forever on a documentation-only pull request.
 A pull request that changes only one format's own files, apart from
 documentation, runs Lint and that format's workflows; the `scope` job of every
 other workflow skips it (CI-13). A change to one workflow file alone runs that
-workflow. Anything else in the same pull request runs everything.
+workflow. Anything else in the same pull request runs every workflow, apart
+from the [candidates](#when-pull-requests-build-the-candidates) and the
+[fuzz targets](#when-pull-requests-run-the-fuzz-targets), which have lists
+of their own.
 
 | Files changed | Workflows that build and test |
 | --- | --- |
@@ -1745,6 +1752,56 @@ Actions, then "Run workflow", or
 pull request's checks; link it in the pull request. A pull request whose
 changed files cannot be listed still builds everything.
 
+### When pull requests run the fuzz targets
+
+The fuzz workflow builds four libFuzzer targets and runs each for 60
+seconds, about 3 minutes on one Linux runner. Many code pull requests change
+nothing the targets read (about a third of the runs measured below), so a
+pull request runs them only when it changes what they are built from (CI-34,
+chosen by jrp on 18 November 2026):
+
+- the harnesses, seeds and regression inputs in `tests/fuzz/`, and the
+  files the workflow runs: `fuzz_campaigns.sh`, `ci_scope.py` and the
+  `use-every-cpu` action;
+- the sources compiled into the targets: the configuration and list parsers
+  (`config.cpp`, `config_parse.cpp`), the audio reader (`sound_files.cpp`,
+  `io.cpp`), the state decoder (`state.cpp`) and the headers they include,
+  among them `convolver/host.hpp`, and the engine, kernels and FFTW backend,
+  which the state decoder's call to `validate_configuration()` brings in;
+- the build configuration: the top-level `CMakeLists.txt` and `cmake/`;
+- the fuzz workflow itself.
+
+The list is `FUZZED` in `ci_scope.py`. Every run of the workflow checks it
+against the targets themselves: `llvm-dwarfdump --show-sources` lists every
+file compiled into them, and `ci_scope.py --fuzz-sources` fails if a
+repository file among them is missing from `FUZZED`, if a file the build
+wrote (a generated header, made from files `FUZZED` may not name) is among
+them without its name in `FUZZED_GENERATED`, or if any of the four harnesses
+is missing from the list. A new dependency has to be added in a file already
+compiled in, so the pull request that adds it runs the workflow and fails
+there. `tests/ci_scope_tests.py` (in pre-commit)
+checks that every entry exists and that the listed sources include no
+unlisted header.
+
+| Event | Fuzz targets | Seconds per target |
+| --- | --- | --- |
+| Pull request that changes a file in `FUZZED` or `fuzz.yml` | Run | 60 |
+| Other pull request | Skipped; the `scope` job says why | — |
+| Pull request whose changed files cannot be listed, or that changes nothing | Run | 60 |
+| Push to `main` | Run | 60 |
+| Each Monday at 06:23 UTC | Run | 600 |
+| Started by hand ("Run workflow" on any branch) | Run | the `seconds` input, 600 by default |
+
+The committed seeds and regression inputs still replay through each harness,
+without libFuzzer, in every native build (`fuzz.replay.*`,
+[below](#which-configurations-run-which-tests)), so every code pull request
+still checks the inputs fuzzing has found. Before this change the
+pull-request runs of 10 to 18 November 2026 included 37 complete fuzz runs
+(median 180 seconds); counting each branch's files as merged, 11 of them, 35
+of their 118 runner-minutes, would have been skipped. The job was never the
+last to finish, so the saving is in Linux runners and jobs, not in the time
+to a result.
+
 ### Which configurations run which tests
 
 A local build runs every CTest entry. CI runs each kind of test only where
@@ -1817,8 +1874,8 @@ flag and every included header, so a cached object is reused only for an
 identical compilation; the cache key (workflow, job and matrix entry) only
 chooses which earlier cache to start from. Pull requests restore the cache that
 `main` saved and never save one, so the repository's 10 GB cache stays bounded
-and a pull request cannot change what `main` builds from; pushes to `main` and
-manual runs save theirs. Each job's log ends with ccache's hit statistics.
+and a pull request cannot change what `main` builds from; pushes to `main`,
+scheduled and manual runs save theirs. Each job's log ends with ccache's hit statistics.
 
 The Windows jobs use the Visual Studio generator, which takes no compiler
 launcher, and the release candidates are built without a cache, from the

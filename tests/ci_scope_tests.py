@@ -158,6 +158,9 @@ class Classification(unittest.TestCase):
 
         everything = set(ci_scope.WORKFLOWS)
         builds = everything - {'release'}
+        # Code the fuzz targets are not built from skips them too (CI-34).
+        unfuzzed = everything - {'fuzz'}
+        others = builds - {'fuzz'}
         # A format's own code runs its workflows; the candidates, which package
         # the VST3 plug-in, the Audio Unit and LV2, build for it only on main or
         # by hand (CI-34).
@@ -176,8 +179,9 @@ class Classification(unittest.TestCase):
         self.assertEqual(
             runs(['plugins/editor/mac/setting_rows.mm', 'tests/au/editor_tests.mm']), {'vst3', 'au', 'release'}
         )
-        self.assertEqual(runs(['plugins/editor/mac/setting_rows.mm', 'plugins/identities.json']), everything)
-        self.assertEqual(runs(['plugins/editor/mac/setting_rows.mm', 'portable/host.cpp']), everything)
+        self.assertEqual(runs(['plugins/editor/mac/setting_rows.mm', 'plugins/identities.json']), unfuzzed)
+        self.assertEqual(runs(['plugins/editor/mac/setting_rows.mm', 'portable/host.cpp']), unfuzzed)
+        self.assertEqual(runs(['plugins/editor/mac/setting_rows.mm', 'portable/state.cpp']), everything)
         self.assertEqual(runs(['plugins/au/effect.hpp', 'docs/use/plugins.md']), {'au', 'release'})
         self.guides['docs/use/plugins.md'] = ['Prose only.\n', 'Changed prose.\n']
         self.assertEqual(runs(['plugins/au/effect.hpp', 'docs/use/plugins.md']), {'au'})
@@ -185,13 +189,14 @@ class Classification(unittest.TestCase):
         self.assertEqual(runs(['.github/workflows/release.yml']), {'release'})
         self.assertEqual(runs(['.github/workflows/lint.yml']), set())
         self.assertEqual(runs(['plugins/au/effect.hpp', 'portable/engine.cpp']), builds)
-        self.assertEqual(runs(['plugins/au/effect.hpp', 'tests/plugins/harness.hpp']), builds)
-        self.assertEqual(runs(['tests/vst3/fft_symbols.py']), builds)
+        self.assertEqual(runs(['plugins/au/effect.hpp', 'tests/plugins/harness.hpp']), others)
+        self.assertEqual(runs(['tests/vst3/fft_symbols.py']), others)
+        self.assertEqual(runs(['tests/vst3/fft_symbols.py', '.github/workflows/fuzz.yml']), builds)
         # Release files: only the candidates, unless other workflows use them too.
         self.assertEqual(runs(['scripts/release/candidate.py', 'tests/release/package_smoke.py']), {'release'})
         self.assertEqual(runs(['packaging/macos/Distribution.xml', 'TODO.md']), {'release'})
-        self.assertEqual(runs(['scripts/release/resolve.py']), everything)
-        self.assertEqual(runs(['packaging/release-policy.json']), everything)
+        self.assertEqual(runs(['scripts/release/resolve.py']), unfuzzed)
+        self.assertEqual(runs(['packaging/release-policy.json']), unfuzzed)
         self.assertEqual(runs(['scripts/release/candidate.py', 'plugins/au/effect.hpp']), {'au', 'release'})
         self.assertEqual(ci_scope.decide(['plugins/au/effect.hpp'], 'release'), {'build': False, 'package': False})
         self.assertEqual(ci_scope.decide(['plugins/lv2/plugin.cpp'], 'release'), {'build': False, 'package': False})
@@ -256,6 +261,85 @@ class Classification(unittest.TestCase):
         for path in skip:
             with self.subTest(path=path):
                 self.assertFalse(ci_scope.candidates([path]))
+
+    def test_fuzz_targets(self):
+        """A pull request runs the fuzz targets only when it changes what they
+        are built from, or the fuzz workflow (CI-34)."""
+        fuzz = (
+            'tests/fuzz/fuzz_config_text.cpp',
+            'tests/fuzz/replay_main.cpp',
+            'tests/fuzz/seeds/host_state/identity',
+            'tests/fuzz/regressions/ir_file/sample-rate-out-of-range.wav',
+            'tests/fuzz/scheduler_tests.py',
+            'scripts/fuzz_campaigns.sh',
+            'scripts/ci_scope.py',
+            '.github/actions/use-every-cpu/action.yml',
+            '.github/workflows/fuzz.yml',
+            'CMakeLists.txt',
+            'cmake/FindConvolverSndFile.cmake',
+            'portable/config_parse.cpp',
+            'portable/sound_files.hpp',
+            'portable/io.cpp',
+            'portable/state.cpp',
+            'portable/engine.cpp',
+            'portable/kernels.inc',
+            'include/convolver/host.hpp',
+        )
+        skip = (
+            'tests/fuzz/README.md',  # Documentation.
+            'portable/host.cpp',
+            'portable/presets.cpp',
+            'portable/filter_file.cpp',
+            'portable/main.cpp',
+            'portable/inspection.cpp',
+            'portable/fft_ooura.cpp',  # Not the runner's FFT backend.
+            'portable/third_party/ooura/fftsg.cpp',
+            'include/convolver/inspection.hpp',
+            'tests/native/engine_tests.cpp',
+            'tests/plugins/harness.hpp',
+            'tests/compatibility/README.md',
+            'historical/Common/foo.cpp',
+            'scripts/release/resolve.py',
+            'plugins/vst3/processor.cpp',
+            '.github/workflows/regression.yml',
+            'CMakePresets.json',
+            'VERSION',
+            'TODO.md',
+        )
+        for path in fuzz:
+            with self.subTest(path=path):
+                self.assertIn('fuzz', ci_scope.needed([path]))
+                self.assertTrue(ci_scope.decide([path], 'fuzz')['build'])
+        for path in skip:
+            with self.subTest(path=path):
+                self.assertNotIn('fuzz', ci_scope.needed([path]))
+                self.assertFalse(ci_scope.decide([path], 'fuzz')['build'])
+        # One fuzzed file among others runs them; nothing listed, or no list, runs everything.
+        self.assertIn('fuzz', ci_scope.needed(['portable/host.cpp', 'TODO.md', 'portable/state.cpp']))
+        self.assertIn('fuzz', ci_scope.needed(['plugins/lv2/plugin.cpp', '.github/workflows/fuzz.yml']))
+        self.assertEqual(ci_scope.needed([]), set(ci_scope.WORKFLOWS))
+        # Other code still runs every other workflow.
+        self.assertEqual(ci_scope.needed(['portable/host.cpp']), set(ci_scope.WORKFLOWS) - {'fuzz', 'release'})
+
+    def test_fuzzed_entries_exist_and_hold_their_includes(self):
+        """Every FUZZED entry exists, and the sources it lists include no
+        repository header it leaves out. The fuzz workflow checks the rest,
+        the files the linker brings in, from the targets themselves."""
+        include = re.compile(r'^\s*#\s*include\s*"([^"]+)"', re.MULTILINE)
+        for entry in ci_scope.FUZZED:
+            with self.subTest(entry=entry):
+                self.assertTrue((ROOT / entry).exists())
+        for source, text in tracked():
+            if not ci_scope.matches(source, ci_scope.FUZZED) or not source.endswith(('.cpp', '.hpp', '.inc', '.h')):
+                continue
+            for name in include.findall(text):
+                for base in (ROOT / source).parent, ROOT / 'portable', ROOT / 'include':
+                    header = (base / name).resolve()
+                    if header.is_file():
+                        relative = header.relative_to(ROOT).as_posix()
+                        with self.subTest(source=source, header=relative):
+                            self.assertTrue(ci_scope.matches(relative, ci_scope.FUZZED))
+                        break
 
     def test_guides(self):
         """A guide in docs/use/ builds the candidates only when it has a
@@ -565,6 +649,57 @@ class Command(unittest.TestCase):
         for event in ('push', 'workflow_dispatch', 'schedule'):
             with self.subTest(event=event):
                 self.assertEqual(self.run_script(event=event)[0], 'build=true\npackage=true\n')
+
+    def test_fuzz_workflow_answer(self):
+        written, printed = self.run_script('--workflow', 'fuzz', 'portable/host.cpp')
+        self.assertEqual(written, 'build=false\npackage=false\n')
+        self.assertIn('The fuzz targets do not run', printed)
+        written, printed = self.run_script('--workflow', 'fuzz', 'portable/config_parse.cpp')
+        self.assertEqual(written, 'build=true\npackage=false\n')
+        self.assertNotIn('The fuzz targets do not run', printed)
+
+    def test_fuzz_sources(self):
+        """--fuzz-sources passes for the listed sources, ignores files outside
+        the repository's tracked ones, and fails for an unlisted repository
+        file or a list with no harness in it."""
+
+        def check(*lines):
+            return subprocess.run(
+                [sys.executable, str(SCRIPT), '--fuzz-sources', '-'],
+                check=False,
+                cwd=ROOT,
+                env=CLEAN,
+                input=''.join(line + '\n' for line in lines),
+                capture_output=True,
+                text=True,
+            )
+
+        harnesses = sorted(str(path) for path in (ROOT / 'tests/fuzz').glob('fuzz_*.cpp'))
+        self.assertEqual(len(harnesses), 4)
+        listed = (*harnesses, str(ROOT / 'portable/state.cpp'), 'include/convolver/host.hpp')
+        outside = ('/usr/include/c++/13/string', str(ROOT / 'build-fuzz/<stdin>'), '<stdin>')
+        result = check(*listed, *outside)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        result = check(*listed, str(ROOT / 'portable/host.cpp'))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('  portable/host.cpp', result.stderr)
+        self.assertNotIn('state.cpp', result.stderr)
+        # A file the build wrote (a generated header) has inputs FUZZED may not name.
+        with tempfile.TemporaryDirectory(dir=ROOT) as temporary:
+            written = Path(temporary) / 'generated' / 'convolver_identities.hpp'
+            written.parent.mkdir()
+            written.write_text('// generated\n')
+            result = check(*listed, str(written))
+            self.assertEqual(result.returncode, 1)
+            self.assertIn('written by the build', result.stderr)
+            self.assertIn(written.relative_to(ROOT).as_posix(), result.stderr)
+            with mock.patch.object(ci_scope, 'FUZZED_GENERATED', ('convolver_identities.hpp',)):
+                self.assertEqual(ci_scope.fuzz_sources([*listed, str(written)], ROOT), ([], [], []))
+        # Every harness must be there: a list from fewer targets, or none, fails.
+        result = check(*listed[1:])
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('  tests/fuzz/' + Path(harnesses[0]).name, result.stderr)
+        self.assertEqual(check().returncode, 1)
 
     def test_pull_request_merge_commit(self):
         def git(*args):

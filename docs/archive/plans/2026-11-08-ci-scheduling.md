@@ -4,8 +4,18 @@
 For CI maintainers: a separate, proposed workstream (CI-34) to reduce duplicated
 builds and queueing while preserving the tests that protect Convolver.
 
+**Finished 18 November 2026** (PR #207, after PR #154): pull requests build
+the candidates and run the fuzz targets only when they change what those are
+built from, and `main`, the weekly and manual runs keep both. Every other
+workflow's triggers are unchanged, so every test configuration keeps a
+trigger; the
+[CI triggers](../../develop/testing.md#when-pull-requests-run-the-fuzz-targets)
+describe how it works now, with the measured effect. Post-merge duplication
+was left unchanged, as below. This page is the plan as it stood, with its
+boxes ticked where done.
+
 **In short:** implement scheduling changes only in a dedicated PR. The
-[preview acceptance plan](../../archive/plans/2026-11-08-preview-acceptance.md), now archived, went ahead independently.
+[preview acceptance plan](2026-11-08-preview-acceptance.md), now archived, went ahead independently.
 This page changes no workflow and authorises no test removal or weaker threshold.
 The first step is done: since 8 November 2026 a pull request builds the
 candidates only when it changes what they are built from or hold
@@ -39,11 +49,14 @@ approved by jrp to stop spending a candidate run on each code tweak.
   branch. Most code pull requests also change a page in `docs/use/`, so jrp
   chose the same day that such a change builds the candidates only when the
   page has a command they run, before or after the change.
-- [ ] Evaluate narrower fuzz-campaign triggers covering configuration/list
+- [x] Evaluate narrower fuzz-campaign triggers covering configuration/list
   parsing, audio readers, saved-state decoding and all shared code, headers,
   limits, dependencies, harnesses and build options those targets depend on.
   Add a scheduled campaign and retain manual execution. Known crash-input
   replay remains in ordinary applicable tests.
+  Done 18 November 2026: the list is what the targets' debug information
+  says is compiled into them, checked on every fuzz run; the Monday run gives
+  each target 600 seconds.
 - [ ] Preserve existing documentation and per-format scoping. Do not add
   unconditional Windows/AU builds to prose-only PRs. Unknown paths or failed
   change detection must conservatively run coverage, not silently skip it.
