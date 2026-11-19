@@ -127,8 +127,11 @@ jobs:
           cmake --preset core-only -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
             -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON
           cmake --build --preset core-only --parallel "$CMAKE_BUILD_PARALLEL_LEVEL"
+          # CI-41: g++'s full build is Release like this one, so it leaves out
+          # the backend-independent label; the Clang jobs' full builds are
+          # Debug with sanitizers, so their core-only Release build keeps it.
           ctest --preset core-only --output-junit junit.xml --parallel "$CTEST_PARALLEL_LEVEL" \
-            -LE backend-independent
+            ${{ matrix.cxx == 'g++' && '-LE backend-independent' || '' }}
       # The default macOS build: AUTO must choose Accelerate and need no FFTW.
       - name: Configure Accelerate
         if: runner.os == 'macOS'

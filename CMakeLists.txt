@@ -384,8 +384,9 @@ if(CONVOLVER_BUILD_NATIVE)
         # PERF-10 to PERF-12: the load-timing harness, on made-up records and
         # briefly with a mock adapter (about 9 s of real time, 20 to 24 s on
         # the macOS CI runner). No FFT backend or core-only shape changes
-        # its result, so CI runs it once per job (CI-41, label
-        # backend-independent; docs/develop/testing.md#which-configurations-run-which-tests).
+        # its result, so CI runs it once per compiler and build type in each
+        # job (CI-41, label backend-independent;
+        # docs/develop/testing.md#which-configurations-run-which-tests).
         convolver_native_test(native.load_timing_harness convolver_load_timing_harness_tests
             SOURCES tests/native/load_timing_harness_tests.cpp tests/plugins/load_timing.cpp
             LIBRARIES Convolver::host Threads::Threads
