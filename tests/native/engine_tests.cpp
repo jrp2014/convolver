@@ -380,6 +380,145 @@ void layouts() {
         close(run(engine, in, expected.size() / c.output_channels, chunks), expected, latency);
     }
 }
+// EDGE-11: an engine skips silent input once silence has outlasted
+// everything that reaches its output. Its output must stay bit-identical to
+// processing that silence, so compare it, sign of zero and NaN payloads
+// included, with an engine built while idling is disabled. Bursts of noise
+// separate silences shorter and longer than the filter, made of +0, -0 or
+// empty spans, over random routing, delays, latencies, host callback sizes
+// and a reset that may come during a silence. Some bursts are near the
+// smallest normal float, so that sums cancel to subnormals, which the engine
+// flushes to zero of either sign (found by the independent review).
+bool same_bits(const std::vector<float>& a, const std::vector<float>& b) {
+    return std::equal(a.begin(), a.end(), b.begin(), b.end(), [](float x, float y) {
+        return std::bit_cast<std::uint32_t>(x) == std::bit_cast<std::uint32_t>(y);
+    });
+}
+// Feeds both engines the same calls: `silent` frames are passed as an empty
+// span when `empty` is set for the call's segment.
+struct Gapped {
+    std::vector<float> input;
+    std::vector<bool> silent;
+    std::size_t frames = 0;
+};
+void run_both(Engine& idling, Engine& reference, const Gapped& g, std::size_t reset_at,
+              std::mt19937& random) {
+    const auto inputs = idling.input_channels(), outputs = idling.output_channels();
+    const auto& layout = detail::partition_layout();
+    std::vector<float> a(g.frames * outputs, 1), b(g.frames * outputs, 2);
+    for (std::size_t done = 0; done < g.frames;) {
+        if (done == reset_at) {
+            idling.reset();
+            reference.reset();
+        }
+        auto n = std::min<std::size_t>(1 + random() % (3 * layout.largest), g.frames - done);
+        if (done < reset_at)
+            n = std::min(n, reset_at - done);
+        // An empty span only where every frame of the call is silent.
+        const bool empty =
+            random() % 2 && std::all_of(g.silent.begin() + done, g.silent.begin() + done + n,
+                                        [](bool v) { return v; });
+        const auto in = empty ? std::span<const float>{}
+                              : std::span<const float>(g.input).subspan(done * inputs, n * inputs);
+        idling.process(in, std::span<float>(a).subspan(done * outputs, n * outputs), n);
+        reference.process(in, std::span<float>(b).subspan(done * outputs, n * outputs), n);
+        done += n;
+    }
+    if (!same_bits(a, b))
+        throw std::runtime_error("output after silence differs from processing it");
+}
+void idle_after_tail() {
+    std::mt19937 random(0xed6e11);
+    std::uniform_real_distribution<float> sample(-.6f, .6f);
+    const auto& layout = detail::partition_layout();
+    const auto largest = layout.largest;
+    const auto build = [](const Configuration& c, std::size_t latency, bool idle) {
+        detail::disable_idle(!idle);
+        Engine e(c, latency);
+        detail::disable_idle(false);
+        return e;
+    };
+    // The default layout's long blocks make each trial long: fewer, shorter
+    // ones, within the test's time limit in sanitized Ooura builds.
+    const bool long_blocks = largest > 1024;
+    const std::size_t trials = long_blocks ? 2 : 24;
+    for (std::size_t trial = 0; trial < trials; ++trial) {
+        const std::size_t latencies[] = {0, 1, layout.first, layout.first + 3, 2 * largest + 37};
+        const auto latency = latencies[trial % std::size(latencies)];
+        Configuration c{48000, 1 + random() % 2, 1 + random() % 3, 0, {}, {}, {}};
+        if (trial % 2)
+            for (std::size_t i = 0; i < c.input_channels; ++i)
+                c.input_delays.push_back(random() % 9);
+        if (trial % 3)
+            for (std::size_t i = 0; i < c.output_channels; ++i)
+                c.output_delays.push_back(random() % 9);
+        std::size_t longest = 0;
+        for (std::size_t path = 0, count = 1 + random() % 4; path < count; ++path) {
+            FilterPath p;
+            p.impulse.resize(1 + random() % ((long_blocks ? 2 : 6) * largest + 2 * layout.first));
+            for (auto& x : p.impulse)
+                x = sample(random);
+            longest = std::max(longest, p.impulse.size());
+            p.inputs = {{random() % c.input_channels, random() % 5 ? sample(random) : 0.f}};
+            p.outputs = {{random() % c.output_channels, sample(random)}};
+            c.paths.push_back(std::move(p));
+        }
+        // Silences from none to about three times what reaches the output.
+        const auto reach = longest + latency + 8 * largest + 32;
+        Gapped g;
+        const auto add = [&](std::size_t frames, bool noise, float zero) {
+            const bool tiny = random() % 3 == 0;
+            for (std::size_t t = 0; t < frames * c.input_channels; ++t)
+                g.input.push_back(!noise  ? zero
+                                  : !tiny ? sample(random)
+                                          : sample(random) * 0x1p-120f +
+                                                (random() % 2 ? 1.3e-38f : -1.3e-38f));
+            g.silent.insert(g.silent.end(), frames, !noise);
+            g.frames += frames;
+        };
+        for (std::size_t segment = 0; segment < (long_blocks ? 4 : 7); ++segment) {
+            add(1 + random() % (2 * largest), true, 0);
+            const auto zero = random() % 3 ? 0.f : -0.f;
+            add(random() % 4 ? random() % (3 * reach) : random() % largest, false, zero);
+        }
+        Engine idling = build(c, latency, true), reference = build(c, latency, false);
+        const auto reset_at = trial % 3 ? random() % g.frames : g.frames;
+        run_both(idling, reference, g, reset_at, random);
+    }
+    // The independent review's finding: sound after an idle can cancel in an
+    // output ring frame to a negative subnormal, which the flushing makes
+    // -0, where a spread block begun on the silence, still running without
+    // idling, would have added +0. The engine therefore never outputs -0.
+    // Two paths of one tap share a mix, with gains 1 and -(1 + 2^-22), so
+    // the direct sum leaves -x 2^-22 in each frame: flushed to -0 for tiny
+    // positive x.
+    {
+        const Configuration c{48000,
+                              1,
+                              1,
+                              0,
+                              {},
+                              {},
+                              {{{1}, {{0, 1}}, {{0, 1}}}, {{1}, {{0, 1}}, {{0, -(1 + 0x1p-22f)}}}}};
+        Engine engine(c, 0);
+        std::vector<float> in(64, 1e-32f), out(64, 1);
+        engine.process(in, out, 64);
+        require(std::all_of(out.begin(), out.end(),
+                            [](float x) { return std::bit_cast<std::uint32_t>(x) == 0; }),
+                "the engine output -0");
+    }
+    // A finite filter whose transform overflows: silence through it is NaN,
+    // never the zeros an idle engine would write.
+    Configuration overflow = mono(std::vector<float>(4 * largest + 3, 3e38f));
+    Engine idling = build(overflow, 0, true), reference = build(overflow, 0, false);
+    Gapped g;
+    g.input.assign(20 * largest, 0.f);
+    g.input[0] = 1e-30f;
+    g.silent.assign(g.input.size(), true);
+    g.silent[0] = false;
+    g.frames = g.input.size();
+    run_both(idling, reference, g, g.frames, random);
+}
 void no_processing_allocation() {
     Engine engine(mono(std::vector<float>(71, .01f)), 7);
     std::vector<float> input(100, 1), output(100);
@@ -387,6 +526,10 @@ void no_processing_allocation() {
     try {
         engine.process(input, output, 100);
         engine.process({}, output, 100);
+        // Long enough for the engine to skip silent input (EDGE-11).
+        for (int i = 0; i < 20; ++i)
+            engine.process({}, output, 100);
+        engine.process(input, output, 100);
         engine.reset();
     } catch (...) {
         forbid_allocation = false;
@@ -736,6 +879,7 @@ int main() {
         forbid_allocation = false;
         detail::force_partition_layout(nullptr);
         detail::force_baseline_kernels(false);
+        detail::disable_idle(false);
     };
     std::vector<convolver::test::Case> list;
     for (const detail::PartitionLayout* layout :
@@ -762,6 +906,7 @@ int main() {
                 {"history_validity" + where, oracle("history_validity", history_validity)});
             if (layout)
                 list.push_back({"layouts" + where, oracle("layouts", layouts)});
+            list.push_back({"idle_after_tail" + where, oracle("idle_after_tail", idle_after_tail)});
         }
     const auto with_defaults = [&](void (*test)()) {
         return [=] {

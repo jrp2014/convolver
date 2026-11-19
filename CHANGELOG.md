@@ -12,6 +12,22 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Engine (EDGE-11, first candidate): once the input has been exactly
+  silent for longer than anything can stay in the engine (the latency, the
+  filter and its delays, plus at most about half a second), each further
+  silent callback writes zeros without convolving. The output stays bit for
+  bit what processing the silence gives, and the next sound resumes at
+  once. The saving applies only to silence after the tail has ended, not
+  to normal playback: on the Linux cloud VM such silence costs 93 to 99%
+  less CPU (11 s stereo reverb: 173 to 2.2 ns per frame), and music costs
+  the same as before within the measurements' spread
+  ([measurements](docs/develop/fft-measurements.md#idle-after-the-tail)).
+  Only Linux was measured; Apple silicon and Windows are not yet.
+  `convolver_benchmark` gained `--silent` to time it. So that this holds
+  exactly, the engine never outputs -0: where sound cancelled to a value
+  too small for a normal float, the frame used to come out as -0 and is now
+  +0. The two are numerically equal and inaudible, but those output bits
+  differ from earlier versions.
 - CLI (DIAG-5, from the BruteFIR comparison): after a render in which any
   sample went beyond full scale, `convolver` warns on stderr with each
   affected channel's clipped-sample count and peak in dBFS, and suggests
