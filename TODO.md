@@ -236,6 +236,18 @@ is superseded.
   (`CONVOLVER_ARDOUR_KEEP`), check the region position and whether the
   plug-in's filter loaded during the export, and repeat with a plug-in
   that reports latency and has no worker.
+- [ ] **HOST-7 — Run the Ardour test with Ardour 9.** From CI-43 (19 November
+  2026): on `ubuntu-latest` (Ubuntu 26.04, Ardour 9's `ardour9-*` tools),
+  `ardour9-lua` died by SIGSEGV running `tests/lv2/ardour_session.lua` for
+  the mono example, after `ardour9-new_session` succeeded and before the
+  script's "Ardour engine running" line appeared (stdout is buffered, so
+  the crash may be later than that line; Convolver's plug-in is loaded only
+  after it). The [Ardour test](docs/develop/testing.md#ardour-headless)
+  therefore stays on `ubuntu-24.04` with Ardour 8.4. Next: run the script
+  with unbuffered output (or `io.stdout:setvbuf("no")`) to find the failing
+  call, and check it against Ardour 9's Lua bindings. **Done when** the job
+  passes on `ubuntu-latest` and its older-image row leaves
+  [compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines).
 
 ## Plug-ins: VST3, LV2 and AU
 
@@ -1220,9 +1232,9 @@ move to the archive.
   latest SDKs: the libraries already followed their newest releases, but the
   compilers and runner images did not. CI now takes the newest generally
   available images, GCC and Xcode, the newest LLVM release and the newest
-  stable Python, and the LV2 tests use the newest Ubuntu image's lilv and
-  Ardour; only the Linux and Windows packages keep older images, for
-  recorded reasons ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
+  stable Python, and the LV2 tests use the newest Ubuntu image's lilv; only
+  the Linux and Windows packages and the Ardour test (HOST-7) keep older
+  images, for recorded reasons ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
 - [x] **CI-42 — Run only the workflows that read the files kept from
   releases.** 19 November 2026, PR #221, from jrp's audit of v0.14.0:
   `ci_scope.py` counted `tests/upgrade/` as code, so changing one retained file ran every

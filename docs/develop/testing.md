@@ -1209,8 +1209,8 @@ whose LV2 host is its own code rather than lilv's or JUCE's (HOST-5). It is
 a job of its own, not a CTest test, because it needs Ardour, a large package
 that the other LV2 jobs do not install.
 [`tests/lv2/ardour_tests.py`](../../tests/lv2/ardour_tests.py) uses Ardour's
-headless tools from Ubuntu's `ardour` package on the newest Ubuntu runner
-image (8.4 on Ubuntu 24.04 when the test was written) on
+headless tools from Ubuntu's `ardour` package (8.4 on Ubuntu 24.04, which
+this job keeps until HOST-7 makes the test work with Ardour 9) on
 each [first-use fixture](#plug-in-comparisons-plug-2): mono (1 in, 1 out),
 the stereo cross-feed (2 in, 2 out) and the crossover (2 in, 6 out).
 
