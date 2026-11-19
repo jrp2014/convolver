@@ -5,11 +5,10 @@
 jrp's review of c2edf84: a baseline must be its own build of a pinned revision,
 never a copy kept in the current source, so that changing the engine cannot
 silently change the baseline. This script checks out each revision into its own
-worktree, builds it (Release, benchmarks on), refuses two revisions whose engine
-source is the same, checks both against the direct double-precision references
-of the first-use fixtures (the stereo cross-feed and the 2-to-6 crossover), and
-then times convolver_callback_benchmark's warmed processing with production
-routing in one engine (each row gives the number of timed callbacks behind
+worktree, builds it (Release, benchmarks on), checks both against the direct
+double-precision references of the first-use fixtures (the stereo cross-feed
+and the 2-to-6 crossover), and then times convolver_callback_benchmark's
+warmed processing with production routing in one engine (each row gives the number of timed callbacks behind
 its percentiles; before 0.13.0 the benchmark counted preparation and warm-up
 in --seconds, so a slow baseline case can have as few as 64):
 
@@ -24,6 +23,14 @@ background load) affects both alike.
 
   python3 tests/native/benchmarks/compare_engines.py --baseline bf6a207 \\
       --candidate HEAD --work ../engine-compare > engines.csv
+
+Two revisions of the same commit are refused before anything is built. Any
+other pair is compared: a change to the partitioner, the kernels or an FFT
+backend changes the engine as much as one to engine.cpp. When nothing under
+portable/ or include/, nor the CMake files or the benchmark's own source,
+differs between them, a warning says so. Timings can still differ for other
+reasons, such as the baseline and candidate latencies, so read them with
+those settings in mind.
 
 The baseline runs at its own Latency (--baseline-latency, default 256, the
 plug-ins' default before PERF-2); the candidate at each --latency. Extra CMake
@@ -44,7 +51,8 @@ REPOSITORY = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPOSITORY / 'tests' / 'plugins'))
 from fixtures import TOLERANCE, read_float_wav, worst_error  # noqa: E402
 
-ENGINE_SOURCES = ('portable/engine.cpp',)
+# What the engine and the benchmark are built from, for the warning above.
+BUILT_FROM = ('portable', 'include', 'CMakeLists.txt', 'cmake', 'tests/native/callback_benchmark.cpp')
 LAYOUTS = {'stereo': ('diagonal', 2, 2), 'true': ('matrix', 2, 2), 'crossover': ('crossover', 2, 6)}
 FIXTURES = ('stereo', 'crossover')
 
@@ -68,11 +76,13 @@ def cpu_name():
 
 
 class Build:
-    def __init__(self, label, revision, work, cmake_options, jobs):
+    def __init__(self, label, revision, work):
         self.label = label
         self.commit = git('rev-parse', '--verify', f'{revision}^{{commit}}')
         self.source = work / f'{label}-{self.commit[:12]}'
         self.binary = self.source / 'build'
+
+    def build(self, cmake_options, jobs):
         if not self.source.exists():
             git('worktree', 'add', '--detach', str(self.source), self.commit)
         subprocess.run(
@@ -194,17 +204,22 @@ def main():
     parser.add_argument('--cmake', nargs=argparse.REMAINDER, default=[], help='extra CMake options')
     o = parser.parse_args()
     o.work.mkdir(parents=True, exist_ok=True)
-    builds = [
-        Build('baseline', o.baseline, o.work.resolve(), o.cmake, o.jobs),
-        Build('candidate', o.candidate, o.work.resolve(), o.cmake, o.jobs),
-    ]
+    builds = [Build('baseline', o.baseline, o.work.resolve()), Build('candidate', o.candidate, o.work.resolve())]
     if builds[0].commit == builds[1].commit:
-        sys.exit('the baseline and the candidate are the same commit')
-    if all(
-        git('rev-parse', f'{builds[0].commit}:{path}') == git('rev-parse', f'{builds[1].commit}:{path}')
-        for path in ENGINE_SOURCES
-    ):
-        sys.exit('the two revisions have the same engine source: nothing to compare')
+        sys.exit('the baseline and the candidate are the same commit: nothing to compare')
+    changed = subprocess.run(
+        ['git', 'diff', '--quiet', builds[0].commit, builds[1].commit, '--', *BUILT_FROM], cwd=REPOSITORY, check=False
+    ).returncode
+    if changed > 1:
+        sys.exit('git diff could not compare the two revisions')
+    if changed == 0:
+        print(
+            'warning: No changes were found in the selected core and build sources. Check latency settings '
+            'and benchmark changes when interpreting timing differences.',
+            file=sys.stderr,
+        )
+    for build in builds:
+        build.build(o.cmake, o.jobs)
     for build in builds:
         print(f'{build.label} {build.commit}: worst fixture error {build.check():.3g}', file=sys.stderr)
     cpu = cpu_name()

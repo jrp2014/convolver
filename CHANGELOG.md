@@ -12,10 +12,68 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Tests (COMPAT-1, in progress): the example presets of the published
+  0.14.0 and the audio its own CLI and VST3 plug-in rendered from them are
+  kept in `tests/upgrade/0.14.0/`, beside those of 0.13.2, 0.13.12,
+  0.13.20 and 0.13.24; `upgrade.cli` and `vst3.upgrade` check later builds against all
+  five. Every preset, filter, input and expected render matches 0.13.24's
+  byte for byte: EDGE-11's change of a -0 sample to +0 did not occur in
+  these renders.
+- Releases: jrp published Convolver 0.14.0, the sixth unsigned developer
+  preview, on 19 November 2026
+  ([release](https://github.com/jrp2014/convolver/releases/tag/v0.14.0)).
+  After publishing it he asked to move the baseline for the checks left,
+  REL-3's walkthrough and COMPAT-1's REAPER project from 0.13.24 to 0.14.0
+  ([decision](docs/project/decisions.md#releases)).
+
+### Changed
+
+- VST3 plug-in (PLUG-39 step 3b): choosing a new Latency while audio plays
+  no longer holds the host's control call until the audio thread finishes
+  its block. The new processor is offered and reported at once, as before;
+  the one it replaces is freed by the plug-in's next control call once the
+  audio thread has let it go. What plays, the latency reported and the
+  pause while the new processor fills are unchanged.
+- CI (CI-42, from jrp's audit of v0.14.0): a pull request that changes
+  only `tests/upgrade/`, the files kept from published releases and their
+  checks, runs the native and VST3 workflows, whose `upgrade.cli` and
+  `vst3.upgrade` read them, instead of every workflow: the Audio Unit and
+  LV2 builds no longer run for it. The Audio Unit job's run of
+  `upgrade.cli`, the only Release Accelerate one with the Xcode of
+  `macos-15` (the macOS candidates' image), is left to `main`; the VST3
+  macOS job (newer Xcode) and the native macOS builds still run it against
+  the same bound. The saving was not measured
+  ([CI triggers](docs/develop/testing.md#pull-requests-for-one-plug-in-format)).
+
+### Fixed
+
+- Benchmarks (PERF-20, from jrp's audit of v0.14.0):
+  `tests/native/benchmarks/compare_engines.py` refused to compare two
+  revisions whose `portable/engine.cpp` was the same, so a change confined to
+  the partitioner, the kernels or an FFT backend could not be measured
+  against its baseline. It now compares any two commits, warns when nothing
+  under `portable/` or `include/`, nor the CMake files or the benchmark's
+  source, differs between them (the warning asks to check the latency
+  settings and benchmark changes when reading the timings), and refuses
+  the same commit before building either revision instead of after
+  building both.
+
+## [0.14.0] - 2026-11-19
+
+The sixth published preview, for macOS, Windows and Linux, unsigned:
+quicker restores of the playing filter, less CPU once the input has been
+silent past the tail, the command-line tool's clipping report and clearer
+messages for a sample-rate refusal and a `.cfg` file name that is not UTF-8
+([release](https://github.com/jrp2014/convolver/releases/tag/v0.14.0)).
+
+### Added
+
 - Engine (EDGE-11, first candidate): once the input has been exactly
   silent for longer than anything can stay in the engine (the latency, the
-  filter and its delays, plus at most about half a second), each further
-  silent callback writes zeros without convolving. The output stays bit for
+  filter and its delays, plus an additional interval determined by the
+  partition layout; approximately half a second or less in the measured
+  48 kHz workloads), each further silent callback writes zeros without
+  convolving. The output stays bit for
   bit what processing the silence gives, and the next sound resumes at
   once. The saving applies only to silence after the tail has ended, not
   to normal playback: on the Linux cloud VM such silence costs 93 to 99%
@@ -158,16 +216,6 @@ Until 1.0 the C++ API may change between minor versions.
   still do, and a VST3 pull request still runs the required acceptance test
   with it ([pre-releases](docs/develop/build.md#pre-releases-and-newer-upstream-versions)).
   Parallel MSVC compiles (`CL=/MP`) were tried and dropped: no measured gain.
-- CI (CI-42, from jrp's audit of v0.14.0): a pull request that changes
-  only `tests/upgrade/`, the files kept from published releases and their
-  checks, runs the native and VST3 workflows, whose `upgrade.cli` and
-  `vst3.upgrade` read them, instead of every workflow: the Audio Unit and
-  LV2 builds no longer run for it. The Audio Unit job's run of
-  `upgrade.cli`, the only Release Accelerate one with the Xcode of
-  `macos-15` (the macOS candidates' image), is left to `main`; the VST3
-  macOS job (newer Xcode) and the native macOS builds still run it against
-  the same bound. The saving was not measured
-  ([CI triggers](docs/develop/testing.md#pull-requests-for-one-plug-in-format)).
 - CI (CI-41, from jrp's review of 19 November 2026): the load-timing
   harness's self-test, `native.load_timing_harness`, which no FFT backend
   or core-only shape changes, runs once for each compiler and build type
@@ -2546,7 +2594,8 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.13.24...HEAD
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/jrp2014/convolver/releases/tag/v0.14.0
 [0.13.24]: https://github.com/jrp2014/convolver/releases/tag/v0.13.24
 [0.13.20]: https://github.com/jrp2014/convolver/releases/tag/v0.13.20
 [0.13.12]: https://github.com/jrp2014/convolver/releases/tag/v0.13.12
