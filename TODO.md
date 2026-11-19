@@ -285,18 +285,18 @@ LV2 (Linux first; also PipeWire system audio):
   project ran at 48000 Hz, so a 48 kHz `.cfg` was refused during playback
   and the exports passed. Refusing the filter is correct; what was hard was
   telling the rate the playing copy runs at from the export's rate. The
-  guides now say so ([plug-ins](docs/use/plugins.md#status-and-the-convolver-log),
-  [Audacity steps](docs/develop/host-testing.md#audacity-vst3)). A refusal
-  for the rate adds one line to its Fix, that the host may play at a
-  different rate from the one it exports at
-  ([decided](docs/project/decisions.md#diagnostics)). Still
-  to decide with jrp: whether the window should mark a host rate as not
-  yet confirmed when it comes from a copy that has not processed audio
-  (the copy in Audacity's effect window, which a host may start briefly at
-  another rate); PLUG-27 overlaps it. Done when every format's rate
-  refusal carries the agreed line, in the window, Status details and the
-  log, and the message tests cover it. Diagnostic text only, no sound
-  change; waits for the freeze unless jrp brings it forward.
+  guides say so ([plug-ins](docs/use/plugins.md#status-and-the-convolver-log),
+  [Audacity steps](docs/develop/host-testing.md#audacity-vst3)), and since
+  PR #210 every format's rate refusal, for a preset or a chosen file, adds
+  the agreed line to its Fix ([decided](docs/project/decisions.md#diagnostics)),
+  checked by `native.host`, `native.filter_file` and `vst3.adapter`.
+  **Remains:** whether the window should mark a host rate as not yet
+  confirmed when it comes from a copy that has not processed audio (the
+  copy in Audacity's effect window, which a host may start briefly at
+  another rate); PLUG-27 overlaps it. **Done when** jrp has decided, and
+  the marking, if he wants it, is shown and its message tests cover it.
+  Diagnostic text only, no sound change; parked until after REL-3 unless
+  jrp brings it forward.
 - [ ] **PLUG-27 — Read a chosen filter before the host's audio settings
   are known.** From the same review: before the host has started audio,
   the VST3 plug-in reads a chosen file for the rate and channels the host
