@@ -25,12 +25,13 @@
 //
 // Why a reader can never use a freed processor: hold() stores its mark and
 // then checks that the processor is still the newest offer, and offer()
-// publishes the newest offer and then reads every mark (those stores and
-// loads are sequentially consistent; a reader letting go stores with release,
-// so its last use comes before the control side frees what it held). So either the control side
-// sees the mark and keeps the processor, or the reader sees the newer offer and tries again before
-// it touches the old one. A retired processor is freed only when a reading of the marks, taken
-// after it was replaced, found none holding it.
+// publishes the newest offer and then reads every mark. Those stores and
+// loads are sequentially consistent, so either the control side sees the
+// mark and keeps the processor, or the reader sees the newer offer and tries
+// again before it touches the old one. A reader letting go stores with
+// release, so its last use comes before the control side frees what it held.
+// A retired processor is freed only when a reading of the marks, taken after
+// it was replaced, found none holding it.
 #pragma once
 #include <array>
 #include <atomic>
