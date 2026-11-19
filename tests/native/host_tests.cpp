@@ -382,9 +382,18 @@ void filter_contract() {
                 first.error().find("\nFix: Load a filter made for 48000 Hz") != std::string::npos &&
                 first.failure()->silent,
             "failed initial load not explained");
+    // PLUG-25: a rate refusal's fix says the playing rate can differ from
+    // the export's (decisions log, 8 November 2026); a channel refusal's does not.
+    const std::string playback_rate =
+        "or set the host's project or audio device to 44100 Hz. The host may play at a "
+        "different rate from the one it exports at.";
+    require(first.error().find(playback_rate) != std::string::npos,
+            "rate refusal without the playback-rate line: " + first.error());
     require(first.activate(stereo).filter.paths[0].impulse == std::vector<float>{0},
             "failed initial load does not play silence");
     expect_rejection([&] { first.load(HostState{wide}, std::nullopt); }, "channel bound unchecked");
+    require(first.error().find("exports at") == std::string::npos,
+            "channel refusal names the playback rate: " + first.error());
     first.load(HostState{}, stereo); // Back to an empty instance.
     require(!first.failed() && first.error().empty() &&
                 first.activate(stereo).filter.paths.size() == 2,

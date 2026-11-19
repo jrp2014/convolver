@@ -1416,6 +1416,8 @@ void run(const fs::path& dir) {
         require(has(unrated, "No entry is for 96000 Hz") &&
                     has(unrated, "convert the audio to 44100 Hz or 48000 Hz"),
                 "list rate mismatch names the rates available");
+        // PLUG-25's sentence is for plug-in hosts only.
+        require(!has(unrated, "exports at"), "the command line names a host's export rate");
     }
     text_file(dir / "unrelated.cfg", "44100 1 1 0\n0\n0\nmissing-unused.wav\n0\n0\n0\n");
     text_file(dir / "list.txt", "unrelated.cfg\ngood.cfg\n");

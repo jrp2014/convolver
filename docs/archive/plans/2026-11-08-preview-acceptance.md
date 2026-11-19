@@ -21,7 +21,7 @@ macOS preview works, recording its limits and handing it to an independent user.
 
 **In short:** hold one candidate still, complete the agreed journeys and release
 gates, fix blocking defects, then stop expanding the test scope. Keep useful
-regression coverage. CI scheduling is a [separate proposal](../../project/plans/2026-11-08-ci-scheduling.md),
+regression coverage. CI scheduling is a [separate proposal](2026-11-08-ci-scheduling.md),
 not a prerequisite for this walkthrough.
 
 The scope is the existing 0.12-series macOS preview: VST3 and Audio Unit with
@@ -165,6 +165,6 @@ the contract or test harness is not a new preview gate.
 | Additional gain modes, meters and convenience changes | PLUG-9, PLUG-10, AU-7; relevant open TODO items | After qualification; prioritise actual user difficulty |
 | Speculative allocation-failure hardening and extreme combinations | ROBUST-1 and relevant open TODO items | A reproduction, credible severe code path or evidence from normal workloads justifies it |
 | Broad concurrency architecture changes | Relevant AU/host items | ThreadSanitizer or a reproduction identifies a remaining ownership problem; no rewrite based on historical counts alone |
-| CI scheduling reductions | CI-34, [separate proposal](../../project/plans/2026-11-08-ci-scheduling.md) | A dedicated PR demonstrates preserved coverage and faster feedback; it does not hold up the preview |
+| CI scheduling reductions | CI-34, [separate proposal](2026-11-08-ci-scheduling.md) | A dedicated PR demonstrates preserved coverage and faster feedback; it does not hold up the preview |
 
 No tests, tolerances, validators or release gates are removed by this plan.
