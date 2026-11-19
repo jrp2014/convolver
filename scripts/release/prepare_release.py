@@ -44,7 +44,8 @@ CHANGES = (
     (
         'Less CPU once the sound has stopped: when the input has been exactly silent (every sample zero, as a '
         'stopped transport gives) for longer than anything can stay in '
-        'the engine (the latency, the filter and its delays, plus at most about half a second), each further silent '
+        'the engine (the latency, the filter and its delays, plus an additional interval determined by the partition '
+        'layout; approximately half a second or less in the measured 48 kHz workloads), each further silent '
         'callback writes silence without convolving, and the next sound starts at once. The saving applies only to '
         'that silence, not to playback: on a Linux test machine such silence cost 93 to 99% less CPU, and music cost '
         'the same as before. Only Linux was measured; macOS and Windows are not yet. The output is what it was, '
@@ -190,7 +191,10 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             "Mix and Latency with the host's own controls. Each channel layout is "
             'its own plug-in. It was checked automatically, with lilv, lv2lint, pluginval and a headless Ardour '
             'session, and from a source build in PipeWire 1.6.8 on virtual devices; nobody has used it in a '
-            'desktop host yet.\n'
+            'desktop host yet. In hosts built on JUCE, pluginval among them, closing the plug-in waits up to '
+            '100 ms for a queued Latency, Gain mode or fault report. Since 0.13.24 this mitigates a host crash '
+            'rather than ruling it out: a file request the host works after closing, or a request delayed over '
+            "100 ms by another plug-in's work, can still reach the closed plug-in and crash the host.\n"
             '- The Windows window has been checked only automatically, on Windows CI machines: it opens, '
             "and the plug-in validator's window tests pass. Nobody has tried it in a Windows host or with a screen "
             'reader yet.\n'

@@ -65,8 +65,12 @@ Until 1.0 the C++ API may change between minor versions.
   guide on Reload when the file changes, the wider static analysis and the
   longer weekly fuzz run. The known limitations say that the quicker
   restores and the saving once the sound has stopped are checked only by
-  automated tests. No change to what the packages run or hold beyond the
-  version number.
+  automated tests. After jrp's review of 19 November 2026, they also say
+  that LV2-9's 100 ms wait on closing mitigates the JUCE host crash rather
+  than ruling it out (also now in TODO's documented limitations), and that
+  the idle starts after an interval set by the partition layout, about
+  half a second or less in the measured 48 kHz workloads. No change to
+  what the packages run or hold beyond the version number.
 - Documentation (DOC-16, from jrp's review of 18 November 2026): the
   plug-ins guide no longer promises that Reload when the file changes never
   reads a file part-way: waiting until a change has held for a second makes
