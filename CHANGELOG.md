@@ -33,7 +33,7 @@ Until 1.0 the C++ API may change between minor versions.
   on, as choosing it again in the VST3 and Audio Unit windows already did
   (jrp's choice, 13 November 2026). The decoded filter decides, never the
   file name: a file of the same name whose contents changed loads as before.
-- Library (PLUG-39 step 1b), incompatible: `HostFilter::load()` decides
+- Library (PLUG-39 step 1b), incompatible, hence 0.16.0: `HostFilter::load()` decides
   what an accepted request changes besides the filter and returns it as a
   `HostChange` (the settings to apply, restored state's bypass, and the
   filter's tail while no processor plays), from the request's new `kind`
