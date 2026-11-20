@@ -168,7 +168,11 @@ def check(tools, environment, directory, plugin_tool, fixture_name, fixture):
 
     name = fixture_name
     session = directory / 'sessions' / name
-    run([tools['new_session'], '-m', str(outputs), '-s', str(RATE), session, name], environment)
+    made = run([tools['new_session'], '-m', str(outputs), '-s', str(RATE), session, name], environment, check=False)
+    if made.returncode != 0:  # HOST-7 diagnosis, temporary: Ardour 9 aborts after creating the session.
+        assert (session / f'{name}.ardour').is_file(), f'{name}: no session after exit code {made.returncode}'
+        tool_name = pathlib.Path(tools['new_session']).name
+        warn(f'{name}: {tool_name} exited with {made.returncode} after creating the session')
     filter_tail = tail(fixture['paths'], fixture['input_delays'], fixture['output_delays'])
     settings = {
         'CONVOLVER_SESSION_DIR': str(session),
