@@ -157,12 +157,11 @@ but Audacity 4.0.2 did not keep it for an export or a saved project: they
 kept whatever Audacity stored last, which may be no filter or an older one,
 so a wrong export could still sound plausible. From 0.13.12 it should be
 kept, but this has been checked only by automated tests, not yet in Audacity.
-In the previews up to 0.14.0, a filter chosen in the window before
-Audacity had played was also refused, because Audacity sets up the plug-in
-at 44.1 kHz until it first plays; later versions keep a single IR file or
-`.cfg` and check it when Audacity plays, while a configuration list still
-needs one playback first
-([when a chosen file is checked](plugins.md#loading-a-filter)).
+Audacity sets up the plug-in at 44.1 kHz until it first plays, so a single
+IR file or `.cfg` chosen before then is kept and checked when Audacity plays,
+and a configuration list needs one playback first
+([when a chosen file is checked](plugins.md#loading-a-filter)); 0.14.0 and
+earlier refused such a file.
 If you load a filter from the window, export a few seconds and check that
 the export has the filter you chose (for example by comparing it with
 `convolver --compare`, as in [check a stereo filter in a host](check-a-stereo-filter.md)).
