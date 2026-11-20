@@ -86,7 +86,7 @@ starting.
 
 | Item | What to do | Note |
 | --- | --- | --- |
-| **PLUG-39** | The load and restore path, steps 1b to 6 in the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)'s order (step 0's protection tests are in, PR #200, and step 1a, PR #205): steps 2 and 4 (with PLUG-30) to 6 (step 1b, PR #224, and PLUG-36, PR #225, are done); step 3 (the shared ownership of the playing processor) and ROBUST-8 after it (PR #223) are done | Plan and order approved by jrp on 13 November 2026; step 3 first and the four items folded in on 19 November 2026 ([decision](docs/project/decisions.md#releases)). Each step is its own reviewed pull request, and step 3 (deferred reclamation) gets its own ownership review |
+| **PLUG-39** | The load and restore path, steps 1b to 6 in the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)'s order (step 0's protection tests are in, PR #200, and step 1a, PR #205): steps 4 (with PLUG-30) to 6 (step 1b, PR #224, PLUG-36, PR #225, and step 2, PR #226, are done); step 3 (the shared ownership of the playing processor) and ROBUST-8 after it (PR #223) are done | Plan and order approved by jrp on 13 November 2026; step 3 first and the four items folded in on 19 November 2026 ([decision](docs/project/decisions.md#releases)). Each step is its own reviewed pull request, and step 3 (deferred reclamation) gets its own ownership review |
 | **PLUG-24** | `HostProcessor` in its own source file | In PLUG-39's sequence, as its own pull request, never inside a step's or with a DSP change (jrp, 19 November 2026) |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the gain modes are in 0.13.20 (PR #188) |
 | **PERF-3** | One measurement exercise: resource budgets and supported workloads | Changes no shipped code; its results decide whether FFT-2, VST3-5, PLUG-11 and PERF-2's tuning are worth doing (EDGE-5 publishes them) |
@@ -401,10 +401,11 @@ LV2 (Linux first; also PipeWire system audio):
   PR #223. Step 1b, in PR #224, makes `HostFilter::load()` decide what an
   accepted request changes besides the filter (`HostChange`, from the
   request's kind) and aligns LV2's re-chosen file with VST3 and the Audio
-  Unit. **Remains:** the
+  Unit. Step 2, in PR #226, gathers VST3's and the Audio Unit's rules for when the host
+  has settled its rate and channels into one record, `HostSettling`, each
+  format keeping its own binding. **Remains:** the
   [consolidation plan](docs/project/plans/2026-11-13-load-restore-consolidation.md)'s
-  steps 2 and 4 to 6 once step 1b is merged: one rule for when the host
-  has settled, diagnostics as a view of state, and
+  steps 4 to 6: diagnostics as a view of state, and
   typed reports and advice. Plan and order approved by jrp on 13 November
   2026, not the implementation: each step's pull request is reviewed and
   tested on its own. **Worth doing** now that 0.13.20 is published

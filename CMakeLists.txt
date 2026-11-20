@@ -368,6 +368,9 @@ if(CONVOLVER_BUILD_NATIVE)
             SOURCES tests/native/playing_processor_tests.cpp LIBRARIES Threads::Threads)
         # It links no Convolver library, so it asks for C++20 itself.
         target_compile_features(convolver_playing_processor_tests PRIVATE cxx_std_20)
+        # PLUG-39 step 2: when the host has settled its rate and channels.
+        convolver_native_test(native.host_settling convolver_host_settling_tests
+            SOURCES tests/native/host_settling_tests.cpp LIBRARIES Convolver::host)
         # PLUG-10: gain and mix.
         convolver_native_test(native.host_settings convolver_host_settings_tests
             SOURCES tests/native/host_settings_tests.cpp LIBRARIES Convolver::host)

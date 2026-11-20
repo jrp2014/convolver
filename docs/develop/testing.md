@@ -64,7 +64,8 @@ with `run_cases()` from [`tests/native/cases.hpp`](../../tests/native/cases.hpp)
 case's name and reason and goes on, and the program fails at the end, so one
 failure does not hide the next. Give `run_cases()` a function to undo what a
 failed case can leave set, such as an allocation guard. `native.engine`,
-`native.host`, `native.host_settings`, `native.playing_processor`,
+`native.host`, `native.host_settings`, `native.host_settling`,
+`native.playing_processor`,
 `native.host_report`,
 `native.denormals`, `native.io`, `native.utilities`, `native.filter_file`,
 `vst3.adapter` and `au.adapter` use it. The lifecycle tests and
@@ -380,6 +381,15 @@ cases.
   sometimes none, while two readers adopt under an allocation guard,
   checking that each sees generations only increase and never uses a freed
   processor (AddressSanitizer checks that too in the sanitizer build).
+- `native.host_settling`: when the host has settled its rate and channels
+  (`HostSettling`, PLUG-39 step 2), for each binding and the host's order
+  that made its rule. VST3: unknown before a start; known while started and
+  while stopped with the same buses; a chosen file refused at once,
+  restored state kept until audio has played with the configuration (a
+  restart with it still counts, a new one does not) and a project the host
+  opens never refused. Audio Unit: an unrendered 44.1 kHz probe binds
+  nothing; formats that rendered stay known while they match, and every
+  request is then refused if it does not suit them.
 - `native.host_report`: the editor report (PLUG-9), one case per state a
   window shows (no filter, before and after the host starts; Gain −20 dB
   with no filter; a stereo filter on a mono track; a wrong rate; a failed

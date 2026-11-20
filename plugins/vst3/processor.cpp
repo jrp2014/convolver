@@ -271,12 +271,10 @@ HostLayout Processor::layout() const {
 // with placeholder values before restoring a project's state at another rate.
 // Until then, restored state is kept and checked at activation (the shared
 // adapter contract's "state that arrives before the host is configured").
-// For restored state, install() also waits until audio has played with them.
+// For restored state, install() also waits until audio has played with them
+// (HostSettling, HostBinding::activation; PLUG-39 step 2).
 std::optional<HostLayout> Processor::known_layout() const {
-    const auto now = layout();
-    if (!activated_ || !same_configuration(*activated_, now))
-        return std::nullopt;
-    return now;
+    return settling_.known(layout());
 }
 tresult PLUGIN_API Processor::setActive(TBool state) {
     const auto result = activate(state);
@@ -299,21 +297,19 @@ tresult Processor::activate(TBool state) {
             tail_.store(static_cast<uint32>(next->tail_frames()));
             next->set_bypass(bypass_.load());
             next->reset();
-            // Audio played with these rate and buses before still counts:
-            // only a new configuration needs the host to play again.
-            if (!activated_ || !same_configuration(*activated_, now))
-                played_.store(false);
             // Not playing: the host does not process while it activates.
             playing_.offer(std::move(next));
             filter_.activate(std::move(activation));
             active_latency_.store(host()->latency_frames());
             hold_fault_signal();
-            activated_ = layout();
+            // Audio played with these rate and buses before still counts:
+            // only a new configuration needs the host to play again.
+            settling_.started(now);
             // What plays and why: a filter restored before the host's rate
             // and buses were known may not suit them.
             try { // Started: nothing here may turn that into a failure.
                 const auto& f = filter_.failure();
-                log(started_line(filter_, *activated_,
+                log(started_line(filter_, now,
                                  static_cast<std::size_t>(processSetup.maxSamplesPerBlock),
                                  &chosen),
                     (f && f->silent) || !filter_.notice().empty());
@@ -323,6 +319,7 @@ tresult Processor::activate(TBool state) {
             // No audio runs while inactive: every processor is freed.
             playing_.clear();
             active_latency_.store(inactive);
+            settling_.stopped();
         }
         active_ = state != 0;
         return AudioEffect::setActive(state);
@@ -381,8 +378,8 @@ bool Processor::chooses_files() const noexcept {
     return files_ != nullptr && has_editor();
 }
 HostStatusLine Processor::status_locked() const {
-    return host_status(filter_, host() ? std::optional(layout()) : known_layout(),
-                       host_log_written(), settings(), shown_bypass_.load(), chooses_files());
+    return host_status(filter_, known_layout(), host_log_written(), settings(),
+                       shown_bypass_.load(), chooses_files());
 }
 HostStatusLine Processor::status() {
     const Locked lock(*this);
@@ -391,7 +388,7 @@ HostStatusLine Processor::status() {
 HostReport Processor::report_locked() const {
     HostReportFacts facts;
     facts.format = tag_;
-    facts.host = host() ? std::optional(layout()) : known_layout();
+    facts.host = known_layout();
     facts.max_frames = host() ? static_cast<std::size_t>(processSetup.maxSamplesPerBlock) : 0;
     facts.settings = settings();
     facts.latency_frames = host() ? host()->latency_frames() : facts.settings.latency;
@@ -588,7 +585,8 @@ void Processor::choose_latency(std::size_t frames) noexcept {
     if (latency_.exchange(frames) == frames)
         return;
     const auto before = host() ? host()->latency_frames() : frames;
-    if (!host() || !activated_ || before == frames) {
+    const auto& started = settling_.last_start();
+    if (!host() || !started || before == frames) {
         try {
             log("Latency set to " + std::to_string(frames) + " frames.", false);
         } catch (...) { // Out of memory for the line: the choice stands.
@@ -599,11 +597,11 @@ void Processor::choose_latency(std::size_t frames) noexcept {
     bool changed = false;
     std::string why;
     try {
-        auto activation = filter_.activation(*activated_);
+        auto activation = filter_.activation(*started);
         if (latency_preparation_for_tests)
             latency_preparation_for_tests();
         auto next = std::make_unique<HostProcessor>(
-            activation.playback, processSetup.maxSamplesPerBlock, settings(), activated_->inputs);
+            activation.playback, processSetup.maxSamplesPerBlock, settings(), started->inputs);
         next->set_bypass(bypass_.load());
         next->reset();
         // Nothing below can fail: what plays, what the host reads and what
@@ -739,23 +737,15 @@ HostLoadCheck Processor::load_check(HostRequestKind kind) const noexcept {
     // before they restore a project (REAPER: stereo, then the track's six
     // channels; jrp's crossover retest, 7 November 2026). Until then a
     // restored filter that does not suit is kept, silent, and checked again
-    // at the next activation.
-    switch (kind) {
-    case HostRequestKind::chosen_file:
-        return HostLoadCheck::refuse_mismatch;
-    case HostRequestKind::restore:
-        return played_.load() ? HostLoadCheck::refuse_mismatch : HostLoadCheck::keep_until_suited;
-    case HostRequestKind::session:
-        return HostLoadCheck::keep_until_suited;
-    }
-    return HostLoadCheck::refuse_mismatch;
+    // at the next activation (HostSettling::check()).
+    return settling_.check(kind);
 }
 std::optional<HostSettings> Processor::install(HostState next, const HostRequest& request) {
     // While active, a prepared replacement is published; inactive, the next
     // activation installs it. load_check() says what a filter that does not
     // suit the host means.
     const auto check = load_check(request.kind);
-    const auto known = host() ? std::optional(layout()) : known_layout();
+    const auto known = known_layout();
     // PLUG-38: state or a preset holding the filter that plays keeps it and
     // its history, and the settings below ramp to theirs; a project the host
     // says it is opening starts clean (HostFilter::load() decides both).
@@ -983,7 +973,7 @@ tresult PLUGIN_API Processor::process(ProcessData& d) {
     if (d.numSamples && (!host || canProcessSampleSize(d.symbolicSampleSize) != kResultOk))
         return kInvalidArgument;
     if (d.numSamples) // Restored state is now checked against the host (install()).
-        played_.store(true, std::memory_order_relaxed);
+        settling_.played();
     if (d.numOutputs && d.outputs)
         d.outputs[0].silenceFlags = 0; // Set again below once the output is known.
     auto render = [&](int32 first, int32 count) {
