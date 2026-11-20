@@ -372,7 +372,7 @@ void wider_bus(const fs::path& dir) {
         const auto line = loaded_line(filter, std::optional<HostLayout>(six));
         std::cout << "wider bus: " << line << '\n';
         require(has(line, "No entry in the list has the host's 6 inputs, so ") &&
-                    has(line, "wide-2x6.cfg plays, the entry with the most inputs below 6.") &&
+                    has(line, "wide-2x6.cfg is used, the entry with the most inputs below 6.") &&
                     has(line, "Inputs 3–6 are ignored: the filter reads inputs 1–2."),
                 "the log line does not explain the choice: " + line);
         HostReportFacts facts;

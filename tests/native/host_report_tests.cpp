@@ -337,7 +337,7 @@ void cases() {
              return host_report(f, bypassed);
          },
          HostStatus::fault,
-         {"The host sent invalid samples (3 times). Bypass is on. The input plays unfiltered."},
+         {"The host sent invalid samples (3 times). Bypass is on: the input plays unfiltered."},
          {"keeps playing"}},
         {"refused replacement, bypassed",
          [&] {

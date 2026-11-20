@@ -175,8 +175,9 @@ namespace {
 // PLUG-33: which list entry a wider input bus chose, and why.
 std::string wider_entry_sentence(const std::string& entry, const HostLayout& host) {
     const auto n = std::to_string(host.inputs);
+    // "is used", not "plays": bypass may be on (PLUG-39 step 4).
     return "No entry in the list has the host's " + n + " inputs, so " + entry +
-           " plays, the entry with the most inputs below " + n + ".";
+           " is used, the entry with the most inputs below " + n + ".";
 }
 } // namespace
 
@@ -357,10 +358,9 @@ std::string playing_words(const HostFilter& filter, const HostLayout& host,
         // As HostProcessor bypasses: the input when there is a dry signal,
         // otherwise silence (dry_signal_rule()).
         auto line = bypassed ? "Bypass is on: " +
-                                   std::string(equal ? "the input plays unfiltered"
-                                                     : "the outputs are silent") +
-                                   "; the filter loaded is " + filter_words(*c) + "." +
-                                   ignored_sentence(*c, host)
+                                   std::string(equal ? "the input plays unfiltered."
+                                                     : "the outputs are silent.") +
+                                   " Loaded: " + filter_words(*c) + "." + ignored_sentence(*c, host)
                              : "Playing " + filter_words(*c) + "." + ignored_sentence(*c, host);
         if (!filter.notice().empty())
             line += " " + detail::as_sentence(detail::advice_line(filter.notice()));

@@ -2231,10 +2231,43 @@ void status_lines() {
         HostFilter h(8);
         h.load(HostState{a}, stereo);
         require(contains(started_line(h, stereo, 512, nullptr, true),
-                         "Bypass is on: the input plays unfiltered; the filter loaded is a filter "
-                         "for 48000 Hz, 2 in, 2 out.") &&
+                         "Bypass is on: the input plays unfiltered. Loaded: a filter for 48000 Hz, "
+                         "2 in, 2 out.") &&
                     !contains(started_line(h, stereo, 512, nullptr, true), "Playing"),
                 "bypassed start line");
+        // A crossover has no dry signal, so bypass plays silence.
+        HostFilter x(8);
+        x.load(HostState{crossover}, crossover_bus);
+        require(contains(started_line(x, crossover_bus, 512, nullptr, true),
+                         "Bypass is on: the outputs are silent. Loaded: a filter for 48000 Hz, "
+                         "2 in, 6 out."),
+                "bypassed crossover start line");
+        // A kept filter that does not suit the host: bypass plays its dry
+        // signal, or silence where it has none (as Status says).
+        HostFilter kept(8);
+        kept.load(HostState{other_rate}, std::nullopt);
+        static_cast<void>(test::started(kept, stereo));
+        require(contains(started_line(kept, stereo, 512, nullptr, true),
+                         "Bypass is on: only the dry signal plays. The saved filter is for "
+                         "44100 Hz"),
+                "bypassed start line of a kept filter");
+        HostFilter kept_x(8);
+        auto slow_crossover = crossover;
+        slow_crossover.sample_rate = 44100;
+        kept_x.load(HostState{slow_crossover}, std::nullopt);
+        static_cast<void>(test::started(kept_x, crossover_bus));
+        require(contains(started_line(kept_x, crossover_bus, 512, nullptr, true),
+                         "Convolver plays silence."),
+                "bypassed start line of a kept crossover");
+        // A refused replacement while a crossover plays bypassed.
+        try {
+            x.load(HostState{slow_crossover}, crossover_bus);
+        } catch (const std::invalid_argument&) {
+        }
+        require(failure_consequence(*x.failure(), &crossover_bus, {}, dry_signal(x, crossover_bus),
+                                    true) ==
+                    "The previous filter is kept. Bypass is on: the outputs are silent.",
+                "bypassed refusal of a crossover");
     }
     g.load(HostState{other_rate}, std::nullopt);
     require(loaded_line(g, false) ==

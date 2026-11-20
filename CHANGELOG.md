@@ -73,11 +73,15 @@ Until 1.0 the C++ API may change between minor versions.
   ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
 - Plug-ins (PLUG-39 step 4): with bypass on, the window's report and the
   Convolver log say what bypass plays instead of saying that the filter
-  plays: a fault reads "Bypass is on. The input plays unfiltered." instead
+  plays: a fault reads "Bypass is on: the input plays unfiltered." instead
   of "The filter keeps playing.", a refused replacement "The previous
   filter is kept. Bypass is on: the input plays unfiltered.", and the start
-  log line "Bypass is on: the input plays unfiltered; the filter loaded
-  is …". As Status already did since PLUG-36; the audio is unchanged.
+  log line "Bypass is on: the input plays unfiltered. Loaded: …", as Status
+  has done since PLUG-36. VST3's log line for restored state kept until the
+  host suits it says what plays meanwhile (silence, Mix's dry share or
+  bypass) instead of always "plays silence", and the log says a list entry
+  chosen for a wider bus "is used" rather than "plays". The audio is
+  unchanged.
 - Plug-ins and Library (PLUG-39 step 4b): one rule in the library shows a
   filter's saved name only while that filter plays (`HostFilter::offer_name()`).
   VST3 offers the name from its controller state there instead of keeping

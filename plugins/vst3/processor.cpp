@@ -779,10 +779,14 @@ std::optional<HostSettings> Processor::install(HostState next, const HostRequest
                     ".";
         const auto& f = filter_.failure();
         const bool kept = check == HostLoadCheck::keep_until_suited;
+        // What plays meanwhile, as the Status says: silence, Mix's dry
+        // share, or what bypass plays (PLUG-39 step 4).
         if (kept && known && f && f->silent && filter_.filter())
-            line += " It does not suit the host's present configuration, so it is kept and plays "
-                    "silence until it does: " +
-                    detail::advice_line(f->message);
+            line += " It does not suit the host's present configuration, so it is kept until it "
+                    "does. " +
+                    failure_consequence(*f, &*known, settings(), dry_signal(filter_, *known),
+                                        bypass_.load()) +
+                    " " + detail::as_sentence(detail::advice_line(f->message));
         if (kept)
             line += request.kind == HostRequestKind::session
                         ? " The host said it is restoring a project, so its channels and rate "

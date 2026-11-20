@@ -279,7 +279,7 @@ Bypass is on: audio passes unchanged.` whatever Gain and Mix are. Where
 bypass plays silence, after a failed load with no filter kept or when the
 filter's or the host's inputs and outputs differ, it still says so. The
 window's report and the Convolver log say the same: with bypass on they
-never say that the filter plays. A
+say what bypass plays, not that the filter plays. A
 filter at Mix
 0% adds `Mix 0%: only the dry signal plays.`
 
