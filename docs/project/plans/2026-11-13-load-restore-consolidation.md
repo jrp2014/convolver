@@ -101,7 +101,7 @@ group to a row:
 | VST3 `active_latency_`; Audio Unit `latency_` (the newest processor's latency, or the chosen one while uninitialized) | The newest processor's latency, and the chosen setting | The newest processor's latency, written by the ownership mechanism when it offers that processor, so the host reads at once the latency the next callback uses; the Audio Unit's second meaning comes from its parameter |
 | Audio Unit `status_`, `status_log_written_`, `status_bypassed_`, `report_cache_` | `host_status()` and `host_report()` of `HostFilter`, the settings and bypass | One control-side snapshot, combined when read with the live audio-side values (step 4) |
 | VST3 controller `status_text_`, `status_value_`, `report_text_` | The report the controller already holds (`report_`) | Derived from it |
-| VST3 processor `kept_name_` and `kept_identity_`, controller `kept_name_` and `kept_identity_` | The name pair of the playing filter, kept beside the newest offered pair | Removed by the shared name rule; the processor's offered pair moves into `HostFilter` |
+| VST3 processor `kept_name_` and `kept_identity_`, controller `kept_name_` and `kept_identity_` | The name pair of the playing filter, kept beside the newest offered pair | Removed by the shared name rule; the processor's offered pair moves into `HostFilter`. Since step 4b: gone; `HostFilter` keeps the offered name, and state of the filter that plays keeps the name it shows |
 | LV2 `shown` | The status ordering above | Still the value `run()` reads, written through the shared ordering |
 
 Text that goes round in a circle, written and then parsed back:

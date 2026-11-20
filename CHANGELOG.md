@@ -70,10 +70,13 @@ Until 1.0 the C++ API may change between minor versions.
   VST3 offers the name from its controller state there instead of keeping
   two name pairs in the processor and two in the controller, and the report
   gains `filter saved name`, which the VST3 controller state saves. A
-  refused preset still never renames the playing filter. One small
-  improvement for both formats: state of a filter chosen earlier as a file,
-  restored after another filter played in between, is named after the file
-  again instead of "Restored filter".
+  refused preset still never renames the playing filter. The Audio Unit
+  now names restored state that brings no name of its own (an "Untitled"
+  preset) after the same filter's earlier file or preset name instead of
+  "Restored filter", as VST3 already did. One rare VST3 order shows
+  "Restored filter" where it showed the name before: a refused preset, then
+  another preset, then the first filter's component state alone with no
+  controller state, since only the last offered name is kept.
 - Plug-ins and Library (PLUG-39 step 4c): one function,
   `host_status_value()`, orders a plug-in's status (a load failure, then a
   fault, then Bypassed, then the filter, then a failed load, then no
