@@ -16,6 +16,7 @@
 --   CONVOLVER_FRAMES  how much to record
 --   CONVOLVER_TAIL    frames to add after the recording
 --   CONVOLVER_LEAD    frames of silence before it
+--   CONVOLVER_ARDOUR_MAJOR  Ardour's major version (8 or 9)
 -- Each step that fails stops the script with an error, which the test reports.
 
 -- Unbuffered, so that a crash shows the last step that finished (HOST-7).
@@ -60,7 +61,13 @@ assert(session, "cannot open the session")
 print("Ardour engine running: " .. tostring(AudioEngine:running()) .. " on " .. AudioEngine:current_backend_name())
 
 step("add a track")
-local track = session:new_audio_track(inputs, outputs, nil, 1, "Convolver",
+-- No route group: Ardour 9 takes an empty RouteGroup, as its own scripts
+-- pass, where Ardour 8 takes nil (Ardour 9 crashes on nil).
+local no_group = nil
+if tonumber(setting("CONVOLVER_ARDOUR_MAJOR")) >= 9 then
+	no_group = ARDOUR.RouteGroup()
+end
+local track = session:new_audio_track(inputs, outputs, no_group, 1, "Convolver",
 	ARDOUR.PresentationInfo.max_order, ARDOUR.TrackMode.Normal, true):front()
 assert(track, "cannot add a track")
 -- Each output goes straight to the master bus channel of the same number,

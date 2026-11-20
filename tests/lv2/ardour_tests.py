@@ -175,6 +175,7 @@ def check(tools, environment, directory, plugin_tool, fixture_name, fixture):
         warn(f'{name}: {tool_name} exited with {made.returncode} after creating the session')
     filter_tail = tail(fixture['paths'], fixture['input_delays'], fixture['output_delays'])
     settings = {
+        'CONVOLVER_ARDOUR_MAJOR': re.match(r'ardour(\d+)-', pathlib.Path(tools['lua']).name)[1],
         'CONVOLVER_SESSION_DIR': str(session),
         'CONVOLVER_SESSION_NAME': name,
         'CONVOLVER_URI': plugin_uri(inputs, outputs),
