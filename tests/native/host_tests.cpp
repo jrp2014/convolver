@@ -1897,6 +1897,55 @@ void processing_faults() {
     require(explained == 3 && q.faults().rejected_input == 3,
             "a fault while a failed first load was prepared is lost from the log");
 }
+// PLUG-39 step 4: host_status_value() is the one status ordering, which
+// host_status(), the report and LV2's status port follow: a load failure,
+// then a fault, then bypass with a filter, then the filter, then a failed
+// first load, then no filter.
+void status_ordering() {
+    using Status = HostStatus;
+    const auto expect = [](const HostFilter& f, const std::optional<HostLayout>& host,
+                           bool bypassed, Status status, const char* what) {
+        const auto value = host_status_value(f, host.has_value(), bypassed);
+        if (value != status || host_status(f, host, true, {}, bypassed).status != value)
+            throw std::runtime_error(std::string("status ordering: ") + what);
+    };
+    const HostLayout layout{48000, 1, 1}, other{44100, 1, 1};
+    for (const bool bypassed : {false, true}) {
+        HostFilter f(8);
+        expect(f, std::nullopt, bypassed, Status::no_filter, "empty, host unknown");
+        expect(f, layout, bypassed, Status::no_filter, "empty");
+        try {
+            f.load(HostState{mono()}, other);
+        } catch (const std::invalid_argument&) {
+        }
+        expect(f, layout, bypassed, Status::load_failed, "failed first load");
+        f.load(HostState{mono()}, std::nullopt);
+        expect(f, std::nullopt, bypassed, bypassed ? Status::bypassed : Status::unchecked,
+               "filter, host unknown");
+        f.load(HostState{mono()}, layout);
+        expect(f, layout, bypassed, bypassed ? Status::bypassed : Status::active, "filter");
+        // A fault comes before bypass and the filter.
+        const auto huge = std::numeric_limits<float>::max() / 4;
+        HostProcessor host(mono(huge), 64, 8);
+        std::array<float, 64> data{};
+        data[0] = huge;
+        const float* in[] = {data.data()};
+        float* out[] = {data.data()};
+        audio_thread = true;
+        static_cast<void>(host.process(in, out, 64));
+        audio_thread = false;
+        static_cast<void>(f.observe(host.faults()));
+        require(f.faults().any(), "status ordering: no fault counted");
+        expect(f, layout, bypassed, Status::fault, "fault");
+        // A refused load comes before the fault, which it leaves.
+        try {
+            f.load(HostState{mono()}, other);
+        } catch (const std::invalid_argument&) {
+        }
+        require(f.faults().any(), "status ordering: a refused load cleared the fault");
+        expect(f, layout, bypassed, Status::load_failed, "refused load over a fault");
+    }
+}
 // A file name of this process's own, so that concurrent runs never share it.
 std::filesystem::path private_temp(const char* name) {
     return std::filesystem::temp_directory_path() /
@@ -2305,6 +2354,7 @@ int main() {
             {"unrecorded_failures", unrecorded_failures},
             {"saved_state_limit", saved_state_limit},
             {"status_lines", status_lines},
+            {"status_ordering", status_ordering},
             {"processing_faults", processing_faults},
             {"same_filter_kept", same_filter_kept},
             {"request_changes", request_changes},

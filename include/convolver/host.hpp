@@ -640,6 +640,14 @@ inline constexpr std::size_t max_status_text = 127; // VST3's String128, less it
 // there is a dry signal; PLUG-36).
 // `chooses_files`: the plug-in has a window that chooses filter files, so
 // with no filter the text names choosing one before a preset (PLUG-33).
+// The status alone, in the order host_status() gives it (PLUG-39 step 4): a
+// load failure, then a fault (unless a failed load left no filter), then
+// Bypassed with a filter, then the filter (Active once the host's
+// configuration is known, Waiting before), then a failed load, then No
+// filter. `host_known`: the instance plays under a known configuration.
+// Adapters with a status of their own (LV2's port) map this value rather
+// than ordering the record again.
+HostStatus host_status_value(const HostFilter&, bool host_known, bool bypassed = false) noexcept;
 HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& host,
                            bool log_written = true, const HostSettings& settings = {},
                            bool bypassed = false, bool chooses_files = false);

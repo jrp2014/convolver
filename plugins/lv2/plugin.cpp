@@ -268,15 +268,12 @@ struct Instance {
         retiring.reset();
         host.reset();
     }
+    // PLUG-39 step 4: the record's status in the shared order, mapped to the
+    // port's values (port_status()). LV2 always knows its rate and ports,
+    // and its host owns bypass, which the port does not show.
     void update_status() noexcept {
-        auto s = Status::no_filter;
-        // A failure stays recorded until a later load succeeds (PLUG-8).
-        // failed() also covers a record that could not be built.
-        if (filter.failure() || filter.failed())
-            s = Status::load_failed;
-        else if (filter.filter())
-            s = Status::running;
-        shown.store(static_cast<int>(s), std::memory_order_relaxed);
+        shown.store(static_cast<int>(port_status(host_status_value(filter, true))),
+                    std::memory_order_relaxed);
     }
     // DIAG-1, control side: explains faults the processor counted that no
     // earlier call explained.
