@@ -178,7 +178,8 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
             faults = observe_faults();
             if (!faults.empty())
                 update_status();
-            state.configuration = filter_.filter();
+            if (const auto& f = filter_.filter()) // Copied for encoding, as before.
+                state.configuration = *f;
             state.failed = filter_.failed(); // Reopening stays silent (state version 2).
             if (host())
                 host()->collect();

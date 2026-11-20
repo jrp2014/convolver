@@ -163,7 +163,8 @@ class Reference final : public lc::Driver {
         if (processor_)
             processor_->collect();
         HostState s;
-        s.configuration = filter_->filter();
+        if (const auto& f = filter_->filter())
+            s.configuration = *f;
         s.failed = filter_->failed();
         return s;
     }

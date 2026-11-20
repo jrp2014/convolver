@@ -197,8 +197,6 @@ class Effect final : public ausdk::AUBase {
     // Why the newest request failed, numbered for the log (rejected_line);
     // empty if memory runs out.
     std::string rejection_line() noexcept;
-    // What the Status parameter shows (DIAG-1).
-    HostStatusLine status();
     // AU-7: the settings the parameters hold, within their ranges.
     HostSettings settings();
     // AU-6: the editor report, after explaining any new faults (PLUG-9).
@@ -262,15 +260,33 @@ class Effect final : public ausdk::AUBase {
     // A fault explanation (observe_faults), logged even if it repeats the
     // last line: each episode counts.
     void log_faults(const std::string&) noexcept;
-    // Recomputes the status under `control_`, and tells the processor whether
-    // a load failure holds Render's Fault signal (it comes first);
-    // notify_status() then tells listeners, outside the lock, as they may
-    // call back into the unit.
+    // Under `control_`, after the control side changes anything: publishes
+    // a new diagnostics snapshot and the Status value, and tells the
+    // processor whether a load failure holds Render's Fault signal (it
+    // comes first); notify_status() then tells listeners, outside the lock,
+    // as they may call back into the unit.
     void update_status() noexcept;
-    // Under `control_`: the status text again, for the current Gain and Mix,
-    // leaving the Status value alone (PLUG-10).
-    void refresh_status_text() noexcept;
     void notify_status() noexcept;
+    // PLUG-39 step 4a: what the Status and the window's report show, taken
+    // under `control_` by update_status() whenever the control side changes
+    // something, and combined, each time either is read, with the values
+    // that change without it (Gain, Mix, bypass, latency and tail). The
+    // HostFilter is a copy that shares the accepted filter, immutable (jrp,
+    // 20 November 2026), so it costs no copy of the filter and stays whole
+    // after a replacement. Published whole under `diagnostics_lock_`, which
+    // guards only the pointer: a reader never waits for a load, and Render
+    // never touches it, so its allocation, lock and final release stay off
+    // the audio thread.
+    struct Diagnostics {
+        HostFilter filter;
+        std::optional<HostLayout> host; // known_layout() when taken.
+        bool log_written = true;        // host_log_written() when taken.
+        std::size_t max_frames = 0;     // GetMaxFramesPerSlice() while initialized.
+    };
+    std::shared_ptr<const Diagnostics> diagnostics() const;
+    // The Status line and the report from a snapshot and the values read now.
+    HostStatusLine status_line(const Diagnostics&);
+    HostReport report_of(const Diagnostics&);
     // DIAG-1, under `control_`: takes the processor's fault counts into
     // filter_ and returns their explanation, to log; empty if none are new.
     std::string observe_faults() noexcept;
@@ -359,18 +375,10 @@ class Effect final : public ausdk::AUBase {
     // at a placeholder rate (see Cleanup). Under control_, except played(),
     // which Render calls.
     HostSettling settling_{HostBinding::rendering};
-    HostStatusLine status_;          // Under control_.
-    bool status_log_written_ = true; // host_log_written() when status_ was set; under control_.
-    bool status_bypassed_ = false;   // bypass_ when status_ was set; under control_ (AU-16).
     std::chrono::steady_clock::time_point
         report_faults_at_{}; // Last report_locked() look; under control_.
-    // AU-6: the last report read, for a read while another call holds
-    // `control_` (a load or the Latency work preparing a filter, which can
-    // take a while). update_status() forgets it whenever what the unit plays
-    // changes, so a read after a load never gets the report from before it;
-    // a read with no copy waits for the lock.
-    std::mutex report_cache_lock_;
-    std::optional<HostReport> report_cache_; // Under report_cache_lock_.
+    mutable std::mutex diagnostics_lock_;
+    std::shared_ptr<const Diagnostics> diagnostics_; // Under diagnostics_lock_.
     std::mutex logging_;
     std::string logged_;    // The last line log() wrote, under logging_.
     const std::string tag_; // "Audio Unit #n": this instance in the Convolver log.

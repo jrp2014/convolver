@@ -174,12 +174,14 @@ struct Effect::MainNotices {
 };
 
 Effect::Effect(AudioComponentInstance instance)
-    : AUBase(instance, 1, 1), status_(host_status(filter_, std::nullopt, true, {}, false, true)),
+    : AUBase(instance, 1, 1),
+      diagnostics_(std::make_shared<const Diagnostics>(Diagnostics{filter_, std::nullopt})),
       tag_(next_tag()) {
     set_host_log_sdk(CONVOLVER_SDK_DESCRIPTION); // The Convolver log names the SDK (CI-6).
     // Not UseIndexedParameters: that numbers parameters from 0, and Status is
     // 1001 (plugins/identities.json), so the parameter map is used instead.
-    Globals()->SetParameter(status_parameter, static_cast<AudioUnitParameterValue>(status_.status));
+    Globals()->SetParameter(status_parameter,
+                            static_cast<AudioUnitParameterValue>(HostStatus::no_filter));
     // AU-7: the settings at their defaults, which keep the sound unchanged.
     const HostSettings defaults;
     Globals()->SetParameter(gain_parameter, static_cast<AudioUnitParameterValue>(defaults.gain_db));
@@ -461,7 +463,7 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
             applied_gain_mode_ = current.gain_mode;
             try { // Best effort: out of memory for the message changes nothing else.
                 mode_message =
-                    gain_mode_line(current, filter_.gains(), filter_.filter().has_value(), why);
+                    gain_mode_line(current, filter_.gains(), filter_.filter() != nullptr, why);
                 mode_problem = !why.empty() ||
                                (filter_.filter() && !applied_gain_db(current, filter_.gains()));
             } catch (...) {
@@ -470,8 +472,12 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
         }
         // AU-16: a bypass switched while another call held the lock
         // (SetProperty) is shown here, with Render's faults explained first
-        // as SetProperty does. Not needed when the update above read it.
-        if (status_bypassed_ != bypass_.load()) {
+        // as SetProperty does. Not needed when the Status value already
+        // shows it (the update above read it), and a Fault Render wrote
+        // differs too, which explains it.
+        if (Globals()->GetParameter(status_parameter) !=
+            static_cast<AudioUnitParameterValue>(
+                host_status_value(filter_, known_layout().has_value(), bypass_.load()))) {
             // Kept apart from any faults the old processor counted above.
             bypass_faults = observe_faults();
             update_status();

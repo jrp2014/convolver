@@ -349,8 +349,10 @@ format.
   see the old value until the call holding the lock or the Latency work
   updates it. The setter wakes that work with its own bit of the dispatch
   source's data, and such a run only updates the Status: it does not
-  retry a Latency that could not be built (AU-16; the pattern is TODO
-  PLUG-30). Host writes to it
+  retry a Latency that could not be built (AU-16; [calls that do not wait
+  for the control lock](#calls-that-do-not-wait-for-the-control-lock)).
+  The line is built when read, from the diagnostics snapshot and the Gain,
+  Mix and bypass set then (PLUG-39 step 4a). Host writes to it
   are ignored, and the value `AUBase::SaveState` writes with the other
   parameters is ignored on restore. When the log file cannot be written
   (`host_log_written()` is false), the text says so instead of pointing to it.
@@ -1126,6 +1128,30 @@ be expensive; neither FFT planning nor file access belongs in a callback.
 Finite input outside float range, and nonfinite input, become silence.
 Nonfinite output is contained and history reset. The processing boundary does
 not throw; invalid dimensions return failure without advancing audio.
+
+### Calls that do not wait for the control lock
+
+PLUG-30 (finished with PLUG-39 step 4a, 20 November 2026): a call that must
+not wait and finds the control lock taken must not skip an update and leave
+what the host sees stale. These are every such call; the audio threads
+(`process()`, `Render`, `run()`) never take the lock at all.
+
+| Adapter | Call | When the lock is taken | Why nothing stays stale | Held-lock test |
+| --- | --- | --- | --- | --- |
+| Audio Unit | The window's report (`Effect::report()`) | Builds the report from the diagnostics snapshot (`Effect::Diagnostics`) and the Gain, Mix, bypass, latency and tail set now | Every control change publishes a new snapshot (`update_status()`) before it lets the lock go, and then notifies the window, so the snapshot describes what plays until the holder finishes. Faults `Render` counted since are explained at the next read that gets the lock | `au.adapter` `report_while_latency_work_holds_lock`; `au.editor` (a restore held open) |
+| Audio Unit | Bypass (`SetProperty`, `kAudioUnitProperty_BypassEffect`) | Stores the bypass and wakes the Latency work's serial queue (AU-16) | The queue may wait for the lock, and updates the Status whenever its value differs from the one the record and bypass give (`host_status_value()`) | `au.adapter` `bypass_while_latency_work_holds_lock` |
+| LV2 | `deactivate()` | Waits for it: it only tries first, to signal the tests (`WorkerPoint::deactivate_waits`) | It does not skip | `lv2.adapter` `held_while_deactivating` |
+| VST3 | None | Every call takes its locks without trying | | |
+
+The Audio Unit's snapshot holds a copy of the `HostFilter`, which shares the
+accepted filter rather than copying it (`HostFilter::filter()`, immutable,
+jrp, 20 November 2026), with the host's configuration and whether the log
+can be written. It is built whole and published under its own lock, which
+guards only the pointer, so a reader never mixes two generations; `Render`
+never touches it, so its allocation, its lock and the release of an old
+filter stay off the audio thread (`native.host` `shared_filter`: an old
+copy stays whole after a replacement, and a refused replacement keeps the
+accepted filter).
 
 ## Host state
 

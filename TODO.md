@@ -86,7 +86,7 @@ starting.
 
 | Item | What to do | Note |
 | --- | --- | --- |
-| **PLUG-39** | The load and restore path, steps 1b to 6 in the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)'s order (step 0's protection tests are in, PR #200, and step 1a, PR #205): steps 4a (with PLUG-30) and 5 to 6 (step 1b, PR #224, PLUG-36, PR #225, step 2, PR #226, step 4c, PR #230, step 4b, PR #231, and the diagnostic texts following bypass, PR #232, are done); step 3 (the shared ownership of the playing processor) and ROBUST-8 after it (PR #223) are done | Plan and order approved by jrp on 13 November 2026; step 3 first and the four items folded in on 19 November 2026 ([decision](docs/project/decisions.md#releases)). Each step is its own reviewed pull request, and step 3 (deferred reclamation) gets its own ownership review |
+| **PLUG-39** | The load and restore path, steps 1b to 6 in the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)'s order (step 0's protection tests are in, PR #200, and step 1a, PR #205): steps 5 to 6 (step 1b, PR #224, PLUG-36, PR #225, step 2, PR #226, step 4c, PR #230, step 4b, PR #231, the diagnostic texts following bypass, PR #232, and step 4a with PLUG-30, are done); step 3 (the shared ownership of the playing processor) and ROBUST-8 after it (PR #223) are done | Plan and order approved by jrp on 13 November 2026; step 3 first and the four items folded in on 19 November 2026 ([decision](docs/project/decisions.md#releases)). Each step is its own reviewed pull request, and step 3 (deferred reclamation) gets its own ownership review |
 | **PLUG-24** | `HostProcessor` in its own source file | In PLUG-39's sequence, as its own pull request, never inside a step's or with a DSP change (jrp, 19 November 2026) |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the gain modes are in 0.13.20 (PR #188) |
 | **PERF-3** | One measurement exercise: resource budgets and supported workloads | Changes no shipped code; its results decide whether FFT-2, VST3-5, PLUG-11 and PERF-2's tuning are worth doing (EDGE-5 publishes them) |
@@ -128,7 +128,7 @@ REL-3.
 
 | Items | Note |
 | --- | --- |
-| **ROBUST-1**, **PLUG-27**, **PLUG-29**, **HOST-6** | Robustness and lifecycle corner cases (ROBUST-8, PLUG-30 and PLUG-36 moved into PLUG-39's sequence on 19 November 2026, [decision](docs/project/decisions.md#releases)) |
+| **ROBUST-1**, **PLUG-27**, **PLUG-29**, **HOST-6** | Robustness and lifecycle corner cases (ROBUST-8, PLUG-30 and PLUG-36 moved into PLUG-39's sequence on 19 November 2026 and are done, [decision](docs/project/decisions.md#releases)) |
 | **CI-32** | The most extreme numerical cases less often; dormant as well (jrp, 12 November 2026) |
 | **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19** | Profiling and measurement-only optimisations |
 | The rest of **PLUG-25** and **CFG-3** | Marking a host rate as not yet confirmed, and reading Windows-1252 names; each also needs jrp's decision |
@@ -366,31 +366,6 @@ LV2 (Linux first; also PipeWire system audio):
   and the one-time read of the old file, and the plug-ins guide says where
   the list is kept. Lower priority than PLUG-27; parked until
   REL-3.
-- [ ] **PLUG-30 — One rule for state a busy lock makes a call skip.**
-  From AU-16 (8 November 2026; jrp asked for fixes like it to be recorded,
-  as stepping back may give a more general fix). The pattern: a call that
-  must not wait changes shared state, finds the control lock taken, skips
-  the update that lock guards and relies on the holder to make it; but the
-  holder may already have made it, or may never make it, so what the host
-  sees stays stale with no later update. Fixed where it was seen: the Audio
-  Unit's bypass setter (`SetProperty`, `effect_properties.cpp`) left Status
-  at Active while the Latency work held the lock with the Latency
-  unchanged (au.adapter, CI run 42418181089 on `2f3cb80`). The narrow fix
-  hands the update to the Latency work's serial queue, which may wait for
-  the lock and updates the Status when the bypass it shows differs
-  (`status_bypassed_`). Other places that skip or work around a busy lock,
-  each correct today for its own reason: the Audio Unit's report read
-  (`Effect::report()`) returns its last copy, safe only because every
-  change goes through `update_status()`, which forgets the copy, and then
-  notifies the window; LV2's `deactivate()` tries the lock first but then
-  waits. VST3 takes its locks without trying. A general fix would make
-  "changed while the lock was held" a rule rather than a per-call
-  decision: for example, a pending-update flag that whoever releases the
-  control lock acts on, or all Audio Unit control work on the one serial
-  queue. Done when each adapter's skip paths either follow that rule or
-  are listed with why they are safe, with a held-lock test for each, as
-  AU-16's. Taken up with PLUG-39's step 4, which removes the Audio Unit's
-  report cache from the list (jrp, 19 November 2026).
 - [ ] **PLUG-39 — One consolidation of the load and restore path.** From
   jrp's review of 13 November 2026: individually reasonable fixes have left
   each adapter deciding for itself what an accepted request requires (six
@@ -413,11 +388,10 @@ LV2 (Linux first; also PipeWire system audio):
   request's kind) and aligns LV2's re-chosen file with VST3 and the Audio
   Unit. Step 2, in PR #226, gathers VST3's and the Audio Unit's rules for when the host
   has settled its rate and channels into one record, `HostSettling`, each
-  format keeping its own binding. Step 4c, in PR #230, gives the status one ordering, `host_status_value()`, which `host_status()`, the report and LV2's status port follow. Step 4b, in PR #231, gives a filter's saved name one rule, `HostFilter::offer_name()`, which VST3 offers its controller state's name to. Step 4's diagnostic texts (the report, the log lines), in PR #232, now follow bypass as Status does. **Remains:** the
+  format keeping its own binding. Step 4c, in PR #230, gives the status one ordering, `host_status_value()`, which `host_status()`, the report and LV2's status port follow. Step 4b, in PR #231, gives a filter's saved name one rule, `HostFilter::offer_name()`, which VST3 offers its controller state's name to. Step 4's diagnostic texts (the report, the log lines), in PR #232, now follow bypass as Status does. Step 4a, in 0.17.0, shares the accepted filter (`std::shared_ptr<const Configuration>`, as jrp chose on 20 November 2026, recorded in
+  [decisions](docs/project/decisions.md#plug-in-behaviour)) between `HostFilter`, the processor and the Audio Unit's diagnostics snapshot, which replaces its report cache and its copies of the status, with PLUG-30. **Remains:** the
   [consolidation plan](docs/project/plans/2026-11-13-load-restore-consolidation.md)'s
-  steps 4a (the Audio Unit's snapshot, with PLUG-30, on a shared accepted
-  filter as jrp chose on 20 November 2026, in 0.17.0, recorded in
-  [decisions](docs/project/decisions.md#plug-in-behaviour)) and 5 to 6: typed reports and advice. Plan and order approved by jrp on 13 November
+  steps 5 to 6: typed reports and advice. Plan and order approved by jrp on 13 November
   2026, not the implementation: each step's pull request is reviewed and
   tested on its own. **Worth doing** now that 0.13.20 is published
   (16 November 2026). **Done
@@ -1219,6 +1193,16 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **PLUG-30 — One rule for state a busy lock makes a call skip.**
+  20 November 2026, with PLUG-39 step 4a, from AU-16: every call that finds
+  the control lock taken is now listed, with why nothing stays stale and a
+  held-lock test for each, in the contract's
+  [calls that do not wait for the control lock](docs/develop/plugin-contract.md#calls-that-do-not-wait-for-the-control-lock).
+  The Audio Unit's report cache, which a read had to wait for when it was
+  empty, is replaced by a diagnostics snapshot that every control change
+  publishes, so the window never waits; the bypass setter's queued update
+  compares the Status value with the one the record gives instead of
+  keeping its own copy of the bypass.
 - [x] **HOST-7 — Run the Ardour test with Ardour 9.**
   20 November 2026, PR #229, from CI-43: Ardour 9's Lua tool crashed in
   `Session:new_audio_track`, which takes an empty `ARDOUR.RouteGroup()`

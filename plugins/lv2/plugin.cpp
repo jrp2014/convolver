@@ -548,7 +548,7 @@ void apply_gain_mode(Instance& p) noexcept {
         auto settings = p.settings();
         settings.gain_mode = mode;
         const auto line =
-            gain_mode_line(settings, p.filter.gains(), p.filter.filter().has_value(), why);
+            gain_mode_line(settings, p.filter.gains(), p.filter.filter() != nullptr, why);
         if (!why.empty() || (p.filter.filter() && !applied_gain_db(settings, p.filter.gains())))
             p.log_error(line);
         else
@@ -1273,7 +1273,8 @@ LV2_State_Status save(LV2_Handle handle, LV2_State_Store_Function store, LV2_Sta
         p.record_dropped();
         p.log_faults();
         HostState saved;
-        saved.configuration = p.filter.filter();
+        if (const auto& f = p.filter.filter()) // Copied for encoding, as before.
+            saved.configuration = *f;
         saved.failed = p.filter.failed(); // Reopening after a failed load stays silent.
         // Bypass is the lv2:enabled port and the settings are their ports
         // (LV2-7), which the host saves itself.

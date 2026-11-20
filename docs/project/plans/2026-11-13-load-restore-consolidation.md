@@ -99,7 +99,7 @@ group to a row:
 | --- | --- | --- |
 | VST3 `tail_`, written in four places; Audio Unit `tail_` | The playing processor's tail and the accepted filter's | Computed by one function from the processor and filter, which already follows a replacement inside a processor (the harness's `tail-after-replacement`) |
 | VST3 `active_latency_`; Audio Unit `latency_` (the newest processor's latency, or the chosen one while uninitialized) | The newest processor's latency, and the chosen setting | The newest processor's latency, written by the ownership mechanism when it offers that processor, so the host reads at once the latency the next callback uses; the Audio Unit's second meaning comes from its parameter |
-| Audio Unit `status_`, `status_log_written_`, `status_bypassed_`, `report_cache_` | `host_status()` and `host_report()` of `HostFilter`, the settings and bypass | One control-side snapshot, combined when read with the live audio-side values (step 4) |
+| Audio Unit `status_`, `status_log_written_`, `status_bypassed_`, `report_cache_` | `host_status()` and `host_report()` of `HostFilter`, the settings and bypass | One control-side snapshot, combined when read with the live audio-side values (step 4). Since step 4a: gone; `Effect::Diagnostics`, which shares the accepted filter, is published whole by `update_status()`, and the Status line and report are built from it with the Gain, Mix, bypass, latency and tail read then |
 | VST3 controller `status_text_`, `status_value_`, `report_text_` | The report the controller already holds (`report_`) | Derived from it |
 | VST3 processor `kept_name_` and `kept_identity_`, controller `kept_name_` and `kept_identity_` | The name pair of the playing filter, kept beside the newest offered pair | Removed by the shared name rule; the processor's offered pair moves into `HostFilter`. Since step 4b: gone; `HostFilter` keeps the offered name, and state of the filter that plays keeps the name it shows |
 | LV2 `shown` | The status ordering above | Still the value `run()` reads, written through the shared ordering |
@@ -254,7 +254,7 @@ the [success criterion](#success-criterion) allows:
 | `vst3.adapter` `latency_handover_waits()`, since step 3b `latency_handover_does_not_wait()` | `holding_for_tests`, and `releasing_for_tests` until step 3b replaced it with `freeing_processor_for_tests` | `process()` holding its processor, and the control side waiting in `release_processor()` (since step 3b, a replaced processor being freed) | 3: the assertion that the control call waits became the safety requirement in step 3b, as above |
 | `au.adapter` `latency_parameter()`, since step 3c | `freeing_processor_for_tests`, and the test host's input callback (`while_pulling`) holding `Render` | A replaced processor being freed while `Render` holds the old one | 3: added by step 3c, as the Audio Unit's counterpart of `latency_handover_does_not_wait()` |
 | `vst3.adapter` `settings_parameters()`, `vst3.editor` `window` | `latency_preparation_for_tests` | Building the processor for a new Latency while active fails | 3: the hook moves to where the shared mechanism builds the processor it offers |
-| `au.adapter` `bypass_while_latency_work_holds_lock()` | `latency_locked_for_tests`, with the waits below | The Latency work holding the control lock, and the Status's `status_bypassed_` copy | 4: the Status becomes a view of state; the hold stays, since the queue does |
+| `au.adapter` `bypass_while_latency_work_holds_lock()` | `latency_locked_for_tests`, with the waits below | The Latency work holding the control lock, and the Status's `status_bypassed_` copy | 4: the Status becomes a view of state; the hold stays, since the queue does. Since step 4a: the queue compares the Status value with `host_status_value()` instead of the copy, and `report_while_latency_work_holds_lock()` uses the same hold for the report |
 | `au.adapter` `latency_queue_lifetime()`, `latency_witness_per_unit()`, `latency_staged_closing()`; `latency_parameter()`, `status_parameter()`, `timing_in_seconds()`, `listeners_on_main_thread()`, which wait through `latency_settled()` | `latency_queue_failure_for_tests`, `latency_progress_for_tests`, `latency_started_for_tests`, `latency_closing_for_tests` | The Audio Unit's Latency queue: its requests, runs and closing | 3, only where it changes how the queue hands over the processor; the queue itself stays ([what stays](#what-stays-and-why)) |
 | `au.editor` `responsive` | `load_started_for_tests` | The start of a load chosen in the window | 1: the hook stays at the start of the request, before the shared decision |
 | `lv2.adapter` `worker_loads()`, `refused_first_loads()`; `lv2.lifecycle`'s `overtake` | `WorkerPoint::read`, `prepared`, `checked` (`pause_at()`) | The worker between reading a file, preparing the filter, its last check for a newer request and publishing | 1 (the decision for a chosen file, with LV2's same-file keep) and 3 (`stage()`, `retire()`, `handover`): each pause keeps its meaning |
@@ -444,7 +444,12 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
      replaces `status_`, `status_log_written_`, `status_bypassed_` and
      `report_cache_` without making a reading stale when nothing on the
      control side has changed, and removes the report cache from PLUG-30's
-     list of paths that skip work when the lock is busy.
+     list of paths that skip work when the lock is busy. Done on 20 November
+     2026 as step 4a, in 0.17.0: the snapshot (`Effect::Diagnostics`) holds
+     a copy of the `HostFilter`, which shares the accepted filter as jrp
+     chose (`HostFilter::filter()` is a `std::shared_ptr<const
+     Configuration>`, also handed to the processor), so it costs no copy of
+     the filter and stays whole after a replacement.
    - VST3 offers names to `HostFilter` with their filter identity, as the
      Audio Unit already does through `HostRequest::name`, and shared code
      applies the rule that a name shows only while its filter plays, so a
@@ -503,7 +508,8 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
   contract's [states and transitions](../../develop/plugin-contract.md#states-and-transitions).
 - **PLUG-30** (one rule for state a busy lock makes a call skip) is taken
   up with step 4 (jrp, 19 November 2026), which removes the Audio Unit's
-  report cache from its list.
+  report cache from its list. Done on 20 November 2026 with step 4a: the
+  contract's [calls that do not wait for the control lock](../../develop/plugin-contract.md#calls-that-do-not-wait-for-the-control-lock).
 - **ROBUST-8** (the fault record after a failed Latency change) was taken
   up right after steps 3b and 3c, as its own pull request for every adapter
   (jrp, 19 November 2026), in PR #223: `HostFilter::activation()` finds

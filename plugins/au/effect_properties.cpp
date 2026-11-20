@@ -188,38 +188,56 @@ std::string Effect::observe_faults() noexcept {
 
 void Effect::update_status() noexcept {
     try {
+        // PLUG-39 step 4a: one snapshot of the control side, built whole and
+        // then published, so a reader never mixes two generations. Copying
+        // the HostFilter shares the accepted filter rather than copying it.
+        auto next = std::make_shared<const Diagnostics>(
+            Diagnostics{filter_, known_layout(), host_log_written(),
+                        host() ? static_cast<std::size_t>(GetMaxFramesPerSlice()) : 0});
+        const auto status = host_status_value(next->filter, next->host.has_value(), bypass_.load());
         {
-            // What plays may have changed: the window's next read builds a
-            // new report rather than taking the copy (report()).
-            std::lock_guard cached(report_cache_lock_);
-            report_cache_.reset();
+            std::lock_guard published(diagnostics_lock_);
+            diagnostics_.swap(next);
         }
-        status_log_written_ = host_log_written();
-        // Gain and Mix change what plays without a filter (PLUG-10).
-        const bool bypassed = bypass_.load();
-        status_ = host_status(filter_, known_layout(), status_log_written_, settings(), bypassed,
-                              true); // Choose Filter in the window.
-        status_bypassed_ = bypassed;
+        // `next` now holds the old snapshot, released here on this control
+        // thread, or later by a reader still holding it, never by Render.
         if (host()) // Render must not show Fault over a load failure.
             host()->hold_fault_signal(filter_.failure_shown());
-        Globals()->SetParameter(status_parameter,
-                                static_cast<AudioUnitParameterValue>(status_.status), true);
-    } catch (...) { // Out of memory: the previous status stays.
+        Globals()->SetParameter(status_parameter, static_cast<AudioUnitParameterValue>(status),
+                                true);
+    } catch (...) { // Out of memory: the previous snapshot and status stay.
     }
 }
 
-// The text only, for the Gain and Mix set now. It never writes the Status
-// value: Render may have written Fault there since the last update_status(),
-// and only an update that has observed the faults may replace it (the
-// independent review).
-void Effect::refresh_status_text() noexcept {
-    try {
-        auto line = host_status(filter_, known_layout(), status_log_written_, settings(),
-                                bypass_.load(), true);
-        if (line.status == status_.status)
-            status_.text = std::move(line.text);
-    } catch (...) { // Out of memory: the previous text stays.
-    }
+std::shared_ptr<const Effect::Diagnostics> Effect::diagnostics() const {
+    std::lock_guard published(diagnostics_lock_);
+    return diagnostics_;
+}
+
+// The Status line for the Gain, Mix and bypass set now (PLUG-10, PLUG-22),
+// as hosts read it: Gain and Mix may change on any thread.
+HostStatusLine Effect::status_line(const Diagnostics& d) {
+    return host_status(d.filter, d.host, d.log_written, settings(), bypass_.load(),
+                       true); // Choose Filter in the window.
+}
+
+HostReport Effect::report_of(const Diagnostics& d) {
+    HostReportFacts facts;
+    facts.format = tag_;
+    facts.host = d.host;
+    facts.max_frames = d.max_frames;
+    facts.settings = settings();
+    facts.latency_frames = latency_.load();
+    facts.tail_frames = tail_.load();
+    facts.log_written = d.log_written;
+    facts.bypassed = bypass_.load();
+    facts.chooses_files = true; // Choose Filter in the window (load_property).
+#if defined(CONVOLVER_AU_READER_LIBSNDFILE)
+    facts.file_reader = sndfile_version();
+#else
+    facts.file_reader = "macOS AudioToolbox";
+#endif
+    return host_report(d.filter, facts);
 }
 
 void Effect::notify_status() noexcept {
@@ -227,7 +245,7 @@ void Effect::notify_status() noexcept {
         // The status was worked out before its lines were logged: if writing
         // them changed whether the log can be written, say so now.
         const Locked lock(*this);
-        if (status_log_written_ != host_log_written())
+        if (diagnostics()->log_written != host_log_written())
             update_status();
     }
     AudioUnitEvent event{};
@@ -240,41 +258,24 @@ void Effect::notify_status() noexcept {
 }
 
 HostReport Effect::report_locked(std::string& faults) {
-    // As for the Status text: faults Render signalled are explained here,
-    // and Gain or Mix may have changed on another thread. Only an update
-    // that has observed new faults rewrites the Status value, which Render
-    // may have just set to Fault (refresh_status_text). A Fault Render wrote
-    // that is not explained yet is taken in at once; faults that go on after
-    // it at most every report_fault_interval, so an open window does not log
-    // a line twice a second (the independent review).
+    // As for the Status text: faults Render signalled are explained here.
+    // Only an update that has observed new faults rewrites the Status value,
+    // which Render may have just set to Fault. A Fault Render wrote that is
+    // not explained yet is taken in at once; faults that go on after it at
+    // most every report_fault_interval, so an open window does not log a
+    // line twice a second (the independent review).
     const auto now = std::chrono::steady_clock::now();
-    const bool unexplained = status_.status != HostStatus::fault &&
+    const bool unexplained = host_status_value(filter_, known_layout().has_value(),
+                                               bypass_.load()) != HostStatus::fault &&
                              Globals()->GetParameter(status_parameter) ==
                                  static_cast<AudioUnitParameterValue>(HostStatus::fault);
     if (unexplained || now - report_faults_at_ >= report_fault_interval) {
         faults = observe_faults();
         report_faults_at_ = now;
     }
-    if (faults.empty())
-        refresh_status_text();
-    else
+    if (!faults.empty())
         update_status();
-    HostReportFacts facts;
-    facts.format = tag_;
-    facts.host = known_layout();
-    facts.max_frames = host() ? GetMaxFramesPerSlice() : 0;
-    facts.settings = settings();
-    facts.latency_frames = latency_.load();
-    facts.tail_frames = tail_.load();
-    facts.log_written = status_log_written_;
-    facts.bypassed = bypass_.load();
-    facts.chooses_files = true; // Choose Filter in the window (load_property).
-#if defined(CONVOLVER_AU_READER_LIBSNDFILE)
-    facts.file_reader = sndfile_version();
-#else
-    facts.file_reader = "macOS AudioToolbox";
-#endif
-    return host_report(filter_, facts);
+    return report_of(*diagnostics());
 }
 
 HostReport Effect::report() {
@@ -282,39 +283,22 @@ HostReport Effect::report() {
     HostReport r;
     {
         // A load or the Latency work holds the lock while it prepares a
-        // filter, which can take a while: the window then gets the last
-        // report at once rather than waiting, and rereads when the load
-        // notifies (TODO AU-6). The copy is forgotten whenever what plays
-        // changes (update_status), so it never predates a finished load.
+        // filter, which can take a while: the window then gets the report of
+        // the snapshot at once, which describes what plays until that call
+        // finishes (PLUG-39 step 4a), and rereads when the call notifies
+        // (AU-6). Faults Render counted since are explained at the next read
+        // that gets the lock.
         std::unique_lock lock(control_, std::try_to_lock);
-        if (!lock.owns_lock()) {
-            {
-                std::lock_guard cached(report_cache_lock_);
-                if (report_cache_)
-                    return *report_cache_;
-            }
-            lock.lock(); // No current copy: wait.
-        }
+        if (!lock.owns_lock())
+            return report_of(*diagnostics());
         playing_.reclaim(); // As every control call does (Locked).
         r = report_locked(faults);
-        // Stored under control_, so a slower reader cannot replace a newer copy.
-        try {
-            std::lock_guard cached(report_cache_lock_);
-            report_cache_ = r;
-        } catch (...) { // Out of memory: the older copy stays.
-        }
     }
     if (!faults.empty()) { // As when a host reads the Status text.
         log_faults(faults);
         notify_status();
     }
     return r;
-}
-
-HostStatusLine Effect::status() {
-    const Locked lock(*this);
-    refresh_status_text(); // With the Gain and Mix set now, as hosts read it.
-    return status_;
 }
 
 OSStatus Effect::GetParameterList(AudioUnitScope scope, AudioUnitParameterID* list, UInt32& count) {
@@ -602,13 +586,13 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
             faults = observe_faults();
             if (!faults.empty())
                 update_status();
-            else // Gain or Mix may have changed, on any thread (PLUG-10).
-                refresh_status_text();
-            const auto current = static_cast<AudioUnitParameterValue>(status_.status);
+            // Gain or Mix may have changed, on any thread (PLUG-10).
+            const auto line = status_line(*diagnostics());
+            const auto current = static_cast<AudioUnitParameterValue>(line.status);
             const auto value = request->inValue ? *request->inValue : current;
             const auto index = static_cast<long>(std::lround(value));
             if (value == current)
-                text = status_.text;
+                text = line.text;
             else if (index >= 0 && index < static_cast<long>(status_names.size()))
                 text = status_names[static_cast<std::size_t>(index)];
         } catch (...) {

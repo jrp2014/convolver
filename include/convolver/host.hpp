@@ -174,7 +174,9 @@ Advice speaker_notice(const Configuration&, const HostLayout&);
 // processing, bypass, Mix and diagnostics never read it differently from a
 // configuration's counts (jrp's review, 7 November 2026).
 struct HostPlayback {
-    Configuration filter;
+    // PLUG-39 step 4a: shared with HostFilter::filter(), never copied; never
+    // null. A processor reads it while it is built and keeps no reference.
+    std::shared_ptr<const Configuration> filter;
     bool dry = false;
     // PLUG-10: what Estimate and No clipping play for this filter
     // (HostFilter fills them in from the accepted filter's filter_gains()).
@@ -188,6 +190,7 @@ struct HostPlayback {
 };
 // A filter that plays: a dry signal only when the filter itself has as many
 // inputs as outputs (PLUG-23), never because the host's counts are equal.
+HostPlayback filter_playback(std::shared_ptr<const Configuration>);
 HostPlayback filter_playback(Configuration);
 
 // What an instance plays without a usable filter, under the shared adapter
@@ -416,9 +419,12 @@ class HostFilter {
     // `max_channels` is the format's channel bound, a check on the state itself.
     explicit HostFilter(std::size_t max_channels = max_channel_count)
         : max_channels_(max_channels) {}
-    // The accepted filter, which a host saves. Absent for an empty instance and
-    // after a failed initial load.
-    const std::optional<Configuration>& filter() const noexcept {
+    // The accepted filter, which a host saves. Null for an empty instance and
+    // after a failed initial load. PLUG-39 step 4a (jrp, 20 November 2026):
+    // immutable and shared, by the processor's HostPlayback and by any copy
+    // of this HostFilter an adapter keeps for its diagnostics, so a copy is
+    // cheap and stays whole however this one changes later.
+    const std::shared_ptr<const Configuration>& filter() const noexcept {
         return filter_;
     }
     // worst_case_peak() of filter(), found when it was accepted; 0 without one.
@@ -598,7 +604,7 @@ class HostFilter {
     HostFailure& record_unexplained(HostFailureKind, const HostRequest&,
                                     const Configuration*) noexcept;
     std::size_t max_channels_;
-    std::optional<Configuration> filter_;
+    std::shared_ptr<const Configuration> filter_;
     double peak_ = 0;            // filter_peak()
     FilterGains gains_;          // gains()
     bool estimating_ = false;    // estimating()

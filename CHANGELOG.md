@@ -28,6 +28,22 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Library (PLUG-39 step 4a), incompatible, hence 0.17.0: the accepted
+  filter is shared rather than copied, as jrp chose on 20 November 2026.
+  `HostFilter::filter()` returns a `std::shared_ptr<const Configuration>`
+  (null while no filter is accepted) instead of a
+  `std::optional<Configuration>`, and `HostPlayback::filter` is the same
+  shared, immutable filter, so activation and a copy of the `HostFilter`
+  no longer copy the filter's samples; `filter_playback()` also takes the
+  shared filter. Output and saved state are unchanged.
+- Audio Unit (PLUG-39 step 4a, PLUG-30): the Status and the window's report
+  are built from one diagnostics snapshot that every control change
+  publishes whole, together with the Gain, Mix, bypass, latency and tail
+  set when they are read. The report cache and the copies of the status
+  are gone, so the window no longer waits for a load or the Latency work
+  when it had no earlier report, and the report follows a bypass switched
+  while that work holds the control lock. The contract lists every call
+  that does not wait for the control lock, with a held-lock test for each.
 - Plug-ins (PLUG-39 step 1b): in LV2, choosing the file of the filter
   already playing again keeps it and what it is playing, so its tail rings
   on, as choosing it again in the VST3 and Audio Unit windows already did
