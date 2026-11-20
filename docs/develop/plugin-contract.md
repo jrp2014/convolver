@@ -136,7 +136,8 @@ before they set the sample rate and channel layout (VST3 `setState` before
   its rate or buses and before it plays again, is therefore kept silent
   rather than refused; VST3 gives no other way to tell it from a restored project
   when the host does not say. `processor.cpp`'s `load_check()` holds the rule
-  (each load names its origin: a chosen file, a state or a project),
+  (each load names its kind, `HostRequestKind`: a chosen file, restored
+  state or a session the host is opening),
   and `vst3.adapter`'s `restored_while_host_settles` replays REAPER's order.
 
 ## Failure reasons
@@ -412,16 +413,19 @@ format.
   accepted load sets `hold_fault_signal(failure_shown())` before the
   snapshot, and VST3 and the Audio Unit set it again after every rejection
   and activation; LV2's status port puts Load failed first itself. When an
-  empty instance's first load fails, every adapter silences the processor
-  that plays with `HostProcessor::silence()` (ROBUST-3) rather than
+  empty instance's first load fails, the processor that plays is silenced
+  with `HostProcessor::silence()` (ROBUST-3), by
+  `HostFilter::fail_request()`, which every adapter calls with that
+  processor after any request that failed (PLUG-39 step 1b), rather than
   a new activation, which would restart the fault count; it neither allocates
   nor fails, so the silence holds even when memory has run out. A first
   load that runs out of memory before its failure is recorded still fails
   (ROBUST-7): `HostFilter` marks the instance failed (`fail_request()`)
   before it allocates anything for the record, which then keeps the kind
   and request number but may lack the message (`failure_message()` gives
-  general advice instead) or the path. The adapters call `fail_request()`
-  for a request that throws before `HostFilter` records it: VST3 in
+  general advice instead) or the path. The adapters' call to
+  `fail_request()` covers a request that throws before `HostFilter`
+  records it too: VST3 in
   `refused()`, the Audio Unit in `fail_unrecorded()`, and LV2 in
   `restore()`, `work()` and `record_dropped()`. The allocation-starvation
   lifecycle tests cover restored state on all three formats; the
@@ -523,7 +527,29 @@ place.
 | Saving | Encodes the state | Playback |
 
 A request can hold several changes (restored state holds a filter and the
-settings), and each part takes its own row. Where the table leaves a case
+settings), and each part takes its own row.
+
+The rows are the specification of `HostChange` (PLUG-39 step 1b): one
+decision for each accepted request, made in `HostFilter::load()` inside its
+transaction from the request's kind (`HostRequestKind`: restored state, a
+session the host is opening, or a file chosen in the plug-in) and the
+state, so that no adapter makes it again. The install callback receives
+what plays (`HostPlayback`, with `playing` set when the filter is the one
+already playing) and passes it to `HostProcessor::play()`, which keeps the
+processor or replaces it; `load()` then returns the rest: the settings to
+apply (the request's own, none to leave them; VST3 fills in its defaults
+for restored state without them, VST3-4, and the Audio Unit lays its saved
+parameters over the present values; the Audio Unit and LV2 ignore settings
+a Convolver state carries, such as a VST3 state's, because their settings
+are parameters and ports), the bypass (restored state's, never a
+chosen file's; only VST3 applies it) and the filter's tail while no
+processor plays. The Latency in those settings goes through each format's
+own Latency path, which builds a new processor only when it differs. A
+refused request returns nothing and changes none of it; every adapter then
+calls `HostFilter::fail_request()` with the processor that plays, which
+silences it after a failed first load.
+
+Where the table leaves a case
 open, the deciding rule is not to surprise the user (jrp, 12 November
 2026); the leading reverbs that play impulse responses have usually been
 tuned on such cases already, so compare with them before choosing. Tests of a change check what
@@ -547,15 +573,21 @@ silent) and is equal in every stored value: the filter's identity picks the
 candidate, a full comparison of every value (floats by their bits) proves
 it, and a file name proves nothing. The adapters (VST3 `setState`, a file
 or `.vstpreset` chosen in the window, AU `RestoreState` and a chosen file,
-LV2 `restore`) then call `HostProcessor::keep()`, which passes the
+LV2 `restore` and a file chosen through `patch:Set`) then call
+`HostProcessor::keep()`, which passes the
 filter's gains to `update_gains()` and keeps the processor, unless the
 processor met a fault since the last accepted load, which replaces it as
 before. Saved state, the filter's name, the log and the notifications
 update as for any accepted load. VST3 state that the host marks as a
-project being opened (`kProject`) still replaces the filter, so reopening a
-project keeps nothing from the session before; a reset or reactivation
+project being opened (`kProject`) is a session (`HostRequestKind::session`),
+which `HostFilter::load()` never counts as playing, so it still replaces the
+filter and reopening a project keeps nothing from the session before; a reset or reactivation
 clears history as always. LV2 files chosen through `patch:Set` go through
-the worker and still replace. The PLUG-2 harness's `same-filter-restore`
+the worker, which keeps the filter only if no newer request has arrived by
+then; until PLUG-39 step 1b they always replaced it (jrp aligned LV2 with
+the other formats on 13 November 2026). `lv2.adapter`'s `rechosen_files`
+checks that the tail of a file chosen again rings on exactly as without it,
+and that a file of the same name whose contents changed loads. The PLUG-2 harness's `same-filter-restore`
 case checks this in every format, with a reset before the same filter
 arrives still giving silence; in `vst3.adapter`,
 `same_filter_keeps_history` checks a Gain change against the uninterrupted
@@ -705,8 +737,10 @@ the plan's Gain modes (12 November 2026); its meters follow later
   a replacement would restart it, silent for the filter's own delay (jrp's
   review found 245 ms of silence with a quarter-second delay). The estimate
   is kept only once applied, so a failure leaves nothing shown that does
-  not play. A restored state with Estimate chosen sets `set_estimating()`
-  before it loads, so its filter gets the estimate as it loads. A filter
+  not play. A request that brings settings with Estimate chosen (restored
+  state, or a chosen preset that holds them) gets its estimate as it loads:
+  `HostFilter::load()` follows the settings' Gain mode, and a refused
+  request leaves `estimating()` as it was. A filter
   whose estimate overflows has none (`estimate_failed`), and Estimate plays
   its bound; a filter with no finite bound plays silence in both modes,
   which the log and the window say. Without a filter both figures are 0 dB.

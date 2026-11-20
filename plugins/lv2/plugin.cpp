@@ -329,19 +329,11 @@ struct Instance {
         } catch (...) {
         }
     }
-    // After a rejection: a failed first load plays silence rather than the
-    // unfiltered input, without allocating, as memory may have run out
-    // (ROBUST-3), maybe before the failure could be recorded (ROBUST-7).
-    void silence_failed_first_load(bool was_failed) noexcept {
-        filter.fail_request();
-        if (host && filter.failed() && !was_failed)
-            host->silence();
-    }
     // ROBUST-7: a request that failed before its failure could be recorded
-    // (memory ran out building the message) still fails a first load.
-    // `was_failed`: filter.failed() from before the request.
-    void fail_unrecorded(bool was_failed) noexcept {
-        silence_failed_first_load(was_failed);
+    // (memory ran out building the message) still fails a first load, which
+    // plays silence rather than the unfiltered input.
+    void fail_unrecorded() noexcept {
+        filter.fail_request(host.get());
         update_status();
     }
     // Records a request run() could not hand to the worker, unless a newer
@@ -352,7 +344,6 @@ struct Instance {
         if (!d || generation <= handled)
             return;
         handled = generation;
-        const bool was_failed = filter.failed();
         try { // The message needs memory: a first load fails all the same (ROBUST-7).
             filter.reject(
                 HostFailureKind::filter_file,
@@ -368,10 +359,9 @@ struct Instance {
                              "Choose the file again.",
                              {}},
                 {HostFilterSource::file, "", generation});
-        } catch (...) {
-            filter.fail_request();
+        } catch (...) { // Out of memory for the message: failed all the same, below.
         }
-        silence_failed_first_load(was_failed);
+        filter.fail_request(host.get()); // A failed first load plays silence.
         update_status();
         log_rejection();
     }
@@ -646,15 +636,15 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
     if (r.generation < newest())
         return Outcome::superseded; // Rapid loads coalesce to the newest.
     HostRequest request{HostFilterSource::file, path, r.generation};
+    request.kind = HostRequestKind::chosen_file;
     // Copied before anything is published, so recording what plays below
     // cannot run out of memory. Running out here, like the copy above, fails
     // the request in work() (ROBUST-7).
     std::string kept_path = path;
     p.log_faults(); // Explained under the filter that played; a load clears them.
-    const bool was_failed = p.filter.failed();
     const auto failed = [&] {
         p.handled = std::max(p.handled, r.generation);
-        p.silence_failed_first_load(was_failed);
+        p.filter.fail_request(p.host.get());
         p.update_status();
         p.log_rejection();
         return Outcome::failed;
@@ -702,19 +692,36 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
                         throw SupersededRequest();
                     return;
                 }
+                const auto prepare = [&] {
+                    try {
+                        return p.host->prepare(c);
+                    } catch (...) { // Out of memory: no failure for an overtaken request.
+                        if (r.generation != newest())
+                            throw SupersededRequest();
+                        throw;
+                    }
+                };
+                // PLUG-39 step 1b (jrp, 13 November 2026): a file holding
+                // the filter that plays needs nothing prepared and keeps it
+                // and its history, as in VST3 and the Audio Unit; HostFilter
+                // compared the decoded filter in full, never the name.
                 std::optional<HostProcessor::Replacement> prepared;
-                try {
-                    prepared.emplace(p.host->prepare(c));
-                } catch (...) { // Out of memory: no failure for an overtaken request.
-                    if (r.generation != newest())
-                        throw SupersededRequest();
-                    throw;
-                }
+                if (!c.playing)
+                    prepared.emplace(prepare());
                 pause_at(p, WorkerPoint::prepared);
                 // 2. The last check, after preparation.
                 if (r.generation != newest())
                     throw SupersededRequest();
                 pause_at(p, WorkerPoint::checked);
+                if (!prepared) {
+                    if (p.host->keep(c))
+                        return;
+                    // Its processor met a fault, so it starts afresh, as
+                    // before PLUG-38.
+                    prepared.emplace(prepare());
+                    if (r.generation != newest())
+                        throw SupersededRequest();
+                }
                 // 3. Publish. From here on run() must not mute: the filter is
                 // accepted (HostFilter::load commits without throwing).
                 p.unfiltered.store(false, std::memory_order_release);
@@ -859,7 +866,6 @@ LV2_Worker_Status work(LV2_Handle handle, LV2_Worker_Respond_Function respond,
         if (p.closing)
             return LV2_WORKER_SUCCESS;
         p.retire();
-        const bool was_failed = p.filter.failed();
         try {
             const std::string path =
                 damaged ? std::string()
@@ -880,7 +886,7 @@ LV2_Worker_Status work(LV2_Handle handle, LV2_Worker_Respond_Function respond,
             // fails (an accepted filter, which has a filter, is unchanged).
             if (r.generation >= p.requested.load(std::memory_order_acquire)) {
                 p.handled = std::max(p.handled, r.generation);
-                p.fail_unrecorded(was_failed);
+                p.fail_unrecorded();
             }
             answer.installed = 0;
             answer.length = 0;
@@ -1322,7 +1328,12 @@ std::optional<HostState> read_state(Instance& p, const void* value, std::size_t 
         if (size > max_host_state_bytes)
             throw std::invalid_argument("it is larger than " +
                                         std::to_string(max_host_state_bytes) + " bytes");
-        return decode_host_state(std::span(static_cast<const std::byte*>(value), size));
+        auto state = decode_host_state(std::span(static_cast<const std::byte*>(value), size));
+        // The host restores the ports, which hold the settings: any a state
+        // carries (another format's, VST3's) must not decide the estimate or
+        // be applied (HostChange::settings).
+        state.settings.reset();
+        return state;
     } catch (const NewerHostState& e) {
         p.filter.reject(HostFailureKind::state_newer, state_read_message(e), request);
     } catch (const std::exception& e) {
@@ -1379,7 +1390,6 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
     p.requested.store(generation, std::memory_order_release);
     p.answered = generation;
     p.handled = generation;
-    const bool was_failed = p.filter.failed();
     const HostRequest from_state{HostFilterSource::state, "", generation};
     auto status = LV2_STATE_SUCCESS;
     std::optional<std::string> path;
@@ -1396,8 +1406,8 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
     // recorded, and such a restore keeps the silence instead of retrying;
     // the next activation retries.
     const auto install = [&](const HostPlayback& c) {
-        if (p.host && !p.host->keep(c))
-            p.host->replace(c);
+        if (p.host)
+            p.host->play(c);
     };
     // The path that plays if a load succeeds, copied before anything is
     // published so that recording it cannot run out of memory. Running out
@@ -1451,7 +1461,7 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
         p.refused_mute = false; // What run() refused no longer counts.
         status = LV2_STATE_SUCCESS;
     } else {
-        p.silence_failed_first_load(was_failed);
+        p.filter.fail_request(p.host.get());
         if (status == LV2_STATE_SUCCESS)
             status = LV2_STATE_ERR_UNKNOWN;
     }
@@ -1468,11 +1478,10 @@ LV2_State_Status restore(LV2_Handle handle, LV2_State_Retrieve_Function retrieve
     auto& p = *static_cast<Instance*>(handle);
     try {
         std::lock_guard lock(p.control);
-        const bool was_failed = p.filter.failed();
         try {
             return restore_locked(p, retrieve, state, features);
         } catch (...) { // ROBUST-7: out of memory, maybe before the failure was recorded.
-            p.fail_unrecorded(was_failed);
+            p.fail_unrecorded();
             return LV2_STATE_ERR_UNKNOWN;
         }
     } catch (...) { // The lock could not be taken.

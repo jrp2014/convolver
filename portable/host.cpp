@@ -408,9 +408,13 @@ HostRequest HostFilter::numbered(HostRequest request) {
     return request;
 }
 
-void HostFilter::fail_request() noexcept {
-    if (!filter_)
-        failed_ = true;
+void HostFilter::fail_request(HostProcessor* playing) noexcept {
+    if (filter_)
+        return;
+    failed_ = true;
+    // Silencing again, after an earlier failed request, changes nothing.
+    if (playing)
+        playing->silence();
 }
 
 HostFailure& HostFilter::record_unexplained(HostFailureKind kind, const HostRequest& request,
@@ -488,12 +492,22 @@ void HostFilter::refuse(HostFailureKind kind, Advice why, const HostRequest& req
     throw Refused(advice_text(load_failure_->message));
 }
 
-void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
-                      const std::function<void(const HostPlayback&)>& install, HostRequest request,
-                      HostProcessor* counting, HostLoadCheck check) {
+HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& host,
+                            const std::function<void(const HostPlayback&)>& install,
+                            HostRequest request, HostProcessor* counting, HostLoadCheck check) {
     const bool keep_mismatch = check == HostLoadCheck::keep_until_suited;
     request = numbered(std::move(request));
     auto& next = state.configuration;
+    // PLUG-39: what the request changes besides the filter, decided here once
+    // for every format (the scope table). Its own settings apply, and their
+    // Gain mode decides whether this load finds the estimate; restored state
+    // brings its bypass, a chosen file none.
+    HostChange change;
+    change.settings = state.settings;
+    if (request.kind != HostRequestKind::chosen_file)
+        change.bypass = state.bypass;
+    const bool estimating =
+        state.settings ? state.settings->gain_mode == GainMode::estimate : estimating_;
     const Configuration* carried = next ? &*next : nullptr;
     // Everything that is kept is built before `install` publishes anything, so
     // that running out of memory rejects the request with the previous state
@@ -566,12 +580,15 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
         if (same) {
             peak = peak_;
             gains = gains_;
-            if (estimating_ && !gains.estimate_db && !gains.estimate_failed)
+            if (estimating && !gains.estimate_db && !gains.estimate_failed)
                 find_estimate(gains, *next);
         } else if (next) {
             peak = worst_case_peak(*next);
-            gains = gains_for(*next, peak, estimating_);
+            gains = gains_for(*next, peak, estimating);
         }
+        // Until a processor is built, the adapter reports the filter's tail.
+        if (next && !counting)
+            change.inactive_tail = configuration_tail_frames(*next);
         if (state.failed) {
             HostFailure f;
             f.kind = HostFailureKind::saved_failure;
@@ -601,8 +618,10 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
                     // PLUG-38: the filter that plays now, unchanged, may play
                     // on with its history: one accepted, suiting the host
                     // (no failure found at activation keeps it silent), and
-                    // equal in full, not by name or identity alone.
-                    const bool unchanged = same && !failed_ && !activation_failure_;
+                    // equal in full, not by name or identity alone. A
+                    // session the host is opening keeps nothing from before.
+                    const bool unchanged = same && !failed_ && !activation_failure_ &&
+                                           request.kind != HostRequestKind::session;
                     HostPlayback playing{std::move(*next), dry, gains, unchanged};
                     install(playing);
                     *next = std::move(playing.filter);
@@ -638,6 +657,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     filter_ = std::move(next);
     peak_ = peak;
     gains_ = gains;
+    estimating_ = estimating;
     identity_ = identity;
     failed_ = state.failed;
     accepted_ = std::move(request);
@@ -659,6 +679,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     } else {
         cleared_ = observed_; // faults() counts on from what observe() last saw.
     }
+    return change;
 }
 
 void HostFilter::reject(HostFailureKind kind, Advice why, HostRequest request,
@@ -1653,6 +1674,10 @@ bool HostProcessor::keep(const HostPlayback& playback) noexcept {
         return false;
     update_gains(playback.gains);
     return true;
+}
+void HostProcessor::play(const HostPlayback& playback) {
+    if (!keep(playback))
+        replace(playback);
 }
 std::uint64_t HostProcessor::publications() const noexcept {
     return impl_->published.load(std::memory_order_acquire);

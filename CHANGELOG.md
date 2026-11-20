@@ -28,6 +28,22 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Plug-ins (PLUG-39 step 1b): in LV2, choosing the file of the filter
+  already playing again keeps it and what it is playing, so its tail rings
+  on, as choosing it again in the VST3 and Audio Unit windows already did
+  (jrp's choice, 13 November 2026). The decoded filter decides, never the
+  file name: a file of the same name whose contents changed loads as before.
+- Library (PLUG-39 step 1b), incompatible, hence 0.16.0: `HostFilter::load()` decides
+  what an accepted request changes besides the filter and returns it as a
+  `HostChange` (the settings to apply, restored state's bypass, and the
+  filter's tail while no processor plays), from the request's new `kind`
+  (`HostRequestKind`: restored state, a session the host is opening, which
+  replaces even the filter already playing, or a file chosen in the
+  plug-in). `set_estimating()` is removed: a load whose state holds settings
+  finds the estimate their Gain mode needs, and a refused one leaves
+  `estimating()` as it was. `fail_request()` takes the processor that plays
+  and silences it after a failed first load, and `HostProcessor::play()`
+  keeps the processor or replaces it, as an install callback needs.
 - Library (ROBUST-8), incompatible, hence 0.15.0: `HostFilter::activate(const
   HostLayout&)` is split in two. `activation()` returns a `HostActivation`
   (what to play, as `playback`, and the failure and notice it would record)

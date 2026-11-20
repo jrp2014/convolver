@@ -705,7 +705,6 @@ std::string state_type(IBStream* stream) {
 tresult Processor::load_state(IBStream* stream) {
     const Locked lock(*this);
     observe_faults(); // Explained under the filter that played; an accepted load clears them.
-    const bool was_failed = filter_.failed();
     try {
         HostState next;
         try {
@@ -717,15 +716,21 @@ tresult Processor::load_state(IBStream* stream) {
             filter_.reject(HostFailureKind::state_unreadable, state_read_message(e));
             throw;
         }
-        install(std::move(next), {},
-                state_type(stream) == StateType::kProject ? Origin::project : Origin::state);
+        // VST3-4: restored state without settings (an older state, or a
+        // preset from convolver-preset) restores the defaults.
+        if (!next.settings)
+            next.settings.emplace();
+        HostRequest request;
+        request.kind = state_type(stream) == StateType::kProject ? HostRequestKind::session
+                                                                 : HostRequestKind::restore;
+        install(std::move(next), request);
         return kResultOk;
     } catch (...) {
-        refused(was_failed);
+        refused();
         return kResultFalse;
     }
 }
-HostLoadCheck Processor::load_check(Origin origin) const noexcept {
+HostLoadCheck Processor::load_check(HostRequestKind kind) const noexcept {
     // A file chosen in the window is checked against the host's configuration
     // once the host has started the plug-in with it (known_layout()).
     // Restored state is refused for not suiting the host only once the host
@@ -735,80 +740,53 @@ HostLoadCheck Processor::load_check(Origin origin) const noexcept {
     // channels; jrp's crossover retest, 7 November 2026). Until then a
     // restored filter that does not suit is kept, silent, and checked again
     // at the next activation.
-    switch (origin) {
-    case Origin::chosen_file:
+    switch (kind) {
+    case HostRequestKind::chosen_file:
         return HostLoadCheck::refuse_mismatch;
-    case Origin::state:
+    case HostRequestKind::restore:
         return played_.load() ? HostLoadCheck::refuse_mismatch : HostLoadCheck::keep_until_suited;
-    case Origin::project:
+    case HostRequestKind::session:
         return HostLoadCheck::keep_until_suited;
     }
     return HostLoadCheck::refuse_mismatch;
 }
-void Processor::install(HostState next, const HostRequest& request, Origin origin) {
+std::optional<HostSettings> Processor::install(HostState next, const HostRequest& request) {
     // While active, a prepared replacement is published; inactive, the next
     // activation installs it. load_check() says what a filter that does not
     // suit the host means.
-    const bool restore = origin != Origin::chosen_file;
-    const auto check = load_check(origin);
+    const auto check = load_check(request.kind);
     const auto known = host() ? std::optional(layout()) : known_layout();
-    const bool bypass = next.bypass;
-    // VST3-4: the state's settings, or the defaults for a state without
-    // them (an older state, or a preset from convolver-preset). PLUG-26: a
-    // chosen .vstpreset's settings apply only when it holds them.
-    const auto saved = next.settings.value_or(HostSettings{});
-    const bool chosen_settings = origin == Origin::chosen_file && next.settings.has_value();
-    // The inactive tail is worked out before anything changes: it needs
-    // memory, and a request that runs out is rejected whole (PLUG-7).
-    uint32 inactive_tail = 0;
-    if (!host() && next.configuration) {
-        try {
-            inactive_tail = static_cast<uint32>(configuration_tail_frames(*next.configuration));
-        } catch (...) {
-            filter_.reject(HostFailureKind::preparation, preparation_message({}), request);
-            throw;
-        }
-    }
-    // PLUG-10: restored state (or a chosen .vstpreset with settings) with
-    // Estimate chosen gets its estimate as it loads; a refused request
-    // leaves the choice as it was.
-    const bool was_estimating = filter_.estimating();
-    if (restore || chosen_settings)
-        filter_.set_estimating(saved.gain_mode == GainMode::estimate);
-    try {
-        filter_.load(
-            std::move(next), known,
-            [&](const HostPlayback& c) {
-                // PLUG-38: state or a preset holding the filter that plays
-                // keeps it and its history, and the settings below ramp to
-                // theirs; a project the host says it is opening starts
-                // clean, keeping nothing from the session before.
-                if (host() && (origin == Origin::project || !host()->keep(c)))
-                    host()->replace(c);
-            },
-            request, host(), check);
-    } catch (...) {
-        filter_.set_estimating(was_estimating);
-        throw;
-    }
+    // PLUG-38: state or a preset holding the filter that plays keeps it and
+    // its history, and the settings below ramp to theirs; a project the host
+    // says it is opening starts clean (HostFilter::load() decides both).
+    const auto change = filter_.load(
+        std::move(next), known,
+        [&](const HostPlayback& c) {
+            if (host())
+                host()->play(c);
+        },
+        request, host(), check);
     // Nothing from here on can throw: the request is accepted.
     hold_fault_signal();
-    tail_.store(host() ? static_cast<uint32>(host()->tail_frames()) : inactive_tail);
-    if (restore) {
-        bypass_.store(bypass);
-        shown_bypass_.store(bypass);
+    tail_.store(host() ? static_cast<uint32>(host()->tail_frames())
+                       : static_cast<uint32>(change.inactive_tail));
+    if (change.bypass) {
+        bypass_.store(*change.bypass);
+        shown_bypass_.store(*change.bypass);
     }
-    if (restore || chosen_settings) {
-        gain_db_.store(saved.gain_db);
-        mix_.store(saved.mix);
+    const bool chosen_settings =
+        request.kind == HostRequestKind::chosen_file && change.settings.has_value();
+    if (const auto& saved = change.settings) {
+        gain_db_.store(saved->gain_db);
+        mix_.store(saved->mix);
         // The estimate, if the mode needs it, was found as the filter loaded.
-        if (gain_mode_.exchange(saved.gain_mode) != saved.gain_mode)
+        if (gain_mode_.exchange(saved->gain_mode) != saved->gain_mode)
             try {
                 log(gain_mode_line(settings(), filter_.gains(), filter_.filter().has_value()),
                     false);
             } catch (...) { // Out of memory for the line: the mode stands.
             }
-        choose_latency(saved.latency);
+        choose_latency(saved->latency);
     }
     logged_.clear(); // A later failure is logged even if it repeats an earlier one.
     try {            // Accepted: nothing here may turn that into a rejection.
@@ -826,7 +804,7 @@ void Processor::install(HostState next, const HostRequest& request, Origin origi
                     "silence until it does: " +
                     detail::advice_line(f->message);
         if (kept)
-            line += origin == Origin::project
+            line += request.kind == HostRequestKind::session
                         ? " The host said it is restoring a project, so its channels and rate "
                           "may still change."
                         : " The host has not played audio since it started the plug-in, so "
@@ -834,14 +812,13 @@ void Processor::install(HostState next, const HostRequest& request, Origin origi
         log(line, f.has_value() || !filter_.notice().empty());
     } catch (...) { // Out of memory for the line: it is dropped.
     }
+    return change.settings;
 }
-void Processor::refused(bool was_failed) noexcept {
+void Processor::refused() noexcept {
     // A failed first load plays silence rather than the unfiltered input,
     // without allocating: memory may have run out (ROBUST-3), maybe before
     // the failure could be recorded (ROBUST-7).
-    filter_.fail_request();
-    if (host() && filter_.failed() && !was_failed)
-        host()->silence();
+    filter_.fail_request(host());
     if (!host() && filter_.failed())
         tail_.store(0);
     hold_fault_signal();
@@ -854,40 +831,18 @@ bool Processor::load_file(std::string_view chosen, std::optional<HostSettings>& 
     settings.reset();
     const Locked lock(*this);
     observe_faults();
-    const bool was_failed = filter_.failed();
-    try { // Copying the path needs memory too: a first load that runs out fails (ROBUST-7).
-        const std::string path(chosen);
-        HostRequest request{HostFilterSource::file, path, 0};
-        // Before the host has started the plug-in, a list chooses its entry
-        // for the rate and channels the host has proposed so far, and the
-        // filter is checked again at activation, as for restored state.
-        const auto host = known_layout().value_or(layout());
-        const auto* reader = files_;
-        if (!reader) {
-            filter_.reject(HostFailureKind::filter_file,
-                           {"this build of Convolver cannot read filter files in the plug-in, so " +
-                                path + " was not loaded",
-                            {},
-                            "Make a preset from it with convolver-preset, and load the preset "
-                            "instead.",
-                            {}},
-                           request);
-            throw std::runtime_error("no reader");
+    // A refusal is recorded where it is found and answered below; copying
+    // the path needs memory too, and a first load that runs out fails as a
+    // refusal does (ROBUST-7).
+    const bool accepted = [&] {
+        try {
+            return install_chosen(std::string(chosen), settings);
+        } catch (...) {
+            return false;
         }
-        FilterFileFailure why;
-        // The files it was read from, so the window can reload it (VST3-11).
-        // PLUG-26: a Convolver .vstpreset too.
-        auto next =
-            read_chosen_file(path, host, *reader, why, &request.files, &request.wider_entry);
-        if (!next) {
-            filter_.reject(why.kind, why.message, request, why.filter());
-            throw std::runtime_error("refused");
-        }
-        const auto chosen = next->settings;
-        install(std::move(*next), request, Origin::chosen_file);
-        settings = chosen;
-    } catch (...) {
-        refused(was_failed);
+    }();
+    if (!accepted) {
+        refused();
         return false;
     }
     // PLUG-22: the file's name and its filter's identity, as the controller
@@ -904,6 +859,36 @@ bool Processor::load_file(std::string_view chosen, std::optional<HostSettings>& 
         kept_name_.clear();
         kept_identity_.clear();
     }
+    return true;
+}
+bool Processor::install_chosen(const std::string& path, std::optional<HostSettings>& settings) {
+    HostRequest request{HostFilterSource::file, path, 0};
+    request.kind = HostRequestKind::chosen_file;
+    // Before the host has started the plug-in, a list chooses its entry
+    // for the rate and channels the host has proposed so far, and the
+    // filter is checked again at activation, as for restored state.
+    const auto host = known_layout().value_or(layout());
+    const auto* reader = files_;
+    if (!reader) {
+        filter_.reject(HostFailureKind::filter_file,
+                       {"this build of Convolver cannot read filter files in the plug-in, so " +
+                            path + " was not loaded",
+                        {},
+                        "Make a preset from it with convolver-preset, and load the preset "
+                        "instead.",
+                        {}},
+                       request);
+        return false;
+    }
+    FilterFileFailure why;
+    // The files it was read from, so the window can reload it (VST3-11).
+    // PLUG-26: a Convolver .vstpreset too.
+    auto next = read_chosen_file(path, host, *reader, why, &request.files, &request.wider_entry);
+    if (!next) {
+        filter_.reject(why.kind, why.message, request, why.filter());
+        return false;
+    }
+    settings = install(std::move(*next), request);
     return true;
 }
 Advice Processor::notice() {

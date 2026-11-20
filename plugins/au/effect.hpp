@@ -213,16 +213,20 @@ class Effect final : public ausdk::AUBase {
     void reject(HostFailureKind, const Advice& why, const HostRequest& = {},
                 const Configuration* carried = nullptr);
     // Under `control_`, after a request failed: marks it failed
-    // (HostFilter::fail_request(), in case it could not be recorded); if it
-    // was the first load to fail (`was_failed` is filter_.failed() from
-    // before it), the unit plays silence rather than the unfiltered input;
-    // uninitialized, a failed filter's tail is 0.
-    void silence_failed_first_load(bool was_failed) noexcept;
+    // (HostFilter::fail_request(), in case it could not be recorded), so
+    // that a failed first load plays silence rather than the unfiltered
+    // input; uninitialized, a failed filter's tail is 0.
+    void silence_failed_first_load() noexcept;
     // The settings as a saved state holds them.
     using SavedSettings = std::vector<std::pair<AudioUnitParameterID, AudioUnitParameterValue>>;
-    // The common step of RestoreState and a chosen file: loads `next`, then
-    // logs and notifies outside the lock. `saved` settings are applied if
-    // it is accepted. Returns whether it was.
+    // The settings `saved` holds, over the present ones for any it leaves
+    // out, each within its range as store() keeps it; none when it holds
+    // none of Gain, Mix, Latency and Gain mode. Under `control_`.
+    std::optional<HostSettings> saved_settings(const SavedSettings& saved);
+    // The common step of RestoreState and a chosen file: loads `next` as
+    // `request.kind`, then logs and notifies outside the lock. The settings
+    // the request holds (`saved` from a restored state, or a chosen preset's
+    // in `next`) are applied if it is accepted. Returns whether it was.
     bool install(HostState next, const HostRequest&, const SavedSettings* saved,
                  bool settings_unreadable);
     // AU-6: a filter file chosen in the window (load_property); PLUG-26: or
@@ -275,8 +279,12 @@ class Effect final : public ausdk::AUBase {
     // every report_fault_interval, once Render's Fault is explained.
     HostReport report_locked(std::string& faults);
     static constexpr std::chrono::seconds report_fault_interval{10};
-    // AU-7: stores a Gain, Mix or Latency value clamped to its range.
+    // AU-7: stores a Gain, Mix, Latency or Gain mode value clamped to its
+    // range; other IDs are ignored.
     void store(AudioUnitParameterID, AudioUnitParameterValue) noexcept;
+    // Stores all four settings, as an accepted request applies them
+    // (HostChange::settings).
+    void store(const HostSettings&) noexcept;
     // PLUG-10: a new Latency is applied only on the unit's own serial queue
     // (latency_queue_), never by the thread that chose it: SetParameter can
     // arrive on any thread, including an audio thread or inside a render
