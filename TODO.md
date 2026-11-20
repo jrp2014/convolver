@@ -237,6 +237,16 @@ is superseded.
   (`CONVOLVER_ARDOUR_KEEP`), check the region position and whether the
   plug-in's filter loaded during the export, and repeat with a plug-in
   that reports latency and has no worker.
+- [ ] **HOST-8 — Ardour 9.0's abort as `new_session` exits.** From HOST-7
+  (20 November 2026): on Ubuntu 26.04, `ardour9-new_session` (9.0.0~ds)
+  writes the session, says so, then aborts with glibc's "FATAL: exception
+  not rethrown", for 7 of 11 sessions in five CI runs and before Convolver
+  is loaded. `new_session()` in `tests/lv2/ardour_tests.py` accepts that
+  abort with a warning
+  ([Ardour, headless](docs/develop/testing.md#ardour-headless)). Next: jrp
+  reports it to Ardour if he wishes; a draft is in the project files.
+  **Done when** the Ardour on `ubuntu-latest` no longer aborts there and the
+  test stops accepting it.
 - [ ] **DIAG-9 — Numbers in the user's locale.** Low priority, from jrp's
   review of PLUG-36 (20 November 2026): diagnostics write sample rates,
   levels and counts as plain ASCII digits ("44100 Hz", "-6.0 dB")

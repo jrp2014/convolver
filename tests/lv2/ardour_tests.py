@@ -99,30 +99,34 @@ EXPORT_ATTEMPTS = 3
 EXPORT_TIMEOUT = 120
 
 
-def warn(message):
+def warn(message, title='Ardour export'):
     print(f'warning: {message}', flush=True)
     if os.environ.get('GITHUB_ACTIONS') == 'true':
-        print(f'::warning title=Ardour export::{message}', flush=True)
+        print(f'::warning title={title}::{message}', flush=True)
 
 
 # Ardour 9.0's new_session (Ubuntu 26.04's 9.0.0~ds) writes the session and
 # prints that it did, then aborts as it exits with glibc's message about an
 # exception not rethrown (a thread's cancellation unwind swallowed during
-# teardown). In CI on 2026-11-20 it did so for 9 of 12 sessions (all of
-# the first three runs, none of the fourth), before Convolver is involved.
-# Only that abort, after the session file exists, is accepted (HOST-7); the
+# teardown). In CI on 2026-11-20 it did so for 7 of 11 sessions in five
+# runs, before Convolver is involved. Only that abort, after it has said it
+# created the session and the session file exists, is accepted (HOST-7); the
 # Lua script then opens the session, so a damaged one fails there.
 def new_session(tool_path, environment, session, name, outputs):
-    """Make the session; accept new_session's abort at exit once the session file is written."""
+    """Make the session; accept new_session's abort at exit once it has created the session."""
     command = [tool_path, '-m', str(outputs), '-s', str(RATE), session, name]
-    returncode = run(command, environment, check=False).returncode
-    if returncode == 0:
+    result = run(command, environment, check=False)
+    if result.returncode == 0:
         return
     tool_name = pathlib.Path(tool_path).name
-    if returncode == -signal.SIGABRT and (session / f'{name}.ardour').is_file():
-        warn(f'{name}: {tool_name} aborted as it exited, after writing the session, as Ardour 9.0 does')
+    created = 'Created session in' in result.stdout + result.stderr
+    if result.returncode == -signal.SIGABRT and created and (session / f'{name}.ardour').is_file():
+        warn(
+            f'{name}: {tool_name} aborted as it exited, after creating the session, as Ardour 9.0 can',
+            'Ardour new session',
+        )
         return
-    sys.exit(f'{tool_name} failed with exit code {returncode}')
+    sys.exit(f'{tool_name} failed with exit code {result.returncode}')
 
 
 def export(tool_path, environment, exported, session, name):
@@ -142,7 +146,7 @@ def export(tool_path, environment, exported, session, name):
         if attempt < EXPORT_ATTEMPTS:
             warn(
                 f'{name}: {tool_name} {failure} (attempt {attempt} of {EXPORT_ATTEMPTS}), '
-                f"as Ardour 8.4's export can with any plug-in; trying again"
+                f"as Ardour's export can with any plug-in; trying again"
             )
     if returncode is None:
         sys.exit(f'{name}: {tool_name} {failure}, {EXPORT_ATTEMPTS} times')

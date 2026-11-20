@@ -1263,16 +1263,17 @@ the stereo cross-feed (2 in, 2 out) and the crossover (2 in, 6 out).
    reported 256 frames) and with the whole tail.
 
 The worst error was 4.7e-8 when the test was written (Linux, Ardour 8.4)
-and 2.65e-8 to 3.42e-8 in two runs with Ardour 9.0 on 20 November 2026.
+and at most 3.42e-8 in three runs with Ardour 9.0 on 20 November 2026.
 
 Ardour 9 takes the new track's route group as an empty `ARDOUR.RouteGroup()`,
 as its own scripts pass, where Ardour 8 took `nil`; given `nil`, Ardour 9's
 Lua tool crashed (HOST-7), so the script passes each version its form. Ardour
 9.0's `new_session` writes the session and then aborts as it exits ("FATAL:
-exception not rethrown") before Convolver is loaded: for 9 of 12 sessions
-in CI on 20 November 2026 (every session of three runs, none of a fourth).
-The test accepts that abort, with a warning, only once the session file
-exists; the Lua script then opens the session, so a damaged one fails there.
+exception not rethrown") before Convolver is loaded: for 7 of 11 sessions
+in five CI runs on 20 November 2026. The test accepts that abort, with a
+warning, only after `new_session` has said it created the session and the
+session file exists; the Lua script then opens the session, so a damaged one
+fails there. HOST-8 drops this once a fixed Ardour ships.
 
 Ardour 8.4's export sometimes corrupts its heap and aborts at the end
 ("double free or corruption") when a track has a plug-in, whichever plug-in
