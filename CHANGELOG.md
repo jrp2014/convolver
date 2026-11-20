@@ -138,10 +138,15 @@ Until 1.0 the C++ API may change between minor versions.
   plug-in and the programs that compile its sources build with the warnings
   the core, the Audio Unit and the LV2 plug-in already had
   (`-Wall -Wextra -Wpedantic`, or `/W4 /permissive- /utf-8` with MSVC); the
-  SDK's headers are system headers. What they found is fixed: an unused
-  variable in `host_report.cpp`, a signed/unsigned comparison and two
-  partly initialised timing results in the VST3 tests, and an unused test
-  helper. No output changes.
+  SDK's headers are system headers. Everything they found is fixed in the
+  code, none silenced: on Windows, a bounded copy of the window's font name,
+  the accessibility IDs passed as the type the interface takes, a copied
+  environment variable in the tests, shadowed names, and compile-time
+  branches for `convolver-vst3-preset`'s differences; on macOS, standard
+  `std::min`/`std::max` and a full conditional in the window instead of GNU
+  extensions; on Linux, an unused variable in `host_report.cpp`, a
+  signed/unsigned comparison and two partly initialised timing results in
+  the VST3 tests, and an unused test helper. No output changes.
 - Plug-ins (PLUG-36): while bypassed, Status and the window's report say
   what bypass plays when no filter is heard. A kept filter that does not
   suit the host (another sample rate, say) showed "Silent:" while bypass
