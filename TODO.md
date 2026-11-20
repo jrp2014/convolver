@@ -1220,7 +1220,7 @@ Items finished since then are listed here, one line each, until the next
 move to the archive.
 
 - [x] **CI-46 — The VST3 plug-in builds with the others' warnings.** 20
-  November 2026, PR #NNN, from an outside audit: `plugins/vst3/` set no
+  November 2026, PR #235, from an outside audit: `plugins/vst3/` set no
   warning flags beyond its macOS window's, unlike the core, the Audio Unit
   and LV2. Its targets now build with the same ones, the SDK as system
   headers, and the warnings they showed are fixed
