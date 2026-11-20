@@ -87,7 +87,7 @@ These pages are in `docs/project/`.
 
 | Page | Kind | What it covers |
 | --- | --- | --- |
-| [Status](project/status.md) | Reference | What users can run now at each evidence level, user journeys, next-milestone blockers, compatibility guarantees, what the tests do not establish, direction |
+| [Status](project/status.md) | Reference | What users can run now at each evidence level, the next milestone, the checks left, what is measured, compatibility guarantees, what the tests do not establish, direction |
 | [Decisions](project/decisions.md) | Reference | jrp's decisions, dated, with the page that explains each |
 | [History](project/history.md) | Background | Provenance, historical builds, downstream use |
 | [convolverPipe](project/convolverPipe.md) | Reference | The recovered historical streaming tool (Windows only) |
@@ -143,17 +143,19 @@ guides and TODO.
 - [Consolidate the plug-ins' load and restore path](project/plans/2026-11-13-load-restore-consolidation.md)
   (PLUG-39, Reference): the decisions, mechanisms and copied values each
   adapter keeps on that path, how they become one each, and seven small steps,
-  each protected by tests of audio, saved state and host behaviour; no code
-  changes yet.
+  each protected by tests of audio, saved state and host behaviour; steps 0
+  to 3, 4b and 4c are merged, 4a, 5 and 6 remain.
 - [Plug-in windows on Windows and Linux](project/plans/2026-11-10-windows-linux-plugin-windows.md)
-  (PLUG-34, VST3-12, VST3-13, Reference): what any route needs first (a sound-file
+  (VST3-12, VST3-13, Reference): what any route needs first (a sound-file
   reader and the window's behaviour in shared code), the routes compared, and
-  the chosen order (Windows first, Linux later); no code changes yet.
+  the chosen order (Windows first, Linux later). The Windows window shipped
+  in 0.13.12; its host checks and the Linux window remain.
 - [Edges over the leading convolution plug-ins](project/plans/2026-11-06-edges-over-other-convolvers.md)
-  (EDGE-1 to EDGE-13, PERF-2, PERF-3, IO-2): how Convolver compares with Altiverb,
+  (EDGE-1 to EDGE-15, PERF-2, PERF-3, IO-2): how Convolver compares with Altiverb,
   Reverberate, Space Designer, Hang Loose Convolver, CamillaDSP and X-MCFX,
   the edges it already has, the ranked edges to build after the first
-  walkthrough, and the rules each keeps.
+  walkthrough, and the rules each keeps. The non-uniform engine (PERF-2,
+  0.13.2) and EDGE-11's idle after the tail (0.14.0) are built from it.
 - [Media Foundation transform](project/plans/2026-10-21-media-foundation-transform.md)
   (HOST-3, parked): a Windows audio effect for Media Player Legacy, DirectShow players and
   Media Foundation or WinRT applications, with APO and Equalizer APO alternatives
