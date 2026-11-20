@@ -204,14 +204,11 @@ HostLayout Effect::layout() {
 
 // Initialized, the host's configuration is the current formats. Uninitialized,
 // it is known only while the formats still match the last initialization that
-// rendered audio (see Cleanup):
-// hosts may restore a project's state before setting its formats, and the
-// default format (44.1 kHz stereo) is not a choice the host has made.
+// rendered audio (see Cleanup; HostSettling, HostBinding::rendering, PLUG-39
+// step 2): hosts may restore a project's state before setting its formats,
+// and the default format (44.1 kHz stereo) is not a choice the host has made.
 std::optional<HostLayout> Effect::known_layout() {
-    const auto now = layout();
-    if (host() || (committed_ && same_configuration(*committed_, now)))
-        return now;
-    return std::nullopt;
+    return settling_.known(layout());
 }
 
 OSStatus Effect::Initialize() {
@@ -245,8 +242,7 @@ OSStatus Effect::Initialize() {
             latency_.store(next->latency_frames());
             playing_.offer(std::move(next));
             filter_.activate(std::move(activation));
-            initialized_ = now;
-            rendered_.store(false);
+            settling_.started(now);
             reset_requested_.store(false);
             started = true;
         } catch (const std::exception& e) {
@@ -261,7 +257,8 @@ OSStatus Effect::Initialize() {
             try {
                 const auto& f = filter_.failure();
                 problem = (f && f->silent) || !filter_.notice().empty();
-                message = started_line(filter_, *initialized_, GetMaxFramesPerSlice(), &current);
+                message = started_line(filter_, *settling_.last_start(), GetMaxFramesPerSlice(),
+                                       &current);
             } catch (...) { // Out of memory for the message: the unit still plays.
             }
         }
@@ -294,14 +291,13 @@ void Effect::Cleanup() {
     {
         const Locked lock(*this);
         faults = observe_faults(); // Before the processor that counted them goes.
-        if (rendered_.load())
-            committed_ = initialized_;
+        settling_.stopped();       // Binds the formats if audio rendered with them.
         // The host does not render while it uninitializes the unit, so the
         // processor is freed here; were Render still running, it would be
         // freed by the next control call instead, without waiting under the
         // lock for a render whose input callback may call into the unit.
         // Such a render, which breaks the host's side of the contract, can
-        // still set rendered_ or take a reset meant for the next
+        // still mark the formats as rendered or take a reset meant for the next
         // initialization; it can no longer use a freed processor.
         playing_.offer(nullptr);
         latency_.store(settings().latency); // What the next initialization uses.
@@ -394,17 +390,18 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
             // not be built is not tried again for it.
         } else if (!host()) {
             changed = latency_.exchange(chosen) != chosen; // The next Initialize uses it.
-        } else if (host()->latency_frames() != chosen && initialized_) {
+        } else if (const auto& started = settling_.last_start();
+                   host()->latency_frames() != chosen && started) {
             const auto before = host()->latency_frames();
             faults = observe_faults(); // Before the processor that counted them goes.
             std::string why;
             try {
                 // As Initialize builds it; Render switches at its next call.
-                auto activation = filter_.activation(*initialized_);
+                auto activation = filter_.activation(*started);
                 if (const auto hook = latency_preparation_for_tests)
                     hook();
                 auto next = std::make_unique<HostProcessor>(
-                    activation.playback, GetMaxFramesPerSlice(), current, initialized_->inputs);
+                    activation.playback, GetMaxFramesPerSlice(), current, started->inputs);
                 next->set_bypass(bypass_.load());
                 next->reset();
                 // Nothing below can fail: the audio, the reported latency and
@@ -577,7 +574,7 @@ OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp&
     AUSDK_RT_UNSAFE_END
     if (!processed)
         return kAudio_ParamError;
-    rendered_.store(true, std::memory_order_relaxed);
+    settling_.played();
     // Silent only once the output is: a filter's tail outlasts silent input.
     bool silent = silent_input;
     for (UInt32 c = 0; silent && c < outputs; ++c)

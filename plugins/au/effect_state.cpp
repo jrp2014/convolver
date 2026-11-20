@@ -292,7 +292,7 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                     if (host())
                         host()->play(c);
                 },
-                request, host());
+                request, host(), settling_.check(request.kind));
             // Nothing from here on can throw: the request is accepted.
             tail_.store(host() ? host()->tail_frames() : change.inactive_tail);
             accepted = true;

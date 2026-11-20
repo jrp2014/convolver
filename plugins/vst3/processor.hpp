@@ -3,6 +3,7 @@
 #include "convolver/host.hpp"
 #include "convolver_identities.hpp"
 #include "host_report.hpp"
+#include "host_settling.hpp"
 #include "playing_processor.hpp"
 #include "pluginterfaces/vst/ivstparameterfunctionname.h"
 #include "public.sdk/source/vst/vstaudioeffect.h"
@@ -334,15 +335,14 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     Steinberg::Vst::SpeakerArrangement input_arrangement_ = Steinberg::Vst::SpeakerArr::kStereo,
                                        output_arrangement_ = Steinberg::Vst::SpeakerArr::kStereo;
     bool active_ = false;
-    // The rate and buses of the last activation. The host's configuration counts
-    // as known only while it still matches: setupProcessing alone is not binding.
-    std::optional<HostLayout> activated_;
-    // Whether process() has played audio with the rate and buses of the last
-    // activation (any activation with them since they last changed). Restored
-    // state is checked against the host only then: until the host plays,
-    // it may still be changing its buses (REAPER starts the plug-in on
-    // stereo buses before it restores a project and gives it the track's).
-    std::atomic<bool> played_{false};
+    // PLUG-39 step 2: when the host has settled its rate and buses. A start
+    // binds them while they stay the same (setupProcessing alone is not
+    // binding), and restored state is refused for not suiting them only once
+    // process() has played audio with them: until then the host may still be
+    // changing its buses (REAPER starts the plug-in on stereo buses before it
+    // restores a project and gives it the track's). Under control_, except
+    // played(), which process() calls.
+    HostSettling settling_{HostBinding::activation};
     bool layout_refusal_logged_ = false; // Refused layouts are logged once per instance.
     std::string logged_;                 // The last line log() queued.
     std::vector<std::pair<std::string, bool>> unlogged_; // Lines and whether each is a problem.
