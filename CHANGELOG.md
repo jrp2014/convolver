@@ -32,7 +32,7 @@ Until 1.0 the C++ API may change between minor versions.
   on GitHub's macOS 26 images (Xcode 26.6 today, was 16.4 on macOS 15), still
   for macOS 14 and later, and the Linux packages with GCC 12 (was 11), still
   on Ubuntu 22.04 for glibc 2.35. CI tests with the newest GCC and Xcode the
-  images have, the newest LLVM release (Clang 23 today, was 21) and the newest
+  images have, the newest LLVM release branch (Clang 23 today, was 21) and the newest
   stable Python (3.15, was 3.12); the Audio Unit job runs on macOS 26, and the
   LV2 tests run on the newest Ubuntu image with its lilv (the Ardour test
   stays on Ubuntu 24.04 until it works with Ardour 9).

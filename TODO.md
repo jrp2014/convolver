@@ -1231,7 +1231,7 @@ move to the archive.
   19 November 2026, PR #222, from jrp's question whether Convolver uses the
   latest SDKs: the libraries already followed their newest releases, but the
   compilers and runner images did not. CI now takes the newest generally
-  available images, GCC and Xcode, the newest LLVM release and the newest
+  available images, GCC and Xcode, the newest LLVM release branch and the newest
   stable Python, and the LV2 tests use the newest Ubuntu image's lilv; only
   the Linux and Windows packages and the Ardour test (HOST-7) keep older
   images, for recorded reasons ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
