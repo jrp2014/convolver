@@ -356,15 +356,19 @@ format.
   the filter's name for the heading (the file's name with its extension;
   after a restore the name saved with the project, `HostRequest::name` in
   the Audio Unit, or VST3's controller state (which a `.vstpreset` made by
-  `convolver-preset` also holds, PLUG-31) while the filter's identity
-  (`HostFilter::filter_identity()`, a hash of every stored value, found once
-  when the filter is accepted) matches the one saved beside it, or
-  "Restored filter" without one, which claims no origin the host did not
-  give; PLUG-22, PLUG-31. VST3 keeps the pair that named the playing filter
-  before the newest controller state and uses whichever pair matches, in
-  the report and in `Controller::getState`, since a host sends a refused
-  preset's controller state as well, in either order with the component
-  state) and a note when
+  `convolver-preset` also holds, PLUG-31), or "Restored filter" without
+  one, which claims no origin the host did not give; PLUG-22, PLUG-31.
+  One rule in `HostFilter` (`offer_name()`, PLUG-39 step 4) shows a name
+  only while its filter plays: VST3 offers the controller state's name
+  with the filter identity saved beside it (`HostFilter::filter_identity()`,
+  a hash of every stored value, found once when the filter is accepted),
+  which state naming nothing takes when its identity matches, in whichever
+  order the host sends the two; an accepted file's own name is offered the
+  same way; and state of the filter that already plays keeps the name it
+  shows. A host sends a refused preset's controller state as well, and
+  that never renames the playing filter. The report's `filter saved name`
+  is the playing filter's name, which `Controller::getState` saves) and a
+  note when
   the newest request was
   refused, the filter's own values for under its name (rate, channels,
   length and taps, speakers; PLUG-22), the Audio facts as short labelled
@@ -1263,8 +1267,10 @@ How each adapter meets the contract where its format differs:
   each string as a little-endian 32-bit length and UTF-8); an empty or
   unknown stream reads as no name, so projects saved before PLUG-22, whose
   controller state is empty, still open. `setState` passes the name and
-  identity to the processor as `ConvolverName`, and the processor names its
-  report before the fields and the copied text are made from it. The view's blocks hold a
+  identity to the processor as `ConvolverName`, and the processor offers
+  them to its `HostFilter` (`offer_name()`); `getState` saves the report's
+  `filter saved name` for the playing filter, or the pair `setState`
+  brought when that filter has none. The view's blocks hold a
   shared link that the editor clears in its destructor, so nothing the view
   does afterwards (a timer, a closing file dialog) reaches a controller the
   host has released. The view does not touch the processor or the audio

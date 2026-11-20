@@ -4,6 +4,7 @@
 #include "convolver_identities.hpp"
 #include "denormals.hpp"
 #include "host_log.hpp"
+#include "utf8.hpp"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -403,6 +404,29 @@ std::uint64_t HostFilter::next_request() noexcept {
     return ++requests_;
 }
 
+namespace {
+// The name a request gives its filter: a file's own name with its extension,
+// never its folder, or the name saved beside state (empty when none).
+std::string shown_name(const HostRequest& r) {
+    if (r.source == HostFilterSource::file && !r.path.empty())
+        return detail::utf8_string(detail::utf8_path(r.path).filename());
+    return r.source == HostFilterSource::state ? r.name : std::string();
+}
+} // namespace
+
+void HostFilter::offer_name(std::string name, std::uint64_t identity) {
+    OfferedName next{std::move(name), identity};
+    // State of this filter is playing without a name: it takes this one.
+    std::string shown;
+    const bool names_playing =
+        filter_ && identity == identity_ && accepted_.source == HostFilterSource::state;
+    if (names_playing)
+        shown = next.name;
+    offered_name_ = std::move(next);
+    if (names_playing)
+        accepted_.name = std::move(shown);
+}
+
 HostRequest HostFilter::numbered(HostRequest request) {
     request.number = request.number ? request.number : requests_ + 1;
     requests_ = std::max(requests_, request.number);
@@ -520,6 +544,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
     double peak = 0;
     std::uint64_t identity = 0;
     FilterGains gains;
+    std::optional<OfferedName> offered;
     try {
         if (state.failed && next)
             refuse(HostFailureKind::state_unreadable,
@@ -576,6 +601,18 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
             identity = configuration_identity(*next);
             same = filter_ && identity == identity_ && same_configuration(*filter_, *next);
         }
+        // PLUG-22, PLUG-39 step 4: a name shows only while its filter plays.
+        // State that names nothing takes the name offered for its filter
+        // (offer_name()), or keeps the one the same filter shows now; an
+        // accepted file's own name is offered for the state saved from it.
+        if (next && request.source == HostFilterSource::state && request.name.empty()) {
+            if (offered_name_ && offered_name_->identity == identity)
+                request.name = offered_name_->name;
+            else if (same)
+                request.name = shown_name(accepted_);
+        }
+        if (next && request.source == HostFilterSource::file)
+            offered = OfferedName{shown_name(request), identity};
         // For the window's Loudest peak; on the control side with the rest of
         // the preparation, so a report never has to compute it.
         if (same) {
@@ -653,6 +690,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
     // The commit, which cannot throw.
     static_assert(std::is_nothrow_move_assignable_v<std::optional<Configuration>> &&
                   std::is_nothrow_move_assignable_v<HostRequest> &&
+                  std::is_nothrow_move_assignable_v<std::optional<OfferedName>> &&
                   std::is_nothrow_move_assignable_v<std::optional<HostFailure>> &&
                   std::is_nothrow_move_assignable_v<Advice>);
     filter_ = std::move(next);
@@ -662,6 +700,8 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
     identity_ = identity;
     failed_ = state.failed;
     accepted_ = std::move(request);
+    if (offered)
+        offered_name_ = std::move(offered);
     load_failure_ = std::move(saved_failure);
     activation_failure_ = std::move(kept_failure);
     notice_ = std::move(notice);

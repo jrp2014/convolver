@@ -65,6 +65,15 @@ Until 1.0 the C++ API may change between minor versions.
   says to keep every external dependency, compilers and CI machines
   included, on its newest formal release
   ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
+- Plug-ins and Library (PLUG-39 step 4b): one rule in the library shows a
+  filter's saved name only while that filter plays (`HostFilter::offer_name()`).
+  VST3 offers the name from its controller state there instead of keeping
+  two name pairs in the processor and two in the controller, and the report
+  gains `filter saved name`, which the VST3 controller state saves. A
+  refused preset still never renames the playing filter. One small
+  improvement for both formats: state of a filter chosen earlier as a file,
+  restored after another filter played in between, is named after the file
+  again instead of "Restored filter".
 - Plug-ins and Library (PLUG-39 step 4c): one function,
   `host_status_value()`, orders a plug-in's status (a load failure, then a
   fault, then Bypassed, then the filter, then a failed load, then no
