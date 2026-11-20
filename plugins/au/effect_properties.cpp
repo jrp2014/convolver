@@ -141,10 +141,10 @@ void Effect::log_faults(const std::string& message) noexcept {
 }
 
 std::string Effect::observe_faults() noexcept {
-    if (!host_)
+    if (!host())
         return {};
     try {
-        return fault_message(filter_.observe(host_->faults()));
+        return fault_message(filter_.observe(host()->faults()));
     } catch (...) { // Out of memory for the message: the status still shows it.
         return {};
     }
@@ -164,8 +164,8 @@ void Effect::update_status() noexcept {
         status_ = host_status(filter_, known_layout(), status_log_written_, settings(), bypassed,
                               true); // Choose Filter in the window.
         status_bypassed_ = bypassed;
-        if (host_) // Render must not show Fault over a load failure.
-            host_->hold_fault_signal(filter_.failure_shown());
+        if (host()) // Render must not show Fault over a load failure.
+            host()->hold_fault_signal(filter_.failure_shown());
         Globals()->SetParameter(status_parameter,
                                 static_cast<AudioUnitParameterValue>(status_.status), true);
     } catch (...) { // Out of memory: the previous status stays.
@@ -190,7 +190,7 @@ void Effect::notify_status() noexcept {
     {
         // The status was worked out before its lines were logged: if writing
         // them changed whether the log can be written, say so now.
-        std::lock_guard lock(control_);
+        const Locked lock(*this);
         if (status_log_written_ != host_log_written())
             update_status();
     }
@@ -226,7 +226,7 @@ HostReport Effect::report_locked(std::string& faults) {
     HostReportFacts facts;
     facts.format = tag_;
     facts.host = known_layout();
-    facts.max_frames = host_ ? GetMaxFramesPerSlice() : 0;
+    facts.max_frames = host() ? GetMaxFramesPerSlice() : 0;
     facts.settings = settings();
     facts.latency_frames = latency_.load();
     facts.tail_frames = tail_.load();
@@ -259,6 +259,7 @@ HostReport Effect::report() {
             }
             lock.lock(); // No current copy: wait.
         }
+        playing_.reclaim(); // As every control call does (Locked).
         r = report_locked(faults);
         // Stored under control_, so a slower reader cannot replace a newer copy.
         try {
@@ -275,7 +276,7 @@ HostReport Effect::report() {
 }
 
 HostStatusLine Effect::status() {
-    std::lock_guard lock(control_);
+    const Locked lock(*this);
     refresh_status_text(); // With the Gain and Mix set now, as hosts read it.
     return status_;
 }
@@ -455,7 +456,7 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
     }
     if (id == test_failure_property) {
         TestFailure t;
-        std::lock_guard lock(control_);
+        const Locked lock(*this);
         if (const auto& f = filter_.failure()) {
             t.present = 1;
             t.kind = static_cast<UInt32>(f->kind);
@@ -497,7 +498,7 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
     if (id == load_property) {
         std::string path;
         try {
-            std::lock_guard lock(control_);
+            const Locked lock(*this);
             if (const auto& r = filter_.accepted(); r.source == HostFilterSource::file)
                 path = r.path;
         } catch (...) {
@@ -555,7 +556,7 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
             return kAudioUnitErr_InvalidParameter;
         std::string text, faults;
         try {
-            std::lock_guard lock(control_);
+            const Locked lock(*this);
             // A host showing Fault, which Render wrote, asks for its text:
             // the faults are explained here, on the host's control thread.
             faults = observe_faults();
@@ -612,6 +613,7 @@ OSStatus Effect::SetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         try {
             std::unique_lock lock(control_, std::try_to_lock);
             if (lock.owns_lock()) {
+                playing_.reclaim(); // As every control call does (Locked).
                 faults = observe_faults();
                 update_status();
                 updated = true;

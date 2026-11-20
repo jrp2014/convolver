@@ -6,6 +6,7 @@
 #include "convolver/host.hpp"
 #include "convolver_identities.hpp"
 #include "host_report.hpp"
+#include "playing_processor.hpp"
 #include "view_properties.hpp"
 #include <AudioUnitSDK/AUBase.h>
 #include <algorithm>
@@ -304,23 +305,32 @@ class Effect final : public ausdk::AUBase {
     }
     void wake(std::uintptr_t why) noexcept;
     void apply_latency(std::uintptr_t wakes) noexcept; // The wakes' bits, ORed.
-    // Under `control_`: makes `next` (null when uninitializing) the processor
-    // Render uses and returns the previous one, for release_processor().
-    std::unique_ptr<HostProcessor> install_processor(std::unique_ptr<HostProcessor> next) noexcept;
-    // Without `control_` (a render callback may call into the unit): frees a
-    // replaced processor once Render no longer uses it, a wait of at most the
-    // rest of one render call. Never on a thread that is rendering.
-    void release_processor(std::unique_ptr<HostProcessor> previous) noexcept;
+    // The newest processor (null while uninitialized), which control calls
+    // use under `control_`; Render may still play the one it replaced until
+    // its next call (`playing_`).
+    HostProcessor* host() const noexcept {
+        return playing_.newest();
+    }
+    // `control_`, held for this object's lifetime. Taking it first frees the
+    // replaced processors Render no longer holds, so a processor a new
+    // Latency replaced lives until the first control call after Render lets
+    // it go, and no call under the lock waits for Render (whose input
+    // callback may call into the unit). The two calls that only try the
+    // lock free them once they hold it.
+    struct Locked {
+        explicit Locked(Effect& e) : lock(e.control_) {
+            e.playing_.reclaim();
+        }
+        std::lock_guard<std::mutex> lock;
+    };
 
     std::mutex control_;
     HostFilter filter_{max_channels}; // The shared adapter contract's control side.
-    // The newest processor, which the control side uses. Render uses
-    // `playing_`, which install_processor() sets to it, and marks the one it
-    // is using in `rendering_` for the length of each call, so a replaced
-    // processor is freed only once Render has let it go.
-    std::unique_ptr<HostProcessor> host_;
-    std::atomic<HostProcessor*> playing_{nullptr};
-    std::atomic<HostProcessor*> rendering_{nullptr};
+    // PLUG-39 step 3: the processor Render plays. The control side offers a
+    // replacement and returns; Render, the one reader, adopts the newest
+    // offer at its next call and holds it for that call; a later control
+    // call (Locked) frees a replaced one Render no longer holds.
+    PlayingProcessor<HostProcessor, 1> playing_;
     std::atomic<bool> bypass_{false};
     std::atomic<bool> reset_requested_{false};
     std::atomic<std::size_t> tail_{0};

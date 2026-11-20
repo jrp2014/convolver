@@ -901,6 +901,13 @@ void settings_parameters() {
     unit.uninitialize();
 }
 
+// PLUG-39 step 3c: counts the processors the Audio Unit frees after a
+// Latency replaced them (convolver::freeing_processor_for_tests).
+std::atomic<int> replaced_freed{0};
+void note_replaced_freed() {
+    ++replaced_freed;
+}
+
 // The frame at which a unit with a one-tap filter of 1 plays an impulse
 // given at frame 0, rendering blocks of 512 frames; -1 if it never does.
 long impulse_delay(Unit& unit) {
@@ -1082,6 +1089,78 @@ void latency_parameter() {
     check(set_inside, "Latency set inside a render");
     require(reports(unit, 64), "a Latency set inside a render was not applied");
     require(impulse_delay(unit) == 64, "the audio is not delayed by 64 frames after a render");
+
+    // PLUG-39 step 3c: while a render holds the processor (its input
+    // callback waits), a new Latency is applied without waiting for it, and
+    // the host reads the new latency at once; the old processor stays alive
+    // while the render holds it, even through another control call; once
+    // the render lets go the next control call frees it, and the next render
+    // plays the new one.
+    {
+        std::atomic<bool> inside{false}, leave{false};
+        unit.while_pulling = [&] {
+            inside = true;
+            while (!leave.load())
+                std::this_thread::yield();
+        };
+        struct Unhook { // A failed check must not leave the hook set.
+            ~Unhook() {
+                convolver::freeing_processor_for_tests = nullptr;
+            }
+        } unhook;
+        // The render above held the processor its Latency replaced, which
+        // the next control call frees: free it now, so that only this
+        // handover's processor is counted.
+        require(latency_settled(unit), "the Latency work before the handover did not finish");
+        CFRelease(unit.class_info_now());
+        replaced_freed = 0;
+        convolver::freeing_processor_for_tests = note_replaced_freed;
+        OSStatus held = noErr;
+        std::thread audio([&] {
+            Buffers r(2, 2, 512);
+            bool silent = false;
+            held = render(unit, r, 512, false, silent);
+        });
+        struct Release { // A failed check must not leave the render waiting.
+            std::atomic<bool>& leave;
+            std::thread& audio;
+            ~Release() {
+                leave = true;
+                if (audio.joinable())
+                    audio.join();
+            }
+        } release{leave, audio};
+        while (!inside.load())
+            std::this_thread::yield();
+        seen.clear();
+        set_parameter(unit, au::latency_parameter, 5);
+        // The Latency work finishes, and the host is told, while the render
+        // still holds the old processor: work that waited for the render to
+        // let go would not finish until it did.
+        const bool applied = reports(unit, 1024);
+        const bool finished = latency_settled(unit, std::chrono::seconds(5));
+        const auto told = seen.of(kAudioUnitProperty_Latency);
+        CFRelease(unit.class_info_now()); // Another control call meanwhile.
+        const int freed_while_held = replaced_freed.load();
+        leave = true;
+        audio.join();
+        unit.while_pulling = nullptr;
+        check(held, "the held render");
+        require(applied, "a Latency chosen while a render held the processor was not reported");
+        require(finished && told == 1,
+                "the Latency work waited for the render, or the host was not told at once");
+        require(freed_while_held == 0, "a replaced processor was freed while a render held it");
+        CFRelease(unit.class_info_now());
+        require(replaced_freed.load() == 1,
+                "the replaced processor was not freed by the next control call");
+        require(impulse_delay(unit) == 1024,
+                "the render after the handover did not play the new processor");
+        set_parameter(unit, au::latency_parameter, 1);
+        require(reports(unit, 64), "Latency back to 64 frames");
+        // The Latency work reads the hook: let it finish before the hook is
+        // cleared (ThreadSanitizer saw the two race).
+        require(latency_settled(unit), "the Latency work after the handover did not finish");
+    }
 
     // Choices from two threads at once while this one renders (john's review
     // reproduced 1024 frames of delay reported as 64): once they stop, the

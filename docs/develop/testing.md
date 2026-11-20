@@ -991,7 +991,12 @@ Five CTest tests run when the adapter is built (label `au`):
   made while initialized applied with its notification and log line, one
   set from a pre-render notification on a new audio thread (no allocation
   on that thread) and one set from the input callback during a render on
-  the main thread (no deadlock), choices from two threads at once while
+  the main thread (no deadlock), a choice applied while a render waits in
+  its input callback (PLUG-39 step 3c: the new latency is reported without
+  waiting for the render, the old processor is not freed while the render
+  holds it, even by a save meanwhile, the next save frees it
+  (`freeing_processor_for_tests`), and an impulse after it comes out 1024
+  frames later), choices from two threads at once while
   rendering (afterwards the reported latency is the last choice and the
   audio has it; the sanitizer job runs it under ASan and UBSan, which catch
   a freed processor only if the timing hits it), out of memory at each
