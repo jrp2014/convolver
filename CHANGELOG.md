@@ -28,6 +28,13 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Library (ROBUST-8), incompatible, hence 0.15.0: `HostFilter::activate(const
+  HostLayout&)` is split in two. `activation()` returns a `HostActivation`
+  (what to play, as `playback`, and the failure and notice it would record)
+  and changes nothing; `activate(HostActivation&&)` records it and cannot
+  fail. Build the processor from `activation().playback`, then call
+  `activate()` once nothing can stop that processor from playing.
+
 - Builds (CI-43): the Mac preview packages are built with the newest Xcode
   on GitHub's macOS 26 images (Xcode 26.6 today, was 16.4 on macOS 15), still
   for macOS 14 and later, and the Linux packages with GCC 12 (was 11), still

@@ -388,10 +388,12 @@ format.
   `HostFilter::activation()` finds what to play and why, and changes
   nothing; every adapter builds the processor from it and calls
   `activate()`, which cannot fail, only once nothing can stop that
-  processor from playing. A processor that cannot be built (a new Latency
-  when memory runs out) leaves the fault count, the speaker notice and the
+  processor from playing. A new Latency whose processor cannot be built
+  (memory runs out) leaves the fault count, the speaker notice and the
   reason a kept filter plays silence as they were, for the processor that
-  keeps playing.
+  keeps playing. A host start whose processor cannot be built records that
+  failure instead (`fail_activation()`), with the count started again, as
+  no processor plays on.
   While one is shown, the report says so (`held`), and its log text says
   that the status shows Load failed instead of Fault.
   One baseline serves both sides (jrp's review of 0.4.43): an adapter passes

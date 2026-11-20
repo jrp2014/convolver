@@ -724,6 +724,12 @@ bool HostFilter::estimate(bool on, const std::function<void(const FilterGains&)>
 }
 
 void HostFilter::fail_activation(std::string why) {
+    // First, before anything that may throw, as for any new start: nothing
+    // counts on from the processor that is gone.
+    notice_ = {};
+    activation_failure_.reset();
+    faults_ = cleared_ = observed_ = {};
+    changed_ = false;
     HostFailure f;
     f.kind = HostFailureKind::activation;
     f.request = accepted_;
@@ -741,10 +747,7 @@ void HostFilter::fail_activation(std::string why) {
                  "Close other projects or programs, then restart playback or load the filter "
                  "again. If it keeps failing, copy the diagnostics and report it.",
                  {}};
-    notice_ = {};
     activation_failure_ = std::move(f);
-    faults_ = cleared_ = observed_ = {}; // No processor counts on from these.
-    changed_ = false;
 }
 
 namespace {

@@ -1799,7 +1799,7 @@ void processing_faults() {
     } catch (const std::invalid_argument&) {
     }
     require(empty.failed(), "failed first load");
-    q.replace(unfiltered_playback(layout, true, false)); // As HostFilter::activate() gives it.
+    q.replace(unfiltered_playback(layout, true, false)); // As HostFilter::activation() gives it.
     play_q(nan);
     const auto after = empty.observe(q.faults());
     explained += after.faults.rejected_input;

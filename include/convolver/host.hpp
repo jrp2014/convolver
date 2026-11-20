@@ -225,7 +225,7 @@ enum class HostLoadCheck {
     refuse_mismatch,
     // The host may still change its configuration (it is restoring a project):
     // the filter is accepted all the same and kept, playing silence with the
-    // reason as failure() until an activation suits it, as activation() keeps
+    // reason as failure() until an activation suits it, as an activation keeps
     // one. VST3: REAPER starts the plug-in on stereo buses, restores the
     // project, then gives it the track's channels (jrp's crossover retest,
     // 7 November 2026).
