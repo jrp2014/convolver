@@ -160,6 +160,23 @@ const detail::SoundFiles& unit_reader() {
 #endif
 }
 
+// One block of silence through an initialized unit, as a host renders.
+// PLUG-27: a chosen file that does not suit the unit is refused only once
+// the host renders through it; before that it is kept and checked when the
+// host initializes the unit.
+void render_block(Unit& unit, std::size_t inputs, std::size_t outputs) {
+    std::vector<std::vector<float>> in(inputs, std::vector<float>(512)),
+        out(outputs, std::vector<float>(512));
+    std::vector<const float*> ins;
+    std::vector<float*> outs;
+    for (auto& b : in)
+        ins.push_back(b.data());
+    for (auto& b : out)
+        outs.push_back(b.data());
+    bool silent = false;
+    check(unit.render(ins, outs, 512, false, silent), "render");
+}
+
 // A file chosen as the window chooses one, without the window.
 OSStatus choose(Unit& unit, const std::string& path) {
     NSString* name = @(path.c_str()); // Held for the call.
@@ -750,6 +767,7 @@ void files() {
             "the saved state differs from the shared file step's (native.audio_toolbox checks "
             "that it matches convolver-preset's)");
 
+    render_block(unit, 2, 2); // PLUG-27: refused only while the host renders.
     require(![view loadFile:@(mono.c_str())], "a mono file accepted by a stereo unit");
     r = report(unit);
     require(contains(r[@"explanation"], mono.c_str()) &&
@@ -837,11 +855,12 @@ void files() {
     [view removeFromSuperview];
     unit.uninitialize();
 
-    // On an empty unit a refused first file leaves it silent, as a first
-    // preset that does not fit does (docs/use/plugins.md).
+    // On an empty unit a file refused while the host renders leaves it
+    // silent, as a first preset that does not fit does (docs/use/plugins.md).
     Unit empty;
     check(empty.configure(44100, 2, 2, 512), "stereo formats");
     check(empty.initialize(), "stereo initialization");
+    render_block(empty, 2, 2);
     require(choose(empty, mono.string()) != noErr, "a mono file accepted by an empty unit");
     const auto first = empty.failure();
     require(first.present && first.silent && contains(report(empty)[@"explanation"], mono.c_str()),
@@ -870,11 +889,77 @@ void files() {
     require(wide_saved.configuration && wide_saved.configuration->input_channels == 2 &&
                 wide_saved.configuration->output_channels == 6,
             "the chosen crossover saved with other channel counts");
+    render_block(wide, 6, 6);
     require(choose(wide, fewer.string()) != noErr, "a 2-out filter chosen on 6 outputs");
     const auto still = wide.failure();
     require(still.present && !still.silent && loaded_path(wide) == crossover.string(),
             "the refused file replaced the crossover");
     wide.uninitialize();
+}
+
+// PLUG-27, as vst3.adapter chosen_before_host_plays: a single filter chosen
+// before the host renders is kept and saved, and checked when the host
+// initializes the unit; a list waits for formats the host has rendered
+// with, with jrp's words (20 November 2026), and once it has rendered at
+// 48 kHz and stopped, chooses its 48 kHz entry; while the host renders, a
+// file that does not suit is refused and the playing filter stays.
+void chosen_before_rendering() {
+    TemporaryFolder folder;
+    write_wav(folder / "room.wav", 48000, 2, 8);
+    write_wav(folder / "hall.wav", 48000, 2, 16);
+    write_wav(folder / "slow.wav", 44100, 2, 8);
+    std::ofstream(folder / "slow.cfg") << "44100 2 2 0\n0 0\n0 0\nslow.wav\n0\n0\n0\n"
+                                       << "slow.wav\n1\n1\n1\n";
+    std::ofstream(folder / "room.cfg") << "48000 2 2 0\n0 0\n0 0\nroom.wav\n0\n0\n0\n"
+                                       << "room.wav\n1\n1\n1\n";
+    std::ofstream(folder / "rates.txt") << "slow.cfg\nroom.cfg\n";
+    const auto rate_of = [](Unit& unit) {
+        const auto saved = unit.saved();
+        return saved.configuration && !saved.failed ? saved.configuration->sample_rate : 0;
+    };
+    Unit unit;
+    // A JUCE host's probe, or a host that has not played yet: initialized
+    // at 44.1 kHz, nothing rendered.
+    check(unit.configure(44100, 2, 2, 512), "44.1 kHz formats");
+    check(unit.initialize(), "44.1 kHz initialization");
+    check(choose(unit, (folder / "room.cfg").string()), "a 48 kHz .cfg chosen before rendering");
+    require(rate_of(unit) == 48000, "the chosen filter is not in the saved state");
+    unit.uninitialize();
+    // Nothing rendered: a list waits, refused as any file is, saying what
+    // to do.
+    require(choose(unit, (folder / "rates.txt").string()) != noErr,
+            "a list chosen before the host rendered");
+    auto f = unit.failure();
+    const std::string waits = f.message;
+    require(f.present && waits.find("no entry selected") != std::string::npos &&
+                waits.find("Play audio once so Convolver can check the host's sample rate and "
+                           "channel counts, then choose the configuration list again.") !=
+                    std::string::npos,
+            "a waiting list's message: " + waits);
+    // Stopped: another single filter is kept too.
+    check(choose(unit, (folder / "hall.wav").string()), "a second file chosen while stopped");
+    auto saved = unit.saved();
+    require(saved.configuration && saved.configuration->paths.at(0).impulse.size() == 16,
+            "the second file is not in the saved state");
+    // Rendered at 48 kHz, then stopped: the list chooses its 48 kHz entry.
+    check(unit.configure(48000, 2, 2, 512), "48 kHz formats");
+    check(unit.initialize(), "48 kHz initialization");
+    render_block(unit, 2, 2);
+    unit.uninitialize();
+    check(choose(unit, (folder / "rates.txt").string()), "the list refused after rendering");
+    saved = unit.saved();
+    require(rate_of(unit) == 48000 && saved.configuration->paths.at(0).impulse.size() == 8,
+            "the list's 48 kHz entry was not chosen");
+    // While the host renders, a 44.1 kHz file is refused; the list's filter
+    // stays.
+    check(unit.initialize(), "48 kHz initialization again");
+    render_block(unit, 2, 2);
+    require(choose(unit, (folder / "slow.wav").string()) != noErr,
+            "a 44.1 kHz file accepted while rendering");
+    f = unit.failure();
+    require(f.present && !f.silent && rate_of(unit) == 48000,
+            "a refused file replaced the playing filter: " + std::string(f.message));
+    unit.uninitialize();
 }
 
 // TODO AU-6: a report read while a load holds the unit's control lock on
@@ -985,6 +1070,7 @@ int main() {
             properties(log);
             window();
             files();
+            chosen_before_rendering();
             responsive();
             faults(log);
         } catch (const std::exception& e) {

@@ -799,7 +799,7 @@ std::optional<HostSettings> Processor::install(HostState next, const HostRequest
                         ? " The host said it is restoring a project, so its channels and rate "
                           "may still change."
                     : request.kind == HostRequestKind::chosen_file
-                        ? " Nothing is playing through the plug-in yet, so the host's channels "
+                        ? " Nothing is playing through the plug-in, so the host's channels "
                           "and rate may still change; the filter is checked again when the "
                           "host starts the plug-in."
                         : " The host has not played audio since it started the plug-in, so "
