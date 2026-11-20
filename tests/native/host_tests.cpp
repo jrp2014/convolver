@@ -2016,8 +2016,13 @@ void status_lines() {
         static_cast<void>(test::started(unsuited, stereo));
         check(host_status(unsuited, stereo, true, {}, true), Status::load_failed,
               "Silent: the filter has 2 in, 6 out", "kept crossover, bypassed");
-        check(host_status(kept, stereo, true, HostSettings{-6, .5}, true), Status::load_failed,
-              "Load failed, only the dry signal plays", "kept at another rate, Mix 50%, bypassed");
+        // A kept filter the adapter could not start has no processor: nothing
+        // plays, bypassed or not.
+        HostFilter unstarted(8);
+        unstarted.load(HostState{a}, stereo);
+        unstarted.fail_activation("no memory");
+        check(host_status(unstarted, stereo, true, {}, true), Status::load_failed,
+              "Silent: the plug-in could not start the filter.", "activation failure, bypassed");
         HostFilter empty(8);
         check(host_status(empty, stereo, true, HostSettings{-6, .5}, true), Status::no_filter,
               "No filter: audio passes unchanged.", "empty, Gain -6 dB, bypassed");

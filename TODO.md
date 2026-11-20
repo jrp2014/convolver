@@ -86,7 +86,7 @@ starting.
 
 | Item | What to do | Note |
 | --- | --- | --- |
-| **PLUG-39** | The load and restore path, steps 1b to 6 in the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)'s order (step 0's protection tests are in, PR #200, and step 1a, PR #205): steps 2 and 4 (with PLUG-30) to 6 (step 1b, PR #224, and PLUG-36 are done); step 3 (the shared ownership of the playing processor) and ROBUST-8 after it (PR #223) are done | Plan and order approved by jrp on 13 November 2026; step 3 first and the four items folded in on 19 November 2026 ([decision](docs/project/decisions.md#releases)). Each step is its own reviewed pull request, and step 3 (deferred reclamation) gets its own ownership review |
+| **PLUG-39** | The load and restore path, steps 1b to 6 in the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)'s order (step 0's protection tests are in, PR #200, and step 1a, PR #205): steps 2 and 4 (with PLUG-30) to 6 (step 1b, PR #224, and PLUG-36, PR #225, are done); step 3 (the shared ownership of the playing processor) and ROBUST-8 after it (PR #223) are done | Plan and order approved by jrp on 13 November 2026; step 3 first and the four items folded in on 19 November 2026 ([decision](docs/project/decisions.md#releases)). Each step is its own reviewed pull request, and step 3 (deferred reclamation) gets its own ownership review |
 | **PLUG-24** | `HostProcessor` in its own source file | In PLUG-39's sequence, as its own pull request, never inside a step's or with a DSP change (jrp, 19 November 2026) |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the gain modes are in 0.13.20 (PR #188) |
 | **PERF-3** | One measurement exercise: resource budgets and supported workloads | Changes no shipped code; its results decide whether FFT-2, VST3-5, PLUG-11 and PERF-2's tuning are worth doing (EDGE-5 publishes them) |
@@ -1203,7 +1203,7 @@ Items finished since then are listed here, one line each, until the next
 move to the archive.
 
 - [x] **PLUG-36 — The loading-and-failure table covers each transition.**
-  20 November 2026, in PLUG-39's sequence after step 1b: the contract's
+  20 November 2026, PR #225, in PLUG-39's sequence after step 1b: the contract's
   [states and transitions](docs/develop/plugin-contract.md#states-and-transitions)
   give the empty, active, kept-but-unsuited and failed states against every
   request and host event, with what plays, what is saved, what Status shows

@@ -257,6 +257,20 @@ void cases() {
          HostStatus::load_failed,
          {"While bypassed, only the dry signal plays: the input unchanged."},
          {"plays silence", "Mix at"}},
+        // A filter the adapter could not start has no processor, so bypass
+        // has nothing to pass either.
+        {"activation failure, bypassed",
+         [] {
+             HostFilter f(8);
+             f.load(HostState{filter(44100, 2)}, HostLayout{44100, 2, 2});
+             f.fail_activation("no memory");
+             auto bypassed = facts(HostLayout{44100, 2, 2});
+             bypassed.bypassed = true;
+             return host_report(f, bypassed);
+         },
+         HostStatus::load_failed,
+         {"Convolver plays silence."},
+         {"While bypassed", "dry signal plays"}},
         {"waiting",
          [] {
              HostFilter f(8);

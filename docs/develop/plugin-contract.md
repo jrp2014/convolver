@@ -156,7 +156,7 @@ rules it follows.
 | **Empty:** nothing accepted, or an empty state accepted | Equal host counts: identity, at the level Gain and Mix give it. Unequal: silence | No filter | No filter |
 | **Active:** an accepted filter that suits the host | The filter at Gain, with Mix's dry share when the filter's own counts are equal | The filter (VST3: with the settings and bypass) | Active; Waiting while the host's configuration is not known, as the filter is not checked yet |
 | **Kept, unsuited:** an accepted filter that does not suit the host's rate or counts, found at activation, or restored into VST3 before audio has played | Silence; Mix's dry share below 100% when the host's counts and the filter's are both equal | The filter, so correcting the host brings it back | Load failed with the reason: "Silent:", or "only the dry signal plays" |
-| **Failed:** a first load failed, or a saved failure was restored | Silence, with no dry signal whatever the counts or Mix | The failure (flag 4, state version 2), no filter | Load failed: "Silent:" with the reason, or "an earlier load failed" |
+| **Failed:** a first load failed, or a saved failure was restored | Silence, with no dry signal whatever the counts or Mix | The failure (flag 4), no filter | Load failed: "Silent:" with the reason, or "an earlier load failed" |
 
 A host start whose processor cannot be built (`fail_activation()`,
 ROBUST-8) plays silence with no dry share and shows Load failed ("Silent:")
@@ -187,9 +187,11 @@ host layer's own tests.
 | Mix below 100% | Unchanged. The input at the level Gain and Mix give it, where the counts are equal | Unchanged. The filter with the dry share, where its counts are equal | Unchanged. The dry share, where both counts are equal | Unchanged. Silence | `native.host_settings` `unequal_mix`, `diagnostics_follow_settings`; `native.host_report` `cases` ("wrong rate, Mix 50%", "failed first load, Mix 50%") |
 | Processing fault (rejected input, output overflow, a failed engine call, an invalid call) | Unchanged; the affected samples or call play silence | Unchanged; the same, and an overflow restarts the filter | Unchanged | Unchanged | `native.host` `processing_faults`; harness `nonfinite-input` |
 
-No event moves an instance out of Failed except an accepted request: a
-filter, an empty state or another saved failure. Bypass, Mix and faults
-never change the state, so they never change what is saved.
+Only an accepted filter or empty state moves an instance out of Failed;
+a refused request or another saved failure leaves it there. Bypass, Mix
+and faults never change the state, so they never change the filter or
+failure that is saved (VST3 saves its bypass and settings beside it, as
+[host state](#host-state) says).
 
 **Which message Status shows** (`host_status()` in
 [`host.cpp`](../../portable/host.cpp); `native.host` `status_lines`), first
@@ -206,10 +208,8 @@ match wins:
 5. Load failed after a failed load.
 6. No filter.
 
-When no filter is heard, the line and the window's report say what does
-play: Mix's dry share, or, while bypassed, the untouched input where there is
-a dry signal (PLUG-36, 20 November 2026; `native.host`
-`status_lines` and `native.host_report` `cases`, "bypassed").
+What the line says when no filter is heard, Mix's dry share and bypass
+included, is in [status and log](#status-and-log).
 
 ## Failure reasons
 
@@ -283,7 +283,16 @@ format.
   line says what is heard when no filter plays (jrp's review of 0.5.5): the
   input at the level Gain and Mix give it when no filter is loaded, and only
   the dry signal, not "Silent", when a kept filter does not suit the host at
-  a Mix below 1 and there is a dry signal ([bypass](#bypass)). Before the
+  a Mix below 1 and there is a dry signal ([bypass](#bypass)). It follows
+  bypass the same way, and so does the window's report (PLUG-36,
+  20 November 2026): bypass plays the untouched input where there is a dry
+  signal, so a bypassed kept filter that does not suit the host reads "only
+  the dry signal plays", and a bypassed instance with no filter reads
+  "audio passes unchanged" whatever Gain and Mix are; an activation whose
+  processor could not be built still reads "Silent", as nothing plays
+  (`native.host` `status_lines`, `native.host_report` `cases`). The start
+  log line, "previous filter keeps playing" and the report's fault branch
+  do not follow bypass yet (PLUG-39 step 4). Before the
   host's configuration is known it cannot tell whether a dry signal will
   play, so it says "no filter plays". The Audio Unit
   recomputes the line each time a host reads it, as Gain and Mix may have
