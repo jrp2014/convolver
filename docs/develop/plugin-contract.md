@@ -283,14 +283,19 @@ format.
   line says what is heard when no filter plays (jrp's review of 0.5.5): the
   input at the level Gain and Mix give it when no filter is loaded, and only
   the dry signal, not "Silent", when a kept filter does not suit the host at
-  a Mix below 1 and there is a dry signal ([bypass](#bypass)). It follows
-  bypass the same way, and so does the window's report (PLUG-36,
-  20 November 2026): bypass plays the untouched input where there is a dry
-  signal, so a bypassed kept filter that does not suit the host reads "only
-  the dry signal plays", and a bypassed instance with no filter reads
-  "audio passes unchanged" whatever Gain and Mix are; an activation whose
-  processor could not be built still reads "Silent", as nothing plays
-  (`native.host` `status_lines`, `native.host_report` `cases`). The start
+  a Mix below 1 and there is a dry signal ([bypass](#bypass)). While
+  bypassed it keeps a failure visible but describes what bypass plays, the
+  untouched input where there is a dry signal, never silence or attenuation
+  that is not happening (jrp, 20 November 2026, PLUG-36): a kept filter that
+  does not suit the host reads "Load failed. Bypass is on: only the dry
+  signal plays. The filter is for 44100 Hz, the host runs at 48000 Hz."
+  (no room is left for the log's pointer), and an instance with no filter
+  reads "No filter. Bypass is on: audio passes unchanged." whatever Gain and
+  Mix are. Where bypass plays silence the line says "Silent" as before: a
+  failed load with no filter kept, a filter or host with unequal counts,
+  and an activation whose processor could not be built. The window's report
+  says the same ("Bypass is on: only the dry signal plays.";
+  `native.host` `status_lines`, `native.host_report` `cases`). The start
   log line, "previous filter keeps playing" and the report's fault branch
   do not follow bypass yet (PLUG-39 step 4). Before the
   host's configuration is known it cannot tell whether a dry signal will

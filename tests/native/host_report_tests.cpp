@@ -243,8 +243,8 @@ void cases() {
              return host_report(HostFilter(8), bypassed);
          },
          HostStatus::no_filter,
-         {"No filter, so audio passes unchanged."},
-         {"Gain and Mix"}},
+         {"No filter. Bypass is on: audio passes unchanged."},
+         {"Gain and Mix", "-2.5 dB"}},
         {"wrong rate, bypassed",
          [] {
              HostFilter f(8);
@@ -255,8 +255,21 @@ void cases() {
              return host_report(f, bypassed);
          },
          HostStatus::load_failed,
-         {"While bypassed, only the dry signal plays: the input unchanged."},
+         {"Bypass is on: only the dry signal plays."},
          {"plays silence", "Mix at"}},
+        // A failed load with no filter kept stays silent, bypassed too
+        // (PLUG-23, jrp, 7 November 2026).
+        {"failed first load, bypassed",
+         [&] {
+             HostFilter f(8);
+             f.reject(HostFailureKind::state_unreadable, {"The saved state could not be read."});
+             auto bypassed = facts(stereo, {0, .5});
+             bypassed.bypassed = true;
+             return host_report(f, bypassed);
+         },
+         HostStatus::load_failed,
+         {"Convolver plays silence."},
+         {"Bypass is on", "dry signal plays"}},
         // A filter the adapter could not start has no processor, so bypass
         // has nothing to pass either.
         {"activation failure, bypassed",
@@ -270,7 +283,7 @@ void cases() {
          },
          HostStatus::load_failed,
          {"Convolver plays silence."},
-         {"While bypassed", "dry signal plays"}},
+         {"Bypass is on", "dry signal plays"}},
         {"waiting",
          [] {
              HostFilter f(8);

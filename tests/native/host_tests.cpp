@@ -2009,8 +2009,13 @@ void status_lines() {
         kept.load(HostState{other_rate}, std::nullopt);
         static_cast<void>(test::started(kept, stereo));
         check(host_status(kept, stereo, true, {}, true), Status::load_failed,
-              "Load failed, only the dry signal plays: the filter is for 44100 Hz",
+              "Load failed. Bypass is on: only the dry signal plays. The filter is for 44100 Hz, "
+              "the host runs at 48000 Hz.",
               "kept at another rate, bypassed");
+        // Whatever Gain and Mix are: bypass passes the input untouched.
+        check(host_status(kept, stereo, true, HostSettings{-6, .5}, true), Status::load_failed,
+              "Load failed. Bypass is on: only the dry signal plays.",
+              "kept at another rate, Gain -6 dB, Mix 50%, bypassed");
         HostFilter unsuited(8);
         unsuited.load(HostState{crossover}, std::nullopt);
         static_cast<void>(test::started(unsuited, stereo));
@@ -2025,7 +2030,9 @@ void status_lines() {
               "Silent: the plug-in could not start the filter.", "activation failure, bypassed");
         HostFilter empty(8);
         check(host_status(empty, stereo, true, HostSettings{-6, .5}, true), Status::no_filter,
-              "No filter: audio passes unchanged.", "empty, Gain -6 dB, bypassed");
+              "No filter. Bypass is on: audio passes unchanged.", "empty, Gain -6 dB, bypassed");
+        check(host_status(empty, crossover_bus, true, {}, true), Status::no_filter,
+              "No filter: silent, as inputs and outputs differ.", "empty, 2->6, bypassed");
         check(host_status(empty, stereo, true, HostSettings{-6, .5}), Status::no_filter,
               "No filter: audio passes at", "empty, Gain -6 dB");
         refused([&] { empty.load(HostState{other_rate}, stereo); });
