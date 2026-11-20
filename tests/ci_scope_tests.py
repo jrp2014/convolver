@@ -532,6 +532,7 @@ FORMAT_REFERENCES = {
         'tests/repository_checks_tests.py': 'made-up paths in its own test repository',
     },
     'lv2': {
+        '.pre-commit-config.yaml': "Lint runs the Ardour test's abort-rule tests for every pull request",
         'CMakeLists.txt': 'adds plugins/lv2 only with CONVOLVER_BUILD_LV2',
         'cmake/ConvolverPluginPackaging.cmake': 'packages the LV2 bundle on Linux, in the candidates (CI-34)',
         'scripts/release/candidate.py': 'the candidates (CI-34: main, weekly, by hand)',

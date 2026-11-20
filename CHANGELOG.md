@@ -51,6 +51,12 @@ Until 1.0 the C++ API may change between minor versions.
   fail. Build the processor from `activation().playback`, then call
   `activate()` once nothing can stop that processor from playing.
 
+- Tests (HOST-7): the headless Ardour test runs Ardour 9 on the newest
+  Ubuntu image instead of Ardour 8.4 on Ubuntu 24.04. Its session script
+  gives Ardour 9 the empty route group it expects (`nil` crashed it), and
+  the test accepts Ardour 9.0's known abort as `new_session` exits once the
+  session is written (that version and message only). Every first-use
+  example matches the oracle (worst error 3.42e-8).
 - Builds (CI-45): Convolver's own sources build without the warnings GCC 12
   to 15, Xcode 26.6 and Visual Studio 2022 gave in CI. No output changes.
 - Builds (CI-43): the Mac preview packages are built with the newest Xcode

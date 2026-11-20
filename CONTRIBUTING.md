@@ -200,7 +200,9 @@ another the [VST trademark wording](packaging/trademarks/README.md), another tes
 and another, whenever
 `scripts/fuzz_campaigns.sh` or its test changes, the
 [fuzz scheduler](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns)'s
-failure paths (it needs bash 4.3 or later and is skipped on macOS's bash 3.2).
+failure paths (it needs bash 4.3 or later and is skipped on macOS's bash 3.2),
+and another, whenever the Ardour test changes, the one Ardour failure it
+[accepts](docs/develop/testing.md#ardour-headless).
 They use only Python's standard library and can be run independently:
 
 ```sh
@@ -214,6 +216,7 @@ python3 tests/trademarks_tests.py
 python3 tests/ci_scope_tests.py
 python3 tests/ci_evidence_tests.py
 python3 tests/fuzz/scheduler_tests.py
+python3 tests/lv2/ardour_harness_tests.py
 ```
 
 [Repository checks](docs/develop/workflow.md#automated-checks) lists each rule and what

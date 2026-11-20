@@ -8,22 +8,25 @@ For each first-use fixture (examples/first-use: mono 1 in 1 out, stereo
 cross-feed 2 in 2 out, the 2 in 6 out crossover) this test:
 
 1. makes an LV2 preset from the fixture's filter with convolver-preset;
-2. makes a session with ardour8-new_session, its master bus one channel per
+2. makes a session with ardourN-new_session, its master bus one channel per
    plug-in output;
-3. runs ardour_session.lua in ardour8-lua: on Ardour's Dummy backend, a track
+3. runs ardour_session.lua in ardourN-lua: on Ardour's Dummy backend, a track
    with the plug-in, the preset loaded from Ardour's preset list, white noise
    recorded onto the track, the region's fades off, the session saved;
-4. exports the session with ardour8-export, a separate process that restores
+4. exports the session with ardourN-export, a separate process that restores
    the saved session, plug-in state included, and renders it offline with
    Ardour's latency compensation;
 5. compares the export with the direct double-precision oracle applied to
    the recorded take: the same length (take plus tail), no offset (Ardour
    compensates the reported 256 frames), within 1e-5.
 
-Needs Ardour's headless tools (Ubuntu's `ardour` package: ardour8-lua,
-ardour8-new_session, ardour8-export). Ardour's configuration goes to a
-temporary folder, not the user's. An export that Ardour 8.4 kills by a
-signal is tried again, with a warning (see `export`).
+Needs Ardour 9's or 8's headless tools (Ubuntu's `ardour` package:
+ardour9-lua, ardour9-new_session, ardour9-export, or ardour8-*). Ardour's
+configuration goes to a temporary folder, not the user's. An export that
+Ardour kills by a signal is tried again, and Ardour 9.0's abort as
+new_session exits is accepted once the session exists, each with a warning
+(see `export` and `known_new_session_abort`, which ardour_harness_tests.py
+checks).
 """
 
 import json
@@ -97,10 +100,58 @@ EXPORT_ATTEMPTS = 3
 EXPORT_TIMEOUT = 120
 
 
-def warn(message):
+def warn(message, title='Ardour export'):
     print(f'warning: {message}', flush=True)
     if os.environ.get('GITHUB_ACTIONS') == 'true':
-        print(f'::warning title=Ardour export::{message}', flush=True)
+        print(f'::warning title={title}::{message}', flush=True)
+
+
+def ardour_version(lua_tool):
+    """Ardour's version as (major, minor), from `ardourN-lua --version`, or None."""
+    result = subprocess.run([lua_tool, '--version'], capture_output=True, text=True, timeout=60, check=False)
+    match = re.search(r'version (\d+)\.(\d+)', result.stdout + result.stderr)
+    return (int(match[1]), int(match[2])) if match else None
+
+
+# Ardour 9.0's new_session (Ubuntu 26.04's 9.0.0~ds) writes the session and
+# prints that it did, then aborts as it exits with glibc's message about an
+# exception not rethrown (a thread's cancellation unwind swallowed during
+# teardown). In CI on 2026-11-20 it did so for 7 of 11 sessions in five
+# runs, before Convolver is involved. Only that abort is accepted (HOST-7):
+# on Ardour 9.0, with that message after the one saying the session was
+# created, and the session file present. Any other abort, or the same on
+# another version, fails. The Lua script then opens the session, so a
+# damaged one fails there. HOST-8 removes this once a fixed Ardour ships.
+NEW_SESSION_CREATED = 'Created session in'
+NEW_SESSION_ABORT = 'FATAL: exception not rethrown'
+NEW_SESSION_ABORTS_IN = {(9, 0)}
+
+
+def known_new_session_abort(returncode, output, version, session_saved):
+    """Whether a failed new_session is Ardour 9.0's abort as it exits, after creating the session."""
+    created = output.find(NEW_SESSION_CREATED)
+    aborted = output.find(NEW_SESSION_ABORT, created + 1) if created >= 0 else -1
+    return (
+        returncode == -signal.SIGABRT and version in NEW_SESSION_ABORTS_IN and session_saved and aborted > created >= 0
+    )
+
+
+def new_session(tool_path, environment, session, name, outputs, version):
+    """Make the session; accept only Ardour 9.0's known abort at exit once it has created the session."""
+    command = [tool_path, '-m', str(outputs), '-s', str(RATE), session, name]
+    result = run(command, environment, check=False)
+    if result.returncode == 0:
+        return
+    tool_name = pathlib.Path(tool_path).name
+    saved = (session / f'{name}.ardour').is_file()
+    if known_new_session_abort(result.returncode, result.stdout + result.stderr, version, saved):
+        warn(
+            f'{name}: {tool_name} aborted as it exited ({NEW_SESSION_ABORT}), after creating the session, '
+            'as Ardour 9.0 can',
+            'Ardour new session',
+        )
+        return
+    sys.exit(f'{tool_name} failed with exit code {result.returncode}')
 
 
 def export(tool_path, environment, exported, session, name):
@@ -120,7 +171,7 @@ def export(tool_path, environment, exported, session, name):
         if attempt < EXPORT_ATTEMPTS:
             warn(
                 f'{name}: {tool_name} {failure} (attempt {attempt} of {EXPORT_ATTEMPTS}), '
-                f"as Ardour 8.4's export can with any plug-in; trying again"
+                f"as Ardour's export can with any plug-in; trying again"
             )
     if returncode is None:
         sys.exit(f'{name}: {tool_name} {failure}, {EXPORT_ATTEMPTS} times')
@@ -168,9 +219,10 @@ def check(tools, environment, directory, plugin_tool, fixture_name, fixture):
 
     name = fixture_name
     session = directory / 'sessions' / name
-    run([tools['new_session'], '-m', str(outputs), '-s', str(RATE), session, name], environment)
+    new_session(tools['new_session'], environment, session, name, outputs, tools['version'])
     filter_tail = tail(fixture['paths'], fixture['input_delays'], fixture['output_delays'])
     settings = {
+        'CONVOLVER_ARDOUR_MAJOR': re.match(r'ardour(\d+)-', pathlib.Path(tools['lua']).name)[1],
         'CONVOLVER_SESSION_DIR': str(session),
         'CONVOLVER_SESSION_NAME': name,
         'CONVOLVER_URI': plugin_uri(inputs, outputs),
@@ -229,6 +281,8 @@ def main():
     bundle = pathlib.Path(sys.argv[1]).resolve()
     plugin_tool = pathlib.Path(sys.argv[2]).resolve()
     tools = {name: tool(name) for name in ('lua', 'new_session', 'export')}
+    tools['version'] = ardour_version(tools['lua'])
+    print(f'Ardour version: {tools["version"]}', flush=True)
     worst = 0.0
     # CONVOLVER_ARDOUR_KEEP=DIR keeps the sessions and exports in DIR, a new or
     # empty folder, to inspect.

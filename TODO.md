@@ -237,18 +237,16 @@ is superseded.
   (`CONVOLVER_ARDOUR_KEEP`), check the region position and whether the
   plug-in's filter loaded during the export, and repeat with a plug-in
   that reports latency and has no worker.
-- [ ] **HOST-7 — Run the Ardour test with Ardour 9.** From CI-43 (19 November
-  2026): on `ubuntu-latest` (Ubuntu 26.04, Ardour 9's `ardour9-*` tools),
-  `ardour9-lua` died by SIGSEGV running `tests/lv2/ardour_session.lua` for
-  the mono example, after `ardour9-new_session` succeeded and before the
-  script's "Ardour engine running" line appeared (stdout is buffered, so
-  the crash may be later than that line; Convolver's plug-in is loaded only
-  after it). The [Ardour test](docs/develop/testing.md#ardour-headless)
-  therefore stays on `ubuntu-24.04` with Ardour 8.4. Next: run the script
-  with unbuffered output (or `io.stdout:setvbuf("no")`) to find the failing
-  call, and check it against Ardour 9's Lua bindings. **Done when** the job
-  passes on `ubuntu-latest` and its older-image row leaves
-  [compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines).
+- [ ] **HOST-8 — Ardour 9.0's abort as `new_session` exits.** From HOST-7
+  (20 November 2026): on Ubuntu 26.04, `ardour9-new_session` (9.0.0~ds)
+  writes the session, says so, then aborts with glibc's "FATAL: exception
+  not rethrown", for 7 of 11 sessions in five CI runs and before Convolver
+  is loaded. `known_new_session_abort()` in `tests/lv2/ardour_tests.py`
+  accepts that abort with a warning, on Ardour 9.0 and with that message
+  only ([Ardour, headless](docs/develop/testing.md#ardour-headless)). Next: jrp
+  reports it to Ardour if he wishes; a draft is in the project files.
+  **Done when** the Ardour on `ubuntu-latest` no longer aborts there and the
+  test stops accepting it.
 - [ ] **DIAG-9 — Numbers in the user's locale.** Low priority, from jrp's
   review of PLUG-36 (20 November 2026): diagnostics write sample rates,
   levels and counts as plain ASCII digits ("44100 Hz", "-6.0 dB")
@@ -1223,6 +1221,14 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **HOST-7 — Run the Ardour test with Ardour 9.**
+  20 November 2026, PR #229, from CI-43: Ardour 9's Lua tool crashed in
+  `Session:new_audio_track`, which takes an empty `ARDOUR.RouteGroup()`
+  where Ardour 8 took `nil`; Ardour 9.0's `new_session` also aborts as it
+  exits, after writing the session, which the test accepts with a warning
+  on 9.0 and with that message only, checked by `ardour_harness_tests.py`.
+  The job runs on `ubuntu-latest` with Ardour 9 and no longer needs an older
+  image ([Ardour, headless](docs/develop/testing.md#ardour-headless)).
 - [x] **CI-45 — Build our own sources without compiler warnings.**
   20 November 2026, PR #228, from the independent review of CI-43: the
   newer compilers CI-43 brought in warned about Convolver's own code. GCC

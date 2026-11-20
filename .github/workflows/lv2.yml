@@ -218,16 +218,13 @@ jobs:
   # its own code, not lilv's or JUCE's: it loads a preset from its preset
   # list, records, saves the session, restores it in a second process and
   # exports it with latency compensation; the export must match the oracle
-  # (tests/lv2/ardour_tests.py). Ardour is the image's Ubuntu package.
-  # An older image on purpose: Ubuntu 26.04's Ardour 9 crashes (SIGSEGV)
-  # running the session script before it reports the engine running, so
-  # this job stays on Ubuntu 24.04's Ardour 8.4 until HOST-7 adapts the
-  # test (docs/develop/build.md#compilers-and-ci-machines).
+  # (tests/lv2/ardour_tests.py). Ardour is the image's Ubuntu package
+  # (Ardour 9 on Ubuntu 26.04).
   ardour:
     needs: scope
     if: needs.scope.outputs.build == 'true'
     name: Ardour (headless)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
