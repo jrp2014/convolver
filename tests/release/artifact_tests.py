@@ -73,6 +73,24 @@ class ArtifactTests(unittest.TestCase):
             self.verifier.check_symbol_versions('GLIBC_2.36 GLIBC_2.2.5', '2.35')
         self.verifier.check_symbol_versions('GLIBC_2.2.5 GLIBC_2.35', '2.35')
 
+    def test_old_libstdcxx_floor(self):
+        # readelf names libstdc++'s versions GLIBCXX_ and CXXABI_; GLIBC_ must
+        # not match them, nor they it.
+        text = 'GLIBC_2.34 GLIBCXX_3.4.31 GLIBCXX_3.4.9 CXXABI_1.3.14 CXXABI_1.3'
+        with self.assertRaisesRegex(ValueError, 'GLIBCXX_3.4.31 exceeds'):
+            self.verifier.check_symbol_versions(text, '3.4.30', 'GLIBCXX')
+        with self.assertRaisesRegex(ValueError, 'CXXABI_1.3.14 exceeds'):
+            self.verifier.check_symbol_versions(text, '1.3.13', 'CXXABI')
+        self.assertEqual(self.verifier.check_symbol_versions(text, '2.35'), ['2.34'])
+        accepted = 'GLIBC_2.35 GLIBCXX_3.4.30 GLIBCXX_3.4 CXXABI_1.3.13'
+        self.assertEqual(self.verifier.check_symbol_versions(accepted, '3.4.30', 'GLIBCXX'), ['3.4', '3.4.30'])
+        self.assertEqual(self.verifier.check_symbol_versions(accepted, '1.3.13', 'CXXABI'), ['1.3.13'])
+
+    def test_linux_policy_names_each_runtime_floor(self):
+        linux = next(p for p in self.policy['platforms'] if p['os'] == 'Linux')
+        for key in ('max_glibc', 'max_glibcxx', 'max_cxxabi'):
+            self.assertRegex(linux[key], r'^\d+(\.\d+)+$', key)
+
 
 if __name__ == '__main__':
     unittest.main()
