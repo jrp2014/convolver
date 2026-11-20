@@ -874,6 +874,14 @@ void settings_parameters() {
     check(copy.load(state_of(half)), "preset without settings");
     require(parameter(copy, au::gain_parameter) == -6 && parameter(copy, au::mix_parameter) == 50,
             "a preset without settings reset them");
+    // Nor does one whose Convolver state carries settings (a VST3 state's):
+    // the unit's settings are its parameters (PLUG-39 step 1b).
+    auto carrying = state_of(half);
+    carrying.settings = HostSettings{-20, .1, 0, GainMode::estimate};
+    check(copy.load(carrying), "preset carrying another format's settings");
+    require(parameter(copy, au::gain_parameter) == -6 && parameter(copy, au::mix_parameter) == 50 &&
+                parameter(copy, au::gain_mode_parameter) == 0,
+            "settings carried in the Convolver state were applied");
     // Malformed parameter data: the filter loads, the settings keep their values.
     const auto mutable_copy =
         CFDictionaryCreateMutableCopy(nullptr, 0, static_cast<CFDictionaryRef>(saved));

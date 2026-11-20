@@ -991,8 +991,9 @@ Five CTest tests run when the adapter is built (label `au`):
   switched from another thread while rendering, the output silence flag, no
   C++ allocation while rendering, and the settings (AU-7): parameter info,
   defaults and clamping, Gain and Mix in the audio, and saving and restoring
-  them with `ClassInfo`, including a preset without settings, malformed
-  parameter data and a rejected preset, and the Status text and start line
+  them with `ClassInfo`, including a preset without settings, one whose
+  Convolver state carries a VST3 state's settings (ignored, PLUG-39 step
+  1b), malformed parameter data and a rejected preset, and the Status text and start line
   with them (no filter at Gain −20 dB, a refused first load at Mix 50%).
   Latency (PLUG-10): its parameter info and value names, rounding and
   clamping, the reported latency and its notification when chosen
@@ -1176,7 +1177,8 @@ python3 tests/au/avaudioengine_tests.py build-au/convolver-preset
   delivered inside `run()`, without a worker, and with scheduling that fails;
   failed files of every kind; a file chosen again while its filter plays,
   whose tail rings on exactly as without it, and the same name with changed
-  contents, which loads (PLUG-39 step 1b); a filter file too large to save (PLUG-12: two
+  contents, which loads, and state carrying a VST3 state's settings, which
+  plays exactly as state without them (PLUG-39 step 1b); a filter file too large to save (PLUG-12: two
   paths of 8,388,608 samples, refused with the original kept, playing and
   saved, or as a silent failed first load); rapid choices; the two preparation-window cases,
   with `work()` paused (through a second test-only extension) after

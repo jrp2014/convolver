@@ -613,6 +613,28 @@ void presets(host::World& world, const Fixture& f, const fs::path& tool, const f
 }
 
 // --- Callback sizes -----------------------------------------------------------------
+// PLUG-39 step 1b: an LV2 instance's settings are its ports, which the host
+// restores, so settings a restored state carries (a VST3 state's) neither
+// apply nor decide whether the filter gets its estimate: in Estimate, state
+// whose settings say Set plays exactly as state without settings.
+void foreign_settings(host::World& world, const Fixture& f) {
+    std::vector<float> played[2];
+    for (const bool carried : {false, true}) {
+        HostState state;
+        state.configuration = f.filter;
+        if (carried)
+            state.settings = HostSettings{-12, .5, 0, GainMode::set};
+        auto p = instance(world, f.filter);
+        p->gain_mode = 1; // Estimate, so the activation finds it.
+        p->activate();
+        check(p->restore(encode_host_state(state), chunk(world)) == LV2_STATE_SUCCESS,
+              f.name + ": state with settings restores");
+        played[carried] = render(*p, f.input, f.input.size() / f.filter.input_channels, 256);
+    }
+    check(played[1] == played[0] &&
+              std::ranges::any_of(played[0], [](float v) { return std::abs(v) > 1e-3f; }),
+          f.name + ": settings carried in restored state are ignored, as the ports hold them");
+}
 void callback_sizes(host::World& world, const Fixture& f) {
     const auto frames =
         f.input.size() / f.filter.input_channels + test::tail(f.filter) + 2 * latency;
@@ -2198,6 +2220,9 @@ int main(int argc, char** argv) {
         for (const auto& f : fixtures)
             if (f.name == "crossover")
                 wider_inputs(world, f);
+        for (const auto& f : fixtures)
+            if (f.name == "stereo")
+                foreign_settings(world, f);
         for (const auto& f : fixtures) {
             status_and_log(world, f);
             presets(world, f, tool, work);

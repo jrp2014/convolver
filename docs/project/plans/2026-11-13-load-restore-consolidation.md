@@ -70,15 +70,17 @@ and, since PR #193, says whether its filter is the one already playing
 (`HostPlayback::playing`). Everything else about an accepted request is
 decided in the adapters, 15 places for six decisions. A place is a cell that
 names the adapter's own code making that decision; "None" and LV2's "always
-checked", where the adapter has no choice to make, do not count:
+checked", where the adapter has no choice to make, do not count. The table
+records the count before step 1b; each of its first five rows ends with
+where that decision is made since step 1b (PR #224):
 
 | Decision | VST3 (`processor.cpp`) | Audio Unit (`effect_state.cpp`) | LV2 (`plugin.cpp`) |
 | --- | --- | --- | --- |
-| Keep the playing filter or replace it (PLUG-38) | `install()`'s callback, with its own exception for `Origin::project` | `install()`'s callback | `restore_locked()`'s callback; a file chosen through `patch:Set` (`load_request()`) always replaces |
-| Which settings an accepted request applies | `install()`: state's settings, or a chosen `.vstpreset`'s when it holds them; bypass from state | `install()`: `store()` for each saved parameter | None: the host restores the ports |
-| Find the estimate for the request's Gain mode, and undo that on refusal | `install()`: `set_estimating()` and back | `install()`: the same | `apply_gain_mode()`, later, on the worker |
-| The tail while inactive | `install()`: `configuration_tail_frames()` | `install()`: the same | None: LV2 core reports no tail |
-| A failed first load plays silence | `refused()` | `silence_failed_first_load()` | `silence_failed_first_load()`, plus `unfiltered` and `refused_mute` for `run()` |
+| Keep the playing filter or replace it (PLUG-38) | `install()`'s callback, with its own exception for `Origin::project` | `install()`'s callback | `restore_locked()`'s callback; a file chosen through `patch:Set` (`load_request()`) always replaces. Since step 1b: `HostFilter::load()` (a session is never counted as playing) and `HostProcessor::play()`, in every format, LV2's chosen file included |
+| Which settings an accepted request applies | `install()`: state's settings, or a chosen `.vstpreset`'s when it holds them; bypass from state | `install()`: `store()` for each saved parameter | None: the host restores the ports. Since step 1b: `HostChange::settings` and `bypass`, the request's own; VST3 fills its defaults for state without them and the Audio Unit lays its parameters over the present values where they read the state, and LV2 drops any a state carries |
+| Find the estimate for the request's Gain mode, and undo that on refusal | `install()`: `set_estimating()` and back | `install()`: the same | `apply_gain_mode()`, later, on the worker. Since step 1b: `HostFilter::load()` follows the settings' Gain mode, committed on acceptance; LV2's port changes still go through `apply_gain_mode()` |
+| The tail while inactive | `install()`: `configuration_tail_frames()` | `install()`: the same | None: LV2 core reports no tail. Since step 1b: `HostChange::inactive_tail` |
+| A failed first load plays silence | `refused()` | `silence_failed_first_load()` | `silence_failed_first_load()`, plus `unfiltered` and `refused_mute` for `run()`. Since step 1b: `HostFilter::fail_request()` with the playing processor; LV2's `unfiltered` and `refused_mute` stay, for a first load `run()` itself refuses on the audio thread |
 | Whether a filter that does not suit the host is refused or kept until it does | `load_check()` from `Origin` and `played_` | `known_layout()`: while uninitialized, nothing until a configuration has rendered, so such a request is not checked | Always checked: LV2 fixes the rate and channels at instantiation |
 
 **Duplicated mechanisms.**

@@ -1328,7 +1328,12 @@ std::optional<HostState> read_state(Instance& p, const void* value, std::size_t 
         if (size > max_host_state_bytes)
             throw std::invalid_argument("it is larger than " +
                                         std::to_string(max_host_state_bytes) + " bytes");
-        return decode_host_state(std::span(static_cast<const std::byte*>(value), size));
+        auto state = decode_host_state(std::span(static_cast<const std::byte*>(value), size));
+        // The host restores the ports, which hold the settings: any a state
+        // carries (another format's, VST3's) must not decide the estimate or
+        // be applied (HostChange::settings).
+        state.settings.reset();
+        return state;
     } catch (const NewerHostState& e) {
         p.filter.reject(HostFailureKind::state_newer, state_read_message(e), request);
     } catch (const std::exception& e) {

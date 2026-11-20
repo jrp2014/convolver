@@ -397,9 +397,8 @@ LV2 (Linux first; also PipeWire system audio):
   request's kind) and aligns LV2's re-chosen file with VST3 and the Audio
   Unit. **Remains:** the
   [consolidation plan](docs/project/plans/2026-11-13-load-restore-consolidation.md)'s
-  steps 1b, 2 and 4 to 6: the rest of one shared decision for each
-  accepted request (building on PLUG-38's `HostPlayback::playing`), one
-  rule for when the host has settled, diagnostics as a view of state, and
+  steps 2 and 4 to 6 once step 1b is merged: one rule for when the host
+  has settled, diagnostics as a view of state, and
   typed reports and advice. Plan and order approved by jrp on 13 November
   2026, not the implementation: each step's pull request is reviewed and
   tested on its own. **Worth doing** now that 0.13.20 is published

@@ -539,7 +539,9 @@ already playing) and passes it to `HostProcessor::play()`, which keeps the
 processor or replaces it; `load()` then returns the rest: the settings to
 apply (the request's own, none to leave them; VST3 fills in its defaults
 for restored state without them, VST3-4, and the Audio Unit lays its saved
-parameters over the present values), the bypass (restored state's, never a
+parameters over the present values; the Audio Unit and LV2 ignore settings
+a Convolver state carries, such as a VST3 state's, because their settings
+are parameters and ports), the bypass (restored state's, never a
 chosen file's; only VST3 applies it) and the filter's tail while no
 processor plays. The Latency in those settings goes through each format's
 own Latency path, which builds a new processor only when it differs. A

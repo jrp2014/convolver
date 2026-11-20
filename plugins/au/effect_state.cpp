@@ -277,8 +277,11 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
         // ignored: the host owns bypass, as SaveState explains. Restored
         // parameters are settings like a chosen preset's, so HostFilter
         // finds the estimate their Gain mode needs as the filter loads.
-        if (saved)
-            next.settings = saved_settings(*saved);
+        // Restored state's settings are its parameters only: any its
+        // Convolver state carries (from a VST3 preset) are ignored, as they
+        // always were. A chosen preset brings its own in `next`.
+        if (request.kind != HostRequestKind::chosen_file)
+            next.settings = saved ? saved_settings(*saved) : std::nullopt;
         std::optional<HostSettings> applied;
         try {
             // PLUG-38: state holding the filter that plays keeps it and its
