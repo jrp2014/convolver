@@ -1220,7 +1220,7 @@ Items finished since then are listed here, one line each, until the next
 move to the archive.
 
 - [x] **DOC-18 — User guides that match the plug-ins.** 20 November
-  2026, PR #NNN, from an outside audit's findings in `docs/use/`: the
+  2026, PR #234, from an outside audit's findings in `docs/use/`: the
   first-sound guide's **Choose…** reads Convolver presets, the concepts
   page's engine and settings are current, the Windows window is named
   wherever the macOS one is, the package list has the LV2 plug-in, and no
