@@ -86,6 +86,18 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Plug-ins (PLUG-36): while bypassed, Status and the window's report say
+  what bypass plays when no filter is heard. A kept filter that does not
+  suit the host (another sample rate, say) showed "Silent:" while bypass
+  passed the input; it now shows "Load failed. Bypass is on: only the dry
+  signal plays." and the reason. With no filter loaded and Gain or Mix
+  changed, Status gave the level they set, though bypass plays the input
+  unchanged; it now says "No filter. Bypass is on: audio passes
+  unchanged." Where bypass plays silence (after a failed load with no
+  filter kept, or with unequal counts) both still say so. The audio is
+  unchanged. The plug-in contract now lists each
+  loading state against every request and host event, with its tests.
+
 - Plug-ins (ROBUST-8): when a new Latency cannot be applied because memory
   runs out, the status and the window's report stay as they were. Before,
   Status could show Fault again for faults a later filter load had cleared,

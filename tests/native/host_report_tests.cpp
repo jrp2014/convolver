@@ -233,6 +233,73 @@ void cases() {
          HostStatus::no_filter,
          {"No filter"},
          {"bypass"}},
+        // PLUG-36: bypass plays the untouched input where there is a dry
+        // signal, whatever Gain and Mix say, so the report says that when no
+        // filter is heard.
+        {"bypassed without a filter, Gain -6 dB",
+         [&] {
+             auto bypassed = facts(stereo, {-6, .5});
+             bypassed.bypassed = true;
+             return host_report(HostFilter(8), bypassed);
+         },
+         HostStatus::no_filter,
+         {"No filter. Bypass is on: audio passes unchanged."},
+         {"Gain and Mix", "-2.5 dB"}},
+        {"wrong rate, bypassed",
+         [] {
+             HostFilter f(8);
+             f.load(HostState{filter(48000, 2)}, std::nullopt);
+             static_cast<void>(test::started(f, {44100, 2, 2}));
+             auto bypassed = facts(HostLayout{44100, 2, 2}, {0, .5});
+             bypassed.bypassed = true;
+             return host_report(f, bypassed);
+         },
+         HostStatus::load_failed,
+         {"Bypass is on: only the dry signal plays."},
+         {"plays silence", "Mix at"}},
+        // Bypass with no dry signal plays silence, and the report says so:
+        // a kept filter with unequal counts (PLUG-23).
+        {"kept crossover, bypassed",
+         [] {
+             Configuration c{48000, 2, 6, 0, {}, {}, {}};
+             c.paths.push_back({{1.f}, {{0, 1}}, {{0, 1}}});
+             HostFilter f(8);
+             f.load(HostState{c}, std::nullopt);
+             static_cast<void>(test::started(f, {44100, 2, 2}));
+             auto bypassed = facts(HostLayout{44100, 2, 2});
+             bypassed.bypassed = true;
+             return host_report(f, bypassed);
+         },
+         HostStatus::load_failed,
+         {"Convolver plays silence."},
+         {"Bypass is on", "dry signal plays"}},
+        // A failed load with no filter kept stays silent, bypassed too
+        // (PLUG-23, jrp, 7 November 2026).
+        {"failed first load, bypassed",
+         [&] {
+             HostFilter f(8);
+             f.reject(HostFailureKind::state_unreadable, {"The saved state could not be read."});
+             auto bypassed = facts(stereo, {0, .5});
+             bypassed.bypassed = true;
+             return host_report(f, bypassed);
+         },
+         HostStatus::load_failed,
+         {"Convolver plays silence."},
+         {"Bypass is on", "dry signal plays"}},
+        // A filter the adapter could not start has no processor, so bypass
+        // has nothing to pass either.
+        {"activation failure, bypassed",
+         [] {
+             HostFilter f(8);
+             f.load(HostState{filter(44100, 2)}, HostLayout{44100, 2, 2});
+             f.fail_activation("no memory");
+             auto bypassed = facts(HostLayout{44100, 2, 2});
+             bypassed.bypassed = true;
+             return host_report(f, bypassed);
+         },
+         HostStatus::load_failed,
+         {"Convolver plays silence."},
+         {"Bypass is on", "dry signal plays"}},
         {"waiting",
          [] {
              HostFilter f(8);

@@ -86,7 +86,7 @@ starting.
 
 | Item | What to do | Note |
 | --- | --- | --- |
-| **PLUG-39** | The load and restore path, steps 1b to 6 in the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)'s order (step 0's protection tests are in, PR #200, and step 1a, PR #205): steps 1b (in PR #224, then PLUG-36), 2 and 4 (with PLUG-30) to 6; step 3 (the shared ownership of the playing processor) and ROBUST-8 after it (PR #223) are done | Plan and order approved by jrp on 13 November 2026; step 3 first and the four items folded in on 19 November 2026 ([decision](docs/project/decisions.md#releases)). Each step is its own reviewed pull request, and step 3 (deferred reclamation) gets its own ownership review |
+| **PLUG-39** | The load and restore path, steps 1b to 6 in the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)'s order (step 0's protection tests are in, PR #200, and step 1a, PR #205): steps 2 and 4 (with PLUG-30) to 6 (step 1b, PR #224, and PLUG-36, PR #225, are done); step 3 (the shared ownership of the playing processor) and ROBUST-8 after it (PR #223) are done | Plan and order approved by jrp on 13 November 2026; step 3 first and the four items folded in on 19 November 2026 ([decision](docs/project/decisions.md#releases)). Each step is its own reviewed pull request, and step 3 (deferred reclamation) gets its own ownership review |
 | **PLUG-24** | `HostProcessor` in its own source file | In PLUG-39's sequence, as its own pull request, never inside a step's or with a DSP change (jrp, 19 November 2026) |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the gain modes are in 0.13.20 (PR #188) |
 | **PERF-3** | One measurement exercise: resource budgets and supported workloads | Changes no shipped code; its results decide whether FFT-2, VST3-5, PLUG-11 and PERF-2's tuning are worth doing (EDGE-5 publishes them) |
@@ -118,7 +118,8 @@ starting.
 Until REL-3, from jrp, 8 November 2026: "park any non-essential corner or edge case robustness
 tests", then "Park both" (the items and CI-34's narrowing, which he
 brought back on 18 November 2026); PLUG-36 on
-12 November 2026 ("park until after REL-3")
+12 November 2026 ("park until after REL-3"; done in PLUG-39's sequence on
+20 November 2026)
 ([decision](docs/project/decisions.md#releases)). The freeze's lifting did
 not change this. No existing test is removed, and a reproduced crash, lost
 state, unsafe output or wrong audio reopens one at once. The FFmpeg and
@@ -248,6 +249,23 @@ is superseded.
   call, and check it against Ardour 9's Lua bindings. **Done when** the job
   passes on `ubuntu-latest` and its older-image row leaves
   [compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines).
+- [ ] **DIAG-9 — Numbers in the user's locale.** Low priority, from jrp's
+  review of PLUG-36 (20 November 2026): diagnostics write sample rates,
+  levels and counts as plain ASCII digits ("44100 Hz", "-6.0 dB")
+  everywhere, from shared text such as `short_reason()` and
+  `host_rate_text()` in `portable/host.cpp`. The Status parameter cannot
+  follow the locale: its line is at most 127 ASCII characters (VST3's
+  String128, the Audio Unit's parameter text, `max_status_text`), and a
+  locale's grouping or decimal mark may not be ASCII (a narrow no-break
+  space in French). The window's report has no such limit, and the macOS
+  window could format its values with the system's formatter, but today it
+  shows the same portable strings. Formatting only there means passing
+  numbers to the window as values rather than text, which fits the typed
+  reporting step of PLUG-39. The log and the CLI stay plain, so that pasted
+  diagnostics read the same everywhere. **Worth doing when** users ask, or
+  after PLUG-39's typed reporting. **Done when** the window shows numbers
+  in the system locale from one formatting path, Status and the log are
+  unchanged, and a test covers a locale with other separators.
 
 ## Plug-ins: VST3, LV2 and AU
 
@@ -408,22 +426,6 @@ LV2 (Linux first; also PipeWire system audio):
   (or a step records with jrp why not), with audio, saved state and host
   behaviour unchanged and no expected value changed except in a commit that
   names the defect, decided difference or deliberate test change.
-- [ ] **PLUG-36 — The loading-and-failure table covers each transition.**
-  Left open by the first-preview acceptance plan (section 5, archived
-  12 November 2026; jrp's 8 November priority: extend the contract and the
-  existing lifecycle tests, no new framework). The
-  [table](docs/develop/plugin-contract.md#loading-and-failure) names three
-  situations; extend it to the empty, active, kept-but-unsuited and failed
-  states against load, restore, rate and bus changes, bypass, Mix and
-  processing faults, saying for each what plays, what is saved and what
-  Status reports, with channel safety kept apart from which message wins.
-  Map each row to its test in `tests/plugins/lifecycle.cpp` or a format's
-  adapter test, and add a test only for a missing rule or a reproduced
-  defect; the expected result must not come from production decision
-  functions. Any unclear rule goes to jrp. Parked until after REL-3 (jrp,
-  12 November 2026), then moved into PLUG-39's sequence after step 1b,
-  whose single decision its load and restore rows map onto (jrp,
-  19 November 2026).
 - [ ] **LV2-3 — Named layouts.** The eight discrete plug-in URIs, `lv2lint`
   and pluginval at strictness 10 run in CI (PR #43;
   [pluginval](docs/develop/testing.md#pluginval)). **Remains:** URIs for the
@@ -1217,6 +1219,13 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **PLUG-36 — The loading-and-failure table covers each transition.**
+  20 November 2026, PR #225, in PLUG-39's sequence after step 1b: the contract's
+  [states and transitions](docs/develop/plugin-contract.md#states-and-transitions)
+  give the empty, active, kept-but-unsuited and failed states against every
+  request and host event, with what plays, what is saved, what Status shows
+  and the tests for each row. One reproduced defect fixed: with no filter
+  heard, Status and the window's report ignored Bypass.
 - [x] **ROBUST-8 — Fault record after a failed Latency change.**
   20 November 2026, PR #223, from the independent review of VST3-16 (PR
   #134), in PLUG-39's sequence right after step 3c: `HostFilter::activate()`

@@ -454,6 +454,11 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
      again in `update_status()` and `shown_status()`; the audio-side
      overlays (Loading, a refusal `run()` made itself, Fault) stay, since
      `run()` must answer without the lock.
+   - Every diagnostic text follows bypass as Status and the report have
+     since PLUG-36 (PR #225): `failure_consequence()`'s "previous filter
+     keeps playing", the report's fault branch ("The filter keeps
+     playing.") and `started_line()`, which the VST3 and Audio Unit start
+     logs use, still describe what plays with bypass off.
 5. **Typed reports and advice.** The report reaches the window as typed
    values encoded once at the transport (the VST3 message, the Audio Unit
    property) by one codec, rather than tab-separated lines parsed back; the
@@ -488,7 +493,8 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
   harness and lifecycle model already state their expected results apart
   from the production code. When PLUG-36 is taken up, its load and restore
   rows map onto step 1's single decision instead of three adapters, which
-  makes its table shorter to write and check.
+  makes its table shorter to write and check. Done on 20 November 2026: the
+  contract's [states and transitions](../../develop/plugin-contract.md#states-and-transitions).
 - **PLUG-30** (one rule for state a busy lock makes a call skip) is taken
   up with step 4 (jrp, 19 November 2026), which removes the Audio Unit's
   report cache from its list.
