@@ -934,13 +934,17 @@ void restore_keeps_history_with_estimate() {
     const auto steady = play(host, std::vector<float>(13000, 1.f), 1, 1, 64);
     require(std::abs(steady.back() - 1) < 1e-5, "the delayed average should play at 1");
     bool kept = false;
-    filter.set_estimating(true); // As an adapter does for state with Estimate.
-    filter.load(HostState{c}, layout, [&](const HostPlayback& p) {
+    HostState restored{c};
+    restored.settings = HostSettings{0, 1, 0, GainMode::estimate}; // Restored state with Estimate.
+    const auto change = filter.load(restored, layout, [&](const HostPlayback& p) {
         kept = host.keep(p);
         if (!kept)
             host.replace(p);
     });
-    require(kept && filter.gains().estimate_db, "the same filter with Estimate was not kept");
+    require(kept && filter.gains().estimate_db && filter.estimating(),
+            "the same filter with Estimate was not kept");
+    require(change.settings && change.settings->gain_mode == GainMode::estimate,
+            "the restored settings were not handed back to apply");
     audio_thread = true;
     host.set_gain_mode(GainMode::estimate); // The restored mode, applied per block.
     audio_thread = false;

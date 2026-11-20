@@ -1581,6 +1581,83 @@ void same_filter_kept() {
     faulty.clear_faults();
     require(faulty.keep(loud_playing), "a processor cleared of its faults not kept");
 }
+// PLUG-39 step 1b: HostFilter::load() decides what an accepted request
+// changes besides the filter (HostChange), from the request's kind and the
+// state, so that no adapter decides it again (the scope table in
+// docs/develop/plugin-contract.md#scope-of-each-change).
+void request_changes() {
+    const HostLayout layout{48000, 1, 1};
+    const Configuration a = mono(.5f);
+    std::optional<bool> playing;
+    const auto install = [&](const HostPlayback& c) { playing = c.playing; };
+    HostRequest session;
+    session.kind = HostRequestKind::session;
+    HostRequest chosen{HostFilterSource::file, "chosen.cfg", 0};
+    chosen.kind = HostRequestKind::chosen_file;
+    HostFilter f(8);
+    // Restored state brings its bypass; without settings it leaves them.
+    HostState restored{a};
+    restored.bypass = true;
+    auto change = f.load(restored, layout, install);
+    require(change.bypass == true && !change.settings, "restored state's bypass not handed back");
+    // A session the host is opening replaces even the filter already playing.
+    playing.reset();
+    change = f.load(HostState{a}, layout, install, session);
+    require(playing == false && change.bypass == false, "a session kept the playing filter");
+    // A chosen file keeps it, never brings a bypass, and brings a preset's
+    // settings when it holds them.
+    HostState preset{a};
+    preset.bypass = true;
+    preset.settings = HostSettings{-6, .5, 256, GainMode::set};
+    playing.reset();
+    change = f.load(preset, layout, install, chosen);
+    require(playing == true && !change.bypass && change.settings &&
+                change.settings->gain_db == -6 && change.settings->latency == 256,
+            "a chosen preset's settings not handed back, or its bypass was");
+    // The settings' Gain mode decides whether the load finds the estimate,
+    // only once it is accepted: a refused request leaves estimating() as it was.
+    HostState estimate{a};
+    estimate.settings = HostSettings{0, 1, 0, GainMode::estimate};
+    bool refused = false;
+    try {
+        f.load(estimate, HostLayout{44100, 1, 1}, install, chosen);
+    } catch (const std::invalid_argument&) {
+        refused = true;
+    }
+    require(refused && !f.estimating() && !f.gains().estimate_db,
+            "a refused request changed estimating()");
+    f.load(estimate, layout, install, chosen);
+    require(f.estimating() && f.gains().estimate_db, "settings with Estimate found no estimate");
+    f.load(HostState{a}, layout, install);
+    require(f.estimating(), "a request without settings changed estimating()");
+    // The tail until a processor is built; a processor knows its own.
+    change = f.load(HostState{a}, std::nullopt);
+    require(change.inactive_tail > 0 && change.inactive_tail == configuration_tail_frames(a),
+            "the tail while inactive: " + std::to_string(change.inactive_tail));
+    require(f.load(HostState{}, std::nullopt).inactive_tail == 0, "an empty instance has a tail");
+    HostProcessor host(a, 64, 8);
+    change = f.load(HostState{a}, layout, [&](const HostPlayback& c) { host.play(c); }, {}, &host);
+    require(change.inactive_tail == 0, "a tail handed back while a processor plays");
+
+    // A failed request silences the processor only while no filter is
+    // accepted: a failed first load plays silence, not the unfiltered input.
+    std::array<float, 64> input{}, output{};
+    input.fill(1);
+    const float* in[] = {input.data()};
+    float* out[] = {output.data()};
+    const auto heard = [&](HostProcessor& p) {
+        audio_thread = true;
+        require(p.process(in, out, input.size()), "process rejected");
+        audio_thread = false;
+        return std::ranges::any_of(output, [](float x) { return x != 0; });
+    };
+    HostFilter empty(8);
+    HostProcessor unfiltered(unfiltered_playback(layout, false, true), 64);
+    empty.fail_request(&unfiltered);
+    require(empty.failed() && !heard(unfiltered), "a failed first load did not silence");
+    f.fail_request(&host);
+    require(!f.failed() && heard(host), "a failed request silenced an accepted filter");
+}
 void processing_faults() {
     const auto huge = std::numeric_limits<float>::max() / 4;
     const Configuration loud = mono(huge);
@@ -2176,6 +2253,7 @@ int main() {
             {"status_lines", status_lines},
             {"processing_faults", processing_faults},
             {"same_filter_kept", same_filter_kept},
+            {"request_changes", request_changes},
             {"costly_moments_against_oracle", costly_moments_against_oracle},
         },
         [] {

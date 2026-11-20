@@ -260,29 +260,31 @@ class Processor final : public Steinberg::Vst::AudioEffect {
         }
         std::lock_guard<std::mutex> lock;
     };
-    // Where a load comes from: a file chosen in the window, state the host
-    // restores (setState), or state the host says (IStreamAttributes) is a
-    // project being restored.
-    enum class Origin { chosen_file, state, project };
-    // What a filter that does not suit the host means for a load from
-    // `origin` (HostLoadCheck), under control_.
-    HostLoadCheck load_check(Origin) const noexcept;
+    // What a filter that does not suit the host means for a request of this
+    // kind (HostLoadCheck), under control_: a file chosen in the window,
+    // state the host restores (setState), or state the host says
+    // (IStreamAttributes) is a project being restored.
+    HostLoadCheck load_check(HostRequestKind) const noexcept;
     // VST3-3: the common step of setState and a chosen file, under control_.
-    // Loads `next`; restored state's bypass and settings apply too. A chosen
-    // file keeps them, except that a chosen .vstpreset's Gain, Mix and
-    // Latency apply when it holds them (PLUG-26; its bypass is cleared by
-    // read_chosen_file()). Throws if it is refused, which HostFilter has
-    // recorded.
-    void install(HostState next, const HostRequest&, Origin);
+    // Loads `next` as `request.kind` and applies what HostFilter::load()
+    // returns (HostChange): restored state's bypass and settings, or a
+    // chosen .vstpreset's Gain, Mix and Latency when it holds them (PLUG-26).
+    // Returns the settings it applied. Throws if it is refused, which
+    // HostFilter has recorded.
+    std::optional<HostSettings> install(HostState next, const HostRequest&);
     // Under control_, after a refused request: a failed first load plays
     // silence, and the log says why.
-    void refused(bool was_failed) noexcept;
+    void refused() noexcept;
     // VST3-3, a load_message: reads the filter file at `path` (UTF-8) for
     // the host's rate and channels, as convolver-preset does, and loads it
     // as a state restore would; PLUG-26: or a Convolver .vstpreset
     // (read_chosen_file()). True if it was accepted. `settings` receives the
     // settings an accepted preset applied, or none.
     bool load_file(std::string_view path, std::optional<HostSettings>& settings);
+    // load_file()'s reading and install(): false after recording why the
+    // file was refused; throws when install() refuses it, or when memory runs
+    // out.
+    bool install_chosen(const std::string& path, std::optional<HostSettings>& settings);
     // VST3-3, under control_: the window's report. The report_message looks
     // for unexplained faults at most every report_fault_interval, so an open
     // window does not log a line twice a second, as in the Audio Unit.

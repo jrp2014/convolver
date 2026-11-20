@@ -339,7 +339,13 @@ cases.
   `silence()` (ROBUST-3: no allocation, exact silence from the first frame
   before any audio, the ramp while audio plays, and which publications it
   covers); allocation failure at every step of `HostFilter::load`, checking
-  that what plays is what is saved; and the saved-state limit (PLUG-12): the
+  that what plays is what is saved; what an accepted load hands back
+  (`request_changes`, PLUG-39 step 1b: restored state's bypass, a session
+  that replaces even the filter already playing, a chosen preset's settings
+  without its bypass, the settings' Gain mode deciding the estimate only
+  once accepted, the tail while no processor plays) and that a failed
+  request silences the processor only while no filter is accepted; and the
+  saved-state limit (PLUG-12): the
   size counted without encoding matches the encoding, a filter that leaves
   exactly the settings' room (PLUG-13) loads, saves with and without
   settings and reads back, a state that already holds settings is accepted

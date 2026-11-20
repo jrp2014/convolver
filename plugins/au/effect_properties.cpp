@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstring>
 #include <dlfcn.h>
+#include <optional>
 #include <string_view>
 
 namespace convolver::au {
@@ -32,6 +33,24 @@ std::size_t latency_index(AudioUnitParameterValue value) noexcept {
     const auto last = static_cast<AudioUnitParameterValue>(host_latencies.size() - 1);
     return static_cast<std::size_t>(
         std::clamp<AudioUnitParameterValue>(std::round(value), 0, last));
+}
+
+// AU-7: a Gain, Mix, Latency or Gain mode value within its range, as store()
+// keeps it; none for any other parameter.
+std::optional<AudioUnitParameterValue> clamped(AudioUnitParameterID id,
+                                               AudioUnitParameterValue value) noexcept {
+    if (id == gain_parameter)
+        return std::isnan(value)
+                   ? 0.f
+                   : std::clamp(value, static_cast<AudioUnitParameterValue>(min_gain_db),
+                                static_cast<AudioUnitParameterValue>(max_gain_db));
+    if (id == mix_parameter)
+        return std::isnan(value) ? 100.f : std::clamp<AudioUnitParameterValue>(value, 0, 100);
+    if (id == latency_parameter)
+        return static_cast<AudioUnitParameterValue>(latency_index(value));
+    if (id == gain_mode_parameter)
+        return static_cast<AudioUnitParameterValue>(gain_mode_at(value));
+    return std::nullopt;
 }
 
 // A path from the window as the file system spells it; empty if it has none.
@@ -96,20 +115,37 @@ HostSettings Effect::settings() {
 }
 
 void Effect::store(AudioUnitParameterID id, AudioUnitParameterValue value) noexcept {
-    if (id == gain_parameter)
-        value = std::isnan(value)
-                    ? 0.f
-                    : std::clamp(value, static_cast<AudioUnitParameterValue>(min_gain_db),
-                                 static_cast<AudioUnitParameterValue>(max_gain_db));
-    else if (id == mix_parameter)
-        value = std::isnan(value) ? 100.f : std::clamp<AudioUnitParameterValue>(value, 0, 100);
-    else if (id == latency_parameter)
-        value = static_cast<AudioUnitParameterValue>(latency_index(value));
-    else if (id == gain_mode_parameter)
-        value = static_cast<AudioUnitParameterValue>(gain_mode_at(value));
-    else
-        return;
-    static_cast<void>(Globals()->SetParameterOrError(id, value));
+    if (const auto v = clamped(id, value))
+        static_cast<void>(Globals()->SetParameterOrError(id, *v));
+}
+
+void Effect::store(const HostSettings& s) noexcept {
+    store(gain_parameter, static_cast<AudioUnitParameterValue>(s.gain_db));
+    store(mix_parameter, static_cast<AudioUnitParameterValue>(s.mix * 100));
+    // read_vst3_preset() has checked that a preset's Latency is one of them.
+    if (const auto at = std::ranges::find(host_latencies, s.latency); at != host_latencies.end())
+        store(latency_parameter, static_cast<AudioUnitParameterValue>(at - host_latencies.begin()));
+    store(gain_mode_parameter, static_cast<AudioUnitParameterValue>(s.gain_mode));
+}
+
+std::optional<HostSettings> Effect::saved_settings(const SavedSettings& saved) {
+    std::optional<HostSettings> s;
+    for (const auto& [id, value] : saved) {
+        const auto v = clamped(id, value);
+        if (!v) // Status and unknown IDs are ignored.
+            continue;
+        if (!s)
+            s = settings();
+        if (id == gain_parameter)
+            s->gain_db = *v;
+        else if (id == mix_parameter)
+            s->mix = *v / 100.0; // As settings() reads it, so storing it back changes nothing.
+        else if (id == latency_parameter)
+            s->latency = host_latencies[static_cast<std::size_t>(*v)];
+        else
+            s->gain_mode = gain_mode_at(*v);
+    }
+    return s;
 }
 
 void Effect::log(const std::string& message, bool problem) noexcept {

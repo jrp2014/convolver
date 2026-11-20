@@ -223,10 +223,8 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
 // An empty instance that fails its first load plays silence, not identity,
 // without allocating: memory may have run out (ROBUST-3), maybe before the
 // failure could be recorded (ROBUST-7).
-void Effect::silence_failed_first_load(bool was_failed) noexcept {
-    filter_.fail_request();
-    if (host() && filter_.failed() && !was_failed)
-        host()->silence();
+void Effect::silence_failed_first_load() noexcept {
+    filter_.fail_request(host());
     if (!host() && filter_.failed())
         tail_.store(0);
 }
@@ -237,10 +235,7 @@ void Effect::fail_unrecorded() noexcept {
     try {
         {
             const Locked lock(*this);
-            // Read now, not before the request: whatever set failed() under
-            // the lock (a recorded refusal) silenced the unit in the same
-            // locked section, so failed() says whether that is still to do.
-            silence_failed_first_load(filter_.failed());
+            silence_failed_first_load();
             update_status();
         }
         notify_status();
@@ -254,9 +249,8 @@ void Effect::reject(HostFailureKind kind, const Advice& why, const HostRequest& 
     {
         const Locked lock(*this);
         faults = observe_faults(); // Explained under the filter that played.
-        const bool was_failed = filter_.failed();
         filter_.reject(kind, why, request, carried);
-        silence_failed_first_load(was_failed);
+        silence_failed_first_load();
         update_status();
     }
     log_faults(faults);
@@ -276,61 +270,37 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
         if (const auto hook = load_started_for_tests)
             hook();
         faults = observe_faults(); // Explained under the filter that played; a load clears them.
-        const bool was_failed = filter_.failed();
         // Initialized, a prepared replacement is published to the audio thread;
         // uninitialized, the next initialization installs the filter.
         const auto known = known_layout();
         // A bypass flag in the state (from another format's preset) is
-        // ignored: the host owns bypass, as SaveState explains.
+        // ignored: the host owns bypass, as SaveState explains. Restored
+        // parameters are settings like a chosen preset's, so HostFilter
+        // finds the estimate their Gain mode needs as the filter loads.
+        if (saved)
+            next.settings = saved_settings(*saved);
+        std::optional<HostSettings> applied;
         try {
-            // The uninitialized tail is worked out before anything changes: it
-            // needs memory, and a request that runs out is rejected whole.
-            std::size_t uninitialized_tail = 0;
-            if (!host() && next.configuration) {
-                try {
-                    uninitialized_tail = configuration_tail_frames(*next.configuration);
-                } catch (...) {
-                    filter_.reject(HostFailureKind::preparation, preparation_message({}), request);
-                    throw;
-                }
-            }
-            // PLUG-10: restored state with Estimate chosen gets its estimate
-            // as it loads; a refused request leaves the choice as it was.
-            std::optional<GainMode> saved_mode;
-            if (saved)
-                for (const auto& [id, value] : *saved)
-                    if (id == gain_mode_parameter)
-                        saved_mode = gain_mode_at(value);
-            const bool was_estimating = filter_.estimating();
-            if (saved_mode)
-                filter_.set_estimating(*saved_mode == GainMode::estimate);
-            try {
-                filter_.load(
-                    std::move(next), known,
-                    [&](const HostPlayback& c) {
-                        // PLUG-38: state holding the filter that plays
-                        // keeps it and its history; the restored settings
-                        // ramp to theirs.
-                        if (host() && !host()->keep(c))
-                            host()->replace(c);
-                    },
-                    request, host());
-            } catch (...) {
-                filter_.set_estimating(was_estimating);
-                throw;
-            }
+            // PLUG-38: state holding the filter that plays keeps it and its
+            // history; the restored settings ramp to theirs.
+            const auto change = filter_.load(
+                std::move(next), known,
+                [&](const HostPlayback& c) {
+                    if (host())
+                        host()->play(c);
+                },
+                request, host());
             // Nothing from here on can throw: the request is accepted.
-            tail_.store(host() ? host()->tail_frames() : uninitialized_tail);
+            tail_.store(host() ? host()->tail_frames() : change.inactive_tail);
             accepted = true;
-            if (saved)
-                for (const auto& [id, value] : *saved)
-                    store(id, value); // Status and unknown IDs are ignored.
-            // The restored mode is in place, with its estimate: the
-            // "Restored settings" below say so, not the Latency queue.
-            if (saved_mode)
-                applied_gain_mode_ = *saved_mode;
+            if ((applied = change.settings)) {
+                store(*applied);
+                // The restored mode is in place, with its estimate: the
+                // "Restored settings" below say so, not the Latency queue.
+                applied_gain_mode_ = applied->gain_mode;
+            }
         } catch (...) {
-            silence_failed_first_load(was_failed);
+            silence_failed_first_load();
         }
         try {
             // Why this request failed, or what was loaded (with the saved
@@ -342,18 +312,15 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                 message = loaded_line(filter_, known);
                 // Hosts such as GarageBand restore a project after starting the
                 // unit, so its "Started at" line shows the settings before this.
-                if (saved && std::ranges::any_of(*saved, [](const auto& p) {
-                        return p.first == gain_parameter || p.first == mix_parameter ||
-                               p.first == latency_parameter || p.first == gain_mode_parameter;
-                    })) {
+                if (applied) {
                     const auto counts = known ? *known : layout();
                     // PLUG-26: a .vstpreset chosen in the window brings them too.
-                    message +=
-                        (request.source == HostFilterSource::file ? " Settings from the preset: "
-                                                                  : " Restored settings: ") +
-                        settings_words(settings(), dry_signal_rule(filter_, counts),
-                                       filter_.filter() ? &filter_.gains() : nullptr) +
-                        ".";
+                    message += (request.kind == HostRequestKind::chosen_file
+                                    ? " Settings from the preset: "
+                                    : " Restored settings: ") +
+                               settings_words(settings(), dry_signal_rule(filter_, counts),
+                                              filter_.filter() ? &filter_.gains() : nullptr) +
+                               ".";
                 }
             }
         } catch (...) { // Out of memory for the message: it is dropped.
@@ -383,6 +350,7 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
 // property, as a state restore does.
 OSStatus Effect::load_file(const std::string& path) {
     HostRequest request{HostFilterSource::file, path, 0};
+    request.kind = HostRequestKind::chosen_file;
     HostLayout host;
     {
         const Locked lock(*this);
@@ -403,25 +371,10 @@ OSStatus Effect::load_file(const std::string& path) {
     if (!next) {
         reject(why.kind, why.message, request, why.filter());
     } else {
-        // A preset's settings as parameter values: Latency is a position in
-        // host_latencies, which read_vst3_preset has checked it is in.
-        std::optional<SavedSettings> saved;
-        if (const auto& s = next->settings) {
-            const auto at = std::ranges::find(host_latencies, s->latency);
-            try {
-                saved = SavedSettings{
-                    {gain_parameter, static_cast<AudioUnitParameterValue>(s->gain_db)},
-                    {gain_mode_parameter, static_cast<AudioUnitParameterValue>(s->gain_mode)},
-                    {mix_parameter, static_cast<AudioUnitParameterValue>(s->mix * 100)}};
-                if (at != host_latencies.end())
-                    saved->emplace_back(latency_parameter, static_cast<AudioUnitParameterValue>(
-                                                               at - host_latencies.begin()));
-            } catch (...) { // Out of memory: the filter alone, as from convolver-preset.
-                saved.reset();
-            }
-        }
-        accepted = install(std::move(*next), request, saved ? &*saved : nullptr, false);
-        if (accepted && saved) {
+        // PLUG-26: a preset's Gain, Mix and Latency apply with its filter.
+        const bool has_settings = next->settings.has_value();
+        accepted = install(std::move(*next), request, nullptr, false);
+        if (accepted && has_settings) {
             request_latency(); // Plays at once, as a restored Latency does.
             settings_changed();
         }

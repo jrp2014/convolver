@@ -413,8 +413,9 @@ void cases() {
                 "(cannot clip at this Gain and Mix)",
             "loudest peak at -30 dB in Set");
     HostFilter estimated(8);
-    estimated.set_estimating(true);
-    estimated.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {});
+    HostState with_estimate{filter(44100, 2)};
+    with_estimate.settings = HostSettings{0, 1, 0, GainMode::estimate};
+    estimated.load(with_estimate, stereo, [](const HostPlayback&) {});
     moded.gain_mode = GainMode::estimate;
     const auto estimate_note = fact(host_report(estimated, facts(stereo, moded)), "Loudest peak");
     require(estimated.gains().estimate_db &&

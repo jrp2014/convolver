@@ -182,7 +182,8 @@ struct HostPlayback {
     // PLUG-38: HostFilter::load() found `filter` to be the one it had
     // accepted and was playing, compared in full, so an adapter may keep the
     // processor and its history (HostProcessor::keep()) instead of replacing
-    // it. False everywhere else.
+    // it. False everywhere else, and for a session the host is opening
+    // (HostRequestKind::session), which keeps nothing from before.
     bool playing = false;
 };
 // A filter that plays: a dry signal only when the filter itself has as many
@@ -251,6 +252,23 @@ enum class HostFailureKind {
 // Where a filter came from. Plug-ins cannot tell a preset from a saved
 // session: both arrive as state.
 enum class HostFilterSource { state, file };
+// PLUG-39: what kind of request a load is, which HostFilter::load() uses to
+// decide what an accepted one changes (HostChange; the scope table in
+// docs/develop/plugin-contract.md#scope-of-each-change).
+enum class HostRequestKind {
+    // State the host restores, or a preset it chooses: the filter already
+    // playing plays on with its history, and the state's settings and bypass
+    // apply.
+    restore,
+    // State the host says comes from a session it is opening (VST3's
+    // kProject): as restore, but even the filter already playing is replaced,
+    // so the session keeps nothing from the one before.
+    session,
+    // A filter file or preset chosen in the plug-in: the filter already
+    // playing plays on, and the settings apply only when the preset holds
+    // them; bypass stays.
+    chosen_file,
+};
 struct HostRequest {
     HostFilterSource source = HostFilterSource::state;
     std::string path; // The filter file, for HostFilterSource::file.
@@ -282,6 +300,9 @@ struct HostRequest {
     // the host's (its path, UTF-8, as read_filter_file() gives it), so the
     // log and the window say which entry plays and why. Empty otherwise.
     std::string wider_entry{};
+    // PLUG-39: what the request is, which decides what an accepted one
+    // changes (HostChange).
+    HostRequestKind kind = HostRequestKind::restore;
 };
 inline constexpr std::size_t max_filter_name_bytes = 1024;
 struct HostFailure {
@@ -353,6 +374,27 @@ struct HostFaultReport {
 // it does not show.
 std::string fault_message(const HostFaultReport&);
 
+// PLUG-39: what an accepted HostFilter::load() requires of the adapter
+// besides what plays (HostPlayback, which its install callback receives):
+// one value decided inside the load's transaction from the request's kind and
+// the state, so that no adapter decides it again. Rows of the scope table
+// (docs/develop/plugin-contract.md#scope-of-each-change).
+struct HostChange {
+    // The settings to apply: the request's own when it holds them, none to
+    // leave them as they are. The load has already found the estimate their
+    // Gain mode needs. A format whose state always restores its settings
+    // fills in its defaults before the load (VST3-4).
+    std::optional<HostSettings> settings;
+    // The state's bypass, for restored state; none for a chosen file. Only
+    // VST3 applies it: the Audio Unit and LV2 leave bypass to the host.
+    std::optional<bool> bypass;
+    // The accepted filter's tail in frames (configuration_tail_frames()) when
+    // no processor plays (load()'s `counting` was null), for the adapter to
+    // report until one is built; 0 otherwise, when the processor knows it,
+    // and for no filter.
+    std::size_t inactive_tail = 0;
+};
+
 // ROBUST-8: what HostFilter::activation() found for the host, which
 // HostFilter::activate() records once the processor built from `playback`
 // will play.
@@ -392,7 +434,8 @@ class HostFilter {
     }
     // PLUG-10: whether load() finds the noise estimate, which Estimate needs
     // and which takes time for a long filter. Adapters set it while their
-    // gain mode is Estimate, before loading, with estimate(). Turning it on
+    // gain mode is Estimate, with estimate(); a load that brings settings
+    // sets it from their Gain mode as it is accepted. Turning it on
     // also finds the estimate of the filter already accepted (control thread;
     // filters noise, may throw std::bad_alloc) and then calls `apply` with
     // the new figures, for the adapter to pass to the playing filter with
@@ -406,12 +449,6 @@ class HostFilter {
     bool estimate(bool on, const std::function<void(const FilterGains&)>& apply = {});
     bool estimating() const noexcept {
         return estimating_;
-    }
-    // Sets estimating() alone, for an adapter about to restore state that
-    // has Estimate chosen: the state's filter gets its estimate as it loads,
-    // and the filter it replaces none.
-    void set_estimating(bool on) noexcept {
-        estimating_ = on;
     }
     // PLUG-22: configuration_identity() of filter(), found when it was
     // accepted, so a report never computes it; 0 without one.
@@ -461,27 +498,33 @@ class HostFilter {
         return notice_;
     }
     // Load decoded state: a filter, none to return to an empty instance, or a
-    // saved failed load (plays silence). Bypass is the adapter's to apply.
-    // Checks on the state itself always run, including that it fits the
-    // saved-state limit (PLUG-12), so whatever is accepted can be saved. Checks against the host
-    // run when `host` is given (its configuration is known); `install` then receives what to play
-    // and may throw to reject, or throw SupersededRequest to abandon the request with nothing
-    // recorded or changed (a newer request has arrived). Without `host`, well-formed state is
-    // accepted and checked at activation. On rejection this records the error, keeps the accepted
-    // filter (a failed initial load if there was none) and throws std::invalid_argument with an
-    // explanation, or std::bad_alloc when memory runs out even for that; failed() is set before
-    // anything is allocated for the record (ROBUST-7). A transaction: everything kept is built
-    // before `install` is called and nothing after it throws, so `install` must publish as its last
-    // step (prepare, which may throw, then publish, which cannot). What plays is then always what
-    // is saved, even when memory runs out. `request` says where the state came from (numbered if
-    // 0). `counting`: the processor that plays (if any). An accepted load clears its fault baseline
-    // (HostProcessor::clear_faults()) and observes from the same snapshot, so faults shown
-    // afterwards are only the new filter's. `check` says what a filter that does not suit `host`
-    // means (HostLoadCheck).
-    void load(HostState, const std::optional<HostLayout>& host,
-              const std::function<void(const HostPlayback&)>& install = {},
-              HostRequest request = {}, HostProcessor* counting = nullptr,
-              HostLoadCheck check = HostLoadCheck::refuse_mismatch);
+    // saved failed load (plays silence). Returns what else the accepted
+    // request requires (HostChange: the settings and bypass to apply, the
+    // tail while no processor plays), decided from `request.kind` and the
+    // state; the install callback receives what to play, which for a
+    // request holding the filter already playing says so
+    // (HostPlayback::playing), and passes it to HostProcessor::play(). A
+    // request bringing settings finds the estimate their Gain mode needs and
+    // sets estimating() from it as it is accepted. Checks on the state itself always run, including
+    // that it fits the saved-state limit (PLUG-12), so whatever is accepted can be saved. Checks
+    // against the host run when `host` is given (its configuration is known); `install` then
+    // receives what to play and may throw to reject, or throw SupersededRequest to abandon the
+    // request with nothing recorded or changed (a newer request has arrived). Without `host`,
+    // well-formed state is accepted and checked at activation. On rejection this records the error,
+    // keeps the accepted filter (a failed initial load if there was none) and throws
+    // std::invalid_argument with an explanation, or std::bad_alloc when memory runs out even for
+    // that; failed() is set before anything is allocated for the record (ROBUST-7). A transaction:
+    // everything kept is built before `install` is called and nothing after it throws, so `install`
+    // must publish as its last step (prepare, which may throw, then publish, which cannot). What
+    // plays is then always what is saved, even when memory runs out. `request` says where the state
+    // came from (numbered if 0). `counting`: the processor that plays (if any). An accepted load
+    // clears its fault baseline (HostProcessor::clear_faults()) and observes from the same
+    // snapshot, so faults shown afterwards are only the new filter's. `check` says what a filter
+    // that does not suit `host` means (HostLoadCheck).
+    HostChange load(HostState, const std::optional<HostLayout>& host,
+                    const std::function<void(const HostPlayback&)>& install = {},
+                    HostRequest request = {}, HostProcessor* counting = nullptr,
+                    HostLoadCheck check = HostLoadCheck::refuse_mismatch);
     // A load that failed before decoding (malformed state, unreadable file):
     // recorded as load() records a rejection. Does not throw: if memory runs
     // out, the record keeps the kind and the request's number and source
@@ -498,11 +541,14 @@ class HostFilter {
     // ROBUST-7: a request failed, recorded or not. Without an accepted filter
     // the instance now fails (failed()): it plays silence, and saved state
     // records the failure. Allocates nothing, so it cannot fail. reject() and
-    // a refused load() do this before they record anything; an adapter also
-    // calls it when a request fails before its failure can be recorded (memory
-    // ran out building the message), and then mutes as for any failed first
-    // load. failure() may then be missing, or describe an earlier request.
-    void fail_request() noexcept;
+    // a refused load() do this before they record anything. Adapters call it
+    // with `playing`, the processor that plays (if any), after every request
+    // that failed, also one that failed before its failure could be recorded
+    // (memory ran out building the message): an instance with no accepted
+    // filter then silences `playing` (HostProcessor::silence()), so a failed
+    // first load plays silence rather than the unfiltered input. failure()
+    // may then be missing, or describe an earlier request.
+    void fail_request(HostProcessor* playing = nullptr) noexcept;
     // What to play under `host` at activation: the accepted filter when it
     // suits the host. Otherwise silence and an error, keeping the filter, so
     // correcting the host's rate or layout brings it back. It may throw
@@ -720,6 +766,9 @@ class HostProcessor {
     // playing (docs/develop/plugin-contract.md#scope-of-each-change). Does
     // not allocate or block.
     bool keep(const HostPlayback& playback) noexcept;
+    // PLUG-39: what an install callback does with what HostFilter::load()
+    // gives it: keep() when it can, otherwise replace(), which may throw.
+    void play(const HostPlayback& playback);
     // Audio thread: the current filter ramps to silence over 1.33 ms (or is
     // silent at once, before any audio since construction or reset) and
     // stays silent until a filter published after this call takes over,
