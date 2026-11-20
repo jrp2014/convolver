@@ -316,9 +316,18 @@ format.
   failed load with no filter kept, a filter or host with unequal counts,
   and an activation whose processor could not be built. The window's report
   says the same ("Bypass is on: only the dry signal plays.";
-  `native.host` `status_lines`, `native.host_report` `cases`). The start
-  log line, "previous filter keeps playing" and the report's fault branch
-  do not follow bypass yet (PLUG-39 step 4). Before the
+  `native.host` `status_lines`, `native.host_report` `cases`). Since
+  PLUG-39 step 4 every other text follows bypass the same way, from
+  `playing_words()`, `failure_consequence()` and `rejected_line()` in
+  [`host_log.cpp`](../../portable/host_log.cpp): the start log line
+  ("Bypass is on: the input plays unfiltered. Loaded: …"), a refused
+  replacement ("The previous filter is kept. Bypass is on: the input plays
+  unfiltered."), its log line ("the previous filter is kept (bypass is
+  on)"), the report's fault explanation ("Bypass is on: the input plays
+  unfiltered.") and VST3's line for restored state kept until the host
+  suits it never say that the filter plays while bypass is on, and a list
+  entry chosen for a wider bus "is used" rather than "plays". The start
+  line's Settings part still names what the Gain mode would play. Before the
   host's configuration is known it cannot tell whether a dry signal will
   play, so it says "no filter plays". The Audio Unit
   recomputes the line each time a host reads it, as Gain and Mix may have

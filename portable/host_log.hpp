@@ -59,8 +59,9 @@ std::string loaded_line(const HostFilter&, const std::optional<HostLayout>& host
 // After a rejected load: what plays instead and HostFilter::rejection()'s
 // message, numbered as loaded_line() numbers accepted ones ("Request 3: ");
 // empty if there is none. `started` says whether the host has started the
-// plug-in, so that a kept filter is said to play only once it can.
-std::string rejected_line(const HostFilter&, bool started);
+// plug-in, so that a kept filter is said to play only once it can, and
+// `bypassed` that bypass plays instead (PLUG-39 step 4).
+std::string rejected_line(const HostFilter&, bool started, bool bypassed = false);
 // DIAG-1: logged when the host's save call fails, which hosts may not report.
 inline constexpr const char* save_failure_message =
     "Saving failed: Convolver could not give its data to the host (out of memory, or the "
@@ -111,14 +112,18 @@ std::string gain_note(const HostSettings&, const FilterGains&, bool has_filter);
 // Mix's dry share still lets through), the filter with any speaker notice,
 // or what passes with no filter. The part of started_line() after the
 // host's rate, channels and block size; the editor report (PLUG-9) uses it
-// too, so the window and the log say the same.
-std::string playing_words(const HostFilter&, const HostLayout& host, const HostSettings&);
+// too, so the window and the log say the same. `bypassed`: what bypass
+// plays instead (PLUG-36, PLUG-39 step 4).
+std::string playing_words(const HostFilter&, const HostLayout& host, const HostSettings&,
+                          bool bypassed = false);
 // DIAG-2: what plays because of a failure, as a sentence: "The previous
 // filter keeps playing.", "Convolver plays silence.", or with a dry signal
 // (`dry`, dry_signal()) and Mix below 100%, what of it still plays. `host`
-// null: not started yet, so Mix's share is not known.
+// null: not started yet, so Mix's share is not known. `bypassed`: what
+// bypass plays instead, the input where there is a dry signal (PLUG-36,
+// PLUG-39 step 4).
 std::string failure_consequence(const HostFailure&, const HostLayout* host, const HostSettings&,
-                                bool dry);
+                                bool dry, bool bypassed = false);
 // DIAG-2: why saved plug-in state could not be read, for HostFilter::reject(),
 // from decode_host_state()'s exception (NewerHostState gives its own fix).
 Advice state_read_message(const std::exception&);
@@ -135,9 +140,9 @@ Advice fault_advice(const HostFaults&, bool held);
 // After the host starts (activates or initializes) the instance: the rate,
 // channels and block size, then what plays and why (the failure or speaker
 // notice in full), and the settings in use when the adapter has them
-// (settings_words(); PLUG-10).
+// (settings_words(); PLUG-10); with `bypassed`, what bypass plays.
 std::string started_line(const HostFilter&, const HostLayout&, std::size_t max_frames,
-                         const HostSettings* settings = nullptr);
+                         const HostSettings* settings = nullptr, bool bypassed = false);
 // PLUG-9: the speakers a channel mask names, in plain words and channel
 // order ("front left, front right"); empty when the mask does not give one
 // known speaker per channel (as speaker_notice() compares them).

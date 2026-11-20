@@ -462,7 +462,9 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
      since PLUG-36 (PR #225): `failure_consequence()`'s "previous filter
      keeps playing", the report's fault branch ("The filter keeps
      playing.") and `started_line()`, which the VST3 and Audio Unit start
-     logs use, still describe what plays with bypass off.
+     logs use, still describe what plays with bypass off. Done on 20 November 2026: `failure_consequence()`, `playing_words()`
+     and `rejected_line()` take bypass, the report's own bypass special
+     cases go, and the adapters pass their bypass to the log lines.
 5. **Typed reports and advice.** The report reaches the window as typed
    values encoded once at the transport (the VST3 message, the Audio Unit
    property) by one codec, rather than tab-separated lines parsed back; the
