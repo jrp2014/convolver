@@ -76,7 +76,7 @@ jobs:
       - uses: ./.github/actions/use-every-cpu
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version: '3.x'
       - name: Linux dependencies
         if: runner.os == 'Linux'
         run: >-
@@ -85,6 +85,10 @@ jobs:
       - name: macOS dependencies
         if: runner.os == 'macOS'
         run: brew install fftw libsndfile
+      # The newest compiler on this image (docs/develop/build.md#compilers-and-ci-machines).
+      - uses: ./.github/actions/newest-compiler
+        with:
+          compiler: ${{ runner.os == 'macOS' && 'xcode' || matrix.cxx == 'g++' && 'gcc' || 'clang' }}
       # Compiler cache: pull requests restore it; main and manual runs also
       # save it (docs/develop/testing.md#compiler-cache).
       - name: Compiler cache
@@ -191,7 +195,7 @@ jobs:
       - uses: ./.github/actions/use-every-cpu
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version: '3.x'
       - name: Prepare vcpkg binary cache
         id: vcpkg-cache
         shell: pwsh

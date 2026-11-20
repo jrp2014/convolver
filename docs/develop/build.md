@@ -23,6 +23,10 @@ them.
   [plug-ins](#plug-ins). Plug-ins need no FFTW.
 - Configuration never downloads anything. Missing dependencies stop CMake with a
   message naming what to install.
+- CI and the preview packages keep every library, compiler, runner image and
+  tool on its newest formal release; see
+  [supporting libraries](#supporting-libraries) and
+  [compilers and CI machines](#compilers-and-ci-machines).
 
 Contents: [choose a build](#choose-a-build) ·
 [dependencies](#dependencies) ·
@@ -32,6 +36,7 @@ Contents: [choose a build](#choose-a-build) ·
 [FFT backend](#fft-backend) · [Windows](#windows) · [options](#build-options) ·
 [targets and installing](#targets-and-installing) · [plug-ins](#plug-ins) ·
 [supporting libraries](#supporting-libraries) ·
+[compilers and CI machines](#compilers-and-ci-machines) ·
 [preview recipe](#preview-recipe) ·
 [when a build fails](#when-a-build-fails)
 
@@ -448,8 +453,8 @@ releases, and where its archive is downloaded.
 | NSIS | `kichik/nsis` tags (`v313` is 3.13); the archive from SourceForge | The Windows installer | Job summary, candidate record |
 | pluginval | `Tracktion/pluginval` tags (1.0.4 in October 2026); the newest 2.0 beta in an advisory run | VST3 validation, later LV2 and AU | Job summary |
 | `lv2lint` | Its own Git host; when that does not answer, the newest version FreeBSD's ports list | LV2 validation | Job summary |
-| `lilv` (test host) and its libraries | The runner image's Ubuntu 24.04 packages, with updates; the newest upstream releases in an advisory job | LV2 tests | Job summary |
-| `auval` | Ships with macOS on the `macos-15` image | AU validation | Each run logs the macOS and Xcode versions |
+| `lilv` (test host) and its libraries | The newest Ubuntu runner image's packages, with updates; the newest upstream releases in an advisory job | LV2 tests | Job summary |
+| `auval` | Ships with macOS on the `macos-26` image | AU validation | Each run logs the macOS and Xcode versions |
 
 The other CI jobs (native, VST3, LV2 and regression) take FFTW and libsndfile
 from the runner's package manager (apt, Homebrew or vcpkg) at its newest
@@ -541,7 +546,8 @@ exception below).
   (CI-38), so it neither tries the pre-release with the Audio Unit or LV2
   plug-ins nor raises the release-notes warning for it, and macOS's
   `--rtcheck relaxed` runs only after merge.
-- lilv: the formal LV2 tests use Ubuntu 24.04's packages. The **Newest upstream
+- lilv: the formal LV2 tests use the packages of the newest Ubuntu runner
+  image (`ubuntu-latest`). The **Newest upstream
   lilv (advisory)** job builds the newest versions of lilv, zix, serd, sord
   and sratom (`resolve.py checkout`, from the policy's `test_sources`; a
   pre-release when it is newer than the newest release) with the newest lv2
@@ -572,6 +578,64 @@ again later. `lv2lint`'s small host has a fallback (FreeBSD's ports list and
 distfile caches), and the summary says when it was used. When an upstream
 project moves or renames its repository or tags, update its entry in the
 release policy.
+
+## Compilers and CI machines
+
+Everything Convolver is built or tested with is kept on its newest formal
+release, not only the libraries above: compilers, the GitHub runner images
+CI uses, Python, the formatting and analysis tools
+([contributor guide](../../CONTRIBUTING.md#formatting-and-analysis)) and the
+GitHub actions ([lint checks](../../CONTRIBUTING.md#lint-checks)).
+A beta, release candidate or public-preview image is never the gate; it may
+run only as advice, as for the libraries
+([pre-releases](#pre-releases-and-newer-upstream-versions)). Output may change
+with a newer compiler, within the stated tolerance
+([decisions](../project/decisions.md#licences-and-dependencies)).
+
+- **Runner images:** each job uses the newest generally available image:
+  `ubuntu-latest`, `macos-latest` and `windows-latest`, or the label of the
+  newest image (`macos-26`, `macos-26-intel`) where a job names one so that
+  its cache and logs stay comparable. Move a named label when GitHub makes a
+  newer image generally available.
+- **Compilers:** the
+  [newest-compiler action](../../.github/actions/newest-compiler/action.yml)
+  puts the newest compiler first on `PATH`, so the jobs' plain `clang++`,
+  `g++`, `c++` and Xcode commands use it, and writes the version into the job
+  summary. On Linux GCC is the newest `g++-N` the image has: a newer GCC release
+  reaches Ubuntu only in a later Ubuntu, and building GCC in every job would
+  take longer than the job itself. Clang is the newest LLVM release branch
+  from [apt.llvm.org](https://apt.llvm.org), because the images carry an
+  older one; that site builds the branch every few days, so the compiler can
+  be a few commits past the release tag, and the job summary gives the exact
+  version. When that host does not answer, the job warns and uses the
+  image's Clang. On macOS it selects the newest released Xcode on the image,
+  the only place a CI job can get Xcode, and makes ccache tell Xcodes apart.
+  Windows jobs use the image's newest Visual Studio.
+- **Python and Node.js:** `actions/setup-python` with `3.x`, its newest
+  stable release, and `actions/setup-node` with `lts/*`, the current LTS
+  release: Node.js only runs markdownlint here, and its other even-numbered
+  releases become LTS within six months while odd-numbered ones are
+  supported for only six. The scripts still run on Python 3.8 (`ruff.toml`'s target), the
+  oldest a contributor may have.
+- **Lint tools:** pre-commit itself, ruff and clang-format are installed at
+  their newest releases. pre-commit pins the other hook repositories by
+  revision (ShellCheck, markdownlint-cli2 and yamllint in
+  `.pre-commit-config.yaml`), and actionlint and ShellCheck by version in its
+  `additional_dependencies`; nothing moves those automatically, so run
+  `pre-commit autoupdate` and update the two versions by hand whenever you
+  see a newer release.
+
+An older image or compiler is allowed only for a reason recorded beside it in
+the workflow. The release candidates have two, and one test job a third:
+
+| Job | Runs on | Why not newer |
+| --- | --- | --- |
+| Linux | `ubuntu-22.04`, newest GCC on it (GCC 12) | A newer Ubuntu's glibc would stop the package loading on Ubuntu 22.04 and other glibc 2.35 systems (`max_glibc` in the release policy); GCC 12 also needs no newer libstdc++ than Ubuntu 22.04 and Debian 12 ship (GLIBCXX_3.4.30) |
+| Windows | `windows-2022`, Visual Studio 2022 | The packages use the Microsoft C++ runtime installed on the user's machine (`MultiThreadedDLL`); a Visual Studio 2026 build would need that runtime's 2026 version there. jrp kept Visual Studio 2022 for the packages when he chose the CI-43 changes (19 November 2026) |
+| LV2 Ardour test | `ubuntu-24.04`, Ardour 8.4 | Ubuntu 26.04's Ardour 9 crashes running the test's session script (19 November 2026); HOST-7 adapts the test, then the job moves |
+
+Contributors' own machines are not held to this; the
+[dependencies](#dependencies) above say what a source build needs.
 
 ## Preview recipe
 

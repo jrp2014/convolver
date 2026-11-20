@@ -28,6 +28,18 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Builds (CI-43): the Mac preview packages are built with the newest Xcode
+  on GitHub's macOS 26 images (Xcode 26.6 today, was 16.4 on macOS 15), still
+  for macOS 14 and later, and the Linux packages with GCC 12 (was 11), still
+  on Ubuntu 22.04 for glibc 2.35. CI tests with the newest GCC and Xcode the
+  images have, the newest LLVM release branch (Clang 23 today, was 21) and the newest
+  stable Python (3.15, was 3.12); the Audio Unit job runs on macOS 26, and the
+  LV2 tests run on the newest Ubuntu image with its lilv (the Ardour test
+  stays on Ubuntu 24.04 until it works with Ardour 9).
+  Output may differ within the tested tolerance. Contributor guidance now
+  says to keep every external dependency, compilers and CI machines
+  included, on its newest formal release
+  ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
 - VST3 plug-in (PLUG-39 step 3b): choosing a new Latency while audio plays
   no longer holds the host's control call until the audio thread finishes
   its block. The new processor is offered and reported at once, as before;

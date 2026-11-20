@@ -71,9 +71,11 @@ jobs:
   au:
     # Skipped with the sdk job when the scope job finds nothing to build.
     needs: sdk
-    # A fixed image label. GitHub still updates its Xcode and macOS point
-    # releases, so the versions are logged for each run.
-    runs-on: macos-15
+    # A fixed image label: the newest generally available macOS image
+    # (docs/develop/build.md#compilers-and-ci-machines). GitHub still updates
+    # its Xcode and macOS point releases, so the versions are logged for each
+    # run.
+    runs-on: macos-26
     timeout-minutes: 30
     env:
       CMAKE_C_COMPILER_LAUNCHER: ccache
@@ -84,7 +86,7 @@ jobs:
       - uses: ./.github/actions/use-every-cpu
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version: '3.x'
       - uses: actions/download-artifact@v8
         with:
           name: audiounitsdk-lock
@@ -94,6 +96,10 @@ jobs:
         run: >-
           python scripts/release/sources.py --lock "$RUNNER_TEMP/lock/audiounitsdk-lock.json" --fetch
           --cache "$RUNNER_TEMP/downloads" --destination "$RUNNER_TEMP/sources" audiounitsdk
+      # The newest Xcode on this image (docs/develop/build.md#compilers-and-ci-machines).
+      - uses: ./.github/actions/newest-compiler
+        with:
+          compiler: xcode
       - name: Tools and libraries
         run: |
           sw_vers
@@ -104,7 +110,7 @@ jobs:
       - name: Compiler cache
         uses: hendrikmuhs/ccache-action@dbeefd73e8e2ffc1bbc412570072735eb4db3607  # v1.2.25
         with:
-          key: au-macos-15
+          key: au-macos-26
           max-size: 1G
           save: ${{ github.event_name != 'pull_request' }}
       # AUTO selects Accelerate for plug-in builds on macOS; libsndfile is only
@@ -254,7 +260,7 @@ jobs:
     # Skipped with the sdk job when the scope job finds nothing to build.
     needs: sdk
     name: ${{ matrix.name }}
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -268,7 +274,7 @@ jobs:
             # Only what the au.* tests run (CI-9).
             targets: convolver_au_suite
             tests: -L au
-            cache: au-sanitizers-macos-15
+            cache: au-sanitizers-macos-26
             tsan: false
           - name: AU adapter tests (Debug, ThreadSanitizer)
             packages: libsndfile
@@ -279,7 +285,7 @@ jobs:
               -DCMAKE_MODULE_LINKER_FLAGS=-fsanitize=thread
             targets: convolver_au_tests
             tests: -R '^au\.adapter$'
-            cache: au-tsan-macos-15
+            cache: au-tsan-macos-26
             tsan: true
     env:
       # Every race is reported, with both threads' stacks, and any report
@@ -293,7 +299,7 @@ jobs:
       - uses: ./.github/actions/use-every-cpu
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version: '3.x'
       - uses: actions/download-artifact@v8
         with:
           name: audiounitsdk-lock
@@ -303,6 +309,10 @@ jobs:
         run: >-
           python scripts/release/sources.py --lock "$RUNNER_TEMP/lock/audiounitsdk-lock.json" --fetch
           --cache "$RUNNER_TEMP/downloads" --destination "$RUNNER_TEMP/sources" audiounitsdk
+      # The newest Xcode on this image (docs/develop/build.md#compilers-and-ci-machines).
+      - uses: ./.github/actions/newest-compiler
+        with:
+          compiler: xcode
       - name: Tools and libraries
         run: |
           xcodebuild -version

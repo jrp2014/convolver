@@ -1209,7 +1209,8 @@ whose LV2 host is its own code rather than lilv's or JUCE's (HOST-5). It is
 a job of its own, not a CTest test, because it needs Ardour, a large package
 that the other LV2 jobs do not install.
 [`tests/lv2/ardour_tests.py`](../../tests/lv2/ardour_tests.py) uses Ardour's
-headless tools from Ubuntu's `ardour` package (8.4 on Ubuntu 24.04) on
+headless tools from Ubuntu's `ardour` package (8.4 on Ubuntu 24.04, which
+this job keeps until HOST-7 makes the test work with Ardour 9) on
 each [first-use fixture](#plug-in-comparisons-plug-2): mono (1 in, 1 out),
 the stereo cross-feed (2 in, 2 out) and the crossover (2 in, 6 out).
 
@@ -1481,8 +1482,10 @@ candidate is built with networking disabled, from the archive alone, with
 CMake's default generator (Unix Makefiles); the
 [earlier build](../archive/reviews/2026-11-08-testing-guide-evidence.md#how-the-candidates-were-built-before-november-2026)
 is archived. The macOS candidates use Ninja and Windows Visual Studio
-(CI-10). Both macOS candidates build on macOS 15 runners (`macos-15` for
-arm64, `macos-15-intel` for x86-64) with a macOS 14 deployment target, the
+(CI-10). Both macOS candidates build on macOS 26 runners (`macos-26` for
+arm64, `macos-26-intel` for x86-64) with the newest Xcode there
+([compilers and CI machines](build.md#compilers-and-ci-machines), CI-43)
+and a macOS 14 deployment target, the
 [proposed minimum system](releasing.md#candidates). No CI job runs a
 candidate on macOS 14 (GitHub retired that image; CI-19): `verify_artifact.py` fails
 any binary whose `minos` is newer than 14.0, but it cannot see a newer macOS
@@ -1726,11 +1729,10 @@ file to `RELEASE_SHARED` in `ci_scope.py`.
 The files kept from releases are read only by `upgrade.cli`, registered
 wherever the CLI is built, and `vst3.upgrade`, registered by the VST3
 build; no LV2 job runs either. The Audio Unit job's suite includes
-`upgrade.cli` as well: the only Release Accelerate run with the Xcode of
-`macos-15`, the image the macOS candidates are built on, where the VST3
-macOS job uses the newer Xcode of `macos-latest`. A pull request that
-changes only these files leaves that run to `main` (CI-42); the other macOS
-runs check the same bound. `tests/ci_scope_tests.py` lists, each with its
+`upgrade.cli` as well. A pull request that changes only these files leaves
+that run to `main` (CI-42); since CI-43 the VST3 macOS job's suite runs it
+with the same compiler (the newest Xcode on `macos-26`, which `macos-latest`
+also is today), and the other macOS runs check the same bound. `tests/ci_scope_tests.py` lists, each with its
 reason, the only files outside `tests/upgrade/` that may name them, and
 checks that those two are the only CTest entries that run the checker; when
 another build starts reading them, add its workflow to `UPGRADE_WORKFLOWS`
@@ -1850,7 +1852,7 @@ another job runs only its own format's tests. The CTest labels select them.
 | `repository` label: `versioning`, `identities`, `examples.fixtures`, `documentation` (no build option changes them) | Native full builds with Clang on Linux and macOS and with MSVC on Windows; the release candidates | Native g++, Ooura and Accelerate builds; VST3; Audio Unit |
 | `backend-independent` label: `native.load_timing_harness` (the load-timing harness's self-test on made-up records and a mock adapter; no FFT backend, file library or core-only shape changes it, and it takes 20 to 24 s on the macOS runner) | The full build of each native job, and the core-only (Release) build of the Clang jobs on Linux and macOS, whose full build is Debug with sanitizers; Audio Unit; VST3 on macOS and Windows; the candidates | The Accelerate and Ooura builds, and the core-only builds of native g++ and MSVC, whose full build is already Release with the same compiler (CI-41) |
 | `consumer` label: `packaging.consumer.*` (the CMake development package) | Every native build | VST3, Audio Unit and the release candidates (none of them ships that package; the candidates' ZIP has its own relocation and smoke tests) |
-| Core and CLI suite (`native.*`, `compatibility.corpus`, `upgrade.cli`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build (except the `backend-independent` label, above), Audio Unit (Release Accelerate, Xcode on `macos-15`), VST3 on macOS (Release Accelerate, the newer Xcode on `macos-latest`), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates; `native.ffmpeg_pipe` only in native g++ Release on Linux, the one job that installs FFmpeg | VST3 on Linux (Release with Ooura has the compiler, flags and image of native g++ Release; Debug with sanitizers and FFTW those of native Clang Debug) |
+| Core and CLI suite (`native.*`, `compatibility.corpus`, `upgrade.cli`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build (except the `backend-independent` label, above), Audio Unit (Release Accelerate, the newest Xcode on `macos-26`), VST3 on macOS (the same on `macos-latest`, which GitHub moves to a newer macOS first; it also covers pull requests that run only the VST3 workflow), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates; `native.ffmpeg_pipe` only in native g++ Release on Linux, the one job that installs FFmpeg | VST3 on Linux (Release with Ooura has the compiler, flags and image of native g++ Release; Debug with sanitizers and FFTW those of native Clang Debug) |
 | Format and release tests (`vst3.*`, `au.*`, `lv2.*`, `release.*`) | Their format's jobs and the candidates | — |
 
 CTest still runs a fixture's setup when a selected test needs it, so

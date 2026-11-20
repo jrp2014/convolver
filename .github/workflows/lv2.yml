@@ -31,8 +31,9 @@ permissions:
   contents: read
 
 # lilv and its libraries (serd, sord, sratom, zix) and the lv2 headers come
-# from the runner image's Ubuntu packages, the newest that Ubuntu 24.04 and its
-# updates offer; each job lists the versions it installed.
+# from the runner image's Ubuntu packages, the newest that the newest
+# generally available Ubuntu image (ubuntu-latest) and its updates offer; each
+# job lists the versions it installed.
 env:
   LV2_PACKAGES: >-
     lv2-dev liblilv-dev liblilv-0-0 lilv-utils libserd-dev libserd-0-0 libsord-dev libsord-0-0
@@ -63,13 +64,13 @@ jobs:
     needs: scope
     if: needs.scope.outputs.build == 'true'
     name: Newest tools and Release bundle
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version: '3.x'
       - name: lilv and lv2 packages
         run: |
           read -ra packages <<< "$LV2_PACKAGES"
@@ -78,6 +79,10 @@ jobs:
             meson ninja-build pkg-config libelf-dev libsndfile1-dev xvfb libasound2t64
           lv2info --version
           python scripts/release/resolve.py packages "${packages[@]}"
+      # The newest compiler on this image (docs/develop/build.md#compilers-and-ci-machines).
+      - uses: ./.github/actions/newest-compiler
+        with:
+          compiler: gcc
       - name: Newest lv2 source
         run: >-
           python scripts/release/sources.py --latest --fetch
@@ -213,8 +218,11 @@ jobs:
   # its own code, not lilv's or JUCE's: it loads a preset from its preset
   # list, records, saves the session, restores it in a second process and
   # exports it with latency compensation; the export must match the oracle
-  # (tests/lv2/ardour_tests.py). Ardour is Ubuntu 24.04's package, the
-  # newest the runner image offers.
+  # (tests/lv2/ardour_tests.py). Ardour is the image's Ubuntu package.
+  # An older image on purpose: Ubuntu 26.04's Ardour 9 crashes (SIGSEGV)
+  # running the session script before it reports the engine running, so
+  # this job stays on Ubuntu 24.04's Ardour 8.4 until HOST-7 adapts the
+  # test (docs/develop/build.md#compilers-and-ci-machines).
   ardour:
     needs: scope
     if: needs.scope.outputs.build == 'true'
@@ -225,7 +233,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version: '3.x'
       - name: Ardour, lilv and lv2 packages
         run: |
           read -ra packages <<< "$LV2_PACKAGES"
@@ -233,6 +241,10 @@ jobs:
           sudo apt-get install -y --no-install-recommends "${packages[@]}" ardour \
             ninja-build pkg-config libsndfile1-dev
           python scripts/release/resolve.py packages ardour "${packages[@]}"
+      # The newest compiler on this image (docs/develop/build.md#compilers-and-ci-machines).
+      - uses: ./.github/actions/newest-compiler
+        with:
+          compiler: gcc
       # Release, as a host would load it; the preset tool makes the presets.
       - name: Convolver's LV2 bundle and preset tool (Release)
         run: |
@@ -256,7 +268,7 @@ jobs:
     needs: scope
     if: needs.scope.outputs.build == 'true'
     name: ${{ matrix.name }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -288,7 +300,7 @@ jobs:
       - uses: ./.github/actions/use-every-cpu
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version: '3.x'
       # The same packages as the tools job.
       - name: lilv and lv2 packages
         run: |
@@ -298,6 +310,10 @@ jobs:
             meson ninja-build pkg-config libelf-dev libsndfile1-dev
           lv2info --version
           python scripts/release/resolve.py packages "${packages[@]}"
+      # The newest compiler on this image (docs/develop/build.md#compilers-and-ci-machines).
+      - uses: ./.github/actions/newest-compiler
+        with:
+          compiler: gcc
       # Compiler cache: pull requests restore it; main and manual runs also
       # save it (docs/develop/testing.md#compiler-cache).
       - name: Compiler cache
@@ -341,7 +357,7 @@ jobs:
         if: success() && github.run_attempt != '1'
         uses: ./.github/actions/note-retry
 
-  # The formal tests above use Ubuntu 24.04's lilv packages. This job builds
+  # The formal tests above use the runner image's lilv packages. This job builds
   # the newest upstream releases of lilv and the libraries under it (zix,
   # serd, sord, sratom; a newer pre-release where there is one) with the
   # newest lv2 headers and runs the same LV2
@@ -351,7 +367,7 @@ jobs:
     needs: scope
     if: needs.scope.outputs.build == 'true'
     name: Newest upstream lilv (advisory)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -359,13 +375,19 @@ jobs:
       - uses: ./.github/actions/use-every-cpu
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version: '3.x'
       - name: Build tools
         id: tools
         continue-on-error: true
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends meson ninja-build pkg-config libsndfile1-dev
+      # The newest compiler on this image (docs/develop/build.md#compilers-and-ci-machines).
+      - if: steps.tools.outcome == 'success'
+        uses: ./.github/actions/newest-compiler
+        continue-on-error: true
+        with:
+          compiler: gcc
       - name: Newest upstream sources
         id: sources
         if: steps.tools.outcome == 'success'
