@@ -128,7 +128,7 @@ REL-3.
 
 | Items | Note |
 | --- | --- |
-| **ROBUST-1**, **PLUG-27**, **PLUG-29**, **HOST-6** | Robustness and lifecycle corner cases (ROBUST-8, PLUG-30 and PLUG-36 moved into PLUG-39's sequence on 19 November 2026, [decision](docs/project/decisions.md#releases)) |
+| **ROBUST-1**, **PLUG-29**, **HOST-6** | Robustness and lifecycle corner cases (ROBUST-8, PLUG-30 and PLUG-36 moved into PLUG-39's sequence on 19 November 2026, [decision](docs/project/decisions.md#releases)) |
 | **CI-32** | The most extreme numerical cases less often; dormant as well (jrp, 12 November 2026) |
 | **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19** | Profiling and measurement-only optimisations |
 | The rest of **PLUG-25** and **CFG-3** | Marking a host rate as not yet confirmed, and reading Windows-1252 names; each also needs jrp's decision |
@@ -331,30 +331,11 @@ LV2 (Linux first; also PipeWire system audio):
   **Remains:** whether the window should mark a host rate as not yet
   confirmed when it comes from a copy that has not processed audio (the
   copy in Audacity's effect window, which a host may start briefly at
-  another rate); PLUG-27 overlaps it. **Done when** jrp has decided, and
+  another rate); PLUG-27, done (PR #233), made it matter less: a file
+  chosen there is no longer refused for that rate. **Done when** jrp has decided, and
   the marking, if he wants it, is shown and its message tests cover it.
   Diagnostic text only, no sound change; parked until after REL-3 unless
   jrp brings it forward.
-- [ ] **PLUG-27 — Read a chosen filter before the host's audio settings
-  are known.** From the same review: before the host has started audio,
-  the VST3 plug-in reads a chosen file for the rate and channels the host
-  has only proposed (`known_layout().value_or(layout())` in
-  `Processor::load_file`), so a single IR file or `.cfg` can be refused
-  against a rate the host never plays at, while a preset or restored
-  project arriving at the same moment is kept and checked when audio
-  starts. Read a single IR file or `.cfg` without assuming a rate and check
-  it at the same point as a preset; a configuration list still needs the
-  rate and channels to choose its entry, so say plainly that the choice
-  waits for the host's audio settings rather than pick an entry for a
-  proposed rate. Keep the protection for an unsuitable replacement during
-  playback; no resampling. The Audio Unit reads a chosen file the same way
-  (`effect_state.cpp`), so it is in scope too. Done when tests cover
-  choosing before activation, a refusal during playback, a changed host
-  rate and list selection, through the existing acceptance code rather
-  than a second state machine, and the
-  [plug-in contract](docs/develop/plugin-contract.md#loading-and-failure)
-  and [plug-ins guide](docs/use/plugins.md#loading-a-filter) say when a
-  chosen file is checked. Parked until REL-3.
 - [ ] **PLUG-29 — Keep the Recent list out of the log folder.** From the
   same review: the window's Recent list is saved beside the log
   (`recent-filters.txt` in `~/Library/Logs/Convolver/`,
@@ -364,8 +345,7 @@ LV2 (Linux first; also PipeWire system audio):
   and the sandboxed path for GarageBand), reading the old file once if the
   new one is missing. Done when the Recent-list tests cover the new path
   and the one-time read of the old file, and the plug-ins guide says where
-  the list is kept. Lower priority than PLUG-27; parked until
-  REL-3.
+  the list is kept. Parked until REL-3.
 - [ ] **PLUG-30 — One rule for state a busy lock makes a call skip.**
   From AU-16 (8 November 2026; jrp asked for fixes like it to be recorded,
   as stepping back may give a more general fix). The pattern: a call that
@@ -633,10 +613,15 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   Audacity by jrp's choice): after an accepted file, a controller whose
   `setDirty` does not succeed reports one edit of Latency that keeps its
   value; `vst3.adapter` checks it
-  ([decisions](docs/project/decisions.md#plug-in-behaviour)). **Remains:**
-  jrp's Audacity check (check 10; steps in project files
-  `vst3-17-audacity/`: Choose, then export with the window open and
-  without playing, save and reopen, with 0.13.2 as a control that fails),
+  ([decisions](docs/project/decisions.md#plug-in-behaviour)). jrp's first
+  Audacity check, on 0.14.0 (20 November 2026,
+  [record](docs/archive/reviews/2026-11-20-vst3-17-audacity.md)), never
+  reached the fix: **Choose…** refused the filter against Audacity's 44.1
+  kHz before playback, PLUG-27, fixed in PR #233. **Remains:**
+  jrp's Audacity check, run again on a build with PLUG-27's fix (check 10;
+  steps in project files `vst3-17-audacity/`: Choose, then export with the
+  window open and without playing, save and reopen, and a list chosen again
+  after one playback),
   including whether undoing a later action brings back the previous
   filter; a REAPER check that a chosen file adds no Latency entry to its
   undo history; and the drafted upstream issue (project files
@@ -1221,6 +1206,19 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **PLUG-27 — Read a chosen filter before the host's audio settings
+  are known.** 20 November 2026, PR #233, brought forward by jrp after his
+  Audacity run of 0.14.0 refused a 48 kHz `.cfg` chosen before playback
+  against Audacity's placeholder 44.1 kHz
+  ([record](docs/archive/reviews/2026-11-20-vst3-17-audacity.md)). In VST3
+  and the Audio Unit a chosen file that does not suit is refused only while
+  the host plays (`HostSettling::check()`); otherwise a single IR file or
+  `.cfg` is read as it is and kept until the host starts, and a list
+  chooses its entry for the configuration the host last started with, or
+  waits with jrp's message
+  ([contract](docs/develop/plugin-contract.md#loading-and-failure),
+  [plug-ins](docs/use/plugins.md#loading-a-filter)). Not yet checked in
+  Audacity (VST3-17's re-run).
 - [x] **HOST-7 — Run the Ardour test with Ardour 9.**
   20 November 2026, PR #229, from CI-43: Ardour 9's Lua tool crashed in
   `Session:new_audio_track`, which takes an empty `ARDOUR.RouteGroup()`
