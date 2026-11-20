@@ -602,14 +602,17 @@ void cases() {
 }
 
 std::optional<std::string> log_variable() {
-#ifdef _MSC_VER // C4996 asks for _dupenv_s, which only copies what is read here at once.
-#pragma warning(push)
-#pragma warning(disable : 4996)
-#endif
+#ifdef _WIN32 // _dupenv_s copies the value, as MSVC asks instead of getenv.
+    char* value = nullptr;
+    std::size_t length = 0;
+    if (_dupenv_s(&value, &length, "CONVOLVER_LOG") == 0 && value) {
+        std::string copy(value);
+        std::free(value);
+        return copy;
+    }
+#else
     if (const char* value = std::getenv("CONVOLVER_LOG"))
         return std::string(value);
-#ifdef _MSC_VER
-#pragma warning(pop)
 #endif
     return std::nullopt;
 }

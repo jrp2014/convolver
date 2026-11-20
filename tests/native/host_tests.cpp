@@ -1498,15 +1498,13 @@ void saved_state_limit() {
 // since temporary folders may hold characters outside the ANSI code page.
 std::optional<std::filesystem::path> log_variable() {
 #ifdef _WIN32
-#ifdef _MSC_VER // C4996 asks for _wdupenv_s, which only copies what is read here at once.
-#pragma warning(push)
-#pragma warning(disable : 4996)
-#endif
-    if (const wchar_t* value = _wgetenv(L"CONVOLVER_LOG"))
-        return std::filesystem::path(value);
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
+    wchar_t* value = nullptr;
+    std::size_t length = 0;
+    if (_wdupenv_s(&value, &length, L"CONVOLVER_LOG") == 0 && value) {
+        std::filesystem::path copy(value);
+        std::free(value);
+        return copy;
+    }
 #else
     if (const char* value = std::getenv("CONVOLVER_LOG"))
         return std::filesystem::path(value);
