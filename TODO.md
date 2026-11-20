@@ -249,6 +249,23 @@ is superseded.
   call, and check it against Ardour 9's Lua bindings. **Done when** the job
   passes on `ubuntu-latest` and its older-image row leaves
   [compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines).
+- [ ] **DIAG-9 — Numbers in the user's locale.** Low priority, from jrp's
+  review of PLUG-36 (20 November 2026): diagnostics write sample rates,
+  levels and counts as plain ASCII digits ("44100 Hz", "-6.0 dB")
+  everywhere, from shared text such as `short_reason()` and
+  `host_rate_text()` in `portable/host.cpp`. The Status parameter cannot
+  follow the locale: its line is at most 127 ASCII characters (VST3's
+  String128, the Audio Unit's parameter text, `max_status_text`), and a
+  locale's grouping or decimal mark may not be ASCII (a narrow no-break
+  space in French). The window's report has no such limit, and the macOS
+  window could format its values with the system's formatter, but today it
+  shows the same portable strings. Formatting only there means passing
+  numbers to the window as values rather than text, which fits the typed
+  reporting step of PLUG-39. The log and the CLI stay plain, so that pasted
+  diagnostics read the same everywhere. **Worth doing when** users ask, or
+  after PLUG-39's typed reporting. **Done when** the window shows numbers
+  in the system locale from one formatting path, Status and the log are
+  unchanged, and a test covers a locale with other separators.
 
 ## Plug-ins: VST3, LV2 and AU
 
