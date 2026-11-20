@@ -517,7 +517,7 @@ void settings_text() {
         require(setting_text(value, min_gain_db, max_gain_db) == text,
                 "setting text: " + setting_text(value, min_gain_db, max_gain_db));
     HostFilter filter;
-    const auto line = started_line(filter, {48000, 2, 2}, 512, &s);
+    const auto line = started_line(filter, {48000, 2, 2}, 512, &s, false);
     require(line.find("Settings: gain -6 dB, mix 50% wet, latency 1024 frames.") !=
                 std::string::npos,
             "started line without settings: " + line);
@@ -719,7 +719,7 @@ void diagnostics_follow_settings() {
         require(line.status == c.value && contains(line.text, c.status) &&
                     line.text.size() <= max_status_text,
                 std::string(c.what) + ": Status " + line.text);
-        const auto started = started_line(filter, c.host, 64, &c.settings);
+        const auto started = started_line(filter, c.host, 64, &c.settings, false);
         require(contains(started, c.started), std::string(c.what) + ": started line " + started);
         // The audible words never contradict the level heard.
         require(c.heard == 0 || (!contains(line.text, "Silent") &&

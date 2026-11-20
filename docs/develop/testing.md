@@ -405,7 +405,8 @@ cases.
   window shows (no filter, before and after the host starts; Gain −20 dB
   with no filter; a stereo filter on a mono track; a wrong rate; a failed
   first load at Mix 50%; a refused replacement; playing; not checked yet; a
-  fault), checking the status, the explanation's wording and what it must
+  fault; a fault and a refused replacement with bypass on, PLUG-39 step 4,
+  for equal and unequal channel counts and before the host starts), checking the status, the explanation's wording and what it must
   not say, the fields and the plain text; the Audio facts in order with
   their values, notes and help (a refused rate and a mono track's channels
   marked as problems, the Routing of a filter that is not playing, what is
@@ -820,6 +821,9 @@ built (a test hook) keeps the running latency, is logged and is built at
 the next activation, and one made after a load has cleared a fault leaves
 Status Active (ROBUST-8, in `status_and_log()`); a choice while inactive waits for the activation; and
 a restored state with another Latency plays it at once.
+`bypassed_log_lines()` (PLUG-39 step 4) checks that with bypass on the log
+says what bypass plays: a refused replacement, a start, and restored state
+saved bypassed and kept until it suits the host.
 `latency_while_playing()` changes the Latency 24 times and replaces the
 filter 8 times while another thread calls `process()`, waiting for a block
 between changes, then checks the last filter at the last Latency; the
@@ -1008,7 +1012,9 @@ Five CTest tests run when the adapter is built (label `au`):
   rejected formats, latency and tail in seconds with change notifications, the
   `ClassInfo` keys, foreign, damaged, newer and failed presets with the failure
   record each leaves (read through a custom property, 64800, that exists for
-  the tests only), an initialization that cannot build its processor, bypass
+  the tests only), an initialization that cannot build its processor, the
+  log with bypass on (a refused replacement and a start say what bypass
+  plays, `bypassed_log_lines`, PLUG-39 step 4), bypass
   switched from another thread while rendering, the output silence flag, no
   C++ allocation while rendering, and the settings (AU-7): parameter info,
   defaults and clamping, Gain and Mix in the audio, and saving and restoring
@@ -1196,7 +1202,8 @@ python3 tests/au/avaudioengine_tests.py build-au/convolver-preset
   as described above.
 - `lv2.adapter`: the bundle's plug-ins and ports through lilv; instantiation
   refusals; the status port, log messages, saved state and failure record after
-  good and bad loads (the record through an unadvertised extension that exists
+  good and bad loads (a refused replacement with bypass on is logged as
+  what bypass plays, PLUG-39 step 4; the record through an unadvertised extension that exists
   for the tests only); presets written by `convolver-preset` and lilv's own
   state round trip; long `run()` calls; filter files through the worker, run
   on a thread, synchronously (as when a host free-wheels) and with answers

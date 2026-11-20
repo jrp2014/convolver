@@ -1244,6 +1244,65 @@ void fractional_rates() {
     p.setActive(false);
     p.terminate();
 }
+// PLUG-39 step 4: with bypass on, the log lines say what bypass plays, not
+// the filter: the start line, a refused replacement, and restored state
+// kept until it suits the host (Processor::install()).
+void bypassed_log_lines() {
+    const convolver::test_log::LogSince log(process_log);
+    const auto logged = [&](const char* part) {
+        return log.text().find(part) != std::string::npos;
+    };
+    HostApplication context;
+    Processor p;
+    require(p.initialize(&context) == kResultOk, "bypassed log initialize");
+    SpeakerArrangement stereo = SpeakerArr::kStereo;
+    require(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "bypassed log buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    const auto stream = [](const convolver::HostState& s) {
+        auto m = std::make_unique<MemoryStream>();
+        require(write_state(m.get(), s), "encode bypassed log state");
+        m->seek(0, IBStream::kIBSeekSet, nullptr);
+        return m;
+    };
+    convolver::HostState good;
+    good.configuration =
+        convolver::Configuration{48000, 2, 2, 0, {}, {}, {{{.5f}, {{0, 1}}, {{1, 1}}}}};
+    auto wrong = good;
+    wrong.configuration->sample_rate = 44100;
+    require(p.setState(stream(good).get()) == kResultOk, "bypassed log filter");
+    ProcessSetup setup{kRealtime, kSample32, 64, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "bypassed log activate");
+    ParameterChanges on;
+    int32 index = 0;
+    on.addParameterData(bypass_id, index)->addPoint(0, 1, index);
+    ProcessData flush{};
+    flush.inputParameterChanges = &on;
+    require(p.process(flush) == kResultOk, "bypassed log bypass");
+    play_block(p, 2, 2, 64);
+    require(p.setState(stream(wrong).get()) == kResultFalse &&
+                logged("Not loaded; the previous filter is kept (bypass is on): the filter is "
+                       "for 44100 Hz"),
+            "a refused replacement while bypassed is logged as playing");
+    require(p.setActive(false) == kResultOk && p.setActive(true) == kResultOk &&
+                logged("blocks of up to 64 frames. Bypass is on: the input plays unfiltered. "
+                       "Loaded: "),
+            "a start while bypassed is logged as playing the filter");
+    // Another rate, before audio plays: restored state that does not suit is
+    // kept until it does, and the bypass it was saved with (step 1b) plays.
+    setup.sampleRate = 96000;
+    require(p.setActive(false) == kResultOk && p.setupProcessing(setup) == kResultOk &&
+                p.setActive(true) == kResultOk,
+            "bypassed log second activation");
+    auto kept = wrong;
+    kept.bypass = true;
+    require(p.setState(stream(kept).get()) == kResultOk &&
+                logged("so it is kept until it does. Bypass is on: only the dry signal plays."),
+            "a kept filter while bypassed is logged as playing");
+    p.setActive(false);
+    p.terminate();
+}
 // DIAG-1: the Status parameter shows each failure in one line, and the
 // Convolver log holds the full explanation.
 void status_and_log() {
@@ -3776,6 +3835,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"same_filter_as_project_starts_clean", [] { same_filter_restore(true); }},
         {"latency_while_playing", latency_while_playing},
         {"latency_handover_does_not_wait", latency_handover_does_not_wait},
+        {"bypassed_log_lines", bypassed_log_lines},
         {"report_and_files", report_and_files},
         {"chosen_file_on_wider_bus", chosen_file_on_wider_bus},
         {"chosen_preset", [] { chosen_preset(true); }},

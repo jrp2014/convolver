@@ -434,6 +434,25 @@ void class_info() {
     same_output(unit, copy, 2, 2);
 }
 
+// PLUG-39 step 4: with bypass on, the log lines say what bypass plays, not
+// the filter: a refused replacement and the start line (Initialize).
+void bypassed_log_lines() {
+    Unit unit;
+    check(unit.configure(48000, 2, 2, 512), "formats");
+    check(unit.initialize(), "initialization");
+    check(unit.load(state_of(stereo(48000))), "filter");
+    unit.set_bypass(true);
+    const au_test::LogSince log(process_log);
+    require(unit.load(state_of(stereo(44100))) != noErr, "a wrong-rate filter accepted");
+    require(log.text().find("the previous filter is kept (bypass is on)") != std::string::npos &&
+                log.text().find("keeps playing") == std::string::npos,
+            "a refused replacement while bypassed is logged as playing: " + log.text());
+    unit.uninitialize();
+    check(unit.initialize(), "second initialization");
+    require(log.text().find("Bypass is on: the input plays unfiltered. Loaded: ") !=
+                std::string::npos,
+            "a start while bypassed is logged as playing the filter: " + log.text());
+}
 void rejected_presets() {
     const auto filter = stereo(48000);
     Unit unit;
@@ -2160,6 +2179,7 @@ int main(int argc, char** argv) {
             {"channel_capabilities", channel_capabilities},
             {"timing_in_seconds", timing_in_seconds},
             {"class_info", class_info},
+            {"bypassed_log_lines", bypassed_log_lines},
             {"rejected_presets", rejected_presets},
             {"bypass_property", bypass_property},
             {"silence_flag", silence_flag},

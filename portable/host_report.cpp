@@ -103,12 +103,10 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
                                             fault_advice(filter.faults(), true).problem));
     } else if (status == HostStatus::fault) {
         take(fault_advice(filter.faults(), false));
-        if (const auto& c = filter.filter()) {
-            m.plays = !facts.bypassed ? std::string("The filter keeps playing.")
-                      : !host         ? std::string("Bypass is on: no filter is applied.")
-                      : dry_signal(filter, *host)
-                          ? std::string("Bypass is on: the input plays unfiltered.")
-                          : std::string("Bypass is on: the outputs are silent.");
+        if (filter.filter()) {
+            m.plays = !facts.bypassed
+                          ? std::string("The filter keeps playing.")
+                          : bypass_sentence(host.has_value(), host && dry_signal(filter, *host));
         } else {
             // Faults are counted with no filter too (the host's samples).
             m.plays = no_filter_plays();
@@ -121,8 +119,6 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         // PLUG-22: as HostProcessor bypasses, the input when there is a dry
         // signal, otherwise silence (dry_signal_rule(), PLUG-23).
         // Nothing is wrong, so turning it off is part of the sentence, not a fix.
-        // As HostProcessor bypasses a filter: the input when there is a dry
-        // signal, otherwise silence (dry_signal_rule(), PLUG-23).
         const auto& c = *filter.filter();
         m.plays =
             (!host ? std::string("No filter is applied while bypassed.")

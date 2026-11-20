@@ -339,6 +339,38 @@ void cases() {
          HostStatus::fault,
          {"The host sent invalid samples (3 times). Bypass is on: the input plays unfiltered."},
          {"keeps playing"}},
+        {"fault, bypassed, unequal counts",
+         [&] {
+             const HostLayout two_to_four{44100, 2, 4, 0, 0};
+             Configuration c{44100, 2, 4, 0, {}, {}, {}};
+             for (std::size_t i = 0; i < 4; ++i)
+                 c.paths.push_back({{1.f}, {{i % 2, 1}}, {{i, 1}}});
+             HostFilter f(8);
+             f.load(HostState{c}, two_to_four, [](const HostPlayback&) {});
+             HostFaults totals;
+             totals.rejected_input = 3;
+             static_cast<void>(f.observe(totals));
+             auto bypassed = facts(two_to_four);
+             bypassed.bypassed = true;
+             return host_report(f, bypassed);
+         },
+         HostStatus::fault,
+         {"Bypass is on: the outputs are silent."},
+         {"keeps playing", "plays unfiltered"}},
+        {"fault, bypassed, not started",
+         [&] {
+             HostFilter f(8);
+             f.load(HostState{filter(44100, 2)}, std::nullopt);
+             HostFaults totals;
+             totals.rejected_input = 3;
+             static_cast<void>(f.observe(totals));
+             auto bypassed = facts(std::nullopt);
+             bypassed.bypassed = true;
+             return host_report(f, bypassed);
+         },
+         HostStatus::fault,
+         {"Bypass is on: no filter is applied."},
+         {"keeps playing", "plays unfiltered"}},
         {"refused replacement, bypassed",
          [&] {
              HostFilter f(8);
@@ -792,7 +824,7 @@ void actions() {
                  {HostFilterSource::file, path, 1});
     const auto shown = host_report(named, choosing);
     require(shown.problem == "room.cfg:2:1: the delay line has 3 values." &&
-                contains(rejected_line(named, true), path + ":2:1:"),
+                contains(rejected_line(named, true, false), path + ":2:1:"),
             "refused file's name: " + shown.problem);
 }
 // The log's start line gives the same corrective action as the window.
@@ -801,7 +833,7 @@ void log_agrees() {
     HostFilter f(8);
     f.load(HostState{filter(44100, 2)}, std::nullopt);
     static_cast<void>(test::started(f, mono));
-    const auto line = started_line(f, mono, 512);
+    const auto line = started_line(f, mono, 512, nullptr, false);
     require(
         contains(line, "put Convolver on a stereo track") &&
             contains(host_report(f, facts(mono)).explanation, "put Convolver on a stereo track"),

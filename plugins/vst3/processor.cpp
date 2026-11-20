@@ -291,11 +291,13 @@ tresult Processor::activate(TBool state) {
             // that correcting the rate or layout brings it back.
             const auto chosen = settings();
             const auto now = layout();
+            // Read once, so the log says the bypass the processor starts with.
+            const bool bypassed = bypass_.load();
             auto activation = filter_.activation(now);
             auto next = std::make_unique<HostProcessor>(
                 activation.playback, processSetup.maxSamplesPerBlock, chosen, now.inputs);
             tail_.store(static_cast<uint32>(next->tail_frames()));
-            next->set_bypass(bypass_.load());
+            next->set_bypass(bypassed);
             next->reset();
             // Not playing: the host does not process while it activates.
             playing_.offer(std::move(next));
@@ -311,7 +313,7 @@ tresult Processor::activate(TBool state) {
                 const auto& f = filter_.failure();
                 log(started_line(filter_, now,
                                  static_cast<std::size_t>(processSetup.maxSamplesPerBlock), &chosen,
-                                 bypass_.load()),
+                                 bypassed),
                     (f && f->silent) || !filter_.notice().empty());
             } catch (...) { // Out of memory for the line: it is dropped.
             }

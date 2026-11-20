@@ -440,20 +440,31 @@ void status_and_log(host::World& world, const Fixture& f) {
           label + "failed replacement: still recorded after reactivation");
     check(same(decode_host_state(p->save().bytes).configuration, a),
           label + "failed replacement: saved state is the running filter");
+    // PLUG-39 step 4: with bypass on, the log says what bypass plays, not
+    // that the previous filter keeps playing.
+    p->enabled = 0.f;
+    p->run_empty();
+    p->log.messages.clear();
+    check(p->restore(state_of(wrong_outputs(a)), chunk(world)) != LV2_STATE_SUCCESS &&
+              p->log.contains(LV2_LOG__Error, "the previous filter is kept (bypass is on)") &&
+              !p->log.contains(LV2_LOG__Error, "keeps playing"),
+          label + "failed replacement while bypassed: logged as playing");
+    p->enabled = 1.f;
+    p->run_empty();
 
     p->log.messages.clear();
     check(p->restore(state_of(a), world.urids().map(LV2_ATOM__String)) == LV2_STATE_ERR_BAD_TYPE,
           label + "state of the wrong type is rejected");
     check(p->log.contains(LV2_LOG__Error, "wrong type"), label + "wrong type is logged");
     check(p->failure() && p->failure()->kind == HostFailureKind::state_unreadable &&
-              p->failure()->request.number == 4,
+              p->failure()->request.number == 5,
           label + "wrong type: recorded as unreadable state");
     const std::vector<std::byte> garbage(40, std::byte{0x5a});
     p->log.messages.clear();
     check(p->restore(garbage, chunk(world)) != LV2_STATE_SUCCESS, label + "corrupt state rejected");
     check(p->log.contains(LV2_LOG__Error, "could not be read"), label + "corrupt state is logged");
     check(p->failure() && p->failure()->kind == HostFailureKind::state_unreadable &&
-              p->failure()->request.number == 5,
+              p->failure()->request.number == 6,
           label + "corrupt state: recorded as unreadable state");
     const auto newer =
         std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 5, 0, 0, 0, 0, 0, 0, 0});

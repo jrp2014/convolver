@@ -226,6 +226,7 @@ OSStatus Effect::Initialize() {
     std::string message, faults;
     bool started = false, problem = true;
     HostSettings current;
+    bool bypassed = false; // Read once, so the log says the bypass the processor starts with.
     {
         const Locked lock(*this);
         faults = observe_faults(); // Before the processor that counted them goes.
@@ -238,7 +239,8 @@ OSStatus Effect::Initialize() {
             auto activation = filter_.activation(now);
             auto next = std::make_unique<HostProcessor>(activation.playback, GetMaxFramesPerSlice(),
                                                         current, now.inputs);
-            next->set_bypass(bypass_.load());
+            bypassed = bypass_.load();
+            next->set_bypass(bypassed);
             next->reset();
             tail_.store(next->tail_frames());
             latency_.store(next->latency_frames());
@@ -260,7 +262,7 @@ OSStatus Effect::Initialize() {
                 const auto& f = filter_.failure();
                 problem = (f && f->silent) || !filter_.notice().empty();
                 message = started_line(filter_, *settling_.last_start(), GetMaxFramesPerSlice(),
-                                       &current, bypass_.load());
+                                       &current, bypassed);
             } catch (...) { // Out of memory for the message: the unit still plays.
             }
         }

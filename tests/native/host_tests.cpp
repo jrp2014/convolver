@@ -458,9 +458,9 @@ void filter_contract() {
             "failed replacement lost the working filter");
     require(running.error().find("the filter could not be prepared") == 0 &&
                 !running.failure()->silent &&
-                failure_consequence(*running.failure(), &stereo, {}, true) ==
+                failure_consequence(*running.failure(), &stereo, {}, true, false) ==
                     "The previous filter keeps playing." &&
-                failure_consequence(*running.failure(), nullptr, {}, true) ==
+                failure_consequence(*running.failure(), nullptr, {}, true, false) ==
                     "The previous filter is kept.",
             "failed replacement not explained");
 
@@ -803,7 +803,7 @@ void wider_inputs() {
             "Mix 0% is said to play the dry signal of a filter that has none");
     require(!dry_signal(f, six) && dry_signal(HostFilter(8), six),
             "the dry signal follows the host's counts, not the filter's");
-    const auto playing = playing_words(f, six, {});
+    const auto playing = playing_words(f, six, {}, false);
     require(playing.find("Inputs 3–6 are ignored: the filter reads inputs 1–2.") !=
                 std::string::npos,
             "playing words: " + playing);
@@ -811,7 +811,8 @@ void wider_inputs() {
                     std::string::npos &&
                 loaded_line(f, std::optional<HostLayout>()).find("ignored") == std::string::npos,
             "loaded line: " + loaded_line(f, std::optional(six)));
-    require(started_line(f, six, 512, nullptr).find("Inputs 3–6 are ignored") != std::string::npos,
+    require(started_line(f, six, 512, nullptr, false).find("Inputs 3–6 are ignored") !=
+                std::string::npos,
             "started line");
 
     // The processor: the extra inputs are read and ignored, so it plays as a
@@ -997,8 +998,8 @@ void wider_inputs() {
             "a kept crossover that does not suit the host has a dry signal");
     require(host_status(kept, slower, true, {0, .5}).text.rfind("Silent: ", 0) == 0,
             "status: " + host_status(kept, slower, true, {0, .5}).text);
-    require(failure_consequence(*kept.failure(), &slower, {0, .5}, dry_signal(kept, slower)) ==
-                "Convolver plays silence.",
+    require(failure_consequence(*kept.failure(), &slower, {0, .5}, dry_signal(kept, slower),
+                                false) == "Convolver plays silence.",
             "a kept crossover is said to play the dry signal");
     for (const float m : {0.f, 1.f}) {
         HostProcessor q(silent_crossover, 32, HostSettings{0, m, 64}, 6);
@@ -2278,10 +2279,10 @@ void status_lines() {
     // The log lines adapters write.
     HostFilter g(8);
     require(loaded_line(g, true) == "Request 0: Loaded a saved project or preset with no filter." &&
-                contains(started_line(g, stereo, 512),
+                contains(started_line(g, stereo, 512, nullptr, false),
                          "Started at 48000 Hz, 2 in, 2 out, blocks of up to 512 frames. No "
                          "filter, so audio passes unchanged.") &&
-                contains(started_line(g, crossover_bus, 512), "plays silence") &&
+                contains(started_line(g, crossover_bus, 512, nullptr, false), "plays silence") &&
                 contains(started_line(g, stereo, 512, nullptr, true),
                          "No filter. Bypass is on: audio passes unchanged."),
             "empty instance log lines");
@@ -2334,30 +2335,30 @@ void status_lines() {
                 "Request 1: Loaded a filter for 44100 Hz, 2 in, 2 out; waiting "
                 "for audio settings from the host.",
             "unchecked load line");
-    require(rejected_line(g, true).empty(), "rejected line without a rejection");
+    require(rejected_line(g, true, false).empty(), "rejected line without a rejection");
     try {
         g.load(HostState{crossover}, stereo);
     } catch (const std::invalid_argument&) {
     }
-    require(
-        rejected_line(g, true).rfind("Request 2: Not loaded; the previous filter keeps "
-                                     "playing: the filter has 2 inputs and 6 outputs, and "
-                                     "the host gives the plug-in 2 inputs and 2 outputs. Cause: ",
-                                     0) == 0 &&
-            rejected_line(g, true).find('\n') == std::string::npos,
-        "rejected line");
+    require(rejected_line(g, true, false)
+                        .rfind("Request 2: Not loaded; the previous filter keeps "
+                               "playing: the filter has 2 inputs and 6 outputs, and "
+                               "the host gives the plug-in 2 inputs and 2 outputs. Cause: ",
+                               0) == 0 &&
+                rejected_line(g, true, false).find('\n') == std::string::npos,
+            "rejected line");
     require(rejected_line(g, true, true)
                     .rfind("Request 2: Not loaded; the previous filter is kept (bypass is on): ",
                            0) == 0,
             "rejected line while bypassed");
     // Before the host starts the plug-in, the kept filter does not play yet.
-    require(rejected_line(g, false).rfind("Request 2: Not loaded; the previous filter is kept: ",
-                                          0) == 0,
+    require(rejected_line(g, false, false)
+                    .rfind("Request 2: Not loaded; the previous filter is kept: ", 0) == 0,
             "rejected line before the host starts the plug-in");
     static_cast<void>(test::started(g, stereo));
-    require(contains(started_line(g, stereo, 64),
+    require(contains(started_line(g, stereo, 64, nullptr, false),
                      "Convolver plays silence. The saved filter is for 44100 Hz") &&
-                contains(started_line(g, stereo, 64), "Convolver never resamples"),
+                contains(started_line(g, stereo, 64, nullptr, false), "Convolver never resamples"),
             "silent start line does not explain");
     g.load(saved_failure, stereo);
     require(contains(loaded_line(g, true), "records a failed load") &&
