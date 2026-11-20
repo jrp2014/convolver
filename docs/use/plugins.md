@@ -163,6 +163,22 @@ The filter is prepared away from the audio, then installed. A filter loaded
 before any audio plays starts at once; one loaded during playback fades in
 ([replacing a filter](#replacing-a-filter)).
 
+**When a chosen file is checked.** In the Audio Unit and the VST3 plug-in, a
+file chosen while the host plays audio through the plug-in is checked at
+once against the host's sample rate and channels, and one that does not fit
+is refused while the working filter keeps playing. Before the host has
+played, and while playback is stopped, the host may not have given its real
+rate yet (Audacity sets up the plug-in at 44.1 kHz until it first plays,
+whatever the project's rate), so a single IR file or `.cfg` is kept, saved
+with the project, and checked when the host starts the plug-in: if it does
+not fit then, it plays silence and Status says why. A configuration list
+needs the rate and channels to choose its entry, so it uses the ones the
+host last started the plug-in with; before the host has started it, the
+list is not loaded, and the window says: "Play audio once so Convolver can
+check the host's sample rate and channel counts, then choose the
+configuration list again." LV2 knows its host's rate and channels from the
+start, so it checks every file at once.
+
 ## When a filter does not fit
 
 A filter, chosen as a file or loaded as a preset, has one sample rate and
