@@ -1029,7 +1029,7 @@ void wider_inputs() {
         q.set_bypass(true);
         std::vector<std::vector<float>> ones(1, std::vector<float>(32, 1.f));
         for (int k = 0; k < 4; ++k) {
-            for (auto& v : ones[0]) // play() leaves the output here.
+            for (auto& v : in[0])
                 v = 1.f;
             play(q, ones, 1);
             for (auto v : ones[0])

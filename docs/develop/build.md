@@ -592,8 +592,8 @@ run only as advice, as for the libraries
 with a newer compiler, within the stated tolerance
 ([decisions](../project/decisions.md#licences-and-dependencies)). A newer
 compiler's warnings in Convolver's own sources are fixed; where the compiler
-is wrong, the warning is silenced at that line with the reason, as for a
-clang-tidy false positive. Warnings in the SDKs and libsndfile are theirs.
+is wrong or its advice does not apply, the warning is silenced at that line
+with the reason, as for a clang-tidy false positive. Warnings in the SDKs and libsndfile are theirs.
 
 - **Runner images:** each job uses the newest generally available image:
   `ubuntu-latest`, `macos-latest` and `windows-latest`, or the label of the
