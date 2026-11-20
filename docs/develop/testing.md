@@ -406,7 +406,8 @@ cases.
   with no filter; a stereo filter on a mono track; a wrong rate; a failed
   first load at Mix 50%; a refused replacement; playing; not checked yet; a
   fault; a fault and a refused replacement with bypass on, PLUG-39 step 4,
-  for equal and unequal channel counts and before the host starts), checking the status, the explanation's wording and what it must
+  for equal and unequal channel counts and before the host starts),
+  checking the status, the explanation's wording and what it must
   not say, the fields and the plain text; the Audio facts in order with
   their values, notes and help (a refused rate and a mono track's channels
   marked as problems, the Routing of a filter that is not playing, what is
@@ -1203,7 +1204,8 @@ python3 tests/au/avaudioengine_tests.py build-au/convolver-preset
 - `lv2.adapter`: the bundle's plug-ins and ports through lilv; instantiation
   refusals; the status port, log messages, saved state and failure record after
   good and bad loads (a refused replacement with bypass on is logged as
-  what bypass plays, PLUG-39 step 4; the record through an unadvertised extension that exists
+  what bypass plays, PLUG-39 step 4; the record through an unadvertised
+  extension that exists
   for the tests only); presets written by `convolver-preset` and lilv's own
   state round trip; long `run()` calls; filter files through the worker, run
   on a thread, synchronously (as when a host free-wheels) and with answers

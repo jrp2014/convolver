@@ -434,25 +434,6 @@ void class_info() {
     same_output(unit, copy, 2, 2);
 }
 
-// PLUG-39 step 4: with bypass on, the log lines say what bypass plays, not
-// the filter: a refused replacement and the start line (Initialize).
-void bypassed_log_lines() {
-    Unit unit;
-    check(unit.configure(48000, 2, 2, 512), "formats");
-    check(unit.initialize(), "initialization");
-    check(unit.load(state_of(stereo(48000))), "filter");
-    unit.set_bypass(true);
-    const au_test::LogSince log(process_log);
-    require(unit.load(state_of(stereo(44100))) != noErr, "a wrong-rate filter accepted");
-    require(log.text().find("the previous filter is kept (bypass is on)") != std::string::npos &&
-                log.text().find("keeps playing") == std::string::npos,
-            "a refused replacement while bypassed is logged as playing: " + log.text());
-    unit.uninitialize();
-    check(unit.initialize(), "second initialization");
-    require(log.text().find("Bypass is on: the input plays unfiltered. Loaded: ") !=
-                std::string::npos,
-            "a start while bypassed is logged as playing the filter: " + log.text());
-}
 void rejected_presets() {
     const auto filter = stereo(48000);
     Unit unit;
@@ -751,6 +732,26 @@ void render_requires_initialization() {
 // The Convolver log, a file of this test's own in the build folder (au.bundle
 // and au.harness share another), set once in main() (CI-22, CI-27).
 std::filesystem::path process_log;
+
+// PLUG-39 step 4: with bypass on, the log lines say what bypass plays, not
+// the filter: a refused replacement and the start line (Initialize).
+void bypassed_log_lines() {
+    Unit unit;
+    check(unit.configure(48000, 2, 2, 512), "formats");
+    check(unit.initialize(), "initialization");
+    check(unit.load(state_of(stereo(48000))), "filter");
+    unit.set_bypass(true);
+    const au_test::LogSince log(process_log);
+    require(unit.load(state_of(stereo(44100))) != noErr, "a wrong-rate filter accepted");
+    require(log.text().find("the previous filter is kept (bypass is on)") != std::string::npos &&
+                log.text().find("keeps playing") == std::string::npos,
+            "a refused replacement while bypassed is logged as playing: " + log.text());
+    unit.uninitialize();
+    check(unit.initialize(), "second initialization");
+    require(log.text().find("Bypass is on: the input plays unfiltered. Loaded: ") !=
+                std::string::npos,
+            "a start while bypassed is logged as playing the filter: " + log.text());
+}
 
 // CI-27: tests/au/log_evidence_tests.py runs this to check that the log
 // survives an abrupt end. One load writes a line (each line is written and
