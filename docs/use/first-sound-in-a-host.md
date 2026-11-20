@@ -7,8 +7,8 @@ that it fits the track, play, and save the project.
 
 **In short:** on macOS or Windows, on a stereo track at 48000 Hz, add
 Convolver, click **Choose…** in its window and pick
-`presets/identity-48000-stereo/filter.cfg` from the extracted package. The window shows 48000 Hz and `2 in → 2 out`, and
-you hear no change. Choose `echo-48000-stereo/filter.cfg` (quieter and
+`presets/identity-48000-stereo/filter.cfg` from the extracted package. The
+window shows 48000 Hz and `2 in → 2 out`, and you hear no change. Choose `echo-48000-stereo/filter.cfg` (quieter and
 hollow) and `repeat-48000-stereo/filter.cfg` (each sound again a quarter of a
 second later), then save, close and reopen the project: the filter is still
 there. Your own IR file, `.cfg` or configuration list loads the same way,

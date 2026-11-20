@@ -33,7 +33,7 @@ they are not automatically normalized.
 | Sample rate | Frames per second, such as 48,000 Hz |
 | Interleaved | Samples ordered by frame: left, right, left, right, … |
 | Planar | One separate sample buffer per channel, as used by many plug-in hosts |
-| Block size B | The number of frames the engine processes as one convolution partition |
+| Block size B | The command line's name for the latency (`--block-size`), in frames; not the size of the blocks the engine divides a filter into |
 | FFT | Fast Fourier transform; used to calculate long convolutions efficiently |
 | FFT plan | Prepared data or a selected algorithm for a transform of a particular size |
 | FFTW wisdom | FFTW's saved plan information; useful for avoiding measured planning at startup |
@@ -63,8 +63,8 @@ use these words for the files you give Convolver and for what a host saves.
 | Audio settings | The sample rate and channels the host gives the plug-in, usually when the plug-in is added or the project opens, not when you press Play. Until then the Status parameter of a plug-in with a filter loaded reads Waiting: Convolver cannot yet tell whether the filter fits | |
 
 At 48 kHz, 256 frames of latency is about 5.33 ms. That is Convolver's delay;
-audio devices and the host can add more. A smaller block reduces this delay but
-can increase CPU work. FFTW planning does not choose the block size for you.
+audio devices and the host can add more. Less latency reduces this delay but
+can increase processor work. FFTW planning does not choose the latency for you.
 
 ## Files and continuous streams
 

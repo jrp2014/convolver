@@ -62,7 +62,7 @@ Contents: [formats](#formats) · [channels](#channels) ·
 | Choose a `.cfg` or IR file directly | [On macOS and Windows](#convolvers-window), in its window | [Yes](#convolvers-window), in its window | [Yes](#lv2-filter-files) |
 | Where a failure is explained | The Status parameter and the [Convolver log](#status-and-the-convolver-log) | The Status parameter and the [Convolver log](#status-and-the-convolver-log), also in the macOS system log | The `status` output and the host's log |
 | Tail reported to the host | Yes | Yes, in seconds | No |
-| [Settings](#settings): gain, mix, latency | Yes | Yes | Yes, as control ports ([LV2 ports](#lv2-ports)) |
+| [Settings](#settings): gain, gain mode, mix, latency | Yes | Yes | Yes, as control ports ([LV2 ports](#lv2-ports)) |
 | Licence | GPL-2.0-or-later | [GPL-3.0-or-later](#audio-unit-licence) | GPL-2.0-or-later |
 
 ## Channels

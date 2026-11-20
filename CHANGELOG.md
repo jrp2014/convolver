@@ -141,7 +141,8 @@ Until 1.0 the C++ API may change between minor versions.
   Gain mode among the settings; the pages that named only macOS for
   Convolver's window include the VST3 window on Windows, with its Copy
   Diagnostics for a problem report; the package list names the Linux LV2
-  plug-in; and TODO IDs no longer appear in the user guides.
+  plug-in, and presets and the plug-ins table name Gain mode; and TODO IDs
+  no longer appear in the user guides.
 - Plug-ins (PLUG-36): while bypassed, Status and the window's report say
   what bypass plays when no filter is heard. A kept filter that does not
   suit the host (another sample rate, say) showed "Silent:" while bypass
