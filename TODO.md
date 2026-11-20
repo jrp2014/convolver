@@ -241,9 +241,9 @@ is superseded.
   (20 November 2026): on Ubuntu 26.04, `ardour9-new_session` (9.0.0~ds)
   writes the session, says so, then aborts with glibc's "FATAL: exception
   not rethrown", for 7 of 11 sessions in five CI runs and before Convolver
-  is loaded. `new_session()` in `tests/lv2/ardour_tests.py` accepts that
-  abort with a warning
-  ([Ardour, headless](docs/develop/testing.md#ardour-headless)). Next: jrp
+  is loaded. `known_new_session_abort()` in `tests/lv2/ardour_tests.py`
+  accepts that abort with a warning, on Ardour 9.0 and with that message
+  only ([Ardour, headless](docs/develop/testing.md#ardour-headless)). Next: jrp
   reports it to Ardour if he wishes; a draft is in the project files.
   **Done when** the Ardour on `ubuntu-latest` no longer aborts there and the
   test stops accepting it.
@@ -1222,7 +1222,8 @@ move to the archive.
   20 November 2026, PR #229, from CI-43: Ardour 9's Lua tool crashed in
   `Session:new_audio_track`, which takes an empty `ARDOUR.RouteGroup()`
   where Ardour 8 took `nil`; Ardour 9.0's `new_session` also aborts as it
-  exits, after writing the session, which the test accepts with a warning.
+  exits, after writing the session, which the test accepts with a warning
+  on 9.0 and with that message only, checked by `ardour_harness_tests.py`.
   The job runs on `ubuntu-latest` with Ardour 9 and no longer needs an older
   image ([Ardour, headless](docs/develop/testing.md#ardour-headless)).
 - [x] **PLUG-36 — The loading-and-failure table covers each transition.**

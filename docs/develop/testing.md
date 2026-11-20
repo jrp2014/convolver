@@ -1271,9 +1271,13 @@ Lua tool crashed (HOST-7), so the script passes each version its form. Ardour
 9.0's `new_session` writes the session and then aborts as it exits ("FATAL:
 exception not rethrown") before Convolver is loaded: for 7 of 11 sessions
 in five CI runs on 20 November 2026. The test accepts that abort, with a
-warning, only after `new_session` has said it created the session and the
-session file exists; the Lua script then opens the session, so a damaged one
-fails there. HOST-8 drops this once a fixed Ardour ships.
+warning, only on Ardour 9.0 (from `ardourN-lua --version`), with exactly
+that message after `new_session` has said it created the session, and with
+the session file present; any other abort fails. The Lua script then opens
+the session, so a damaged one fails there.
+[`ardour_harness_tests.py`](../../tests/lv2/ardour_harness_tests.py) (in
+pre-commit) checks that rule both ways. HOST-8 drops it once a fixed Ardour
+ships.
 
 Ardour 8.4's export sometimes corrupts its heap and aborts at the end
 ("double free or corruption") when a track has a plug-in, whichever plug-in
