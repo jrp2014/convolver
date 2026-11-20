@@ -107,6 +107,22 @@ before they set the sample rate and channel layout (VST3 `setState` before
   counts as whole: rounding, not a different rate.
 - LV2 knows the sample rate at instantiation and its ports are fixed, so its
   configuration is always known and both kinds of check run in `restore()`.
+- The Audio Unit counts its formats as known while it is initialized, and,
+  uninitialized, while they still match the last initialization that
+  rendered audio. JUCE hosts initialize it at AUBase's default 44.1 kHz to
+  try a channel layout, then restore the project before preparing to play,
+  so counting that probe would refuse a 48 kHz project's filter
+  (`au.adapter` `layout_probe_before_restore`). Once the formats are known,
+  every request is checked against them, a chosen file included.
+- One shared record holds both formats' rules: `HostSettling` in
+  [`host_settling.hpp`](../../portable/host_settling.hpp) (PLUG-39 step 2,
+  `native.host_settling`), which each adapter tells when the host starts
+  it, plays audio with it and stops it, and asks what the host's
+  configuration is and whether a request that does not suit it is refused
+  or kept. VST3 uses `HostBinding::activation` and the Audio Unit
+  `HostBinding::rendering`; they differ, as jrp decided (13 November
+  2026), for a file chosen while stopped after a start that never played:
+  VST3 checks it against that start, the Audio Unit does not.
 - VST3 counts its configuration as known once the plug-in has been activated
   with it and has played audio with it (a `process` call with samples, in
   that activation or an earlier one since the rate or buses last changed),
@@ -135,7 +151,7 @@ before they set the sample rate and channel layout (VST3 `setState` before
   new instance before it has played audio, or just after the host changed
   its rate or buses and before it plays again, is therefore kept silent
   rather than refused; VST3 gives no other way to tell it from a restored project
-  when the host does not say. `processor.cpp`'s `load_check()` holds the rule
+  when the host does not say. `HostSettling::check()` holds the rule
   (each load names its kind, `HostRequestKind`: a chosen file, restored
   state or a session the host is opening),
   and `vst3.adapter`'s `restored_while_host_settles` replays REAPER's order.
