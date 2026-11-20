@@ -1263,7 +1263,7 @@ with its default buses, which for Convolver are 2 in and 2 out: on a mono
 track it feeds the one input to both, and it does not ask for another
 arrangement, so a mono or crossover filter does not fit. Ardour 8.4 also
 names every VST3 parameter that cannot be automated (Gain mode and Latency)
-"hidden", so the script finds the Latency parameter by its eight steps. For
+"hidden", so the script finds the Latency parameter by its shape: the one input with as many entries as the Latency menu. For
 each case:
 
 1. `convolver-preset` makes a preset from the fixture's filter: an LV2

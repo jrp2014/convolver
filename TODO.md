@@ -247,6 +247,17 @@ is superseded.
   reports it to Ardour if he wishes; a draft is in the project files.
   **Done when** the Ardour on `ubuntu-latest` no longer aborts there and the
   test stops accepting it.
+- [ ] **HOST-10 — Ardour's VST3 channels and settings.** From HOST-9
+  (20 November 2026): Ardour 8.4 ran Convolver's VST3 only at its default
+  2 in, 2 out, never asking for another bus arrangement, and named Latency
+  and Gain mode "hidden" ([unresolved host finding](docs/develop/host-testing.md#unresolved-host-findings)).
+  **Remains:** whether Ardour 9 does the same (the Ardour test's mono VST3
+  case shows it), and whether Ardour's own controls show those two
+  settings; then say what Ardour users should choose in the
+  [plug-in guide](docs/use/plugins.md) if it matters to them. **Worth doing
+  when** someone uses the VST3 in Ardour, which on Linux has no window of
+  ours; the LV2 layouts play every example there. **Done when** the finding
+  is explained and the guide says what it needs to.
 - [ ] **DIAG-9 — Numbers in the user's locale.** Low priority, from jrp's
   review of PLUG-36 (20 November 2026): diagnostics write sample rates,
   levels and counts as plain ASCII digits ("44100 Hz", "-6.0 dB")
@@ -1220,10 +1231,11 @@ Items finished since then are listed here, one line each, until the next
 move to the archive.
 
 - [x] **HOST-9 — Play the VST3 and a saved Latency in the Ardour test.**
-  20 November 2026, from the external audit of 20 November: the Ardour test
+  20 November 2026, PR #237: the Ardour test
   moved to `tests/plugins/` and now also runs in the VST3 workflow, on
   Ardour's own VST3 host (the stereo example; Ardour 8.4 runs a VST3 only
-  at its default 2 in, 2 out, an [unresolved host finding](docs/develop/host-testing.md#unresolved-host-findings)).
+  at its default 2 in, 2 out, an [unresolved host finding](docs/develop/host-testing.md#unresolved-host-findings)
+  that HOST-10 follows).
   Each format also saves sessions at Latency 256 or 1024, which Ardour must
   report at once, report again after reopening, and export in time
   ([Ardour, headless](docs/develop/testing.md#ardour-headless)).

@@ -60,7 +60,8 @@ SCRIPT = pathlib.Path(__file__).with_name('ardour_session.lua')
 REOPEN = pathlib.Path(__file__).with_name('ardour_reopen.lua')
 REGISTRY = json.loads((REPOSITORY / 'plugins' / 'identities.json').read_text(encoding='utf-8'))
 RATE = 48000
-VST3_CLASS = 'Convolver'  # The name the VST3 factory gives the processor class; Ardour finds it by that.
+VST3_CLASS = 'Convolver'  # The name the VST3 factory gives the processor class.
+VST3_CLASS_ID = REGISTRY['vst3']['processor_class_id']  # Ardour finds the plug-in by it.
 RECORD = 24000  # Half a second of the Dummy backend's noise.
 MARGIN = 1000  # Frames exported after the filter's tail, which must be silent.
 # Ardour's gain stages ramp up over the first frames of an export (by 0.3 %
@@ -102,6 +103,15 @@ def scanner(lua_tool):
     if not path.is_file():
         sys.exit(f"Ardour's VST3 scanner {path} is not installed (Ubuntu: apt-get install ardour)")
     return path
+
+
+def explain_vst3_discovery(directory):
+    """For a failure: the scanner's cache files and Ardour's scan log, which decide what it lists."""
+    for folder in (directory / 'cache', directory / 'config'):
+        for path in sorted(folder.rglob('*')):
+            if path.is_file() and (path.suffix == '.v3i' or path.name == 'scan_log'):
+                print(f'--- {path.relative_to(directory)}')
+                print(path.read_text(encoding='utf-8', errors='replace')[:4000])
 
 
 def plugin_uri(inputs, outputs):
@@ -274,7 +284,9 @@ def check(tools, environment, directory, plugin_tool, format_name, fixture_name,
         'CONVOLVER_SESSION_DIR': str(session),
         'CONVOLVER_SESSION_NAME': name,
         'CONVOLVER_FORMAT': format_name,
-        'CONVOLVER_PLUGIN': plugin_uri(inputs, outputs) if format_name == 'LV2' else VST3_CLASS,
+        'CONVOLVER_PLUGIN': plugin_uri(inputs, outputs)
+        if format_name == 'LV2'
+        else REGISTRY['vst3']['processor_class_id'],
         'CONVOLVER_PRESET': label,
         'CONVOLVER_LATENCY': str(latency),
         'CONVOLVER_LATENCIES': ','.join(str(frames) for frames in LATENCIES),
@@ -284,7 +296,12 @@ def check(tools, environment, directory, plugin_tool, format_name, fixture_name,
         'CONVOLVER_TAIL': str(filter_tail + MARGIN),
         'CONVOLVER_LEAD': str(LEAD),
     }
-    log = run([tools['lua'], SCRIPT], {**environment, **settings}).stdout
+    result = run([tools['lua'], SCRIPT], {**environment, **settings}, check=False)
+    if result.returncode != 0:
+        if format_name == 'VST3':
+            explain_vst3_discovery(directory)
+        sys.exit(f'{name}: {pathlib.Path(tools["lua"]).name} failed with exit code {result.returncode}')
+    log = result.stdout
     # The region can be a few frames shorter than the take's files.
     recorded = re.search(r'^Recorded (\d+) frames', log, re.MULTILINE)
     assert recorded, f'{name}: the script did not report the recording'
@@ -370,8 +387,10 @@ def main():
         else:
             installed = directory / 'home' / '.vst3' / bundle.name
             shutil.copytree(bundle, installed)
-            # Ardour lists only VST3 plug-ins its scanner has indexed; the GUI
-            # runs it when it finds a new bundle, the headless tools do not.
+            # Ardour looks for VST3 bundles on VST3_PATH and in ~/.vst3, and
+            # lists only those its scanner has indexed; the GUI runs it when
+            # it finds a new bundle, the headless tools do not.
+            environment['VST3_PATH'] = str(installed.parent)
             scan = scanner(tools['lua'])
             library = {'LD_LIBRARY_PATH': ':'.join(filter(None, [str(scan.parent), os.environ.get('LD_LIBRARY_PATH')]))}
             run([scan, '--force', installed], {**environment, **library})

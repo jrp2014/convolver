@@ -13,7 +13,7 @@
 -- and saves. The settings come from the environment:
 --   CONVOLVER_SESSION_DIR, CONVOLVER_SESSION_NAME  the session
 --   CONVOLVER_FORMAT  LV2 or VST3
---   CONVOLVER_PLUGIN  the plug-in: its URI (LV2) or its name (VST3)
+--   CONVOLVER_PLUGIN  the plug-in: its URI (LV2) or its processor class ID (VST3)
 --   CONVOLVER_PRESET  the preset's label
 --   CONVOLVER_LATENCY    the Latency to choose, in frames
 --   CONVOLVER_LATENCIES  the Latency menu's choices, in frames, in order
@@ -91,7 +91,18 @@ step("add the plug-in")
 local plugin_type = ({ LV2 = ARDOUR.PluginType.LV2, VST3 = ARDOUR.PluginType.VST3 })[format]
 assert(plugin_type, "CONVOLVER_FORMAT must be LV2 or VST3, not " .. format)
 local processor = ARDOUR.LuaAPI.new_plugin(session, identifier, plugin_type, "")
-assert(not processor:isnil(), "Ardour cannot find the " .. format .. " plug-in " .. identifier)
+if processor:isnil() then
+	-- What Ardour does list, to tell a plug-in it never found from one it
+	-- found under another name.
+	local listed = 0
+	for info in ARDOUR.LuaAPI.list_plugins():iter() do
+		if info.type == plugin_type then
+			listed = listed + 1
+			print("Ardour lists " .. format .. " plug-in " .. info.name .. " (" .. info.unique_id .. ") from " .. info.path)
+		end
+	end
+	error("Ardour cannot find the " .. format .. " plug-in " .. identifier .. " among the " .. listed .. " it lists")
+end
 assert(track:add_processor_by_index(processor, 0, nil, true) == 0, "cannot add the plug-in to the track")
 local plugin = processor:to_insert():plugin(0)
 local preset = plugin:preset_by_label(label)
@@ -106,14 +117,17 @@ print("Loaded preset " .. label .. " into " .. plugin:name())
 -- (Gain mode has three). Its value is the entry's index.
 step("choose Latency " .. latency)
 local which, value
+local matches = 0
 for n = 0, plugin:parameter_count() - 1 do
 	local id, found = plugin:nth_parameter(n, true)
 	if found[2] and plugin:parameter_is_input(id) then
 		local _, descriptor = plugin:get_parameter_descriptor(id, ARDOUR.ParameterDescriptor())
 		descriptor = descriptor[2]
 		if descriptor.label == "Latency" and descriptor.upper == latencies[#latencies] then
+			matches = matches + 1
 			which, value = n, latency
 		elseif descriptor.integer_step and descriptor.lower == 0 and descriptor.upper == #latencies - 1 then
+			matches = matches + 1
 			for index, frames in ipairs(latencies) do
 				if frames == latency then
 					which, value = n, index - 1
@@ -122,7 +136,10 @@ for n = 0, plugin:parameter_count() - 1 do
 		end
 	end
 end
-assert(which and value, "cannot find a Latency parameter offering " .. latency .. " frames")
+-- Exactly one, so that a host listing its parameters differently fails
+-- here rather than setting another one.
+assert(matches == 1, matches .. " parameters look like Latency; expected one")
+assert(which and value, "the Latency parameter does not offer " .. latency .. " frames")
 assert(ARDOUR.LuaAPI.set_processor_param(processor, which, value), "Ardour refused Latency " .. latency)
 assert(ARDOUR.LuaAPI.get_processor_param(processor, which) == value, "Latency did not keep its new value")
 print("Latency set to " .. latency .. " frames (parameter " .. which .. ", value " .. value .. ")")
