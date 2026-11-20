@@ -8,3 +8,4 @@ and what is ready now is in [status](../../project/status.md).
 | Record | What it records | Current page |
 | --- | --- | --- |
 | [Developer preview, 18 October 2026](2026-10-18-developer-preview.md) | The first unsigned candidate matrix, local signing limitations, production gates and licence notes; updated 21 October 2026 when the work was merged | [Releasing](../../develop/releasing.md) |
+| [Superseded decisions, 20 November 2026](2026-11-20-superseded-decisions.md) | Decisions-log entries that later decisions wholly replaced, among them the earlier baselines for the checks left; moved out of the log on 20 November 2026 | [Decisions](../../project/decisions.md) |
