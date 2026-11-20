@@ -95,12 +95,36 @@ void rendering_binding() {
     require(known_as(s, stereo) && !s.known(probe), "an unrendered start replaced the binding");
     require(s.last_start() && same_configuration(*s.last_start(), probe), "last start");
 }
+
+// Calls a host makes out of order bind nothing they should not: a stop
+// before any start, and a second start without a stop, which counts as a
+// start with the new configuration.
+void out_of_order() {
+    for (const auto binding : {HostBinding::activation, HostBinding::rendering}) {
+        HostSettling s(binding);
+        s.stopped();
+        require(!s.known(stereo) && !s.last_start(), "a stop before any start bound something");
+        s.started(stereo);
+        s.played();
+        s.started(six);
+        require(known_as(s, six), "the second start is not the host's configuration");
+        s.stopped();
+        require(!s.known(stereo), "the first start still binds after a second");
+        // VST3: audio played with the first configuration, not this one;
+        // the Audio Unit checks every request.
+        const auto expected = binding == HostBinding::activation ? HostLoadCheck::keep_until_suited
+                                                                 : HostLoadCheck::refuse_mismatch;
+        require(s.check(HostRequestKind::restore) == expected,
+                "restored state after a second start without a stop");
+    }
+}
 } // namespace
 
 int main() {
     if (test::run_cases({
             {"activation_binding", activation_binding},
             {"rendering_binding", rendering_binding},
+            {"out_of_order", out_of_order},
         }))
         return 1;
     std::cout << "host settling tests passed\n";

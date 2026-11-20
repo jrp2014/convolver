@@ -23,8 +23,10 @@
 //   earlier one since it last changed), and a project the host says it is
 //   opening never is: hosts start the plug-in on placeholder buses before
 //   they restore a project (REAPER; jrp's crossover retest, 7 November 2026).
-// - HostBinding::rendering (Audio Unit): a start binds the configuration only
-//   once audio has rendered with it, and then binds every request. JUCE hosts
+// - HostBinding::rendering (Audio Unit): while started, the configuration is
+//   the host's and every request is checked against it; stopped, it stays
+//   known only if audio rendered with that start, and then still binds every
+//   request. JUCE hosts
 //   initialize at AUBase's default 44.1 kHz to try a layout, then restore the
 //   project before preparing to play; counting that probe would turn a
 //   48 kHz project's filter into a failed load.

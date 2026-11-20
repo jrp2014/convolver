@@ -120,9 +120,13 @@ before they set the sample rate and channel layout (VST3 `setState` before
   it, plays audio with it and stops it, and asks what the host's
   configuration is and whether a request that does not suit it is refused
   or kept. VST3 uses `HostBinding::activation` and the Audio Unit
-  `HostBinding::rendering`; they differ, as jrp decided (13 November
-  2026), for a file chosen while stopped after a start that never played:
-  VST3 checks it against that start, the Audio Unit does not.
+  `HostBinding::rendering`, and their differences stay as jrp decided
+  (13 November 2026): while stopped after a start that never played, VST3
+  still knows that start's configuration and checks a chosen file against
+  it, while the Audio Unit knows only the last initialization that
+  rendered; and while started, VST3 keeps restored state that does not
+  suit until audio has played and never refuses a project the host is
+  opening, while the Audio Unit refuses both at once.
 - VST3 counts its configuration as known once the plug-in has been activated
   with it and has played audio with it (a `process` call with samples, in
   that activation or an earlier one since the rate or buses last changed),
