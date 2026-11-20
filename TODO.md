@@ -1236,7 +1236,7 @@ move to the archive.
   the new processor will play
   ([status and log](docs/develop/plugin-contract.md#status-and-log)).
 - [x] **CI-44 — Check the Linux package's libstdc++ versions.**
-  20 November 2026, PR #NNN, from the independent review of CI-43:
+  20 November 2026, PR #227, from the independent review of CI-43:
   `verify_artifact.py` refused glibc symbols newer than Ubuntu 22.04's but
   not libstdc++ ones, so a newer GCC on the build image would have shipped
   a package that does not load there or on Debian 12. It now refuses
