@@ -355,7 +355,8 @@ cases.
   (`shared_filter`, PLUG-39 step 4a: the processor and activation get the
   same object, a copy of the `HostFilter` keeps the old filter whole and
   its record after a replacement, a refused replacement and the same filter
-  restored again keep the accepted object, and the last owner frees it); and the
+  restored again keep the accepted object, the last owner frees it, and a
+  playback with no filter is refused); and the
   saved-state limit (PLUG-12): the
   size counted without encoding matches the encoding, a filter that leaves
   exactly the settings' room (PLUG-13) loads, saves with and without

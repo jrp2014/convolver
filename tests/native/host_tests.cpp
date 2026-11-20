@@ -1322,7 +1322,7 @@ void allocation_failures() {
                 std::string(c.name) + " with " + std::to_string(limit) + " allocations: ";
             require(audible == saved_sound(f), (what + "what plays is not what is saved").c_str());
             if (!done)
-                require(audible == before && f.filter() != nullptr == c.before.has_value() &&
+                require(audible == before && (f.filter() != nullptr) == c.before.has_value() &&
                             f.failed() == !c.before,
                         (what + "a rejected load changed the previous state, or a refused "
                                 "first load did not fail the instance (ROBUST-7)")
@@ -1356,7 +1356,7 @@ void unrecorded_failures() {
         f.reject(HostFailureKind::filter_file, std::move(why), std::move(request));
         allocations_left = -1;
         const auto& r = f.failure();
-        require(f.failed() == !kept && f.filter() != nullptr == kept && r &&
+        require(f.failed() == !kept && (f.filter() != nullptr) == kept && r &&
                     r->kind == HostFailureKind::filter_file && r->silent == !kept &&
                     r->request.source == HostFilterSource::file && r->request.number > 0 &&
                     r->request.path.empty() && r->message == expected,
@@ -1376,7 +1376,7 @@ void unrecorded_failures() {
         }
         allocations_left = -1;
         const auto& q = g.failure();
-        require(threw && g.failed() == !kept && g.filter() != nullptr == kept && q &&
+        require(threw && g.failed() == !kept && (g.filter() != nullptr) == kept && q &&
                     q->kind == HostFailureKind::preparation && q->silent == !kept &&
                     q->message.empty() &&
                     failure_message(*q).problem.find("memory ran out") != std::string::npos,
@@ -1913,13 +1913,9 @@ void processing_faults() {
 void shared_filter() {
     const HostLayout layout{48000, 1, 1};
     HostFilter f(8);
-    const HostPlayback* installed = nullptr;
     std::shared_ptr<const Configuration> played;
-    f.load(HostState{mono(.5f)}, layout, [&](const HostPlayback& p) {
-        installed = &p;
-        played = p.filter;
-    });
-    require(installed && played && played == f.filter(), "the processor's filter is a copy");
+    f.load(HostState{mono(.5f)}, layout, [&](const HostPlayback& p) { played = p.filter; });
+    require(played && played == f.filter(), "the processor's filter is a copy");
     const auto first = f.filter();
     const HostFilter snapshot = f;
     require(snapshot.filter() == first, "a copy of the HostFilter copied the filter");
@@ -1948,6 +1944,18 @@ void shared_filter() {
     // The last owner frees it: nothing else holds the old one.
     played.reset();
     require(first.use_count() == 2, "the replaced filter is held elsewhere");
+    // A playback with no filter is refused, never dereferenced.
+    const auto refused = [](auto&& build) {
+        try {
+            build();
+        } catch (const std::invalid_argument&) {
+            return true;
+        }
+        return false;
+    };
+    require(refused([] { filter_playback(std::shared_ptr<const Configuration>{}); }) &&
+                refused([] { HostProcessor(HostPlayback{}, 64, HostSettings{}); }),
+            "a playback with no filter was not refused");
 }
 // PLUG-22, PLUG-39 step 4: a name kept apart from the filter's state
 // (VST3's controller state) shows only while its filter plays, whichever

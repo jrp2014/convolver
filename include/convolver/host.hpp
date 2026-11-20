@@ -175,7 +175,8 @@ Advice speaker_notice(const Configuration&, const HostLayout&);
 // configuration's counts (jrp's review, 7 November 2026).
 struct HostPlayback {
     // PLUG-39 step 4a: shared with HostFilter::filter(), never copied; never
-    // null. A processor reads it while it is built and keeps no reference.
+    // null (a processor refuses a null one with std::invalid_argument). A
+    // processor reads it while it is built and keeps no reference.
     std::shared_ptr<const Configuration> filter;
     bool dry = false;
     // PLUG-10: what Estimate and No clipping play for this filter
