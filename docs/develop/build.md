@@ -626,13 +626,12 @@ with a newer compiler, within the stated tolerance
   see a newer release.
 
 An older image or compiler is allowed only for a reason recorded beside it in
-the workflow. The release candidates have two, and one test job a third:
+the workflow. The release candidates have two:
 
 | Job | Runs on | Why not newer |
 | --- | --- | --- |
 | Linux | `ubuntu-22.04`, newest GCC on it (GCC 12) | A newer Ubuntu's glibc would stop the package loading on Ubuntu 22.04 and other glibc 2.35 systems (`max_glibc` in the release policy); GCC 12 also needs no newer libstdc++ than Ubuntu 22.04 and Debian 12 ship (GLIBCXX_3.4.30) |
 | Windows | `windows-2022`, Visual Studio 2022 | The packages use the Microsoft C++ runtime installed on the user's machine (`MultiThreadedDLL`); a Visual Studio 2026 build would need that runtime's 2026 version there. jrp kept Visual Studio 2022 for the packages when he chose the CI-43 changes (19 November 2026) |
-| LV2 Ardour test | `ubuntu-24.04`, Ardour 8.4 | Ubuntu 26.04's Ardour 9 crashes running the test's session script (19 November 2026); HOST-7 adapts the test, then the job moves |
 
 Contributors' own machines are not held to this; the
 [dependencies](#dependencies) above say what a source build needs.

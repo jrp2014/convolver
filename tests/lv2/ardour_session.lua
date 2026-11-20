@@ -1,9 +1,10 @@
 -- SPDX-License-Identifier: GPL-2.0-or-later
 -- Builds an Ardour session around Convolver's LV2 plug-in for
 -- tests/lv2/ardour_tests.py, which runs it with Ardour's headless Lua
--- interpreter (ardour8-lua) and then exports the session with ardour8-export.
+-- interpreter (ardourN-lua, Ardour 9 or 8) and then exports the session with
+-- ardourN-export.
 --
--- It opens a session made by ardour8-new_session (master bus with one
+-- It opens a session made by ardourN-new_session (master bus with one
 -- channel per plug-in output) on Ardour's Dummy audio backend, adds a track
 -- with the plug-in, loads a preset made by convolver-preset from the host's
 -- preset list, records the Dummy backend's white noise onto the track, turns
@@ -19,7 +20,7 @@
 --   CONVOLVER_ARDOUR_MAJOR  Ardour's major version (8 or 9)
 -- Each step that fails stops the script with an error, which the test reports.
 
--- Unbuffered, so that a crash shows the last step that finished (HOST-7).
+-- Unbuffered, so that if Ardour crashes the log shows the last step begun.
 if io and io.stdout then
 	io.stdout:setvbuf("no")
 end

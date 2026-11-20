@@ -1230,28 +1230,39 @@ whose LV2 host is its own code rather than lilv's or JUCE's (HOST-5). It is
 a job of its own, not a CTest test, because it needs Ardour, a large package
 that the other LV2 jobs do not install.
 [`tests/lv2/ardour_tests.py`](../../tests/lv2/ardour_tests.py) uses Ardour's
-headless tools from Ubuntu's `ardour` package (8.4 on Ubuntu 24.04, which
-this job keeps until HOST-7 makes the test work with Ardour 9) on
+headless tools from Ubuntu's `ardour` package (Ardour 9 on Ubuntu 26.04
+in CI; it also finds Ardour 8's tools, which CI used until 20 November
+2026) on
 each [first-use fixture](#plug-in-comparisons-plug-2): mono (1 in, 1 out),
 the stereo cross-feed (2 in, 2 out) and the crossover (2 in, 6 out).
 
 1. `convolver-preset` makes an LV2 preset from the fixture's filter, and
-   `ardour8-new_session` makes a session whose master bus has one channel
+   `ardour9-new_session` makes a session whose master bus has one channel
    per plug-in output.
 2. [`ardour_session.lua`](../../tests/lv2/ardour_session.lua), run by
-   `ardour8-lua` on Ardour's Dummy backend, adds a track with the plug-in,
+   `ardour9-lua` on Ardour's Dummy backend, adds a track with the plug-in,
    loads the preset from Ardour's preset list, records the backend's white
    noise onto the track, turns off the region's fades and bypasses the
    panners. It then starts the take 9600 frames into the session, after
    the ramp Ardour's gain stages make at the start of an export (0.3 % low
    after 1000 frames), and saves the session.
-3. `ardour8-export`, a second process, restores the session, plug-in state
+3. `ardour9-export`, a second process, restores the session, plug-in state
    included, and exports it offline with Ardour's latency compensation.
 4. The export must match the direct double-precision oracle applied to the
    recorded take within 1e-5, with no offset (Ardour compensates the
    reported 256 frames) and with the whole tail.
 
-The worst error was 4.7e-8 when the test was written (Linux, Ardour 8.4).
+The worst error was 4.7e-8 when the test was written (Linux, Ardour 8.4)
+and 2.65e-8 with Ardour 9.0 on 20 November 2026.
+
+Ardour 9 takes the new track's route group as an empty `ARDOUR.RouteGroup()`,
+as its own scripts pass, where Ardour 8 took `nil`; given `nil`, Ardour 9's
+Lua tool crashed (HOST-7), so the script passes each version its form. Ardour
+9.0's `new_session` writes the session and then aborts as it exits ("FATAL:
+exception not rethrown"), on every run in CI on 20 November 2026 and before
+Convolver is loaded. The test accepts that abort, with a warning, only once
+the session file exists; the Lua script then opens the session, so a damaged
+one fails there.
 
 Ardour 8.4's export sometimes corrupts its heap and aborts at the end
 ("double free or corruption") when a track has a plug-in, whichever plug-in

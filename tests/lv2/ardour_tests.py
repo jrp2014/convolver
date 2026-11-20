@@ -8,22 +8,24 @@ For each first-use fixture (examples/first-use: mono 1 in 1 out, stereo
 cross-feed 2 in 2 out, the 2 in 6 out crossover) this test:
 
 1. makes an LV2 preset from the fixture's filter with convolver-preset;
-2. makes a session with ardour8-new_session, its master bus one channel per
+2. makes a session with ardourN-new_session, its master bus one channel per
    plug-in output;
-3. runs ardour_session.lua in ardour8-lua: on Ardour's Dummy backend, a track
+3. runs ardour_session.lua in ardourN-lua: on Ardour's Dummy backend, a track
    with the plug-in, the preset loaded from Ardour's preset list, white noise
    recorded onto the track, the region's fades off, the session saved;
-4. exports the session with ardour8-export, a separate process that restores
+4. exports the session with ardourN-export, a separate process that restores
    the saved session, plug-in state included, and renders it offline with
    Ardour's latency compensation;
 5. compares the export with the direct double-precision oracle applied to
    the recorded take: the same length (take plus tail), no offset (Ardour
    compensates the reported 256 frames), within 1e-5.
 
-Needs Ardour's headless tools (Ubuntu's `ardour` package: ardour8-lua,
-ardour8-new_session, ardour8-export). Ardour's configuration goes to a
-temporary folder, not the user's. An export that Ardour 8.4 kills by a
-signal is tried again, with a warning (see `export`).
+Needs Ardour 9's or 8's headless tools (Ubuntu's `ardour` package:
+ardour9-lua, ardour9-new_session, ardour9-export, or ardour8-*). Ardour's
+configuration goes to a temporary folder, not the user's. An export that
+Ardour kills by a signal is tried again, and Ardour 9.0's abort as
+new_session exits is accepted once the session exists, each with a warning
+(see `export` and `new_session`).
 """
 
 import json
@@ -103,6 +105,26 @@ def warn(message):
         print(f'::warning title=Ardour export::{message}', flush=True)
 
 
+# Ardour 9.0's new_session (Ubuntu 26.04's 9.0.0~ds) writes the session and
+# prints that it did, then aborts as it exits with glibc's message about an
+# exception not rethrown (a thread's cancellation unwind swallowed during
+# teardown). It did so on every run in CI on 2026-11-20, before Convolver
+# is involved. Only that abort, after the session file exists, is accepted
+# (HOST-7); the Lua script then opens the session, so a damaged one fails
+# there.
+def new_session(tool_path, environment, session, name, outputs):
+    """Make the session; accept new_session's abort at exit once the session file is written."""
+    command = [tool_path, '-m', str(outputs), '-s', str(RATE), session, name]
+    returncode = run(command, environment, check=False).returncode
+    if returncode == 0:
+        return
+    tool_name = pathlib.Path(tool_path).name
+    if returncode == -signal.SIGABRT and (session / f'{name}.ardour').is_file():
+        warn(f'{name}: {tool_name} aborted as it exited, after writing the session, as Ardour 9.0 does')
+        return
+    sys.exit(f'{tool_name} failed with exit code {returncode}')
+
+
 def export(tool_path, environment, exported, session, name):
     """Export the session; an export killed by a signal, or hung, is tried again with a warning."""
     tool_name = pathlib.Path(tool_path).name
@@ -168,11 +190,7 @@ def check(tools, environment, directory, plugin_tool, fixture_name, fixture):
 
     name = fixture_name
     session = directory / 'sessions' / name
-    made = run([tools['new_session'], '-m', str(outputs), '-s', str(RATE), session, name], environment, check=False)
-    if made.returncode != 0:  # HOST-7 diagnosis, temporary: Ardour 9 aborts after creating the session.
-        assert (session / f'{name}.ardour').is_file(), f'{name}: no session after exit code {made.returncode}'
-        tool_name = pathlib.Path(tools['new_session']).name
-        warn(f'{name}: {tool_name} exited with {made.returncode} after creating the session')
+    new_session(tools['new_session'], environment, session, name, outputs)
     filter_tail = tail(fixture['paths'], fixture['input_delays'], fixture['output_delays'])
     settings = {
         'CONVOLVER_ARDOUR_MAJOR': re.match(r'ardour(\d+)-', pathlib.Path(tools['lua']).name)[1],

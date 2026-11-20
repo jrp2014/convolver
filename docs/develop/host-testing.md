@@ -166,7 +166,7 @@ LV2-4's host matrix. A result counts only for the host version named.
 
 | Host | How it was run | Result |
 | --- | --- | --- |
-| Ardour 8.4 | Headless, in CI on every LV2 change ([Ardour](testing.md#ardour-headless)) | Records, restores and exports the three first-use examples within 1e-5 of the oracle |
+| Ardour 9.0 | Headless, in CI on every LV2 change ([Ardour](testing.md#ardour-headless)) | Records, restores and exports the three first-use examples within 1e-5 of the oracle |
 | PipeWire 1.6.8 `filter-chain` | By hand in a cloud session, 12 November 2026, on virtual devices ([below](#pipewire-filter-chain)) | Works: the first-use stereo and crossover examples match `expected.wav`; a list switches entries when the rate changes; a filter that does not fit is silent and explained in the log |
 | PipeWire 1.0.5 (Ubuntu 24.04) | Same session | Does not work: Ubuntu builds it without LV2 support. With the LV2 module built from the same source, the plug-in starts but receives no filter (it plays as with no filter), because PipeWire before 1.6 ignores `config` for LV2 |
 | PipeWire 1.6.0 and 1.6.1 | Not tried | Not recommended: 1.6.2 fixed the default and range values PipeWire gives LV2 controls |

@@ -218,11 +218,8 @@ jobs:
   # its own code, not lilv's or JUCE's: it loads a preset from its preset
   # list, records, saves the session, restores it in a second process and
   # exports it with latency compensation; the export must match the oracle
-  # (tests/lv2/ardour_tests.py). Ardour is the image's Ubuntu package.
-  # An older image on purpose: Ubuntu 26.04's Ardour 9 crashes (SIGSEGV)
-  # running the session script before it reports the engine running, so
-  # this job stays on Ubuntu 24.04's Ardour 8.4 until HOST-7 adapts the
-  # test (docs/develop/build.md#compilers-and-ci-machines).
+  # (tests/lv2/ardour_tests.py). Ardour is the image's Ubuntu package
+  # (Ardour 9 on Ubuntu 26.04).
   ardour:
     needs: scope
     if: needs.scope.outputs.build == 'true'
@@ -253,15 +250,6 @@ jobs:
           cmake --build build-lv2 --parallel --target convolver_lv2 convolver_preset_tool
       - name: Ardour plays the first-use examples
         run: python tests/lv2/ardour_tests.py build-lv2/lv2/convolver.lv2 build-lv2/convolver-preset
-      # HOST-7, temporary: where ardour9-lua crashes.
-      - name: Backtrace of a crash (HOST-7 diagnosis)
-        if: failure()
-        run: |
-          sudo apt-get install -y --no-install-recommends gdb file
-          lua="$(command -v ardour9-lua || command -v ardour8-lua)"
-          file "$lua"
-          if file "$lua" | grep -q text; then cat "$lua"; fi
-          ardour9-lua --version || true
       - name: Explain a failure that may come from a new upstream release
         if: failure()
         run: python scripts/release/resolve.py explain-failure

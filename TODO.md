@@ -237,18 +237,6 @@ is superseded.
   (`CONVOLVER_ARDOUR_KEEP`), check the region position and whether the
   plug-in's filter loaded during the export, and repeat with a plug-in
   that reports latency and has no worker.
-- [ ] **HOST-7 — Run the Ardour test with Ardour 9.** From CI-43 (19 November
-  2026): on `ubuntu-latest` (Ubuntu 26.04, Ardour 9's `ardour9-*` tools),
-  `ardour9-lua` died by SIGSEGV running `tests/lv2/ardour_session.lua` for
-  the mono example, after `ardour9-new_session` succeeded and before the
-  script's "Ardour engine running" line appeared (stdout is buffered, so
-  the crash may be later than that line; Convolver's plug-in is loaded only
-  after it). The [Ardour test](docs/develop/testing.md#ardour-headless)
-  therefore stays on `ubuntu-24.04` with Ardour 8.4. Next: run the script
-  with unbuffered output (or `io.stdout:setvbuf("no")`) to find the failing
-  call, and check it against Ardour 9's Lua bindings. **Done when** the job
-  passes on `ubuntu-latest` and its older-image row leaves
-  [compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines).
 - [ ] **DIAG-9 — Numbers in the user's locale.** Low priority, from jrp's
   review of PLUG-36 (20 November 2026): diagnostics write sample rates,
   levels and counts as plain ASCII digits ("44100 Hz", "-6.0 dB")
@@ -1219,6 +1207,13 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **HOST-7 — Run the Ardour test with Ardour 9.**
+  20 November 2026, PR #229, from CI-43: Ardour 9's Lua tool crashed in
+  `Session:new_audio_track`, which takes an empty `ARDOUR.RouteGroup()`
+  where Ardour 8 took `nil`; Ardour 9.0's `new_session` also aborts as it
+  exits, after writing the session, which the test accepts with a warning.
+  The job runs on `ubuntu-latest` with Ardour 9 and no longer needs an older
+  image ([Ardour, headless](docs/develop/testing.md#ardour-headless)).
 - [x] **PLUG-36 — The loading-and-failure table covers each transition.**
   20 November 2026, PR #225, in PLUG-39's sequence after step 1b: the contract's
   [states and transitions](docs/develop/plugin-contract.md#states-and-transitions)
