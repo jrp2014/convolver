@@ -63,6 +63,13 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Plug-ins (ROBUST-8): when a new Latency cannot be applied because memory
+  runs out, the status and the window's report stay as they were. Before,
+  Status could show Fault again for faults a later filter load had cleared,
+  and, if memory ran out while the filter was checked against the host,
+  read Active over a filter playing silence. Now a new start is recorded
+  only once its processor plays. What plays is unchanged.
+
 - Benchmarks (PERF-20, from jrp's audit of v0.14.0):
   `tests/native/benchmarks/compare_engines.py` refused to compare two
   revisions whose `portable/engine.cpp` was the same, so a change confined to

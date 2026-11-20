@@ -410,12 +410,12 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
    Independent of steps 1 and 2, and taken next, before them (jrp,
    19 November 2026). Step 3a, the shared class (`PlayingProcessor` in
    `portable/playing_processor.hpp`, with `native.playing_processor`), was
-   merged in PR #213. Step 3b moves VST3 to it, in PR #217: the control
+   merged in PR #213. Step 3b moved VST3 to it, merged in PR #217: the control
    side's wait and VST3's own marks go, every control call frees what no
    reader holds, `latency_handover_waits()` becomes
    `latency_handover_does_not_wait()` as condition 4 says, and the ownership
-   rules are now in the adapter contract. Step 3c moves the Audio Unit to it,
-   in PR #219: `Render` is its one reader, uninitializing offers no
+   rules are now in the adapter contract. Step 3c moved the Audio Unit to it,
+   merged in PR #219: `Render` is its one reader, uninitializing offers no
    processor rather than wait under the lock, and `latency_parameter()`
    shows the same outcomes for it, holding `Render` in its input callback. LV2 keeps `stage()` and
    `retire()`: its worker and `run()` already defer freeing, with one
@@ -481,12 +481,13 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
 - **PLUG-30** (one rule for state a busy lock makes a call skip) is taken
   up with step 4 (jrp, 19 November 2026), which removes the Audio Unit's
   report cache from its list.
-- **ROBUST-8** (the fault record after a failed Latency change) is taken up
-  right after steps 3b and 3c, as its own pull request for both adapters
-  (jrp, 19 November 2026): now that the shared ownership
-  offers the new processor, `HostFilter::activate()`'s commit can follow
-  the offer, so a processor that cannot be built leaves the record as it
-  was.
+- **ROBUST-8** (the fault record after a failed Latency change) was taken
+  up right after steps 3b and 3c, as its own pull request for every adapter
+  (jrp, 19 November 2026), in PR #223: `HostFilter::activation()` finds
+  what to play and changes nothing, and `activate()` records it only once
+  nothing can stop the new processor from playing, so a processor that
+  cannot be built leaves the record as it was. Each adapter's
+  re-observation after a failed Latency is deleted.
 - **PLUG-27** (reading a chosen file before the host's audio settings are
   known) stays as it is; step 2 gathers the rule it would change into one
   place in both formats, so PLUG-27 becomes a change there.
