@@ -1054,25 +1054,36 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
     // Which status, in the one order host_status_value() gives; then its words.
     line.status = host_status_value(filter, host.has_value(), bypassed);
     const auto& f = failure;
-    if (f) {
-        // A filter the adapter could not start has no processor, so nothing
-        // plays, not even Mix's dry share (the independent review).
-        if (f->silent && f->kind != HostFailureKind::activation && bypass_dry) {
-            auto reason = short_reason(*f, host);
-            if (!reason.empty())
-                reason[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(reason[0])));
-            // No room for the log's pointer: the window's report and the log
-            // give the details.
-            line.text = "Load failed. Bypass is on: only the dry signal plays. " + reason;
-        } else {
-            line.text = (!f->silent ? "Load failed, previous filter kept: "
-                         : f->kind == HostFailureKind::activation ? std::string("Silent: ")
-                                                                  : silent_words()) +
-                        short_reason(*f, host) + details;
+    switch (line.status) {
+    case HostStatus::load_failed:
+        if (!f) {
+            // A failed load: no filter is kept, so no dry signal plays either.
+            line.text = "Silent: an earlier load failed." + std::string(details);
+            break;
         }
-    } else if (line.status == HostStatus::fault) {
+        {
+            // A filter the adapter could not start has no processor, so nothing
+            // plays, not even Mix's dry share (the independent review).
+            if (f->silent && f->kind != HostFailureKind::activation && bypass_dry) {
+                auto reason = short_reason(*f, host);
+                if (!reason.empty())
+                    reason[0] =
+                        static_cast<char>(std::toupper(static_cast<unsigned char>(reason[0])));
+                // No room for the log's pointer: the window's report and the log
+                // give the details.
+                line.text = "Load failed. Bypass is on: only the dry signal plays. " + reason;
+            } else {
+                line.text = (!f->silent ? "Load failed, previous filter kept: "
+                             : f->kind == HostFailureKind::activation ? std::string("Silent: ")
+                                                                      : silent_words()) +
+                            short_reason(*f, host) + details;
+            }
+        }
+        break;
+    case HostStatus::fault:
         line.text = "Fault: " + short_fault(filter.faults()) + details;
-    } else if (line.status == HostStatus::bypassed) {
+        break;
+    case HostStatus::bypassed: {
         // As HostProcessor bypasses: the delayed input on each output when
         // there is a dry signal, otherwise silence (dry_signal_rule).
         const auto rule = host ? dry_signal_rule(filter, *host) : HostDrySignal::present;
@@ -1080,7 +1091,11 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
                     : rule == HostDrySignal::present
                         ? "Bypassed: the input plays unfiltered."
                         : std::string("Bypassed: silent, as ") + no_dry_reason(rule) + ".";
-    } else if (const auto& c = filter.filter()) { // Active, or Waiting.
+        break;
+    }
+    case HostStatus::active:
+    case HostStatus::unchecked: {
+        const auto& c = filter.filter();
         const auto ignored = host ? ignored_inputs(*c, *host, "-") : std::string();
         line.text = "Filter loaded: " + std::to_string(c->sample_rate) + " Hz, " +
                     ports(c->input_channels, c->output_channels) +
@@ -1092,10 +1107,9 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
                                      : " Speaker labels differ.";
         if (dry_known && clamp_mix(settings.mix) == 0)
             line.text += " Mix 0%: only the dry signal plays.";
-    } else if (line.status == HostStatus::load_failed) {
-        // A failed load: no filter is kept, so no dry signal plays either.
-        line.text = "Silent: an earlier load failed." + std::string(details);
-    } else { // No filter.
+        break;
+    }
+    case HostStatus::no_filter: {
         const std::string load = chooses_files ? " Choose a filter or load a Convolver preset."
                                                : " Load a Convolver preset.";
         if (!host)
@@ -1108,6 +1122,8 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
             line.text = "No filter: audio passes at " + sound.level + " (Gain and Mix)." + load;
         else
             line.text = "No filter: audio passes unchanged." + load;
+        break;
+    }
     }
     if (line.text.size() > max_status_text)
         line.text.resize(max_status_text);

@@ -455,7 +455,8 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
      its status values, instead of ordering failures, filters and faults
      again in `update_status()` and `shown_status()`; the audio-side
      overlays (Loading, a refusal `run()` made itself, Fault) stay, since
-     `run()` must answer without the lock.
+     `run()` must answer without the lock. Done on 20 November 2026 as step 4c
+     (PR #230): `host_status_value()` and LV2's `port_status()`.
    - Every diagnostic text follows bypass as Status and the report have
      since PLUG-36 (PR #225): `failure_consequence()`'s "previous filter
      keeps playing", the report's fault branch ("The filter keeps

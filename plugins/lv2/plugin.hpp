@@ -78,6 +78,12 @@ constexpr Status port_status(convolver::HostStatus s) noexcept {
     }
     return Status::running;
 }
+static_assert(port_status(convolver::HostStatus::no_filter) == Status::no_filter &&
+              port_status(convolver::HostStatus::load_failed) == Status::load_failed &&
+              port_status(convolver::HostStatus::fault) == Status::fault &&
+              port_status(convolver::HostStatus::active) == Status::running &&
+              port_status(convolver::HostStatus::unchecked) == Status::running &&
+              port_status(convolver::HostStatus::bypassed) == Status::running);
 
 // The filter parameter (<base>filter, an atom:Path, patch:writable) and the
 // longest path it takes, in bytes without the terminating NUL. Longer paths
