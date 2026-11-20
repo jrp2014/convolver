@@ -69,7 +69,7 @@ For each case, `run_upgrade.py`:
   the bound shows before it fails.
 
 How far builds fall from the bound, on Linux x86-64 against the 0.13.2
-files, which 0.13.12's, 0.13.20's and 0.13.24's match byte for byte (peaks 0.25 to 0.53): a Clang 18
+files, which 0.13.12's, 0.13.20's, 0.13.24's and 0.14.0's match byte for byte (peaks 0.25 to 0.53): a Clang 18
 Release build and a GCC 13.3 Release build with Ooura reproduced the capture's
 renders (made by GCC 11.4 Release builds) sample for sample; CI's GCC 15 Release build
 with Ooura differed by up to 1.3e-7, and a Clang 18 build with FFTW by up to
@@ -86,8 +86,9 @@ so.
 
 - Never regenerate or edit a retained file; the runner fails if one changes.
   The version folders are checked out byte for byte (`.gitattributes`), left
-  alone by the formatters and markdownlint, and any change to them runs the
-  full CI ([CI triggers](../../docs/develop/testing.md#ci-triggers)).
+  alone by the formatters and markdownlint, and any change in this folder
+  runs the native and VST3 workflows, the two whose tests read it
+  ([CI triggers](../../docs/develop/testing.md#pull-requests-for-one-plug-in-format)).
   A deliberate incompatibility is jrp's decision, recorded in the
   [decisions log](../../docs/project/decisions.md), and the check it breaks is
   changed in the same pull request, not the file. So is a deliberate

@@ -1662,7 +1662,9 @@ except:
   commands; CI-35). Other edits to those three pages count as the
   documentation or packaged page each otherwise is;
 - Markdown under `tests/upgrade/`, which `upgrade.cli` and `vst3.upgrade`
-  read: the version folders hash their files, Markdown included (COMPAT-1);
+  read: the version folders hash their files, Markdown included (COMPAT-1).
+  It counts with the rest of that folder, which runs the native and VST3
+  workflows ([below](#pull-requests-for-one-plug-in-format));
 - pages copied into the preview packages, which also run the
   [candidate workflow](#plug-in-candidate-checks): everything under `docs/use/`,
   `examples/plugin-presets/README.md` and the Ooura `README.md`. A page in
@@ -1702,6 +1704,7 @@ of their own.
 | `plugins/lv2/`, `tests/lv2/` | LV2 |
 | `plugins/editor/mac/` (the macOS window, CI-26) | VST3, Audio Unit and the candidates: only those builds compile it, and their `editor_tests.mm` test it |
 | `scripts/release/`, `tests/release/`, `packaging/`, apart from the files other workflows use (CI-34) | the [candidates](#plug-in-candidate-checks) |
+| `tests/upgrade/`, the [files kept from releases](../../tests/upgrade/README.md) and their checks (CI-42) | native and VST3, whose `upgrade.cli` and `vst3.upgrade` read them |
 | `.github/workflows/NAME.yml` | that workflow |
 
 The shared parts are not a format's files: the PLUG-2 harness in
@@ -1724,6 +1727,19 @@ and the VST trademark wording that the VST3 build reads. Only the files
 `tests/ci_scope_tests.py` lists, each with its reason, may name another
 release file, so a new use outside the candidates fails pre-commit; add that
 file to `RELEASE_SHARED` in `ci_scope.py`.
+
+The files kept from releases are read only by `upgrade.cli`, registered
+wherever the CLI is built, and `vst3.upgrade`, registered by the VST3
+build; no LV2 job runs either. The Audio Unit job's suite includes
+`upgrade.cli` as well: the only Release Accelerate run with the Xcode of
+`macos-15`, the image the macOS candidates are built on, where the VST3
+macOS job uses the newer Xcode of `macos-latest`. A pull request that
+changes only these files leaves that run to `main` (CI-42); the other macOS
+runs check the same bound. `tests/ci_scope_tests.py` lists, each with its
+reason, the only files outside `tests/upgrade/` that may name them, and
+checks that those two are the only CTest entries that run the checker; when
+another build starts reading them, add its workflow to `UPGRADE_WORKFLOWS`
+in `ci_scope.py`.
 
 ### When pull requests build the candidates
 
