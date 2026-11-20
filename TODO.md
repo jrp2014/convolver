@@ -1220,7 +1220,7 @@ Items finished since then are listed here, one line each, until the next
 move to the archive.
 
 - [x] **CI-45 — Build our own sources without compiler warnings.**
-  20 November 2026, PR #NNN, from the independent review of CI-43: the
+  20 November 2026, PR #228, from the independent review of CI-43: the
   newer compilers CI-43 brought in warned about Convolver's own code. GCC
   12 to 15 flagged the tests' replacement allocators (false positives, now
   silenced beside them), copies in range loops and a possibly dangling
