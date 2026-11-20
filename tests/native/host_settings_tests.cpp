@@ -28,11 +28,20 @@ void* operator new(std::size_t n) {
         return p;
     throw std::bad_alloc();
 }
+// GCC warns that free() here mismatches the operator new above once this
+// delete is inlined; both use malloc's heap, so the pair matches.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmismatched-new-delete"
+#endif
 void operator delete(void* p) noexcept {
     if (audio_thread && p)
         std::abort();
     std::free(p);
 }
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 #include "replaced_allocation.hpp"
 
 using namespace convolver;

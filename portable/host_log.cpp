@@ -37,8 +37,15 @@ std::filesystem::path from_environment(const char* name) {
 #ifdef _WIN32
     // _wgetenv: user profile folders may hold characters outside the ANSI code page.
     std::wstring wide(name, name + std::char_traits<char>::length(name));
+#ifdef _MSC_VER // C4996 asks for _wdupenv_s, which only copies what is read here at once.
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
     if (const wchar_t* value = _wgetenv(wide.c_str()); value && *value)
         return std::filesystem::path(value);
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 #else
     if (const char* value = std::getenv(name); value && *value)
         return std::filesystem::path(value);
@@ -355,8 +362,15 @@ std::string started_line(const HostFilter& filter, const HostLayout& host, std::
 
 std::filesystem::path host_log_path() {
 #ifdef _WIN32
+#ifdef _MSC_VER // C4996 asks for _wdupenv_s, which only copies what is read here at once.
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
     if (const wchar_t* chosen = _wgetenv(L"CONVOLVER_LOG"))
         return std::filesystem::path(chosen);
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
     const auto base = from_environment("LOCALAPPDATA");
     return base.empty() ? base : base / "Convolver" / "Convolver.log";
 #else

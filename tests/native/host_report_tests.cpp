@@ -602,8 +602,15 @@ void cases() {
 }
 
 std::optional<std::string> log_variable() {
+#ifdef _MSC_VER // C4996 asks for _dupenv_s, which only copies what is read here at once.
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
     if (const char* value = std::getenv("CONVOLVER_LOG"))
         return std::string(value);
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
     return std::nullopt;
 }
 void set_log_variable(const std::optional<std::string>& value) {
@@ -760,7 +767,7 @@ void wider_inputs() {
     const auto r = host_report(f, facts(six));
     require(r.status.status == HostStatus::active && r.problem.empty(),
             "a crossover on a wider bus is reported as a problem: " + r.explanation);
-    const auto& channels = fact(r, "Host channels");
+    const auto channels = fact(r, "Host channels");
     require(channels.value == "6 in, 6 out" && channels.note == "(inputs 3–6 ignored)" &&
                 !channels.problem,
             "Channels: " + channels.value + " " + channels.note);

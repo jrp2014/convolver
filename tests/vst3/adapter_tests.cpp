@@ -514,7 +514,7 @@ void restored_while_host_settles() {
         bool while_active, project, resaved;
     };
     std::vector<char> silent_save; // From the first order, while kept silent.
-    for (const auto [while_active, project, resaved] :
+    for (const auto& [while_active, project, resaved] :
          {Order{true, false, false}, Order{true, true, false}, Order{false, false, false},
           Order{false, true, false}, Order{true, false, true}}) {
         const std::string order = std::string(while_active ? "active" : "inactive") +

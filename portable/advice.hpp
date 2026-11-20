@@ -28,8 +28,11 @@ inline std::string advice_text(const Advice& a) {
     std::string text = a.problem;
     const std::string* parts[] = {&a.cause, &a.fix, &a.note};
     for (std::size_t i = 0; i < 3; ++i)
-        if (!parts[i]->empty())
-            text += "\n" + std::string(advice_labels[i]) + *parts[i];
+        if (!parts[i]->empty()) {
+            text += '\n';
+            text += advice_labels[i];
+            text += *parts[i];
+        }
     return text;
 }
 

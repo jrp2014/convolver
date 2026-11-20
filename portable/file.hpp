@@ -45,7 +45,14 @@ inline void write_new_file(const std::filesystem::path& path, std::span<const st
     if (!opened)
         throw std::runtime_error("cannot create output file (must be a new path)");
 #endif
-    std::unique_ptr<std::FILE, decltype(&std::fclose)> file(opened, &std::fclose);
+    // A deleter type rather than decltype(&std::fclose), whose attributes
+    // GCC drops from the template argument with a warning.
+    struct Close {
+        void operator()(std::FILE* stream) const noexcept {
+            std::fclose(stream);
+        }
+    };
+    std::unique_ptr<std::FILE, Close> file(opened);
     const bool written =
         data.empty() || std::fwrite(data.data(), 1, data.size(), file.get()) == data.size();
     // Closing flushes buffered writes and can fail even after fwrite succeeds.
