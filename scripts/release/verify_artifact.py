@@ -27,11 +27,16 @@ def check_dependencies(system, dependencies, policy):
             raise ValueError(f'forbidden or unresolved runtime dependency: {dependency}')
 
 
-def check_symbol_versions(text, maximum):
-    versions = re.findall(r'\bGLIBC_(\d+(?:\.\d+)+)', text)
+def check_symbol_versions(text, maximum, prefix='GLIBC'):
+    """Return the binary's `prefix`_N.N versions, refusing any above `maximum`.
+
+    `prefix` is GLIBC for the C library and GLIBCXX or CXXABI for libstdc++,
+    whose versions the C++ runtime on the oldest supported system must have.
+    """
+    versions = re.findall(rf'\b{prefix}_(\d+(?:\.\d+)+)', text)
     for version in versions:
         if tuple(map(int, version.split('.'))) > tuple(map(int, maximum.split('.'))):
-            raise ValueError(f'GLIBC_{version} exceeds candidate baseline GLIBC_{maximum}')
+            raise ValueError(f'{prefix}_{version} exceeds candidate baseline {prefix}_{maximum}')
     return sorted(set(versions))
 
 
@@ -116,9 +121,10 @@ def inspect_binary(path, candidate, policy):
         libraries = re.findall(r'\(NEEDED\).*?\[(.*?)\]', dynamic)
         if re.search(r'\((RPATH|RUNPATH)\)', dynamic):
             raise ValueError(f'unexpected runtime search path: {path.name}')
-        record['glibc_versions'] = check_symbol_versions(
-            output(['readelf', '--version-info', str(path)]), candidate['max_glibc']
-        )
+        versions = output(['readelf', '--version-info', str(path)])
+        record['glibc_versions'] = check_symbol_versions(versions, candidate['max_glibc'])
+        record['glibcxx_versions'] = check_symbol_versions(versions, candidate['max_glibcxx'], 'GLIBCXX')
+        record['cxxabi_versions'] = check_symbol_versions(versions, candidate['max_cxxabi'], 'CXXABI')
     elif system == 'Windows':
         headers = output(['dumpbin', '/headers', str(path)])
         if arch != 'x86_64' or not re.search(r'8664 machine', headers, re.IGNORECASE):

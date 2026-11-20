@@ -55,8 +55,10 @@ Until 1.0 the C++ API may change between minor versions.
   Ubuntu image instead of Ardour 8.4 on Ubuntu 24.04. Its session script
   gives Ardour 9 the empty route group it expects (`nil` crashed it), and
   the test accepts Ardour 9.0's known abort as `new_session` exits once the
-  session is written (that version and message only). Every first-use example matches the oracle (worst
-  error 3.42e-8).
+  session is written (that version and message only). Every first-use
+  example matches the oracle (worst error 3.42e-8).
+- Builds (CI-45): Convolver's own sources build without the warnings GCC 12
+  to 15, Xcode 26.6 and Visual Studio 2022 gave in CI. No output changes.
 - Builds (CI-43): the Mac preview packages are built with the newest Xcode
   on GitHub's macOS 26 images (Xcode 26.6 today, was 16.4 on macOS 15), still
   for macOS 14 and later, and the Linux packages with GCC 12 (was 11), still
@@ -69,6 +71,11 @@ Until 1.0 the C++ API may change between minor versions.
   says to keep every external dependency, compilers and CI machines
   included, on its newest formal release
   ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
+- Releases (CI-44): the Linux candidate's check refuses libstdc++ symbol
+  versions newer than GCC 12's (GLIBCXX_3.4.30, CXXABI_1.3.13), as it
+  already refused glibc ones newer than 2.35: a newer GCC on the build
+  image now fails the candidate instead of shipping a package that does not
+  load on Ubuntu 22.04 or Debian 12.
 - Plug-ins (PLUG-39 step 2): VST3 and the Audio Unit decide when the
   host has settled its sample rate and channels in one shared record
   (`HostSettling`), which each feeds with the host's starts, stops and

@@ -42,11 +42,20 @@ void* operator new(std::size_t n) {
         return p;
     throw std::bad_alloc();
 }
+// GCC warns that free() here mismatches the operator new above once this
+// delete is inlined; both use malloc's heap, so the pair matches.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmismatched-new-delete"
+#endif
 void operator delete(void* p) noexcept {
     if (audio_thread && p)
         std::abort();
     std::free(p);
 }
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 #include "replaced_allocation.hpp"
 using namespace convolver;
 void require(bool value, const char* message) {
@@ -925,9 +934,9 @@ void wider_inputs() {
     // on output 6.
     for (const float m : {0.f, .5f}) {
         const auto label = "Mix " + std::to_string(static_cast<int>(m * 100)) + "%, ";
-        HostProcessor playing(equal, 32, HostSettings{0, m, 64}, 6);
+        HostProcessor mixing(equal, 32, HostSettings{0, m, 64}, 6);
         for (int k = 0; k < 8; ++k)
-            play(playing, a, 6);
+            play(mixing, a, 6);
         const float mixed = m * .5f + (1 - m);
         for (std::size_t o = 0; o < 6; ++o) {
             require(std::abs(a[o][31] - mixed) < 1e-6f,
@@ -938,10 +947,10 @@ void wider_inputs() {
         for (const auto& [next, want, what] :
              {std::tuple{&x, &crossover, "the 6x6 filter to the crossover"},
               std::tuple{&equal, &filtered, "the crossover to the 6x6 filter"}}) {
-            playing.publish(playing.prepare(*next));
+            mixing.publish(mixing.prepare(*next));
             float step = 0;
             for (int k = 0; k < 16; ++k) {
-                play(playing, a, 6);
+                play(mixing, a, 6);
                 for (std::size_t o = 0; o < 6; ++o)
                     for (std::size_t i = 0; i < 32; ++i) {
                         step = std::max(step, std::abs(a[o][i] - last[o]));
@@ -1018,12 +1027,12 @@ void wider_inputs() {
     {
         HostProcessor q(test::started(failed_mono, mono_host), 32, HostSettings{0, .5, 64}, 1);
         q.set_bypass(true);
-        std::vector<std::vector<float>> one(1, std::vector<float>(32, 1.f));
+        std::vector<std::vector<float>> ones(1, std::vector<float>(32, 1.f));
         for (int k = 0; k < 4; ++k) {
             for (auto& v : in[0])
                 v = 1.f;
-            play(q, one, 1);
-            for (auto v : one[0])
+            play(q, ones, 1);
+            for (auto v : ones[0])
                 require(v == 0, "a failed mono load passes its input bypassed");
         }
     }
@@ -1489,8 +1498,13 @@ void saved_state_limit() {
 // since temporary folders may hold characters outside the ANSI code page.
 std::optional<std::filesystem::path> log_variable() {
 #ifdef _WIN32
-    if (const wchar_t* value = _wgetenv(L"CONVOLVER_LOG"))
-        return std::filesystem::path(value);
+    wchar_t* value = nullptr;
+    std::size_t length = 0;
+    if (_wdupenv_s(&value, &length, L"CONVOLVER_LOG") == 0 && value) {
+        std::filesystem::path copy(value);
+        std::free(value);
+        return copy;
+    }
 #else
     if (const char* value = std::getenv("CONVOLVER_LOG"))
         return std::filesystem::path(value);
@@ -1955,9 +1969,9 @@ void status_lines() {
         Configuration x{48000, 2, 6, 0, {}, {}, {}};
         x.paths.push_back({{1.f}, {{0, 1}}, {{0, 1}}});
         x.paths.push_back({{1.f}, {{1, 1}}, {{5, 1}}});
-        HostFilter crossover(8);
-        crossover.load(HostState{x}, six);
-        check(host_status(crossover, six, true, {}, true), Status::bypassed,
+        HostFilter split(8);
+        split.load(HostState{x}, six);
+        check(host_status(split, six, true, {}, true), Status::bypassed,
               "Bypassed: silent, as the filter's inputs and outputs differ.",
               "bypassed, unequal counts");
     }
@@ -2206,7 +2220,7 @@ void costly_moments_against_oracle() {
     std::uniform_real_distribution<float> sample(-.5f, .5f);
     auto filter = [&](std::size_t b) {
         Configuration c{48000, 2, 2, 0, {}, {}, {}};
-        for (const auto [in, out] : {std::pair{0, 0}, std::pair{1, 1}, std::pair{0, 1}}) {
+        for (const auto& [in, out] : {std::pair{0, 0}, std::pair{1, 1}, std::pair{0, 1}}) {
             FilterPath p;
             p.impulse.resize(3 * b + 1 + random() % b);
             for (auto& x : p.impulse)
@@ -2217,10 +2231,10 @@ void costly_moments_against_oracle() {
         }
         return c;
     };
-    for (const auto [b, callback] : {std::pair{std::size_t(257), std::size_t(64)},
-                                     std::pair{std::size_t(257), std::size_t(1000)},
-                                     std::pair{std::size_t(255), std::size_t(1)},
-                                     std::pair{std::size_t(64), std::size_t(100)}}) {
+    for (const auto& [b, callback] : {std::pair{std::size_t(257), std::size_t(64)},
+                                      std::pair{std::size_t(257), std::size_t(1000)},
+                                      std::pair{std::size_t(255), std::size_t(1)},
+                                      std::pair{std::size_t(64), std::size_t(100)}}) {
         const auto first = filter(b), second = filter(b);
         HostProcessor host(first, callback, b);
         // Interleaved input and output of every frame processed so far.

@@ -1226,6 +1226,17 @@ move to the archive.
   on 9.0 and with that message only, checked by `ardour_harness_tests.py`.
   The job runs on `ubuntu-latest` with Ardour 9 and no longer needs an older
   image ([Ardour, headless](docs/develop/testing.md#ardour-headless)).
+- [x] **CI-45 — Build our own sources without compiler warnings.**
+  20 November 2026, PR #228, from the independent review of CI-43: the
+  newer compilers CI-43 brought in warned about Convolver's own code. GCC
+  12 to 15 flagged the tests' replacement allocators and an `std::optional`
+  refill (false positives, now silenced beside them), copies in range loops and a possibly dangling
+  reference; Xcode 26.6 flagged mixed enumerations and a nonblocking
+  function that may throw in the Audio Unit; Visual Studio 2022 flagged
+  narrowing, shadowed names and `getenv`. Each is fixed or, where the
+  compiler is wrong or its advice does not apply, silenced at that line with
+  the reason. Output is unchanged
+  ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
 - [x] **PLUG-36 — The loading-and-failure table covers each transition.**
   20 November 2026, PR #225, in PLUG-39's sequence after step 1b: the contract's
   [states and transitions](docs/develop/plugin-contract.md#states-and-transitions)
@@ -1242,6 +1253,13 @@ move to the archive.
   play and changes nothing, and every adapter calls `activate()` only once
   the new processor will play
   ([status and log](docs/develop/plugin-contract.md#status-and-log)).
+- [x] **CI-44 — Check the Linux package's libstdc++ versions.**
+  20 November 2026, PR #227, from the independent review of CI-43:
+  `verify_artifact.py` refused glibc symbols newer than Ubuntu 22.04's but
+  not libstdc++ ones, so a newer GCC on the build image would have shipped
+  a package that does not load there or on Debian 12. It now refuses
+  GLIBCXX and CXXABI versions above GCC 12's (`max_glibcxx`, `max_cxxabi`)
+  ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
 - [x] **CI-43 — Keep compilers and CI machines on their newest releases.**
   19 November 2026, PR #222, from jrp's question whether Convolver uses the
   latest SDKs: the libraries already followed their newest releases, but the

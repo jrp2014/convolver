@@ -571,14 +571,14 @@ struct Engine::Impl {
             k.direct(direct.data(), mix.head_history.data() + mix.head - 1, path.head.data(), taps,
                      frames);
             // Tap k plays at output time k + planned (planned < first here).
-            const auto at = static_cast<std::size_t>(time + planned) & ring_mask;
-            const auto before_wrap = std::min(frames, ring - at);
+            const auto tap_start = static_cast<std::size_t>(time + planned) & ring_mask;
+            const auto before_wrap = std::min(frames, ring - tap_start);
             for (const auto& route : path.outputs) {
                 float* out = output_rings.data() + route.channel * ring;
                 for (std::size_t t = 0; t < before_wrap; ++t)
-                    out[at + t] += direct[t] * route.gain;
+                    out[tap_start + t] += direct[t] * route.gain;
                 for (std::size_t t = before_wrap; t < frames; ++t)
-                    out[at + t - ring] += direct[t] * route.gain;
+                    out[tap_start + t - ring] += direct[t] * route.gain;
             }
         }
         for (auto& mix : mixes)

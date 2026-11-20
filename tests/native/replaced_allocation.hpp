@@ -15,6 +15,12 @@
 void* operator new[](std::size_t n) {
     return ::operator new(n);
 }
+// GCC warns that these deletes mismatch their pointers' operator new once
+// inlined; each forwards to the test's own pair, so they match.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmismatched-new-delete"
+#endif
 void operator delete[](void* p) noexcept {
     ::operator delete(p);
 }
@@ -24,3 +30,6 @@ void operator delete(void* p, std::size_t) noexcept {
 void operator delete[](void* p, std::size_t) noexcept {
     ::operator delete(p);
 }
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif

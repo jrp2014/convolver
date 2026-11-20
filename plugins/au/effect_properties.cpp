@@ -416,9 +416,12 @@ OSStatus Effect::GetParameterValueStrings(AudioUnitScope scope, AudioUnitParamet
     }
     *out = CFArrayCreate(nullptr, values.data(), static_cast<CFIndex>(values.size()),
                          &kCFTypeArrayCallBacks);
-    return *out ? noErr : kAudioUnitErr_InvalidProperty;
+    return *out ? noErr : OSStatus{kAudioUnitErr_InvalidProperty};
 }
 
+// As AUBase::SetParameter, nonblocking but not noexcept: the SDK's loose
+// real-time contract lets AUBase throw, and its dispatcher catches.
+AUSDK_BEGIN_NO_RT_NOEXCEPT_WARNINGS
 OSStatus Effect::SetParameter(AudioUnitParameterID id, AudioUnitScope scope,
                               AudioUnitElement element, AudioUnitParameterValue value,
                               UInt32 offset) AUSDK_RTSAFE {
@@ -440,6 +443,7 @@ OSStatus Effect::SetParameter(AudioUnitParameterID id, AudioUnitScope scope,
         request_gain_mode();
     return noErr;
 }
+AUSDK_END_NO_RT_NOEXCEPT_WARNINGS
 
 OSStatus Effect::GetPropertyInfo(AudioUnitPropertyID id, AudioUnitScope scope,
                                  AudioUnitElement element, UInt32& size, bool& writable) {
@@ -573,7 +577,7 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
             } catch (...) {
                 return kAudioUnitErr_InvalidPropertyValue;
             }
-            return request->outString ? noErr : kAudioUnitErr_InvalidPropertyValue;
+            return request->outString ? noErr : OSStatus{kAudioUnitErr_InvalidPropertyValue};
         }
         if (request->inParamID == latency_parameter) {
             // A Latency value reads as its menu name (auval asks, as for any
@@ -586,7 +590,7 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
             } catch (...) {
                 return kAudioUnitErr_InvalidPropertyValue;
             }
-            return request->outString ? noErr : kAudioUnitErr_InvalidPropertyValue;
+            return request->outString ? noErr : OSStatus{kAudioUnitErr_InvalidPropertyValue};
         }
         if (request->inParamID != status_parameter)
             return kAudioUnitErr_InvalidParameter;
@@ -618,7 +622,7 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
             return kAudioUnitErr_InvalidPropertyValue;
         request->outString =
             CFStringCreateWithCString(nullptr, text.c_str(), kCFStringEncodingUTF8);
-        return request->outString ? noErr : kAudioUnitErr_InvalidPropertyValue;
+        return request->outString ? noErr : OSStatus{kAudioUnitErr_InvalidPropertyValue};
     }
     return AUBase::GetProperty(id, scope, element, data);
 }

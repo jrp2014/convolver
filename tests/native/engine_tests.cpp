@@ -31,9 +31,18 @@ void* operator new(std::size_t bytes) {
         return p;
     throw std::bad_alloc();
 }
+// GCC warns that free() here mismatches the operator new above once this
+// delete is inlined; both use malloc's heap, so the pair matches.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmismatched-new-delete"
+#endif
 void operator delete(void* p) noexcept {
     std::free(p);
 }
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 #include "replaced_allocation.hpp"
 
 using namespace convolver;
@@ -295,7 +304,7 @@ void history_validity() {
          {std::size_t(1), std::size_t(5), std::size_t(64), std::size_t(255), std::size_t(257)}) {
         Configuration c{48000, 2, 3, 0, {0, 3}, {2, 0, 1}, {}};
         // Two paths share input 0's mix with 5 and 2 partitions; one has its own.
-        for (const auto [channel, partitions] :
+        for (const auto& [channel, partitions] :
              {std::pair{std::size_t(0), std::size_t(5)}, std::pair{std::size_t(1), std::size_t(3)},
               std::pair{std::size_t(0), std::size_t(2)}}) {
             FilterPath p;

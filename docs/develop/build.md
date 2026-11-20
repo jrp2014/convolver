@@ -590,7 +590,11 @@ A beta, release candidate or public-preview image is never the gate; it may
 run only as advice, as for the libraries
 ([pre-releases](#pre-releases-and-newer-upstream-versions)). Output may change
 with a newer compiler, within the stated tolerance
-([decisions](../project/decisions.md#licences-and-dependencies)).
+([decisions](../project/decisions.md#licences-and-dependencies)). A newer
+compiler's warnings in Convolver's own sources are fixed; where the compiler
+is wrong or its advice does not apply, the warning is silenced at that line
+with the reason, as for a clang-tidy false positive. Warnings in the SDKs
+and libsndfile are theirs.
 
 - **Runner images:** each job uses the newest generally available image:
   `ubuntu-latest`, `macos-latest` and `windows-latest`, or the label of the
@@ -630,7 +634,7 @@ the workflow. The release candidates have two:
 
 | Job | Runs on | Why not newer |
 | --- | --- | --- |
-| Linux | `ubuntu-22.04`, newest GCC on it (GCC 12) | A newer Ubuntu's glibc would stop the package loading on Ubuntu 22.04 and other glibc 2.35 systems (`max_glibc` in the release policy); GCC 12 also needs no newer libstdc++ than Ubuntu 22.04 and Debian 12 ship (GLIBCXX_3.4.30) |
+| Linux | `ubuntu-22.04`, newest GCC on it (GCC 12) | A newer Ubuntu's glibc would stop the package loading on Ubuntu 22.04 and other glibc 2.35 systems (`max_glibc` in the release policy); GCC 12 also needs no newer libstdc++ than Ubuntu 22.04 and Debian 12 ship (GLIBCXX_3.4.30 and CXXABI_1.3.13, `max_glibcxx` and `max_cxxabi`), so a newer GCC on the image fails the candidate's check instead of shipping |
 | Windows | `windows-2022`, Visual Studio 2022 | The packages use the Microsoft C++ runtime installed on the user's machine (`MultiThreadedDLL`); a Visual Studio 2026 build would need that runtime's 2026 version there. jrp kept Visual Studio 2022 for the packages when he chose the CI-43 changes (19 November 2026) |
 
 Contributors' own machines are not held to this; the
