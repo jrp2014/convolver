@@ -2221,8 +2221,21 @@ void status_lines() {
                 contains(started_line(g, stereo, 512),
                          "Started at 48000 Hz, 2 in, 2 out, blocks of up to 512 frames. No "
                          "filter, so audio passes unchanged.") &&
-                contains(started_line(g, crossover_bus, 512), "plays silence"),
+                contains(started_line(g, crossover_bus, 512), "plays silence") &&
+                contains(started_line(g, stereo, 512, nullptr, true),
+                         "No filter. Bypass is on: audio passes unchanged."),
             "empty instance log lines");
+    {
+        // PLUG-39 step 4: with bypass on, the start line says what bypass
+        // plays, not that the filter plays.
+        HostFilter h(8);
+        h.load(HostState{a}, stereo);
+        require(contains(started_line(h, stereo, 512, nullptr, true),
+                         "Bypass is on: the input plays unfiltered; the filter loaded is a filter "
+                         "for 48000 Hz, 2 in, 2 out.") &&
+                    !contains(started_line(h, stereo, 512, nullptr, true), "Playing"),
+                "bypassed start line");
+    }
     g.load(HostState{other_rate}, std::nullopt);
     require(loaded_line(g, false) ==
                 "Request 1: Loaded a filter for 44100 Hz, 2 in, 2 out; waiting "
@@ -2240,6 +2253,10 @@ void status_lines() {
                                      0) == 0 &&
             rejected_line(g, true).find('\n') == std::string::npos,
         "rejected line");
+    require(rejected_line(g, true, true)
+                    .rfind("Request 2: Not loaded; the previous filter is kept (bypass is on): ",
+                           0) == 0,
+            "rejected line while bypassed");
     // Before the host starts the plug-in, the kept filter does not play yet.
     require(rejected_line(g, false).rfind("Request 2: Not loaded; the previous filter is kept: ",
                                           0) == 0,

@@ -310,8 +310,8 @@ tresult Processor::activate(TBool state) {
             try { // Started: nothing here may turn that into a failure.
                 const auto& f = filter_.failure();
                 log(started_line(filter_, now,
-                                 static_cast<std::size_t>(processSetup.maxSamplesPerBlock),
-                                 &chosen),
+                                 static_cast<std::size_t>(processSetup.maxSamplesPerBlock), &chosen,
+                                 bypass_.load()),
                     (f && f->silent) || !filter_.notice().empty());
             } catch (...) { // Out of memory for the line: it is dropped.
             }
@@ -803,7 +803,7 @@ void Processor::refused() noexcept {
         tail_.store(0);
     hold_fault_signal();
     try {
-        log(rejected_line(filter_, host() != nullptr));
+        log(rejected_line(filter_, host() != nullptr, bypass_.load()));
     } catch (...) { // Out of memory for the line: it is dropped.
     }
 }

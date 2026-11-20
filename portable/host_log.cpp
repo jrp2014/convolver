@@ -205,7 +205,7 @@ std::string loaded_line(const HostFilter& filter, const std::optional<HostLayout
     return line;
 }
 
-std::string rejected_line(const HostFilter& filter, bool started) {
+std::string rejected_line(const HostFilter& filter, bool started, bool bypassed) {
     const auto& r = filter.rejection();
     if (!r)
         return {};
@@ -216,6 +216,7 @@ std::string rejected_line(const HostFilter& filter, bool started) {
            (r->silent                ? "Not loaded, so Convolver plays silence: "
             : shown && shown->silent ? "Not loaded; the previous filter is kept (it does "
                                        "not play): "
+            : started && bypassed    ? "Not loaded; the previous filter is kept (bypass is on): "
             : started                ? "Not loaded; the previous filter keeps playing: "
                                      : "Not loaded; the previous filter is kept: ") +
            detail::advice_line(failure_message(*r));
@@ -313,13 +314,23 @@ std::string settings_words(const HostSettings& s, HostDrySignal dry, const Filte
 }
 
 std::string failure_consequence(const HostFailure& failure, const HostLayout* host,
-                                const HostSettings& used, bool dry) {
-    if (!failure.silent)
-        return host ? "The previous filter keeps playing." : "The previous filter is kept.";
+                                const HostSettings& used, bool dry, bool bypassed) {
+    // PLUG-36, PLUG-39 step 4: bypass plays the input wherever there is a dry
+    // signal, so with bypass on the words describe that, never the filter.
+    if (!failure.silent) {
+        if (!host)
+            return "The previous filter is kept.";
+        if (bypassed)
+            return dry ? "The previous filter is kept. Bypass is on: the input plays unfiltered."
+                       : "The previous filter is kept. Bypass is on: the outputs are silent.";
+        return "The previous filter keeps playing.";
+    }
     // A filter the adapter could not start has no processor, so nothing
     // plays, not even Mix's dry share (as host_status() says).
     if (!host || !dry || failure.kind == HostFailureKind::activation)
         return "Convolver plays silence.";
+    if (bypassed)
+        return "Bypass is on: only the dry signal plays.";
     const auto s = unfiltered_sound(used, false);
     if (s.silent)
         return "Convolver plays silence.";
@@ -329,7 +340,7 @@ std::string failure_consequence(const HostFailure& failure, const HostLayout* ho
 }
 
 std::string playing_words(const HostFilter& filter, const HostLayout& host,
-                          const HostSettings& used) {
+                          const HostSettings& used, bool bypassed) {
     // PLUG-10: with a dry signal, Mix's dry share plays even when no filter
     // does, and Gain changes the input that passes with no filter loaded.
     const bool equal = dry_signal(filter, host);
@@ -340,10 +351,17 @@ std::string playing_words(const HostFilter& filter, const HostLayout& host,
         return s.unchanged ? std::string("unchanged") : "at " + s.level;
     };
     if (const auto& f = filter.failure(); f && f->silent)
-        return failure_consequence(*f, &host, used, equal) + " " +
+        return failure_consequence(*f, &host, used, equal, bypassed) + " " +
                detail::as_sentence(detail::advice_line(failure_message(*f)));
     if (const auto& c = filter.filter()) {
-        auto line = "Playing " + filter_words(*c) + "." + ignored_sentence(*c, host);
+        // As HostProcessor bypasses: the input when there is a dry signal,
+        // otherwise silence (dry_signal_rule()).
+        auto line = bypassed ? "Bypass is on: " +
+                                   std::string(equal ? "the input plays unfiltered"
+                                                     : "the outputs are silent") +
+                                   "; the filter loaded is " + filter_words(*c) + "." +
+                                   ignored_sentence(*c, host)
+                             : "Playing " + filter_words(*c) + "." + ignored_sentence(*c, host);
         if (!filter.notice().empty())
             line += " " + detail::as_sentence(detail::advice_line(filter.notice()));
         return line;
@@ -356,16 +374,18 @@ std::string playing_words(const HostFilter& filter, const HostLayout& host,
     }
     if (!equal)
         return "No filter, and inputs and outputs differ, so Convolver plays silence.";
+    if (bypassed)
+        return "No filter. Bypass is on: audio passes unchanged.";
     const auto s = sound(true);
     return s.unchanged ? std::string("No filter, so audio passes unchanged.")
                        : "No filter, so audio passes at " + s.level + ", set by Gain and Mix.";
 }
 
 std::string started_line(const HostFilter& filter, const HostLayout& host, std::size_t max_frames,
-                         const HostSettings* settings) {
+                         const HostSettings* settings, bool bypassed) {
     auto line = "Started at " + host_rate_text(host) + ", " + ports(host.inputs, host.outputs) +
                 ", blocks of up to " + std::to_string(max_frames) + " frames. " +
-                playing_words(filter, host, settings ? *settings : HostSettings{});
+                playing_words(filter, host, settings ? *settings : HostSettings{}, bypassed);
     if (settings)
         line += " Settings: " +
                 settings_words(*settings, dry_signal_rule(filter, host),

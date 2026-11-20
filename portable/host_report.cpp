@@ -72,14 +72,21 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
     const auto* layout = host ? &*host : nullptr;
     const auto& failure = filter.failure();
     const auto choose = facts.chooses_files ? "choose filter" : "";
-    // PLUG-36 (jrp, 20 November 2026): bypass plays the untouched input
-    // wherever there is a dry signal, so when no filter is heard the report
-    // says that bypass is on and what it plays, as host_status() does.
-    const bool bypass_dry = facts.bypassed && layout && dry_signal(filter, *layout);
+    // PLUG-36 (jrp, 20 November 2026), PLUG-39 step 4: with bypass on, what
+    // plays is what bypass plays, as host_status() says; playing_words() and
+    // failure_consequence() say it.
     const auto no_filter_plays = [&] {
-        return !host        ? std::string("No filter is loaded.")
-               : bypass_dry ? std::string("No filter. Bypass is on: audio passes unchanged.")
-                            : playing_words(filter, *host, facts.settings);
+        return !host ? std::string("No filter is loaded.")
+                     : playing_words(filter, *host, facts.settings, facts.bypassed);
+    };
+    // As HostProcessor bypasses a filter: the input when there is a dry
+    // signal, otherwise silence (dry_signal_rule(), PLUG-23).
+    const auto bypassed_plays = [&](const Configuration& c) {
+        return !host ? std::string("No filter is applied while bypassed.")
+               : dry_signal(filter, *host)
+                   ? std::string("The input plays unfiltered.")
+                   : "The outputs are silent: with " + ports(c.input_channels, c.output_channels) +
+                         ", the filter has no unfiltered signal to play.";
     };
     Message m;
     const auto take = [&](const detail::Advice& a) {
@@ -95,10 +102,8 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         auto a = failure_message(*failure);
         a.problem = short_problem(std::move(a.problem), *failure);
         take(a);
-        m.plays = bypass_dry && failure->silent && failure->kind != HostFailureKind::activation
-                      ? std::string("Bypass is on: only the dry signal plays.")
-                      : failure_consequence(*failure, layout, facts.settings,
-                                            layout && dry_signal(filter, *layout));
+        m.plays = failure_consequence(*failure, layout, facts.settings,
+                                      layout && dry_signal(filter, *layout), facts.bypassed);
         if (chosen_away(failure->kind))
             m.action = choose;
         // Faults the load failure hides from the status.
@@ -107,8 +112,9 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
                                             fault_advice(filter.faults(), true).problem));
     } else if (status == HostStatus::fault) {
         take(fault_advice(filter.faults(), false));
-        if (filter.filter()) {
-            m.plays = "The filter keeps playing.";
+        if (const auto& c = filter.filter()) {
+            m.plays = facts.bypassed ? "Bypass is on. " + bypassed_plays(*c)
+                                     : std::string("The filter keeps playing.");
         } else {
             // Faults are counted with no filter too (the host's samples).
             m.plays = no_filter_plays();
@@ -121,14 +127,7 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         // PLUG-22: as HostProcessor bypasses, the input when there is a dry
         // signal, otherwise silence (dry_signal_rule(), PLUG-23).
         // Nothing is wrong, so turning it off is part of the sentence, not a fix.
-        const auto& c = *filter.filter();
-        m.plays =
-            (!host ? std::string("No filter is applied while bypassed.")
-             : dry_signal(filter, *host)
-                 ? std::string("The input plays unfiltered.")
-                 : "The outputs are silent: with " + ports(c.input_channels, c.output_channels) +
-                       ", the filter has no unfiltered signal to play.") +
-            " Turn bypass off to hear the filter.";
+        m.plays = bypassed_plays(*filter.filter()) + " Turn bypass off to hear the filter.";
     } else if (status == HostStatus::active || status == HostStatus::unchecked) {
         // PLUG-22: while it plays, the window's heading names the filter and
         // the Audio section describes it, so nothing is said here.
@@ -138,7 +137,7 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         if (host && !filter.notice().empty())
             take(filter.notice());
     } else if (status == HostStatus::load_failed) {
-        m.plays = host ? playing_words(filter, *host, facts.settings)
+        m.plays = host ? playing_words(filter, *host, facts.settings, facts.bypassed)
                        : std::string("Silent after a failed load.");
         m.fix = "Load a filter made for the host's sample rate and channels.";
         m.action = choose;

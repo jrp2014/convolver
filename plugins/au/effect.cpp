@@ -258,7 +258,7 @@ OSStatus Effect::Initialize() {
                 const auto& f = filter_.failure();
                 problem = (f && f->silent) || !filter_.notice().empty();
                 message = started_line(filter_, *settling_.last_start(), GetMaxFramesPerSlice(),
-                                       &current);
+                                       &current, bypass_.load());
             } catch (...) { // Out of memory for the message: the unit still plays.
             }
         }
