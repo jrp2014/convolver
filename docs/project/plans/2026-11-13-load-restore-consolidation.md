@@ -339,6 +339,15 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
    what is heard (the tail rings on), so it is a separate commit in this
    step, with an LV2 test that re-chooses the same file during a tail and
    one that re-chooses the same name with changed contents.
+   Step 1b is in PR #224. Two differences from this description, found
+   while doing it: the install callback still receives `HostPlayback`
+   (whose `playing` now also answers for a session), and `load()` returns
+   the rest as `HostChange` after its commit, because the callback is not
+   called while the host's configuration is unknown and the settings must
+   apply then too; and the decision does not say whether the Latency needs
+   a new processor, because each format's Latency path already builds one
+   only when the value differs from its newest processor's, which step 5's
+   single latency value takes up.
 2. **One rule for when the host has settled its rate and channels.** Replace
    VST3's and the Audio Unit's two implementations with one small shared
    record that each adapter feeds with the same events (activated with a
