@@ -1753,6 +1753,24 @@ void status_parameter() {
     check(unit.load(state_of(stereo(48000))), "load after a fault");
     require(value() == HostStatus::active && contains(shown(), "Filter loaded"),
             "a load does not clear Fault: " + shown());
+    // ROBUST-8: a Latency whose processor cannot be built leaves the status
+    // as it was. The processor that counted the fault keeps playing, and the
+    // load just made cleared it, so Fault does not come back. The load woke
+    // the Latency work, so the hook is set only once that has finished.
+    require(latency_settled(unit), "the Latency work did not finish after the load");
+    au::latency_preparation_for_tests = [] { throw std::runtime_error("no memory for the test"); };
+    set_parameter(unit, au::latency_parameter, 5);
+    const bool refused = latency_settled(unit);
+    au::latency_preparation_for_tests = nullptr;
+    require(refused && std::lround(unit.seconds(kAudioUnitProperty_Latency) * 48000) == 0 &&
+                contains(log_text(), "Latency 1024 frames could not be applied, so the plug-in "
+                                     "keeps 0 frames: no memory for the test"),
+            "a Latency that could not be built changed the latency or was not logged");
+    require(value() == HostStatus::active && contains(shown(), "Filter loaded"),
+            "a Latency that could not be built brought back the Fault a load had cleared: " +
+                shown());
+    set_parameter(unit, au::latency_parameter, 0);
+    require(latency_settled(unit), "the Latency work did not finish for the default Latency");
     // jrp's review of 0.4.43: Render must not write Fault over Load failed,
     // which comes first; an accepted load releases the signal.
     const auto render_invalid = [&] {

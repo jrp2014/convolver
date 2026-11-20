@@ -2,6 +2,7 @@
 #include "advice.hpp"
 #include "cases.hpp"
 #include "convolver/host.hpp"
+#include "host_activation.hpp"
 #include "host_log.hpp"
 #include "oracle.hpp"
 #include <algorithm>
@@ -389,14 +390,14 @@ void filter_contract() {
         "different rate from the one it exports at.";
     require(first.error().find(playback_rate) != std::string::npos,
             "rate refusal without the playback-rate line: " + first.error());
-    require(first.activate(stereo).filter.paths[0].impulse == std::vector<float>{0},
+    require(test::started(first, stereo).filter.paths[0].impulse == std::vector<float>{0},
             "failed initial load does not play silence");
     expect_rejection([&] { first.load(HostState{wide}, std::nullopt); }, "channel bound unchecked");
     require(first.error().find("exports at") == std::string::npos,
             "channel refusal names the playback rate: " + first.error());
     first.load(HostState{}, stereo); // Back to an empty instance.
     require(!first.failed() && first.error().empty() &&
-                first.activate(stereo).filter.paths.size() == 2,
+                test::started(first, stereo).filter.paths.size() == 2,
             "empty state does not restore identity");
 
     // A saved failed load (state version 2) restores as silence, not identity.
@@ -408,7 +409,7 @@ void filter_contract() {
     require(reopened.failed() && !reopened.filter() && !reopened.error().empty() &&
                 installed.paths.size() == 1 && installed.paths[0].impulse == std::vector<float>{0},
             "saved failed load does not restore as silence");
-    require(reopened.activate(stereo).filter.paths[0].impulse == std::vector<float>{0},
+    require(test::started(reopened, stereo).filter.paths[0].impulse == std::vector<float>{0},
             "saved failed load activates as identity");
     // Restoring it over a working filter restores what was saved: silence.
     HostFilter working(8);
@@ -450,13 +451,13 @@ void filter_contract() {
     HostFilter early(8);
     early.load(HostState{other_rate}, std::nullopt);
     require(early.filter() && early.filter()->sample_rate == 44100, "early restore not kept");
-    require(early.activate(stereo).filter.paths[0].impulse == std::vector<float>{0} &&
+    require(test::started(early, stereo).filter.paths[0].impulse == std::vector<float>{0} &&
                 early.error().find("44100 Hz") != std::string::npos,
             "mismatch at activation does not play silence with an error");
-    require(early.filter() && early.activate({44100, 2, 2}).filter.sample_rate == 44100 &&
+    require(early.filter() && test::started(early, {44100, 2, 2}).filter.sample_rate == 44100 &&
                 early.error().empty(),
             "correcting the rate does not bring the filter back");
-    require(early.activate({44100, 2, 6}).filter.paths[0].impulse == std::vector<float>{0} &&
+    require(test::started(early, {44100, 2, 6}).filter.paths[0].impulse == std::vector<float>{0} &&
                 early.error().find("2 inputs and 6 outputs") != std::string::npos,
             "channel mismatch at activation not explained");
 }
@@ -506,7 +507,7 @@ void failure_reasons() {
                 !f.failure()->silent && f.failure()->outputs == 6 &&
                 contains(f.error(), "the filter has 2 inputs and 6 outputs"),
             "failed replacement not recorded");
-    require(f.activate(stereo).filter.paths.size() == 1 && f.failure() &&
+    require(test::started(f, stereo).filter.paths.size() == 1 && f.failure() &&
                 f.failure()->request.number == 3,
             "activation cleared a rejected request's failure");
     // Request 4: preparation fails.
@@ -541,7 +542,7 @@ void failure_reasons() {
     HostFilter early(8);
     early.load(HostState{other_rate}, std::nullopt); // Request 1, accepted unchecked.
     refused([&] { early.load(HostState{crossover}, {{44100, 2, 2}}); }); // Request 2.
-    require(early.activate(stereo).filter.paths[0].impulse == std::vector<float>{0},
+    require(test::started(early, stereo).filter.paths[0].impulse == std::vector<float>{0},
             "mismatch played");
     require(early.failure()->kind == Kind::sample_rate && early.failure()->request.number == 1 &&
                 early.failure()->silent && early.failure()->sample_rate == 44100 &&
@@ -555,14 +556,14 @@ void failure_reasons() {
                 contains(early.rejection()->message, "6 outputs"),
             "a request rejected during an activation failure is not its own rejection");
     refused([&] { early.load(HostState{crossover}, {{44100, 2, 2}}); }); // Request 4.
-    require(early.activate({44100, 2, 2}).filter.sample_rate == 44100 && early.failure() &&
+    require(test::started(early, {44100, 2, 2}).filter.sample_rate == 44100 && early.failure() &&
                 early.failure()->request.number == 4 && !early.failure()->silent,
             "rejected request's failure lost behind an activation failure");
     early.fail_activation("out of memory");
     require(early.failure()->kind == Kind::activation && early.failure()->request.number == 1 &&
                 early.failure()->silent && contains(early.error(), "out of memory"),
             "activation failure not recorded");
-    early.activate({44100, 2, 2});
+    test::started(early, {44100, 2, 2});
     require(early.failure()->kind != Kind::activation && early.failure()->request.number == 4,
             "activation failure outlived activation");
     // A number the adapter supplies (an LV2 generation) is kept, and later
@@ -598,7 +599,7 @@ void failure_reasons() {
     early.load(HostState{}, std::nullopt); // An empty instance succeeds.
     require(!early.failure(), "empty state did not clear the failure");
     HostFilter empty(8);
-    empty.activate(stereo);
+    test::started(empty, stereo);
     empty.fail_activation("out of memory");
     require(empty.failure()->request.number == 0 && empty.failure()->inputs == 0,
             "an instance that never loaded a filter has a request");
@@ -614,7 +615,7 @@ void failure_reasons() {
                 contains(reopened.error(), "had failed to load when this project or preset was "
                                            "saved"),
             "saved failure not recorded");
-    require(reopened.activate(stereo).filter.paths[0].impulse == std::vector<float>{0} &&
+    require(test::started(reopened, stereo).filter.paths[0].impulse == std::vector<float>{0} &&
                 reopened.failure()->kind == Kind::saved_failure,
             "activation cleared a saved failure");
 }
@@ -684,13 +685,16 @@ void speaker_notices() {
     filter.load(HostState{c}, music);
     require(filter.filter() && filter.error().empty() && contains(filter.notice(), "BL BR SL SR"),
             "notice not recorded on load");
-    require(filter.activate(back).filter.paths.size() == 1 && filter.notice().empty(),
+    require(test::started(filter, back).filter.paths.size() == 1 && filter.notice().empty(),
             "matching speakers left a notice");
     filter.load(HostState{c}, std::nullopt);
     require(filter.notice().empty(), "notice without the host's configuration");
-    require(filter.activate(music).filter.paths.size() == 1 && !filter.notice().empty(),
+    require(test::started(filter, music).filter.paths.size() == 1 && !filter.notice().empty(),
             "notice not recorded at activation");
-    require(filter.activate({44100, 2, 6, 0, 0x633}).filter.paths[0].impulse ==
+    // ROBUST-8: an activation whose processor was not built keeps it.
+    require(filter.activation(back).notice.empty() && !filter.notice().empty(),
+            "an activation that never played changed the notice");
+    require(test::started(filter, {44100, 2, 6, 0, 0x633}).filter.paths[0].impulse ==
                     std::vector<float>{0} &&
                 filter.notice().empty(),
             "notice kept while the filter does not play");
@@ -754,7 +758,7 @@ void wider_inputs() {
     HostFilter f(8);
     Configuration installed;
     f.load(HostState{x}, six, [&](const HostPlayback& c) { installed = c.filter; });
-    require(installed.input_channels == 2 && f.activate(six).filter.input_channels == 2 &&
+    require(installed.input_channels == 2 && test::started(f, six).filter.input_channels == 2 &&
                 !f.failure(),
             "a filter with fewer inputs than the host's is refused");
     require(ignored_inputs(x, six) == "inputs 3–6" && ignored_inputs(x, six, "-") == "inputs 3-6" &&
@@ -969,7 +973,7 @@ void wider_inputs() {
     const HostLayout slower{44100, 6, 6};
     HostFilter kept(8);
     kept.load(HostState{x}, std::nullopt);
-    const auto silent_crossover = kept.activate(slower);
+    const auto silent_crossover = test::started(kept, slower);
     require(kept.failure() && kept.failure()->silent &&
                 dry_signal_rule(kept, slower) == HostDrySignal::filter_counts &&
                 !silent_crossover.dry && silent_crossover.filter.output_channels == 6,
@@ -992,7 +996,7 @@ void wider_inputs() {
     // A kept 6x6 filter at the wrong rate keeps its dry signal.
     HostFilter kept_equal(8);
     kept_equal.load(HostState{equal}, std::nullopt);
-    const auto silent_equal = kept_equal.activate(slower);
+    const auto silent_equal = test::started(kept_equal, slower);
     require(dry_signal(kept_equal, slower) && silent_equal.dry,
             "a kept 6x6 filter that does not suit the host has no dry signal");
     // A failed load with no filter kept (here, an unreadable state; a missing
@@ -1000,7 +1004,7 @@ void wider_inputs() {
     HostFilter failed(8);
     failed.reject(HostFailureKind::filter_file, {"The filter file could not be read."});
     require(dry_signal_rule(failed, six) == HostDrySignal::failed_load &&
-                !failed.activate(six).dry && !unfiltered_playback(six, true, false).dry &&
+                !test::started(failed, six).dry && !unfiltered_playback(six, true, false).dry &&
                 unfiltered_playback(six, true, true).dry &&
                 !unfiltered_playback({48000, 2, 6}, false, true).dry,
             "a failed load with no filter kept has a dry signal");
@@ -1009,10 +1013,10 @@ void wider_inputs() {
     failed_mono.reject(HostFailureKind::filter_file, {"The filter file could not be read."});
     const HostLayout mono_host{48000, 1, 1};
     require(dry_signal_rule(failed_mono, mono_host) == HostDrySignal::failed_load &&
-                !failed_mono.activate(mono_host).dry,
+                !test::started(failed_mono, mono_host).dry,
             "a failed mono load has a dry signal");
     {
-        HostProcessor q(failed_mono.activate(mono_host), 32, HostSettings{0, .5, 64}, 1);
+        HostProcessor q(test::started(failed_mono, mono_host), 32, HostSettings{0, .5, 64}, 1);
         q.set_bypass(true);
         std::vector<std::vector<float>> one(1, std::vector<float>(32, 1.f));
         for (int k = 0; k < 4; ++k) {
@@ -1025,7 +1029,7 @@ void wider_inputs() {
     }
     // An untouched mono instance still passes its input.
     HostFilter untouched_mono(8);
-    require(dry_signal(untouched_mono, mono_host) && untouched_mono.activate(mono_host).dry,
+    require(dry_signal(untouched_mono, mono_host) && test::started(untouched_mono, mono_host).dry,
             "an untouched mono instance has no dry signal");
     require(host_status(failed, six, true, {0, .5}).text.rfind("Silent: ", 0) == 0,
             "status: " + host_status(failed, six, true, {0, .5}).text);
@@ -1551,7 +1555,7 @@ void same_filter_kept() {
     loads(kept, a, other, HostLoadCheck::keep_until_suited);
     require(!loads(kept, a, other, HostLoadCheck::keep_until_suited),
             "a filter kept silent counted as playing");
-    kept.activate(layout);
+    test::started(kept, layout);
     require(loads(kept, a, layout), "a filter playing after activation not counted");
 
     HostProcessor host(a, 64, 8);
@@ -1634,8 +1638,27 @@ void processing_faults() {
     // observe(), so the cleared fault does not come back (DIAG-3 review).
     require(!f.observe(host.faults()).any() && !f.faults().any(),
             "a load without a processor did not keep the fault cleared");
+    // ROBUST-8: an activation whose processor was not built (a new Latency
+    // when memory ran out) records nothing. The running processor counts on,
+    // so the fault the load cleared stays cleared.
+    static_cast<void>(f.activation(layout));
+    require(!f.observe(host.faults()).any() && !f.faults().any() &&
+                host_status(f, layout).status == HostStatus::active,
+            "an activation that never played brought a cleared fault back");
+    // Nor does it clear why a kept filter plays silence (nor the speaker
+    // notice, checked in speaker_notices()) until activate() records it.
+    HostFilter kept(8);
+    kept.load(HostState{mono()}, std::nullopt);
+    static_cast<void>(test::started(kept, HostLayout{44100, 1, 1}));
+    require(kept.failure() && kept.failure()->silent, "a kept filter at another rate");
+    auto suited = kept.activation(layout);
+    require(!suited.failure && suited.playback.filter.sample_rate == 48000 && kept.failure() &&
+                kept.failure()->silent,
+            "an activation that never played cleared why the filter is silent");
+    kept.activate(std::move(suited));
+    require(!kept.failure(), "an activation that plays did not clear why it was silent");
     // A new processor counts from 0 after activate().
-    static_cast<void>(f.activate(layout));
+    static_cast<void>(test::started(f, layout));
     HostFaults restarted;
     restarted.rejected_input = 1;
     require(f.observe(restarted).faults.rejected_input == 1 &&
@@ -1755,7 +1778,7 @@ void processing_faults() {
     // with silence. Every fault is explained once: before the request, while
     // the rejected filter was prepared, and after.
     HostFilter empty(8);
-    HostProcessor q(empty.activate(layout).filter, 64, 8);
+    HostProcessor q(test::started(empty, layout).filter, 64, 8);
     const auto play_q = [&](float first) {
         buffer.fill(0.f);
         buffer[0] = first;
@@ -1838,7 +1861,7 @@ void status_lines() {
           "Filter loaded: 44100 Hz, 2 in, 2 out; waiting for audio settings from the host.",
           "unchecked");
     // Checked at activation: silence, and why.
-    static_cast<void>(f.activate(stereo));
+    static_cast<void>(test::started(f, stereo));
     check(host_status(f, stereo), Status::load_failed, "Silent: the filter is for 44100 Hz",
           "mismatch at activation");
     f.load(HostState{a}, stereo);
@@ -1894,7 +1917,7 @@ void status_lines() {
                 "a restored filter that does not suit yet was not kept silent");
         check(host_status(kept, stereo), Status::load_failed,
               "Silent: the filter has 2 in, 6 out, the host 2 in, 2 out.", "kept, unsuited");
-        static_cast<void>(kept.activate(six));
+        static_cast<void>(test::started(kept, six));
         require(!kept.failure(), "the kept filter does not play on buses that suit it");
         check(host_status(kept, six), Status::active, "Filter loaded: 48000 Hz, 2 in, 6 out",
               "kept, then suited");
@@ -1969,7 +1992,7 @@ void status_lines() {
     require(rejected_line(g, false).rfind("Request 2: Not loaded; the previous filter is kept: ",
                                           0) == 0,
             "rejected line before the host starts the plug-in");
-    static_cast<void>(g.activate(stereo));
+    static_cast<void>(test::started(g, stereo));
     require(contains(started_line(g, stereo, 64),
                      "Convolver plays silence. The saved filter is for 44100 Hz") &&
                 contains(started_line(g, stereo, 64), "Convolver never resamples"),

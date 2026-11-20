@@ -236,13 +236,15 @@ OSStatus Effect::Initialize() {
             // A filter that does not suit the host plays silence, and is kept so
             // that correcting the rate or channels brings it back. Gain and Mix
             // apply from the first frame, and the Latency is the block size.
-            auto next = std::make_unique<HostProcessor>(
-                filter_.activate(now), GetMaxFramesPerSlice(), current, now.inputs);
+            auto activation = filter_.activation(now);
+            auto next = std::make_unique<HostProcessor>(activation.playback, GetMaxFramesPerSlice(),
+                                                        current, now.inputs);
             next->set_bypass(bypass_.load());
             next->reset();
             tail_.store(next->tail_frames());
             latency_.store(next->latency_frames());
             playing_.offer(std::move(next));
+            filter_.activate(std::move(activation));
             initialized_ = now;
             rendered_.store(false);
             reset_requested_.store(false);
@@ -395,42 +397,37 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
         } else if (host()->latency_frames() != chosen && initialized_) {
             const auto before = host()->latency_frames();
             faults = observe_faults(); // Before the processor that counted them goes.
-            std::unique_ptr<HostProcessor> next;
             std::string why;
             try {
                 // As Initialize builds it; Render switches at its next call.
-                next = std::make_unique<HostProcessor>(filter_.activate(*initialized_),
-                                                       GetMaxFramesPerSlice(), current,
-                                                       initialized_->inputs);
+                auto activation = filter_.activation(*initialized_);
+                if (const auto hook = latency_preparation_for_tests)
+                    hook();
+                auto next = std::make_unique<HostProcessor>(
+                    activation.playback, GetMaxFramesPerSlice(), current, initialized_->inputs);
                 next->set_bypass(bypass_.load());
                 next->reset();
-            } catch (const std::exception& e) {
-                next.reset();
-                try {
-                    why = e.what();
-                } catch (...) {
-                }
-            } catch (...) {
-                next.reset();
-            }
-            if (next) {
-                // Nothing below can fail: the audio and the reported latency
-                // change together, from the processor that now plays.
+                // Nothing below can fail: the audio, the reported latency and
+                // the status change together, from the processor that now
+                // plays (ROBUST-8).
                 tail_.store(next->tail_frames());
                 latency_.store(next->latency_frames());
                 // Render plays it from its next call; the one it replaces is
                 // freed by a later control call once Render has let it go.
                 playing_.offer(std::move(next));
+                filter_.activate(std::move(activation));
                 changed = true;
-            } else {
-                // The previous processor keeps playing at its latency, and
-                // the window's report says the chosen one is not in use.
-                // activate() started the fault count again for a new
-                // processor, so count from the old one's totals (already
-                // logged above) rather than logging them all again.
-                problem = true;
-                (void)filter_.observe(host()->faults());
+            } catch (const std::exception& e) {
+                try {
+                    why = e.what();
+                } catch (...) {
+                }
+            } catch (...) {
             }
+            // If it failed, the previous processor keeps playing at its
+            // latency, and the window's report says the chosen one is not in
+            // use.
+            problem = !changed;
             try { // Best effort: out of memory for the message changes nothing else.
                 message = changed ? "Latency changed from " + std::to_string(before) + " to " +
                                         std::to_string(chosen) +

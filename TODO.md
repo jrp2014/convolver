@@ -827,7 +827,7 @@ so the preset file path is not needed).
 - [ ] **PERF-19 — Copies of whole configurations on the control side.**
   From jrp's review of PLUG-23 (7 November 2026): a filter's configuration,
   every tap included, is copied where the control side hands it on:
-  `HostFilter::activate()` returns a copy in a `HostPlayback` at each
+  `HostFilter::activation()` returns a copy in a `HostPlayback` at each
   activation, the install callback's filter is copied into the prepared
   engine, and saving copies it into `HostState`. For a 30-second stereo
   reverb at 48 kHz each copy is at least 11 MB. Profiling targets only: measure the preview loading

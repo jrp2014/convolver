@@ -384,6 +384,14 @@ format.
   returns the new ones, which adapters log with `fault_message()`;
   `HostFilter::faults()` keeps them until an accepted load or `activate()`,
   and `host_status()` shows them as Fault unless a load failure is shown.
+  An activation is recorded only once its processor will play (ROBUST-8):
+  `HostFilter::activation()` finds what to play and why, and changes
+  nothing; every adapter builds the processor from it and calls
+  `activate()`, which cannot fail, only once nothing can stop that
+  processor from playing. A processor that cannot be built (a new Latency
+  when memory runs out) leaves the fault count, the speaker notice and the
+  reason a kept filter plays silence as they were, for the processor that
+  keeps playing.
   While one is shown, the report says so (`held`), and its log text says
   that the status shows Load failed instead of Fault.
   One baseline serves both sides (jrp's review of 0.4.43): an adapter passes
@@ -404,7 +412,7 @@ format.
   and activation; LV2's status port puts Load failed first itself. When an
   empty instance's first load fails, every adapter silences the processor
   that plays with `HostProcessor::silence()` (ROBUST-3) rather than
-  `activate()`, which would restart the fault count; it neither allocates
+  a new activation, which would restart the fault count; it neither allocates
   nor fails, so the silence holds even when memory has run out. A first
   load that runs out of memory before its failure is recorded still fails
   (ROBUST-7): `HostFilter` marks the instance failed (`fail_request()`)
@@ -594,7 +602,7 @@ Which counts decide is what plays (`dry_signal_rule()` in `host.hpp`):
   replacement keeps the previous filter with its own rule.
 
 Each prepared filter carries the answer: `HostPlayback` holds the
-configuration and whether it has a dry signal, and `HostFilter::activate()`,
+configuration and whether it has a dry signal, and `HostFilter::activation()`,
 the `HostFilter::load()` install callback and `HostProcessor` take it.
 `filter_playback()` gives a playing filter its own counts' answer and
 `unfiltered_playback()` the answer for no filter; processing, bypass, Mix and
@@ -790,7 +798,8 @@ the plan's Gain modes (12 November 2026); its meters follow later
   restart, and faults the old one counts in its last moments are not
   reported. If the new processor cannot be built, the old one keeps
   playing, the log says why, the window says the chosen Latency is not in
-  use, and it is not tried again until chosen again.
+  use, the status and fault count stay as they were (ROBUST-8), and it is
+  not tried again until chosen again.
   `RestoreState` reads the parameter values from "data" itself, with bounds
   checks (AUBase's reader has none), and applies them only when the filter is
   accepted; it ignores Status and unknown IDs, keeps settings the state does

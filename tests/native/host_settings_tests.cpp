@@ -4,6 +4,7 @@
 // without allocation on the audio thread.
 #include "cases.hpp"
 #include "convolver/host.hpp"
+#include "host_activation.hpp"
 #include "host_log.hpp"
 #include "oracle.hpp"
 #include <algorithm>
@@ -698,7 +699,7 @@ void diagnostics_follow_settings() {
                 c.host);
         auto settings = c.settings;
         settings.latency = 64;
-        HostProcessor host(filter.activate(c.host), 64, settings);
+        HostProcessor host(test::started(filter, c.host), 64, settings);
         const auto output = play(host, std::vector<float>(2048 * c.host.inputs, .5f), c.host.inputs,
                                  c.host.outputs, 64);
         for (std::size_t i = output.size() - 64 * c.host.outputs; i < output.size(); ++i)
