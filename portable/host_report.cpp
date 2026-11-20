@@ -88,6 +88,9 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         m.fix = a.fix;
         m.note = a.note;
     };
+    // Which state the report explains, in the order Status gives it
+    // (host_status_value()).
+    const auto status = host_status_value(filter, host.has_value(), facts.bypassed);
     if (failure) {
         auto a = failure_message(*failure);
         a.problem = short_problem(std::move(a.problem), *failure);
@@ -102,7 +105,7 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         if (filter.faults().any())
             add_note(m, detail::as_sentence("While audio played: " +
                                             fault_advice(filter.faults(), true).problem));
-    } else if (filter.faults().any() && !filter.failed()) {
+    } else if (status == HostStatus::fault) {
         take(fault_advice(filter.faults(), false));
         if (filter.filter()) {
             m.plays = "The filter keeps playing.";
@@ -114,7 +117,7 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         }
         if (filter.faults().processing_failure)
             m.action = "copy diagnostics";
-    } else if (facts.bypassed && filter.filter()) {
+    } else if (status == HostStatus::bypassed) {
         // PLUG-22: as HostProcessor bypasses, the input when there is a dry
         // signal, otherwise silence (dry_signal_rule(), PLUG-23).
         // Nothing is wrong, so turning it off is part of the sentence, not a fix.
@@ -134,7 +137,7 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
                       "the host's sample rate and channels.";
         if (host && !filter.notice().empty())
             take(filter.notice());
-    } else if (filter.failed()) {
+    } else if (status == HostStatus::load_failed) {
         m.plays = host ? playing_words(filter, *host, facts.settings)
                        : std::string("Silent after a failed load.");
         m.fix = "Load a filter made for the host's sample rate and channels.";

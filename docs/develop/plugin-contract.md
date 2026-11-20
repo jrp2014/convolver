@@ -213,9 +213,10 @@ and faults never change the state, so they never change the filter or
 failure that is saved (VST3 saves its bypass and settings beside it, as
 [host state](#host-state) says).
 
-**Which message Status shows** (`host_status()` in
-[`host.cpp`](../../portable/host.cpp); `native.host` `status_lines`), first
-match wins:
+**Which message Status shows** (`host_status_value()` in
+[`host.cpp`](../../portable/host.cpp), which `host_status()`, the window's
+report and LV2's status port all follow; `native.host` `status_lines`),
+first match wins:
 
 1. A load failure: the failure found at activation while it lasts, otherwise
    the newest refused request's. A kept filter that does not suit therefore
@@ -1332,7 +1333,12 @@ How each adapter meets the contract where its format differs:
   the LV2 state specification requires ("This allows the host to reset the
   plugin state with an empty map"): no filter, no failure, no path, and loads
   still outstanding are superseded. The status port
-  follows the newest request (3, Loading, while it is outstanding); the path
+  follows the newest request (3, Loading, while it is outstanding), and
+  otherwise the record's status in the order Status gives it in the other
+  formats: the control side maps `host_status_value()` to the port's values
+  (`port_status()` in `plugin.hpp`; Active, Waiting and Bypassed are all 0,
+  running; PLUG-39 step 4), and `run()` lays its own Fault and a refusal it
+  made itself over that, Load failed first; the path
   it reports and saves follows the installed filter. The design, with the full
   lifecycle, is in the archived formats plan's
   [worker and state lifecycle](../archive/plans/2026-10-21-plugin-formats.md#lv2-adapter-design).

@@ -60,6 +60,25 @@ inline constexpr std::uint32_t atom_buffer_bytes = 8192;
 // explains.
 enum class Status : int { running = 0, no_filter = 1, load_failed = 2, loading = 3, fault = 4 };
 
+// The port's value for a shared status (host_status_value()): Active,
+// Waiting and Bypassed are all "running", as the port has no others.
+// Loading is the port's own, set while a chosen file is outstanding.
+constexpr Status port_status(convolver::HostStatus s) noexcept {
+    switch (s) {
+    case convolver::HostStatus::no_filter:
+        return Status::no_filter;
+    case convolver::HostStatus::load_failed:
+        return Status::load_failed;
+    case convolver::HostStatus::fault:
+        return Status::fault;
+    case convolver::HostStatus::active:
+    case convolver::HostStatus::unchecked:
+    case convolver::HostStatus::bypassed:
+        return Status::running;
+    }
+    return Status::running;
+}
+
 // The filter parameter (<base>filter, an atom:Path, patch:writable) and the
 // longest path it takes, in bytes without the terminating NUL. Longer paths
 // are refused with "load failed".

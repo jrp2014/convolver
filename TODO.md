@@ -415,10 +415,11 @@ LV2 (Linux first; also PipeWire system audio):
   request's kind) and aligns LV2's re-chosen file with VST3 and the Audio
   Unit. Step 2, in PR #226, gathers VST3's and the Audio Unit's rules for when the host
   has settled its rate and channels into one record, `HostSettling`, each
-  format keeping its own binding. **Remains:** the
+  format keeping its own binding. Step 4c gives the status one ordering, `host_status_value()`, which `host_status()`, the report and LV2's status port follow. **Remains:** the
   [consolidation plan](docs/project/plans/2026-11-13-load-restore-consolidation.md)'s
-  steps 4 to 6: diagnostics as a view of state, and
-  typed reports and advice. Plan and order approved by jrp on 13 November
+  steps 4a (the Audio Unit's snapshot, with PLUG-30, on a shared accepted
+  filter as jrp chose on 20 November 2026, in 0.17.0), 4b (VST3's filter
+  names) and 5 to 6: typed reports and advice. Plan and order approved by jrp on 13 November
   2026, not the implementation: each step's pull request is reviewed and
   tested on its own. **Worth doing** now that 0.13.20 is published
   (16 November 2026). **Done

@@ -63,6 +63,11 @@ Until 1.0 the C++ API may change between minor versions.
   says to keep every external dependency, compilers and CI machines
   included, on its newest formal release
   ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
+- Plug-ins and Library (PLUG-39 step 4c): one function,
+  `host_status_value()`, orders a plug-in's status (a load failure, then a
+  fault, then Bypassed, then the filter, then a failed load, then no
+  filter). `host_status()`, the window's report and LV2's status port all
+  follow it instead of ordering the record again. Nothing shown changes.
 - Plug-ins (PLUG-39 step 2): VST3 and the Audio Unit decide when the
   host has settled its sample rate and channels in one shared record
   (`HostSettling`), which each feeds with the host's starts, stops and

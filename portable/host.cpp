@@ -1010,6 +1010,20 @@ const char* no_dry_reason(HostDrySignal rule) noexcept {
     return "";
 }
 
+HostStatus host_status_value(const HostFilter& filter, bool host_known, bool bypassed) noexcept {
+    if (filter.failure())
+        return HostStatus::load_failed;
+    if (filter.faults().any() && !filter.failed())
+        return HostStatus::fault;
+    if (bypassed && filter.filter())
+        return HostStatus::bypassed;
+    if (filter.filter())
+        return host_known ? HostStatus::active : HostStatus::unchecked;
+    if (filter.failed())
+        return HostStatus::load_failed;
+    return HostStatus::no_filter;
+}
+
 HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLayout>& host,
                            bool log_written, const HostSettings& settings, bool bypassed,
                            bool chooses_files) {
@@ -1037,8 +1051,10 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
             return "Load failed, only the dry signal plays: ";
         return "Silent: ";
     };
-    if (const auto& f = failure) {
-        line.status = HostStatus::load_failed;
+    // Which status, in the one order host_status_value() gives; then its words.
+    line.status = host_status_value(filter, host.has_value(), bypassed);
+    const auto& f = failure;
+    if (f) {
         // A filter the adapter could not start has no processor, so nothing
         // plays, not even Mix's dry share (the independent review).
         if (f->silent && f->kind != HostFailureKind::activation && bypass_dry) {
@@ -1054,20 +1070,17 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
                                                                   : silent_words()) +
                         short_reason(*f, host) + details;
         }
-    } else if (filter.faults().any() && !filter.failed()) {
-        line.status = HostStatus::fault;
+    } else if (line.status == HostStatus::fault) {
         line.text = "Fault: " + short_fault(filter.faults()) + details;
-    } else if (bypassed && filter.filter()) {
+    } else if (line.status == HostStatus::bypassed) {
         // As HostProcessor bypasses: the delayed input on each output when
         // there is a dry signal, otherwise silence (dry_signal_rule).
-        line.status = HostStatus::bypassed;
         const auto rule = host ? dry_signal_rule(filter, *host) : HostDrySignal::present;
         line.text = !host ? "Bypassed: no filter is applied."
                     : rule == HostDrySignal::present
                         ? "Bypassed: the input plays unfiltered."
                         : std::string("Bypassed: silent, as ") + no_dry_reason(rule) + ".";
-    } else if (const auto& c = filter.filter()) {
-        line.status = host ? HostStatus::active : HostStatus::unchecked;
+    } else if (const auto& c = filter.filter()) { // Active, or Waiting.
         const auto ignored = host ? ignored_inputs(*c, *host, "-") : std::string();
         line.text = "Filter loaded: " + std::to_string(c->sample_rate) + " Hz, " +
                     ports(c->input_channels, c->output_channels) +
@@ -1079,12 +1092,10 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
                                      : " Speaker labels differ.";
         if (dry_known && clamp_mix(settings.mix) == 0)
             line.text += " Mix 0%: only the dry signal plays.";
-    } else if (filter.failed()) {
-        line.status = HostStatus::load_failed;
-        // No filter is kept, so no dry signal plays either.
+    } else if (line.status == HostStatus::load_failed) {
+        // A failed load: no filter is kept, so no dry signal plays either.
         line.text = "Silent: an earlier load failed." + std::string(details);
-    } else {
-        line.status = HostStatus::no_filter;
+    } else { // No filter.
         const std::string load = chooses_files ? " Choose a filter or load a Convolver preset."
                                                : " Load a Convolver preset.";
         if (!host)
