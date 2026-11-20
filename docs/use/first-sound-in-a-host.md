@@ -5,9 +5,9 @@ For anyone who has [installed](install.md) the Convolver plug-in and wants to
 hear it work. You will choose an example filter in Convolver's window, check
 that it fits the track, play, and save the project.
 
-**In short:** on macOS, on a stereo track at 48000 Hz, add Convolver, click
-**Choose…** in its window and pick `presets/identity-48000-stereo/filter.cfg`
-from the extracted package. The window shows 48000 Hz and `2 in → 2 out`, and
+**In short:** on macOS or Windows, on a stereo track at 48000 Hz, add
+Convolver, click **Choose…** in its window and pick
+`presets/identity-48000-stereo/filter.cfg` from the extracted package. The window shows 48000 Hz and `2 in → 2 out`, and
 you hear no change. Choose `echo-48000-stereo/filter.cfg` (quieter and
 hollow) and `repeat-48000-stereo/filter.cfg` (each sound again a quarter of a
 second later), then save, close and reopen the project: the filter is still
@@ -65,8 +65,11 @@ as `filter.cfg` and `impulse.wav`, and the same filter as a preset.
 
 **Choose…** reads an IR file (a WAV, AIFF, FLAC or other sound file), a
 `.cfg` or a configuration list, from any folder: nothing needs installing or
-converting first. It does not read preset files; those go through the
-host's preset menu ([optional route](#optional-load-a-preset)). Your own
+converting first. It also opens a Convolver `.vstpreset`, in the VST3
+plug-in and the Audio Unit alike
+([a preset in the window](plugins.md#a-preset-in-the-window)); the host's
+preset menu is the other route for presets
+([optional route](#optional-load-a-preset)). Your own
 filter loads the same way; it must be made for the rate and channels your
 host runs at. [Loading a filter](plugins.md#loading-a-filter) lists what
 each plug-in reads.

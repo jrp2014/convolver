@@ -28,8 +28,8 @@ Write down, while you remember them:
 
 - What you did, what you expected and what happened instead.
 - How the filter was loaded: **Choose…**, **Recent** or **Reload** in
-  Convolver's window (macOS), a preset from the host's preset menu, or a
-  reopened project.
+  Convolver's window (macOS and Windows), a preset from the host's preset
+  menu, or a reopened project.
 - Where the problem shows: in what you hear while playing, in an export or
   render, or after reopening the project.
 - The host and its version (for example REAPER 7.2), your system and its
@@ -69,7 +69,12 @@ log show --last 1h --info --predicate 'eventMessage CONTAINS "Convolver"' --styl
 
 ### Windows
 
-Press **Windows+R**, type `%LOCALAPPDATA%\Convolver` and press Enter. Attach
+In Convolver's window, press **Copy Diagnostics**, as on macOS: it copies
+the filter's details, the software versions and this instance's recent log
+lines as text.
+
+If the window will not open, or your version has none, press
+**Windows+R**, type `%LOCALAPPDATA%\Convolver` and press Enter. Attach
 `Convolver.log` from the folder that opens to the report, or copy it in
 PowerShell:
 
