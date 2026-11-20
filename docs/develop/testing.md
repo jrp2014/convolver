@@ -332,7 +332,9 @@ cases.
   bypass/reset, concurrent and queued filter replacements, with a callback heap guard;
   the shared adapter contract's `HostFilter`, including the failure record
   (PLUG-8): its kind, request number and silence for each failure, kept across
-  activations until a later request succeeds; `mute()` (its 1.33 ms ramp,
+  activations until a later request succeeds, and an activation that never
+  plays (`activation()` without `activate()`, ROBUST-8) leaving the fault
+  count, the speaker notice and that failure as they were; `mute()` (its 1.33 ms ramp,
   bypass, reset, a crossfade, and a replacement fading in from silence);
   `silence()` (ROBUST-3: no allocation, exact silence from the first frame
   before any audio, the ramp while audio plays, and which publications it
@@ -788,7 +790,8 @@ to restart (the test reads it then, as REAPER does) and delays an impulse by
 exactly the chosen frames at once, in both directions, after quick
 successive choices and after a restart; a choice whose processor cannot be
 built (a test hook) keeps the running latency, is logged and is built at
-the next activation; a choice while inactive waits for the activation; and
+the next activation, and one made after a load has cleared a fault leaves
+Status Active (ROBUST-8, in `status_and_log()`); a choice while inactive waits for the activation; and
 a restored state with another Latency plays it at once.
 `latency_while_playing()` changes the Latency 24 times and replaces the
 filter 8 times while another thread calls `process()`, waiting for a block
@@ -1002,6 +1005,9 @@ Five CTest tests run when the adapter is built (label `au`):
   a freed processor only if the timing hits it), out of memory at each
   allocation the worker makes for a change (the reported latency always
   matches the audio, and a change that plays is never logged as failed),
+  a change whose processor cannot be built after a load has cleared a fault
+  (ROBUST-8: `latency_preparation_for_tests` makes it fail; the latency,
+  the log line and Status, still Active, show it changed nothing else),
   and saving and restoring it, also after the unit has started
   (GarageBand's order). PLUG-26's `chosen_preset()`: a `.vstpreset` chosen
   through the window's property 64002 sets its filter and its Gain, Mix and

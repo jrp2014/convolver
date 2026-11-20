@@ -536,7 +536,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
                     mismatch(*next, *host, keep_mismatch ? "the saved filter" : "the filter")) {
                 if (!keep_mismatch)
                     refuse(m->kind, std::move(m->why), request, carried);
-                // Kept, as activate() keeps a filter that does not suit.
+                // Kept, as activation() keeps a filter that does not suit.
                 HostFailure f;
                 f.kind = m->kind;
                 f.request = request;
@@ -669,13 +669,12 @@ void HostFilter::reject(HostFailureKind kind, Advice why, HostRequest request,
     }
 }
 
-HostPlayback HostFilter::activate(const HostLayout& host) {
-    notice_ = {};
-    activation_failure_.reset();
-    faults_ = cleared_ = observed_ = {}; // The adapter builds a new processor, which counts from 0.
-    changed_ = false;
-    if (!filter_)
-        return unfiltered_playback(host, failed_, !failed_);
+HostActivation HostFilter::activation(const HostLayout& host) const {
+    HostActivation a;
+    if (!filter_) {
+        a.playback = unfiltered_playback(host, failed_, !failed_);
+        return a;
+    }
     if (auto m = mismatch(*filter_, host, "the saved filter")) {
         HostFailure f;
         f.kind = m->kind;
@@ -685,13 +684,27 @@ HostPlayback HostFilter::activate(const HostLayout& host) {
         f.outputs = filter_->output_channels;
         f.silent = true;
         f.message = std::move(m->why);
-        activation_failure_ = std::move(f);
-        return unfiltered_playback(host, true, dry_signal(*this, host));
+        a.failure = std::move(f);
+        // What dry_signal() gives once this failure is recorded.
+        a.playback = unfiltered_playback(
+            host, true, unplayed_dry(&*filter_, true, host) == HostDrySignal::present);
+        return a;
     }
-    notice_ = speaker_notice(*filter_, host);
-    auto playback = filter_playback(*filter_);
-    playback.gains = gains_;
-    return playback;
+    a.notice = speaker_notice(*filter_, host);
+    a.playback = filter_playback(*filter_);
+    a.playback.gains = gains_;
+    return a;
+}
+
+static_assert(std::is_nothrow_move_assignable_v<std::optional<HostFailure>> &&
+                  std::is_nothrow_move_assignable_v<Advice>,
+              "HostFilter::activate() must not throw");
+
+void HostFilter::activate(HostActivation&& a) noexcept {
+    activation_failure_ = std::move(a.failure);
+    notice_ = std::move(a.notice);
+    faults_ = cleared_ = observed_ = {}; // The new processor counts from 0.
+    changed_ = false;
 }
 
 bool HostFilter::estimate(bool on, const std::function<void(const FilterGains&)>& apply) {
@@ -711,6 +724,12 @@ bool HostFilter::estimate(bool on, const std::function<void(const FilterGains&)>
 }
 
 void HostFilter::fail_activation(std::string why) {
+    // First, before anything that may throw, as for any new start: nothing
+    // counts on from the processor that is gone.
+    notice_ = {};
+    activation_failure_.reset();
+    faults_ = cleared_ = observed_ = {};
+    changed_ = false;
     HostFailure f;
     f.kind = HostFailureKind::activation;
     f.request = accepted_;
@@ -728,7 +747,6 @@ void HostFilter::fail_activation(std::string why) {
                  "Close other projects or programs, then restart playback or load the filter "
                  "again. If it keeps failing, copy the diagnostics and report it.",
                  {}};
-    notice_ = {};
     activation_failure_ = std::move(f);
 }
 

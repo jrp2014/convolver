@@ -225,7 +225,7 @@ enum class HostLoadCheck {
     refuse_mismatch,
     // The host may still change its configuration (it is restoring a project):
     // the filter is accepted all the same and kept, playing silence with the
-    // reason as failure() until an activation suits it, as activate() keeps
+    // reason as failure() until an activation suits it, as an activation keeps
     // one. VST3: REAPER starts the plug-in on stereo buses, restores the
     // project, then gives it the track's channels (jrp's crossover retest,
     // 7 November 2026).
@@ -352,6 +352,17 @@ struct HostFaultReport {
 // The log text, whose ending never says the status shows Fault for faults
 // it does not show.
 std::string fault_message(const HostFaultReport&);
+
+// ROBUST-8: what HostFilter::activation() found for the host, which
+// HostFilter::activate() records once the processor built from `playback`
+// will play.
+struct HostActivation {
+    HostPlayback playback;
+    // A filter that does not suit the host: why it plays silence.
+    std::optional<HostFailure> failure;
+    // The speaker notice (speaker_notice()), empty if none.
+    Advice notice;
+};
 
 // Control side of the shared adapter contract, for every plug-in format
 // (docs/develop/plugin-contract.md): which
@@ -494,10 +505,20 @@ class HostFilter {
     void fail_request() noexcept;
     // What to play under `host` at activation: the accepted filter when it
     // suits the host. Otherwise silence and an error, keeping the filter, so
-    // correcting the host's rate or layout brings it back.
-    HostPlayback activate(const HostLayout& host);
-    // The adapter could not build a processor for what activate() returned,
-    // so it plays silence; recorded until the next activate().
+    // correcting the host's rate or layout brings it back. It may throw
+    // (memory for the reason) and changes nothing. The adapter builds its
+    // processor from `playback` and calls activate() only once nothing can
+    // stop that processor from playing, so one that cannot be built leaves
+    // the failure, the notice and the fault count as they were (ROBUST-8).
+    HostActivation activation(const HostLayout& host) const;
+    // Records an activation whose processor will play: its failure and
+    // notice, and the fault count starts again for the new processor, which
+    // counts from 0. Takes `failure` and `notice`, leaving `playback`.
+    // Allocates nothing, so it cannot fail.
+    void activate(HostActivation&&) noexcept;
+    // The adapter could not build a processor for what activation() returned
+    // when the host started it, so it plays silence; recorded until the next
+    // activate(). The fault count starts again, as for a new processor.
     void fail_activation(std::string why);
     // DIAG-1: processing faults since the filter that plays was accepted or
     // the instance last started (activate()), whichever is later. host_status()

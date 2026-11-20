@@ -581,8 +581,10 @@ void activate_locked(Instance& p) {
     try {
         // A fresh processor: the filter plays from the first frame, its tail
         // and history start afresh, and LV2's activate() is also its reset.
-        p.host = std::make_unique<HostProcessor>(p.filter.activate(p.layout), p.max_block, settings,
+        auto activation = p.filter.activation(p.layout);
+        p.host = std::make_unique<HostProcessor>(activation.playback, p.max_block, settings,
                                                  p.layout.inputs);
+        p.filter.activate(std::move(activation));
     } catch (const std::exception& e) {
         record_activation_failure(p, e.what());
     } catch (...) {
@@ -753,12 +755,14 @@ void apply_latency(Instance& p) noexcept {
     try {
         auto settings = p.settings();
         settings.latency = frames;
-        auto next = std::make_unique<HostProcessor>(p.filter.activate(p.layout), p.max_block,
-                                                    settings, p.layout.inputs);
+        auto activation = p.filter.activation(p.layout);
+        auto next = std::make_unique<HostProcessor>(activation.playback, p.max_block, settings,
+                                                    p.layout.inputs);
         next->set_bypass(p.bypass.load(std::memory_order_relaxed));
         next->reset();
         pause_at(p, WorkerPoint::latency_built);
         p.stage(std::move(next)); // Nothing below can fail.
+        p.filter.activate(std::move(activation));
         changed = true;
     } catch (const std::exception& e) {
         try {
@@ -766,11 +770,6 @@ void apply_latency(Instance& p) noexcept {
         } catch (...) {
         }
     } catch (...) {
-    }
-    if (!changed) {
-        // activate() started the fault count again for a new processor, so
-        // count from the running one's totals (logged above).
-        (void)p.filter.observe(p.host->faults());
     }
     p.update_status();
     try { // Best effort: out of memory for the line changes nothing else.

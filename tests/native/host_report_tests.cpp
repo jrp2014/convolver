@@ -5,6 +5,7 @@
 // the Copy diagnostics text with this instance's Convolver log lines.
 #include "cases.hpp"
 #include "convolver/host.hpp"
+#include "host_activation.hpp"
 #include "host_log.hpp"
 #include "host_report.hpp"
 #include <cstdlib>
@@ -113,7 +114,7 @@ void cases() {
          [&] {
              HostFilter f(8);
              f.load(HostState{filter(44100, 2)}, std::nullopt);
-             static_cast<void>(f.activate(mono));
+             static_cast<void>(test::started(f, mono));
              return host_report(f, facts(mono));
          },
          HostStatus::load_failed,
@@ -129,7 +130,7 @@ void cases() {
          [&] {
              HostFilter f(8);
              f.load(HostState{filter(44100, 6)}, std::nullopt);
-             static_cast<void>(f.activate(mono));
+             static_cast<void>(test::started(f, mono));
              return host_report(f, facts(mono));
          },
          HostStatus::load_failed,
@@ -139,7 +140,7 @@ void cases() {
          [] {
              HostFilter f(8);
              f.load(HostState{filter(48000, 2)}, std::nullopt);
-             static_cast<void>(f.activate({44100, 2, 2}));
+             static_cast<void>(test::started(f, {44100, 2, 2}));
              return host_report(f, facts(HostLayout{44100, 2, 2}));
          },
          HostStatus::load_failed,
@@ -166,7 +167,7 @@ void cases() {
          [] {
              HostFilter f(8);
              f.load(HostState{filter(48000, 2)}, std::nullopt);
-             static_cast<void>(f.activate({44100, 2, 2}));
+             static_cast<void>(test::started(f, {44100, 2, 2}));
              return host_report(f, facts(HostLayout{44100, 2, 2}, {0, .5}));
          },
          HostStatus::load_failed,
@@ -511,7 +512,7 @@ void cases() {
     // A stereo filter the host started on a mono track: not playing.
     HostFilter idle(8);
     idle.load(HostState{filter(44100, 2)}, std::nullopt);
-    static_cast<void>(idle.activate({44100, 1, 1}));
+    static_cast<void>(test::started(idle, {44100, 1, 1}));
     const auto ri = host_report(idle, facts(HostLayout{44100, 1, 1}));
     require(fact(ri, "Host channels").problem &&
                 fact(ri, "Host channels").note == "the filter has 2 in, 2 out" &&
@@ -639,7 +640,7 @@ void actions() {
     // Faults are counted with no filter too: the window then says no filter
     // plays and still offers to choose one.
     HostFilter unfiltered(8);
-    static_cast<void>(unfiltered.activate(stereo));
+    static_cast<void>(test::started(unfiltered, stereo));
     HostFaults input;
     input.rejected_input = 3;
     static_cast<void>(unfiltered.observe(input));
@@ -665,7 +666,7 @@ void log_agrees() {
     const HostLayout mono{44100, 1, 1};
     HostFilter f(8);
     f.load(HostState{filter(44100, 2)}, std::nullopt);
-    static_cast<void>(f.activate(mono));
+    static_cast<void>(test::started(f, mono));
     const auto line = started_line(f, mono, 512);
     require(
         contains(line, "put Convolver on a stereo track") &&
@@ -687,7 +688,7 @@ void wider_inputs() {
     x.paths.push_back({{1.f}, {{1, 1}}, {{5, 1}}});
     HostFilter f(8);
     f.load(HostState{x}, six);
-    static_cast<void>(f.activate(six));
+    static_cast<void>(test::started(f, six));
     const auto r = host_report(f, facts(six));
     require(r.status.status == HostStatus::active && r.problem.empty(),
             "a crossover on a wider bus is reported as a problem: " + r.explanation);
@@ -719,7 +720,7 @@ void wider_inputs() {
     HostFilter kept(8);
     kept.load(HostState{x}, std::nullopt);
     const HostLayout slower{44100, 6, 6};
-    static_cast<void>(kept.activate(slower));
+    static_cast<void>(test::started(kept, slower));
     const auto rk = host_report(kept, facts(slower, {0, .5}));
     require(rk.mix_note == r.mix_note && contains(rk.explanation, "Convolver plays silence.") &&
                 contains(rk.settings, "mix 100% wet (the filter's inputs and outputs differ"),

@@ -293,8 +293,9 @@ tresult Processor::activate(TBool state) {
             // that correcting the rate or layout brings it back.
             const auto chosen = settings();
             const auto now = layout();
+            auto activation = filter_.activation(now);
             auto next = std::make_unique<HostProcessor>(
-                filter_.activate(now), processSetup.maxSamplesPerBlock, chosen, now.inputs);
+                activation.playback, processSetup.maxSamplesPerBlock, chosen, now.inputs);
             tail_.store(static_cast<uint32>(next->tail_frames()));
             next->set_bypass(bypass_.load());
             next->reset();
@@ -304,6 +305,7 @@ tresult Processor::activate(TBool state) {
                 played_.store(false);
             // Not playing: the host does not process while it activates.
             playing_.offer(std::move(next));
+            filter_.activate(std::move(activation));
             active_latency_.store(host()->latency_frames());
             hold_fault_signal();
             activated_ = layout();
@@ -597,18 +599,19 @@ void Processor::choose_latency(std::size_t frames) noexcept {
     bool changed = false;
     std::string why;
     try {
-        const auto playback = filter_.activate(*activated_);
+        auto activation = filter_.activation(*activated_);
         if (latency_preparation_for_tests)
             latency_preparation_for_tests();
-        auto next = std::make_unique<HostProcessor>(playback, processSetup.maxSamplesPerBlock,
-                                                    settings(), activated_->inputs);
+        auto next = std::make_unique<HostProcessor>(
+            activation.playback, processSetup.maxSamplesPerBlock, settings(), activated_->inputs);
         next->set_bypass(bypass_.load());
         next->reset();
+        // Nothing below can fail: what plays, what the host reads and what
+        // the status says change together (ROBUST-8).
+        filter_.activate(std::move(activation));
         // Before it plays, so its first block cannot show Fault over a load
         // failure that is showing.
         next->hold_fault_signal(filter_.failure_shown());
-        // Nothing below can fail: what plays and what the host reads change
-        // together.
         tail_.store(static_cast<uint32>(next->tail_frames()));
         active_latency_.store(next->latency_frames());
         // process() plays it from its next block; the one it replaces is
@@ -622,13 +625,8 @@ void Processor::choose_latency(std::size_t frames) noexcept {
         }
     } catch (...) {
     }
-    if (!changed) {
-        // The running processor keeps playing at its latency, and the
-        // window's report says the chosen one is not in use. activate()
-        // started the fault count again for a new processor, so count from
-        // the running one's totals (logged above) rather than log them again.
-        (void)filter_.observe(host()->faults());
-    }
+    // If it failed, the running processor keeps playing at its latency, and
+    // the window's report says the chosen one is not in use.
     try { // Best effort: out of memory for the line changes nothing else.
         log(changed ? "Latency changed from " + std::to_string(before) + " to " +
                           std::to_string(frames) +

@@ -117,6 +117,12 @@ inline void (*latency_closing_for_tests)(AudioComponentInstance unit) noexcept =
 // Null in the component; change it only while no unit's Latency work is
 // running.
 inline void (*latency_locked_for_tests)(AudioComponentInstance unit) noexcept = nullptr;
+// For the tests only (ROBUST-8): when set, the Latency work calls it before
+// it builds the processor for a new Latency, on the work's queue, holding
+// the control lock; throwing from it makes that preparation fail as if
+// memory ran out. Null in the component; change it only while no unit's
+// Latency work is running.
+inline void (*latency_preparation_for_tests)() = nullptr;
 
 // One input bus and one output bus, 1 to 8 channels each (counts may differ),
 // following the shared adapter contract

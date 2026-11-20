@@ -1523,6 +1523,18 @@ void status_and_log() {
     require(p.setState(stream(good).get()) == kResultOk &&
                 status() == convolver::HostStatus::active,
             "status good again");
+    // ROBUST-8: a Latency whose processor cannot be built leaves the status
+    // as it was. The processor that counted the faults above keeps playing,
+    // and the load just made cleared them, so Fault does not come back.
+    latency_preparation_for_tests = [] { throw std::runtime_error("no memory for the test"); };
+    const auto refused = c.setParamNormalized(latency_id, normalized_latency(1024));
+    latency_preparation_for_tests = nullptr;
+    require(refused == kResultOk && p.getLatencySamples() == latency_samples &&
+                status() == convolver::HostStatus::active,
+            "a Latency that could not be built brought back the Fault a load had cleared");
+    require(c.setParamNormalized(latency_id, normalized_latency(latency_samples)) == kResultOk &&
+                p.getLatencySamples() == latency_samples,
+            "the default Latency again");
     require(p.setActive(false) == kResultOk, "status deactivate");
     setup.sampleRate = 44100;
     require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,

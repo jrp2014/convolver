@@ -7,6 +7,7 @@
 #include "../plugins/audio_guard.hpp"
 #include "../plugins/lifecycle.hpp"
 #include "convolver/host.hpp"
+#include "host_activation.hpp"
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -167,7 +168,7 @@ class Reference final : public lc::Driver {
   private:
     // PLUG-23: activate() may read fewer inputs than the host gives.
     void build() {
-        processor_ = std::make_unique<HostProcessor>(filter_->activate(layout()), max_block(),
+        processor_ = std::make_unique<HostProcessor>(test::started(*filter_, layout()), max_block(),
                                                      settings_, layout().inputs);
         processor_->set_bypass(bypass_);
         processor_->reset();
