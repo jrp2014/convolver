@@ -1,0 +1,93 @@
+---
+# SPDX-License-Identifier: GPL-2.0-or-later
+name: Newest compiler
+description: >-
+  Puts the newest formal release of a compiler first on PATH, so the job's
+  plain `clang++`, `g++`, `c++` or Xcode commands use it
+  (docs/develop/build.md#compilers-and-ci-machines). `gcc` takes the newest
+  `g++-N` the runner image has; `clang` installs the newest LLVM release branch
+  from apt.llvm.org (Linux), falling back to the image's Clang with a warning when
+  that fails; `xcode` selects the newest released Xcode on the image (macOS).
+inputs:
+  compiler:
+    description: gcc, clang or xcode
+    required: true
+outputs:
+  version:
+    description: The compiler version the job now uses
+    value: ${{ steps.choose.outputs.version }}
+runs:
+  using: composite
+  steps:
+    - name: Choose the newest ${{ inputs.compiler }}
+      id: choose
+      shell: bash
+      env:
+        COMPILER: ${{ inputs.compiler }}
+      run: |
+        set -euo pipefail
+        case "$COMPILER" in
+          gcc)
+            # The highest g++-N the image installs; c++, g++, cc and gcc in a
+            # directory first on PATH point at it.
+            gxx=$(printf '%s\n' /usr/bin/g++-[0-9]* | grep -E '/g\+\+-[0-9]+$' | sort -V | tail -1)
+            major=${gxx##*-}
+            bin="$RUNNER_TEMP/newest-gcc"
+            mkdir -p "$bin"
+            ln -sf "/usr/bin/g++-$major" "$bin/g++"
+            ln -sf "/usr/bin/g++-$major" "$bin/c++"
+            ln -sf "/usr/bin/gcc-$major" "$bin/gcc"
+            ln -sf "/usr/bin/gcc-$major" "$bin/cc"
+            echo "$bin" >> "$GITHUB_PATH"
+            version=$("$bin/g++" -dumpfullversion)
+            ;;
+          clang)
+            # The newest formal LLVM release (llvmorg-X.Y.Z tags, never -rc)
+            # names the apt.llvm.org branch to install.
+            major=$(git ls-remote --tags --refs https://github.com/llvm/llvm-project 'llvmorg-*' |
+              sed -n 's|.*refs/tags/llvmorg-\([0-9]*\)\.[0-9]*\.[0-9]*$|\1|p' | sort -n | tail -1) || major=
+            # shellcheck source=/dev/null
+            codename=$(. /etc/os-release && echo "$VERSION_CODENAME")
+            key=/etc/apt/keyrings/apt.llvm.org.asc
+            suite="llvm-toolchain-$codename-$major"
+            # set -e does not apply inside a function called from `if`, so
+            # each step returns its own failure.
+            add_llvm() {
+              sudo install -d -m 0755 /etc/apt/keyrings || return
+              curl -fsSL --retry 3 https://apt.llvm.org/llvm-snapshot.gpg.key |
+                sudo tee "$key" >/dev/null || return
+              echo "deb [signed-by=$key] https://apt.llvm.org/$codename/ $suite main" |
+                sudo tee /etc/apt/sources.list.d/apt.llvm.org.list >/dev/null || return
+              sudo apt-get update -o Dir::Etc::sourcelist=sources.list.d/apt.llvm.org.list \
+                -o Dir::Etc::sourceparts=- -o APT::Get::List-Cleanup=0 || return
+              sudo apt-get install -y --no-install-recommends \
+                "clang-$major" "llvm-$major" "libclang-rt-$major-dev"
+            }
+            if [ -n "$major" ] && add_llvm; then
+              echo "/usr/lib/llvm-$major/bin" >> "$GITHUB_PATH"
+              version=$("/usr/lib/llvm-$major/bin/clang++" -dumpversion)
+            else
+              echo "::warning title=Newest Clang unavailable::Could not install LLVM ${major:-?}" \
+                "from apt.llvm.org; this job uses the runner image's Clang instead."
+              version=$(clang++ -dumpversion)
+            fi
+            ;;
+          xcode)
+            # Released Xcodes are /Applications/Xcode_N[.N[.N]].app; betas and
+            # release candidates carry a suffix and are skipped.
+            app=$(printf '%s\n' /Applications/Xcode_*.app |
+              grep -E '/Xcode_[0-9]+(\.[0-9]+)*\.app$' | sort -V | tail -1)
+            sudo xcode-select -s "$app/Contents/Developer"
+            version=$(xcodebuild -version | paste -sd ' ' -)
+            # CMake records /usr/bin/clang++, a shim whose time stamp does not
+            # change with xcode-select, so ccache compares the Xcode instead.
+            echo "CCACHE_COMPILERCHECK=string:$version" >> "$GITHUB_ENV"
+            ;;
+          *)
+            echo "::error::Unknown compiler '$COMPILER' (gcc, clang or xcode)"
+            exit 1
+            ;;
+        esac
+        echo "Compiler: $version"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+        echo "Compiler: $COMPILER $version" >> "$GITHUB_STEP_SUMMARY"

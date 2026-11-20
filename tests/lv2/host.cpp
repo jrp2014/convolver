@@ -95,9 +95,12 @@ World::World(const std::filesystem::path& bundle) : world_(lilv_world_new()) {
     if (!world_)
         throw std::runtime_error("lilv_world_new failed");
     // The LV2 specifications (core, state, ...) from the system or LV2_PATH,
-    // then only our bundle: other installed plug-ins play no part.
+    // then only our bundle: other installed plug-ins play no part. No test
+    // asks for a plug-in's class, so the classes are not loaded:
+    // lilv_world_load_plugin_classes leaks the URI of a class without a
+    // label (lilv 0.26.2 to 0.28.0, seen under LeakSanitizer on Ubuntu
+    // 26.04, CI-43).
     lilv_world_load_specifications(world_);
-    lilv_world_load_plugin_classes(world_);
     load_bundle(bundle);
 }
 World::~World() {

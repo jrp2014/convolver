@@ -59,7 +59,7 @@ install_host_test_tools() {
 install_lint_hook() {
   local venv="${HOME}/.cache/convolver-lint"
   if [ ! -x "${venv}/bin/pre-commit" ]; then
-    if ! { python3 -m venv "$venv" && "${venv}/bin/python" -m pip install -q pre-commit==4.5.1; } >/dev/null 2>&1; then
+    if ! { python3 -m venv "$venv" && "${venv}/bin/python" -m pip install -q --upgrade pre-commit; } >/dev/null 2>&1; then
       echo "Could not install pre-commit; run the lint checks by hand (CONTRIBUTING.md)." >&2
       return 0
     fi
