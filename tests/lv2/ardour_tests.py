@@ -108,10 +108,10 @@ def warn(message):
 # Ardour 9.0's new_session (Ubuntu 26.04's 9.0.0~ds) writes the session and
 # prints that it did, then aborts as it exits with glibc's message about an
 # exception not rethrown (a thread's cancellation unwind swallowed during
-# teardown). It did so on every run in CI on 2026-11-20, before Convolver
-# is involved. Only that abort, after the session file exists, is accepted
-# (HOST-7); the Lua script then opens the session, so a damaged one fails
-# there.
+# teardown). In CI on 2026-11-20 it did so for 9 of 12 sessions (all of
+# the first three runs, none of the fourth), before Convolver is involved.
+# Only that abort, after the session file exists, is accepted (HOST-7); the
+# Lua script then opens the session, so a damaged one fails there.
 def new_session(tool_path, environment, session, name, outputs):
     """Make the session; accept new_session's abort at exit once the session file is written."""
     command = [tool_path, '-m', str(outputs), '-s', str(RATE), session, name]

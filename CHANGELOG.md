@@ -56,7 +56,7 @@ Until 1.0 the C++ API may change between minor versions.
   gives Ardour 9 the empty route group it expects (`nil` crashed it), and
   the test accepts Ardour 9.0's abort as `new_session` exits once the
   session is written. Every first-use example matches the oracle (worst
-  error 2.65e-8).
+  error 3.42e-8).
 - Builds (CI-43): the Mac preview packages are built with the newest Xcode
   on GitHub's macOS 26 images (Xcode 26.6 today, was 16.4 on macOS 15), still
   for macOS 14 and later, and the Linux packages with GCC 12 (was 11), still
