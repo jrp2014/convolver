@@ -602,8 +602,18 @@ void cases() {
 }
 
 std::optional<std::string> log_variable() {
+#ifdef _WIN32 // _dupenv_s copies the value, as MSVC asks instead of getenv.
+    char* value = nullptr;
+    std::size_t length = 0;
+    if (_dupenv_s(&value, &length, "CONVOLVER_LOG") == 0 && value) {
+        std::string copy(value);
+        std::free(value);
+        return copy;
+    }
+#else
     if (const char* value = std::getenv("CONVOLVER_LOG"))
         return std::string(value);
+#endif
     return std::nullopt;
 }
 void set_log_variable(const std::optional<std::string>& value) {
@@ -760,7 +770,7 @@ void wider_inputs() {
     const auto r = host_report(f, facts(six));
     require(r.status.status == HostStatus::active && r.problem.empty(),
             "a crossover on a wider bus is reported as a problem: " + r.explanation);
-    const auto& channels = fact(r, "Host channels");
+    const auto channels = fact(r, "Host channels");
     require(channels.value == "6 in, 6 out" && channels.note == "(inputs 3–6 ignored)" &&
                 !channels.problem,
             "Channels: " + channels.value + " " + channels.note);

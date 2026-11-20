@@ -11,7 +11,9 @@
 #include <cstdlib>
 #include <ctime>
 #include <fstream>
+#include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <system_error>
 #include <vector>
@@ -33,12 +35,31 @@ namespace convolver {
 namespace {
 constexpr std::uintmax_t largest_log = 1024 * 1024;
 
+#ifdef _WIN32
+// A copy of the variable, or nothing if it is unset. _wdupenv_s copies it, so
+// another plug-in in the host that changes the environment meanwhile cannot
+// change the text under us, as it could the pointer _wgetenv returns. Wide:
+// user profile folders may hold characters outside the ANSI code page.
+std::optional<std::wstring> environment_value(const wchar_t* name) {
+    struct Free {
+        void operator()(wchar_t* p) const noexcept {
+            std::free(p);
+        }
+    };
+    wchar_t* value = nullptr;
+    std::size_t length = 0;
+    if (_wdupenv_s(&value, &length, name) != 0 || !value)
+        return std::nullopt;
+    const std::unique_ptr<wchar_t, Free> owned(value);
+    return std::wstring(value);
+}
+#endif
+
 std::filesystem::path from_environment(const char* name) {
 #ifdef _WIN32
-    // _wgetenv: user profile folders may hold characters outside the ANSI code page.
     std::wstring wide(name, name + std::char_traits<char>::length(name));
-    if (const wchar_t* value = _wgetenv(wide.c_str()); value && *value)
-        return std::filesystem::path(value);
+    if (const auto value = environment_value(wide.c_str()); value && !value->empty())
+        return std::filesystem::path(*value);
 #else
     if (const char* value = std::getenv(name); value && *value)
         return std::filesystem::path(value);
@@ -355,8 +376,8 @@ std::string started_line(const HostFilter& filter, const HostLayout& host, std::
 
 std::filesystem::path host_log_path() {
 #ifdef _WIN32
-    if (const wchar_t* chosen = _wgetenv(L"CONVOLVER_LOG"))
-        return std::filesystem::path(chosen);
+    if (const auto chosen = environment_value(L"CONVOLVER_LOG"))
+        return std::filesystem::path(*chosen);
     const auto base = from_environment("LOCALAPPDATA");
     return base.empty() ? base : base / "Convolver" / "Convolver.log";
 #else

@@ -1220,6 +1220,17 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **CI-45 — Build our own sources without compiler warnings.**
+  20 November 2026, PR #228, from the independent review of CI-43: the
+  newer compilers CI-43 brought in warned about Convolver's own code. GCC
+  12 to 15 flagged the tests' replacement allocators and an `std::optional`
+  refill (false positives, now silenced beside them), copies in range loops and a possibly dangling
+  reference; Xcode 26.6 flagged mixed enumerations and a nonblocking
+  function that may throw in the Audio Unit; Visual Studio 2022 flagged
+  narrowing, shadowed names and `getenv`. Each is fixed or, where the
+  compiler is wrong or its advice does not apply, silenced at that line with
+  the reason. Output is unchanged
+  ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
 - [x] **PLUG-36 — The loading-and-failure table covers each transition.**
   20 November 2026, PR #225, in PLUG-39's sequence after step 1b: the contract's
   [states and transitions](docs/develop/plugin-contract.md#states-and-transitions)

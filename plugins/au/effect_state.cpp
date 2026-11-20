@@ -401,7 +401,7 @@ OSStatus Effect::load_file(const std::string& path) {
             PropertyChanged(kAudioUnitProperty_PresentPreset, kAudioUnitScope_Global, 0);
         }
     }
-    return accepted ? noErr : kAudioUnitErr_InvalidPropertyValue;
+    return accepted ? noErr : OSStatus{kAudioUnitErr_InvalidPropertyValue};
 }
 
 OSStatus Effect::RestoreState(CFPropertyListRef plist) {

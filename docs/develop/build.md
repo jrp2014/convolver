@@ -590,7 +590,11 @@ A beta, release candidate or public-preview image is never the gate; it may
 run only as advice, as for the libraries
 ([pre-releases](#pre-releases-and-newer-upstream-versions)). Output may change
 with a newer compiler, within the stated tolerance
-([decisions](../project/decisions.md#licences-and-dependencies)).
+([decisions](../project/decisions.md#licences-and-dependencies)). A newer
+compiler's warnings in Convolver's own sources are fixed; where the compiler
+is wrong or its advice does not apply, the warning is silenced at that line
+with the reason, as for a clang-tidy false positive. Warnings in the SDKs
+and libsndfile are theirs.
 
 - **Runner images:** each job uses the newest generally available image:
   `ubuntu-latest`, `macos-latest` and `windows-latest`, or the label of the

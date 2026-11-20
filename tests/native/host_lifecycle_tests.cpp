@@ -51,7 +51,16 @@ class Reference final : public lc::Driver {
     }
     void create(const lc::Host& host, bool configured) override {
         destroy();
+// GCC 15 warns that emplace() may destroy an uninitialised HostFilter: it
+// loses track of destroy() having emptied filter_ already. A false positive.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
         filter_.emplace(8);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
         host_ = host;
         bound_ = configured ? std::optional(host) : std::nullopt;
         bypass_ = false;

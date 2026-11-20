@@ -129,7 +129,7 @@ int main() {
                     moded_filter_back.configuration->paths[0].impulse == std::vector<float>{1.f},
                 "version-4 gain mode with a filter and otherwise default settings");
         // Set is never written as version 4, and a mode out of range is damage.
-        for (const unsigned char bad_mode : {0, 3, 0xff}) {
+        for (const unsigned char bad_mode : std::to_array<unsigned char>({0, 3, 0xff})) {
             auto bytes_bad = moded_bytes;
             bytes_bad[32] = std::byte{bad_mode};
             rejects([&] { (void)decode_host_state(bytes_bad); });
@@ -177,7 +177,7 @@ int main() {
             rejects([&] { (void)decode_host_state(bytes_bad); });
         }
         // PLUG-8: a newer state version is told apart from damaged state.
-        for (const unsigned char format : {5, 0xff}) {
+        for (const unsigned char format : std::to_array<unsigned char>({5, 0xff})) {
             const auto newer =
                 std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, format, 0, 0, 0, 0, 0, 0, 0});
             try {
