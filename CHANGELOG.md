@@ -63,6 +63,13 @@ Until 1.0 the C++ API may change between minor versions.
   says to keep every external dependency, compilers and CI machines
   included, on its newest formal release
   ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
+- Plug-ins (PLUG-39 step 2): VST3 and the Audio Unit decide when the
+  host has settled its sample rate and channels in one shared record
+  (`HostSettling`), which each feeds with the host's starts, stops and
+  played audio, instead of in fields of their own. Each format keeps its
+  rule: VST3 binds a start and refuses restored state only once audio
+  has played; the Audio Unit binds an initialization only once it has
+  rendered. Nothing heard, saved or reported changes.
 - Audio Unit (PLUG-39 step 3c): as in VST3, a new Latency and
   uninitializing no longer wait for `Render` to let go of the processor
   they replace; the next control call frees it. Nothing heard or reported

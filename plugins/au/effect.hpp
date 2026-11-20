@@ -6,6 +6,7 @@
 #include "convolver/host.hpp"
 #include "convolver_identities.hpp"
 #include "host_report.hpp"
+#include "host_settling.hpp"
 #include "playing_processor.hpp"
 #include "view_properties.hpp"
 #include <AudioUnitSDK/AUBase.h>
@@ -351,14 +352,13 @@ class Effect final : public ausdk::AUBase {
     std::atomic<std::size_t> latency_{default_host_latency}; // In frames; see GetLatency.
     // PLUG-10, under control_: the Gain mode the queue last applied and logged.
     GainMode applied_gain_mode_ = GainMode::set;
-    // The rate and channels of the current or last initialization, whether
-    // it has rendered, and the last initialization that did. Uninitialized,
-    // the host's configuration counts as known only while it still matches
-    // `committed_`: hosts may restore state before they set the formats, and
-    // may initialize briefly at a placeholder rate (see Cleanup).
-    std::optional<HostLayout> initialized_;
-    std::atomic<bool> rendered_{false};
-    std::optional<HostLayout> committed_;
+    // PLUG-39 step 2: when the host has settled its formats. An
+    // initialization binds them only once audio has rendered with it; then,
+    // uninitialized, they count as known while they still match: hosts may
+    // restore state before they set the formats, and may initialize briefly
+    // at a placeholder rate (see Cleanup). Under control_, except played(),
+    // which Render calls.
+    HostSettling settling_{HostBinding::rendering};
     HostStatusLine status_;          // Under control_.
     bool status_log_written_ = true; // host_log_written() when status_ was set; under control_.
     bool status_bypassed_ = false;   // bypass_ when status_ was set; under control_ (AU-16).

@@ -81,14 +81,14 @@ where that decision is made since step 1b (PR #224):
 | Find the estimate for the request's Gain mode, and undo that on refusal | `install()`: `set_estimating()` and back | `install()`: the same | `apply_gain_mode()`, later, on the worker. Since step 1b: `HostFilter::load()` follows the settings' Gain mode, committed on acceptance; LV2's port changes still go through `apply_gain_mode()` |
 | The tail while inactive | `install()`: `configuration_tail_frames()` | `install()`: the same | None: LV2 core reports no tail. Since step 1b: `HostChange::inactive_tail` |
 | A failed first load plays silence | `refused()` | `silence_failed_first_load()` | `silence_failed_first_load()`, plus `unfiltered` and `refused_mute` for `run()`. Since step 1b: `HostFilter::fail_request()` with the playing processor; LV2's `unfiltered` and `refused_mute` stay, for a first load `run()` itself refuses on the audio thread |
-| Whether a filter that does not suit the host is refused or kept until it does | `load_check()` from `Origin` and `played_` | `known_layout()`: while uninitialized, nothing until a configuration has rendered, so such a request is not checked | Always checked: LV2 fixes the rate and channels at instantiation |
+| Whether a filter that does not suit the host is refused or kept until it does | `load_check()` from `Origin` and `played_` | `known_layout()`: while uninitialized, nothing until a configuration has rendered, so such a request is not checked | Always checked: LV2 fixes the rate and channels at instantiation. Since step 2: `HostSettling::check()` and `known()` for VST3 and the Audio Unit |
 
 **Duplicated mechanisms.**
 
 | Mechanism | Implementations today | Target |
 | --- | --- | --- |
 | Ownership of the playing processor: who may use it, and when a replaced one is freed | VST3, since step 3b: `PlayingProcessor` with a reader for `process()` and one for `setProcessing()` (which also resets the processor), freed in every control call (`Locked`); before it, `host_`, `played_host_`, `processing_host_`, `starting_host_`, `install_processor()`, `release_processor()` and `hold()`, and the control side waited. Audio Unit, since step 3c: `PlayingProcessor` with one reader, `Render()`, freed in every control call (`Effect::Locked`, and the two calls that try the lock once they hold it); before it, `host_`, `playing_`, `rendering_`, the same two functions and the mark in `Render()`, and the control side waited. LV2: `host`, `retiring`, `handover`, `playing`, with `stage()`, `retire()` and `drop_processors()`; `run()` adopts and nothing waits | One, with every reader protected ([step 3](#steps)); a format it cannot cover keeps its own with the reason recorded |
-| When the host's rate and channels count as settled | VST3: `activated_`, `active_`, `played_`, `known_layout()`, `load_check()`. Audio Unit: `initialized_`, `rendered_`, `committed_`, `known_layout()`. They differ for a file chosen while inactive after an activation that never played | One shared rule fed with the same events (step 2) |
+| When the host's rate and channels count as settled | VST3: `activated_`, `active_`, `played_`, `known_layout()`, `load_check()`. Audio Unit: `initialized_`, `rendered_`, `committed_`, `known_layout()`. They differ for a file chosen while inactive after an activation that never played. Since step 2: `HostSettling` in `portable/host_settling.hpp`, one record each adapter feeds with its starts, stops and played audio; `activated_`, `played_`, `initialized_`, `rendered_` and `committed_` are gone, and `known_layout()` and `load_check()` only ask it. The difference stays, as `HostBinding::activation` and `HostBinding::rendering` | One shared rule fed with the same events (step 2) |
 | The status ordering (a load failure, then a fault, then the filter) | `host_status()` for VST3 and the Audio Unit; LV2 orders them again in `update_status()` and `shown_status()` | One (step 4) |
 | A filter's name shows only while that filter plays | `HostRequest::name` in `HostFilter::accepted()` for the Audio Unit; VST3's processor and controller each keep their own rule with a second, "kept" name pair, so that a refused preset does not rename the playing filter | One, in `HostFilter` (step 4) |
 
@@ -357,7 +357,9 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
    asks whether a request is checked, refused or kept until it suits. The
    step keeps both formats' present behaviour, including their difference
    for a file chosen while inactive, as jrp decided (13 November 2026).
-   After step 1, because the decision value uses the answer.
+   After step 1, because the decision value uses the answer. Done on
+   20 November 2026: `HostSettling` (`portable/host_settling.hpp`,
+   `native.host_settling`).
 3. **Deferred reclamation of the playing processor.** An ownership redesign,
    not a tidying of fields into a class, and its own reviewed change after
    the preview. Today VST3 and the Audio Unit publish the replacement and
