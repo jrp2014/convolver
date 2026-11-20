@@ -1236,6 +1236,13 @@ move to the archive.
   play and changes nothing, and every adapter calls `activate()` only once
   the new processor will play
   ([status and log](docs/develop/plugin-contract.md#status-and-log)).
+- [x] **CI-44 — Check the Linux package's libstdc++ versions.**
+  20 November 2026, PR #227, from the independent review of CI-43:
+  `verify_artifact.py` refused glibc symbols newer than Ubuntu 22.04's but
+  not libstdc++ ones, so a newer GCC on the build image would have shipped
+  a package that does not load there or on Debian 12. It now refuses
+  GLIBCXX and CXXABI versions above GCC 12's (`max_glibcxx`, `max_cxxabi`)
+  ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
 - [x] **CI-43 — Keep compilers and CI machines on their newest releases.**
   19 November 2026, PR #222, from jrp's question whether Convolver uses the
   latest SDKs: the libraries already followed their newest releases, but the
