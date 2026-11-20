@@ -140,6 +140,77 @@ before they set the sample rate and channel layout (VST3 `setState` before
   state or a session the host is opening),
   and `vst3.adapter`'s `restored_while_host_settles` replays REAPER's order.
 
+### States and transitions
+
+PLUG-36 (20 November 2026) states the three situations above as four states
+and says what each request or host event does to each. What plays (channel
+safety) is decided first and alone; which message Status shows is decided
+after it, from the same state, and never changes what plays. The expected
+results in the tests named here are written from these tables, not from
+production decision functions: the reference model in
+[`tests/plugins/lifecycle.cpp`](../../tests/plugins/lifecycle.cpp) cites the
+rules it follows.
+
+| State | What plays (active, Bypass off) | What is saved | Status |
+| --- | --- | --- | --- |
+| **Empty:** nothing accepted, or an empty state accepted | Equal host counts: identity, at the level Gain and Mix give it. Unequal: silence | No filter | No filter |
+| **Active:** an accepted filter that suits the host | The filter at Gain, with Mix's dry share when the filter's own counts are equal | The filter (VST3: with the settings and bypass) | Active; Waiting while the host's configuration is not known, as the filter is not checked yet |
+| **Kept, unsuited:** an accepted filter that does not suit the host's rate or counts, found at activation, or restored into VST3 before audio has played | Silence; Mix's dry share below 100% when the host's counts and the filter's are both equal | The filter, so correcting the host brings it back | Load failed with the reason: "Silent:", or "only the dry signal plays" |
+| **Failed:** a first load failed, or a saved failure was restored | Silence, with no dry signal whatever the counts or Mix | The failure (flag 4, state version 2), no filter | Load failed: "Silent:" with the reason, or "an earlier load failed" |
+
+A host start whose processor cannot be built (`fail_activation()`,
+ROBUST-8) plays silence with no dry share and shows Load failed ("Silent:")
+whatever the state; the saved state is unchanged, and the next start that
+builds a processor returns to the state's own behaviour (`native.host`
+`failure_reasons`, `status_lines`).
+
+Each row gives the state after the event, from each starting state. Tests
+are named as CTest runs them: lifecycle operations (`vst3.lifecycle`,
+`au.lifecycle`, `lv2.lifecycle`, `native.host_lifecycle`), PLUG-2 harness
+cases ([testing](testing.md#plug-in-format-tests)) and the adapters' and the
+host layer's own tests.
+
+| Event | From Empty | From Active | From Kept | From Failed | Tests |
+| --- | --- | --- | --- | --- | --- |
+| State or preset that suits the host, or arrives while its configuration is not known | Active | Active (replaced, or kept playing when the same filter and settings arrive) | Active | Active | Lifecycle `state-A`, `state-B`; harness `initial`, `restore-after-activation`, `restore-before-setup`, `live-replacement`, `same-filter-restore`; `native.host` `same_filter_kept`, `request_changes` |
+| State that does not suit, while the configuration is not known | Waiting, then Kept at activation | The same | The same | The same | Lifecycle `state-other-rate` before `setup`; harness `restore-before-setup-mismatch` |
+| State that does not suit, VST3, started but not yet played with this configuration | Kept | Kept | Kept | Kept | `vst3.adapter` `restored_while_host_settles`; `native.host` `status_lines` ("kept, unsuited"); lifecycle `state-other-rate` (VST3) |
+| State that does not suit, configuration known | Failed | Active, previous filter kept: Status "previous filter kept" | Kept: Status still gives why the kept filter is silent; the log gives the refusal | Failed, with the new reason | Lifecycle `state-other-rate`; harness `failed-replacement`, `failed-replacement-inactive`, `failed-initial-load`; `vst3.adapter` `failed_first_loads`, `failure_records`; `au.adapter` `rejected_presets`; `lv2.adapter` `refused_first_loads`; `native.host` `failure_reasons` |
+| Malformed or newer state (checked at once, in every format) | Failed | Active, previous filter kept | Kept | Failed | Lifecycle `state-malformed`; `vst3.adapter` `failed_first_loads`; `native.host` `failure_reasons` |
+| Empty state; LV2's empty state map | Empty | Empty | Empty | Empty | Lifecycle `state-empty`, `empty-map`; `lv2.adapter` `empty_state_resets` |
+| Saved failed state | Failed | Failed: silence replaces the filter | Failed | Failed | Lifecycle `state-failed`; `native.host` `processing_faults` (the saved failure holds the fault signal) |
+| Chosen filter file accepted (VST3 before activation: checked at activation) | Active | Active | Active | Active | Lifecycle `file-A` then `work` (LV2); `vst3.adapter` `chosen_preset`, `chosen_preset_before_activation`, `chosen_file_on_wider_bus`; `au.adapter` `chosen_preset`; `lv2.adapter` `worker_loads`, `rechosen_files` |
+| Chosen filter file refused (missing, unreadable, or not suiting the started host) | Failed | Active, previous filter kept | Kept | Failed, with the new reason | Lifecycle `file-missing`, `file-refused`; `lv2.adapter` `refused_first_loads`; `vst3.adapter` `report_and_files`, `chosen_preset` |
+| Activation after a rate or bus change | Empty: identity or silence by the new counts | Active if the filter suits, otherwise Kept | Active if the filter now suits, otherwise Kept | Failed | Lifecycle `rate`, `layout`, `start`; harness `restore-before-setup-mismatch`; `native.host` `status_lines` ("kept, then suited"), `processing_faults` |
+| Reopening the project (the saved state restored into a new instance) | Empty | Active | Waiting, then Kept at activation (LV2: Kept at once) | Failed | Lifecycle `reopen` |
+| Bypass | Unchanged. The untouched input where the host's counts are equal, else silence | Unchanged. The input where the filter's counts are equal, else silence | Unchanged. The input where the host's and the filter's counts are both equal, else silence | Unchanged. Silence | Lifecycle `bypass`; harness `bypass`; `native.host` `unequal_bypass`, `status_lines`; `native.host_report` `cases` |
+| Mix below 100% | Unchanged. The input at the level Gain and Mix give it, where the counts are equal | Unchanged. The filter with the dry share, where its counts are equal | Unchanged. The dry share, where both counts are equal | Unchanged. Silence | `native.host_settings` `unequal_mix`, `diagnostics_follow_settings`; `native.host_report` `cases` ("wrong rate, Mix 50%", "failed first load, Mix 50%") |
+| Processing fault (rejected input, output overflow, a failed engine call, an invalid call) | Unchanged; the affected samples or call play silence | Unchanged; the same, and an overflow restarts the filter | Unchanged | Unchanged | `native.host` `processing_faults`; harness `nonfinite-input` |
+
+No event moves an instance out of Failed except an accepted request: a
+filter, an empty state or another saved failure. Bypass, Mix and faults
+never change the state, so they never change what is saved.
+
+**Which message Status shows** (`host_status()` in
+[`host.cpp`](../../portable/host.cpp); `native.host` `status_lines`), first
+match wins:
+
+1. A load failure: the failure found at activation while it lasts, otherwise
+   the newest refused request's. A kept filter that does not suit therefore
+   keeps showing why it is silent while a later refusal is logged.
+2. A fault, unless a failed load left no filter. Faults stay until an
+   accepted load or an activation; while a load failure is shown the report
+   adds them as a note.
+3. Bypassed, when a filter is loaded.
+4. Active, or Waiting before the host's configuration is known.
+5. Load failed after a failed load.
+6. No filter.
+
+When no filter is heard, the line and the window's report say what does
+play: Mix's dry share, or, while bypassed, the untouched input where there is
+a dry signal (PLUG-36, 20 November 2026; `native.host`
+`status_lines` and `native.host_report` `cases`, "bypassed").
+
 ## Failure reasons
 
 Added 22 October 2026 from jrp's

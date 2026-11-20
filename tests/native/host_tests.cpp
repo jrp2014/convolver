@@ -1999,6 +1999,34 @@ void status_lines() {
         check(host_status(kept, six), Status::active, "Filter loaded: 48000 Hz, 2 in, 6 out",
               "kept, then suited");
     }
+    // PLUG-36: Bypass changes what plays without a filter, so the line follows
+    // it as it follows Mix. A kept filter that does not suit the host, with
+    // equal counts on both, passes the dry signal while bypassed; with a
+    // crossover there is none. An empty instance and a failed load say what
+    // bypass plays too: the input, or silence.
+    {
+        HostFilter kept(8);
+        kept.load(HostState{other_rate}, std::nullopt);
+        static_cast<void>(test::started(kept, stereo));
+        check(host_status(kept, stereo, true, {}, true), Status::load_failed,
+              "Load failed, only the dry signal plays: the filter is for 44100 Hz",
+              "kept at another rate, bypassed");
+        HostFilter unsuited(8);
+        unsuited.load(HostState{crossover}, std::nullopt);
+        static_cast<void>(test::started(unsuited, stereo));
+        check(host_status(unsuited, stereo, true, {}, true), Status::load_failed,
+              "Silent: the filter has 2 in, 6 out", "kept crossover, bypassed");
+        check(host_status(kept, stereo, true, HostSettings{-6, .5}, true), Status::load_failed,
+              "Load failed, only the dry signal plays", "kept at another rate, Mix 50%, bypassed");
+        HostFilter empty(8);
+        check(host_status(empty, stereo, true, HostSettings{-6, .5}, true), Status::no_filter,
+              "No filter: audio passes unchanged.", "empty, Gain -6 dB, bypassed");
+        check(host_status(empty, stereo, true, HostSettings{-6, .5}), Status::no_filter,
+              "No filter: audio passes at", "empty, Gain -6 dB");
+        refused([&] { empty.load(HostState{other_rate}, stereo); });
+        check(host_status(empty, stereo, true, {}, true), Status::load_failed,
+              "Silent: the filter is for 44100 Hz", "failed first load, bypassed");
+    }
     // The longest common line still fits when the log cannot be written.
     refused([&] { f.load(HostState{other_rate}, stereo); });
     check(host_status(f, stereo, false), Status::load_failed,

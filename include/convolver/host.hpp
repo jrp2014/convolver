@@ -635,7 +635,9 @@ inline constexpr std::size_t max_status_text = 127; // VST3's String128, less it
 // and Mix (PLUG-10): without a filter, or after a failed load, the text says
 // what they let through (the input at a changed level, or the dry signal),
 // not only what the filter does. `bypassed`: the instance is bypassed; a load
-// failure or a fault still comes first, as both need attention.
+// failure or a fault still comes first, as both need attention, and when no
+// filter is heard the text says what bypass plays (the untouched input where
+// there is a dry signal; PLUG-36).
 // `chooses_files`: the plug-in has a window that chooses filter files, so
 // with no filter the text names choosing one before a preset (PLUG-33).
 HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& host,

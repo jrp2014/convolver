@@ -488,7 +488,8 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
   harness and lifecycle model already state their expected results apart
   from the production code. When PLUG-36 is taken up, its load and restore
   rows map onto step 1's single decision instead of three adapters, which
-  makes its table shorter to write and check.
+  makes its table shorter to write and check. Done on 20 November 2026: the
+  contract's [states and transitions](../../develop/plugin-contract.md#states-and-transitions).
 - **PLUG-30** (one rule for state a busy lock makes a call skip) is taken
   up with step 4 (jrp, 19 November 2026), which removes the Audio Unit's
   report cache from its list.

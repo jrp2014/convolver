@@ -270,7 +270,11 @@ is heard. With no filter loaded and Gain or Mix changed, it reads, for
 example, `No filter: audio passes at -20.0 dB (Gain and Mix).`; when a
 kept filter does not fit and Mix is below 100%, `Load failed, only the dry
 signal plays: ...` instead of `Silent: ...`, as the dry share still plays
-(only where there is a dry signal: see [bypass](#bypass)). A filter at Mix
+(only where there is a dry signal: see [bypass](#bypass)). It follows bypass
+the same way: bypass plays the input unchanged where there is a dry signal,
+so a bypassed kept filter that does not fit reads `Load failed, only the dry
+signal plays: ...`, and a bypassed instance with no filter reads `No filter:
+audio passes unchanged.` whatever Gain and Mix are. A filter at Mix
 0% adds `Mix 0%: only the dry signal plays.`
 
 **Fault** means something went wrong in the audio while it played, with or

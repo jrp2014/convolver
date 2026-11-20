@@ -1023,12 +1023,18 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
     const auto& failure = filter.failure();
     const bool never_dry = dry_signal_before_host(filter) == HostDrySignal::failed_load;
     const bool dry_unknown = !host && !never_dry && clamp_mix(settings.mix) < 1;
+    // PLUG-36: bypass plays the untouched input wherever there is a dry
+    // signal, so when no filter is heard the line says what bypass plays, as
+    // it would at Mix 0%.
+    HostSettings heard = settings;
+    if (bypassed && host)
+        heard.mix = 0;
     // What plays with no filter heard, before the reason: "Silent: " only
     // when Mix lets no dry signal through.
     const auto silent_words = [&]() -> std::string {
         if (dry_unknown)
             return "Load failed, no filter plays: ";
-        if (dry_known && !unfiltered_sound(settings, false).silent)
+        if (dry_known && !unfiltered_sound(heard, false).silent)
             return "Load failed, only the dry signal plays: ";
         return "Silent: ";
     };
@@ -1077,7 +1083,7 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
             line.text = "No filter loaded." + load;
         else if (!dry_known)
             line.text = "No filter: silent, as inputs and outputs differ." + load;
-        else if (const auto sound = unfiltered_sound(settings, true); !sound.unchanged)
+        else if (const auto sound = unfiltered_sound(heard, true); !sound.unchanged)
             line.text = "No filter: audio passes at " + sound.level + " (Gain and Mix)." + load;
         else
             line.text = "No filter: audio passes unchanged." + load;

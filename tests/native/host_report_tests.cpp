@@ -233,6 +233,30 @@ void cases() {
          HostStatus::no_filter,
          {"No filter"},
          {"bypass"}},
+        // PLUG-36: bypass plays the untouched input where there is a dry
+        // signal, whatever Gain and Mix say, so the report says that when no
+        // filter is heard.
+        {"bypassed without a filter, Gain -6 dB",
+         [&] {
+             auto bypassed = facts(stereo, {-6, .5});
+             bypassed.bypassed = true;
+             return host_report(HostFilter(8), bypassed);
+         },
+         HostStatus::no_filter,
+         {"No filter, so audio passes unchanged."},
+         {"Gain and Mix"}},
+        {"wrong rate, bypassed",
+         [] {
+             HostFilter f(8);
+             f.load(HostState{filter(48000, 2)}, std::nullopt);
+             static_cast<void>(test::started(f, {44100, 2, 2}));
+             auto bypassed = facts(HostLayout{44100, 2, 2}, {0, .5});
+             bypassed.bypassed = true;
+             return host_report(f, bypassed);
+         },
+         HostStatus::load_failed,
+         {"While bypassed, only the dry signal plays: the input unchanged."},
+         {"plays silence", "Mix at"}},
         {"waiting",
          [] {
              HostFilter f(8);

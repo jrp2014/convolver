@@ -72,6 +72,12 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
     const auto* layout = host ? &*host : nullptr;
     const auto& failure = filter.failure();
     const auto choose = facts.chooses_files ? "choose filter" : "";
+    // PLUG-36: bypass plays the untouched input wherever there is a dry
+    // signal, so when no filter is heard the report says what bypass plays,
+    // as host_status() does.
+    HostSettings heard = facts.settings;
+    if (facts.bypassed && host)
+        heard.mix = 0;
     Message m;
     const auto take = [&](const detail::Advice& a) {
         m.problem = detail::as_sentence(a.problem);
@@ -83,8 +89,12 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         auto a = failure_message(*failure);
         a.problem = short_problem(std::move(a.problem), *failure);
         take(a);
-        m.plays = failure_consequence(*failure, layout, facts.settings,
-                                      layout && dry_signal(filter, *layout));
+        const bool dry = layout && dry_signal(filter, *layout);
+        m.plays =
+            facts.bypassed && dry && failure->silent && failure->kind != HostFailureKind::activation
+                ? std::string("While bypassed, only the dry signal plays: the input "
+                              "unchanged.")
+                : failure_consequence(*failure, layout, facts.settings, dry);
         if (chosen_away(failure->kind))
             m.action = choose;
         // Faults the load failure hides from the status.
@@ -97,8 +107,8 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
             m.plays = "The filter keeps playing.";
         } else {
             // Faults are counted with no filter too (the host's samples).
-            m.plays = host ? playing_words(filter, *host, facts.settings)
-                           : std::string("No filter is loaded.");
+            m.plays =
+                host ? playing_words(filter, *host, heard) : std::string("No filter is loaded.");
             add_note(m, load_fix(facts.chooses_files));
             m.action = choose;
         }
@@ -130,8 +140,7 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         m.fix = "Load a filter made for the host's sample rate and channels.";
         m.action = choose;
     } else {
-        m.plays = host ? playing_words(filter, *host, facts.settings)
-                       : std::string("No filter is loaded.");
+        m.plays = host ? playing_words(filter, *host, heard) : std::string("No filter is loaded.");
         m.fix = load_fix(facts.chooses_files);
         m.action = choose;
     }
