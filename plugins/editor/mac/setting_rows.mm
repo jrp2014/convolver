@@ -166,8 +166,9 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
         if (index >= 0 && index < menu.numberOfItems && menu.indexOfSelectedItem != index)
             [menu selectItemAtIndex:index];
         // PLUG-10: the Gain mode's menu shows the gain it plays instead.
-        _values[i].stringValue =
-            [settings_[i][@"note"] isEqual:@"gain"] ? (gainNote_ ?: @"") : [self latencyNote:menu];
+        _values[i].stringValue = [settings_[i][@"note"] isEqual:@"gain"]
+                                     ? (gainNote_ ? gainNote_ : @"")
+                                     : [self latencyNote:menu];
         return;
     }
     NSString* number = [self number:value of:settings_[i]];

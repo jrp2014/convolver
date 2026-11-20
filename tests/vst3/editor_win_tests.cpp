@@ -242,8 +242,8 @@ class Resizing final : public IPlugFrame {
         }
         return recorded_.resizeView(view, size);
     }
-    tresult PLUGIN_API queryInterface(const TUID iid, void** obj) override {
-        return recorded_.queryInterface(iid, obj);
+    tresult PLUGIN_API queryInterface(const TUID _iid, void** obj) override {
+        return recorded_.queryInterface(_iid, obj);
     }
     uint32 PLUGIN_API addRef() override {
         return 1;
