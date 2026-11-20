@@ -1174,7 +1174,9 @@ python3 tests/au/avaudioengine_tests.py build-au/convolver-preset
   state round trip; long `run()` calls; filter files through the worker, run
   on a thread, synchronously (as when a host free-wheels) and with answers
   delivered inside `run()`, without a worker, and with scheduling that fails;
-  failed files of every kind; a filter file too large to save (PLUG-12: two
+  failed files of every kind; a file chosen again while its filter plays,
+  whose tail rings on exactly as without it, and the same name with changed
+  contents, which loads (PLUG-39 step 1b); a filter file too large to save (PLUG-12: two
   paths of 8,388,608 samples, refused with the original kept, playing and
   saved, or as a silent failed first load); rapid choices; the two preparation-window cases,
   with `work()` paused (through a second test-only extension) after

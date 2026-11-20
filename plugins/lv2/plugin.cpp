@@ -692,19 +692,36 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
                         throw SupersededRequest();
                     return;
                 }
+                const auto prepare = [&] {
+                    try {
+                        return p.host->prepare(c);
+                    } catch (...) { // Out of memory: no failure for an overtaken request.
+                        if (r.generation != newest())
+                            throw SupersededRequest();
+                        throw;
+                    }
+                };
+                // PLUG-39 step 1b (jrp, 13 November 2026): a file holding
+                // the filter that plays needs nothing prepared and keeps it
+                // and its history, as in VST3 and the Audio Unit; HostFilter
+                // compared the decoded filter in full, never the name.
                 std::optional<HostProcessor::Replacement> prepared;
-                try {
-                    prepared.emplace(p.host->prepare(c));
-                } catch (...) { // Out of memory: no failure for an overtaken request.
-                    if (r.generation != newest())
-                        throw SupersededRequest();
-                    throw;
-                }
+                if (!c.playing)
+                    prepared.emplace(prepare());
                 pause_at(p, WorkerPoint::prepared);
                 // 2. The last check, after preparation.
                 if (r.generation != newest())
                     throw SupersededRequest();
                 pause_at(p, WorkerPoint::checked);
+                if (!prepared) {
+                    if (p.host->keep(c))
+                        return;
+                    // Its processor met a fault, so it starts afresh, as
+                    // before PLUG-38.
+                    prepared.emplace(prepare());
+                    if (r.generation != newest())
+                        throw SupersededRequest();
+                }
                 // 3. Publish. From here on run() must not mute: the filter is
                 // accepted (HostFilter::load commits without throwing).
                 p.unfiltered.store(false, std::memory_order_release);

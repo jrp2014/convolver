@@ -788,9 +788,9 @@ A preset, or an undo, that holds the filter already playing, with Latency
 unchanged, and changes only Gain, Mix or the Gain mode keeps the filter and
 what it is playing: the new settings ramp in over 1.3 ms and the reverb tail
 rings on. A different Latency still rebuilds the processing and starts the
-filter afresh. Choosing the playing filter's file again in the VST3 or
-Audio Unit window keeps it the same way; an LV2 host's file choice starts it
-afresh. Reopening a
+filter afresh. Choosing the playing filter's file again, in the VST3 or
+Audio Unit window or through an LV2 host's file choice, keeps it the same
+way, unless the file's contents have changed. Reopening a
 project, or a host stopping and restarting the plug-in, starts the filter
 afresh.
 

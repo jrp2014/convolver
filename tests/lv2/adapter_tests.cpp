@@ -1398,6 +1398,57 @@ void worker_loads(host::World& world, const fs::path& work) {
     }
 }
 
+// PLUG-39 step 1b (jrp, 13 November 2026): a file chosen again whose filter
+// is the one playing keeps it and its history, as in VST3 and the Audio
+// Unit, so the tail rings on as if nothing had arrived; the decoded filter
+// decides, never the name, so a file of the same name whose contents
+// changed loads as any other.
+void rechosen_files(host::World& world, const fs::path& work) {
+    const auto folder = work / "rechosen";
+    fs::create_directories(folder);
+    {
+        // A 0.1 s moving average: the tail falls for 4800 frames after the
+        // input stops.
+        fs::remove(folder / "tail.wav");
+        AudioWriter writer(folder / "tail.wav", {48000, 1}, OutputFormat::wav_float);
+        const std::vector<float> average(4800, 1.f / 4800);
+        writer.write(average);
+        writer.close();
+    }
+    const auto file = folder / "tail.cfg";
+    write_text(file, scaling_cfg(48000, "tail.wav", ".5"));
+    const auto path = file.string();
+    using host::Worker;
+    auto chosen_again = worker_instance(world, Worker::threaded);
+    auto untouched = worker_instance(world, Worker::threaded);
+    const std::vector<float> silence(4096 * 2, 0.f);
+    for (auto* p : {chosen_again.get(), untouched.get()}) {
+        p->activate();
+        p->set_filter(path);
+        settle(*p);
+        play_constant(*p, 6000);
+        render(*p, silence, 1024, 256); // The input stops; the tail rings.
+    }
+    chosen_again->set_filter(path);
+    settle(*chosen_again);
+    const auto kept = render(*chosen_again, silence, 4096, 256);
+    const auto reference = render(*untouched, silence, 4096, 256);
+    check(kept[0] > .1f && kept == reference,
+          "re-choosing the playing file keeps its tail ringing as if nothing arrived (first " +
+              std::to_string(kept[0]) + ", uninterrupted " + std::to_string(reference[0]) + ")");
+    check(chosen_again->status == as_float(lv2::Status::running) && !chosen_again->failure() &&
+              reported(*chosen_again) == path && saved_path(*chosen_again) == path,
+          "re-choosing the playing file: running, reported and saved as before");
+    // The same name with other contents is another filter.
+    write_text(file, scaling_cfg(48000, "tail.wav", ".25"));
+    chosen_again->set_filter(path);
+    play_constant(*chosen_again, 256);
+    settle(*chosen_again);
+    const auto changed = play_constant(*chosen_again, 8192);
+    check(std::abs(changed.back() - .25f) < 1e-3f,
+          "a file of the same name with changed contents loads: " + std::to_string(changed.back()));
+}
+
 // PLUG-12 (jrp's review of 6920a45): a filter file whose filter the saved
 // state cannot hold is refused when it is chosen, not accepted and then
 // lost when the host saves. Two paths of 8,388,608 samples are 16,777,216 in
@@ -2138,6 +2189,7 @@ int main(int argc, char** argv) {
         bundle(world);
         instantiation(world);
         worker_loads(world, work);
+        rechosen_files(world, work);
         settings_ports(world, work);
         oversized_files(world, work);
         path_state(world, work);

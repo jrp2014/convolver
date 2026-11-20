@@ -571,7 +571,8 @@ silent) and is equal in every stored value: the filter's identity picks the
 candidate, a full comparison of every value (floats by their bits) proves
 it, and a file name proves nothing. The adapters (VST3 `setState`, a file
 or `.vstpreset` chosen in the window, AU `RestoreState` and a chosen file,
-LV2 `restore`) then call `HostProcessor::keep()`, which passes the
+LV2 `restore` and a file chosen through `patch:Set`) then call
+`HostProcessor::keep()`, which passes the
 filter's gains to `update_gains()` and keeps the processor, unless the
 processor met a fault since the last accepted load, which replaces it as
 before. Saved state, the filter's name, the log and the notifications
@@ -580,7 +581,11 @@ project being opened (`kProject`) is a session (`HostRequestKind::session`),
 which `HostFilter::load()` never counts as playing, so it still replaces the
 filter and reopening a project keeps nothing from the session before; a reset or reactivation
 clears history as always. LV2 files chosen through `patch:Set` go through
-the worker and still replace. The PLUG-2 harness's `same-filter-restore`
+the worker, which keeps the filter only if no newer request has arrived by
+then; until PLUG-39 step 1b they always replaced it (jrp aligned LV2 with
+the other formats on 13 November 2026). `lv2.adapter`'s `rechosen_files`
+checks that the tail of a file chosen again rings on exactly as without it,
+and that a file of the same name whose contents changed loads. The PLUG-2 harness's `same-filter-restore`
 case checks this in every format, with a reset before the same filter
 arrives still giving silence; in `vst3.adapter`,
 `same_filter_keeps_history` checks a Gain change against the uninterrupted
