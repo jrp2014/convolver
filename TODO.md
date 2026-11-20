@@ -1219,6 +1219,12 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **CI-46 — The VST3 plug-in builds with the others' warnings.** 20
+  November 2026, PR #NNN, from an outside audit: `plugins/vst3/` set no
+  warning flags beyond its macOS window's, unlike the core, the Audio Unit
+  and LV2. Its targets now build with the same ones, the SDK as system
+  headers, and the warnings they showed are fixed
+  ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
 - [x] **HOST-7 — Run the Ardour test with Ardour 9.**
   20 November 2026, PR #229, from CI-43: Ardour 9's Lua tool crashed in
   `Session:new_audio_track`, which takes an empty `ARDOUR.RouteGroup()`

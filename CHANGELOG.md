@@ -134,6 +134,14 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Builds (CI-46, from an outside audit of 20 November 2026): the VST3
+  plug-in and the programs that compile its sources build with the warnings
+  the core, the Audio Unit and the LV2 plug-in already had
+  (`-Wall -Wextra -Wpedantic`, or `/W4 /permissive- /utf-8` with MSVC); the
+  SDK's headers are system headers. What they found is fixed: an unused
+  variable in `host_report.cpp`, a signed/unsigned comparison and two
+  partly initialised timing results in the VST3 tests, and an unused test
+  helper. No output changes.
 - Plug-ins (PLUG-36): while bypassed, Status and the window's report say
   what bypass plays when no filter is heard. A kept filter that does not
   suit the host (another sample rate, say) showed "Silent:" while bypass

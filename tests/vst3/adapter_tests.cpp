@@ -1707,8 +1707,7 @@ void output_silence_flags() {
     require(call(music) == (L >= frames ? 3 : 0),
             "the latency is silence, so it is flagged; audio is not");
     while (frame < stop + tail - frames)
-        require(call(music) == 0 || frame < latency_samples,
-                "audio or the filter's tail was flagged silent");
+        require(call(music) == 0 || frame < L, "audio or the filter's tail was flagged silent");
     // The call holding the tail's last sample. Float rounding in the last
     // blocks computed from the audio can leave values near 1e-8 for up to two
     // partitions after it; from then on the output is exactly zero.

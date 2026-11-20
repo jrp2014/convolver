@@ -227,13 +227,6 @@ void close(const std::vector<float>& actual, const std::vector<double>& expected
     }
     worst = std::max(worst, local);
 }
-std::vector<double> slice(const std::vector<double>& v, std::size_t channels, std::size_t from,
-                          std::size_t frames) {
-    std::vector<double> r(frames * channels);
-    for (std::size_t i = 0; i < r.size() && from * channels + i < v.size(); ++i)
-        r[i] = v[from * channels + i];
-    return r;
-}
 void silent(const std::vector<float>& actual, const std::string& what) {
     for (std::size_t i = 0; i < actual.size(); ++i)
         require(actual[i] == 0, what + ": sample " + std::to_string(i) + " is " +
