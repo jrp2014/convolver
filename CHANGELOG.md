@@ -8,17 +8,17 @@ release notes are archived in [docs/historical](docs/historical).
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Until 1.0 the C++ API may change between minor versions.
 
+Each release lists first, under **Added**, **Changed** and **Fixed**, what
+users of the command-line tools and plug-ins and of the C++ library can see.
+Work only contributors see (tests, CI, builds, contributor documentation and
+records) follows under **For contributors**; every finished TODO item keeps
+its entry there until formal releases. Releases before 0.12.12, the first
+published preview, keep their original grouping.
+
 ## [Unreleased]
 
 ### Added
 
-- Tests (COMPAT-1, in progress): the example presets of the published
-  0.14.0 and the audio its own CLI and VST3 plug-in rendered from them are
-  kept in `tests/upgrade/0.14.0/`, beside those of 0.13.2, 0.13.12,
-  0.13.20 and 0.13.24; `upgrade.cli` and `vst3.upgrade` check later builds against all
-  five. Every preset, filter, input and expected render matches 0.13.24's
-  byte for byte: EDGE-11's change of a -0 sample to +0 did not occur in
-  these renders.
 - Releases: jrp published Convolver 0.14.0, the sixth unsigned developer
   preview, on 19 November 2026
   ([release](https://github.com/jrp2014/convolver/releases/tag/v0.14.0)).
@@ -51,26 +51,6 @@ Until 1.0 the C++ API may change between minor versions.
   fail. Build the processor from `activation().playback`, then call
   `activate()` once nothing can stop that processor from playing.
 
-- Tests (HOST-7): the headless Ardour test runs Ardour 9 on the newest
-  Ubuntu image instead of Ardour 8.4 on Ubuntu 24.04. Its session script
-  gives Ardour 9 the empty route group it expects (`nil` crashed it), and
-  the test accepts Ardour 9.0's known abort as `new_session` exits once the
-  session is written (that version and message only). Every first-use
-  example matches the oracle (worst error 3.42e-8).
-- Builds (CI-45): Convolver's own sources build without the warnings GCC 12
-  to 15, Xcode 26.6 and Visual Studio 2022 gave in CI. No output changes.
-- Builds (CI-43): the Mac preview packages are built with the newest Xcode
-  on GitHub's macOS 26 images (Xcode 26.6 today, was 16.4 on macOS 15), still
-  for macOS 14 and later, and the Linux packages with GCC 12 (was 11), still
-  on Ubuntu 22.04 for glibc 2.35. CI tests with the newest GCC and Xcode the
-  images have, the newest LLVM release branch (Clang 23 today, was 21) and the newest
-  stable Python (3.15, was 3.12); the Audio Unit job runs on macOS 26, and the
-  LV2 tests run on the newest Ubuntu image with its lilv (the Ardour test
-  stays on Ubuntu 24.04 until it works with Ardour 9).
-  Output may differ within the tested tolerance. Contributor guidance now
-  says to keep every external dependency, compilers and CI machines
-  included, on its newest formal release
-  ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
 - Plug-ins (PLUG-39 step 4): with bypass on, the window's report and the
   Convolver log say what bypass plays instead of saying that the filter
   plays: a fault reads "Bypass is on: the input plays unfiltered." instead
@@ -99,18 +79,6 @@ Until 1.0 the C++ API may change between minor versions.
   fault, then Bypassed, then the filter, then a failed load, then no
   filter). `host_status()`, the window's report and LV2's status port all
   follow it instead of ordering the record again. Nothing shown changes.
-- Releases (CI-44): the Linux candidate's check refuses libstdc++ symbol
-  versions newer than GCC 12's (GLIBCXX_3.4.30, CXXABI_1.3.13), as it
-  already refused glibc ones newer than 2.35: a newer GCC on the build
-  image now fails the candidate instead of shipping a package that does not
-  load on Ubuntu 22.04 or Debian 12.
-- Plug-ins (PLUG-39 step 2): VST3 and the Audio Unit decide when the
-  host has settled its sample rate and channels in one shared record
-  (`HostSettling`), which each feeds with the host's starts, stops and
-  played audio, instead of in fields of their own. Each format keeps its
-  rule: VST3 binds a start and refuses restored state only once audio
-  has played; the Audio Unit binds an initialization only once it has
-  rendered. Nothing heard, saved or reported changes.
 - Audio Unit (PLUG-39 step 3c): as in VST3, a new Latency and
   uninitializing no longer wait for `Render` to let go of the processor
   they replace; the next control call frees it. Nothing heard or reported
@@ -121,16 +89,6 @@ Until 1.0 the C++ API may change between minor versions.
   the one it replaces is freed by the plug-in's next control call once the
   audio thread has let it go. What plays, the latency reported and the
   pause while the new processor fills are unchanged.
-- CI (CI-42, from jrp's audit of v0.14.0): a pull request that changes
-  only `tests/upgrade/`, the files kept from published releases and their
-  checks, runs the native and VST3 workflows, whose `upgrade.cli` and
-  `vst3.upgrade` read them, instead of every workflow: the Audio Unit and
-  LV2 builds no longer run for it. The Audio Unit job's run of
-  `upgrade.cli`, the only Release Accelerate one with the Xcode of
-  `macos-15` (the macOS candidates' image), is left to `main`; the VST3
-  macOS job (newer Xcode) and the native macOS builds still run it against
-  the same bound. The saving was not measured
-  ([CI triggers](docs/develop/testing.md#pull-requests-for-one-plug-in-format)).
 
 ### Fixed
 
@@ -152,6 +110,58 @@ Until 1.0 the C++ API may change between minor versions.
   and, if memory ran out while the filter was checked against the host,
   read Active over a filter playing silence. Now a new start is recorded
   only once its processor plays. What plays is unchanged.
+
+### For contributors
+
+- Tests (COMPAT-1, in progress): the example presets of the published
+  0.14.0 and the audio its own CLI and VST3 plug-in rendered from them are
+  kept in `tests/upgrade/0.14.0/`, beside those of 0.13.2, 0.13.12,
+  0.13.20 and 0.13.24; `upgrade.cli` and `vst3.upgrade` check later builds against all
+  five. Every preset, filter, input and expected render matches 0.13.24's
+  byte for byte: EDGE-11's change of a -0 sample to +0 did not occur in
+  these renders.
+- Tests (HOST-7): the headless Ardour test runs Ardour 9 on the newest
+  Ubuntu image instead of Ardour 8.4 on Ubuntu 24.04. Its session script
+  gives Ardour 9 the empty route group it expects (`nil` crashed it), and
+  the test accepts Ardour 9.0's known abort as `new_session` exits once the
+  session is written (that version and message only). Every first-use
+  example matches the oracle (worst error 3.42e-8).
+- Builds (CI-45): Convolver's own sources build without the warnings GCC 12
+  to 15, Xcode 26.6 and Visual Studio 2022 gave in CI. No output changes.
+- Builds (CI-43): the Mac preview packages are built with the newest Xcode
+  on GitHub's macOS 26 images (Xcode 26.6 today, was 16.4 on macOS 15), still
+  for macOS 14 and later, and the Linux packages with GCC 12 (was 11), still
+  on Ubuntu 22.04 for glibc 2.35. CI tests with the newest GCC and Xcode the
+  images have, the newest LLVM release branch (Clang 23 today, was 21) and the newest
+  stable Python (3.15, was 3.12); the Audio Unit job runs on macOS 26, and the
+  LV2 tests run on the newest Ubuntu image with its lilv (the Ardour test
+  stays on Ubuntu 24.04 until it works with Ardour 9).
+  Output may differ within the tested tolerance. Contributor guidance now
+  says to keep every external dependency, compilers and CI machines
+  included, on its newest formal release
+  ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
+- Releases (CI-44): the Linux candidate's check refuses libstdc++ symbol
+  versions newer than GCC 12's (GLIBCXX_3.4.30, CXXABI_1.3.13), as it
+  already refused glibc ones newer than 2.35: a newer GCC on the build
+  image now fails the candidate instead of shipping a package that does not
+  load on Ubuntu 22.04 or Debian 12.
+- Plug-ins (PLUG-39 step 2): VST3 and the Audio Unit decide when the
+  host has settled its sample rate and channels in one shared record
+  (`HostSettling`), which each feeds with the host's starts, stops and
+  played audio, instead of in fields of their own. Each format keeps its
+  rule: VST3 binds a start and refuses restored state only once audio
+  has played; the Audio Unit binds an initialization only once it has
+  rendered. Nothing heard, saved or reported changes.
+- CI (CI-42, from jrp's audit of v0.14.0): a pull request that changes
+  only `tests/upgrade/`, the files kept from published releases and their
+  checks, runs the native and VST3 workflows, whose `upgrade.cli` and
+  `vst3.upgrade` read them, instead of every workflow: the Audio Unit and
+  LV2 builds no longer run for it. The Audio Unit job's run of
+  `upgrade.cli`, the only Release Accelerate one with the Xcode of
+  `macos-15` (the macOS candidates' image), is left to `main`; the VST3
+  macOS job (newer Xcode) and the native macOS builds still run it against
+  the same bound. The saving was not measured
+  ([CI triggers](docs/develop/testing.md#pull-requests-for-one-plug-in-format)).
 
 - Benchmarks (PERF-20, from jrp's audit of v0.14.0):
   `tests/native/benchmarks/compare_engines.py` refused to compare two
@@ -202,12 +212,6 @@ messages for a sample-rate refusal and a `.cfg` file name that is not UTF-8
   status are unchanged. The C++ API gains `Quantizer::clipped()` and
   `AudioWriter::clipped_samples()`, which count the clipped samples of each
   channel.
-- Tests (COMPAT-1, in progress): the example presets of the published
-  0.13.24 and the audio its own CLI and VST3 plug-in rendered from them are
-  kept in `tests/upgrade/0.13.24/`, beside those of 0.13.2, 0.13.12 and
-  0.13.20; `upgrade.cli` and `vst3.upgrade` check later builds against all
-  four. Every preset, filter, input and expected render matches 0.13.20's
-  byte for byte, as expected of a patch that changed only the LV2 plug-in.
 - Releases: jrp published Convolver 0.13.24, the fifth unsigned developer
   preview and a patch of 0.13.20 with LV2-9's fix, on 16 November 2026
   ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.24)).
@@ -256,18 +260,6 @@ messages for a sample-rate refusal and a `.cfg` file name that is not UTF-8
   retelling each preview's publication, CONTRIBUTING no longer calls
   bundled dependencies future work, and the documentation guide says what
   a source comment should hold.
-- Documentation, for contributors (DOC-17, from jrp's edits of
-  19 November 2026): the documentation guide's
-  [current claims](docs/develop/documentation.md#current-claims-and-dated-evidence)
-  section says how claims in the README, user guides and release notes stay
-  current. The README and release notes cite a guide, test or dated
-  measurement; user guides do so only for quantitative performance,
-  accuracy or comparative claims. Each claim keeps its evidence's scope, is
-  updated in the change that affects it and is narrowed when the evidence
-  no longer supports it. The workflow's while-working
-  list, the definition of done, the review checklist, the pull request
-  template and AGENTS.md link to it, and the release steps check a draft's
-  notes and download links against its tag and files before publishing.
 - Configurations (CFG-3, first part): a file name in a `.cfg` or list that
   is not UTF-8 text, as in a file saved in Windows-1252 (Notepad's old
   "ANSI"), now stops with an error that says so: its line, the byte that is
@@ -302,6 +294,39 @@ messages for a sample-rate refusal and a `.cfg` file name that is not UTF-8
   macOS, Windows and Linux. Each claim links to the guide, test or
   measurement behind it; the preview's limitations follow in their own
   section.
+
+### Fixed
+
+- CLI (DIAG-8, from jrp's review of 19 November 2026): the clipping report
+  after a render said that a sample of +1.0 always clips, which is not so
+  with dither: dither can take such a sample down within range, and jrp's
+  render of 4,096 samples at +1.0 with triangular dither counted 3,556
+  clipped yet still printed that sentence. It now says that +1.0 is above the
+  largest representable positive integer sample, so leave headroom for
+  quantization. Only the wording changed; the counts, samples and exit
+  status are as before
+  ([file rendering](docs/use/command-line.md#file-rendering)).
+
+### For contributors
+
+- Tests (COMPAT-1, in progress): the example presets of the published
+  0.13.24 and the audio its own CLI and VST3 plug-in rendered from them are
+  kept in `tests/upgrade/0.13.24/`, beside those of 0.13.2, 0.13.12 and
+  0.13.20; `upgrade.cli` and `vst3.upgrade` check later builds against all
+  four. Every preset, filter, input and expected render matches 0.13.20's
+  byte for byte, as expected of a patch that changed only the LV2 plug-in.
+- Documentation, for contributors (DOC-17, from jrp's edits of
+  19 November 2026): the documentation guide's
+  [current claims](docs/develop/documentation.md#current-claims-and-dated-evidence)
+  section says how claims in the README, user guides and release notes stay
+  current. The README and release notes cite a guide, test or dated
+  measurement; user guides do so only for quantitative performance,
+  accuracy or comparative claims. Each claim keeps its evidence's scope, is
+  updated in the change that affects it and is narrowed when the evidence
+  no longer supports it. The workflow's while-working
+  list, the definition of done, the review checklist, the pull request
+  template and AGENTS.md link to it, and the release steps check a draft's
+  notes and download links against its tag and files before publishing.
 - CI (CI-34, finished; chosen by jrp on 18 November 2026): a pull request
   runs the fuzz workflow only when it changes what the four fuzz targets are
   built from: their harnesses, seeds and regression inputs, the parsers,
@@ -335,17 +360,6 @@ messages for a sample-rate refusal and a `.cfg` file name that is not UTF-8
   comparison and plug-in timing test still runs where it did
   ([which configurations run which tests](docs/develop/testing.md#which-configurations-run-which-tests)).
 
-### Fixed
-
-- CLI (DIAG-8, from jrp's review of 19 November 2026): the clipping report
-  after a render said that a sample of +1.0 always clips, which is not so
-  with dither: dither can take such a sample down within range, and jrp's
-  render of 4,096 samples at +1.0 with triangular dither counted 3,556
-  clipped yet still printed that sentence. It now says that +1.0 is above the
-  largest representable positive integer sample, so leave headroom for
-  quantization. Only the wording changed; the counts, samples and exit
-  status are as before
-  ([file rendering](docs/use/command-line.md#file-rendering)).
 - CI (CI-40, from jrp's review of 18 November 2026): clang-tidy ran on a
   hand-kept list of portable sources, repeated in CONTRIBUTING, that had
   missed `portable/partitions.cpp`. CI and the documented command now
@@ -368,13 +382,6 @@ from the version number ([release](https://github.com/jrp2014/convolver/releases
 
 ### Added
 
-- Tests (COMPAT-1, in progress): the example presets of the published
-  0.13.20 and the audio its own CLI and VST3 plug-in rendered from them are
-  kept in `tests/upgrade/0.13.20/`, beside 0.13.2's and 0.13.12's;
-  `upgrade.cli` and `vst3.upgrade` check later builds against all three.
-  Every preset, filter, input and expected render matches 0.13.12's byte
-  for byte, so 0.13.20 renders those presets exactly as the two earlier
-  previews did.
 - Releases: jrp published Convolver 0.13.20, the fourth unsigned developer
   preview, on 16 November 2026
   ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.20)).
@@ -401,6 +408,16 @@ from the version number ([release](https://github.com/jrp2014/convolver/releases
   change; this mitigates the crash rather than ruling out every late
   call. Present since the Gain mode arrived in 0.13.20. No
   change to the sound or to saved state.
+
+### For contributors
+
+- Tests (COMPAT-1, in progress): the example presets of the published
+  0.13.20 and the audio its own CLI and VST3 plug-in rendered from them are
+  kept in `tests/upgrade/0.13.20/`, beside 0.13.2's and 0.13.12's;
+  `upgrade.cli` and `vst3.upgrade` check later builds against all three.
+  Every preset, filter, input and expected render matches 0.13.12's byte
+  for byte, so 0.13.20 renders those presets exactly as the two earlier
+  previews did.
 
 ## [0.13.20] - 2026-11-16
 
@@ -429,12 +446,6 @@ published before any of them was tried in a host
   LV2 control `gain_mode`. Set mode plays every sample exactly as before;
   the other modes match the double-precision oracle within 1.3e-7 of the
   output peak. Not yet tried in a host.
-- Tests (COMPAT-1, in progress): the example presets of the published
-  0.13.12 and the audio its own CLI and VST3 plug-in rendered from them are
-  kept in `tests/upgrade/0.13.12/`, beside 0.13.2's; `upgrade.cli` and
-  `vst3.upgrade` check later builds against both. Every preset, filter,
-  input and expected render matches 0.13.2's byte for byte, so 0.13.12 renders those presets exactly as
-  0.13.2 did.
 - Releases: jrp published Convolver 0.13.12, the third unsigned developer
   preview, on 11 November 2026
   ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.12)).
@@ -467,35 +478,6 @@ published before any of them was tried in a host
   VST3 project saved at Latency 0, every earlier preview one saved with
   Gain mode Estimate or No clipping). The LV2 limitation names the PipeWire
   trial. No change to what the packages run or hold.
-
-- Backlog (DOC-14, jrp's review of 12 November 2026): one consolidation
-  pass over [TODO](TODO.md). Open items now say what remains, what would
-  justify doing it and what counts as finished, and the progress
-  narratives moved, word for word, to
-  [`docs/archive/todo/`](docs/archive/todo/2026-11-12-open-item-history.md).
-  REL-1 is the one production-release checklist (PLUG-5 and AU-5 are done
-  for the previews); PLUG-10 is the meters, starting with the output peak
-  and clipping (PLUG-9 and AU-7 are done); LV2-5 is done for Linux; PERF-3
-  is one measurement exercise (PERF-1 joined it, EDGE-5 publishes it);
-  EDGE-10 and EDGE-11 investigate a candidate only when a measured
-  limitation justifies it; IO-2 starts from the rate-mismatch workflow
-  before EDGE-1; CI-32 is dormant. Typed `Advice` errors, VST3's
-  `"refused"` throw and typed report facts are notes for when that code
-  next changes. The workflow guide's rule for recording progress follows.
-
-- Plug-in contract (PLUG-37, jrp's simplification review of 12 November
-  2026): a new section, [scope of each change](docs/develop/plugin-contract.md#scope-of-each-change),
-  states that each change does only the work it needs. Gain, Mix, the Gain
-  mode and bypass ramp on the playing filter and keep its history; names and
-  diagnostics change only what is shown; only a different filter is prepared
-  and crossfaded; only a different Latency or host configuration builds new
-  processing; saving leaves playback alone. `native.host_settings` now
-  checks that a Gain and Mix change keeps a long filter's history, latency
-  and tail (`settings_keep_history`). History is kept for changes during
-  playback; a session restored after a host reset starts clean. The one
-  place that did not follow the rule, restored state holding the filter
-  already playing, is fixed by PLUG-38 (below); the plug-in harness's new
-  `same-filter-restore` case checks it in every format.
 
 ### Fixed
 
@@ -540,6 +522,43 @@ published before any of them was tried in a host
   REAPER users to the preset for the crossover. Filters that loaded before
   load and sound the same.
 
+### For contributors
+
+- Tests (COMPAT-1, in progress): the example presets of the published
+  0.13.12 and the audio its own CLI and VST3 plug-in rendered from them are
+  kept in `tests/upgrade/0.13.12/`, beside 0.13.2's; `upgrade.cli` and
+  `vst3.upgrade` check later builds against both. Every preset, filter,
+  input and expected render matches 0.13.2's byte for byte, so 0.13.12 renders those presets exactly as
+  0.13.2 did.
+- Backlog (DOC-14, jrp's review of 12 November 2026): one consolidation
+  pass over [TODO](TODO.md). Open items now say what remains, what would
+  justify doing it and what counts as finished, and the progress
+  narratives moved, word for word, to
+  [`docs/archive/todo/`](docs/archive/todo/2026-11-12-open-item-history.md).
+  REL-1 is the one production-release checklist (PLUG-5 and AU-5 are done
+  for the previews); PLUG-10 is the meters, starting with the output peak
+  and clipping (PLUG-9 and AU-7 are done); LV2-5 is done for Linux; PERF-3
+  is one measurement exercise (PERF-1 joined it, EDGE-5 publishes it);
+  EDGE-10 and EDGE-11 investigate a candidate only when a measured
+  limitation justifies it; IO-2 starts from the rate-mismatch workflow
+  before EDGE-1; CI-32 is dormant. Typed `Advice` errors, VST3's
+  `"refused"` throw and typed report facts are notes for when that code
+  next changes. The workflow guide's rule for recording progress follows.
+
+- Plug-in contract (PLUG-37, jrp's simplification review of 12 November
+  2026): a new section, [scope of each change](docs/develop/plugin-contract.md#scope-of-each-change),
+  states that each change does only the work it needs. Gain, Mix, the Gain
+  mode and bypass ramp on the playing filter and keep its history; names and
+  diagnostics change only what is shown; only a different filter is prepared
+  and crossfaded; only a different Latency or host configuration builds new
+  processing; saving leaves playback alone. `native.host_settings` now
+  checks that a Gain and Mix change keeps a long filter's history, latency
+  and tail (`settings_keep_history`). History is kept for changes during
+  playback; a session restored after a host reset starts clean. The one
+  place that did not follow the rule, restored state holding the filter
+  already playing, is fixed by PLUG-38 (below); the plug-in harness's new
+  `same-filter-restore` case checks it in every format.
+
 ## [0.13.12] - 2026-11-11
 
 The third published preview: macOS, Windows and Linux, unsigned, adding the
@@ -580,34 +599,9 @@ checked in Audacity ([release](https://github.com/jrp2014/convolver/releases/tag
   Linux plug-in reads filter files with libsndfile (WAV, RF64, W64, AIFF,
   CAF and headerless files), and on Linux exports only its entry points. No
   change to the sound.
-- Tests (COMPAT-1, in progress): the example presets of the published 0.13.2,
-  with the audio its own CLI and VST3 plug-in rendered from them, are kept in
-  `tests/upgrade/0.13.2/`. `upgrade.cli` and `vst3.upgrade` fail if a later
-  build stops loading them or renders different audio (beyond 1e-5, or by any
-  amount where it builds and runs as the capture did: a newer compiler may
-  change the samples within 1e-5).
 - Releases: jrp published Convolver 0.13.2, the second unsigned developer
   preview and the first for Windows and Linux, on 9 November 2026
   ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.2)).
-- Benchmark documentation (PERF-1): distinguish the older FFTW/Accelerate
-  comparison from the Accelerate-only PERF-2 engine results. Add a matched
-  new-engine comparison of Accelerate, native NEON FFTW estimation and
-  patient wisdom, with raw timings and practical CPU/tuning trade-offs;
-  explain that explicit CLI wisdom tuning does not configure the Mac plug-in.
-  Add paired Ooura measurements and review portable FFT alternatives (FFT-2),
-  including the real-time integration limits of PocketFFT and an isolated
-  ordered-PFFFT Mac experiment. No production backend or default changes.
-- Tests (CI-36): the VST3 workflow runs its tests under sanitizers, as the
-  Audio Unit and LV2 workflows already did. The Linux FFTW job is now a
-  Debug build with ASan and UBSan running every `vst3.*` test it can (the
-  SDK validator and pluginval cannot load an instrumented bundle and keep
-  running on the Release jobs, so no job now loads an FFTW bundle in them),
-  and a new Debug build runs `vst3.adapter` under ThreadSanitizer with the
-  shipped Ooura backend; a step checks that the test is instrumented.
-  `vst3.preset` gets 300 s in sanitizer builds. Both passed on their first
-  run, with no reports. From the whole-project review of 9 November 2026.
-  No change to the plug-in
-  ([VST3 tests](docs/develop/testing.md#vst3-tests)).
 - Problem reports: a new page, [report a problem](docs/use/report-a-problem.md),
   says what to collect on macOS, Windows and Linux (Copy Diagnostics, or
   where the Convolver log is and how to attach or copy it) and how to keep
@@ -618,24 +612,6 @@ checked in Audacity ([release](https://github.com/jrp2014/convolver/releases/tag
 
 ### Changed
 
-- Source (PLUG-34): what Convolver's window does, apart from drawing it,
-  moved from the macOS window's Objective-C into shared C++
-  (`portable/window_model.hpp`), so the coming Windows window behaves the
-  same; `native.window_model` tests it on every system. The macOS window
-  looks and behaves as before, except in typed values nobody would type:
-  `0x10` now reads as 0 rather than 16, and `5e` is refused rather than
-  read as 5.
-- Source (TIDY-1, from the whole-project review of 9 November 2026): small
-  helpers that existed in two or three copies now have one: the SplitMix64
-  generator and the little-endian readers and writers in `bytes.hpp`, and
-  "2 in, 6 out" in `host_log.hpp`. The macOS window names its status
-  values from `HostStatus`, and the FFT backends lose `fft_size()`, unused
-  since the PERF-2 engine. No change in behaviour or output.
-- Tests (CI-37, from the whole-project review of 9 November 2026): ten C++
-  test programs, among them `native.engine`, `native.host` and the VST3
-  and Audio Unit adapter tests, run every case and report each failure by
-  name, where the first failed check used to end the program and hide the
-  rest. The shared runner is `tests/native/cases.hpp`.
 - Command line and plug-ins (DIAG-6, from the whole-project review of 9
   November 2026): a sound file refused as a filter is reported with the
   reader's reason, for example "truncated or invalid RIFF/WAVE size" or
@@ -689,6 +665,52 @@ checked in Audacity ([release](https://github.com/jrp2014/convolver/releases/tag
   Checked by automated tests only, not yet in Audacity, so the guides keep
   Audacity's preset menu as the checked route.
 
+### For contributors
+
+- Tests (COMPAT-1, in progress): the example presets of the published 0.13.2,
+  with the audio its own CLI and VST3 plug-in rendered from them, are kept in
+  `tests/upgrade/0.13.2/`. `upgrade.cli` and `vst3.upgrade` fail if a later
+  build stops loading them or renders different audio (beyond 1e-5, or by any
+  amount where it builds and runs as the capture did: a newer compiler may
+  change the samples within 1e-5).
+- Benchmark documentation (PERF-1): distinguish the older FFTW/Accelerate
+  comparison from the Accelerate-only PERF-2 engine results. Add a matched
+  new-engine comparison of Accelerate, native NEON FFTW estimation and
+  patient wisdom, with raw timings and practical CPU/tuning trade-offs;
+  explain that explicit CLI wisdom tuning does not configure the Mac plug-in.
+  Add paired Ooura measurements and review portable FFT alternatives (FFT-2),
+  including the real-time integration limits of PocketFFT and an isolated
+  ordered-PFFFT Mac experiment. No production backend or default changes.
+- Tests (CI-36): the VST3 workflow runs its tests under sanitizers, as the
+  Audio Unit and LV2 workflows already did. The Linux FFTW job is now a
+  Debug build with ASan and UBSan running every `vst3.*` test it can (the
+  SDK validator and pluginval cannot load an instrumented bundle and keep
+  running on the Release jobs, so no job now loads an FFTW bundle in them),
+  and a new Debug build runs `vst3.adapter` under ThreadSanitizer with the
+  shipped Ooura backend; a step checks that the test is instrumented.
+  `vst3.preset` gets 300 s in sanitizer builds. Both passed on their first
+  run, with no reports. From the whole-project review of 9 November 2026.
+  No change to the plug-in
+  ([VST3 tests](docs/develop/testing.md#vst3-tests)).
+- Source (PLUG-34): what Convolver's window does, apart from drawing it,
+  moved from the macOS window's Objective-C into shared C++
+  (`portable/window_model.hpp`), so the coming Windows window behaves the
+  same; `native.window_model` tests it on every system. The macOS window
+  looks and behaves as before, except in typed values nobody would type:
+  `0x10` now reads as 0 rather than 16, and `5e` is refused rather than
+  read as 5.
+- Source (TIDY-1, from the whole-project review of 9 November 2026): small
+  helpers that existed in two or three copies now have one: the SplitMix64
+  generator and the little-endian readers and writers in `bytes.hpp`, and
+  "2 in, 6 out" in `host_log.hpp`. The macOS window names its status
+  values from `HostStatus`, and the FFT backends lose `fft_size()`, unused
+  since the PERF-2 engine. No change in behaviour or output.
+- Tests (CI-37, from the whole-project review of 9 November 2026): ten C++
+  test programs, among them `native.engine`, `native.host` and the VST3
+  and Audio Unit adapter tests, run every case and report each failure by
+  name, where the first failed check used to end the program and hide the
+  rest. The shared runner is `tests/native/cases.hpp`.
+
 ## [0.13.2] - 2026-11-09
 
 The second published preview: macOS, Windows and Linux, unsigned, with the
@@ -721,27 +743,9 @@ in a host ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.2))
 - Releases (REL-7): jrp published Convolver 0.12.12 as the first unsigned
   developer preview for macOS on 8 November 2026
   ([release](https://github.com/jrp2014/convolver/releases/tag/v0.12.12)).
-- Long-reverb experiment (PERF-2): `convolver_long_reverb_benchmark`
-  compares today's engine with prototype non-uniform partitions (zero
-  latency, large blocks' work spread over callbacks, or on a worker thread)
-  and with KlangFalter's engine, checks each against the double-precision
-  oracle, and `auto_gain.py` measures what automatic gain would do to
-  reverb and room-correction filters. Results are in the
-  [measurements](docs/develop/fft-measurements.md#long-reverbs-and-zero-latency)
-  and the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#automatic-gain),
-  with a review of eleven other open-source convolvers and of algorithms
-  beyond partitioned convolution
-  ([other convolvers](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#other-convolvers-and-algorithms));
-  the product is unchanged.
 
 ### Changed
 
-- CI (CI-35): a pull request that edits the README, the first-use
-  examples' README or `docs/use/first-filter.md` without changing a
-  command marked `<!-- first-use-example -->` now runs Lint (and, for the
-  packaged guide, only what a guide edit runs) instead of every workflow;
-  a change to those commands still runs everything
-  ([CI triggers](docs/develop/testing.md#documentation-only-pull-requests)).
 - Version 0.13.0 for PERF-2 (jrp, 8 November 2026): the next minor-version
   pre-release after the published `v0.12.12`. C++ consumers request
   `find_package(Convolver 0.13)`.
@@ -769,6 +773,28 @@ in a host ([release](https://github.com/jrp2014/convolver/releases/tag/v0.13.2))
   `validate_configuration` and `configuration_tail_frames` default to
   latency 0.
 
+### For contributors
+
+- Long-reverb experiment (PERF-2): `convolver_long_reverb_benchmark`
+  compares today's engine with prototype non-uniform partitions (zero
+  latency, large blocks' work spread over callbacks, or on a worker thread)
+  and with KlangFalter's engine, checks each against the double-precision
+  oracle, and `auto_gain.py` measures what automatic gain would do to
+  reverb and room-correction filters. Results are in the
+  [measurements](docs/develop/fft-measurements.md#long-reverbs-and-zero-latency)
+  and the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#automatic-gain),
+  with a review of eleven other open-source convolvers and of algorithms
+  beyond partitioned convolution
+  ([other convolvers](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#other-convolvers-and-algorithms));
+  the product is unchanged.
+
+- CI (CI-35): a pull request that edits the README, the first-use
+  examples' README or `docs/use/first-filter.md` without changing a
+  command marked `<!-- first-use-example -->` now runs Lint (and, for the
+  packaged guide, only what a guide edit runs) instead of every workflow;
+  a change to those commands still runs everything
+  ([CI triggers](docs/develop/testing.md#documentation-only-pull-requests)).
+
 ## [0.12.12] - 2026-11-08
 
 The first published preview: macOS only, unsigned, published before its
@@ -776,67 +802,6 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
 
 ### Added
 
-- Release evidence (REL-6, REL-7): jrp's responsiveness qualification of
-  the 0.12.5 source on his MacBook Pro is recorded: all 24 combinations
-  passed on the first run, with the longest hold of the host's thread
-  43.2 ms and the longest judged callback 2.95 ms
-  ([record](docs/archive/reviews/2026-11-08-rel6-qualification.md)). The
-  status page now lists, once, the checks left before the first preview
-  is published, keeping the host results jrp accepted
-  ([checks left](docs/project/status.md#checks-left-before-publication)).
-- Host checks (HOST-1, AU-4): jrp's 8 November 2026 checks of the v0.12.8
-  candidate are recorded
-  ([record](docs/archive/reviews/2026-11-08-v0128-host-checks.md)). In
-  REAPER a render, save and reopen, a refused preset and a change of host
-  rate passed against the CLI; in GarageBand a packaged preset with save
-  and reopen, Recent and Reload passed. In Audacity 4 a filter chosen with
-  Choose… was missing from the export, because Audacity stores a plug-in's
-  state only after a parameter edit (VST3-17, open).
-  For the first preview, Audacity is supported through its own preset
-  menu only, and the release notes say so.
-- Releases (REL-8): a "Draft preview release" workflow turns a passed
-  candidate run on a `vX.Y.Z` tag into a draft GitHub pre-release. It refuses
-  a run that was not started by hand on the tag or did not pass, or whose
-  tag holds another commit or version, checks every file against
-  `SHA256SUMS` and the candidate record, attaches only the macOS packages
-  and the corresponding source, writes the release notes (each file's
-  SHA-256, the run, the install guide, known limitations and the
-  responsiveness result) and downloads the attached files again to compare
-  them. Nothing is public until jrp publishes the draft. Pull requests that
-  change it run a dry run on the newest tag candidate. jrp rehearsed it on
-  8 November 2026 with the v0.12.5 candidate: the draft was right and was
-  deleted. REL-8 is done.
-- Tests (AU-3): the Audio Unit workflow runs `au.adapter` under
-  ThreadSanitizer, in a Debug build with the defaults the packages use, on
-  the runs where that workflow already runs. It switches bypass from another
-  thread while rendering, sets the Latency from audio threads and holds the
-  Latency work while bypass changes; a step checks that the test is
-  instrumented. Its first runs reported four races, all in the test's own
-  setup, which relied on a dispatch source's wake-up that ThreadSanitizer
-  does not see as ordering; the test now sets its hooks before any unit
-  exists and publishes each hold atomically. No plug-in code changed. AU-3
-  is done, and with it first-preview gate 4.
-- Host checks (HOST-1, AU-4): jrp's 8 November 2026 checks with the 0.12.5
-  candidate are recorded. In REAPER, part C on the redesigned window
-  passed its controls and state, including save, quit and reopen, and the
-  latency renders lined up again
-  ([record](docs/archive/reviews/2026-11-08-host1-reaper-window.md)). In
-  GarageBand, the Audio Unit's presets, **Choose…**, a refused preset,
-  settings kept after reopening and two exports matching the CLI passed
-  ([record](docs/archive/reviews/2026-11-08-au4-garageband.md)). Listening
-  was not checked in either. jrp decided these results stand for the final
-  candidate after PLUG-31, where only what it touches and the unchecked
-  steps are run.
-- Preview qualification (REL-7): an acceptance plan with a fixed-candidate
-  stop rule, required gates, blocker classification and deferred work.
-  CI-34 proposes scheduling improvements separately; workflows and useful
-  test coverage are unchanged.
-
-- Host checks (HOST-1): a reusable 20-second, 48 kHz stereo listening WAV
-  with quiet clicks and sustained tones, a standard-library Python generator,
-  and [usage notes](examples/host-audio/README.md). The REAPER smoke-test
-  guide links to it. This is source audio for manual checks, not a filter
-  or a numerical reference; preview package contents are unchanged.
 - User guides (REL-2): [check a crossover in a host](docs/use/check-a-crossover-in-a-host.md),
   the 2→6 crossover journey in REAPER with the VST3 plug-in or the Audio
   Unit, and [check file rendering with the command line](docs/use/check-files-with-the-command-line.md),
@@ -868,34 +833,6 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   and `same_rate()` in `convolver/host.hpp`. Added, so existing code
   compiles unchanged.
 
-- Tests (LV2-3, AU-3): pluginval, at the VST3 job's strictness (10, the
-  highest), validates each of the eight LV2 plug-ins in the Release bundle
-  and the installed Audio Unit, its editor tests opening the window, in the
-  LV2 and Audio Unit workflows. The newest full release decides; a newer
-  pre-release runs afterwards as a warning only. Both formats share the
-  command line with the VST3 tests in `tests/plugins/pluginval.py`. Given
-  a bundle, pluginval tests only its first LV2 plug-in, so each is copied
-  into a bundle of its own first.
-- Tests (AU-15): the Audio Unit workflow plays the three first-use
-  fixtures through the installed unit with Apple's AVAudioEngine (offline
-  manual rendering, the filter loaded as an `.aupreset` through
-  `ClassInfo`, block sizes 61, 300 and 1000) and checks the 256-frame
-  latency and the output against the oracle within 1e-5.
-- Tests (HOST-5): the LV2 workflow plays the three first-use fixtures in
-  headless Ardour 8 sessions on the Dummy backend: the preset loaded from
-  Ardour's preset list, white noise recorded, the session saved, then
-  restored and exported by `ardour8-export` in a second process. Each
-  export must match the oracle applied to the recorded take within 1e-5,
-  with Ardour's latency compensation leaving no offset; the worst error was
-  4.7e-8.
-- Tests (FFMPEG-1): `native.ffmpeg_pipe` runs the
-  [FFmpeg pipe](docs/use/command-line.md#with-ffmpeg) as the guide writes
-  it, on a short film with two audio tracks: the second track is chosen,
-  the 2-in/6-out crossover's six channels keep every frame and the filter's
-  tail and match the expected output after FLAC, the video is copied, and
-  audio that started late starts at time zero, as the guide warns. It runs
-  where CMake finds `ffmpeg` and `ffprobe`; the Linux g++ Release CI job
-  installs them.
 - macOS preview packages (AU-5, PLUG-5) hold the Audio Unit,
   `Components/Convolver.component`, beside the VST3 plug-in, with its
   licence notices in `licenses/` (`Convolver-AU.txt`, `GPL-3.0.txt`,
@@ -916,17 +853,6 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   pre-commit and writes the guides' closing block with `--fix`. Packages ship
   `docs/use/images/`, and `package_docs.py` refuses an image a packaged
   guide could not show offline.
-
-- Tests (PERF-9): `vst3.load_timing`, `au.load_timing` and `lv2.load_timing`
-  time each plug-in format's own load entry points (VST3 `setState` and the
-  window's file, the Audio Unit's `RestoreState` and load property, LV2's
-  `restore()` and worker) with filters of 1 to 30 seconds while another
-  thread renders at the host's pace, and report how long the caller was held
-  and how late audio callbacks were. In optimised builds they fail above
-  jrp's limits for the loading-responsiveness gate: no late callback, and
-  the host's thread held at most 100 ms with filters up to 10 s and 250 ms
-  with 30 s; an entry that does not pass runs up to three times (how runs
-  are judged: PERF-10, under Fixed). Tests only: no change to the plug-ins or the sound.
 
 - `convolver --compare OUTPUT EXPECTED` (REL-5) checks a render, such as a
   plug-in host's, against the file it should match, sample for sample. It
@@ -1029,15 +955,6 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   and the GitHub problem form ask for Copy Diagnostics, the loading method
   and whether playback, an export or reopening is affected. No behaviour
   change.
-- CI (CI-34, first step, approved by jrp on 8 November 2026): a pull request
-  builds the plug-in distribution candidates, whose macOS builds are the
-  slowest jobs, only when it changes release files, packaged pages, the
-  macOS window, the build configuration or a shipped dependency; for
-  anything else, start the workflow by hand on the branch. A change only to
-  `scripts/release/`, `tests/release/` or `packaging/` now runs only the
-  candidates, and a change to a guide in `docs/use/` builds them only when
-  the page has a command they run or shows an image. Pushes to `main`, the weekly run and
-  manual runs still build them every time, and no test was removed.
 - Plug-in presets (PLUG-31, from jrp's REAPER check of VST3-16, 8 November
   2026): a `.vstpreset` made by `convolver-preset` also holds the name of
   the file it was made from, with its extension and without its folder, and
@@ -1056,37 +973,6 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   name. The controller state's reader and writer moved to
   `portable/vst3_controller_state.hpp` so the tool, which needs no SDK,
   shares them.
-- Documentation (DOC-13, from jrp's review of `main` at `21711c5`, 8
-  November 2026): [TODO](TODO.md) holds open work only. The 122 finished
-  items' one-line entries moved, with their IDs and links, to
-  [`docs/archive/todo/`](docs/archive/todo/2026-11-08-done-items.md), whose
-  IDs the repository checks (`scripts/check_repository.py`) now count as
-  defined and done; the execution priorities no longer describe VST3-16 as an
-  open draft. The plug-in formats and editor plans, whose state paragraphs
-  dated from October, are [archived as superseded](docs/archive/plans/README.md);
-  the risks, the PipeWire comparison and one owner's question they still
-  held moved to HOST-2, VST3-6, AU-6, LV2-4 and LV2-5. Dated dependency versions, fixed intermittent failures and old
-  timings moved from the [testing guide](docs/develop/testing.md) to an
-  [evidence record](docs/archive/reviews/2026-11-08-testing-guide-evidence.md),
-  leaving the two failure causes that still apply to new work.
-- Documentation (DOC-11, from jrp's review of `main` at `bf6a207`, 8
-  November 2026): the [status page](docs/project/status.md) agrees with the
-  dated host records. It is dated 8 November 2026 against 0.12.1, no longer
-  says there are no open fixes while the VST3 Latency finding in REAPER
-  (VST3-16) is open, says which window each host run used (none yet the
-  0.12 window), and gives the crossover's passing REAPER retest without the
-  older refusal as a current result. [What still blocks the first
-  preview](docs/project/status.md#what-still-blocks-the-first-preview) is now
-  one table listing each remaining gate once, with its status and evidence:
-  VST3-16, the VST3 smoke tests on the current window (HOST-1), the Audio
-  Unit in GarageBand (AU-4), the Audio Unit's ThreadSanitizer build (AU-3),
-  responsiveness qualified on a named machine (REL-6), one exact candidate
-  (PLUG-5) and the independent walkthrough (REL-3). Every host
-  step, those that passed on earlier candidates included, is run again on
-  the preview candidate, as jrp decided on 8 November 2026. TODO's
-  execution priorities now list VST3-16 as an open fix and PLUG-28 before
-  the first preview. The dated records are unchanged. No code or sound
-  changes.
 - Packages (PLUG-28, from jrp's file-loading review; jrp chose to do it
   before the first preview): the 18 example presets in `presets/` are named
   after their folder, such as `presets/repeat-48000-stereo/repeat-48000-stereo.vstpreset`,
@@ -1111,22 +997,6 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   host's audio settings are known), PLUG-28 (packaged presets named after
   their filter) and PLUG-29 (the Recent list out of the log folder), and
   PLUG-25 records jrp's agreed wording for a rate refusal.
-- Host checks (HOST-1): jrp's Audacity 4.0.2 session with the VST3
-  plug-in (7 November 2026, candidate 0.10.13) is
-  [recorded](docs/archive/reviews/2026-11-07-host1-audacity.md): the seven
-  48 kHz stereo exports with a filter or bypass matched the CLI with
-  `convolver --compare`, including after a refused preset and after
-  restarting Audacity, and the export with no filter matched the original
-  file. The guides now say
-  what it found: Audacity plays real-time effects at its Default sample
-  rate, which can differ from the rate an export uses, so set it, and the
-  project's rate, to the filter's rate; Convolver's window shows with *Preset options ›
-  Use vendor UI*; and, as Audacity's preset menu does not import
-  `.vstpreset`, a filter can be chosen with **Choose…** in the window on
-  macOS. [Your first sound in a host](docs/use/first-sound-in-a-host.md) no
-  longer says the plug-in has no window or that preview packages lack the
-  Audio Unit. PLUG-25 records the clearer playback-rate wording still to
-  decide. No code or sound changes.
 - Wording (DOC-9, from jrp's review of 7 November 2026): one set of words for
   filters, IR files, configurations, presets and projects, listed in
   [words Convolver uses](docs/use/concepts.md#words-convolver-uses) and used
@@ -1204,34 +1074,6 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   `HostProcessor`'s constructor, `prepare()` and `replace()` gain
   `HostPlayback` overloads beside the `Configuration` ones, and
   `same_configuration()` compares two layouts' rates and channels.
-- Development (DOC-8, from jrp's review of the agent guidance at `f6895f3`):
-  the [workflow guide](docs/develop/workflow.md#verification-for-each-kind-of-change)
-  says what each kind of change must run before a push (a prose-only change
-  needs pre-commit, not a native build), and that a review is read-only
-  unless asked otherwise, host testing records what was observed, and only a
-  change gets a branch. The `todo-item` and `review-change` skills link to
-  their sections and the link check now reads `.claude/skills/`; `AGENTS.md`
-  lists the same entry points and a task-to-section index. The dated
-  benchmarks move to [FFT and engine measurements](docs/develop/fft-measurements.md)
-  and the load-timing method to [load timing](docs/develop/load-timing.md),
-  with the old links kept. jrp's HOST-1 REAPER session is archived, and its
-  two open findings (a new VST3 Latency not used until the project is
-  reopened; no REAPER route for the 2→6 crossover) are listed in
-  [host testing](docs/develop/host-testing.md#unresolved-host-findings)
-  instead of the guides promising those results. Merged branches are kept
-  for a while and deleted periodically by jrp from a list agents prepare.
-- Documentation (DOC-7): finished items in [TODO](TODO.md#done) are one line
-  each again, as the workflow guide asks: ID, title, date, pull request and
-  the page that describes the result. Their earlier full entries, with the
-  evidence they recorded, are kept unchanged apart from link paths in
-  [`docs/archive/todo/`](docs/archive/todo/2026-11-06-done-entries.md).
-  `TODO.md` is about 500 lines shorter.
-- Development (DOC-7): `scripts/check_format.sh`, a wrapper kept only for old
-  habits, is removed; run `python3 scripts/check_format.py` (or pre-commit).
-- LV2 (LV2-8): closed without a change. Jalv, Ardour, Carla and PipeWire,
-  read in their current source and in their normal configuration, do not
-  drop a queued worker request and then reactivate the plug-in, so the
-  status cannot be left at Loading in them.
 - CLI (GAIN-3): `--gain-db no-clip` now also reserves the headroom that
   integer output needs, so input within full scale cannot clip even after
   rounding, dither and noise shaping. **Integer output with `no-clip` is
@@ -1243,16 +1085,6 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   full (for example `-3.5314949508258078 dB`), so the figure can be given to
   `--gain-db` to make the same file, and `no-clip` says how much of it is
   headroom. The library adds `quantization_headroom()`.
-- Planning (jrp's review of 0.10.8): the first preview is macOS-only, with
-  the VST3 plug-in and the Audio Unit in the existing shared window and
-  their Gain, Mix and Latency settings; the Windows and Linux windows, the
-  other gain modes and the meters move to later previews. Its
-  loading-responsiveness gate names a finite set of workloads, the stereo 1,
-  10 and 30 s filters its test already runs; PERF-3's wider supported
-  workloads come after the preview. TODO, the status page (whose summary
-  now describes 0.10.8), the release steps and the decisions log say so.
-  The Audio Unit's ThreadSanitizer build (AU-3) and the named-machine
-  responsiveness qualification (REL-6) stay first-preview gates.
 - Inspection (ROBUST-2, jrp's answers on PR #118): when `--all-configurations`
   stops at a limit, the `limit` error now ends "The check is incomplete: this
   entry and every entry after it were not checked.", and the selection reason
@@ -1263,14 +1095,6 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   headroom, in its own pull request) and the crossover journey in HOST-1's
   REAPER session.
 
-- Repository checks (DOC-2): `scripts/check_repository.py` now fails when a
-  guide, workflow or script names a CMake `-DCONVOLVER_…` option the build
-  does not define (or a value it does not allow, such as an unknown FFT
-  backend), when the build guide leaves an option out, when a command shown
-  with `convolver`, `convolver-preset` or `convolver-equalizer-apo` uses an
-  option the tool does not parse, or when a tool's guide leaves out one it
-  does. The presets and Equalizer APO guides now mention `--help` and
-  `--version`.
 - Documentation (GAIN-1): the command-line guide states a safe bound for the
   headroom integer output needs after `--gain-db no-clip`: none for float
   output, beyond float rounding; for B-bit integers, H = (1 + S)(½ + D) + ½
@@ -1282,49 +1106,6 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   and 24 bits with every dither and shaper, and the exact undithered
   endpoints; `native.engine` checks that the no-clip gain keeps the input
   that reaches the bound within full scale. The sound is unchanged.
-- Tests (PERF-12, from jrp's review of `db54160`): the load-timing tests
-  record each audio callback (when it was due, when the thread woke, when
-  the plug-in was entered and returned, and the thread's CPU time where the
-  platform gives it) and print the latest wake and the longest call into the
-  plug-in. A callback late only because its thread woke late is not judged
-  and leaves the run not qualified rather than failed; a slow call with
-  little CPU time is judged, since a call blocked on a lock looks the same
-  as a descheduled one. `native.load_timing_harness` tests the verdicts on made-up records
-  instead of sleeping, in about 9 seconds rather than 40 to 60. Tests only:
-  no change to the plug-ins or the sound.
-- Tests (AU-14, from jrp's review of `db54160`): `au.adapter` waits for the
-  Audio Unit's Latency work to finish, through a completion witness, instead
-  of sleeping 100 ms and 20 ms before checking its notification and log
-  line. Each unit counts its Latency requests with a lock-free increment
-  for this, so one unit's finished work never satisfies another's check;
-  no change to the sound.
-- Tests (PERF-13, from jrp's review of `db54160`): each load-timing test
-  writes every callback's record, each phase's summary and each run's
-  verdict, with the Convolver version, build, compiler, FFT backend and
-  machine, to `FORMAT-load-timing.json` in its work folder; the VST3 and
-  Audio Unit Release jobs keep them as an artifact. Tests only: no change to
-  the plug-ins or the sound.
-- Releasing (REL-6, from jrp's review of `db54160`): a responsiveness
-  qualification before each release, on a named machine with the
-  candidate's source and an optimised build, cold and `--warm`; the release
-  notes state whether it qualified
-  ([releasing](docs/develop/releasing.md#responsiveness-qualification)).
-- Tests (PERF-14, from jrp's review of `db54160`): the load-timing tests
-  take `--warm`, which fills the filter's input history faster than real
-  time before the replacement and the reset, so they start from a long
-  filter's full cost, and shows half a second of each filter at that cost
-  (reported only). Not in CI (filling takes minutes). Tests only; no change
-  to the sound.
-- Tests (PLUG-21, from jrp's review of `db54160`): teardown is tested at
-  chosen stages instead of by repetition. `lv2.adapter` holds the worker's
-  `work()` after reading the file, after preparation and after its last
-  check, deactivates or closes the instance from another thread, and
-  releases it once deactivation signals from inside that it is waiting for
-  the held work; `au.adapter` holds a run of the Latency work while the
-  unit closes, releasing it once closing has cancelled the work. With LV2's
-  `deactivate()` lock removed, the staged case fails while the earlier
-  repeated loop passes. Both plug-ins gain test-only hooks, null in the
-  components; no change to the sound.
 - Processing (PERF-15, jrp's decision of 5 November 2026): numbers below the
   smallest normal float (about 1.2e-38, -758 dBFS) are flushed to zero
   while Convolver processes, in the plug-ins (the whole
@@ -1361,13 +1142,6 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   which the first preview was first to be cut (jrp, 5 November 2026). Its
   CMake consumers request `find_package(Convolver 0.9)`, and its LV2 plug-in
   reports minor version 9, which LV2 reads as a development version.
-- Plug-in contract (PLUG-19, from jrp's simplification review of 5 November
-  2026): a setting transition (bypass, mute, gain, mix) may end one frame
-  after its ramp's last frame, which is inaudible (about 5.7 µs at
-  176.4 kHz). It must still end exactly at its target and not click.
-  `native.host_settings` allows that frame, so a later shared ramp helper
-  need not reproduce PLUG-18's frame counting. Reported latency and channel
-  alignment stay exact to the sample. The sound is unchanged.
 - Library and plug-ins (DIAG-3, from jrp's simplification review): faults
   met while a replacement filter was being prepared are logged together with
   any met just after it, as "around a filter change", instead of in a
@@ -1402,11 +1176,6 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   replaces `headline` with `problem`, `plays`, `cause`, `fix`, `note` and
   `action`, which `report_fields()` also gives. Scripts that matched the old one-paragraph
   wording must match the new lines; exit codes are unchanged.
-- The macOS window's files moved from `plugins/au/` to `plugins/editor/mac/`
-  (VST3-11), shared by the Audio Unit and VST3, which each build them with
-  class names of their own. The setting rows can now mark the start and end
-  of a slider drag for a format that asks (VST3 does); the Audio Unit's
-  window behaves as before.
 - Library (VST3-11): `HostRequest` gains `files`, the files an accepted
   file's filter was read from; the report gains the fields `filter path`
   and `filter files` for the window's Reload. Code that builds a
@@ -1415,10 +1184,6 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   `HostSettings` that host state version 3 records (VST3 only), and
   `HostSettings` is declared before it in `convolver/host.hpp`. Existing
   code that builds a `HostState` compiles unchanged.
-- Audio Unit window (AU-10): the Gain, Mix and Latency rows and their
-  handling moved out of the window's layout code into their own file
-  (`plugins/au/setting_rows.mm`), so the window can gain controls without
-  growing one file further. No change in behaviour or sound.
 - The version is now 0.8.0, the minor step for the library change below
   (jrp, 1 November 2026: an incompatible API change before 1.0 needs one).
   CMake consumers now request `find_package(Convolver 0.8)`, and the first
@@ -1459,109 +1224,16 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   `details` with `headline`, `filter_name`, `filter_note`, `audio`
   (`HostFact`), `settings`, `reference`, `sample_rate` and
   `latency_waits` (pre-1.0 internal API).
-- REL-5, the early macOS walkthrough, ran as a package and command-line
-  check of the stereo journey on a macOS arm64 candidate, assisted for jrp
-  rather than by an independent tester: the checksums,
-  the package contents and the command-line render all matched, with no
-  defect found. By jrp's choice its host steps moved to the REAPER smoke
-  test (HOST-1) and the preview walkthrough (REL-3).
-- The [status page](docs/project/status.md) is checked against `main` at
-  0.8.6 (DOC-6, from jrp's review of `276c7dc`). It no longer calls the CLI
-  and the journey presets missing, the journeys not started or the VST3 work
-  unclaimed, and it now names only what remains, linking each TODO item;
-  progress detail lives only in TODO's `Progress` lines
-  ([recording progress](docs/develop/workflow.md#recording-progress-in-todo)).
-  TODO gains VST3-14, VST3-15 and AU-11 from the same review.
-- The [status page](docs/project/status.md) is checked again against `main`,
-  now at 0.8.2 (DOC-5, from jrp's review of PR #98). It names the commit
-  and the CI runs it relies on, the Audio Unit's Latency setting, window
-  redesign and editor tests, jrp's GarageBand run of the redesign and the
-  typed-box defects it led to, and what remains of the settings and windows.
-- Continuous integration (CI-21): the one third-party action,
-  `hendrikmuhs/ccache-action`, is pinned to the commit of its v1.2.24 release
-  instead of the tag, so a moved tag cannot run other code in CI. Dependabot
-  still proposes each new release. GitHub's own actions keep their major tags.
-- Continuous integration (CI-26): a pull request that changes only the macOS
-  window that VST3 and the Audio Unit share (`plugins/editor/mac/`) runs Lint,
-  the VST3, Audio Unit and candidate workflows, and skips the native, LV2
-  and fuzz builds, as a change to one format's own files does (CI-13).
-  Anything else in the same pull request still runs everything.
-- Continuous integration (CI-27, from jrp's review of `f2dc691`): the Audio
-  Unit adapter and window tests write their Convolver logs to files in the
-  build folder from the start, rather than private files copied there or
-  deleted at exit, so the logs survive a sanitizer abort, crash or forced
-  end. CI evidence now includes the window test's log, which was missing,
-  and the `.old` file each test log rotates to. `au.log_evidence` checks
-  collection after an abort and a kill.
-- VST3 adapter (VST3-14, from jrp's review of `276c7dc`): the edit
-  controller moved from `plugins/vst3/processor.cpp` to its own file,
-  `plugins/vst3/controller.cpp`, unchanged, before the window gains more
-  controls.
-- macOS window (AU-11, from jrp's review of `276c7dc`): Reload When the File
-  Changes, following the playing filter's files, moved from the window's
-  layout (`plugins/editor/mac/diagnostic_view.mm`) to its own file
-  (`plugins/editor/mac/file_watch.mm`), unchanged, before the window gains
-  more controls.
-- Continuous integration (CI-28, from CI-27's review): `vst3.adapter` and
-  `vst3.preset`, which runs the same tests, write their Convolver logs to
-  files of their own in the build folder (`convolver-adapter-tests.log`,
-  `convolver-preset-tests.log`), set once at start, and the Status and log
-  case reads what it added from there, rather than switching to a temporary file for that case and
-  deleting it, so a crash in the case keeps its log. The Audio Unit and VST3
-  tests share the log helper (`tests/plugins/test_log.hpp`).
-- Build (PLUG-15): a new macOS build directory targets macOS 14.0 unless the
-  first configure sets `CMAKE_OSX_DEPLOYMENT_TARGET` or
-  `MACOSX_DEPLOYMENT_TARGET` says otherwise, the same for every target and
-  the preview packages; an existing directory keeps the target in its cache.
-  The VST3 and Audio Unit folders used to force 11.0 for their own targets
-  after `project()`, so a developer's plug-in build targeted another macOS
-  than the packages and the core it links.
-- Build (FFT-4): the Apple vDSP kernel experiment
-  (`CONVOLVER_EXPERIMENT_VDSP_MAC`, `portable/kernels_vdsp.cpp` and its two
-  scripts) is removed; its timing program is now `convolver_kernel_benchmark`.
-  It was off by default and its 24 October results kept the existing
-  kernels; no build that ships changes.
 - Plug-in contract (PLUG-16): a replacement filter plays for one Latency
   block, not always 256 samples, before its 256-sample crossfade, as it has
   since the Latency setting arrived; the page now says so. In
   `HostProcessor` the 64-frame ramps and the crossfade are named constants;
   the sound is unchanged.
-- Continuous integration (CI-7): the VST3 and Audio Unit workflows resolve
-  the newest SDK release once per run, in a first `sdk` job that uploads a
-  lock file, and every build job of the run builds exactly that release
-  (`sources.py --lock`), so one run can no longer mix two releases. Each
-  job's summary still lists what it built with.
-- Continuous integration (CI-8): the advisory checks (the newest pluginval
-  pre-release in the VST3 jobs, the newest upstream lilv in the LV2
-  workflow) keep CTest's output as an `advisory-evidence-…` artifact when
-  they report a problem, as failed jobs keep theirs; the job still passes.
-  `scripts/ci_evidence.py --advisory` collects it and lists the tests in the
-  job summary as an advisory problem.
-- Continuous integration (CI-29): static analysis runs LLVM's
-  `run-clang-tidy.py`, installed with clang-tidy, in place of
-  `scripts/clang_tidy.py` (removed with its tests and pre-commit hook). The
-  checks and the file list are unchanged; a listed file the build does not
-  compile is now skipped rather than reported.
-- Audio Unit (AU-12): a new Latency is applied on a serial dispatch queue
-  woken by a `DISPATCH_SOURCE_TYPE_DATA_OR` source, Apple's coalescing
-  wake-up, in place of Convolver's own thread (`portable/request_worker.hpp`).
-  Behaviour is unchanged: the choice still plays at once, wakes that arrive
-  together run the work once, and closing the unit waits for work in
-  progress. The worker's tests (`native.request_worker` and its watchdog
-  check), `.github/workflows/watchdog.yml` and `scripts/ci_watchdog_probe.py`
-  are removed, the Linux CI jobs no longer install gdb, and CI-24 and CI-25
-  close without a cause; their evidence is archived.
 - Plug-ins (PLUG-17): the Gain, Mix, bypass and mute ramps last 1.33 ms and
   a replacement filter's crossfade 5.33 ms at every sample rate, rather
   than 64 and 256 frames. At 48 kHz the sound is unchanged (the oracle tests
   pass as before); at 44.1 kHz the ramps are 59 and 235 frames, and at
   96 kHz 128 and 512, so fades no longer get shorter as the rate rises.
-- Command line (IO-9): `convolver-equalizer-apo` formats gains with
-  `std::to_chars` instead of a search with `snprintf` and `strtof`. Every
-  gain reads back as the same number; the text is the same for every float
-  but ±2^-96 (about −578 dB), which now takes one digit fewer. Building it now needs macOS 13.3 or later (the
-  default target is 14.0); the build guide says what building for an older
-  macOS would need.
 
 ### Fixed
 
@@ -1646,18 +1318,6 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   plug-in 6 in, 6 out"); it says "the filter has 2 in, 6 out; the channels
   have changed since." (or "the rate has changed since."), and the log keeps
   the counts the load was refused against.
-- Tests (CI-33): `native.cli`'s no-clip case compared each pair of renders
-  byte for byte, so its float case failed when the two files' `PEAK` chunks,
-  in which libsndfile records the second a float WAV file was written,
-  differed. It now checks the format, rate, channel count and frame count
-  one by one and every sample exactly, with an explicit dither seed, and
-  reports the first differing sample and the largest difference. The
-  [command-line reference](docs/use/command-line.md) now promises
-  byte-identical samples, not byte-identical files, for a given seed (with
-  the default FFT planning or a wisdom file), as jrp
-  [decided](docs/project/decisions.md#configuration-and-sound). The review
-  checklist says assertions test contracts and invariants, not incidental
-  metadata.
 - Inspection (ROBUST-2): `--inspect` and `--validate` with
   `--all-configurations` decode and prepare every entry of a list, so a
   small list naming one long filter thousands of times kept them busy for
@@ -1671,28 +1331,6 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   most ten of the list's rates, as it already did entries; it had named
   every rate, which a plug-in's log and window then showed. The `limit`
   error is kept even when the report's 256 diagnostics are already used.
-- Tests (PERF-10, from jrp's review of `59ac8e0`): the load-timing tests
-  passed when they could not judge a run: a late baseline made every
-  violation, an over-long load included, "inconclusive", which counted as
-  a pass. The hold of the host's thread is now judged whatever the audio
-  thread saw; a run whose late callbacks come with a late baseline (half a
-  second idle before the phases and another after them), or that ran in a
-  build that does not enforce the limits, is "not qualified", and the
-  test then exits 77, which CTest reports as skipped, not passed. An entry
-  no limit applies to (LV2's `restore()`) is "reported only" rather than
-  passed. The summary lists every run that did not pass, also when a later
-  run did, and counts entries that passed only after a run that did not.
-  An entry passes only if one run met both limits; limits met in different
-  runs leave it not qualified (or failed, when every run broke one), and the
-  summary names the run that met each. A test in which nothing was judged is skipped, not passed.
-  `native.load_timing_harness` checks these verdicts with a mock adapter.
-  Tests only: no change to the plug-ins or the sound.
-- Tests (PERF-11, from jrp's review of `59ac8e0`): the load-timing tests
-  played input whose negative half wrapped round in unsigned arithmetic to
-  about 1.8e15, instead of quiet noise from -0.1 to 0.1. The generator now
-  subtracts in signed arithmetic, and `native.load_timing_harness` checks
-  the input's range and sign. Tests only: no change to the plug-ins or the
-  sound.
 - Plug-ins (ROBUST-7, from an external review of `91fcf1f`): when memory ran
   out while a refused first load was being recorded, VST3, the Audio Unit
   and LV2 could go on passing the unfiltered input, and saved state did not
@@ -1712,14 +1350,6 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   dispatch source that had never been activated, which Apple documents as
   undefined. The source is now created last, so a failure there leaves
   nothing to undo, and opening the unit fails cleanly.
-- Tests (CI-31): the shared double-precision oracle works out each route's
-  invariant parts once, with the same arithmetic, so `native.host_settings`
-  takes about 4 seconds rather than 90 under GCC's AddressSanitizer, where
-  it had passed its time limit.
-- Tests (CI-30): `native.engine` replaces `operator new` with the array and
-  sized `operator delete` too, from one shared file, so GCC's
-  AddressSanitizer build runs the oracle tests instead of stopping on
-  alloc-dealloc-mismatch.
 - VST3 (VST3-15, from jrp's review of `276c7dc`): with a host that puts a
   proxy between the plug-in's two halves and delivers their messages later,
   a new Latency asked the host to restart before the processor had it, so
@@ -1747,6 +1377,406 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   the unit plays changes, so it is shown only while it is still current
   (during a load or a Latency change, as before). Seen as an intermittent
   `au.editor` failure in the sanitizer job.
+
+### For contributors
+
+- Release evidence (REL-6, REL-7): jrp's responsiveness qualification of
+  the 0.12.5 source on his MacBook Pro is recorded: all 24 combinations
+  passed on the first run, with the longest hold of the host's thread
+  43.2 ms and the longest judged callback 2.95 ms
+  ([record](docs/archive/reviews/2026-11-08-rel6-qualification.md)). The
+  status page now lists, once, the checks left before the first preview
+  is published, keeping the host results jrp accepted
+  ([checks left](docs/project/status.md#checks-left-before-publication)).
+- Host checks (HOST-1, AU-4): jrp's 8 November 2026 checks of the v0.12.8
+  candidate are recorded
+  ([record](docs/archive/reviews/2026-11-08-v0128-host-checks.md)). In
+  REAPER a render, save and reopen, a refused preset and a change of host
+  rate passed against the CLI; in GarageBand a packaged preset with save
+  and reopen, Recent and Reload passed. In Audacity 4 a filter chosen with
+  Choose… was missing from the export, because Audacity stores a plug-in's
+  state only after a parameter edit (VST3-17, open).
+  For the first preview, Audacity is supported through its own preset
+  menu only, and the release notes say so.
+- Releases (REL-8): a "Draft preview release" workflow turns a passed
+  candidate run on a `vX.Y.Z` tag into a draft GitHub pre-release. It refuses
+  a run that was not started by hand on the tag or did not pass, or whose
+  tag holds another commit or version, checks every file against
+  `SHA256SUMS` and the candidate record, attaches only the macOS packages
+  and the corresponding source, writes the release notes (each file's
+  SHA-256, the run, the install guide, known limitations and the
+  responsiveness result) and downloads the attached files again to compare
+  them. Nothing is public until jrp publishes the draft. Pull requests that
+  change it run a dry run on the newest tag candidate. jrp rehearsed it on
+  8 November 2026 with the v0.12.5 candidate: the draft was right and was
+  deleted. REL-8 is done.
+- Tests (AU-3): the Audio Unit workflow runs `au.adapter` under
+  ThreadSanitizer, in a Debug build with the defaults the packages use, on
+  the runs where that workflow already runs. It switches bypass from another
+  thread while rendering, sets the Latency from audio threads and holds the
+  Latency work while bypass changes; a step checks that the test is
+  instrumented. Its first runs reported four races, all in the test's own
+  setup, which relied on a dispatch source's wake-up that ThreadSanitizer
+  does not see as ordering; the test now sets its hooks before any unit
+  exists and publishes each hold atomically. No plug-in code changed. AU-3
+  is done, and with it first-preview gate 4.
+- Host checks (HOST-1, AU-4): jrp's 8 November 2026 checks with the 0.12.5
+  candidate are recorded. In REAPER, part C on the redesigned window
+  passed its controls and state, including save, quit and reopen, and the
+  latency renders lined up again
+  ([record](docs/archive/reviews/2026-11-08-host1-reaper-window.md)). In
+  GarageBand, the Audio Unit's presets, **Choose…**, a refused preset,
+  settings kept after reopening and two exports matching the CLI passed
+  ([record](docs/archive/reviews/2026-11-08-au4-garageband.md)). Listening
+  was not checked in either. jrp decided these results stand for the final
+  candidate after PLUG-31, where only what it touches and the unchecked
+  steps are run.
+- Preview qualification (REL-7): an acceptance plan with a fixed-candidate
+  stop rule, required gates, blocker classification and deferred work.
+  CI-34 proposes scheduling improvements separately; workflows and useful
+  test coverage are unchanged.
+
+- Host checks (HOST-1): a reusable 20-second, 48 kHz stereo listening WAV
+  with quiet clicks and sustained tones, a standard-library Python generator,
+  and [usage notes](examples/host-audio/README.md). The REAPER smoke-test
+  guide links to it. This is source audio for manual checks, not a filter
+  or a numerical reference; preview package contents are unchanged.
+- Tests (LV2-3, AU-3): pluginval, at the VST3 job's strictness (10, the
+  highest), validates each of the eight LV2 plug-ins in the Release bundle
+  and the installed Audio Unit, its editor tests opening the window, in the
+  LV2 and Audio Unit workflows. The newest full release decides; a newer
+  pre-release runs afterwards as a warning only. Both formats share the
+  command line with the VST3 tests in `tests/plugins/pluginval.py`. Given
+  a bundle, pluginval tests only its first LV2 plug-in, so each is copied
+  into a bundle of its own first.
+- Tests (AU-15): the Audio Unit workflow plays the three first-use
+  fixtures through the installed unit with Apple's AVAudioEngine (offline
+  manual rendering, the filter loaded as an `.aupreset` through
+  `ClassInfo`, block sizes 61, 300 and 1000) and checks the 256-frame
+  latency and the output against the oracle within 1e-5.
+- Tests (HOST-5): the LV2 workflow plays the three first-use fixtures in
+  headless Ardour 8 sessions on the Dummy backend: the preset loaded from
+  Ardour's preset list, white noise recorded, the session saved, then
+  restored and exported by `ardour8-export` in a second process. Each
+  export must match the oracle applied to the recorded take within 1e-5,
+  with Ardour's latency compensation leaving no offset; the worst error was
+  4.7e-8.
+- Tests (FFMPEG-1): `native.ffmpeg_pipe` runs the
+  [FFmpeg pipe](docs/use/command-line.md#with-ffmpeg) as the guide writes
+  it, on a short film with two audio tracks: the second track is chosen,
+  the 2-in/6-out crossover's six channels keep every frame and the filter's
+  tail and match the expected output after FLAC, the video is copied, and
+  audio that started late starts at time zero, as the guide warns. It runs
+  where CMake finds `ffmpeg` and `ffprobe`; the Linux g++ Release CI job
+  installs them.
+- Tests (PERF-9): `vst3.load_timing`, `au.load_timing` and `lv2.load_timing`
+  time each plug-in format's own load entry points (VST3 `setState` and the
+  window's file, the Audio Unit's `RestoreState` and load property, LV2's
+  `restore()` and worker) with filters of 1 to 30 seconds while another
+  thread renders at the host's pace, and report how long the caller was held
+  and how late audio callbacks were. In optimised builds they fail above
+  jrp's limits for the loading-responsiveness gate: no late callback, and
+  the host's thread held at most 100 ms with filters up to 10 s and 250 ms
+  with 30 s; an entry that does not pass runs up to three times (how runs
+  are judged: PERF-10, under Fixed). Tests only: no change to the plug-ins or the sound.
+
+- CI (CI-34, first step, approved by jrp on 8 November 2026): a pull request
+  builds the plug-in distribution candidates, whose macOS builds are the
+  slowest jobs, only when it changes release files, packaged pages, the
+  macOS window, the build configuration or a shipped dependency; for
+  anything else, start the workflow by hand on the branch. A change only to
+  `scripts/release/`, `tests/release/` or `packaging/` now runs only the
+  candidates, and a change to a guide in `docs/use/` builds them only when
+  the page has a command they run or shows an image. Pushes to `main`, the weekly run and
+  manual runs still build them every time, and no test was removed.
+- Documentation (DOC-13, from jrp's review of `main` at `21711c5`, 8
+  November 2026): [TODO](TODO.md) holds open work only. The 122 finished
+  items' one-line entries moved, with their IDs and links, to
+  [`docs/archive/todo/`](docs/archive/todo/2026-11-08-done-items.md), whose
+  IDs the repository checks (`scripts/check_repository.py`) now count as
+  defined and done; the execution priorities no longer describe VST3-16 as an
+  open draft. The plug-in formats and editor plans, whose state paragraphs
+  dated from October, are [archived as superseded](docs/archive/plans/README.md);
+  the risks, the PipeWire comparison and one owner's question they still
+  held moved to HOST-2, VST3-6, AU-6, LV2-4 and LV2-5. Dated dependency versions, fixed intermittent failures and old
+  timings moved from the [testing guide](docs/develop/testing.md) to an
+  [evidence record](docs/archive/reviews/2026-11-08-testing-guide-evidence.md),
+  leaving the two failure causes that still apply to new work.
+- Documentation (DOC-11, from jrp's review of `main` at `bf6a207`, 8
+  November 2026): the [status page](docs/project/status.md) agrees with the
+  dated host records. It is dated 8 November 2026 against 0.12.1, no longer
+  says there are no open fixes while the VST3 Latency finding in REAPER
+  (VST3-16) is open, says which window each host run used (none yet the
+  0.12 window), and gives the crossover's passing REAPER retest without the
+  older refusal as a current result. [What still blocks the first
+  preview](docs/project/status.md#what-still-blocks-the-first-preview) is now
+  one table listing each remaining gate once, with its status and evidence:
+  VST3-16, the VST3 smoke tests on the current window (HOST-1), the Audio
+  Unit in GarageBand (AU-4), the Audio Unit's ThreadSanitizer build (AU-3),
+  responsiveness qualified on a named machine (REL-6), one exact candidate
+  (PLUG-5) and the independent walkthrough (REL-3). Every host
+  step, those that passed on earlier candidates included, is run again on
+  the preview candidate, as jrp decided on 8 November 2026. TODO's
+  execution priorities now list VST3-16 as an open fix and PLUG-28 before
+  the first preview. The dated records are unchanged. No code or sound
+  changes.
+- Host checks (HOST-1): jrp's Audacity 4.0.2 session with the VST3
+  plug-in (7 November 2026, candidate 0.10.13) is
+  [recorded](docs/archive/reviews/2026-11-07-host1-audacity.md): the seven
+  48 kHz stereo exports with a filter or bypass matched the CLI with
+  `convolver --compare`, including after a refused preset and after
+  restarting Audacity, and the export with no filter matched the original
+  file. The guides now say
+  what it found: Audacity plays real-time effects at its Default sample
+  rate, which can differ from the rate an export uses, so set it, and the
+  project's rate, to the filter's rate; Convolver's window shows with *Preset options ›
+  Use vendor UI*; and, as Audacity's preset menu does not import
+  `.vstpreset`, a filter can be chosen with **Choose…** in the window on
+  macOS. [Your first sound in a host](docs/use/first-sound-in-a-host.md) no
+  longer says the plug-in has no window or that preview packages lack the
+  Audio Unit. PLUG-25 records the clearer playback-rate wording still to
+  decide. No code or sound changes.
+- Development (DOC-8, from jrp's review of the agent guidance at `f6895f3`):
+  the [workflow guide](docs/develop/workflow.md#verification-for-each-kind-of-change)
+  says what each kind of change must run before a push (a prose-only change
+  needs pre-commit, not a native build), and that a review is read-only
+  unless asked otherwise, host testing records what was observed, and only a
+  change gets a branch. The `todo-item` and `review-change` skills link to
+  their sections and the link check now reads `.claude/skills/`; `AGENTS.md`
+  lists the same entry points and a task-to-section index. The dated
+  benchmarks move to [FFT and engine measurements](docs/develop/fft-measurements.md)
+  and the load-timing method to [load timing](docs/develop/load-timing.md),
+  with the old links kept. jrp's HOST-1 REAPER session is archived, and its
+  two open findings (a new VST3 Latency not used until the project is
+  reopened; no REAPER route for the 2→6 crossover) are listed in
+  [host testing](docs/develop/host-testing.md#unresolved-host-findings)
+  instead of the guides promising those results. Merged branches are kept
+  for a while and deleted periodically by jrp from a list agents prepare.
+- Documentation (DOC-7): finished items in [TODO](TODO.md#done) are one line
+  each again, as the workflow guide asks: ID, title, date, pull request and
+  the page that describes the result. Their earlier full entries, with the
+  evidence they recorded, are kept unchanged apart from link paths in
+  [`docs/archive/todo/`](docs/archive/todo/2026-11-06-done-entries.md).
+  `TODO.md` is about 500 lines shorter.
+- Development (DOC-7): `scripts/check_format.sh`, a wrapper kept only for old
+  habits, is removed; run `python3 scripts/check_format.py` (or pre-commit).
+- LV2 (LV2-8): closed without a change. Jalv, Ardour, Carla and PipeWire,
+  read in their current source and in their normal configuration, do not
+  drop a queued worker request and then reactivate the plug-in, so the
+  status cannot be left at Loading in them.
+- Planning (jrp's review of 0.10.8): the first preview is macOS-only, with
+  the VST3 plug-in and the Audio Unit in the existing shared window and
+  their Gain, Mix and Latency settings; the Windows and Linux windows, the
+  other gain modes and the meters move to later previews. Its
+  loading-responsiveness gate names a finite set of workloads, the stereo 1,
+  10 and 30 s filters its test already runs; PERF-3's wider supported
+  workloads come after the preview. TODO, the status page (whose summary
+  now describes 0.10.8), the release steps and the decisions log say so.
+  The Audio Unit's ThreadSanitizer build (AU-3) and the named-machine
+  responsiveness qualification (REL-6) stay first-preview gates.
+- Repository checks (DOC-2): `scripts/check_repository.py` now fails when a
+  guide, workflow or script names a CMake `-DCONVOLVER_…` option the build
+  does not define (or a value it does not allow, such as an unknown FFT
+  backend), when the build guide leaves an option out, when a command shown
+  with `convolver`, `convolver-preset` or `convolver-equalizer-apo` uses an
+  option the tool does not parse, or when a tool's guide leaves out one it
+  does. The presets and Equalizer APO guides now mention `--help` and
+  `--version`.
+- Tests (PERF-12, from jrp's review of `db54160`): the load-timing tests
+  record each audio callback (when it was due, when the thread woke, when
+  the plug-in was entered and returned, and the thread's CPU time where the
+  platform gives it) and print the latest wake and the longest call into the
+  plug-in. A callback late only because its thread woke late is not judged
+  and leaves the run not qualified rather than failed; a slow call with
+  little CPU time is judged, since a call blocked on a lock looks the same
+  as a descheduled one. `native.load_timing_harness` tests the verdicts on made-up records
+  instead of sleeping, in about 9 seconds rather than 40 to 60. Tests only:
+  no change to the plug-ins or the sound.
+- Tests (AU-14, from jrp's review of `db54160`): `au.adapter` waits for the
+  Audio Unit's Latency work to finish, through a completion witness, instead
+  of sleeping 100 ms and 20 ms before checking its notification and log
+  line. Each unit counts its Latency requests with a lock-free increment
+  for this, so one unit's finished work never satisfies another's check;
+  no change to the sound.
+- Tests (PERF-13, from jrp's review of `db54160`): each load-timing test
+  writes every callback's record, each phase's summary and each run's
+  verdict, with the Convolver version, build, compiler, FFT backend and
+  machine, to `FORMAT-load-timing.json` in its work folder; the VST3 and
+  Audio Unit Release jobs keep them as an artifact. Tests only: no change to
+  the plug-ins or the sound.
+- Releasing (REL-6, from jrp's review of `db54160`): a responsiveness
+  qualification before each release, on a named machine with the
+  candidate's source and an optimised build, cold and `--warm`; the release
+  notes state whether it qualified
+  ([releasing](docs/develop/releasing.md#responsiveness-qualification)).
+- Tests (PERF-14, from jrp's review of `db54160`): the load-timing tests
+  take `--warm`, which fills the filter's input history faster than real
+  time before the replacement and the reset, so they start from a long
+  filter's full cost, and shows half a second of each filter at that cost
+  (reported only). Not in CI (filling takes minutes). Tests only; no change
+  to the sound.
+- Tests (PLUG-21, from jrp's review of `db54160`): teardown is tested at
+  chosen stages instead of by repetition. `lv2.adapter` holds the worker's
+  `work()` after reading the file, after preparation and after its last
+  check, deactivates or closes the instance from another thread, and
+  releases it once deactivation signals from inside that it is waiting for
+  the held work; `au.adapter` holds a run of the Latency work while the
+  unit closes, releasing it once closing has cancelled the work. With LV2's
+  `deactivate()` lock removed, the staged case fails while the earlier
+  repeated loop passes. Both plug-ins gain test-only hooks, null in the
+  components; no change to the sound.
+- Plug-in contract (PLUG-19, from jrp's simplification review of 5 November
+  2026): a setting transition (bypass, mute, gain, mix) may end one frame
+  after its ramp's last frame, which is inaudible (about 5.7 µs at
+  176.4 kHz). It must still end exactly at its target and not click.
+  `native.host_settings` allows that frame, so a later shared ramp helper
+  need not reproduce PLUG-18's frame counting. Reported latency and channel
+  alignment stay exact to the sample. The sound is unchanged.
+- The macOS window's files moved from `plugins/au/` to `plugins/editor/mac/`
+  (VST3-11), shared by the Audio Unit and VST3, which each build them with
+  class names of their own. The setting rows can now mark the start and end
+  of a slider drag for a format that asks (VST3 does); the Audio Unit's
+  window behaves as before.
+- Audio Unit window (AU-10): the Gain, Mix and Latency rows and their
+  handling moved out of the window's layout code into their own file
+  (`plugins/au/setting_rows.mm`), so the window can gain controls without
+  growing one file further. No change in behaviour or sound.
+- REL-5, the early macOS walkthrough, ran as a package and command-line
+  check of the stereo journey on a macOS arm64 candidate, assisted for jrp
+  rather than by an independent tester: the checksums,
+  the package contents and the command-line render all matched, with no
+  defect found. By jrp's choice its host steps moved to the REAPER smoke
+  test (HOST-1) and the preview walkthrough (REL-3).
+- The [status page](docs/project/status.md) is checked against `main` at
+  0.8.6 (DOC-6, from jrp's review of `276c7dc`). It no longer calls the CLI
+  and the journey presets missing, the journeys not started or the VST3 work
+  unclaimed, and it now names only what remains, linking each TODO item;
+  progress detail lives only in TODO's `Progress` lines
+  ([recording progress](docs/develop/workflow.md#recording-progress-in-todo)).
+  TODO gains VST3-14, VST3-15 and AU-11 from the same review.
+- The [status page](docs/project/status.md) is checked again against `main`,
+  now at 0.8.2 (DOC-5, from jrp's review of PR #98). It names the commit
+  and the CI runs it relies on, the Audio Unit's Latency setting, window
+  redesign and editor tests, jrp's GarageBand run of the redesign and the
+  typed-box defects it led to, and what remains of the settings and windows.
+- Continuous integration (CI-21): the one third-party action,
+  `hendrikmuhs/ccache-action`, is pinned to the commit of its v1.2.24 release
+  instead of the tag, so a moved tag cannot run other code in CI. Dependabot
+  still proposes each new release. GitHub's own actions keep their major tags.
+- Continuous integration (CI-26): a pull request that changes only the macOS
+  window that VST3 and the Audio Unit share (`plugins/editor/mac/`) runs Lint,
+  the VST3, Audio Unit and candidate workflows, and skips the native, LV2
+  and fuzz builds, as a change to one format's own files does (CI-13).
+  Anything else in the same pull request still runs everything.
+- Continuous integration (CI-27, from jrp's review of `f2dc691`): the Audio
+  Unit adapter and window tests write their Convolver logs to files in the
+  build folder from the start, rather than private files copied there or
+  deleted at exit, so the logs survive a sanitizer abort, crash or forced
+  end. CI evidence now includes the window test's log, which was missing,
+  and the `.old` file each test log rotates to. `au.log_evidence` checks
+  collection after an abort and a kill.
+- VST3 adapter (VST3-14, from jrp's review of `276c7dc`): the edit
+  controller moved from `plugins/vst3/processor.cpp` to its own file,
+  `plugins/vst3/controller.cpp`, unchanged, before the window gains more
+  controls.
+- macOS window (AU-11, from jrp's review of `276c7dc`): Reload When the File
+  Changes, following the playing filter's files, moved from the window's
+  layout (`plugins/editor/mac/diagnostic_view.mm`) to its own file
+  (`plugins/editor/mac/file_watch.mm`), unchanged, before the window gains
+  more controls.
+- Continuous integration (CI-28, from CI-27's review): `vst3.adapter` and
+  `vst3.preset`, which runs the same tests, write their Convolver logs to
+  files of their own in the build folder (`convolver-adapter-tests.log`,
+  `convolver-preset-tests.log`), set once at start, and the Status and log
+  case reads what it added from there, rather than switching to a temporary file for that case and
+  deleting it, so a crash in the case keeps its log. The Audio Unit and VST3
+  tests share the log helper (`tests/plugins/test_log.hpp`).
+- Build (PLUG-15): a new macOS build directory targets macOS 14.0 unless the
+  first configure sets `CMAKE_OSX_DEPLOYMENT_TARGET` or
+  `MACOSX_DEPLOYMENT_TARGET` says otherwise, the same for every target and
+  the preview packages; an existing directory keeps the target in its cache.
+  The VST3 and Audio Unit folders used to force 11.0 for their own targets
+  after `project()`, so a developer's plug-in build targeted another macOS
+  than the packages and the core it links.
+- Build (FFT-4): the Apple vDSP kernel experiment
+  (`CONVOLVER_EXPERIMENT_VDSP_MAC`, `portable/kernels_vdsp.cpp` and its two
+  scripts) is removed; its timing program is now `convolver_kernel_benchmark`.
+  It was off by default and its 24 October results kept the existing
+  kernels; no build that ships changes.
+- Continuous integration (CI-7): the VST3 and Audio Unit workflows resolve
+  the newest SDK release once per run, in a first `sdk` job that uploads a
+  lock file, and every build job of the run builds exactly that release
+  (`sources.py --lock`), so one run can no longer mix two releases. Each
+  job's summary still lists what it built with.
+- Continuous integration (CI-8): the advisory checks (the newest pluginval
+  pre-release in the VST3 jobs, the newest upstream lilv in the LV2
+  workflow) keep CTest's output as an `advisory-evidence-…` artifact when
+  they report a problem, as failed jobs keep theirs; the job still passes.
+  `scripts/ci_evidence.py --advisory` collects it and lists the tests in the
+  job summary as an advisory problem.
+- Continuous integration (CI-29): static analysis runs LLVM's
+  `run-clang-tidy.py`, installed with clang-tidy, in place of
+  `scripts/clang_tidy.py` (removed with its tests and pre-commit hook). The
+  checks and the file list are unchanged; a listed file the build does not
+  compile is now skipped rather than reported.
+- Audio Unit (AU-12): a new Latency is applied on a serial dispatch queue
+  woken by a `DISPATCH_SOURCE_TYPE_DATA_OR` source, Apple's coalescing
+  wake-up, in place of Convolver's own thread (`portable/request_worker.hpp`).
+  Behaviour is unchanged: the choice still plays at once, wakes that arrive
+  together run the work once, and closing the unit waits for work in
+  progress. The worker's tests (`native.request_worker` and its watchdog
+  check), `.github/workflows/watchdog.yml` and `scripts/ci_watchdog_probe.py`
+  are removed, the Linux CI jobs no longer install gdb, and CI-24 and CI-25
+  close without a cause; their evidence is archived.
+- Command line (IO-9): `convolver-equalizer-apo` formats gains with
+  `std::to_chars` instead of a search with `snprintf` and `strtof`. Every
+  gain reads back as the same number; the text is the same for every float
+  but ±2^-96 (about −578 dB), which now takes one digit fewer. Building it now needs macOS 13.3 or later (the
+  default target is 14.0); the build guide says what building for an older
+  macOS would need.
+
+- Tests (CI-33): `native.cli`'s no-clip case compared each pair of renders
+  byte for byte, so its float case failed when the two files' `PEAK` chunks,
+  in which libsndfile records the second a float WAV file was written,
+  differed. It now checks the format, rate, channel count and frame count
+  one by one and every sample exactly, with an explicit dither seed, and
+  reports the first differing sample and the largest difference. The
+  [command-line reference](docs/use/command-line.md) now promises
+  byte-identical samples, not byte-identical files, for a given seed (with
+  the default FFT planning or a wisdom file), as jrp
+  [decided](docs/project/decisions.md#configuration-and-sound). The review
+  checklist says assertions test contracts and invariants, not incidental
+  metadata.
+- Tests (PERF-10, from jrp's review of `59ac8e0`): the load-timing tests
+  passed when they could not judge a run: a late baseline made every
+  violation, an over-long load included, "inconclusive", which counted as
+  a pass. The hold of the host's thread is now judged whatever the audio
+  thread saw; a run whose late callbacks come with a late baseline (half a
+  second idle before the phases and another after them), or that ran in a
+  build that does not enforce the limits, is "not qualified", and the
+  test then exits 77, which CTest reports as skipped, not passed. An entry
+  no limit applies to (LV2's `restore()`) is "reported only" rather than
+  passed. The summary lists every run that did not pass, also when a later
+  run did, and counts entries that passed only after a run that did not.
+  An entry passes only if one run met both limits; limits met in different
+  runs leave it not qualified (or failed, when every run broke one), and the
+  summary names the run that met each. A test in which nothing was judged is skipped, not passed.
+  `native.load_timing_harness` checks these verdicts with a mock adapter.
+  Tests only: no change to the plug-ins or the sound.
+- Tests (PERF-11, from jrp's review of `59ac8e0`): the load-timing tests
+  played input whose negative half wrapped round in unsigned arithmetic to
+  about 1.8e15, instead of quiet noise from -0.1 to 0.1. The generator now
+  subtracts in signed arithmetic, and `native.load_timing_harness` checks
+  the input's range and sign. Tests only: no change to the plug-ins or the
+  sound.
+- Tests (CI-31): the shared double-precision oracle works out each route's
+  invariant parts once, with the same arithmetic, so `native.host_settings`
+  takes about 4 seconds rather than 90 under GCC's AddressSanitizer, where
+  it had passed its time limit.
+- Tests (CI-30): `native.engine` replaces `operator new` with the array and
+  sized `operator delete` too, from one shared file, so GCC's
+  AddressSanitizer build runs the oracle tests instead of stopping on
+  alloc-dealloc-mismatch.
 - Release scripts (CI-20): unpacking a ZIP (the downloaded NSIS release on
   Windows, and each candidate's own ZIP) now checks that every file lands
   inside the destination. Before, on Windows a member name starting with `/`

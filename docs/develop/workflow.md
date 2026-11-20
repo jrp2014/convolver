@@ -194,7 +194,8 @@ checklist says so:
   ([page ownership](documentation.md#one-home-for-each-topic)); a new page is in
   the [index](../README.md); user-visible changes and every finished TODO
   item, contributor-only ones included, are in the
-  [CHANGELOG](../../CHANGELOG.md) under its ID. Affected product claims and
+  [CHANGELOG](../../CHANGELOG.md) under its ID, contributor-only ones under
+  **For contributors**. Affected product claims and
   their summaries follow the [claims rule](documentation.md#current-claims-and-dated-evidence).
 - **TODO:** the item is ticked with its evidence, or says what remains,
   what would justify it and when it is done. A plan that is now fully implemented, or superseded,
@@ -347,7 +348,7 @@ replace the item with one ticked line in TODO's [done](../../TODO.md#done) list:
 its ID and title, the date, the pull request if there was one, and a link to the page that now
 describes it. In the same pull request, add an entry naming the ID under
 `[Unreleased]` in the [CHANGELOG](../../CHANGELOG.md), even for work only
-contributors see. TODO keeps open work only; the one-line entry keeps the ID
+contributors see, which goes under **For contributors**. TODO keeps open work only; the one-line entry keeps the ID
 defined, and the [repository checks](#automated-checks) reject a TODO ID that
 is used but never defined. When the done list grows long, a documentation
 change moves its lines unchanged, apart from relative links, into a new dated
