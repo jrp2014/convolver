@@ -275,9 +275,10 @@ it still shows a failure but says what bypass plays, the input unchanged
 where there is a dry signal: a kept filter that does not fit reads `Load
 failed. Bypass is on: only the dry signal plays. The filter is for 44100 Hz,
 the host runs at 48000 Hz.`, and with no filter loaded it reads `No filter.
-Bypass is on: audio passes unchanged.` whatever Gain and Mix are. After a
-failed load with no filter kept it stays `Silent: ...`, as bypass plays
-silence then too. A filter at Mix
+Bypass is on: audio passes unchanged.` whatever Gain and Mix are. Where
+bypass plays silence, after a failed load with no filter kept or when the
+filter's or the host's inputs and outputs differ, it still says so. A
+filter at Mix
 0% adds `Mix 0%: only the dry signal plays.`
 
 **Fault** means something went wrong in the audio while it played, with or

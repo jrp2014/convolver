@@ -257,6 +257,22 @@ void cases() {
          HostStatus::load_failed,
          {"Bypass is on: only the dry signal plays."},
          {"plays silence", "Mix at"}},
+        // Bypass with no dry signal plays silence, and the report says so:
+        // a kept filter with unequal counts (PLUG-23).
+        {"kept crossover, bypassed",
+         [] {
+             Configuration c{48000, 2, 6, 0, {}, {}, {}};
+             c.paths.push_back({{1.f}, {{0, 1}}, {{0, 1}}});
+             HostFilter f(8);
+             f.load(HostState{c}, std::nullopt);
+             static_cast<void>(test::started(f, {44100, 2, 2}));
+             auto bypassed = facts(HostLayout{44100, 2, 2});
+             bypassed.bypassed = true;
+             return host_report(f, bypassed);
+         },
+         HostStatus::load_failed,
+         {"Convolver plays silence."},
+         {"Bypass is on", "dry signal plays"}},
         // A failed load with no filter kept stays silent, bypassed too
         // (PLUG-23, jrp, 7 November 2026).
         {"failed first load, bypassed",

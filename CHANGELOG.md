@@ -93,8 +93,9 @@ Until 1.0 the C++ API may change between minor versions.
   signal plays." and the reason. With no filter loaded and Gain or Mix
   changed, Status gave the level they set, though bypass plays the input
   unchanged; it now says "No filter. Bypass is on: audio passes
-  unchanged." After a failed load with no filter kept both still say
-  silence, which is what plays. What plays is unchanged. The plug-in contract now lists each
+  unchanged." Where bypass plays silence (after a failed load with no
+  filter kept, or with unequal counts) both still say so. The audio is
+  unchanged. The plug-in contract now lists each
   loading state against every request and host event, with its tests.
 
 - Plug-ins (ROBUST-8): when a new Latency cannot be applied because memory
