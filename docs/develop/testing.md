@@ -345,7 +345,13 @@ cases.
   that replaces even the filter already playing, a chosen preset's settings
   without its bypass, the settings' Gain mode deciding the estimate only
   once accepted, the tail while no processor plays) and that a failed
-  request silences the processor only while no filter is accepted; and the
+  request silences the processor only while no filter is accepted; the one
+  status ordering (`status_ordering`, PLUG-39 step 4: every status with and
+  without bypass, `host_status()` agreeing with `host_status_value()`); a
+  saved name shown only while its filter plays (`filter_names`, PLUG-22 and
+  PLUG-39 step 4: offered before or after its state, a refused preset's
+  name leaving the playing one, a file's name for the state saved from it,
+  a state's own name standing); and the
   saved-state limit (PLUG-12): the
   size counted without encoding matches the encoding, a filter that leaves
   exactly the settings' room (PLUG-13) loads, saves with and without

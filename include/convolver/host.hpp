@@ -292,8 +292,9 @@ struct HostRequest {
     // extension, never its folder, as the Audio Unit's preset name keeps it.
     // Empty when unknown; a file's request leaves it empty, as the window
     // takes the name from `path`. VST3 keeps the name in the controller
-    // state, apart from the component's, and the processor names its report
-    // with it while HostFilter::filter_identity() matches the saved one.
+    // state, apart from the component's, and offers it to the filter
+    // (HostFilter::offer_name()), which gives accepted() the name of the
+    // filter that plays.
     std::string name{};
     // PLUG-33: for a configuration list chosen where no entry has the host's
     // input count, the entry read instead, the one with the most inputs below
@@ -450,6 +451,16 @@ class HostFilter {
     bool estimating() const noexcept {
         return estimating_;
     }
+    // PLUG-22, PLUG-39 step 4: a name kept apart from the filter's state
+    // (VST3's controller state), offered with the identity of the filter it
+    // names (filter_identity()). A name shows only while its filter plays:
+    // accepted() takes it when that filter plays now or when state that
+    // names nothing brings it later, in whichever order the host sends the
+    // two, and a filter that is refused never renames the one that plays.
+    // An accepted file's own name is offered the same way, and state of the
+    // filter that plays keeps the name it shows. May throw std::bad_alloc,
+    // and then changes nothing.
+    void offer_name(std::string name, std::uint64_t identity);
     // PLUG-22: configuration_identity() of filter(), found when it was
     // accepted, so a report never computes it; 0 without one.
     std::uint64_t filter_identity() const noexcept {
@@ -593,6 +604,12 @@ class HostFilter {
     bool estimating_ = false;    // estimating()
     std::uint64_t identity_ = 0; // filter_identity()
     HostRequest accepted_;       // The request that supplied filter_ (or the saved failure).
+    // offer_name(): the name offered last, and the identity of its filter.
+    struct OfferedName {
+        std::string name;
+        std::uint64_t identity = 0;
+    };
+    std::optional<OfferedName> offered_name_;
     std::uint64_t requests_ = 0;
     bool failed_ = false;
     std::optional<HostFailure> load_failure_, activation_failure_;

@@ -401,16 +401,7 @@ HostReport Processor::report_locked() const {
 #else
     facts.file_reader = "libsndfile";
 #endif
-    auto report = host_report(filter_, facts);
-    // PLUG-22: saved state (no file path) of the filter the saved name
-    // belongs to is named, in the fields and the text alike.
-    if (report.filter_path.empty() && !report.filter_identity.empty()) {
-        if (!saved_name_.empty() && report.filter_identity == saved_identity_)
-            report.filter_name = saved_name_;
-        else if (!kept_name_.empty() && report.filter_identity == kept_identity_)
-            report.filter_name = kept_name_;
-    }
-    return report;
+    return host_report(filter_, facts);
 }
 void Processor::send_status(const StatusAnswer& answer) noexcept {
     try {
@@ -537,18 +528,17 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
         if (has_name != has_identity || (name_size && !name) || (identity_size && !identity) ||
             name_size > max_filter_name_bytes || identity_size > max_controller_identity_bytes)
             return kInvalidArgument;
+        // Offered to the filter, which shows it only while its filter plays
+        // (HostFilter::offer_name()): a host sends a refused preset's
+        // controller state too, and that names a filter that does not play.
+        // An identity this version could not have written names none.
+        const auto id = parse_filter_identity_text(
+            std::string_view(static_cast<const char*>(identity), identity_size));
         try {
-            const Locked lock(*this);
-            // The pair that names the playing filter is kept: a host sends
-            // a refused preset's controller state too, and that names a
-            // filter that does not play.
-            const auto playing = report_locked().filter_identity;
-            if (!saved_identity_.empty() && saved_identity_ == playing) {
-                kept_name_ = saved_name_;
-                kept_identity_ = saved_identity_;
+            if (name_size && id) {
+                const Locked lock(*this);
+                filter_.offer_name(std::string(static_cast<const char*>(name), name_size), *id);
             }
-            saved_name_.assign(static_cast<const char*>(name), name_size);
-            saved_identity_.assign(static_cast<const char*>(identity), identity_size);
         } catch (...) {
             return kOutOfMemory;
         }
@@ -834,20 +824,6 @@ bool Processor::load_file(std::string_view chosen, std::optional<HostSettings>& 
     if (!accepted) {
         refused();
         return false;
-    }
-    // PLUG-22: the file's name and its filter's identity, as the controller
-    // records them from the report for its state.
-    try {
-        const auto report = report_locked();
-        saved_name_ = report.filter_name;
-        saved_identity_ = report.filter_identity;
-        kept_name_.clear();
-        kept_identity_.clear();
-    } catch (...) {
-        saved_name_.clear(); // Out of memory: no name rather than another filter's.
-        saved_identity_.clear();
-        kept_name_.clear();
-        kept_identity_.clear();
     }
     return true;
 }

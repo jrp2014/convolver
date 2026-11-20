@@ -358,6 +358,21 @@ std::string filter_identity_text(std::uint64_t identity) {
     return text;
 }
 
+std::optional<std::uint64_t> parse_filter_identity_text(std::string_view text) noexcept {
+    if (text.size() != 16)
+        return std::nullopt;
+    std::uint64_t value = 0;
+    for (const char ch : text) {
+        const int digit = ch >= '0' && ch <= '9'   ? ch - '0'
+                          : ch >= 'a' && ch <= 'f' ? ch - 'a' + 10
+                                                   : -1;
+        if (digit < 0)
+            return std::nullopt;
+        value = value << 4 | static_cast<std::uint64_t>(digit);
+    }
+    return value;
+}
+
 HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
     HostReport r;
     r.status = host_status(filter, facts.host, facts.log_written, facts.settings, facts.bypassed,
@@ -399,6 +414,9 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
         r.filter_taps = std::to_string(taps) + " taps";
         r.filter_length = length.empty() ? r.filter_taps : length;
         r.filter_identity = filter_identity_text(filter.filter_identity());
+        r.filter_saved_name = accepted.source == HostFilterSource::file && !accepted.path.empty()
+                                  ? r.filter_name
+                                  : accepted.name;
         // A list on its own, so it starts with a capital: "Front left, front right".
         r.filter_speakers = speaker_names(c->channel_mask, c->output_channels);
         if (!r.filter_speakers.empty())
@@ -508,6 +526,7 @@ std::vector<std::pair<std::string, std::string>> report_fields(const HostReport&
             {"filter length", r.filter_length},
             {"filter taps", r.filter_taps},
             {"filter identity", r.filter_identity},
+            {"filter saved name", r.filter_saved_name},
             {"filter speakers", r.filter_speakers},
             {"filter note", r.filter_note},
             {"filter path", r.filter_path},

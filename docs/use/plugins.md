@@ -396,7 +396,8 @@ From the top, the window has:
   VST3 preset made with [`convolver-preset`](presets.md) keeps the name of
   the file it was made from in the same way. A project saved by an earlier
   Convolver, or a preset that holds no name (such as a VST3 preset made by
-  an earlier `convolver-preset`), shows "Restored filter". With no filter it reads
+  an earlier `convolver-preset`), shows "Restored filter", unless it holds
+  the same filter that already plays, which keeps its name. With no filter it reads
   "None". Under the name, the filter's own facts as labelled columns:
   **Sample rate**, **Channels** (`2 in → 2 out`), **Length** and, when the
   filter names them, **Speakers** (cut short with "…" if they do not fit;
