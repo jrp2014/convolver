@@ -65,6 +65,11 @@ Until 1.0 the C++ API may change between minor versions.
   says to keep every external dependency, compilers and CI machines
   included, on its newest formal release
   ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
+- Releases (CI-44): the Linux candidate's check refuses libstdc++ symbol
+  versions newer than GCC 12's (GLIBCXX_3.4.30, CXXABI_1.3.13), as it
+  already refused glibc ones newer than 2.35: a newer GCC on the build
+  image now fails the candidate instead of shipping a package that does not
+  load on Ubuntu 22.04 or Debian 12.
 - Plug-ins (PLUG-39 step 2): VST3 and the Audio Unit decide when the
   host has settled its sample rate and channels in one shared record
   (`HostSettling`), which each feeds with the host's starts, stops and
