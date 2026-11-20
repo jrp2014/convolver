@@ -18,6 +18,14 @@
 --   CONVOLVER_LEAD    frames of silence before it
 -- Each step that fails stops the script with an error, which the test reports.
 
+-- Unbuffered, so that a crash shows the last step that finished (HOST-7).
+if io and io.stdout then
+	io.stdout:setvbuf("no")
+end
+local function step(text)
+	print("Step: " .. text)
+end
+
 local function setting(name)
 	local value = os.getenv(name)
 	assert(value and value ~= "", name .. " is not set")
@@ -36,17 +44,22 @@ local lead = tonumber(setting("CONVOLVER_LEAD"))
 
 -- The Dummy backend is hidden unless asked for. At "10x Speed" it runs ten
 -- times faster than real time; its inputs carry the chosen test signal.
+step("show the Dummy backend")
 ARDOUR.config():set_hide_dummy_backend(false)
+step("choose the Dummy backend")
 local backend = AudioEngine:set_backend("None (Dummy)", "", "")
 assert(not backend:isnil(), "Ardour has no Dummy backend")
+step("set the Dummy backend's speed, signal and rate")
 assert(backend:set_driver("10x Speed") == 0, "cannot choose the Dummy backend's speed")
 assert(backend:set_device_name("Uniform White Noise") == 0, "cannot choose the Dummy backend's signal")
 assert(backend:set_sample_rate(48000) == 0, "cannot set the sample rate")
 
+step("open the session")
 local session = load_session(directory, name)
 assert(session, "cannot open the session")
 print("Ardour engine running: " .. tostring(AudioEngine:running()) .. " on " .. AudioEngine:current_backend_name())
 
+step("add a track")
 local track = session:new_audio_track(inputs, outputs, nil, 1, "Convolver",
 	ARDOUR.PresentationInfo.max_order, ARDOUR.TrackMode.Normal, true):front()
 assert(track, "cannot add a track")
@@ -56,6 +69,7 @@ assert(track, "cannot add a track")
 track:panner_shell():set_bypassed(true)
 session:master_out():panner_shell():set_bypassed(true)
 
+step("add the plug-in")
 local processor = ARDOUR.LuaAPI.new_plugin(session, uri, ARDOUR.PluginType.LV2, "")
 assert(not processor:isnil(), "Ardour cannot find " .. uri)
 assert(track:add_processor_by_index(processor, 0, nil, true) == 0, "cannot add the plug-in to the track")
@@ -66,6 +80,7 @@ assert(plugin:load_preset(preset), "Ardour cannot load the preset " .. label)
 print("Loaded preset " .. label .. " into " .. plugin:name())
 
 -- Record: the track records its input, before the plug-in.
+step("record")
 track:rec_enable_control():set_value(1, PBD.GroupControlDisposition.NoGroup)
 session:maybe_enable_record(false)
 session:request_roll(ARDOUR.TransportRequestSource.TRS_UI)
