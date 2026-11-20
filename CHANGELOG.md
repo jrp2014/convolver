@@ -63,6 +63,10 @@ Until 1.0 the C++ API may change between minor versions.
   says to keep every external dependency, compilers and CI machines
   included, on its newest formal release
   ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
+- Releases (CI-44): the Linux candidate's check refuses libstdc++ symbol
+  versions newer than GCC 12's (GLIBCXX_3.4.30, CXXABI_1.3.13), as it
+  already refused glibc ones newer than 2.35, so the package keeps loading
+  on Ubuntu 22.04 and Debian 12 whatever GCC the build image gains.
 - Audio Unit (PLUG-39 step 3c): as in VST3, a new Latency and
   uninitializing no longer wait for `Render` to let go of the processor
   they replace; the next control call frees it. Nothing heard or reported
