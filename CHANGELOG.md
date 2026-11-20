@@ -12,6 +12,11 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Tests (HOST-9): the headless Ardour test plays the VST3 plug-in too, in
+  the VST3 workflow, on Ardour's own VST3 host, and both formats save
+  sessions at Latency 256 or 1024: Ardour must report the new latency at
+  once, report it again after reopening the session, and export it in
+  time, within 1e-5 of the oracle. The test moved to `tests/plugins/`.
 - Tests (COMPAT-1, in progress): the example presets of the published
   0.14.0 and the audio its own CLI and VST3 plug-in rendered from them are
   kept in `tests/upgrade/0.14.0/`, beside those of 0.13.2, 0.13.12,

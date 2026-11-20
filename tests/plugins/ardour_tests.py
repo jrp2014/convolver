@@ -1,32 +1,42 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Play Convolver's LV2 plug-in in a headless Ardour session (HOST-5).
+"""Play Convolver's LV2 or VST3 plug-in in a headless Ardour session (HOST-5, HOST-9).
 
-  ardour_tests.py <convolver.lv2> <convolver-preset>
+  ardour_tests.py <convolver.lv2 | Convolver.vst3> <convolver-preset>
 
-Ardour is a full DAW, and its LV2 host is its own code, not lilv's or JUCE's.
-For each first-use fixture (examples/first-use: mono 1 in 1 out, stereo
-cross-feed 2 in 2 out, the 2 in 6 out crossover) this test:
+Ardour is a full DAW, and its LV2 and VST3 hosts are its own code, not
+lilv's, Steinberg's or JUCE's. The bundle's name chooses the format. For each
+case below (a first-use fixture from examples/first-use: mono 1 in 1 out,
+stereo cross-feed 2 in 2 out, the 2 in 6 out crossover; and a Latency) this
+test:
 
-1. makes an LV2 preset from the fixture's filter with convolver-preset;
+1. makes a preset from the fixture's filter with convolver-preset (an LV2
+   preset bundle, or a .vstpreset in the folder Ardour lists VST3 presets
+   from);
 2. makes a session with ardourN-new_session, its master bus one channel per
    plug-in output;
 3. runs ardour_session.lua in ardourN-lua: on Ardour's Dummy backend, a track
-   with the plug-in, the preset loaded from Ardour's preset list, white noise
-   recorded onto the track, the region's fades off, the session saved;
-4. exports the session with ardourN-export, a separate process that restores
-   the saved session, plug-in state included, and renders it offline with
-   Ardour's latency compensation;
-5. compares the export with the direct double-precision oracle applied to
+   with the plug-in, the preset loaded from Ardour's preset list, the case's
+   Latency chosen through Ardour's parameter (Ardour must then report it
+   without reopening), white noise recorded onto the track, the region's
+   fades off, the session saved;
+4. reopens the session in a new ardourN-lua process with ardour_reopen.lua:
+   the restored plug-in must report the Latency the session was saved with;
+5. exports the session with ardourN-export, a separate process that restores
+   the saved session, plug-in state and Latency included, and renders it
+   offline with Ardour's latency compensation;
+6. compares the export with the direct double-precision oracle applied to
    the recorded take: the same length (take plus tail), no offset (Ardour
-   compensates the reported 256 frames), within 1e-5.
+   compensates the latency the restored plug-in reports, so a session saved
+   at Latency 1024 must play in time when reopened), within 1e-5.
 
 Needs Ardour 9's or 8's headless tools (Ubuntu's `ardour` package:
-ardour9-lua, ardour9-new_session, ardour9-export, or ardour8-*). Ardour's
-configuration goes to a temporary folder, not the user's. An export that
-Ardour kills by a signal is tried again, and Ardour 9.0's abort as
-new_session exits is accepted once the session exists, each with a warning
-(see `export` and `known_new_session_abort`, which ardour_harness_tests.py
-checks).
+ardour9-lua, ardour9-new_session, ardour9-export, or ardour8-*), and for VST3
+Ardour's scanner, ardour-vst3-scanner, which the package installs beside its
+libraries. Ardour's configuration and the plug-in's VST3 folder go to a
+temporary home folder, not the user's. An export that Ardour kills by a
+signal is tried again, and Ardour 9.0's abort as new_session exits is
+accepted once the session exists, each with a warning (see `export` and
+`known_new_session_abort`, which ardour_harness_tests.py checks).
 """
 
 import json
@@ -47,13 +57,33 @@ from fixtures import TOLERANCE, fixtures, read_float_wav, render, tail, worst_er
 
 EXAMPLES = REPOSITORY / 'examples' / 'first-use'
 SCRIPT = pathlib.Path(__file__).with_name('ardour_session.lua')
+REOPEN = pathlib.Path(__file__).with_name('ardour_reopen.lua')
 REGISTRY = json.loads((REPOSITORY / 'plugins' / 'identities.json').read_text(encoding='utf-8'))
 RATE = 48000
+VST3_CLASS = 'Convolver'  # The name the VST3 factory gives the processor class; Ardour finds it by that.
 RECORD = 24000  # Half a second of the Dummy backend's noise.
 MARGIN = 1000  # Frames exported after the filter's tail, which must be silent.
 # Ardour's gain stages ramp up over the first frames of an export (by 0.3 %
 # after 1000 frames): the take starts later, so the ramp acts on silence.
 LEAD = 9600
+# The Latency menu's entries, in frames, from the one list every format offers.
+LATENCIES = [
+    int(frames)
+    for frames in re.search(
+        r'host_latencies\{([^}]*)\}', (REPOSITORY / 'include' / 'convolver' / 'host.hpp').read_text(encoding='utf-8')
+    )[1].split(',')
+]
+# Each fixture at the default Latency, 0; then a session saved at a larger
+# Latency, which Ardour must compensate when the export restores it: the
+# largest delay a user is likely to choose, and a multichannel one. Ardour
+# 8.4 runs a VST3 plug-in only with its default buses (Convolver's: 2 in,
+# 2 out), feeding a mono track to both inputs, so the mono and crossover
+# presets do not fit there and only the stereo cases run; Ardour's LV2 host
+# chooses the layout by URI.
+CASES = {
+    'LV2': [('mono', 0), ('stereo', 0), ('crossover', 0), ('stereo', 1024), ('crossover', 256)],
+    'VST3': [('stereo', 0), ('stereo', 1024)],
+}
 
 
 def tool(name):
@@ -63,6 +93,15 @@ def tool(name):
         if path:
             return path
     sys.exit(f"Ardour's headless tool ardour*-{name} is not installed (Ubuntu: apt-get install ardour)")
+
+
+def scanner(lua_tool):
+    """Ardour's VST3 scanner, which its package installs beside its libraries."""
+    major = re.match(r'ardour(\d+)-', pathlib.Path(lua_tool).name)[1]
+    path = pathlib.Path(f'/usr/lib/ardour{major}/ardour-vst3-scanner')
+    if not path.is_file():
+        sys.exit(f"Ardour's VST3 scanner {path} is not installed (Ubuntu: apt-get install ardour)")
+    return path
 
 
 def plugin_uri(inputs, outputs):
@@ -211,13 +250,22 @@ def best_lag(got, want, search=512, span=4096):
     return min(((lag, error(lag)) for lag in range(-search, search + 1)), key=lambda pair: pair[1])
 
 
-def check(tools, environment, directory, plugin_tool, fixture_name, fixture):
+def preset_path(directory, format_name, fixture_name, label):
+    """Where Ardour lists the preset: LV2_PATH for LV2; the vendor's and plug-in's VST3 preset folder."""
+    if format_name == 'LV2':
+        return directory / 'lv2' / f'{fixture_name}.preset.lv2'
+    return directory / 'home' / '.vst3' / 'presets' / REGISTRY['vendor']['name'] / VST3_CLASS / f'{label}.vstpreset'
+
+
+def check(tools, environment, directory, plugin_tool, format_name, fixture_name, fixture, latency):
     inputs, outputs = fixture['inputs'], fixture['outputs']
     label = f'Convolver {fixture_name}'
-    preset = directory / 'lv2' / f'{fixture_name}.preset.lv2'
-    run([plugin_tool, '--name', label, EXAMPLES / fixture_name / fixture['filter'], preset], environment)
+    preset = preset_path(directory, format_name, fixture_name, label)
+    if not preset.exists():
+        preset.parent.mkdir(parents=True, exist_ok=True)
+        run([plugin_tool, '--name', label, EXAMPLES / fixture_name / fixture['filter'], preset], environment)
 
-    name = fixture_name
+    name = f'{fixture_name}-{latency}'
     session = directory / 'sessions' / name
     new_session(tools['new_session'], environment, session, name, outputs, tools['version'])
     filter_tail = tail(fixture['paths'], fixture['input_delays'], fixture['output_delays'])
@@ -225,8 +273,11 @@ def check(tools, environment, directory, plugin_tool, fixture_name, fixture):
         'CONVOLVER_ARDOUR_MAJOR': re.match(r'ardour(\d+)-', pathlib.Path(tools['lua']).name)[1],
         'CONVOLVER_SESSION_DIR': str(session),
         'CONVOLVER_SESSION_NAME': name,
-        'CONVOLVER_URI': plugin_uri(inputs, outputs),
+        'CONVOLVER_FORMAT': format_name,
+        'CONVOLVER_PLUGIN': plugin_uri(inputs, outputs) if format_name == 'LV2' else VST3_CLASS,
         'CONVOLVER_PRESET': label,
+        'CONVOLVER_LATENCY': str(latency),
+        'CONVOLVER_LATENCIES': ','.join(str(frames) for frames in LATENCIES),
         'CONVOLVER_INPUTS': str(inputs),
         'CONVOLVER_OUTPUTS': str(outputs),
         'CONVOLVER_FRAMES': str(RECORD),
@@ -238,6 +289,13 @@ def check(tools, environment, directory, plugin_tool, fixture_name, fixture):
     recorded = re.search(r'^Recorded (\d+) frames', log, re.MULTILINE)
     assert recorded, f'{name}: the script did not report the recording'
     length = int(recorded[1])
+
+    # A new process reopens the saved session: the restored plug-in must
+    # report the Latency it was saved with, not the default.
+    log = run([tools['lua'], REOPEN], {**environment, **settings}).stdout
+    reopened = re.search(r'^Reopened: Ardour reports latency (\d+)', log, re.MULTILINE)
+    assert reopened, f'{name}: the reopening script did not report the latency'
+    assert int(reopened[1]) == latency, f'{name}: reopened with latency {reopened[1]}, saved with {latency}'
 
     exported = directory / f'{name}.wav'
     export(tools['export'], environment, exported, session, name)
@@ -267,8 +325,8 @@ def check(tools, environment, directory, plugin_tool, fixture_name, fixture):
         print(f'{name}: the region is at {region_position(session, name)} in the session file')
     peak = max(abs(v) for channel in expected for v in channel)
     print(
-        f'{name}: {inputs} in, {outputs} out, {len(take[0])} recorded frames, export of {frames}: '
-        f'worst error {worst:.3g} (output peak {peak:.3g})'
+        f'{format_name} {name}: {inputs} in, {outputs} out, Latency {latency}, {len(take[0])} recorded frames, '
+        f'export of {frames}: worst error {worst:.3g} (output peak {peak:.3g})'
     )
     assert peak > 0.01, f'{name}: the recorded input is silent'
     assert worst < TOLERANCE, f'{name}: error {worst} exceeds {TOLERANCE}'
@@ -280,6 +338,9 @@ def main():
         sys.exit(__doc__)
     bundle = pathlib.Path(sys.argv[1]).resolve()
     plugin_tool = pathlib.Path(sys.argv[2]).resolve()
+    format_name = {'.lv2': 'LV2', '.vst3': 'VST3'}.get(bundle.suffix)
+    if not format_name:
+        sys.exit(f'{bundle.name}: name an LV2 bundle (.lv2) or a VST3 bundle (.vst3)')
     tools = {name: tool(name) for name in ('lua', 'new_session', 'export')}
     tools['version'] = ardour_version(tools['lua'])
     print(f'Ardour version: {tools["version"]}', flush=True)
@@ -295,16 +356,41 @@ def main():
         directory.mkdir(parents=True, exist_ok=True)
         (directory / 'lv2').mkdir()
         (directory / 'sessions').mkdir()
-        shutil.copytree(bundle, directory / 'lv2' / bundle.name)
+        (directory / 'home').mkdir()
         environment = {
             **os.environ,
+            # Ardour lists VST3 plug-ins and their presets under ~/.vst3.
+            'HOME': str(directory / 'home'),
             'LV2_PATH': str(directory / 'lv2'),
             'XDG_CONFIG_HOME': str(directory / 'config'),
             'XDG_CACHE_HOME': str(directory / 'cache'),
         }
-        for fixture_name, fixture in fixtures().items():
-            worst = max(worst, check(tools, environment, directory, plugin_tool, fixture_name, fixture))
-    print(f'Ardour: worst error against the oracle {worst:.3g}')
+        if format_name == 'LV2':
+            shutil.copytree(bundle, directory / 'lv2' / bundle.name)
+        else:
+            installed = directory / 'home' / '.vst3' / bundle.name
+            shutil.copytree(bundle, installed)
+            # Ardour lists only VST3 plug-ins its scanner has indexed; the GUI
+            # runs it when it finds a new bundle, the headless tools do not.
+            scan = scanner(tools['lua'])
+            library = {'LD_LIBRARY_PATH': ':'.join(filter(None, [str(scan.parent), os.environ.get('LD_LIBRARY_PATH')]))}
+            run([scan, '--force', installed], {**environment, **library})
+        all_fixtures = fixtures()
+        for fixture_name, latency in CASES[format_name]:
+            worst = max(
+                worst,
+                check(
+                    tools,
+                    environment,
+                    directory,
+                    plugin_tool,
+                    format_name,
+                    fixture_name,
+                    all_fixtures[fixture_name],
+                    latency,
+                ),
+            )
+    print(f'Ardour ({format_name}): worst error against the oracle {worst:.3g}')
 
 
 if __name__ == '__main__':

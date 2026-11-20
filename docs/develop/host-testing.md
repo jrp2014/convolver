@@ -119,7 +119,8 @@ macOS 14 or later. Checked on 23 October 2026:
 Three independent hosts play the plug-ins unattended in CI: pluginval
 (JUCE) validates all three formats, AVAudioEngine (Apple's own hosting
 stack) renders the Audio Unit, and a headless Ardour session records,
-restores and exports the LV2 plug-in. Each checks its audio against the
+reopens and exports the LV2 and VST3 plug-ins, a session saved at a larger
+Latency included. Each checks its audio against the
 oracle where it renders
 ([testing](testing.md#pluginval), [AVAudioEngine](testing.md#avaudioengine-render),
 [Ardour](testing.md#ardour-headless)). They make the named-host tests below
@@ -166,7 +167,7 @@ LV2-4's host matrix. A result counts only for the host version named.
 
 | Host | How it was run | Result |
 | --- | --- | --- |
-| Ardour 9.0 | Headless, in CI on every LV2 change ([Ardour](testing.md#ardour-headless)) | Records, restores and exports the three first-use examples within 1e-5 of the oracle |
+| Ardour 9.0 | Headless, in CI on every LV2 change ([Ardour](testing.md#ardour-headless)) | Records, reopens and exports the three first-use examples within 1e-5 of the oracle, at Latency 0 and in sessions saved at 256 and 1024, which reopen at that latency and in time |
 | PipeWire 1.6.8 `filter-chain` | By hand in a cloud session, 12 November 2026, on virtual devices ([below](#pipewire-filter-chain)) | Works: the first-use stereo and crossover examples match `expected.wav`; a list switches entries when the rate changes; a filter that does not fit is silent and explained in the log |
 | PipeWire 1.0.5 (Ubuntu 24.04) | Same session | Does not work: Ubuntu builds it without LV2 support. With the LV2 module built from the same source, the plug-in starts but receives no filter (it plays as with no filter), because PipeWire before 1.6 ignores `config` for LV2 |
 | PipeWire 1.6.0 and 1.6.1 | Not tried | Not recommended: 1.6.2 fixed the default and range values PipeWire gives LV2 controls |
@@ -572,12 +573,15 @@ explained or fixed. Each names the host and build it was seen in; it is not a
 claim about other hosts or versions. Do not add host steps to work around one
 until its cause is known: record what was observed, as below.
 
-None at present. The last one, a new VST3 Latency that REAPER used only
-after a render, FX Offline then Online, or reopening the project, was fixed
-by VST3-16 and checked in REAPER on 8 November 2026
+| Finding | Host and build | Observed | Not yet known | Evidence |
+| --- | --- | --- | --- | --- |
+| Ardour runs the VST3 only at 2 in, 2 out, and names Latency and Gain mode "hidden" | Ardour 8.4 (Ubuntu 24.04's 8.4.0~ds1), headless, 20 November 2026 | On a mono track Ardour fed the one input to both of the VST3's inputs and kept its two outputs; it never asked for another bus arrangement, so the mono example's preset did not fit and the export was silent. Ardour named the two parameters that cannot be automated "hidden" and saved them as not automatable; setting them through its Lua API worked. The LV2 layouts, chosen by URI, play every example | Whether Ardour 9 does the same, and whether Ardour's own controls show those two settings | HOST-9's [Ardour test](testing.md#ardour-headless) runs only the stereo VST3 cases for this reason; the session file showed `ConfiguredInput` 1 and `ConfiguredOutput` 2 |
+
+The last one before it, a new VST3 Latency that REAPER used only after a
+render, FX Offline then Online, or reopening the project, was fixed by
+VST3-16 and checked in REAPER on 8 November 2026
 ([acceptance](../archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md)).
-Record the next with these columns: the finding, the host and build it was
-seen in, what was observed, what is not yet known, and the evidence.
+Record the next with the same columns.
 
 ## Production qualification
 

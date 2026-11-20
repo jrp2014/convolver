@@ -241,7 +241,7 @@ is superseded.
   (20 November 2026): on Ubuntu 26.04, `ardour9-new_session` (9.0.0~ds)
   writes the session, says so, then aborts with glibc's "FATAL: exception
   not rethrown", for 7 of 11 sessions in five CI runs and before Convolver
-  is loaded. `known_new_session_abort()` in `tests/lv2/ardour_tests.py`
+  is loaded. `known_new_session_abort()` in `tests/plugins/ardour_tests.py`
   accepts that abort with a warning, on Ardour 9.0 and with that message
   only ([Ardour, headless](docs/develop/testing.md#ardour-headless)). Next: jrp
   reports it to Ardour if he wishes; a draft is in the project files.
@@ -1219,6 +1219,14 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **HOST-9 — Play the VST3 and a saved Latency in the Ardour test.**
+  20 November 2026, from the external audit of 20 November: the Ardour test
+  moved to `tests/plugins/` and now also runs in the VST3 workflow, on
+  Ardour's own VST3 host (the stereo example; Ardour 8.4 runs a VST3 only
+  at its default 2 in, 2 out, an [unresolved host finding](docs/develop/host-testing.md#unresolved-host-findings)).
+  Each format also saves sessions at Latency 256 or 1024, which Ardour must
+  report at once, report again after reopening, and export in time
+  ([Ardour, headless](docs/develop/testing.md#ardour-headless)).
 - [x] **HOST-7 — Run the Ardour test with Ardour 9.**
   20 November 2026, PR #229, from CI-43: Ardour 9's Lua tool crashed in
   `Session:new_audio_track`, which takes an empty `ARDOUR.RouteGroup()`
