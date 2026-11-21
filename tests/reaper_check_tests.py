@@ -27,7 +27,8 @@ SPEC.loader.exec_module(reaper_check)
 
 # A stand-in REAPER: reads the ReaScript's CONFIG, records what a passing run
 # records and writes the files REAPER would. FAKE_REAPER=exit quits at once,
-# and FAKE_REAPER=silent restores nothing on reopening.
+# FAKE_REAPER=silent restores nothing on reopening, and FAKE_REAPER=stopped
+# reads Status after the transport stopped, as REAPER did in jrp's first run.
 FAKE_REAPER = textwrap.dedent(
     r"""
     #!/usr/bin/env python3
@@ -43,7 +44,8 @@ FAKE_REAPER = textwrap.dedent(
     status = 'Silent: no filter' if reopen and mode == 'silent' else loaded
     lines = [('stage', 'reopen' if reopen else 'first'), ('reaper_version', '7.99/macOS-arm64'),
              ('fx_name', 'VST3: Convolver (Convolver)'), ('status_playing', status),
-             ('status_reopened' if reopen else 'status_after_preset', status)]
+             ('status_reopened' if reopen else 'status_after_preset', status),
+             ('play_state', '0' if mode == 'stopped' else '1'), ('play_position', '1.500')]
     if reopen:
         opened = next(a for a in sys.argv[1:] if a.endswith('.rpp'))
         lines.append(('project_opened', '/elsewhere/other.rpp' if mode == 'other' else opened))
@@ -99,6 +101,14 @@ class LuaText(unittest.TestCase):
             text = reaper_check.lua_script(stage, {'results': '/r'})
             self.assertTrue(text.startswith('-- SPDX-License-Identifier: GPL-2.0-or-later\nlocal CONFIG = {'))
             self.assertTrue(text.rstrip().endswith('reaper.defer(tick)'))
+        for stage in ('first', 'reopen'):
+            # Status is read while the transport runs (jrp's first run read it stopped).
+            # The project's own loop and repeat come back, so the saved project is unchanged.
+            text = reaper_check.lua_script(stage, {})
+            self.assertIn('reaper.GetSetRepeatEx(project, 1)', text)
+            self.assertIn('reaper.GetSetRepeatEx(project, repeat_before)', text)
+            self.assertIn('reaper.GetSet_LoopTimeRange2(project, true, true, loop_start, loop_end, false)', text)
+        self.assertEqual(reaper_check.lua_script('first', {}).count('"D_PANLAW", 1)'), 2)
         self.assertIn('TrackFX_SetPreset', reaper_check.lua_script('first', {}))
         self.assertNotIn('TrackFX_SetPreset', reaper_check.lua_script('reopen', {}))
 
@@ -115,6 +125,15 @@ class Records(unittest.TestCase):
         self.assertEqual(reaper_check.rate_hint({'device_rate': '48000', 'device_rate_playing': '48000'}), '')
         self.assertEqual(reaper_check.rate_hint({'device_rate': '(not reported)'}), '')
         self.assertIn('ran at 44100 Hz: set it to 48000 Hz', reaper_check.rate_hint({'device_rate': '44100'}))
+
+    def test_only_a_reading_with_the_transport_running_counts_as_playing(self):
+        loaded = reaper_check.LOADED + '.'
+        self.assertTrue(reaper_check.loaded_while_playing({'play_state': '1', 'status_playing': loaded}))
+        self.assertTrue(reaper_check.loaded_while_playing({'play_state': '5', 'status_playing': loaded}))
+        for state in ('0', '2', '', 'x'):
+            self.assertFalse(reaper_check.loaded_while_playing({'play_state': state, 'status_playing': loaded}))
+        self.assertFalse(reaper_check.loaded_while_playing({'status_playing': loaded}))
+        self.assertIn('did not start within 10 s', reaper_check.playing_text({'play_state': '0', 'play_started': 'no'}))
 
     def test_a_missing_file_records_nothing(self):
         self.assertEqual(reaper_check.read_results(pathlib.Path('/nonexistent/first.txt')), {})
@@ -175,6 +194,7 @@ class Run(unittest.TestCase):
             self.assertIn(wanted, result)
         self.assertRegex(result, re.escape(f'(`{self.package.name}.zip`)'))
         self.assertIn('quit (by itself)', result)
+        self.assertIn('transport running, at 1.500 s', result)
 
     def test_reaper_that_never_runs_the_script(self):
         with mock.patch.dict(os.environ, {'FAKE_REAPER': 'exit'}):
@@ -190,6 +210,17 @@ class Run(unittest.TestCase):
         self.assertEqual(status, 1)
         self.assertIn('| 7 | The reopened project restores the filter | **FAIL** | Status on reopening: Silent', result)
         self.assertIn('**FAIL: 7 of 8 checks passed.**', result)
+
+    def test_status_read_after_the_transport_stopped(self):
+        # jrp's first run (21 November 2026): both renders matched, but both
+        # readings "while playing" were taken with the transport stopped.
+        with mock.patch.dict(os.environ, {'FAKE_REAPER': 'stopped'}):
+            status, result = self.run_check()
+        self.assertEqual(status, 1)
+        self.assertIn('transport stopped, so this is not a reading during playback', result)
+        self.assertIn('| 3 | The .vstpreset loads the stereo example | **FAIL** |', result)
+        self.assertIn('| 7 | The reopened project restores the filter | **FAIL** |', result)
+        self.assertIn('**FAIL: 6 of 8 checks passed.**', result)
 
     def test_a_preset_call_that_failed(self):
         # Status and both renders look right, but REAPER said the preset did
