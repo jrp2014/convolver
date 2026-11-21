@@ -116,6 +116,13 @@ CHANGES = (
         'playing silence.'
     ),
     (
+        'The `echo` example presets and filters now sound like an echo: each sound comes back three times, 0.3 s '
+        'apart, each repeat 6 dB quieter, where before a single copy 5 ms later only made the tone hollow. The '
+        'identity, echo and repeat examples now sound clearly different and show differently on a level meter. A '
+        "copy of an earlier preview's echo preset, or a preset made from it, keeps the old sound: make it again from "
+        "this package's files."
+    ),
+    (
         'The limits guide now states, from measurements on four machines, what one instance handles: room '
         'correction for up to 8 channels, stereo and true-stereo reverbs up to 60 s (true-stereo 30 s at 96 kHz), '
         'a full 8 × 8 matrix only at 48 kHz, and the memory and preparation time a filter takes.'
