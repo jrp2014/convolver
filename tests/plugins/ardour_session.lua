@@ -22,6 +22,9 @@
 --   CONVOLVER_TAIL    frames to add after the recording
 --   CONVOLVER_LEAD    frames of silence before it
 --   CONVOLVER_ARDOUR_MAJOR  Ardour's major version (8 or 9)
+--   CONVOLVER_PINS    optional; 1 sets the plug-in's inputs and outputs to
+--                     the track's by hand, as Ardour's pin configuration
+--                     window's manual setting does
 -- Each step that fails stops the script with an error, which the test reports.
 
 -- Unbuffered, so that if Ardour crashes the log shows the last step begun.
@@ -104,16 +107,25 @@ if processor:isnil() then
 	error("Ardour cannot find the " .. format .. " plug-in " .. identifier .. " among the " .. listed .. " it lists")
 end
 assert(track:add_processor_by_index(processor, 0, nil, true) == 0, "cannot add the plug-in to the track")
+if os.getenv("CONVOLVER_PINS") == "1" then
+	step("set the plug-in's inputs and outputs by hand")
+	local audio = ARDOUR.DataType("audio")
+	assert(track:customize_plugin_insert(processor, 1, ARDOUR.ChanCount(audio, outputs), ARDOUR.ChanCount(audio, inputs)),
+		"Ardour refused " .. inputs .. " in, " .. outputs .. " out for the plug-in")
+end
 local plugin = processor:to_insert():plugin(0)
 local preset = plugin:preset_by_label(label)
 assert(preset, "Ardour does not list the preset " .. label)
 assert(plugin:load_preset(preset), "Ardour cannot load the preset " .. label)
 print("Loaded preset " .. label .. " into " .. plugin:name())
--- HOST-10: the channels Ardour runs the plug-in with, which the test checks
--- against the track's; and what Ardour calls each input parameter, since
--- its generic controls leave out every one it names "hidden".
+-- HOST-10: the channels the plug-in itself runs with (its natural streams),
+-- which the test checks against the filter's, and the insert's on the track
+-- side; and what Ardour calls each input parameter, since its generic
+-- controls leave out every one it names "hidden".
 local insert = processor:to_insert()
-print("Plug-in channels: " .. insert:input_streams():n_audio() .. " in, " ..
+print("Plug-in channels: " .. insert:natural_input_streams():n_audio() .. " in, " ..
+	insert:natural_output_streams():n_audio() .. " out")
+print("Insert channels: " .. insert:input_streams():n_audio() .. " in, " ..
 	insert:output_streams():n_audio() .. " out")
 for n = 0, plugin:parameter_count() - 1 do
 	local id, found = plugin:nth_parameter(n, true)

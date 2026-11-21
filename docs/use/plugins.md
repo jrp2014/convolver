@@ -91,8 +91,8 @@ Channels are numbered in the host's order, and the `.cfg` routes refer to them
 in that order. For VST3 the order follows the speaker arrangement: 5.1 is left,
 right, centre, LFE, left surround, right surround, the same order as the WAV
 speaker mask `3F`. Any arrangement with the right number of channels is
-accepted. Ardour runs the VST3 plug-in only with 2 inputs and 2 outputs
-([Ardour](#ardour)).
+accepted. Ardour gives the VST3 plug-in 2 inputs and 2 outputs unless its
+channels are set by hand ([Ardour](#ardour)).
 
 **Speaker check (VST3).** If the `.cfg` names its output speakers (the mask at
 the end of its first line, which presets keep) and the host's output
@@ -857,27 +857,34 @@ afresh.
 
 ## Ardour
 
-Ardour hosts the LV2 plug-in fully, but in Ardour 8 and 9.0 the VST3 plug-in
-gets only 2 inputs and 2 outputs, and two of its settings are missing from
-Ardour's controls. Seen in Ardour 8.4 and 9.0 on Linux, run headless in CI.
+In Ardour 8 and 9.0, the LV2 plug-in plays its mono, stereo and 2→6
+layouts as it does elsewhere. The VST3 plug-in gets 2 inputs and 2 outputs
+unless you set its channels by hand, and two of its settings are missing
+from Ardour's controls.
 
-- **Channels.** Whatever the track has, Ardour runs Convolver's VST3
-  plug-in with 2 inputs and 2 outputs; on a mono track it feeds the track's
-  channel to both inputs. A filter made for other counts, such as a mono
-  filter (1 in, 1 out) or a 2→6 crossover, does not fit: Convolver plays
-  silence and its Status says why. Ardour 9.0 does ask for the track's
-  channels, but on a mono track the request reaches Convolver as a layout
-  with no channels, which it refuses (the
-  [Convolver log](#status-and-the-convolver-log) then says `Refused the
-  host's channel layout: it has 0 input and 0 output channels`), and on a
-  wider track as stereo. With the VST3 plug-in in Ardour, use filters made
-  for 2 inputs and 2 outputs.
+- **Channels.** With Ardour's automatic pin configuration, Convolver's VST3
+  plug-in runs with 2 inputs and 2 outputs whatever the track has; on a
+  mono track Ardour feeds the track's channel to both inputs. A filter with
+  other outputs, such as a mono filter (1 in, 1 out) or a 2→6 crossover,
+  then plays silence and Convolver's Status says why. (Ardour 9.0 does ask
+  for a mono track's channel, but the request reaches Convolver as a layout
+  with no channels, which it refuses: the
+  [Convolver log](#status-and-the-convolver-log) says `Refused the host's
+  channel layout: it has 0 input and 0 output channels`.)
+- **A mono filter on a mono track** plays once you set the channels by
+  hand: in the mixer strip, right-click Convolver, choose **Pin
+  Connections…**, click **Manual Config**, and set **Audio Out** to 1 and
+  the audio input pins to 1 with the − buttons. A crossover cannot be set
+  up this way: Convolver still gets only 2 outputs. With the VST3 plug-in in
+  Ardour, use filters with 2 outputs (and 1 or 2 inputs), or a mono filter
+  set up as above.
 - **Settings.** Ardour leaves Gain mode and Latency out of its own controls
   for the VST3 plug-in, because they cannot be automated; Gain and Mix are
   there. On macOS and Windows, Convolver's window has all four (not yet
   tried in Ardour). On Linux the VST3 plug-in has no window, so in Ardour
   those two stay as they are.
-- **Which to use.** On Linux, use the LV2 plug-in: add the
+- **Which to use.** On Linux, use the LV2 plug-in for a crossover or to
+  reach every setting: add the
   [layout](#lv2-channel-layouts) that matches the track, such as 1→1 for
   mono or 2→6 for a crossover, choose the filter with its
   [Filter parameter](#lv2-filter-files), and Ardour shows Gain, Mix,

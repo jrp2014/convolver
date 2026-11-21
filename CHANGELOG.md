@@ -29,14 +29,16 @@ first published preview, keep their original grouping.
 
 ### Changed
 
-- Documentation (HOST-10): the plug-in guide has an Ardour section. Ardour
-  8 and 9.0 run the VST3 plug-in only with 2 inputs and 2 outputs, so a
-  mono or crossover filter plays silence there (Ardour 9.0 asks for a mono
-  track's channels, but the request arrives as a layout with no channels,
-  which Convolver refuses), and Ardour leaves Gain mode and Latency out of
-  its controls for the VST3 plug-in. On Linux, use the LV2 plug-in, whose
-  layouts and four settings Ardour shows in full. The LV2 ports table now
-  lists `gain_mode`.
+- Documentation (HOST-10): the plug-in guide has an Ardour section. With
+  Ardour's automatic pin configuration (Ardour 8 and 9.0), the VST3
+  plug-in gets 2 inputs and 2 outputs, so a mono or crossover filter plays
+  silence there (Ardour 9.0 asks for a mono track's channel, but the
+  request arrives as a layout with no channels, which Convolver refuses).
+  A mono filter on a mono track plays once its channels are set by hand in
+  Ardour's Pin Connections window; a crossover cannot be set up that way.
+  Ardour also leaves Gain mode and Latency out of its controls for the VST3
+  plug-in. On Linux, the LV2 plug-in's layouts and four settings work in
+  Ardour as elsewhere. The LV2 ports table now lists `gain_mode`.
 - Library (PLUG-39 step 4a), incompatible, hence 0.17.0: the accepted
   filter is shared rather than copied, as jrp chose on 20 November 2026.
   `HostFilter::filter()` returns a `std::shared_ptr<const Configuration>`
@@ -180,9 +182,11 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
-- Tests (HOST-10): the headless Ardour test requires Ardour to run the
-  plug-in with the track's channels, prints the Convolver log when it does
-  not, and prints the name Ardour gives each input parameter.
+- Tests (HOST-10): the headless Ardour test plays the mono example in the
+  VST3 plug-in with its inputs and outputs set by hand, as Ardour's pin
+  configuration window does; prints the channels the plug-in and the
+  insert run with and the name Ardour gives each input parameter; and
+  prints the Convolver log when an export does not match the oracle.
 - Tests (HOST-11, first version): `scripts/reaper_check.py` runs part of
   the REAPER host check from one command on a Mac. REAPER renders the
   stereo example through its `.vstpreset`, saves, quits, reopens the

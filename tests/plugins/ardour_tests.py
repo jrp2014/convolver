@@ -78,16 +78,18 @@ LATENCIES = [
 # Each fixture at the default Latency, 0; then a session saved at a larger
 # Latency, which Ardour must compensate when the export restores it: the
 # largest delay a user is likely to choose, and a multichannel one. Ardour's
-# LV2 host chooses the layout by URI. Ardour 8 and 9.0 run Convolver's VST3
-# only with 2 in, 2 out (HOST-10), feeding a mono track to both inputs, so
-# the mono and crossover presets do not fit there and only the stereo cases
-# run: Ardour 8 keeps a VST3's default buses, and Ardour 9.0's request for
-# the track's channels reaches the plug-in as no channels for a mono track
-# (VST3PI::request_bus_layout masks kMono with the default bus width), which
-# Convolver refuses, and as at most the default two channels otherwise.
+# LV2 host chooses the layout by URI. With its automatic pin configuration,
+# Ardour (8.4 and 9.0) runs Convolver's VST3 with 2 in, 2 out, feeding a
+# mono track to both inputs, so a mono or crossover preset plays silence
+# (HOST-10): Ardour 9.0's request for one channel reaches the plug-in as
+# none (VST3PI::request_bus_layout masks kMono with the default bus width),
+# and a request for more as two. Set by hand, as the pin configuration
+# window's manual setting does ('pins'), a mono track's 1 in, 1 out plays
+# the mono preset: Ardour then gives the plug-in a mono output. A crossover
+# set by hand still gets 2 outputs (tried on Ardour 8.4), so it is not run.
 CASES = {
     'LV2': [('mono', 0), ('stereo', 0), ('crossover', 0), ('stereo', 1024), ('crossover', 256)],
-    'VST3': [('stereo', 0), ('stereo', 1024)],
+    'VST3': [('stereo', 0), ('stereo', 1024), ('mono', 0, 'pins')],
 }
 
 
@@ -283,7 +285,7 @@ def preset_path(directory, format_name, fixture_name, label):
     return directory / 'home' / '.vst3' / 'presets' / REGISTRY['vendor']['name'] / VST3_CLASS / f'{label}.vstpreset'
 
 
-def check(tools, environment, directory, plugin_tool, format_name, fixture_name, fixture, latency):
+def check(tools, environment, directory, plugin_tool, format_name, fixture_name, fixture, latency, *, pins=False):
     inputs, outputs = fixture['inputs'], fixture['outputs']
     label = f'Convolver {fixture_name}'
     preset = preset_path(directory, format_name, fixture_name, label)
@@ -291,7 +293,7 @@ def check(tools, environment, directory, plugin_tool, format_name, fixture_name,
         preset.parent.mkdir(parents=True, exist_ok=True)
         run([plugin_tool, '--name', label, EXAMPLES / fixture_name / fixture['filter'], preset], environment)
 
-    name = f'{fixture_name}-{latency}'
+    name = f'{fixture_name}-{latency}' + ('-pins' if pins else '')
     session = directory / 'sessions' / name
     new_session(tools['new_session'], environment, session, name, outputs, tools['version'])
     filter_tail = tail(fixture['paths'], fixture['input_delays'], fixture['output_delays'])
@@ -311,6 +313,7 @@ def check(tools, environment, directory, plugin_tool, format_name, fixture_name,
         'CONVOLVER_FRAMES': str(RECORD),
         'CONVOLVER_TAIL': str(filter_tail + MARGIN),
         'CONVOLVER_LEAD': str(LEAD),
+        'CONVOLVER_PINS': '1' if pins else '',
     }
     result = run([tools['lua'], SCRIPT], {**environment, **settings}, check=False)
     if result.returncode != 0:
@@ -318,17 +321,13 @@ def check(tools, environment, directory, plugin_tool, format_name, fixture_name,
             explain_vst3_discovery(directory)
         sys.exit(f'{name}: {pathlib.Path(tools["lua"]).name} failed with exit code {result.returncode}')
     log = result.stdout
-    # HOST-10: Ardour must run the plug-in with the track's channels; a mono
-    # track fed to a 2-in VST3, as Ardour 8 and 9.0 do, leaves a mono preset
-    # unsuited and the export silent.
-    channels = re.search(r'^Plug-in channels: (\d+) in, (\d+) out', log, re.MULTILINE)
-    assert channels, f"{name}: the script did not report the plug-in's channels"
-    if (int(channels[1]), int(channels[2])) != (inputs, outputs):
-        show_convolver_log(directory)  # A refused layout is explained there.
-    assert (int(channels[1]), int(channels[2])) == (inputs, outputs), (
-        f'{name}: Ardour runs the plug-in with {channels[1]} in, {channels[2]} out, '
-        f"not the track's {inputs} in, {outputs} out"
-    )
+    # HOST-10: the channels Ardour gives the plug-in are printed, not
+    # asserted: what users hear is the export, checked against the oracle
+    # below, and a filter Ardour's channels do not suit exports silence.
+    # The Convolver log says what the plug-in was given.
+    for line in log.splitlines():
+        if line.startswith(('Plug-in channels:', 'Insert channels:')):
+            print(f'{name}: {line}')
     # The region can be a few frames shorter than the take's files.
     recorded = re.search(r'^Recorded (\d+) frames', log, re.MULTILINE)
     assert recorded, f'{name}: the script did not report the recording'
@@ -367,6 +366,7 @@ def check(tools, environment, directory, plugin_tool, format_name, fixture_name,
                 lag, error = best_lag(got, want)
                 print(f'{name}: output {c} matches best {lag:+d} frames from where expected (error {error:.3g})')
         print(f'{name}: the region is at {region_position(session, name)} in the session file')
+        show_convolver_log(directory)  # Says which channels the plug-in was given, and why it is silent.
     peak = max(abs(v) for channel in expected for v in channel)
     print(
         f'{format_name} {name}: {inputs} in, {outputs} out, Latency {latency}, {len(take[0])} recorded frames, '
@@ -430,7 +430,7 @@ def main():
             library = {'LD_LIBRARY_PATH': ':'.join(filter(None, [str(scan.parent), os.environ.get('LD_LIBRARY_PATH')]))}
             run([scan, '--force', installed], {**environment, **library})
         all_fixtures = fixtures()
-        for fixture_name, latency in CASES[format_name]:
+        for fixture_name, latency, *pins in CASES[format_name]:
             worst = max(
                 worst,
                 check(
@@ -442,6 +442,7 @@ def main():
                     fixture_name,
                     all_fixtures[fixture_name],
                     latency,
+                    pins=bool(pins),
                 ),
             )
     print(f'Ardour ({format_name}): worst error against the oracle {worst:.3g}')

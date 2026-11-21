@@ -631,11 +631,17 @@ until its cause is known: record what was observed, as below.
 | --- | --- | --- | --- | --- |
 
 None is open. The last, Ardour running the VST3 plug-in only at 2 in, 2 out
-and naming Latency and Gain mode "hidden" (Ardour 8.4, headless, 20 November
-2026), was explained by HOST-10 on 21 November 2026: Ardour 8 keeps a VST3
-plug-in's default buses, Ardour 9.0 masks its request for the track's
-channels with the default width, and both hide parameters that cannot be
-automated ([Ardour, headless](testing.md#ardour-headless)); the
+and naming Latency and Gain mode "hidden", was seen in Ardour 8.4 (Ubuntu
+24.04's 8.4.0~ds1, headless, 20 November 2026): on a mono track Ardour fed
+the one input to both of the VST3's inputs and kept its two outputs, so the
+mono example's preset did not fit and the export was silent (the session
+file showed `ConfiguredInput` 1 and `ConfiguredOutput` 2); Ardour saved the
+two parameters as not automatable, and setting them through its Lua API
+worked. HOST-10 explained it on 21 November 2026: with its automatic pin
+configuration, Ardour 8 keeps a VST3 plug-in's default buses and Ardour 9.0
+masks its request for the track's channels with the default width; set by
+hand, a mono track's 1 in, 1 out plays; and both hide parameters that
+cannot be automated ([Ardour, headless](testing.md#ardour-headless)). The
 [plug-in guide](../use/plugins.md#ardour) says what Ardour users need.
 Before it, a new VST3 Latency that REAPER used only after a render, FX
 Offline then Online, or reopening the project, was fixed by VST3-16 and

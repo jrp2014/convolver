@@ -492,8 +492,8 @@ Items finished since then are listed here, one line each, until the next
 move to the archive.
 
 - [x] **HOST-10 — Ardour's VST3 channels and settings.** 21 November 2026,
-  PR #247: Ardour 8 and 9.0 run the VST3 only at 2 in, 2 out and hide Gain
-  mode and Latency ([plug-ins](docs/use/plugins.md#ardour)).
+  PR #247: Ardour 8 and 9.0 give the VST3 2 in, 2 out unless set by hand,
+  and hide Gain mode and Latency ([plug-ins](docs/use/plugins.md#ardour)).
 - [x] **CI-48 — No GCC 12 warnings from our sources in the Linux package.** 21
   November 2026, PR #244
   ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
