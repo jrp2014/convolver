@@ -325,6 +325,18 @@ relevant to a convolver unless the product changes.
 - [ ] **PERF-8 — Split spectra straight from the FFT.** Skip the
   interleave and deinterleave kernels where the backend works in split form,
   within the divergence gates.
+- [ ] **FFT-5 — Estimate's overflow decided the same in every build.**
+  `estimate_attenuation()` filters fixed-seed full-scale noise through the
+  engine, so whether a near-overflow filter's noise overflows depends on the
+  FFT library's intermediate values: one tap of 3e38 got no estimate in one
+  Linux Clang Debug build and an estimate in another and in the Linux
+  Release candidate (21 November 2026, PR #261; jrp: "an interesting
+  performance finding"). The plug-ins' "Too loud to estimate" is untested
+  for that reason. **Done when** the decision is the same in every build
+  (for example from the filter's energy in double precision, or with the
+  noise scaled before filtering), a test covers "Too loud to estimate", and
+  a check shows whether the FFTW plan chosen changes other results at
+  extreme levels.
 
 ### Kernel rounding
 
