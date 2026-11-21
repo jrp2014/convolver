@@ -16,10 +16,17 @@ compiler flags, FFT backend and CPU kernels.
         --vst3-bundle build/VST3/Release/Convolver.vst3 --vst3-backend OOURA
     python3 tests/upgrade/run_upgrade.py --lv2-render build/.../convolver_lv2_render \
         --lv2-bundle build/.../convolver.lv2 --lv2-backend OOURA
+    python3 tests/upgrade/run_upgrade.py --au-render avaudioengine_render
 
 A folder's lv2.json, where a release shipped the LV2 plug-in, lists LV2
 state that release saved through lilv; each is restored as a host reopens a
 session, ports included, and must reproduce the release's own render.
+A folder's au.json lists the ClassInfo the release's Audio Unit saved; on
+macOS, with this build's unit installed for the user, avaudioengine_render
+(the Audio Unit tests' AVAudioEngine host, built with `xcrun swiftc`)
+restores each in a new unit and renders it, which must report the release's
+latency and match the expected audio within the bound (never sample for
+sample: the expected audio comes from the Linux capture).
 
 CTest also passes --compiler, --configuration and --flags; without all
 three the check is held to the tolerance only.
@@ -235,6 +242,44 @@ def check_lv2(folder, case, render, bundle, exact, work, worst_seen):
     return compare(label, actual, expected, exact, worst_seen)
 
 
+def check_au(folder, case, render, block, work, worst_seen):
+    label = f'{folder.name} {case["name"]} au'
+    expected = fixtures.read_float_wav(folder / case['expected'])
+    planar = fixtures.read_float_wav(folder / case['input'])
+    interleaved = [planar[c][i] for i in range(len(planar[0])) for c in range(len(planar))]
+    raw_in, raw_out = work / 'in.f32', work / 'out.f32'
+    raw_in.write_bytes(struct.pack(f'<{len(interleaved)}f', *interleaved))
+    latency = case['latency']
+    registry = json.loads((HERE.parents[1] / 'plugins' / 'identities.json').read_text(encoding='utf-8'))['au']
+    codes = ','.join(registry[key] for key in ('type', 'subtype', 'manufacturer'))
+    code, text = run(
+        [
+            render,
+            codes,
+            folder / case['state'],
+            raw_in,
+            raw_out,
+            case['rate'],
+            case['inputs'],
+            case['outputs'],
+            block,
+            latency + len(expected[0]),
+        ]
+    )
+    if code != 0:
+        return f'{label}: exit {code}\n{text}'
+    reported = [line.split() for line in text.splitlines() if line.startswith('latency ')]
+    if reported != [['latency', str(latency)]]:
+        return f'{label}: reported {reported}; the release reported latency {latency}'
+    data = raw_out.read_bytes()
+    samples = struct.unpack(f'<{len(data) // 4}f', data)
+    rendered = [list(samples[c :: case['outputs']]) for c in range(case['outputs'])]
+    early = max((abs(v) for channel in rendered for v in channel[:latency]), default=0.0)
+    if early > bound(expected):
+        return f'{label}: {early:.3g} before the reported latency of {latency} frames'
+    return compare(label, [channel[latency:] for channel in rendered], expected, exact=False, worst_seen=worst_seen)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--cli', type=Path, help='the convolver command-line tool to check')
@@ -244,6 +289,7 @@ def main(argv=None):
     parser.add_argument('--lv2-render', type=Path, help='convolver_lv2_render')
     parser.add_argument('--lv2-bundle', type=Path, help='the convolver.lv2 bundle to check')
     parser.add_argument('--lv2-backend', help="the bundle's FFT backend, as CMake names it (OOURA)")
+    parser.add_argument('--au-render', type=Path, help="avaudioengine_render, with this build's Audio Unit installed")
     parser.add_argument('--compiler', help='this build\'s compiler and version, as CMake names them ("GNU 11.4.0")')
     parser.add_argument('--configuration', help="this build's configuration (Release)")
     parser.add_argument(
@@ -254,8 +300,8 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
     lv2 = bool(args.lv2_render and args.lv2_bundle)
-    if not args.cli and not (args.vst3_render and args.vst3_bundle) and not lv2:
-        parser.error('give --cli, --vst3-render with --vst3-bundle, or --lv2-render with --lv2-bundle')
+    if not args.cli and not (args.vst3_render and args.vst3_bundle) and not lv2 and not args.au_render:
+        parser.error('give --cli, --vst3-render with --vst3-bundle, --lv2-render with --lv2-bundle, or --au-render')
 
     folders = sorted(p.parent for p in HERE.glob('*/manifest.json'))
     if not folders:
@@ -321,6 +367,18 @@ def main(argv=None):
                     failure = check_lv2(folder, case, args.lv2_render, args.lv2_bundle, lv2_exact, work, worst_seen)
                     if failure:
                         failures.append(failure)
+            au_path = folder / 'au.json'
+            if args.au_render and au_path.is_file():
+                au_record = json.loads(au_path.read_text(encoding='utf-8'))
+                failures += check_files(folder, au_record)
+                print('  au: within the bound')
+                block = au_record['captured']['block_size']
+                for case in au_record['cases']:
+                    failure = check_au(folder, case, args.au_render, block, work, worst_seen)
+                    if failure:
+                        failures.append(failure)
+    if args.au_render and not any((folder / 'au.json').is_file() for folder in folders):
+        failures.append('no folder holds Audio Unit state (au.json) for --au-render to check')
     if worst_seen:
         print(
             f'largest difference: {worst_seen["worst"]:.3g} in {worst_seen["label"]}, '

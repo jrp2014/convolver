@@ -361,8 +361,11 @@ limitation that no longer holds is removed. Its merge makes the tag.
    build `convolver_lv2_render` (an LV2 build with tests) and run
    [`tests/upgrade/capture_lv2.py`](../../tests/upgrade/capture_lv2.py) on
    the same ZIP: the package's LV2 plug-in saves each case's state through
-   lilv and renders it, into the same folder. Open a pull request with that
-   folder. Then save a REAPER project with the
+   lilv and renders it, into the same folder. On an Apple silicon Mac,
+   install the macOS arm64 ZIP's `Convolver.component` for the user and run
+   [`tests/upgrade/capture_au.py`](../../tests/upgrade/capture_au.py) with
+   that ZIP: the package's Audio Unit saves each case's `ClassInfo`, into
+   the same folder. Open a pull request with that folder. Then save a REAPER project with the
    released plug-in for the same folder (COMPAT-1 in [TODO](../../TODO.md)).
    What the folder holds and how later builds are checked against it:
    [files from released builds](../../tests/upgrade/README.md).

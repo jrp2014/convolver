@@ -25,6 +25,15 @@ python3 tests/upgrade/run_upgrade.py --lv2-render build/.../convolver_lv2_render
   --lv2-bundle build/.../convolver.lv2 --lv2-backend OOURA --kernels-from build/convolver
 ```
 
+The Audio Unit check is a step of the Audio Unit workflow's Release job, not
+a CTest test: it needs the unit installed for the user, as the workflow
+installs it. On a Mac with this build's unit installed:
+
+```sh
+xcrun swiftc -O -o avaudioengine_render <the Audio Unit tests' avaudioengine_render.swift>
+python3 tests/upgrade/run_upgrade.py --au-render ./avaudioengine_render
+```
+
 ## What each folder holds
 
 - `package/`: the release's example presets (`presets/`) and first-use
@@ -59,6 +68,15 @@ python3 tests/upgrade/run_upgrade.py --lv2-render build/.../convolver_lv2_render
   CLI's file where the release's plug-in, restoring the state, rendered the
   same samples (every case at the default settings did), otherwise
   `expected/NAME.lv2.wav`.
+- `au-state/` and `au.json` (0.14.0 so far): for each LV2 case, the same
+  settings included, the ClassInfo the release's macOS arm64 Audio Unit
+  gave once it had restored an `.aupreset` the release's `convolver-preset`
+  made from the case's filter and taken the case's settings through its
+  parameters, as a host saves a project (`NAME.plist`, an XML property list
+  written by Python's `plistlib`). `au.json` records how they were made,
+  each file's SHA-256 and, for each case, its settings, latency, the
+  expected file (the same as the LV2 case's) and how far the release's own
+  unit, restoring that ClassInfo through AVAudioEngine, fell from it.
 
 ## The checks
 
@@ -79,6 +97,12 @@ For each case, `run_upgrade.py`:
   counts, as a host reopening a session does; the instance plays the input
   in the same irregular host blocks, and the latency its port reports, which
   must be the release's, is dropped;
+- on macOS, with `--au-render`, restores each Audio Unit state in this
+  build's installed unit through AVAudioEngine, renders the input in blocks
+  of the size `au.json` records and drops the latency the unit reports,
+  which must be the release's; the audio must be silent before it and
+  within the bound after it (never identical samples: the expected files
+  come from Linux);
 - requires the same rate, channel count and frame count, and samples within
   the bound: 1e-5 (the PLUG-2 oracle tolerance), times the expected file's
   peak when it is louder than full scale, since float rounding grows with the
@@ -114,7 +138,8 @@ so.
 - Never regenerate or edit a retained file; the runner fails if one changes.
   The version folders are checked out byte for byte (`.gitattributes`), left
   alone by the formatters and markdownlint, and any change in this folder
-  runs the native, VST3 and LV2 workflows, the three whose tests read it
+  runs the native, VST3, LV2 and Audio Unit workflows, the four whose tests
+  read it
   ([CI triggers](../../docs/develop/testing.md#pull-requests-for-one-plug-in-format)).
   A deliberate incompatibility is jrp's decision, recorded in the
   [decisions log](../../docs/project/decisions.md), and the check it breaks is
@@ -125,16 +150,16 @@ so.
   [`capture.py`](capture.py) on Linux x86-64 from that release's Linux ZIP
   ([publication steps](../../docs/develop/releasing.md#publishing-an-unsigned-preview)),
   then its LV2 state with [`capture_lv2.py`](capture_lv2.py) from the same
-  ZIP. Their docstrings give the commands; each refuses to write files it
-  would replace.
+  ZIP, then its Audio Unit state with [`capture_au.py`](capture_au.py) on an
+  Apple silicon Mac from its macOS arm64 ZIP, with the release's unit
+  installed. Their docstrings give the commands; each refuses to write files
+  it would replace.
 
 ## Not yet kept
 
 - A saved REAPER project containing Convolver, made with the release, kept
   for reopening by hand; the runner will take the plug-in state out of it and
   restore it through the adapters (COMPAT-1 in [TODO](../../TODO.md)).
-- Audio Unit state from a release: the VST3 check runs on each CI system
-  that builds the bundle and the LV2 check in the LV2 workflow, but no Audio
-  Unit state is kept yet.
-- LV2 state from 0.13.12, 0.13.20 and 0.13.24, which shipped the LV2
-  plug-in before 0.14.0; only 0.14.0's is kept.
+- LV2 and Audio Unit state from the releases before 0.14.0 (0.13.2 to
+  0.13.24 shipped the Audio Unit, and 0.13.12 to 0.13.24 the LV2 plug-in);
+  only 0.14.0's is kept.
