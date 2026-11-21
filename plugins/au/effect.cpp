@@ -519,7 +519,9 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
         } catch (...) {
         }
     }
-    if (!message.empty() || problem || bypass_shown || !mode_message.empty())
+    // `changed`: uninitialized, the Latency the next initialization uses,
+    // which the Status line and report show (AU-19).
+    if (!message.empty() || problem || bypass_shown || !mode_message.empty() || changed)
         notify_status();
     // Finished: the tests' witness (AU-14).
     if (const auto hook = latency_progress_for_tests)

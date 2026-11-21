@@ -472,7 +472,9 @@ format.
   says about the settings, in short, after the line's own words: a Latency
   chosen but not in use yet ("Latency 1024 frames not in use yet.", from
   the latency the processor plays at, except after a load failure or a
-  fault, which say more), and, with a filter, Estimate chosen without an
+  fault, which say more; with no processor, as while the Audio Unit is
+  uninitialized, the choice is the one the next start uses, so it is never
+  "not in use yet", AU-19), and, with a filter, Estimate chosen without an
   estimate ("No estimate: No clipping's gain plays." or "Too loud to
   estimate: …") or no gain figure at all ("Silent: no gain figure for this
   filter.", or "No gain figure for this filter: only the dry signal

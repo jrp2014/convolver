@@ -73,6 +73,10 @@ using namespace convolver;
 using au_test::check;
 using au_test::Unit;
 
+// Defined with the parameter tests below.
+void set_parameter(Unit& unit, AudioUnitParameterID id, AudioUnitParameterValue v);
+std::string status_text(Unit& unit);
+
 namespace {
 void require(bool condition, const std::string& message) {
     if (!condition)
@@ -337,7 +341,7 @@ bool latency_settled(const Unit& unit,
 void timing_in_seconds() {
     Unit unit;
     Notifications seen;
-    for (auto id : {kAudioUnitProperty_Latency, kAudioUnitProperty_TailTime})
+    for (auto id : {kAudioUnitProperty_Latency, kAudioUnitProperty_TailTime, au::report_property})
         check(AudioUnitAddPropertyListener(unit.get(), id, &Notifications::listener, &seen),
               "property listener");
     const auto filter = crossover(48000);
@@ -351,6 +355,22 @@ void timing_in_seconds() {
             "latency at 48 kHz is not 256 frames in seconds");
     check(unit.load(state_of(filter)), "load before initialization");
     require(seen.of(kAudioUnitProperty_TailTime) > 0, "no tail notification after a load");
+    // AU-19 (jrp's review, 21 November 2026): uninitialized, a new Latency is
+    // the one the next initialization uses, never "not in use yet", even
+    // before the Latency work has run, and the window is told once it has.
+    require(latency_settled(unit), "the Latency work the load woke did not finish");
+    seen.clear(); // The load's notices.
+    for (const auto index : {2, 3}) {
+        set_parameter(unit, au::latency_parameter, static_cast<float>(index));
+        require(status_text(unit).find("not in use yet") == std::string::npos,
+                "Status uninitialized after a Latency change: " + status_text(unit));
+        require(latency_settled(unit), "the Latency work did not finish uninitialized");
+        require(status_text(unit).find("not in use yet") == std::string::npos,
+                "Status uninitialized once the Latency work ran: " + status_text(unit));
+        require(seen.of(au::report_property) > 0,
+                "the window was not told of a Latency change uninitialized");
+        seen.clear();
+    }
     require(unit.seconds(kAudioUnitProperty_TailTime) == static_cast<double>(tail) / 48000,
             "tail before initialization is not the filter's tail in seconds");
     check(unit.initialize(), "initialization");

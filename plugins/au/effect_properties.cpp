@@ -221,7 +221,9 @@ std::shared_ptr<const Effect::Diagnostics> Effect::diagnostics() const {
 HostStatusLine Effect::status_line(const Diagnostics& d) {
     return host_status(d.filter, d.host, d.log_written, settings(), bypass_.load(),
                        true, // Choose Filter in the window.
-                       latency_.load());
+                       // Uninitialized, the Latency setting the next
+                       // initialization uses, as VST3's status() (AU-19).
+                       d.running ? latency_.load() : settings().latency);
 }
 
 HostReport Effect::report_of(const Diagnostics& d) {
@@ -231,7 +233,7 @@ HostReport Effect::report_of(const Diagnostics& d) {
     facts.max_frames = d.max_frames;
     facts.running = d.running;
     facts.settings = settings();
-    facts.latency_frames = latency_.load();
+    facts.latency_frames = d.running ? latency_.load() : settings().latency;
     facts.tail_frames = tail_.load();
     facts.tail_rate = tail_rate_.load();
     facts.log_written = d.log_written;
