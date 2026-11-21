@@ -103,7 +103,11 @@ class LuaText(unittest.TestCase):
             self.assertTrue(text.rstrip().endswith('reaper.defer(tick)'))
         for stage in ('first', 'reopen'):
             # Status is read while the transport runs (jrp's first run read it stopped).
-            self.assertIn('reaper.GetSetRepeatEx(project, 1)', reaper_check.lua_script(stage, {}))
+            # The project's own loop and repeat come back, so the saved project is unchanged.
+            text = reaper_check.lua_script(stage, {})
+            self.assertIn('reaper.GetSetRepeatEx(project, 1)', text)
+            self.assertIn('reaper.GetSetRepeatEx(project, repeat_before)', text)
+            self.assertIn('reaper.GetSet_LoopTimeRange2(project, true, true, loop_start, loop_end, false)', text)
         self.assertEqual(reaper_check.lua_script('first', {}).count('"D_PANLAW", 1)'), 2)
         self.assertIn('TrackFX_SetPreset', reaper_check.lua_script('first', {}))
         self.assertNotIn('TrackFX_SetPreset', reaper_check.lua_script('reopen', {}))
@@ -129,6 +133,7 @@ class Records(unittest.TestCase):
         for state in ('0', '2', '', 'x'):
             self.assertFalse(reaper_check.loaded_while_playing({'play_state': state, 'status_playing': loaded}))
         self.assertFalse(reaper_check.loaded_while_playing({'status_playing': loaded}))
+        self.assertIn('did not start within 10 s', reaper_check.playing_text({'play_state': '0', 'play_started': 'no'}))
 
     def test_a_missing_file_records_nothing(self):
         self.assertEqual(reaper_check.read_results(pathlib.Path('/nonexistent/first.txt')), {})

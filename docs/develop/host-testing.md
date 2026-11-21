@@ -462,8 +462,8 @@ window, Latency and the crossover stay manual until the script grows to
 cover them, one addition per run. jrp's first run, on 21 November 2026
 with the 0.16.14 candidate, passed all eight checks
 ([record](../archive/reviews/2026-11-21-host11-reaper.md)); it read Status
-"while playing" after the transport had stopped, which the repeat now
-prevents. Without REAPER, `tests/reaper_check_tests.py`
+"while playing" after the transport had stopped. The repeat is meant to
+prevent that; it has not yet run in REAPER. Without REAPER, `tests/reaper_check_tests.py`
 checks the script in pre-commit against a stand-in REAPER.
 
 ### Audacity (VST3)

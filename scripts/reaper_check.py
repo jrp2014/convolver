@@ -274,8 +274,8 @@ step(function()
   end
   reaper.SetMediaTrackInfo_Value(master, "D_VOL", 1)
   reaper.SetMediaTrackInfo_Value(master, "D_PAN", 0)
-  -- A gain of 1 at the centre, whatever the default pan law in REAPER's
-  -- preferences (-1 would follow them).
+  -- A gain of 1 at the centre, whatever the project's default pan law
+  -- (taken from REAPER's preferences or template), which -1 would follow.
   reaper.SetMediaTrackInfo_Value(master, "D_PANLAW", 1)
   reaper.SetMediaTrackInfo_Value(master, "I_NCHAN", 2)
   reaper.GetSetProjectInfo(project, "PROJECT_SRATE", CONFIG.rate, true)
@@ -588,7 +588,12 @@ def loaded_while_playing(results):
 def playing_text(results):
     if 'play_state' not in results:
         return 'while playing: (not read)'
-    when = 'transport running' if playing(results) else 'transport stopped, so this is not a reading during playback'
+    if playing(results):
+        when = 'transport running'
+    elif results.get('play_started') == 'no':
+        when = 'the transport did not start within 10 s: check the audio device in REAPER'
+    else:
+        when = 'transport stopped, so this is not a reading during playback'
     return (
         f'while playing: {results.get("status_playing", "(none)")} '
         f'(play state {results["play_state"]}, {when}, at {results.get("play_position", "?")} s)'

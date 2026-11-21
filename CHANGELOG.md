@@ -217,9 +217,9 @@ first published preview, keep their original grouping.
   the render within the bound; `capture_au.py` captures later releases,
   and the AVAudioEngine renderer gains `--parameter` and `--save` for it.
   Changes to `tests/upgrade/` now run the LV2 and Audio Unit workflows too.
-- Tests (HOST-11): `scripts/reaper_check.py` reads Status during playback
-  with REAPER's transport running, repeating the project's first seconds
-  while it plays; in jrp's first run, on 21 November 2026, REAPER had
+- Tests (HOST-11): `scripts/reaper_check.py` repeats the project's first
+  seconds while REAPER plays, so that Status is read with the transport
+  running, and counts that reading only when REAPER reports it running; in jrp's first run, on 21 November 2026, REAPER had
   stopped at the end of the 85 ms example before the reading. Checks 3
   and 7 now need that reading too, and track and master pan laws are set to
   0 dB. The first run passed all eight checks on the 0.16.14 candidate.
