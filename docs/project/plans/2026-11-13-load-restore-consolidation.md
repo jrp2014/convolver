@@ -100,7 +100,7 @@ group to a row:
 | VST3 `tail_`, written in four places; Audio Unit `tail_` | The playing processor's tail and the accepted filter's | Computed by one function from the processor and filter, which already follows a replacement inside a processor (the harness's `tail-after-replacement`) |
 | VST3 `active_latency_`; Audio Unit `latency_` (the newest processor's latency, or the chosen one while uninitialized) | The newest processor's latency, and the chosen setting | The newest processor's latency, written by the ownership mechanism when it offers that processor, so the host reads at once the latency the next callback uses; the Audio Unit's second meaning comes from its parameter |
 | Audio Unit `status_`, `status_log_written_`, `status_bypassed_`, `report_cache_` | `host_status()` and `host_report()` of `HostFilter`, the settings and bypass | One control-side snapshot, combined when read with the live audio-side values (step 4). Since step 4a: gone; `Effect::Diagnostics`, which shares the accepted filter, is published whole by `update_status()`, and the Status line and report are built from it with the Gain, Mix, bypass, latency and tail read then |
-| VST3 controller `status_text_`, `status_value_`, `report_text_` | The report the controller already holds (`report_`) | Derived from it |
+| VST3 controller `status_text_`, `status_value_`, `report_text_` | The report the controller already holds (`report_`) | Derived from it. Since step 5a: gone; the controller holds the decoded report and the log tag only |
 | VST3 processor `kept_name_` and `kept_identity_`, controller `kept_name_` and `kept_identity_` | The name pair of the playing filter, kept beside the newest offered pair | Removed by the shared name rule; the processor's offered pair moves into `HostFilter`. Since step 4b: gone; `HostFilter` keeps the offered name, and state of the filter that plays keeps the name it shows |
 | LV2 `shown` | The status ordering above | Still the value `run()` reads, written through the shared ordering |
 
@@ -109,6 +109,7 @@ Text that goes round in a circle, written and then parsed back:
 - `report_fields()` (`portable/host_report.cpp`) writes the window's audio
   facts as tab- and newline-separated lines, which `window_model.cpp` parses
   back; the VST3 processor also sends `report_text()` beside the fields.
+  Since step 5a: gone; one codec carries the typed report.
 - Exceptions carry `Advice` as English-labelled text ("Cause: ", "Fix: ",
   "Note: ") that `parse_advice()` (`portable/advice.hpp`) reads back.
 - The VST3 processor's `load_file()` throws `"refused"` or `"no reader"` only
@@ -476,7 +477,14 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
    VST3 controller derives the report's text and the Status text from the
    report it holds; exceptions carry `Advice` as a typed value, keeping the
    public exception types and their `what()` text. No message a user reads
-   changes.
+   changes. Step 5a, done on 21 November 2026: `encode_report()` and
+   `decode_report()` (`portable/host_report.hpp`) are the one codec, the VST3
+   message and the Audio Unit property carry their bytes, `window_content()`
+   takes the typed report, and the VST3 controller keeps only the decoded
+   report (with the log tag) and derives the Status text, its value and Copy
+   diagnostics from it; `report_fields()`, the VST3 codec of its own and the
+   separate `report_text()` attribute are gone. Step 5b carries the typed
+   advice.
 6. **Recount and close.** Recount the inventory on `main`; update the
    [implementation map](../../develop/architecture.md) and the
    [adapter contract](../../develop/plugin-contract.md) where they describe the

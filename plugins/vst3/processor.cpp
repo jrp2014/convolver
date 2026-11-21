@@ -97,31 +97,6 @@ ParamValue normalized_gain_mode(GainMode mode) noexcept {
     const auto i = std::min(static_cast<std::size_t>(mode), gain_mode_count - 1);
     return static_cast<ParamValue>(i) / static_cast<ParamValue>(gain_mode_count - 1);
 }
-std::string encode_report(const std::vector<std::pair<std::string, std::string>>& fields) {
-    std::string bytes;
-    for (const auto& [name, value] : fields) {
-        bytes += name;
-        bytes += '\0';
-        bytes += value;
-        bytes += '\0';
-    }
-    return bytes;
-}
-std::vector<std::pair<std::string, std::string>> decode_report(std::string_view bytes) {
-    std::vector<std::pair<std::string, std::string>> fields;
-    while (!bytes.empty()) {
-        const auto name_end = bytes.find('\0');
-        if (name_end == std::string_view::npos)
-            break;
-        const auto value_end = bytes.find('\0', name_end + 1);
-        if (value_end == std::string_view::npos)
-            break;
-        fields.emplace_back(bytes.substr(0, name_end),
-                            bytes.substr(name_end + 1, value_end - name_end - 1));
-        bytes.remove_prefix(value_end + 1);
-    }
-    return fields;
-}
 namespace {
 std::string next_tag() {
     static std::atomic<unsigned> instances{0};
@@ -410,16 +385,13 @@ HostReport Processor::report_locked() const {
 }
 void Processor::send_status(const StatusAnswer& answer) noexcept {
     try {
-        HostStatusLine line;
-        std::string fields, text;
+        std::string report;
         {
             const Locked lock(*this);
             if (settling_.playing()) // PLUG-27: the host plays the filter.
                 filter_.confirm();
-            line = status_locked();
-            const auto report = report_locked();
-            fields = encode_report(report_fields(report));
-            text = report_text(report);
+            // PLUG-39 step 5: the report holds the Status line too.
+            report = encode_report(report_locked());
         }
         if (!getPeer())
             return;
@@ -430,10 +402,7 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
         auto* attributes = message->getAttributes();
         if (!attributes)
             return;
-        attributes->setInt("status", static_cast<int64>(line.status));
-        attributes->setBinary("text", line.text.data(), static_cast<uint32>(line.text.size()));
-        attributes->setBinary("report", fields.data(), static_cast<uint32>(fields.size()));
-        attributes->setBinary("report text", text.data(), static_cast<uint32>(text.size()));
+        attributes->setBinary("report", report.data(), static_cast<uint32>(report.size()));
         attributes->setBinary("format", tag_.data(), static_cast<uint32>(tag_.size()));
         if (answer.load_request) {
             attributes->setInt("load request", answer.load_request);

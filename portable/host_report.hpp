@@ -56,6 +56,7 @@ struct HostFact {
     std::string label, value, note;
     bool problem = false;
     std::string help;
+    bool operator==(const HostFact&) const = default;
 };
 
 struct HostReport {
@@ -126,6 +127,7 @@ struct HostReport {
     std::vector<std::pair<std::string, std::string>> reference;
     std::string log_path; // UTF-8; empty when there is none.
     bool log_written = true;
+    bool operator==(const HostReport&) const = default;
 };
 
 HostReport host_report(const HostFilter&, const HostReportFacts&);
@@ -138,16 +140,16 @@ std::string filter_identity_text(std::uint64_t identity);
 // digits, or none for anything else (VST3's controller state, PLUG-22).
 std::optional<std::uint64_t> parse_filter_identity_text(std::string_view text) noexcept;
 
-// The report as named text values, for a format's transport (an Audio Unit
-// property dictionary): status (the HostStatus number), status name,
-// summary (the status line), title, explanation, problem, plays, cause, fix,
-// note, action, filter name,
-// filter note, filter identity, filter saved name, filter path, filter files (one per line), sample
-// rate (digits, or empty), latency waits ("yes" or "no"), mix note, gain note, audio (one line per
-// fact: label, value, note, "problem" or empty, and help, separated by tabs), reference (one
-// "Label: value" line each), log path and log written
-// ("yes" or "no").
-std::vector<std::pair<std::string, std::string>> report_fields(const HostReport&);
+// PLUG-39 step 5: the report as bytes, for a format's transport (the VST3
+// processor's status message, the Audio Unit's report property), and the
+// report back from them: every field of HostReport, typed, encoded once,
+// so a window or controller never parses text lines back (a negative
+// sample rate, which host_report() never gives, is sent as 0). decode_report()
+// gives nothing for bytes it cannot read whole (another encoding version,
+// cut short, an out-of-range status or anything left over); it may throw
+// std::bad_alloc.
+std::string encode_report(const HostReport&);
+std::optional<HostReport> decode_report(std::string_view bytes);
 
 // The report as plain text: title, status, explanation, the Audio facts
 // ("Label: value note"), the settings and the reference lines.
@@ -157,7 +159,4 @@ std::string report_text(const HostReport&);
 // the Convolver log (host_log_recent), ready to paste into a report. Reads
 // the log file, so it is built only when asked for, never on the audio thread.
 std::string diagnostics_text(const HostReport&, const std::string& format);
-// The same from report_text() already made, for a format whose window has
-// only the text (the VST3 controller, which the processor sends it).
-std::string diagnostics_text(const std::string& report_text, const std::string& format);
 } // namespace convolver

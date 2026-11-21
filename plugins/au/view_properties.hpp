@@ -8,9 +8,10 @@
 #include <AudioToolbox/AudioToolbox.h>
 
 namespace convolver::au {
-// Read-only, global. A CFDictionaryRef of CFString values, report_fields()
-// (portable/host_report.hpp), which the caller releases (QA1684). The unit
-// signals a property change whenever the status may have changed.
+// Read-only, global. A CFDataRef holding encode_report() (portable/
+// host_report.hpp; PLUG-39 step 5), which the caller releases (QA1684) and
+// reads with decode_report(). The unit signals a property change whenever
+// the status may have changed.
 inline constexpr AudioUnitPropertyID report_property = 64000;
 // Read-only, global. A CFStringRef the caller releases: diagnostics_text(),
 // the report and this instance's recent Convolver log lines, for Copy

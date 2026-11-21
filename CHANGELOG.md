@@ -29,6 +29,16 @@ first published preview, keep their original grouping.
 
 ### Changed
 
+- Plug-ins (PLUG-39 step 5a): the window's report travels as one typed
+  value. `encode_report()` and `decode_report()` in
+  `portable/host_report.hpp` encode it once for the VST3 message between the
+  processor and the controller and for the Audio Unit's report property
+  (64000, now a `CFData` instead of a dictionary of strings), and read it
+  back whole or not at all; the windows no longer parse tab-separated
+  lines back. The VST3 controller derives the Status text and Copy
+  diagnostics from the report it holds rather than keeping copies.
+  `report_fields()` is removed, and `HostStatusLine` gains `operator==`.
+  Nothing a user sees or hears changes.
 - Library (PLUG-39 step 4a), incompatible, hence 0.17.0: the accepted
   filter is shared rather than copied, as jrp chose on 20 November 2026.
   `HostFilter::filter()` returns a `std::shared_ptr<const Configuration>`

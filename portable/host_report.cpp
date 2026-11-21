@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <limits>
 #include <string>
 
 namespace convolver {
@@ -511,45 +512,172 @@ std::string fact_text(const HostFact& f) {
 }
 } // namespace
 
-std::vector<std::pair<std::string, std::string>> report_fields(const HostReport& r) {
-    std::string audio, reference, files;
-    for (const auto& file : r.filter_files)
-        files += file + "\n";
-    for (const auto& f : r.audio)
-        audio += f.label + "\t" + f.value + "\t" + f.note + "\t" + (f.problem ? "problem" : "") +
-                 "\t" + f.help + "\n";
-    for (const auto& [label, value] : r.reference)
-        reference += label + ": " + value + "\n";
-    return {{"status", std::to_string(static_cast<int>(r.status.status))},
-            {"status name", r.status_name},
-            {"summary", r.status.text},
-            {"title", r.title},
-            {"explanation", r.explanation},
-            {"problem", r.problem},
-            {"plays", r.plays},
-            {"cause", r.cause},
-            {"fix", r.fix},
-            {"note", r.note},
-            {"action", r.action},
-            {"filter name", r.filter_name},
-            {"filter rate", r.filter_rate},
-            {"filter channels", r.filter_channels},
-            {"filter length", r.filter_length},
-            {"filter taps", r.filter_taps},
-            {"filter identity", r.filter_identity},
-            {"filter saved name", r.filter_saved_name},
-            {"filter speakers", r.filter_speakers},
-            {"filter note", r.filter_note},
-            {"filter path", r.filter_path},
-            {"filter files", files},
-            {"sample rate", r.sample_rate ? std::to_string(r.sample_rate) : std::string()},
-            {"latency waits", r.latency_waits ? "yes" : "no"},
-            {"mix note", r.mix_note},
-            {"gain note", r.gain_note},
-            {"audio", audio},
-            {"reference", reference},
-            {"log path", r.log_path},
-            {"log written", r.log_written ? "yes" : "no"}};
+namespace {
+// PLUG-39 step 5: one list of HostReport's fields, read and written in the
+// same order by the two classes below, so the encoding cannot drift from
+// the decoding. Numbers are 8 bytes, least significant first; a text is its
+// length then its bytes; a list is its count then its items.
+constexpr std::uint64_t report_encoding = 1; // The first number; bump on any change.
+
+class ReportWriter {
+  public:
+    bool number(std::uint64_t n) {
+        for (int i = 0; i < 8; ++i)
+            bytes += static_cast<char>((n >> (8 * i)) & 0xff);
+        return true;
+    }
+    bool text(const std::string& t) {
+        number(t.size());
+        bytes += t;
+        return true;
+    }
+    bool flag(bool b) {
+        return number(b ? 1 : 0);
+    }
+    bool status(HostStatus s) {
+        return number(static_cast<std::uint64_t>(s));
+    }
+    bool rate(int r) {
+        return number(static_cast<std::uint64_t>(std::max(r, 0)));
+    }
+    bool texts(const std::vector<std::string>& list) {
+        number(list.size());
+        for (const auto& t : list)
+            text(t);
+        return true;
+    }
+    bool facts(const std::vector<HostFact>& list) {
+        number(list.size());
+        for (const auto& f : list) {
+            text(f.label);
+            text(f.value);
+            text(f.note);
+            flag(f.problem);
+            text(f.help);
+        }
+        return true;
+    }
+    bool pairs(const std::vector<std::pair<std::string, std::string>>& list) {
+        number(list.size());
+        for (const auto& [label, value] : list) {
+            text(label);
+            text(value);
+        }
+        return true;
+    }
+    std::string bytes;
+};
+
+class ReportReader {
+  public:
+    explicit ReportReader(std::string_view bytes) : rest_(bytes) {}
+    bool number(std::uint64_t& n) {
+        if (rest_.size() < 8)
+            return false;
+        n = 0;
+        for (int i = 0; i < 8; ++i)
+            n |= static_cast<std::uint64_t>(static_cast<unsigned char>(rest_[i])) << (8 * i);
+        rest_.remove_prefix(8);
+        return true;
+    }
+    bool text(std::string& t) {
+        std::uint64_t n = 0;
+        if (!number(n) || n > rest_.size())
+            return false;
+        t.assign(rest_.substr(0, static_cast<std::size_t>(n)));
+        rest_.remove_prefix(static_cast<std::size_t>(n));
+        return true;
+    }
+    bool flag(bool& b) {
+        std::uint64_t n = 0;
+        if (!number(n) || n > 1)
+            return false;
+        b = n == 1;
+        return true;
+    }
+    bool status(HostStatus& s) {
+        std::uint64_t n = 0;
+        if (!number(n) || n >= host_status_names.size())
+            return false;
+        s = static_cast<HostStatus>(n);
+        return true;
+    }
+    bool rate(int& r) {
+        std::uint64_t n = 0;
+        if (!number(n) || n > static_cast<std::uint64_t>(std::numeric_limits<int>::max()))
+            return false;
+        r = static_cast<int>(n);
+        return true;
+    }
+    bool texts(std::vector<std::string>& list) {
+        std::uint64_t n = 0;
+        if (!count(n))
+            return false;
+        list.assign(static_cast<std::size_t>(n), {});
+        return std::all_of(list.begin(), list.end(), [&](std::string& t) { return text(t); });
+    }
+    bool facts(std::vector<HostFact>& list) {
+        std::uint64_t n = 0;
+        if (!count(n))
+            return false;
+        list.assign(static_cast<std::size_t>(n), {});
+        return std::all_of(list.begin(), list.end(), [&](HostFact& f) {
+            return text(f.label) && text(f.value) && text(f.note) && flag(f.problem) &&
+                   text(f.help);
+        });
+    }
+    bool pairs(std::vector<std::pair<std::string, std::string>>& list) {
+        std::uint64_t n = 0;
+        if (!count(n))
+            return false;
+        list.assign(static_cast<std::size_t>(n), {});
+        return std::all_of(list.begin(), list.end(),
+                           [&](auto& p) { return text(p.first) && text(p.second); });
+    }
+    bool done() const noexcept {
+        return rest_.empty();
+    }
+
+  private:
+    // A count no larger than the bytes left could hold (every item takes at
+    // least 8), so a damaged count cannot ask for a huge allocation.
+    bool count(std::uint64_t& n) {
+        return number(n) && n <= rest_.size() / 8;
+    }
+    std::string_view rest_;
+};
+
+// Every field, in one order, for either class. Report is HostReport or
+// const HostReport.
+template <class Io, class Report> bool report_io(Io& io, Report& r) {
+    return io.status(r.status.status) && io.text(r.status.text) && io.text(r.status_name) &&
+           io.text(r.title) && io.text(r.problem) && io.text(r.plays) && io.text(r.cause) &&
+           io.text(r.fix) && io.text(r.note) && io.text(r.action) && io.text(r.explanation) &&
+           io.text(r.filter_name) && io.text(r.filter_note) && io.text(r.filter_rate) &&
+           io.text(r.filter_channels) && io.text(r.filter_length) && io.text(r.filter_speakers) &&
+           io.text(r.filter_taps) && io.text(r.filter_identity) && io.text(r.filter_saved_name) &&
+           io.text(r.filter_path) && io.texts(r.filter_files) && io.facts(r.audio) &&
+           io.text(r.settings) && io.rate(r.sample_rate) && io.flag(r.latency_waits) &&
+           io.text(r.mix_note) && io.text(r.gain_note) && io.pairs(r.reference) &&
+           io.text(r.log_path) && io.flag(r.log_written);
+}
+} // namespace
+
+std::string encode_report(const HostReport& r) {
+    ReportWriter w;
+    w.number(report_encoding);
+    report_io(w, r);
+    return std::move(w.bytes);
+}
+
+std::optional<HostReport> decode_report(std::string_view bytes) {
+    ReportReader reader(bytes);
+    std::uint64_t encoding = 0;
+    HostReport r;
+    if (!reader.number(encoding) || encoding != report_encoding || !report_io(reader, r) ||
+        !reader.done())
+        return std::nullopt;
+    return r;
 }
 
 std::string report_text(const HostReport& r) {
@@ -570,10 +698,7 @@ std::string report_text(const HostReport& r) {
 }
 
 std::string diagnostics_text(const HostReport& r, const std::string& format) {
-    return diagnostics_text(report_text(r), format);
-}
-std::string diagnostics_text(const std::string& report_text, const std::string& format) {
-    auto text = report_text + "\nRecent Convolver log lines for " + format + ":\n";
+    auto text = report_text(r) + "\nRecent Convolver log lines for " + format + ":\n";
     const auto recent = host_log_recent(format);
     return text + (recent.empty() ? "(none found)\n" : recent);
 }

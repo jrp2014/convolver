@@ -53,11 +53,11 @@ constexpr Steinberg::Vst::ParamValue normalized_status(HostStatus status) {
 inline long status_index(Steinberg::Vst::ParamValue value) {
     return std::lround(value * static_cast<Steinberg::Vst::ParamValue>(status_names.size() - 1));
 }
-// VST3-3: the status_message also carries the PLUG-9 report for the window
-// ("report": report_fields() as UTF-8 name and value pairs, each ended by a
-// zero byte; "report text": report_text(); "format": the log tag), which
-// the controller keeps a copy of. Internal between the two classes, which
-// always ship together: not a stable interface.
+// VST3-3: the status_message carries the PLUG-9 report for the window
+// ("report": encode_report(), which holds the Status line too, PLUG-39
+// step 5; "format": the log tag), which the controller keeps a copy of and
+// derives the Status text and Copy diagnostics from. Internal between the
+// two classes, which always ship together: not a stable interface.
 // The controller asks for a fresh report with a report_message while the
 // window is open (Gain and Mix change in process(), which sends nothing),
 // and has a filter file loaded with a load_message ("path": UTF-8 bytes;
@@ -82,12 +82,9 @@ struct StatusAnswer {
     std::optional<HostSettings> settings = std::nullopt;
 };
 inline constexpr const char* load_message = "ConvolverLoad";
-// The report's name and value pairs as the messages carry them, and back.
-std::string encode_report(const std::vector<std::pair<std::string, std::string>>&);
 // PLUG-22: the controller state (ControllerState, encode_controller_state
 // and decode_controller_state) is in vst3_controller_state.hpp, which
 // convolver-preset shares (PLUG-31).
-std::vector<std::pair<std::string, std::string>> decode_report(std::string_view);
 // How the plug-in reads the sound files a chosen filter file names: macOS's
 // AudioToolbox on macOS, as the Audio Unit does; libsndfile on Windows and
 // Linux, as the command-line tool and the LV2 plug-in do (VST3-12).
@@ -390,11 +387,11 @@ class Controller final : public Steinberg::Vst::EditController,
                                                         Steinberg::Vst::String128) override;
     std::string status_text() {
         std::lock_guard lock(status_lock_);
-        return status_text_;
+        return report_ ? report_->status.text : std::string();
     }
-    // VST3-3: the window's report, the copy the processor sent last (empty
+    // VST3-3: the window's report, the copy the processor sent last (none
     // before it has sent one), after asking it for a fresh one.
-    std::vector<std::pair<std::string, std::string>> report();
+    std::optional<HostReport> report();
     // Copy diagnostics: the report's text and this instance's recent log
     // lines. Reads the log file: on the window's thread only.
     std::string diagnostics();
@@ -426,10 +423,11 @@ class Controller final : public Steinberg::Vst::EditController,
     // The host may restore state (and so send the status) on another thread
     // than the one reading parameter text.
     std::mutex status_lock_;
-    std::string status_text_;
-    int status_value_ = static_cast<int>(HostStatus::no_filter); // The status the text is for.
-    std::vector<std::pair<std::string, std::string>> report_;    // VST3-3, under status_lock_.
-    std::string report_text_, format_;                           // Under status_lock_.
+    // VST3-3, under status_lock_: the report the processor sent last, from
+    // which the Status text and Copy diagnostics come (PLUG-39 step 5), and
+    // its log tag.
+    std::optional<HostReport> report_;
+    std::string format_;
     // VST3-15, under status_lock_: the last load_message's number, the last
     // one answered and whether it was accepted; the last latency_message's
     // number, and whether its answer is still to come.

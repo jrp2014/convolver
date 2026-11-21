@@ -6,6 +6,7 @@
 // allocation while rendering.
 #include "../native/cases.hpp"
 #include "au/au_host.hpp"
+#include "host_report.hpp"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -2136,13 +2137,14 @@ void report_while_latency_work_holds_lock() {
         check(AudioUnitGetProperty(unit->get(), au::report_property, kAudioUnitScope_Global, 0,
                                    &value, &size),
               "report property");
-        require(value && CFGetTypeID(value) == CFDictionaryGetTypeID(),
-                "the report is not a dictionary");
-        const auto dict = static_cast<CFDictionaryRef>(value);
-        auto fields =
-            std::pair(string_value(dict, "status name"), string_value(dict, "filter rate"));
+        require(value && CFGetTypeID(value) == CFDataGetTypeID(), "the report is not data");
+        const auto data = static_cast<CFDataRef>(value);
+        const auto r =
+            decode_report(std::string_view(reinterpret_cast<const char*>(CFDataGetBytePtr(data)),
+                                           static_cast<std::size_t>(CFDataGetLength(data))));
         CFRelease(value);
-        return fields;
+        require(r.has_value(), "the report property does not decode");
+        return std::pair(r->status_name, r->filter_rate);
     };
     const HoldScope scope(unit->get(), LatencyHold::At::locked);
     auto& hold = scope.hold;
