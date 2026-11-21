@@ -291,7 +291,13 @@ struct HostProcessor::Impl {
     // heard is already silent, as a filter published then is installed
     // directly.
     void mute(std::uint64_t through) noexcept {
-        // A filter published after `through` is already playing: nothing to mute.
+        // The filter being faded out mutes if it was published up to
+        // `through`, also when silence(through) arrives after the audio
+        // thread adopted a later publication.
+        if (previous && previous->number <= through)
+            previous_muted = true;
+        // A filter published after `through` is already playing: nothing
+        // more to mute.
         if (current && current->number > through)
             return;
         muted = true;
@@ -637,8 +643,10 @@ void HostProcessor::mute(std::uint64_t through) noexcept {
 }
 void HostProcessor::silence() noexcept {
     // The control side is the only publisher, so this count is exact.
-    impl_->silence_through.store(impl_->published.load(std::memory_order_relaxed) + 1,
-                                 std::memory_order_release);
+    silence(impl_->published.load(std::memory_order_relaxed));
+}
+void HostProcessor::silence(std::uint64_t through) noexcept {
+    impl_->silence_through.store(through + 1, std::memory_order_release);
 }
 std::size_t HostProcessor::latency_frames() const noexcept {
     return impl_->block;

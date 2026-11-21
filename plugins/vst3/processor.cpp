@@ -782,7 +782,7 @@ std::optional<HostSettings> Processor::install(HostState next, const HostRequest
                                    filter_.filter() ? &filter_.gains() : nullptr) +
                     ".";
         const auto& f = filter_.failure();
-        const bool kept = check == HostLoadCheck::keep_until_suited;
+        const bool kept = known && filter_.kept_unsuited();
         // What plays meanwhile, as the Status says: silence, Mix's dry
         // share, or what bypass plays (PLUG-39 step 4).
         if (kept && known && f && f->silent && filter_.filter())
@@ -791,7 +791,9 @@ std::optional<HostSettings> Processor::install(HostState next, const HostRequest
                     failure_consequence(*f, &*known, settings(), dry_signal(filter_, *known),
                                         bypass_.load()) +
                     " " + detail::as_sentence(detail::advice_line(f->message));
-        if (kept)
+        if (kept && check == HostLoadCheck::keep_unless_one_plays)
+            line += kept_rather_than_refused_sentence;
+        else if (check == HostLoadCheck::keep_until_suited)
             line += request.kind == HostRequestKind::session
                         ? " The host said it is restoring a project, so its channels and rate "
                           "may still change."
@@ -848,7 +850,10 @@ bool Processor::install_chosen(const std::string& path, std::optional<HostSettin
     // kept, checked when the host starts the plug-in; a list chooses its
     // entry for the configuration the host last started with, or waits for
     // one (read_filter_file()).
-    const bool settled = load_check(request.kind) == HostLoadCheck::refuse_mismatch;
+    const bool settled = load_check(request.kind) != HostLoadCheck::keep_until_suited;
+    // PLUG-42: settled, with nothing suiting playing, a single filter that
+    // does not suit is kept as a preset would be, not refused.
+    const bool keep_unsuited = settled && !filter_.plays_suiting();
     const auto host = known_layout();
     const auto* reader = files_;
     if (!reader) {
@@ -865,8 +870,8 @@ bool Processor::install_chosen(const std::string& path, std::optional<HostSettin
     FilterFileFailure why;
     // The files it was read from, so the window can reload it (VST3-11).
     // PLUG-26: a Convolver .vstpreset too.
-    auto next =
-        read_chosen_file(path, host, *reader, why, &request.files, &request.wider_entry, settled);
+    auto next = read_chosen_file(path, host, *reader, why, &request.files, &request.wider_entry,
+                                 settled, keep_unsuited);
     if (!next) {
         filter_.reject(why.kind, why.message, request, why.filter());
         return false;

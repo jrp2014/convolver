@@ -40,6 +40,9 @@ class AudioUnitAdapter final : public test::Adapter {
         host::check(unit_->render(ins, outs, 1, false, silent), "first render");
         deactivate();
     }
+    bool keeps_unsuited_when_nothing_plays() const override {
+        return true; // PLUG-42.
+    }
     bool create_unconfigured() override {
         destroy();
         unit_ = std::make_unique<host::Unit>();

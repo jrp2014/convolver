@@ -212,9 +212,19 @@ void restore(const Context& x, Model& m, std::optional<Which> filter, bool faile
     if (malformed)
         return reject(m, HostFailureKind::state_unreadable, request);
     const auto kind = filter ? mismatch(configuration(x.filters, *filter), m.host) : std::nullopt;
-    if (kind && known(x, m))
+    // PLUG-42 (jrp, 21 November 2026): where a later start may bring
+    // another configuration (VST3, the Audio Unit), a filter that does not
+    // suit is refused only while an accepted filter that suits plays;
+    // otherwise it is kept silent with the reason, as below.
+    const bool later_start_may_suit =
+        x.format.known == Known::played || x.format.known == Known::rendering;
+    const bool one_plays = m.filter && !m.failed && !m.activation_failure;
+    if (kind && known(x, m) && (one_plays || !later_start_may_suit))
         return reject(m, *kind, request);
+    const bool kept = kind && known(x, m);
     accept(x, m, filter, failed, request, false);
+    if (kept)
+        m.activation_failure = Failure{*kind, request, true};
     if (x.format.state_settings) {
         m.gain_db = settings.gain_db;
         choose_latency(m, settings.latency);

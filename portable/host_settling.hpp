@@ -13,7 +13,8 @@
 //   requests against (HostFilter::load()'s `host`);
 // - check(): what a request that does not suit that configuration means
 //   (HostFilter::load()'s HostLoadCheck); a chosen single filter is read for
-//   that configuration only when the answer is to refuse it, while a
+//   that configuration only when it is settled (any answer but
+//   keep_until_suited), while a
 //   configuration list always chooses its entry for known() (PLUG-27).
 //
 // A file chosen in the window follows one rule in both formats (PLUG-27,
@@ -113,19 +114,23 @@ class HostSettling {
         // first block, waits as the Audio Unit's does (jrp's review, 21
         // November 2026).
         if (kind == HostRequestKind::chosen_file)
-            return playing() ? HostLoadCheck::refuse_mismatch : HostLoadCheck::keep_until_suited;
+            return playing() ? HostLoadCheck::keep_unless_one_plays
+                             : HostLoadCheck::keep_until_suited;
+        // Settled, but a later start may bring another configuration: a
+        // filter that does not suit is refused only while one that suits
+        // plays (PLUG-42).
         if (binding_ == HostBinding::rendering)
-            return HostLoadCheck::refuse_mismatch;
+            return HostLoadCheck::keep_unless_one_plays;
         switch (kind) {
         case HostRequestKind::chosen_file: // Answered above.
             return HostLoadCheck::keep_until_suited;
         case HostRequestKind::restore:
-            return played_.load(std::memory_order_relaxed) ? HostLoadCheck::refuse_mismatch
+            return played_.load(std::memory_order_relaxed) ? HostLoadCheck::keep_unless_one_plays
                                                            : HostLoadCheck::keep_until_suited;
         case HostRequestKind::session:
             return HostLoadCheck::keep_until_suited;
         }
-        return HostLoadCheck::refuse_mismatch;
+        return HostLoadCheck::keep_unless_one_plays;
     }
 
   private:
