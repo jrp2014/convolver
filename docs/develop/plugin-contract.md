@@ -233,7 +233,11 @@ before they set the sample rate and channel layout (VST3 `setState` before
   still fading out. A filter kept before, or a failure, is not muted: it
   plays silence with at most the dry share and bypass the new one carries
   on, so a host restoring the same preset again (GarageBand) leaves them
-  without a gap. A chosen IR
+  without a gap. A muted empty instance or suiting filter that was
+  bypassed passes the input again only once the kept playback has warmed
+  up (about 84 ms at Latency 4096; on main such a load was refused and
+  stayed silent): skipping the mute when bypass is on and the kept
+  playback has a dry signal would close that gap. A chosen IR
   file or `.cfg` is kept the same way: `read_chosen_file()`'s
   `keep_unsuited` reads a single filter that does not suit as it is,
   rather than refusing it; a configuration list with no entry for the
