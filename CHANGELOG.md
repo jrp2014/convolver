@@ -267,6 +267,11 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
+- Code (PLUG-24): `HostProcessor`, the plug-ins' audio path, moved out of
+  `portable/host.cpp` into `portable/host_processor.cpp` unchanged; the
+  gain, Mix and dry-signal rules it shares with `HostFilter` are in
+  `portable/host_common.hpp`. Public APIs, saved state, messages and audio
+  are the same.
 - Tests (HOST-10): the headless Ardour test plays the mono and stereo
   examples on Strict-I/O tracks too, as Ardour's window adds by default
   (`CONVOLVER_STRICT_IO`), and the mono example in the VST3 plug-in on a
