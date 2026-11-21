@@ -153,7 +153,8 @@ first published preview, keep their original grouping.
 ### For contributors
 
 - Builds (CI-48): the Linux package, built with GCC 12.3 on Ubuntu 22.04,
-  builds without warnings. That compiler wrongly warned `-Wrestrict` at nine
+  builds without warnings from Convolver's own sources (libsndfile's and the
+  VST3 SDK's remain theirs). That compiler wrongly warned `-Wrestrict` at nine
   places in the core and the tests that put text in front of a temporary
   string; they now build the string front to back. No output changes.
 - Builds (CI-46, from an outside audit of 20 November 2026): the VST3
