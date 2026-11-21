@@ -153,12 +153,11 @@ preset's, as choosing it again would.
 `convolver-preset`, which reads an IR file, a `.cfg`, a configuration list
 or a Convolver `.vstpreset`, and lists the folders where hosts look for
 presets. A preset is needed where the plug-in has no window (the VST3
-plug-in on Linux, and on Windows up to 0.13.2), in an LV2 host with no file chooser, and is
-the checked route in Audacity: up to 0.13.2, Audacity 4.0.2 did not keep a
-filter loaded in the window (with Choose…, Recent, Reload or reloading when
-the file changes) for exports or saved projects. Later versions should keep
-it, checked so far only by automated tests, not in Audacity
-([in Audacity](first-sound-in-a-host.md#in-audacity)).
+plug-in on Linux, and on Windows up to 0.13.2), and in an LV2 host with no file chooser. In
+Audacity 4.0.2 (VST3, on macOS) both routes are checked: its preset menu,
+and the window, where a filter chosen with Choose… was kept for exports and
+saved projects and one chosen from Recent for an export (up to 0.13.2 it
+was not kept) ([in Audacity](first-sound-in-a-host.md#in-audacity)).
 
 The filter is prepared away from the audio, then installed. A filter loaded
 before any audio plays starts at once; one loaded during playback fades in
@@ -188,7 +187,19 @@ stays selected either way. A configuration list needs the rate and channels
 to choose its entry, so it uses the ones the host last ran the plug-in with;
 before the host has run it with them, the list is not loaded, and the window
 says: "Play audio once so Convolver can check the host's sample rate and
-channel counts, then choose the configuration list again." If the list has
+channel counts, then choose the configuration list again." With Convolver's
+window open, you need not choose it again: when the host plays, the window
+loads the list itself, choosing its entry for the host's rate and channels,
+and Convolver tells the host the project has changed, as for a chosen file
+(the list is not added to Recent). This is checked by automated tests, not
+yet in a host. If the window was closed while the host played, choose the
+list again, or play again with the window open. Once Convolver has seen the
+host play (for example when the host reads the Audio Unit's Status while it
+plays; the VST3 plug-in's Status is not read that way), the
+window says "The host's settings are now known (48000 Hz, 2 in, 2 out):
+choose the configuration list again." (with the host's values), and Status
+says the same in short; a brief start the host makes without playing, such
+as Audacity's after a parameter edit, does not count. If the list has
 no entry for the rate and channels the host last ran with, it is refused
 naming them, and whenever the host is not playing audio through the plug-in
 at that moment the advice adds the same step, for a host such as Audacity
@@ -511,8 +522,8 @@ From the top, the window has:
   file, and Convolver tells the host the project has changed. What the
   host does with that differs: most mark the project unsaved. A host that
   cannot be told (Audacity 4.0.2) is shown a change of Latency that keeps
-  its value instead, so that it stores the new filter; this has not been
-  checked in Audacity yet ([loading a filter](#loading-a-filter)).
+  its value instead, so that it stores the new filter; this is checked in
+  Audacity 4.0.2 on macOS ([in Audacity](first-sound-in-a-host.md#in-audacity)).
   The
   file is read and the filter prepared before the window responds again,
   so a very long filter can make the window (and the host) pause for a

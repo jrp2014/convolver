@@ -127,6 +127,14 @@ void chosen_file() {
         s.stopped();
         s.started(stereo);
         require(!s.playing(), name + "a restart with the same configuration counted as playing");
+        // jrp's review of 21 November 2026: a file chosen after that restart,
+        // before its first block, waits like one chosen before any audio,
+        // in both formats (VST3 had refused it from the earlier start).
+        require(chosen() == HostLoadCheck::keep_until_suited,
+                name + "a choice after a restart refused before audio in this start");
+        s.played();
+        require(chosen() == HostLoadCheck::refuse_mismatch,
+                name + "kept while the host plays after the restart");
     }
 }
 

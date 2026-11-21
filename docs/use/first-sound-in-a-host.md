@@ -12,8 +12,10 @@ window shows 48000 Hz and `2 in → 2 out`, and you hear no change. Choose `echo
 hollow) and `repeat-48000-stereo/filter.cfg` (each sound again a quarter of a
 second later), then save, close and reopen the project: the filter is still
 there. Your own IR file, `.cfg` or configuration list loads the same way,
-from any folder. Presets are an [optional route](#optional-load-a-preset),
-and the checked one [in Audacity](#in-audacity).
+from any folder. Presets are an [optional route](#optional-load-a-preset);
+in Audacity both the preset menu and **Choose…** are checked (Audacity
+4.0.2 on macOS, Convolver previews after 0.14.0;
+[In Audacity](#in-audacity)).
 
 You need a plug-in host that loads VST® 3, such as REAPER or Audacity
 (version 4 or later), or one that loads Audio Units, such as GarageBand or
@@ -35,9 +37,10 @@ see the [Equalizer APO export](equalizer-apo.md) on Windows and
 - The filter's sample rate must match the host's: Convolver does not
   resample. Audacity plays effects at its Default sample rate, which can
   differ from the rate it exports at.
-- **In Audacity**, Audacity's own preset menu is the checked way to load
-  filters, as [In Audacity](#in-audacity) says; loading from Convolver's
-  window should now work but has not been checked in Audacity yet.
+- **In Audacity**, Audacity's own preset menu and Convolver's **Choose…**
+  and **Recent** are checked ways to load filters (Audacity 4.0.2, VST3 on
+  macOS, Convolver previews after 0.14.0; in 0.14.0 use the preset menu),
+  as [In Audacity](#in-audacity) says.
 - Changing **Latency** during playback leaves a short gap and cuts off a
   tail that is still sounding; hosts differ in when they line the audio up
   again ([latency and tail](plugins.md#latency-and-tail)).
@@ -153,19 +156,21 @@ choosing an entry from a list, and the folders where hosts look for presets.
 
 ## In Audacity
 
-Audacity's own preset menu is the route checked in Audacity 4. Up to
-0.13.2, a filter loaded from Convolver's window (**Choose…**, **Recent**,
-**Reload**, or reloading when the file changes) played while you listened,
-but Audacity 4.0.2 did not keep it for an export or a saved project: they
-kept whatever Audacity stored last, which may be no filter or an older one,
-so a wrong export could still sound plausible. From 0.13.12 it should be
-kept, but this has been checked only by automated tests, not yet in Audacity.
+Audacity's own preset menu and Convolver's **Choose…** and **Recent** are
+the routes checked in Audacity 4.0.2 (VST3, on macOS, from the preview
+after 0.14.0; [status](../project/status.md#checks-left-before-publication)):
+a filter chosen with **Choose…** before playing was in the export and, after
+saving and reopening the project, in the next export; one chosen from
+**Recent** was in the export. Up to 0.13.2, Audacity 4.0.2 did not keep a
+filter loaded from the window for an export or a saved project.
+**Reload**, reloading when the file changes, a `.vstpreset` chosen in the
+window, and Audacity on Windows are not yet checked.
 Audacity sets up the plug-in at 44.1 kHz until it first plays, so a single
 IR file or `.cfg` chosen before then is kept and checked when Audacity plays,
 and a configuration list needs one playback first
 ([when a chosen file is checked](plugins.md#loading-a-filter)); 0.14.0 and
 earlier refused such a file.
-If you load a filter from the window, export a few seconds and check that
+If you load a filter in an unchecked way, export a few seconds and check that
 the export has the filter you chose (for example by comparing it with
 `convolver --compare`, as in [check a stereo filter in a host](check-a-stereo-filter.md)).
 
@@ -190,9 +195,9 @@ the export has the filter you chose (for example by comparing it with
    Or skip the copying: in step 3, instead of the preset menu, open
    Convolver's window (*Use vendor UI*) and choose the `.vstpreset` from
    any folder with **Choose…**
-   ([a preset in the window](plugins.md#a-preset-in-the-window)). This is
-   not yet checked in Audacity, and the window's export check above
-   applies.
+   ([a preset in the window](plugins.md#a-preset-in-the-window)). A
+   `.vstpreset` chosen this way is not yet checked in Audacity, so the
+   export check above applies.
 3. Add Convolver as a real-time effect and choose the preset by its file
    name from Audacity's preset menu. To see Convolver's window and status,
    turn on *Preset options › Use vendor UI*.

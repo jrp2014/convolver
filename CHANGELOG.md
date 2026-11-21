@@ -49,6 +49,29 @@ first published preview, keep their original grouping.
   up that way. Ardour also leaves Gain mode and Latency out of its controls
   for the VST3 plug-in, and names all four of the LV2 plug-in's settings.
   The LV2 ports table now lists `gain_mode`.
+- Plug-ins (PLUG-40, from jrp's Audacity pass of 21 November 2026): a
+  configuration list chosen in Convolver's window before the host has
+  played is no longer something to choose again. With the window open, it
+  loads by itself, as if chosen, when the host plays, and the project is
+  marked changed (it is not added to Recent). Checked by automated tests,
+  not yet in a host. Once Convolver has seen the host play, Status and the
+  window say "The host's settings are now known (48000 Hz, 2 in, 2 out):
+  choose the configuration list again." (Status in short) instead of still
+  saying the settings are unknown; a brief start without playing, such as
+  Audacity's after a parameter edit, does not count. The window no longer
+  suggests dropping a file beside any refusal. VST3 and the Audio Unit; the
+  Audio Unit's part is checked only on macOS CI
+  ([when a chosen file is checked](docs/use/plugins.md#loading-a-filter)).
+- Documentation (VST3-17): in Audacity, Convolver's **Choose…** and
+  **Recent** are now checked routes alongside Audacity's preset menu. jrp
+  checked the 0.16.14 candidate in Audacity 4.0.2 on macOS on 21 November
+  2026: a filter chosen before playing was in the export with the window
+  open and, after saving, quitting and reopening, in the next export; a
+  configuration list chosen after one playback took its 48 kHz entry
+  ([record](docs/archive/reviews/2026-11-21-vst3-17-audacity-pass.md)).
+  The guides, status and the release notes' text say so; **Reload**,
+  reloading when the file changes and a `.vstpreset` chosen in the window
+  remain checked only by automated tests.
 - Library and tools (PLUG-39 step 5b): exceptions keep their message's
   parts (problem, cause, fix, note) typed beside their text, and every catch
   block reads the parts rather than parsing the "Cause: ", "Fix: " and
@@ -167,6 +190,14 @@ first published preview, keep their original grouping.
 
 ### Fixed
 
+- Plug-ins (PLUG-41, from jrp's review of 21 November 2026): a filter file
+  chosen in Convolver's window waits for audio in the current start in both
+  formats. The VST3 plug-in refused a file chosen just after the host
+  stopped and started again with the same settings, before any audio of
+  that start, from audio played in the earlier start. The Audio Unit
+  counted a render of zero frames as the host playing, so after one it
+  refused a chosen file that should wait, and refused restoring a 48 kHz
+  project after a 44.1 kHz probe (error -10851). No change to the sound.
 - Plug-ins (PLUG-27): a filter file chosen in Convolver's window before the
   host plays is kept and saved with the project, and checked when the host
   plays audio through the plug-in; until then Status says "Filter selected.
@@ -182,8 +213,13 @@ first published preview, keep their original grouping.
   no entry for the rate the host last ran at is refused naming it, with
   the same step added to the advice while the host is not playing. While the
   host plays, a file that does not suit it is still refused and the working
-  filter keeps playing. VST3 and the Audio Unit; not yet checked in
-  Audacity ([when a chosen file is checked](docs/use/plugins.md#loading-a-filter)).
+  filter keeps playing. VST3 and the Audio Unit
+  ([when a chosen file is checked](docs/use/plugins.md#loading-a-filter));
+  checked in Audacity 4.0.2 on macOS with the 0.16.14 candidate (jrp, 21
+  November 2026, [record](docs/archive/reviews/2026-11-21-vst3-17-audacity-pass.md)):
+  Status said it was waiting, both exports had the filter, and a list
+  chosen after one playback took its 48 kHz entry. The Audio Unit's part
+  is checked only by automated tests.
 - Documentation (DOC-18, from an outside audit of 20 November 2026): the
   user guides no longer contradict the plug-ins. **Choose…** opens a
   Convolver `.vstpreset` (the first-sound guide said it read no presets);
@@ -253,6 +289,16 @@ first published preview, keep their original grouping.
   the render within the bound; `capture_au.py` captures later releases,
   and the AVAudioEngine renderer gains `--parameter` and `--save` for it.
   Changes to `tests/upgrade/` now run the LV2 and Audio Unit workflows too.
+  The Audio Unit check requires every sample before the reported latency
+  to be finite; it had checked only their largest value, which a NaN
+  passes, before dropping them. `tests/upgrade/harness_tests.py` (in
+  pre-commit) feeds it a NaN, an infinity and sound there. `capture_au.py`
+  no longer uses `str.removesuffix`, which needs Python 3.9.
+- Tests (HOST-11): `scripts/reaper_check.py` accepts a Status reading only
+  when it is exactly the stereo example's Active text, `Filter loaded: 48000
+  Hz, 2 in, 2 out.`. From jrp's review of 21 November 2026: the waiting text
+  ("; waiting for audio settings from the host.") and the Mix 0% text start
+  the same way, and passed checks 3 and 7 before.
 - Tests (HOST-11): `scripts/reaper_check.py` repeats the project's first
   seconds while REAPER plays, so that Status is read with the transport
   running, and counts that reading only when REAPER reports it running; in jrp's first run, on 21 November 2026, REAPER had

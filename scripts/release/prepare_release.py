@@ -202,8 +202,9 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'warning.\n'
             '- Windows needs the Microsoft Visual C++ 2015-2022 x64 runtime, which most computers already have.\n'
             '- An early preview, published before its last checks. Its new audio engine, which adds no delay at '
-            'Latency 0, has been checked only automatically, against an exact reference and the command-line tool, '
-            'on macOS, Windows and Linux; nobody has listened to it in a host yet. With the previous engine '
+            'Latency 0, has been checked automatically, against an exact reference and the command-line tool, '
+            'on macOS, Windows and Linux, and in Audacity exports on macOS; nobody has listened to it in a host '
+            'yet. With the previous engine '
             '(0.12.12), on one Mac, renders and exports from REAPER and Audacity (VST3) and GarageBand (Audio Unit) '
             'matched the command-line tool, and saved projects reopened with their filter. Not yet checked: '
             'listening in any host, VoiceOver, the latest Audio Unit changes in GarageBand, and anyone outside the '
@@ -213,9 +214,10 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'and removed itself. Nobody has used them in a host yet. '
             f'[Status]({base}/blob/{tag}/docs/project/status.md#checks-left-before-publication) lists what is open. '
             'Other hosts are untested.\n'
-            "- In Audacity, Convolver's window (Choose…, Recent or Reload) should now keep the filter for exports and "
-            "saved projects, but this has been checked only by automated tests, not yet in Audacity. Audacity's own "
-            'preset menu is the route that has been checked.\n'
+            "- In Audacity, a filter chosen with Convolver's Choose…, even before playing, is kept for exports and "
+            'saved projects, and one chosen from Recent for exports (checked in Audacity 4.0.2 on macOS on 21 '
+            "November 2026, as is Audacity's own preset menu). Reload and reloading when the file changes are "
+            'checked only by automated tests.\n'
             '- Checked only by automated tests: new in 0.14, the quicker restore of the playing filter and the '
             'saving once the sound '
             'has stopped; new in 0.13.20, the Gain mode, a `.vstpreset` chosen in the window, Choose… on a track '
