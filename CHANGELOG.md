@@ -53,6 +53,19 @@ first published preview, keep their original grouping.
   so a minor version step. The
   [plan](docs/archive/plans/2026-11-13-load-restore-consolidation.md) is
   archived with its recount.
+- Documentation (HOST-10): the plug-in guide has an Ardour section, by the
+  track's Pin Mode (tried with Ardour 8.4 and 9.0). On a Strict-I/O track,
+  Ardour's default, a mono or stereo filter plays in the VST3 and the LV2
+  plug-in, but a crossover cannot (the track keeps its channel count). On a
+  Flexible-I/O track, the LV2 plug-in plays its mono, stereo and 2→6
+  layouts, while the VST3 plug-in gets 2 inputs and 2 outputs whatever the
+  track has, so a mono or crossover filter plays silence; the guide gives
+  Pin Connections steps that should let a mono filter play there (the same
+  settings, made from a script, played it; set the channels before choosing
+  the filter, or choose it again after), and a crossover cannot be set up
+  that way. Ardour also leaves Gain mode and Latency out of its controls
+  for the VST3 plug-in, and names all four of the LV2 plug-in's settings.
+  The LV2 ports table now lists `gain_mode`.
 - Plug-ins (PLUG-40, from jrp's Audacity pass of 21 November 2026): a
   configuration list chosen in Convolver's window before the host has
   played is no longer something to choose again. With the window open, it
@@ -254,6 +267,19 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
+- Tests (HOST-10): the headless Ardour test plays the mono and stereo
+  examples on Strict-I/O tracks too, as Ardour's window adds by default
+  (`CONVOLVER_STRICT_IO`), and the mono example in the VST3 plug-in on a
+  Flexible-I/O track with its channels set by hand, as the Pin Connections
+  window's Manual Config does: outputs only (all Ardour 8's window can set
+  for a VST3) and outputs and input pins (Ardour 9's). It prints the
+  track's Pin Mode, Ardour's
+  natural streams, the insert's channels and the name Ardour gives each
+  input parameter, the layout lines the Convolver log gained in each case,
+  and the whole log when an export does not match the oracle. After
+  setting the channels it waits until the log says the plug-in started
+  with them: Ardour 8.4 restarts the plug-in a little later, and a preset
+  loaded before that was refused and saved as a failure (PLUG-42).
 - Benchmarks (PERF-3): `tests/native/benchmarks/workloads.py` measures
   callback times, peak memory and preparation for long and multichannel
   filters through `HostProcessor`, and the manual Workload measurements

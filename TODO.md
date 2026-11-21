@@ -86,6 +86,7 @@ anything.
 | Item | What remains | The decision |
 | --- | --- | --- |
 | **REL-1**, **PLUG-20** | Signing and notarization, verified minimum versions and the final licence review; the VST logo in the window (optional) | jrp's signing choices in the [signing plan](docs/project/plans/2026-11-09-macos-signing.md), then his setup |
+| **PLUG-42** | Whether a filter refused only for its channels is tried again when the host restarts the plug-in with channels that fit (found in Ardour 8.4 by HOST-10) | jrp: retry at the next start that fits, or keep the refusal final |
 | **IO-2**, **EDGE-1** and the other **EDGE** items | First the limitations users cite (IO-2, EDGE-11's other candidates, EDGE-10, EDGE-3, EDGE-13); then EDGE-12, EDGE-9, EDGE-2, EDGE-4 and EDGE-5; then EDGE-6 to EDGE-8; EDGE-14 and EDGE-15 | Each starts with the owner's decision its row in the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) names, and the plan's gate. Feedback that asks for one moves it up |
 
 ### Parked
@@ -148,11 +149,6 @@ Foundation items are parked by owner decision instead.
   `known_new_session_abort()` in `tests/plugins/ardour_tests.py` accepts it on
   9.0 only; jrp may report it upstream. **Done when** the Ardour on
   `ubuntu-latest` no longer aborts and the test stops accepting it.
-- [ ] **HOST-10 — Ardour's VST3 channels and settings.** From HOST-9:
-  Ardour 8.4 ran the VST3 only at its default 2 in, 2 out and named Latency
-  and Gain mode "hidden" ([unresolved host finding](docs/develop/host-testing.md#unresolved-host-findings)).
-  **Done when** it is known whether Ardour 9 does the same and the
-  [plug-in guide](docs/use/plugins.md) says what Ardour users need.
 - [ ] **HOST-11 — One command for the REAPER checks.** Step 3 of the
   [plan](docs/project/plans/2026-11-21-host-test-automation.md#steps): a
   ReaScript-driven script for jrp's Mac (presets, renders compared with
@@ -196,6 +192,17 @@ done once for all three formats:
   a placeholder-rate match and restored state are still judged against
   it); parked. **Done when** jrp has decided and, if
   he wants it, the marking is shown and its message tests cover it.
+- [ ] **PLUG-42 — Try a refused filter again when the channels change.**
+  Found by HOST-10 on Ardour 8.4. Setting a VST3's outputs by hand restarts
+  the plug-in a little later, and a filter chosen while it still runs with
+  the old outputs is refused ("Not loaded"). It is not tried again when the
+  host restarts the plug-in with channels that fit, so the project saves
+  the refusal. The [Ardour guide](docs/use/plugins.md#ardour) says to choose the
+  filter again ([evidence](docs/develop/testing.md#ardour-headless)). **Needs** jrp's
+  decision: keep a filter refused only for its channels, and try it again
+  at the next start whose channels fit, or keep the refusal final. **Done
+  when** he has decided and, if he wants the retry, adapter tests cover it
+  in each format that refuses a chosen file.
 - [ ] **PLUG-29 — Keep the Recent list out of the log folder.** Save it in
   each platform's application-support folder, reading the old file once.
   **Done when** the tests cover both paths and the guide names the folder.
@@ -490,6 +497,12 @@ move to the archive.
   November 2026, PRs #200, #205, #213, #217, #219, #224, #226, #230 to
   #232, #236, #246, #250 and #256 ([plan](docs/archive/plans/2026-11-13-load-restore-consolidation.md),
   [adapter contract](docs/develop/plugin-contract.md#replacement-and-threads)).
+- [x] **HOST-10 — Ardour's VST3 channels and settings.** 21 November 2026,
+  PR #247: on Ardour's default Strict-I/O tracks mono and stereo play; a
+  crossover needs the LV2 on a Flexible-I/O track, where the VST3 gets 2
+  in, 2 out (a mono filter plays once its outputs are set by hand); the
+  VST3's Gain mode and Latency are hidden
+  ([plug-ins](docs/use/plugins.md#ardour)).
 - [x] **PERF-3 — One measurement exercise: budgets, supported workloads and
   published evidence.** 21 November 2026, PR #248
   ([supported workloads](docs/develop/fft-measurements.md#supported-workloads),
