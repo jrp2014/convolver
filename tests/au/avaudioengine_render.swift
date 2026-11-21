@@ -24,9 +24,9 @@
 // been applied (the Status parameter reads Active and the latency the unit
 // reports is the one chosen), and the input starts after it. The input's
 // first frame is OUTPUT's first frame.
-// Prints the latency the unit reports, in frames, as "latency N", and, when
-// the unit told the host's property listener of a new latency, "latency
-// notified".
+// Prints the latency the unit reports, in frames, as "latency N", and, for
+// --latency without --round-trip, "latency notified N" once the host's
+// property listener has been called while the unit reported the chosen N.
 
 import AVFoundation
 import AudioToolbox
@@ -186,11 +186,13 @@ if roundTrip {
 }
 
 // The host's property listener, as GarageBand and Logic register one for
-// the latency; the unit calls it on the main thread (AU-17).
-var latencyNotified = false
-let listener: AudioUnitPropertyListenerProc = { _, _, id, _, _ in
+// the latency; the unit calls it on the main thread (AU-17). Each call
+// records the latency the unit reports then, so that the notice for a
+// chosen Latency is told apart from the one initialization sends.
+var notifiedLatencies = [Int]()
+let listener: AudioUnitPropertyListenerProc = { _, unit, id, _, _ in
     if id == kAudioUnitProperty_Latency {
-        latencyNotified = true
+        notifiedLatencies.append(reportedLatency(unit))
     }
 }
 guard AudioUnitAddPropertyListener(effect.audioUnit, kAudioUnitProperty_Latency, listener, nil) == noErr else {
@@ -285,19 +287,20 @@ if startFirst {
 }
 if let latency = chosenLatency, !roundTrip {
     // Chosen while the engine runs: the unit prepares it on its Latency
-    // queue, then reports it.
+    // queue, then reports it and tells the host's listener.
+    RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+    notifiedLatencies.removeAll()
     setLatency(effect.audioUnit, latency)
-    settle("Latency \(latency)") {
+    settle("Latency \(latency) and its notice") {
         reportedLatency(effect.audioUnit) == latency && parameter(effect.audioUnit, statusParameter) == statusActive
+            && notifiedLatencies.contains(latency)
     }
     print("chose Latency \(latency) while running")
+    print("latency notified \(latency)")
 }
 // Notices still queued for the main thread arrive before the result.
 RunLoop.main.run(until: Date().addingTimeInterval(0.1))
 print("latency \(reportedLatency(effect.audioUnit))")
-if latencyNotified {
-    print("latency notified")
-}
 
 playing = true
 var output = [Float]()

@@ -1181,8 +1181,9 @@ runs the main queue until the Status parameter reads Active and the unit
 reports the new latency, at most 30 seconds, then starts the input.
 [`tests/au/avaudioengine_tests.py`](../../tests/au/avaudioengine_tests.py)
 checks that the unit reports the case's latency and that nothing comes out
-before it; for a Latency chosen while running, that the unit told the
-host's property listener (AU-17's notices on the main thread). After the
+before it; for a Latency chosen while running, that the host's property
+listener was called after the change while the unit reported the new
+latency (AU-17's notices on the main thread), not just at initialization. After the
 latency, the output must match the fixture's `expected.wav` from the direct
 double-precision oracle within 1e-5. It prints the worst error. To run it on
 a Mac with the component installed and Xcode's command-line tools:

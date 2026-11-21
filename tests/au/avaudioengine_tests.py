@@ -95,11 +95,11 @@ def render(renderer, preset_tool, directory, number, name, filter_name, block, p
     if result.returncode != 0:
         sys.exit(f'{name}: the render failed (exit code {result.returncode})')
     lines = result.stdout.splitlines()
-    reported = [line.split()[1] for line in lines if line.startswith('latency ') and line != 'latency notified']
+    reported = [line.split()[1] for line in lines if line.startswith('latency ') and len(line.split()) == 2]
     assert reported == [str(latency)], f'{name}: the unit reports latency {reported}, expected {latency}'
     if latency != LATENCY and '--round-trip' not in options:
         # A new Latency reaches the host's property listener, on the main thread.
-        assert 'latency notified' in lines, f"{name}: the host's listener was not told of Latency {latency}"
+        assert f'latency notified {latency}' in lines, f"{name}: the host's listener was not told of Latency {latency}"
     rendered = planar(output.read_bytes(), len(expected))
     assert all(len(channel) == frames for channel in rendered), f'{name}: short output'
     # Nothing before the latency; then the oracle's output.
