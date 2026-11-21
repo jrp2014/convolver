@@ -54,10 +54,11 @@ jobs:
       - name: macOS dependencies
         if: runner.os == 'macOS'
         run: brew install libsndfile
+      # The compilers the candidates build the plug-ins with (release.yml).
       - uses: ./.github/actions/newest-compiler
         if: runner.os != 'Windows'
         with:
-          compiler: ${{ runner.os == 'macOS' && 'xcode' || 'clang' }}
+          compiler: ${{ runner.os == 'macOS' && 'xcode' || 'gcc' }}
       - name: Configure and build (Linux, macOS)
         if: runner.os != 'Windows'
         run: |
