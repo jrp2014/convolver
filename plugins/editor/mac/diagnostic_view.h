@@ -21,8 +21,10 @@
 // own. The Audio Unit (AU-6, its view factory) and VST3 on macOS (VST3-11, its editor)
 // both show this view, each supplying the blocks.
 #pragma once
+#include "host_report.hpp"
 #import "setting_rows.h"
 #import <AppKit/AppKit.h>
+#include <optional>
 
 // Objective-C classes share one namespace per process, so the build names
 // this class with Convolver's version (ConvolverDiagnosticView_0_6_0 in the
@@ -34,9 +36,10 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-// report_fields() (portable/host_report.hpp) as a dictionary, or nil when the
-// plug-in cannot give it.
-typedef NSDictionary<NSString*, NSString*>* _Nullable (^ConvolverReportSource)(void);
+// The plug-in's report (portable/host_report.hpp: the Audio Unit decodes its
+// report property with decode_report(), VST3 gives its controller's copy),
+// or none when the plug-in cannot give it (PLUG-39 step 5).
+typedef std::optional<convolver::HostReport> (^ConvolverReportSource)(void);
 // diagnostics_text(), or nil.
 typedef NSString* _Nullable (^ConvolverDiagnosticsSource)(void);
 // Loads the filter file at `path` (a .cfg, a configuration list or a sound

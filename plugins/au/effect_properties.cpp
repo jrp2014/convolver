@@ -513,15 +513,10 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         try {
             const auto r = report();
             if (id == report_property) {
-                const auto fields = report_fields(r);
-                cf_owned<CFMutableDictionaryRef> dict(CFDictionaryCreateMutable(
-                    nullptr, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks));
-                for (const auto& [key, text] : fields) {
-                    const auto k = cf_string(key), v = cf_string(text);
-                    if (dict && k && v)
-                        CFDictionarySetValue(dict.get(), k.get(), v.get());
-                }
-                value = dict.release();
+                // PLUG-39 step 5: the report encoded once (encode_report()).
+                const auto bytes = encode_report(r);
+                value = CFDataCreate(nullptr, reinterpret_cast<const UInt8*>(bytes.data()),
+                                     static_cast<CFIndex>(bytes.size()));
             } else {
                 value = cf_string(diagnostics_text(r, tag_)).release();
             }

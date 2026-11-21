@@ -139,21 +139,9 @@ class Editor final : public EditorView {
 Editor::Editor(Controller& controller) : EditorView(&controller), link_(std::make_shared<Link>()) {
     link_->controller = &controller;
     SharedLink held = link_;
-    ConvolverReportSource report = ^NSDictionary<NSString*, NSString*>*(void) {
+    ConvolverReportSource report = ^std::optional<convolver::HostReport>(void) {
         Controller* c = held->controller;
-        if (!c)
-            return nil;
-        const auto fields = c->report();
-        if (fields.empty())
-            return nil;
-        NSMutableDictionary<NSString*, NSString*>* dictionary = [NSMutableDictionary dictionary];
-        for (const auto& field : fields) {
-            NSString* key = ns(field.first);
-            NSString* value = ns(field.second);
-            if (key && value)
-                dictionary[key] = value;
-        }
-        return dictionary;
+        return c ? c->report() : std::nullopt;
     };
     ConvolverDiagnosticsSource diagnostics = ^NSString*(void) {
       Controller* c = held->controller;

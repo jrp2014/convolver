@@ -61,7 +61,7 @@ before starting anything.
 
 | Item | What to do | Note |
 | --- | --- | --- |
-| **PLUG-39** | Steps 5 and 6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps); steps 0 to 4 and ROBUST-8 are merged | Each step is its own reviewed pull request (jrp, 13 and 19 November 2026) |
+| **PLUG-39** | Step 5's typed advice and step 6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps); steps 0 to 4, step 5a's typed report and ROBUST-8 are merged | Each step is its own reviewed pull request (jrp, 13 and 19 November 2026) |
 | **PLUG-24** | `HostProcessor` in its own source file | In PLUG-39's sequence, as its own pull request, never with a DSP change (jrp, 19 November 2026) |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **PERF-3** | One measurement exercise: resource budgets and supported workloads | Changes no shipped code; decides whether FFT-2, VST3-5, PLUG-11 and PERF-2's tuning are worth doing |
@@ -251,9 +251,9 @@ upstream, or state support in FFmpeg's `lv2` filter
   either way. **Done when** he has decided and, if he wants it, such names
   load with a test.
 - [ ] **COMPAT-1 — Files from released builds.** Five previews' files are
-  kept and checked ([upgrade tests](tests/upgrade/README.md)). **Remains:**
-  a REAPER project saved with 0.14.0 and Audio Unit state from a release.
-  **Done when** both are kept and checked.
+  kept and checked, and 0.14.0's LV2 and Audio Unit state
+  ([upgrade tests](tests/upgrade/README.md)). **Remains:**
+  a REAPER project saved with 0.14.0. **Done when** it is kept and checked.
 - [ ] **IO-1 — Large files.** **Done when** each container's 4 GiB boundary
   and pipes beyond it have a test; only for a defect or a user need.
 - [ ] **IO-2 — The rate-mismatch workflow, and offline IR resampling.** A
@@ -352,11 +352,11 @@ the test in [load timing](docs/develop/load-timing.md) and the procedure in
 
 ### Keeping `host.cpp` manageable
 
-Three narrow simplifications from jrp's review of 12 November 2026 go with
+Two narrow simplifications from jrp's review of 12 November 2026 go with
 PLUG-39's [steps](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)
-1 and 5: typed `Advice` in exceptions, refusals returned directly in VST3's
-`load_file()`, and the window report kept typed until the transport
-boundary; none changes a message a user reads ([archived text](docs/archive/todo/2026-11-20-open-item-history.md#keeping-hostcpp-manageable)).
+1 and 5: typed `Advice` in exceptions, and refusals returned directly in
+VST3's `load_file()` (step 5a keeps the window report typed until the
+transport boundary); none changes a message a user reads ([archived text](docs/archive/todo/2026-11-20-open-item-history.md#keeping-hostcpp-manageable)).
 
 ## Edges over other convolvers
 

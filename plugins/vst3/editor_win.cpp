@@ -1299,9 +1299,8 @@ void Editor::follow_size() {
 }
 
 WindowContent Editor::read_content() {
-    const auto fields = controller ? owner().report() : decltype(owner().report()){};
-    const auto report = report_map(fields);
-    return window_content(fields.empty() ? nullptr : &report, true);
+    const auto report = controller ? owner().report() : std::nullopt;
+    return window_content(report ? &*report : nullptr, true);
 }
 
 void Editor::refresh() {
