@@ -54,9 +54,8 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 ### In progress
 
 PLUG-39's step 4a with PLUG-30 (PR #236); PLUG-27, which jrp brought
-forward on 20 November 2026 (PR #233); and DOC-19, whose parts each have
-their own pull request. Check the open pull requests for an ID before
-starting anything.
+forward on 20 November 2026 (PR #233). Check the open pull requests for an
+ID before starting anything.
 
 ### Ready
 
@@ -437,12 +436,6 @@ and the owner's decision its row names, and keeps its
   today. **Worth doing when** one of them sets a job's run time. **Done
   when** they run less often with their evidence kept and the everyday gates
   unchanged.
-- [ ] **DOC-19 — Shorter project records.** From an outside audit of
-  20 November 2026, approved by jrp: this file cut to open work in a line or
-  two per item; the [status page](docs/project/status.md) rewritten for
-  0.14.0; the [decisions log](docs/project/decisions.md) as short headed
-  entries; the CHANGELOG leading with what users see. **Done when** each
-  part's pull request has merged.
 
 ## Documented limitations
 
@@ -492,3 +485,6 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 
 Items finished since then are listed here, one line each, until the next
 move to the archive.
+
+- [x] **DOC-19 — Shorter project records.** 21 November 2026, PRs #238 to
+  #241 ([recording progress](docs/develop/workflow.md#recording-progress-in-todo)).

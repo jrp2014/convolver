@@ -29,12 +29,6 @@ first published preview, keep their original grouping.
 
 ### Changed
 
-- Documentation (DOC-19, from an outside audit jrp accepted): `TODO.md`
-  holds open work only, each item in a line or two, and its documented
-  limitations one line each, pointing at the page that owns the detail; the
-  48 finished items and the items' earlier text moved unchanged to
-  `docs/archive/todo/`. PLUG-39's step 1b is no longer listed as both in
-  progress and done.
 - Plug-ins (PLUG-39 step 1b): in LV2, choosing the file of the filter
   already playing again keeps it and what it is playing, so its tail rings
   on, as choosing it again in the VST3 and Audio Unit windows already did
@@ -141,6 +135,18 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
+- Records (DOC-19, from an outside audit jrp accepted): `TODO.md`
+  holds open work only, each item in a line or two, and its documented
+  limitations one line each, pointing at the page that owns the detail; the
+  48 finished items and the items' earlier text moved unchanged to
+  `docs/archive/todo/`, and PLUG-39's step 1b is no longer listed as both in
+  progress and done. The [status page](docs/project/status.md) is rewritten
+  for 0.14.0, with the first preview's gates in
+  `docs/archive/releases/`; the [decisions log](docs/project/decisions.md)
+  is a list of dated entries, with those later decisions wholly replaced
+  archived beside it; and each published release in this file lists what
+  users see first and contributor-only entries under **For contributors**,
+  none removed.
 - Tests (COMPAT-1, in progress): the example presets of the published
   0.14.0 and the audio its own CLI and VST3 plug-in rendered from them are
   kept in `tests/upgrade/0.14.0/`, beside those of 0.13.2, 0.13.12,
