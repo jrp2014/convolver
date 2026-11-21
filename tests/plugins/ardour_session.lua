@@ -29,6 +29,9 @@
 --                     which has no input-pin setting for a VST3); "all"
 --                     sets its inputs to the track's too (Ardour 9's window
 --                     has an Audio Input Pins setting)
+--   CONVOLVER_LOG     with CONVOLVER_PINS, Convolver's log file: the script
+--                     waits for the plug-in to start with those outputs
+--                     before it loads the preset (see below)
 --   CONVOLVER_STRICT_IO  optional; 1 makes the track Strict-I/O, as a track
 --                     added in Ardour's window is by default (a track the
 --                     script adds is otherwise Flexible-I/O)
@@ -127,9 +130,34 @@ if pins ~= "" then
 		sinks = processor:to_insert():natural_input_streams():n_audio()
 	end
 	step("set the plug-in's channels by hand: " .. sinks .. " input pins, " .. outputs .. " outputs")
+	local log_path = assert(os.getenv("CONVOLVER_LOG"), "CONVOLVER_PINS needs CONVOLVER_LOG")
+	local function log_text()
+		local file = io.open(log_path, "rb")
+		if not file then
+			return ""
+		end
+		local text = file:read("a")
+		file:close()
+		return text
+	end
+	local before = #log_text()
 	local audio = ARDOUR.DataType("audio")
 	assert(track:customize_plugin_insert(processor, 1, ARDOUR.ChanCount(audio, outputs), ARDOUR.ChanCount(audio, sinks)),
 		"Ardour refused " .. sinks .. " input pins, " .. outputs .. " outputs for the plug-in")
+	-- Ardour 8.4 restarts the plug-in with the new outputs a little after
+	-- customize_plugin_insert returns, while it goes on running it with the
+	-- old ones. A filter chosen in between is judged against those, refused
+	-- and not tried again (HOST-10), so the session would save the refusal.
+	-- A user sees the change in the window before choosing a filter: wait,
+	-- as they do, until the log says the plug-in started with these outputs.
+	local started = "Started at %d+ Hz, %d+ in, " .. outputs .. " out"
+	local waited = 0
+	while not log_text():sub(before + 1):find(started) do
+		assert(waited < 10000, "the plug-in did not start with " .. outputs .. " outputs within 10 s of setting them")
+		ARDOUR.LuaAPI.usleep(50000)
+		waited = waited + 50
+	end
+	step("the plug-in started with " .. outputs .. " outputs after " .. waited .. " ms")
 end
 local plugin = processor:to_insert():plugin(0)
 local preset = plugin:preset_by_label(label)

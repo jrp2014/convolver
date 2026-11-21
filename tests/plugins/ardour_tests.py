@@ -365,6 +365,7 @@ def check(tools, environment, directory, plugin_tool, format_name, fixture_name,
         'CONVOLVER_TAIL': str(filter_tail + MARGIN),
         'CONVOLVER_LEAD': str(LEAD),
         'CONVOLVER_PINS': mode if mode in {'outputs', 'all'} else '',
+        'CONVOLVER_LOG': str(convolver_log(directory)),
         'CONVOLVER_STRICT_IO': '1' if mode == 'strict' else '',
     }
     log_start = log_size(directory)

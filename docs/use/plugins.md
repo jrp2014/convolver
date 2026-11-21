@@ -917,9 +917,13 @@ names the channels Ardour gave it
   click **Manual Config**, and set **Audio Out** to 1 with its − button;
   leave Ardour 9's **Audio Input Pins** as they are. The log's next
   `Started at` line then ends `1 out` (with `2 in` on Ardour 8, where
-  Convolver plays the first input and ignores the second). These steps are not yet confirmed in
-  Ardour's window. A crossover cannot be set up this way: Convolver still
-  gets only 2 outputs.
+  Convolver plays the first input and ignores the second). Set the
+  channels before choosing the filter: a filter chosen while Convolver
+  still has 2 outputs can be refused (the log says `Not loaded`), and it is
+  not tried again when the outputs change, so choose it again after that
+  `Started at` line. These steps are not yet confirmed in Ardour's window.
+  A crossover cannot be set up this way: Convolver still gets only 2
+  outputs.
 - **Settings.** Ardour leaves Gain mode and Latency out of its own controls
   for the VST3 plug-in, because they cannot be automated; Gain and Mix are
   there. On macOS and Windows, Convolver's window has all four (not yet

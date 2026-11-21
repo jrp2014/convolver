@@ -1373,13 +1373,29 @@ example plays. Ardour 8's window can set only the outputs for a VST3 (its
 "Audio Input Pins" setting is for plug-ins whose inputs can change, which
 9.0 extends to VST3), so one case sets the outputs to 1 and leaves the
 input pins as Ardour has them (2), and the other sets the input pins to 1
-as well. On Ardour 8.4, locally, the outputs-only case played within
-2.7e-8 of the oracle in every run, the Convolver log saying 2 in, 1 out
-with the second input ignored. The case with the input pins as well
-exported silence in 5 of 9 local runs on 21 November 2026, with the same
-log lines (2 in, 1 out) while recording and, in the last, exporting, whichever cases ran before it; since Ardour 8's window cannot
-make that setting, it matters only to Ardour 9, and the guide leaves the
-input pins alone. On Ardour 9.0 both played, within 2.1e-8 (outputs only)
+as well. Ardour 8.4 restarts the plug-in with the new outputs a little
+after `customize_plugin_insert` returns, and runs it with the old ones
+meanwhile. A preset loaded in between is judged against 2 in, 2 out and
+refused (the log says "Not loaded"). It is not tried again when the
+plug-in restarts at 2 in, 1 out, so the session saves the refusal and the
+export is silent (PLUG-42). Before the script waited for the restart, this
+happened locally on 21 November 2026:
+
+- in 5 of 9 runs with the input pins set as well;
+- in 2 of 3 runs with the outputs only, on main at `d7a217b`;
+- in 2 of 4 runs with the outputs only, with #252's changes (`4ba9673`).
+
+A user sees the change in the window before choosing a filter. So the
+script now waits, after setting the channels, until the Convolver log says
+the plug-in started with the new outputs (50 ms each time on 8.4), and the
+guide says to choose the filter again if it was chosen before. With the
+wait, both cases played within 2.6e-8 of the oracle, locally on 8.4:
+
+- in five runs on `d7a217b`'s VST3;
+- in three runs of every VST3 case with #252's changes (`4ba9673`). The log said 2 in, 1 out with the second
+input ignored (outputs only), or 1 in, 1 out. The guide still leaves the
+input pins alone, since Ardour 8's window cannot set them. On Ardour 9.0
+both played, within 2.1e-8 (outputs only)
 and 1.9e-8 (input pins as well) in the Ardour job at `75b615b`
 ([run 44915756335](https://github.com/jrp2014/convolver/actions/runs/44915756335))
 and within 2.14e-8 and 2.05e-8 at `3627960`

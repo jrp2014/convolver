@@ -259,9 +259,10 @@ first published preview, keep their original grouping.
   track's Pin Mode, Ardour's
   natural streams, the insert's channels and the name Ardour gives each
   input parameter, the layout lines the Convolver log gained in each case,
-  and the whole log when an export does not match the oracle. On Ardour
-  8.4 the case with input pins set exported silence in 5 of 9 local runs,
-  so the guide leaves them alone.
+  and the whole log when an export does not match the oracle. After
+  setting the channels it waits until the log says the plug-in started
+  with them: Ardour 8.4 restarts the plug-in a little later, and a preset
+  loaded before that was refused and saved as a failure (PLUG-42).
 - Benchmarks (PERF-3): `tests/native/benchmarks/workloads.py` measures
   callback times, peak memory and preparation for long and multichannel
   filters through `HostProcessor`, and the manual Workload measurements
