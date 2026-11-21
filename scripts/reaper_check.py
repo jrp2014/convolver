@@ -48,8 +48,12 @@ PRESET = EXAMPLE / 'first-use-stereo.vstpreset'
 INPUT = EXAMPLE / 'input.wav'
 EXPECTED = EXAMPLE / 'expected.wav'
 CLI = Path('bin/convolver')
-# What Status reads once the stereo example plays (portable/host.cpp).
-LOADED = 'Filter loaded: 48000 Hz, 2 in, 2 out'
+# What Status reads, in full, while the stereo example is active
+# (portable/host.cpp). Other texts start the same way but go on to say
+# that the filter waits for the host's settings, that Mix 0% plays only the
+# dry signal, or that speaker labels differ (jrp's review of 21 November
+# 2026), so only the whole text counts.
+ACTIVE = 'Filter loaded: 48000 Hz, 2 in, 2 out.'
 REAPERS = (
     '/Applications/REAPER.app/Contents/MacOS/REAPER',
     '/Applications/REAPER64.app/Contents/MacOS/REAPER',
@@ -581,8 +585,13 @@ def playing(results):
         return False
 
 
+def active(text):
+    """Whether a Status reading is exactly the stereo example's Active text."""
+    return (text or '').strip() == ACTIVE
+
+
 def loaded_while_playing(results):
-    return playing(results) and results.get('status_playing', '').startswith(LOADED)
+    return playing(results) and active(results.get('status_playing'))
 
 
 def playing_text(results):
@@ -629,7 +638,7 @@ def evaluate(first, reopen, first_compare, reopen_compare, project):
         (
             'The .vstpreset loads the stereo example',
             one.get('preset_applied') == 'true'
-            and one.get('status_after_preset', '').startswith(LOADED)
+            and active(one.get('status_after_preset'))
             and loaded_while_playing(one),
             (
                 f'TrackFX_SetPreset returned {one.get("preset_applied") or "nothing"}; '
@@ -658,7 +667,7 @@ def evaluate(first, reopen, first_compare, reopen_compare, project):
         ),
         (
             'The reopened project restores the filter',
-            two.get('status_reopened', '').startswith(LOADED) and loaded_while_playing(two),
+            active(two.get('status_reopened')) and loaded_while_playing(two),
             (f'Status on reopening: {two.get("status_reopened", "(none)")}; {playing_text(two)}{rate_hint(two)}'),
         ),
         ('The reopened render matches expected.wav', reopen_compare['match'], last_line(reopen_compare['output'])),
