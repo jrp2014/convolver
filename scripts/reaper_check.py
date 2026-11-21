@@ -551,6 +551,17 @@ def rate_hint(results):
     return ''
 
 
+def same_file(recorded, project):
+    """Whether the path REAPER reports is the project saved in the first
+    stage (allowing for symbolic links such as /var and /private/var)."""
+    if not recorded:
+        return False
+    try:
+        return Path(recorded).samefile(project)
+    except OSError:
+        return Path(recorded).resolve() == Path(project).resolve()
+
+
 def evaluate(first, reopen, first_compare, reopen_compare, project):
     """The checks, in order: (name, passed, evidence)."""
     one = first['results']
@@ -568,8 +579,13 @@ def evaluate(first, reopen, first_compare, reopen_compare, project):
         ),
         (
             'The .vstpreset loads the stereo example',
-            one.get('status_after_preset', '').startswith(LOADED) or one.get('status_playing', '').startswith(LOADED),
+            one.get('preset_applied') == 'true'
+            and (
+                one.get('status_after_preset', '').startswith(LOADED)
+                or one.get('status_playing', '').startswith(LOADED)
+            ),
             (
+                f'TrackFX_SetPreset returned {one.get("preset_applied") or "nothing"}; '
                 f'Status after the preset: {one.get("status_after_preset", "(none)")}; '
                 f'while playing: {one.get("status_playing", "(none)")}{rate_hint(one)}'
             ),
@@ -577,9 +593,19 @@ def evaluate(first, reopen, first_compare, reopen_compare, project):
         ('The render matches expected.wav', first_compare['match'], last_line(first_compare['output'])),
         ('The project is saved', project.exists(), project.name if project.exists() else 'not saved'),
         (
-            'REAPER reopened the project in a new process and ran the second ReaScript to the end',
-            bool(reopen) and reopen['finished'] and 'error' not in two,
-            (two.get('error') or reopen.get('problem') or f'{reopen["seconds"]} s, process {reopen["pid"]}')
+            'REAPER reopened the saved project in a new process and ran the second ReaScript to the end',
+            bool(reopen)
+            and reopen['finished']
+            and 'error' not in two
+            and reopen['pid'] != first['pid']
+            and same_file(two.get('project_opened'), project),
+            (
+                two.get('error')
+                or reopen.get('problem')
+                or f'{reopen["seconds"]} s, process {reopen["pid"]}; REAPER opened '
+                f'{two.get("project_opened") or "(no project path)"}'
+                + ('' if same_file(two.get('project_opened'), project) else f', not {project}')
+            )
             if reopen
             else 'not run',
         ),

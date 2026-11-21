@@ -44,6 +44,11 @@ FAKE_REAPER = textwrap.dedent(
     lines = [('stage', 'reopen' if reopen else 'first'), ('reaper_version', '7.99/macOS-arm64'),
              ('fx_name', 'VST3: Convolver (Convolver)'), ('status_playing', status),
              ('status_reopened' if reopen else 'status_after_preset', status)]
+    if reopen:
+        opened = next(a for a in sys.argv[1:] if a.endswith('.rpp'))
+        lines.append(('project_opened', '/elsewhere/other.rpp' if mode == 'other' else opened))
+    else:
+        lines.append(('preset_applied', 'false' if mode == 'refused' else 'true'))
     shutil.copy(os.environ['FAKE_RENDER'], os.path.join(config['output'], config['render'] + '.wav'))
     open(config['project'], 'w').write('<REAPER_PROJECT\n>\n')
     lines.append(('done', 'yes'))
@@ -185,6 +190,38 @@ class Run(unittest.TestCase):
         self.assertEqual(status, 1)
         self.assertIn('| 7 | The reopened project restores the filter | **FAIL** | Status on reopening: Silent', result)
         self.assertIn('**FAIL: 7 of 8 checks passed.**', result)
+
+    def test_a_preset_call_that_failed(self):
+        # Status and both renders look right, but REAPER said the preset did
+        # not load: the run cannot claim it loaded (jrp's review).
+        with mock.patch.dict(os.environ, {'FAKE_REAPER': 'refused'}):
+            status, result = self.run_check()
+        self.assertEqual(status, 1)
+        self.assertIn(
+            '| 3 | The .vstpreset loads the stereo example | **FAIL** | TrackFX_SetPreset returned false', result
+        )
+        self.assertIn('**FAIL: 7 of 8 checks passed.**', result)
+
+    def test_another_project_reopened(self):
+        # The second REAPER reports a project other than the one saved: the
+        # renders match, but the save and reopen is not shown (jrp's review).
+        with mock.patch.dict(os.environ, {'FAKE_REAPER': 'other'}):
+            status, result = self.run_check()
+        self.assertEqual(status, 1)
+        self.assertRegex(
+            result, r'\| 6 \| REAPER reopened the saved project [^|]*\| \*\*FAIL\*\* \|[^|]*/elsewhere/other\.rpp, not '
+        )
+        self.assertIn('**FAIL: 7 of 8 checks passed.**', result)
+
+    def test_the_saved_project_is_recognised_through_a_link(self):
+        base = pathlib.Path(self.directory.name)
+        project = base / 'saved.rpp'
+        project.write_text('x')
+        link = base / 'link'
+        link.symlink_to(base, target_is_directory=True)
+        self.assertTrue(reaper_check.same_file(str(link / 'saved.rpp'), project))
+        self.assertFalse(reaper_check.same_file(str(base / 'missing.rpp'), project))
+        self.assertFalse(reaper_check.same_file('', project))
 
     def test_a_render_that_differs(self):
         os.environ['FAKE_RENDER'] = str(self.package / reaper_check.INPUT)
