@@ -153,7 +153,7 @@ def log_size(directory):
 
 
 def print_layout_lines(directory, name, start):
-    """Each different layout line the Convolver log gained since start: what the plug-in was given.
+    """The layout lines the Convolver log gained since start: what the plug-in was given.
 
     A refused layout is followed by the one Ardour gave next, so a Refused
     line is not by itself a failure; the export says what was heard.
@@ -165,11 +165,11 @@ def print_layout_lines(directory, name, start):
     with path.open('rb') as log:
         log.seek(start)
         text = log.read().decode('utf-8', errors='replace')
-    seen = []
+    last = None
     for line in text.splitlines():
         found = re.search(r"(Refused the host's channel layout: .*|Started at .*?, blocks of up to \d+ frames\.)", line)
-        if found and found[1] not in seen:
-            seen.append(found[1])
+        if found and found[1] != last:  # Repeats in a row say nothing new.
+            last = found[1]
             print(f'{name}: log: {found[1]}')
 
 
@@ -395,7 +395,9 @@ def check(tools, environment, directory, plugin_tool, format_name, fixture_name,
     assert int(reopened[1]) == latency, f'{name}: reopened with latency {reopened[1]}, saved with {latency}'
 
     exported = directory / f'{name}.wav'
+    log_start = log_size(directory)
     export(tools['export'], environment, exported, session, name)
+    print_layout_lines(directory, f'{name} export', log_start)
 
     take = recorded_take(session, name)
     assert len(take) == inputs, f'{name}: recorded {len(take)} channels, expected {inputs}'

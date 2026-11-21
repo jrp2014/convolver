@@ -224,7 +224,7 @@ first published preview, keep their original grouping.
   natural streams, the insert's channels and the name Ardour gives each
   input parameter, the layout lines the Convolver log gained in each case,
   and the whole log when an export does not match the oracle. On Ardour
-  8.4 the case with input pins set exported silence in 4 of 8 local runs,
+  8.4 the case with input pins set exported silence in 5 of 9 local runs,
   so the guide leaves them alone.
 - Benchmarks (PERF-3): `tests/native/benchmarks/workloads.py` measures
   callback times, peak memory and preparation for long and multichannel

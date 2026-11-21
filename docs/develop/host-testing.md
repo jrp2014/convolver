@@ -640,7 +640,8 @@ None is open. The last, Ardour 8.4 running the VST3 plug-in at 2 in, 2 out
 on a mono track and hiding Latency and Gain mode (headless, 20 November
 2026), was explained by HOST-10 on 21 November 2026: the test's tracks were
 Flexible-I/O, and on Ardour's default Strict-I/O tracks the mono example
-plays ([Ardour, headless](testing.md#ardour-headless)). The
+plays; Ardour hides every VST3 parameter that cannot be automated, which
+Gain mode and Latency are ([Ardour, headless](testing.md#ardour-headless)). The
 [plug-in guide](../use/plugins.md#ardour) says what Ardour users need.
 Before it, a new VST3 Latency that REAPER used only after a render, FX
 Offline then Online, or reopening the project, was fixed by VST3-16 and

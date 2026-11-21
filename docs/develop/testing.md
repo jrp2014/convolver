@@ -1333,12 +1333,13 @@ A track the script adds is Flexible-I/O unless the case asks for
 Strict-I/O (`Route::set_strict_io`), which is what Ardour's window gives a
 new track by default (the `strict-io` preference) and which keeps the
 track's channel count through its plug-ins. On a Strict-I/O track, both
-formats play mono and stereo as they are: for the VST3, Ardour gives the
-plug-in as many outputs as the track has channels (`enable_io`, which does
-not mask the request). On a mono track the Convolver log said 1 in, 1 out
-on Ardour 8.4; on 9.0 it first said "Refused the host's channel layout:
-it has 0 input and 0 output channels" (the masked request described
-below), then 2 in, 1 out, the second input ignored
+formats play mono and stereo as they are: for the VST3, Ardour then gives
+the plug-in as many outputs as the track has channels (`enable_io`, which
+does not mask the request). On a mono track the Convolver log said 1 in,
+1 out on Ardour 8.4. On 9.0 it first said "Refused the host's channel
+layout: it has 0 input and 0 output channels", from the masked
+`request_bus_layout` described below, which 9.0 makes on every kind of
+track before `enable_io`; then 2 in, 1 out, the second input ignored
 ([run 44931897154](https://github.com/jrp2014/convolver/actions/runs/44931897154)
 at `28dec71`, which prints those lines for every case). The Strict-I/O cases played on
 Ardour 8.4 locally and on 9.0 in the Ardour jobs at `3627960` on
@@ -1372,15 +1373,18 @@ input pins as Ardour has them (2), and the other sets the input pins to 1
 as well. On Ardour 8.4, locally, the outputs-only case played within
 2.7e-8 of the oracle in every run, the Convolver log saying 2 in, 1 out
 with the second input ignored. The case with the input pins as well
-exported silence in 4 of 8 local runs on 21 November 2026, with the same
-log line, whichever cases ran before it; since Ardour 8's window cannot
+exported silence in 5 of 9 local runs on 21 November 2026, with the same
+log lines (2 in, 1 out) while recording and, in the last, exporting, whichever cases ran before it; since Ardour 8's window cannot
 make that setting, it matters only to Ardour 9, and the guide leaves the
 input pins alone. On Ardour 9.0 both played, within 2.1e-8 (outputs only)
 and 1.9e-8 (input pins as well) in the Ardour job at `75b615b`
 ([run 44915756335](https://github.com/jrp2014/convolver/actions/runs/44915756335))
 and within 2.14e-8 and 2.05e-8 at `3627960`
-([run 44928692792](https://github.com/jrp2014/convolver/actions/runs/44928692792));
-there the log said 1 in, 1 out in both, after the refused request.
+([run 44928692792](https://github.com/jrp2014/convolver/actions/runs/44928692792)),
+and again at `28dec71`
+([run 44931897154](https://github.com/jrp2014/convolver/actions/runs/44931897154)),
+whose log lines show, in both, the refused request, then 2 in, 2 out, then
+1 in, 1 out.
 The crossover set by hand (2 in, 6 out) still got 2 outputs on Ardour 8.4
 and played silence, so the VST3 crossover is not run; for Ardour 9 that
 it gets 2 outputs too comes from reading `request_bus_layout`, not from a
@@ -1389,7 +1393,7 @@ Ardour's natural streams, its count of the plug-in's pins (2 in, 2 out in
 every VST3 case, even when the plug-in runs 2 in, 1 out), and the insert's
 channels on the track side, for the record; the export, checked against
 the oracle, is what the test asserts. For every case it prints the layout
-lines the Convolver log gained (`Started at`, and any `Refused the host's
+lines the Convolver log gained while recording and while exporting (`Started at`, and any `Refused the host's
 channel layout`), which say what the plug-in was given, and the whole log
 when the export fails. Ardour, 8.4 and 9.0 alike, names every VST3
 parameter that cannot be automated (Gain mode and Latency) "hidden" and
