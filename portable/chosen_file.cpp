@@ -15,21 +15,20 @@ constexpr const char* use_instead =
     "or choose the filter itself (an IR file, .cfg or configuration list).";
 } // namespace
 
-std::optional<HostState> read_chosen_file(const std::string& path, const HostLayout& host,
-                                          const detail::SoundFiles& reader,
-                                          FilterFileFailure& failure,
-                                          std::vector<std::string>* files,
-                                          std::string* wider_entry) {
+std::optional<HostState>
+read_chosen_file(const std::string& path, const std::optional<HostLayout>& host,
+                 const detail::SoundFiles& reader, FilterFileFailure& failure,
+                 std::vector<std::string>* files, std::string* wider_entry, bool settled) {
     std::filesystem::path file;
     try {
         file = detail::utf8_path(path);
     } catch (const std::exception&) {
         // Not a name this system can use (a damaged Recent entry):
         // read_filter_file() refuses it with its explanation.
-        return read_filter_file(path, host, reader, failure, files, wider_entry);
+        return read_filter_file(path, host, reader, failure, files, wider_entry, settled);
     }
     if (presets::format_for(file) != presets::Format::vst3)
-        return read_filter_file(path, host, reader, failure, files, wider_entry);
+        return read_filter_file(path, host, reader, failure, files, wider_entry, settled);
     if (files)
         files->clear();
     if (wider_entry)

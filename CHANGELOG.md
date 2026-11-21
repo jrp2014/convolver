@@ -105,6 +105,23 @@ first published preview, keep their original grouping.
 
 ### Fixed
 
+- Plug-ins (PLUG-27): a filter file chosen in Convolver's window before the
+  host plays is kept and saved with the project, and checked when the host
+  plays audio through the plug-in; until then Status says "Filter selected.
+  Waiting for the host's audio settings." rather than judging it against a
+  brief start at a placeholder rate. In Audacity 4.0.2, which sets up the
+  plug-in at 44.1 kHz until it first plays whatever the project's rate, a
+  48 kHz filter chosen before playback was refused, and the project then
+  saved that failure, so exports were dry or silent (jrp's run of 0.14.0,
+  20 November 2026, [record](docs/archive/reviews/2026-11-20-vst3-17-audacity.md)).
+  A configuration list needs the host's rate and channels to choose its
+  entry: before the host has started the plug-in it is not loaded, and the
+  window says to play audio once, then choose the list again; a list with
+  no entry for the rate the host last ran at is refused naming it, with
+  the same step added to the advice while the host is not playing. While the
+  host plays, a file that does not suit it is still refused and the working
+  filter keeps playing. VST3 and the Audio Unit; not yet checked in
+  Audacity ([when a chosen file is checked](docs/use/plugins.md#loading-a-filter)).
 - Documentation (DOC-18, from an outside audit of 20 November 2026): the
   user guides no longer contradict the plug-ins. **Choose…** opens a
   Convolver `.vstpreset` (the first-sound guide said it read no presets);

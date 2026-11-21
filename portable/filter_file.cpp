@@ -55,6 +55,31 @@ std::size_t wider_bus_inputs(const std::vector<detail::SelectionCandidate>& cand
             inputs = std::max(inputs, c.input_channels);
     return inputs;
 }
+// PLUG-27: whether `path` is a configuration list, read as text alone (no
+// sound file is decoded). Anything that cannot be read or parsed is not:
+// the read that follows explains it.
+bool configuration_list(const std::string& path) noexcept {
+    try {
+        const auto file = detail::utf8_path(path);
+        const auto text = detail::read_configuration_text(file);
+        return !detail::not_configuration_text(text) &&
+               detail::parse_configuration_text(text, file).kind ==
+                   detail::ParsedDocument::Kind::list;
+    } catch (...) {
+        return false;
+    }
+}
+// PLUG-27: jrp's words (20 November 2026) for a list chosen before the host
+// has played audio, which the window shows as for any refused file.
+Advice list_waits_refusal(const std::string& path) {
+    return {path + ": no entry selected",
+            "A configuration list's entry is chosen for the host's sample rate and channel "
+            "counts, and the host has not played audio through the plug-in yet, so they are not "
+            "known.",
+            "Play audio once so Convolver can check the host's sample rate and channel counts, "
+            "then choose the configuration list again.",
+            {}};
+}
 } // namespace
 
 HostState filter_file_state(const std::filesystem::path& path,
@@ -68,17 +93,42 @@ HostState filter_file_state(const std::filesystem::path& path,
     return state;
 }
 
-std::optional<HostState> read_filter_file(const std::string& path, const HostLayout& host,
-                                          const detail::SoundFiles& reader,
-                                          FilterFileFailure& failure,
-                                          std::vector<std::string>* files,
-                                          std::string* wider_entry) {
+std::optional<HostState>
+read_filter_file(const std::string& path, const std::optional<HostLayout>& known,
+                 const detail::SoundFiles& reader, FilterFileFailure& failure,
+                 std::vector<std::string>* files, std::string* wider_entry, bool settled) {
     failure.kind = HostFailureKind::filter_file;
     failure.carried.reset();
     if (files)
         files->clear();
     if (wider_entry)
         wider_entry->clear();
+    // PLUG-27: while the host is not playing, a single filter is read as it
+    // is, to be kept and checked when the host starts; a list's entry is
+    // chosen for the configuration the host last started with, if any.
+    const bool list = !settled || !known ? configuration_list(path) : false;
+    if (!known && list) {
+        failure.message = list_waits_refusal(path);
+        return std::nullopt;
+    }
+    if (!known || (!settled && !list)) {
+        try {
+            std::vector<std::filesystem::path> sources;
+            auto state = filter_file_state(detail::utf8_path(path), {}, reader, nullptr, true,
+                                           false, &sources);
+            if (files) {
+                std::vector<std::string> named;
+                for (const auto& source : sources)
+                    named.push_back(detail::utf8_string(source));
+                *files = std::move(named);
+            }
+            return state;
+        } catch (const std::exception& e) {
+            failure.message = refusal(path, e.what());
+        }
+        return std::nullopt;
+    }
+    const auto& host = *known;
     try {
         // Explained in the host's terms, not the command line's (jrp's
         // GarageBand run: the window advised omitting --output-channels).
@@ -168,6 +218,21 @@ std::optional<HostState> read_filter_file(const std::string& path, const HostLay
             failure.message =
                 fractional_rate_refusal(path, host, std::move(rates), !failure.carried);
         }
+        // PLUG-27 (jrp, 21 November 2026): the host is not playing, so the
+        // configuration the list was checked against may be a placeholder
+        // (Audacity's 44.1 kHz before it first plays). The message keeps
+        // naming it, and the fix says what to do if it is one. settled is
+        // false whenever the host is not playing at this moment, so this is
+        // added after a real start too, and for channels as for rates;
+        // following it, the list is chosen while the host plays and gets
+        // the normal fix alone, so the advice cannot send anyone round in
+        // circles.
+        if (e.list && !settled)
+            failure.message.fix +=
+                std::string(failure.message.fix.empty() ? "" : " ") +
+                "If the host has not played audio at your project's rate yet, play audio once so "
+                "Convolver can check the host's sample rate and channel counts, then choose the "
+                "configuration list again.";
     } catch (const std::exception& e) {
         if (wider_entry) // Refused after the entry was named (out of memory).
             wider_entry->clear();
