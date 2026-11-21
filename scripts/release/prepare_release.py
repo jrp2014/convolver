@@ -280,8 +280,8 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'On Linux use the LV2 plug-in on a Flexible-I/O track for a crossover '
             f'([Ardour]({docs}/plugins.md#ardour)).\n'
             '- Checked only by automated tests: new in 0.18, a configuration list loading by itself once the host '
-            'plays, a chosen file waiting for audio in the current start, a filter that does not suit the host kept until '
-            'it does, Status naming a setting not in use, the tail reported after a stop, choosing '
+            'plays, a chosen file waiting for audio in the current start, a filter that does not suit the host '
+            'kept until it does, Status naming a setting not in use, the tail reported after a stop, choosing '
             "the playing file again in LV2, and the Audio Unit's part of keeping a filter chosen before the host "
             'plays; new in 0.14, the quicker restore of the playing filter and the saving once the sound '
             'has stopped; new in 0.13.20, the Gain mode, a `.vstpreset` chosen in the window, Choose… on a track '
