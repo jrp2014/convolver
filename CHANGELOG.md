@@ -172,6 +172,13 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
+- Tests (HOST-11, first version): `scripts/reaper_check.py` runs part of
+  the REAPER host check from one command on a Mac. REAPER renders the
+  stereo example through its `.vstpreset`, saves, quits, reopens the
+  project in a new process and renders again; both renders are compared
+  with `convolver --compare`, and one `result.md` holds what a host report
+  needs. It needs REAPER, so no workflow runs it; its tests run in
+  pre-commit against a stand-in REAPER.
 - Tests (HOST-9): the headless Ardour test plays the VST3 plug-in too, in
   the VST3 workflow, on Ardour's own VST3 host, and saves sessions at a
   larger Latency (LV2 at 256 and 1024, VST3 at 1024): Ardour must be told
@@ -185,6 +192,11 @@ first published preview, keep their original grouping.
   the engine runs, which the host's property listener must hear of; and a
   project's round trip into a second unit through `ClassInfo`. Each must
   report the expected latency and match the oracle within 1e-5.
+- Builds (CI-48): the Linux package, built with GCC 12.3 on Ubuntu 22.04,
+  builds without warnings from Convolver's own sources (libsndfile's and the
+  VST3 SDK's remain theirs). That compiler wrongly warned `-Wrestrict` at nine
+  places in the core and the tests that put text in front of a temporary
+  string; they now build the string front to back. No output changes.
 - Builds (CI-47): the Audio Unit component's own sources (its factory and
   the window it shares with the VST3 plug-in) and the Audio Unit and LV2
   tests build with `-Wall -Wextra -Wpedantic`, as everything else now does;

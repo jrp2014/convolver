@@ -556,7 +556,8 @@ void presets(host::World& world, const Fixture& f, const fs::path& tool, const f
     const auto label = f.name + ": ";
     const auto folder = work / (f.name + ".preset.lv2");
     fs::remove_all(folder);
-    const auto command = "\"" + tool.string() + "\" --name \"" + f.name + " preset\" \"" +
+    const auto tool_path = tool.string();
+    const auto command = "\"" + tool_path + "\" --name \"" + f.name + " preset\" \"" +
                          f.source.string() + "\" \"" + folder.string() + "\"";
     if (std::system(command.c_str()) != 0) {
         check(false, label + "convolver-preset wrote no LV2 preset: " + command);

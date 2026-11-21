@@ -17,7 +17,8 @@ bool save(const std::vector<std::string>& files) {
     if (path.has_parent_path())
         std::filesystem::create_directories(path.parent_path(), ec);
     auto temporary = path;
-    temporary += "." + std::to_string(std::random_device{}()) + ".tmp";
+    const auto nonce = std::to_string(std::random_device{}());
+    temporary += "." + nonce + ".tmp";
     {
         std::ofstream out(temporary, std::ios::binary | std::ios::trunc);
         for (const auto& file : files)

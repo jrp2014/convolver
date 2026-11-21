@@ -1836,6 +1836,7 @@ of their own.
 | `scripts/release/`, `tests/release/`, `packaging/`, apart from the files other workflows use (CI-34) | the [candidates](#plug-in-candidate-checks) |
 | `tests/upgrade/`, the [files kept from releases](../../tests/upgrade/README.md) and their checks (CI-42) | native and VST3, whose `upgrade.cli` and `vst3.upgrade` read them |
 | `tests/plugins/ardour_*`, the [headless Ardour test](#ardour-headless) (HOST-9) | VST3 and LV2, the only workflows that run it (`ARDOUR_WORKFLOWS`); the fixtures it imports count as shared |
+| `scripts/reaper_check.py` and its tests, the [REAPER check](host-testing.md#reaper-from-one-command) jrp runs by hand (HOST-11) | none: Lint's pre-commit runs `tests/reaper_check_tests.py` (`MANUAL`) |
 | `.github/workflows/NAME.yml` | that workflow |
 
 The shared parts are not a format's files: the PLUG-2 harness in

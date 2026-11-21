@@ -68,6 +68,9 @@ class Classification(unittest.TestCase):
             # code (below).
             'tests/plugins/ardour_tests.py': 'ardour',
             'tests/plugins/ardour_session.lua': 'ardour',
+            # The REAPER script jrp runs by hand, and its tests (HOST-11).
+            'scripts/reaper_check.py': 'manual',
+            'tests/reaper_check_tests.py': 'manual',
             'portable/third_party/ooura/README.md': 'packaged',
             'portable/engine.cpp': 'code',
             'COPYING': 'code',
@@ -223,6 +226,9 @@ class Classification(unittest.TestCase):
         self.assertEqual(runs(['tests/plugins/ardour_tests.py', 'tests/plugins/ardour_reopen.lua']), ardour)
         self.assertEqual(runs(['tests/plugins/ardour_session.lua', 'plugins/au/effect.hpp']), ardour | {'au'})
         self.assertEqual(runs(['tests/plugins/ardour_tests.py', 'tests/plugins/harness.hpp']), others)
+        # The REAPER script and its tests run only in lint's pre-commit (HOST-11).
+        self.assertEqual(runs(['scripts/reaper_check.py', 'tests/reaper_check_tests.py', 'TODO.md']), set())
+        self.assertEqual(runs(['scripts/reaper_check.py', 'plugins/au/effect.hpp']), {'au'})
         self.assertEqual(ci_scope.decide(['plugins/au/effect.hpp'], 'release'), {'build': False, 'package': False})
         self.assertEqual(ci_scope.decide(['plugins/lv2/plugin.cpp'], 'release'), {'build': False, 'package': False})
         self.assertEqual(ci_scope.decide(['cmake/X.cmake'], 'release'), {'build': True, 'package': True})
@@ -675,6 +681,13 @@ class UpgradeIsolation(unittest.TestCase):
         found = {path for path, contents in tracked() if not path.startswith(own) and pattern.search(contents)}
         # Lint runs the harness tests through pre-commit for every pull request.
         self.assertEqual(found, {'.github/workflows/vst3.yml', '.github/workflows/lv2.yml', '.pre-commit-config.yaml'})
+
+    def test_no_workflow_runs_the_manual_host_scripts(self):
+        pattern = re.compile(r'\breaper_check(?:_tests)?\b')
+        own = (*ci_scope.MANUAL, 'scripts/ci_scope.py', 'tests/ci_scope_tests.py')
+        found = {path for path, contents in tracked() if path not in own and pattern.search(contents)}
+        # Only lint's pre-commit runs their tests.
+        self.assertEqual(found, {'.pre-commit-config.yaml'})
 
     def test_only_listed_files_name_the_upgrade_files(self):
         # A relative path such as parents[1] / 'upgrade/x' counts too.
