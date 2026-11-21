@@ -129,7 +129,9 @@ class VersioningTests(GitFixture):
         self.write('cmake/example.cmake', '# source build change\n')
         self.commit()
         self.git('push', 'origin', 'main')
-        self.run_version('--push')
+        self.run_version('--push', ok=False)  # Labels must be read or explicitly ignored.
+        self.assertEqual(self.git('tag', '--list', 'v0.2.1'), '')
+        self.run_version('--push', '--ignore-labels')
         self.assertIn(self.git('rev-parse', 'HEAD'), self.git('ls-remote', 'origin', 'refs/heads/main'))
         self.assertIn(self.git('rev-parse', 'v0.2.1'), self.git('ls-remote', 'origin', 'refs/tags/v0.2.1'))
         # An upstream change must reject both refs, never leave a detached tag.
@@ -157,7 +159,7 @@ class VersioningTests(GitFixture):
         subprocess.run(['git', '-C', str(clone), 'push', 'origin', 'main'], check=True, capture_output=True)
         self.write('portable/example.cpp', '// local next source\n')
         self.commit()
-        self.run_version('--push', ok=False)
+        self.run_version('--push', '--ignore-labels', ok=False)
         self.assertEqual(self.git('ls-remote', 'origin', 'refs/tags/v0.2.2'), '')
 
     def test_server_rejection_cannot_publish_only_the_tag(self):
@@ -174,7 +176,7 @@ class VersioningTests(GitFixture):
         with hook.open('w', encoding='utf-8', newline='\n') as stream:
             stream.write('#!/bin/sh\n[ "$1" != "refs/heads/main" ]\n')
         hook.chmod(0o755)
-        self.run_version('--push', ok=False)
+        self.run_version('--push', '--ignore-labels', ok=False)
         self.assertIn(source, self.git('ls-remote', 'origin', 'refs/heads/main'))
         self.assertEqual(self.git('ls-remote', 'origin', 'refs/tags/v0.2.1'), '')
 

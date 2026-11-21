@@ -37,6 +37,8 @@ NEWEST_FIRST_DECISIONS = {'Releases'}
 DONE_LIST_LEAD = 'Items finished since then are listed here'
 
 DONE_LINE = re.compile(r'^- \[[xX]\] \*\*[A-Z][A-Z0-9]*-\d+ — ')
+# Any TODO item line, ticked or not: allowed only under Done.
+TODO_LINE = re.compile(r'^- \[[ xX]\] \*\*[A-Z][A-Z0-9]*-\d+ — ')
 INLINE_LINK = re.compile(r'(\]\()(\s*<?)([^\s()<>]+)')
 FRAGMENT_NAME = re.compile(r'^[A-Z][A-Z0-9]*-\d+(?:-[a-z0-9]+)*\.md$')
 
@@ -104,6 +106,13 @@ def parse(path):
             raise FragmentError(f'{name}: section "{section}" is empty')
         if not lines[0].startswith('- '):
             raise FragmentError(f'{name}: section "{section}" must be a list; start each entry with "- "')
+        if section != DONE:
+            for line in lines:
+                if TODO_LINE.match(line):
+                    raise FragmentError(
+                        f'{name}: "{line[:40]}…" is a TODO line under "{section}"; it would be folded '
+                        'there and the item would vanish from TODO, so put it under "## Done"'
+                    )
         if section == DONE:
             for line in lines:
                 if line.startswith('- ') and not DONE_LINE.match(line):
@@ -115,19 +124,20 @@ def parse(path):
 
 
 def rewrite_links(lines, page):
-    """Fragment links are written from the repository root, as in CHANGELOG.md
-    and TODO.md; make them relative to the page they are folded into."""
+    """Fragment links are relative to the fragment, as in any page, so they
+    work where the fragment is read; make them relative to the page they are
+    folded into instead."""
     base = str(Path(page).parent)
-    if base == '.':
-        return lines
 
     def relative(match):
         target = match.group(3)
         if re.match(r'^[a-z][a-z0-9+.-]*:', target, re.IGNORECASE) or target.startswith(('#', '/')):
             return match.group(0)
         path, hash_mark, fragment = target.partition('#')
-        moved = os.path.relpath(path, base).replace(os.sep, '/') if path else ''
-        return match.group(1) + match.group(2) + moved + hash_mark + fragment
+        if path:
+            from_root = os.path.normpath(f'{FRAGMENTS}/{path}')
+            path = os.path.relpath(from_root, base).replace(os.sep, '/')
+        return match.group(1) + match.group(2) + path + hash_mark + fragment
 
     return [INLINE_LINK.sub(relative, line) for line in lines]
 
@@ -212,31 +222,33 @@ def fold_decision(lines, section, entries):
         insert_bottom(lines, bounds[0], bounds[1], entries)
 
 
-def added_time(root, path):
+def git_output(root, *args):
+    try:
+        return subprocess.run(['git', *args], cwd=root, capture_output=True, text=True, check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return ''
+
+
+def main_line(root):
+    """The history that says when fragments reached main: origin/main when
+    the checkout has it, so that a branch which merged main in (the
+    release-notes pull request, refreshed) still dates each fragment by its
+    own arrival on main rather than by that merge; otherwise HEAD."""
+    return 'origin/main' if git_output(root, 'rev-parse', '--verify', '--quiet', 'origin/main') else 'HEAD'
+
+
+def added_time(root, path, line):
     """When the fragment reached the main line (seconds), so entries keep the
     order their pull requests merged in: --first-parent dates a fragment from
-    a merged branch by its merge, not by the branch's own commit. Uncommitted
-    fragments come last."""
-    try:
-        stamp = subprocess.run(
-            [
-                'git',
-                'log',
-                '--first-parent',
-                '--diff-filter=A',
-                '--format=%ct',
-                '-1',
-                '--',
-                str(path.relative_to(root)),
-            ],
-            cwd=root,
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
-        stamp = ''
-    return int(stamp) if stamp else sys.maxsize
+    a merged branch by its merge, not by the branch's own commit. A fragment
+    not on that line yet (added on this branch) counts from this branch's
+    history, and an uncommitted one comes last."""
+    name = str(path.relative_to(root))
+    for ref in dict.fromkeys((line, 'HEAD')):
+        stamp = git_output(root, 'log', '--first-parent', '--diff-filter=A', '--format=%ct', '-1', ref, '--', name)
+        if stamp:
+            return int(stamp)
+    return sys.maxsize
 
 
 def read_page(root, name):
@@ -263,13 +275,8 @@ def check(root):
 
 
 def shallow(root):
-    try:
-        answer = subprocess.run(
-            ['git', 'rev-parse', '--is-shallow-repository'], cwd=root, capture_output=True, text=True, check=True
-        ).stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
-        return False  # Not a Git checkout: every fragment counts as uncommitted.
-    return answer == 'true'
+    # Outside a Git checkout every fragment counts as uncommitted.
+    return git_output(root, 'rev-parse', '--is-shallow-repository') == 'true'
 
 
 def fold(root):
@@ -281,7 +288,8 @@ def fold(root):
             'this is a shallow clone, which cannot tell when older fragments reached main, so entries '
             'would fold out of order; run "git fetch --unshallow" and fold from an up-to-date main'
         )
-    parsed.sort(key=lambda item: (added_time(root, item[0]), item[0].name))
+    line = main_line(root)
+    parsed.sort(key=lambda item: (added_time(root, item[0], line), item[0].name))
     pages = {name: read_page(root, name) for name in (CHANGELOG, TODO, DECISIONS)}
     # Oldest first: newest-first lists insert at the top, so the newest ends up
     # there; oldest-first decision sections append.

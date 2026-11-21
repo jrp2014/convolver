@@ -112,10 +112,13 @@ python3 tests/versioning_tests.py
 For manual recovery in a clean, fully fetched checkout of `main`:
 
 ```sh
-python3 scripts/version_source.py --push
+python3 scripts/version_source.py --push --labels-from jrp2014/convolver
 ```
 
-Add `--labels-from jrp2014/convolver` (with the GitHub CLI signed in) so that
-version labels count, as they do in the workflow. Omit `--push` to create only
+This reads the version labels through the GitHub CLI, which must be signed
+in, as the workflow does. `--push` refuses to run without `--labels-from`,
+since a missed `version:minor` would publish a patch that no tag move can
+undo; `--ignore-labels` replaces it only when you have checked that no pull
+request merged since the last tag has a version label. Omit `--push` to create only
 the local version commit and tag. This is a mutation, not a dry run. If publication failed after local creation, use a fresh clone for
 recovery; do not force-push or move a published tag.

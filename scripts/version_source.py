@@ -129,13 +129,26 @@ def version_source(*, push=False, labels_from=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--push', action='store_true', help='atomically push main and its new tag to origin')
-    parser.add_argument(
+    labels = parser.add_mutually_exclusive_group()
+    labels.add_argument(
         '--labels-from',
         metavar='OWNER/NAME',
         help='read version:minor and version:major labels of merged pull requests with the GitHub CLI',
     )
+    labels.add_argument(
+        '--ignore-labels',
+        action='store_true',
+        help='version without reading labels; with --push, only when no merged pull request asks for a step',
+    )
     args = parser.parse_args()
     try:
+        if args.push and not (args.labels_from or args.ignore_labels):
+            # A push without labels would publish a patch for a pull request
+            # labelled for a minor or major step, and tags are never moved.
+            raise ValueError(
+                '--push needs --labels-from OWNER/NAME so that version:minor and version:major labels count '
+                '(or --ignore-labels, when you have checked that no merged pull request has one)'
+            )
         version_source(push=args.push, labels_from=args.labels_from)
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
         detail = error.stderr if isinstance(error, subprocess.CalledProcessError) else str(error)

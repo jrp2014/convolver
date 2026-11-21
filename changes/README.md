@@ -25,7 +25,7 @@ after any of them, or one file each.
 ## Changed
 
 - Plug-ins (PLUG-40): what a user notices, as the changelog says it. See
-  [loading a filter](docs/use/plugins.md#loading-a-filter).
+  [loading a filter](../docs/use/plugins.md#loading-a-filter).
 
 ## For contributors
 
@@ -34,12 +34,12 @@ after any of them, or one file each.
 ## Done
 
 - [x] **PLUG-40 — Reload a refused list when the host plays.** 21 November
-  2026, PR #252 ([plug-ins](docs/use/plugins.md#loading-a-filter)).
+  2026, PR #252 ([plug-ins](../docs/use/plugins.md#loading-a-filter)).
 
 ## Decisions: Plug-in behaviour
 
 - **21 November 2026.** What jrp decided, in his words where they help. See
-  [loading a filter](docs/use/plugins.md#loading-a-filter).
+  [loading a filter](../docs/use/plugins.md#loading-a-filter).
 ```
 
 - Start with the SPDX line and a level-one heading as the title (the ID is enough).
@@ -56,12 +56,15 @@ after any of them, or one file each.
     file formats, Configuration and sound, Diagnostics, Licences and
     dependencies, Documentation) holds jrp's decision, dated, as a log
     entry.
-- Write links from the repository root, as `CHANGELOG.md` and `TODO.md`
-  do (`docs/use/plugins.md`, not `../docs/use/plugins.md`). Folding
-  rewrites them for the decisions log, and the link check reads them that
-  way. Use inline links, not reference definitions.
+- Write links relative to the fragment, as in any page
+  (`../docs/use/plugins.md`), so that they work where the fragment is read.
+  Folding rewrites each for the page it lands in. Use inline links, not
+  reference definitions.
+- Put a TODO item's line only under **Done**: anywhere else it would be
+  folded into that page and the item would vanish from TODO.
 
 `python3 scripts/fold_changes.py --check` (run by pre-commit) refuses a
 fragment it could not fold: a wrong name or section, an empty section,
-prose instead of a list, or a Done line that is not a ticked TODO line. The
+prose instead of a list, a Done line that is not a ticked TODO line, or a
+TODO line outside Done. The
 repository checks treat an ID ticked in a fragment as defined and done.

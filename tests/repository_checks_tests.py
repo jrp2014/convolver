@@ -109,11 +109,11 @@ class RepositoryChecks(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertBroken(
-            self.run_check({'changes/PLUG-2.md': SPDX_MD + '- [x] **PLUG-2 — Harness.** Done.\n'}),
+            self.run_check({'changes/PLUG-2.md': SPDX_MD + '## Done\n\n- [x] **PLUG-2 — Harness.** Done.\n'}),
             'changes/PLUG-2.md: PLUG-2 is already defined in TODO.md',
         )
         self.assertBroken(
-            self.run_check({'changes/PLUG-4.md': SPDX_MD + '- [ ] **PLUG-4 — Open.** Open.\n'}),
+            self.run_check({'changes/PLUG-4.md': SPDX_MD + '## Done\n\n- [ ] **PLUG-4 — Open.** Open.\n'}),
             'changes/PLUG-4.md: PLUG-4 is not ticked',
         )
         self.assertBroken(
@@ -121,6 +121,14 @@ class RepositoryChecks(unittest.TestCase):
             'changes/PLUG-3.md:4: PLUG-9 is not defined',
         )
         self.assertBroken(self.run_check({'changes/PLUG-3.md': '# PLUG-3\n'}), 'changes/PLUG-3.md: add an SPDX')
+        # A ticked line outside Done would fold into another page: it defines nothing.
+        misplaced = SPDX_MD + '# PLUG-3\n\n## Changed\n\n- [x] **PLUG-3 — Presets.** Done.\n'
+        self.assertBroken(
+            self.run_check(
+                {'changes/PLUG-3.md': misplaced, 'docs/use/guide.md': SPDX_MD + 'PLUG-3 is done; LV2-1 is next.\n'}
+            ),
+            'docs/use/guide.md:2: PLUG-3 is not defined',
+        )
 
     def test_unindexed_page(self):
         self.assertBroken(

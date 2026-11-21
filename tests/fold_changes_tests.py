@@ -79,10 +79,10 @@ class FoldChanges(unittest.TestCase):
             'changes/PLUG-3.md',
             fragment(
                 'PLUG-3',
-                '## Changed\n\n- Earlier change (PLUG-3), [guide](docs/use/guide.md#a).\n  Continued.\n\n'
+                '## Changed\n\n- Earlier change (PLUG-3), [guide](../docs/use/guide.md#a).\n  Continued.\n\n'
                 '## Done\n\n- [x] **PLUG-3 — Open.** 20 November 2026, PR #3.\n\n'
                 '## Decisions: Direction\n\n- **20 November 2026.** Earlier direction. See '
-                '[workflow](docs/develop/workflow.md#while-working), [web](https://example.invalid/x).\n',
+                '[workflow](../docs/develop/workflow.md#while-working), [web](https://example.invalid/x).\n',
             ),
         )
         self.commit('PLUG-3', '2026-11-20T00:00:00Z')
@@ -148,6 +148,10 @@ class FoldChanges(unittest.TestCase):
                 'use inline links',
             ),
             'changes/PLUG-9.md': (fragment('PLUG-9', '## Done\n\n- PLUG-9 finished.\n'), 'not a ticked TODO line'),
+            'changes/PLUG-14.md': (
+                fragment('PLUG-14', '## Changed\n\n- [x] **PLUG-14 — Misplaced.** 21 November 2026.\n'),
+                'is a TODO line under "Changed"',
+            ),
             'changes/PLUG-10.md': (SPDX_MD + '## Changed\n\n- Entry.\n', 'start with a "# " title'),
             'changes/PLUG-11.md': (
                 fragment('PLUG-11', '## Decisions: Licences\n\n- **1 November 2026.** Entry.\n'),
@@ -184,6 +188,34 @@ class FoldChanges(unittest.TestCase):
         )
         self.run_fold()
         self.assertIn('- Merged later (PLUG-5).\n- Merged first (PLUG-4).\n- Old change', self.read('CHANGELOG.md'))
+
+    def test_refreshed_branch_dates_fragments_by_their_arrival_on_main(self):
+        # The release-notes branch starts before PLUG-9 and PLUG-4 reach
+        # main, then merges main in: both arrive through that one merge.
+        self.git('checkout', '-q', '-b', 'notes')
+        self.write('notes.txt', 'release notes\n')
+        self.commit('Notes', '2026-11-05T00:00:00Z')
+        self.git('checkout', '-q', 'main')
+        self.write('changes/PLUG-9.md', fragment('PLUG-9', '## Changed\n\n- Reached main first (PLUG-9).\n'))
+        self.commit('PLUG-9', '2026-11-10T00:00:00Z')
+        self.write('changes/PLUG-4.md', fragment('PLUG-4', '## Changed\n\n- Reached main second (PLUG-4).\n'))
+        self.commit('PLUG-4', '2026-11-11T00:00:00Z')
+        self.git('update-ref', 'refs/remotes/origin/main', 'main')
+        self.git('checkout', '-q', 'notes')
+        date = '2026-11-12T00:00:00Z'
+        self.git(
+            'merge',
+            '-q',
+            '--no-ff',
+            '-m',
+            'Merge main',
+            'main',
+            env={**os.environ, 'GIT_AUTHOR_DATE': date, 'GIT_COMMITTER_DATE': date},
+        )
+        self.run_fold()
+        self.assertIn(
+            '- Reached main second (PLUG-4).\n- Reached main first (PLUG-9).\n- Old change', self.read('CHANGELOG.md')
+        )
 
     def test_shallow_clone_is_refused(self):
         self.write('changes/PLUG-4.md', fragment('PLUG-4', '## Changed\n\n- Entry (PLUG-4).\n'))

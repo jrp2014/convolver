@@ -8,7 +8,7 @@
   open pull requests used to conflict whenever one merged. Each adds its
   own file, `changes/<ID>.md`, with its changelog entries, its finished
   item's done line and any decision of jrp's
-  ([form](changes/README.md#the-form)), and `scripts/fold_changes.py` folds
+  ([form](README.md#the-form)), and `scripts/fold_changes.py` folds
   the fragments into those pages, in the order they merged, and deletes
   them: in the release-notes pull request before each preview, or sooner
   in a pull request of its own. Pre-commit refuses a fragment that could
@@ -19,21 +19,21 @@
   still honoured. A new rule clears whatever a change has processed:
   folded fragments and scratch files are deleted, finished plans and dated
   evidence archived
-  ([change fragments](docs/develop/workflow.md#change-fragments),
-  [clearing processed records](docs/develop/workflow.md#clearing-processed-records),
-  [source versioning](docs/develop/versioning.md#minor-and-major-versions)).
+  ([change fragments](../docs/develop/workflow.md#change-fragments),
+  [clearing processed records](../docs/develop/workflow.md#clearing-processed-records),
+  [source versioning](../docs/develop/versioning.md#minor-and-major-versions)).
   Pre-commit now also runs the versioning tests when the version helper
   or its tests change, as CTest's `versioning` test already did. A pull
   request that changes only the record checks, the fragment folder or their
   tests now runs Lint alone, and one that changes the version helper adds
   only the native workflow, instead of every plug-in workflow
-  ([CI triggers](docs/develop/testing.md#ci-triggers)).
+  ([CI triggers](../docs/develop/testing.md#ci-triggers)).
 
 ## Done
 
 - [x] **DOC-20 — Shared records without merge conflicts.** 21 November
   2026, PR #257
-  ([change fragments](docs/develop/workflow.md#change-fragments)).
+  ([change fragments](../docs/develop/workflow.md#change-fragments)).
 
 ## Decisions: Documentation
 
@@ -47,6 +47,6 @@
   complete with a rule to get rid of, or archive, cruft once things are
   processed or consolidated"; DOC-20). Every finished TODO item still gets
   a changelog entry. See [Change
-  fragments](docs/develop/workflow.md#change-fragments), [clearing
-  processed records](docs/develop/workflow.md#clearing-processed-records),
-  [source versioning](docs/develop/versioning.md#minor-and-major-versions).
+  fragments](../docs/develop/workflow.md#change-fragments), [clearing
+  processed records](../docs/develop/workflow.md#clearing-processed-records),
+  [source versioning](../docs/develop/versioning.md#minor-and-major-versions).

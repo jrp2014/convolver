@@ -389,10 +389,11 @@ every-item rule is unchanged: every finished TODO item still gets a
 changelog entry, in its fragment.
 
 Fragments are folded, which moves each entry into its page in the order the
-fragments reached `main` and deletes the fragments. Fold on a branch made
-from an up-to-date `main` with full history; the script refuses a shallow
-clone, which cannot tell when older fragments arrived (`git fetch
---unshallow` first):
+fragments reached `main` and deletes the fragments. It reads that order
+from `origin/main`'s history, so a branch that has merged `main` in, such as
+a refreshed release-notes branch, still folds in merge order: run
+`git fetch origin main` first. It refuses a shallow clone, which cannot tell
+when older fragments arrived (`git fetch --unshallow` first):
 
 ```sh
 python3 scripts/fold_changes.py

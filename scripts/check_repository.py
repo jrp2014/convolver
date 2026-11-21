@@ -175,7 +175,10 @@ def check_todo_ids(root, files, errors):
     for name in files:
         if not is_fragment(name):
             continue
-        for match in TODO_DEFINITION.finditer(read(root, name)):
+        # Only the Done section folds into TODO; a ticked line anywhere else
+        # would land in another page and leave the ID undefined.
+        done = re.search(r'^## Done[ \t]*\n(.*?)(?=^#|\Z)', read(root, name), re.MULTILINE | re.DOTALL)
+        for match in TODO_DEFINITION.finditer(done.group(1) if done else ''):
             identifier = match.group(2)
             if match.group(1) == ' ':
                 errors.append(f'{name}: {identifier} is not ticked; a fragment lists only finished items')
