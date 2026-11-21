@@ -48,6 +48,7 @@ TOP_LEVEL = {
     'README.md',
     'TODO.md',
     'VERSION',
+    'changes',
     'cmake',
     'docs',
     'examples',
@@ -91,6 +92,10 @@ TODO_DEFINITION = re.compile(r'^- \[([ xX])\] \*\*([A-Z][A-Z0-9]*-\d+) — ', re
 # files counts as defined and done. The files are dated records, so an ID may
 # appear in more than one of them.
 TODO_ARCHIVE = 'docs/archive/todo/'
+# Change fragments (DOC-20): each pull request's entries for the changelog,
+# the done list and the decisions log, until scripts/fold_changes.py folds
+# them in. A ticked line in one counts as defined and done.
+FRAGMENTS = 'changes/'
 PLAN_NAME = re.compile(r'^\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*\.md$')
 CODE_SPAN = re.compile(r'`([^`\n]+)`')
 
@@ -130,8 +135,12 @@ def maintained_markdown(files):
     return [
         name
         for name in files
-        if name.endswith('.md') and not is_record(name) and ('/' not in name or name.startswith('docs/'))
+        if name.endswith('.md') and not is_record(name) and ('/' not in name or name.startswith(('docs/', FRAGMENTS)))
     ]
+
+
+def is_fragment(name):
+    return name.startswith(FRAGMENTS) and name.endswith('.md') and name != FRAGMENTS + 'README.md'
 
 
 def read(root, name):
@@ -163,6 +172,23 @@ def check_todo_ids(root, files, errors):
             )
         else:
             defined[identifier] = True
+    for name in files:
+        if not is_fragment(name):
+            continue
+        # Only the Done section folds into TODO; a ticked line anywhere else
+        # would land in another page and leave the ID undefined.
+        done = re.search(r'^## Done[ \t]*\n(.*?)(?=^#|\Z)', read(root, name), re.MULTILINE | re.DOTALL)
+        for match in TODO_DEFINITION.finditer(done.group(1) if done else ''):
+            identifier = match.group(2)
+            if match.group(1) == ' ':
+                errors.append(f'{name}: {identifier} is not ticked; a fragment lists only finished items')
+            elif identifier in defined:
+                errors.append(
+                    f'{name}: {identifier} is already defined in TODO.md or {TODO_ARCHIVE}; '
+                    'remove its open item from TODO.md, or give reopened work a new ID'
+                )
+            else:
+                defined[identifier] = True
     prefixes = sorted({identifier.rsplit('-', 1)[0] for identifier in defined}, key=len, reverse=True)
     if not prefixes:
         return defined
@@ -336,7 +362,7 @@ def check_build_options(root, files, errors):
     sources = [
         name
         for name in maintained_markdown(files)
-        if name != 'CHANGELOG.md' and not name.startswith('docs/project/plans/')
+        if name != 'CHANGELOG.md' and not is_fragment(name) and not name.startswith('docs/project/plans/')
     ]
     sources += [name for name in files if name.startswith('.github/workflows/') and name.endswith('.yml')]
     sources += [name for name in files if name.startswith('scripts/') and name.endswith(('.py', '.sh'))]
@@ -403,8 +429,8 @@ def check_cli_options(root, files, errors):
         return
     every = set().union(*known.values())
     for page in maintained_markdown(files):
-        if page == 'CHANGELOG.md' or page.startswith('docs/project/plans/'):
-            continue  # Past and proposed options.
+        if page == 'CHANGELOG.md' or is_fragment(page) or page.startswith('docs/project/plans/'):
+            continue  # Past and proposed options; a fragment becomes changelog text.
         for number, line in command_lines(read(root, page)):
             # Each command of a pipeline or list, run by any path (./bin/,
             # ./build/, .\bin\ on Windows).
