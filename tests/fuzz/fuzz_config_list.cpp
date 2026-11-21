@@ -28,7 +28,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     sources.read_text = [&](const std::filesystem::path& p) {
         const auto it = files.find(name(p));
         if (it == files.end())
-            throw ConfigurationError("unreadable", {p, 0, 0}, "not in the fuzz file set");
+            throw ConfigurationError("unreadable", {p, 0, 0}, Advice{"not in the fuzz file set"});
         return it->second;
     };
     sources.canonical = [](const std::filesystem::path& p) { return p.lexically_normal(); };

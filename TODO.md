@@ -62,7 +62,7 @@ anything.
 
 | Item | What to do | Note |
 | --- | --- | --- |
-| **PLUG-39** | Step 5's typed advice and step 6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps); steps 0 to 4, step 5a's typed report and ROBUST-8 are merged | Each step is its own reviewed pull request (jrp, 13 and 19 November 2026) |
+| **PLUG-39** | Step 6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps); steps 0 to 5 and ROBUST-8 are merged | Each step is its own reviewed pull request (jrp, 13 and 19 November 2026) |
 | **PLUG-24** | `HostProcessor` in its own source file | In PLUG-39's sequence, as its own pull request, never with a DSP change (jrp, 19 November 2026) |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
@@ -165,6 +165,11 @@ Foundation items are parked by owner decision instead.
   the window shows numbers in the system locale from one formatting path,
   Status and the log stay plain, and a test covers other separators; best
   after PLUG-39's typed reporting.
+- [ ] **DIAG-10 — Status says what the window says.** Status also names a
+  Latency not in use yet, the Estimate being found or failing, and a filter
+  still loading ([what Status leaves out](docs/use/plugins.md#status-and-the-convolver-log));
+  in PLUG-39's typed reporting. **Done when** each format's tests cover
+  them and jrp has decided LV2's `status` port values.
 
 ## Plug-ins: VST3, LV2 and AU
 
@@ -195,8 +200,8 @@ done once for all three formats:
 - [ ] **PLUG-29 — Keep the Recent list out of the log folder.** Save it in
   each platform's application-support folder, reading the old file once.
   **Done when** the tests cover both paths and the guide names the folder.
-- [ ] **PLUG-39 — One consolidation of the load and restore path.** Steps
-  5 and 6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md).
+- [ ] **PLUG-39 — One consolidation of the load and restore path.** Step
+  6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md).
   **Done when** the plan's
   [success criterion](docs/project/plans/2026-11-13-load-restore-consolidation.md#success-criterion)
   is met.
@@ -358,14 +363,6 @@ was set and the measurements behind it are in the
 [archived text](docs/archive/todo/2026-11-20-open-item-history.md#loading-responsiveness),
 the test in [load timing](docs/develop/load-timing.md) and the procedure in
 [responsiveness qualification](docs/develop/releasing.md#responsiveness-qualification).
-
-### Keeping `host.cpp` manageable
-
-Two narrow simplifications from jrp's review of 12 November 2026 go with
-PLUG-39's [steps](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)
-1 and 5: typed `Advice` in exceptions, and refusals returned directly in
-VST3's `load_file()` (step 5a keeps the window report typed until the
-transport boundary); none changes a message a user reads ([archived text](docs/archive/todo/2026-11-20-open-item-history.md#keeping-hostcpp-manageable)).
 
 ## Edges over other convolvers
 

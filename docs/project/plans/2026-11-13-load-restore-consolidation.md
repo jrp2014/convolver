@@ -111,9 +111,11 @@ Text that goes round in a circle, written and then parsed back:
   back; the VST3 processor also sends `report_text()` beside the fields.
   Since step 5a: gone; one codec carries the typed report.
 - Exceptions carry `Advice` as English-labelled text ("Cause: ", "Fix: ",
-  "Note: ") that `parse_advice()` (`portable/advice.hpp`) reads back.
+  "Note: ") that `parse_advice()` (`portable/advice.hpp`) reads back. Since
+  step 5b: gone; an exception keeps its `Advice` typed.
 - The VST3 processor's `load_file()` throws `"refused"` or `"no reader"` only
-  to reach its own catch block, after it has recorded the refusal.
+  to reach its own catch block, after it has recorded the refusal. Since
+  step 1b: gone; it returns the refusal it recorded.
 
 ## What stays and why
 
@@ -483,8 +485,15 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
    takes the typed report, and the VST3 controller keeps only the decoded
    report (with the log tag) and derives the Status text, its value and Copy
    diagnostics from it; `report_fields()`, the VST3 codec of its own and the
-   separate `report_text()` attribute are gone. Step 5b carries the typed
-   advice.
+   separate `report_text()` attribute are gone. Step 5b, done on 21
+   November 2026: an exception keeps its `Advice` typed
+   (`detail::AdvisedError<E>`, a standard or Convolver exception type whose
+   `what()` is the same labelled text, and `ConfigurationError`, `NoMatch`
+   and `RefusedSoundFile` likewise), every catch block reads the parts with
+   `detail::advice_of()`, and `parse_advice()`, `advice_problem()` and the
+   text form of `advice_line()` are gone. A message passed on as a phrase
+   (an activation failure, a preparation failure, an estimate's reason) is
+   the exception's problem, and the logs are built from the parts.
 6. **Recount and close.** Recount the inventory on `main`; update the
    [implementation map](../../develop/architecture.md) and the
    [adapter contract](../../develop/plugin-contract.md) where they describe the
@@ -533,8 +542,8 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
   which jrp noted does not resolve these issues on its own. It is in this
   sequence (jrp, 19 November 2026) as its own pull request, never in a
   step's.
-- **[Keeping `host.cpp` manageable](../../../TODO.md#keeping-hostcpp-manageable)**:
-  its three narrow simplifications are carried out by steps 1 and 5.
+- **[Keeping `host.cpp` manageable](../../archive/todo/2026-11-20-open-item-history.md#keeping-hostcpp-manageable)**:
+  its three narrow simplifications are carried out by steps 1 and 5 (done).
 - **The host sessions and the next preview (PR #192)** come first. Steps 1
   to 6 start once the next preview is published, so the preview and the
   sessions on jrp's Mac test code this work has not changed. Step 0 waits

@@ -53,6 +53,7 @@
 // follow a person's choice, several can be queued, and other hosts drop
 // queued work when they close a plug-in.
 #include "plugin.hpp"
+#include "advice.hpp"
 #include "convolver/host.hpp"
 #include "convolver/io.hpp"
 #include "convolver_identities.hpp"
@@ -323,7 +324,7 @@ struct Instance {
         // also where LV2 hosts send a plug-in's unlogged diagnostics. One
         // line per event (DIAG-2).
         try {
-            lv2_log_error(&logger, "Convolver: %s\n", detail::advice_line(message).c_str());
+            lv2_log_error(&logger, "Convolver: %s\n", detail::advice_line(Advice{message}).c_str());
         } catch (...) {
         }
     }
@@ -512,9 +513,10 @@ void read_settings(Instance& p) noexcept {
     }
 }
 
-void record_activation_failure(Instance& p, const char* why) noexcept {
+// `error` is null when something other than a std::exception was thrown.
+void record_activation_failure(Instance& p, const std::exception* error) noexcept {
     try {
-        p.filter.fail_activation(why);
+        p.filter.fail_activation(error);
     } catch (...) { // Out of memory for the message: nothing more to keep.
     }
 }
@@ -538,7 +540,7 @@ void apply_gain_mode(Instance& p) noexcept {
         });
     } catch (const std::exception& e) {
         try {
-            why = e.what();
+            why = detail::advice_of(e).problem;
         } catch (...) {
         }
     } catch (...) {
@@ -574,9 +576,9 @@ void activate_locked(Instance& p) {
                                                  p.layout.inputs);
         p.filter.activate(std::move(activation));
     } catch (const std::exception& e) {
-        record_activation_failure(p, e.what());
+        record_activation_failure(p, &e);
     } catch (...) {
-        record_activation_failure(p, "the processor could not be built.");
+        record_activation_failure(p, nullptr);
     }
     if (!p.host) {
         try {
@@ -586,8 +588,9 @@ void activate_locked(Instance& p) {
                                                      p.max_block, settings, p.layout.inputs);
         } catch (...) {
         }
-        try { // error() builds the text, which needs memory (ROBUST-7).
-            p.log_error(p.filter.error());
+        try { // The line needs memory (ROBUST-7).
+            if (const auto& f = p.filter.failure())
+                p.log_error(detail::advice_line(failure_message(*f)));
         } catch (...) {
         }
     }
@@ -771,7 +774,7 @@ void apply_latency(Instance& p) noexcept {
         changed = true;
     } catch (const std::exception& e) {
         try {
-            why = e.what();
+            why = detail::advice_line(detail::advice_of(e));
         } catch (...) {
         }
     } catch (...) {

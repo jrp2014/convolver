@@ -18,10 +18,9 @@
 
 namespace {
 namespace fs = std::filesystem;
-using convolver::detail::advice_problem;
+using convolver::detail::advice_of;
 using convolver::detail::advice_text;
 using convolver::detail::cli_error;
-using convolver::detail::parse_advice;
 using convolver::detail::utf8_string;
 using convolver::presets::Format;
 
@@ -92,12 +91,12 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
             }
             auto format = convolver::presets::format_for(output);
             if (!format)
-                throw std::invalid_argument(advice_text(
+                throw convolver::detail::AdvisedError<std::invalid_argument>(
                     {utf8_string(output) + ": the preset format is not known from this name",
                      "convolver-preset chooses the format by the name's ending.",
                      "End the name with .vstpreset (VST3), .aupreset (AU) or .preset.lv2 (an LV2 "
                      "preset folder).",
-                     {}}));
+                     {}});
             formats.push_back(*format);
         }
         convolver::HostState state;
@@ -109,25 +108,25 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
             from_preset = convolver::presets::format_for(input) == Format::vst3;
         if (from_preset) {
             if (selected)
-                throw std::invalid_argument(advice_text(
+                throw convolver::detail::AdvisedError<std::invalid_argument>(
                     {"--sample-rate, --input-channels and --output-channels cannot choose from a "
                      ".vstpreset",
                      "A .vstpreset already holds one filter; these options choose an entry from "
                      "a configuration list.",
                      "Leave out those options, or make the preset from the configuration list.",
-                     {}}));
+                     {}});
             try {
                 // PLUG-26: the reader the plug-in windows use for a chosen preset.
                 auto read = convolver::presets::read_vst3_preset_file(input);
                 state = std::move(read.state);
                 filter_file_name = std::move(read.filter_name);
             } catch (const std::invalid_argument& e) {
-                throw std::invalid_argument(advice_text(
-                    {utf8_string(input) + ": " + advice_problem(e.what()),
+                throw convolver::detail::AdvisedError<std::invalid_argument>(
+                    {utf8_string(input) + ": " + advice_of(e).problem,
                      "Only a .vstpreset that holds a Convolver filter can be converted.",
                      "Convert a .vstpreset that a VST3 host saved from Convolver, or make the "
                      "preset from the filter itself (an IR, .cfg or configuration list).",
-                     {}}));
+                     {}});
             }
         } else {
             std::vector<fs::path> raw_filters;
@@ -167,21 +166,21 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
             } catch (const convolver::presets::ChannelLimit& e) {
                 if (alias)
                     throw;
-                throw std::invalid_argument(advice_text(
-                    {advice_problem(e.what()),
+                throw convolver::detail::AdvisedError<std::invalid_argument>(
+                    {advice_of(e).problem,
                      "The plug-ins take 1 to 8 channels on each side, so their presets do too.",
                      "Use the command-line tool, convolver, for filters with more channels.",
-                     {}}));
+                     {}});
             }
             if constexpr (!alias) {
                 std::error_code error;
                 if (fs::symlink_status(outputs[i], error).type() != fs::file_type::not_found)
-                    throw std::invalid_argument(
-                        advice_text({utf8_string(outputs[i]) + " already exists",
-                                     "convolver-preset writes only to new paths, so it never "
-                                     "replaces a preset.",
-                                     "Choose another name, or remove the old preset first.",
-                                     {}}));
+                    throw convolver::detail::AdvisedError<std::invalid_argument>(
+                        {utf8_string(outputs[i]) + " already exists",
+                         "convolver-preset writes only to new paths, so it never "
+                         "replaces a preset.",
+                         "Choose another name, or remove the old preset first.",
+                         {}});
             }
         }
         for (std::size_t i = 0; i < outputs.size(); ++i) {
@@ -192,15 +191,15 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
                 if (alias)
                     throw;
                 std::error_code error;
-                throw std::runtime_error(advice_text(
-                    {utf8_string(outputs[i]) + ": " + advice_problem(e.what()),
+                throw convolver::detail::AdvisedError<std::runtime_error>(
+                    {utf8_string(outputs[i]) + ": " + advice_of(e).problem,
                      fs::is_directory(outputs[i].parent_path().empty() ? fs::path(".")
                                                                        : outputs[i].parent_path(),
                                       error)
                          ? "Its folder exists, but this program could not write there."
                          : "Its folder does not exist.",
                      "Check that the folder exists and is writable, or choose another place.",
-                     {}}));
+                     {}});
             }
             created.push_back(outputs[i]);
         }
@@ -230,7 +229,7 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
         if (alias) {
             std::cerr << e.what() << '\n';
         } else {
-            auto advice = parse_advice(e.what());
+            auto advice = advice_of(e);
             if (!created.empty())
                 advice.note += std::string(advice.note.empty() ? "" : " ") +
                                "No presets were kept from this run.";

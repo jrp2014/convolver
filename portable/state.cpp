@@ -204,14 +204,14 @@ HostState decode_host_state(std::span<const std::byte> bytes) {
         throw std::invalid_argument("it was not saved by Convolver");
     const auto format = r.word();
     if (format > version)
-        throw NewerHostState(detail::advice_text(
+        throw detail::AdvisedError<NewerHostState>(
             {"it was saved by a newer version of Convolver (state version " +
                  std::to_string(format) + "; this version reads versions 1 to " +
                  std::to_string(version) + ")",
              {},
              "Update Convolver to load it, or make the preset again from its .cfg with this "
              "version's convolver-preset.",
-             {}}));
+             {}});
     if (format < 1)
         throw std::invalid_argument("unsupported host state version " + std::to_string(format));
     auto flags = r.word();
