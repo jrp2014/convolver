@@ -306,7 +306,8 @@ limitation that no longer holds is removed. Its merge makes the tag.
    `gh workflow run publish.yml -f run_id=<ID> -f qualification="<result>"`.
    It refuses a run that was not started by hand on a `vX.Y.Z` tag, did not
    pass, or whose tag holds another commit or `VERSION`, and a tag on which
-   any of the other workflows has no passed run started by hand; it checks every file
+   any of the other workflows has no passed run started by hand on that tag (a branch at the
+   same commit does not count); it checks every file
    against `SHA256SUMS` and the candidate record, and refuses if a release or
    draft for the tag already exists. Next, its clean-machine jobs (REL-9,
    [`clean_machine.py`](../../tests/release/clean_machine.py)) run the exact

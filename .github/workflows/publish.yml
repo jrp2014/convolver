@@ -104,8 +104,9 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
       # jrp, 21 November 2026: every release and preview gets the full CI.
       # Pull requests and main can carry a passed result forward (CI-53), so
-      # each workflow must also have passed when started by hand on the tag,
-      # which always runs everything (docs/develop/releasing.md#publishing-an-unsigned-preview).
+      # each workflow must also have passed when started by hand on the tag
+      # itself (not a branch at the same commit), which always runs everything
+      # (docs/develop/releasing.md#publishing-an-unsigned-preview).
       - name: Check that the full CI passed on the tag
         env:
           GH_TOKEN: ${{ github.token }}
@@ -116,7 +117,7 @@ jobs:
           sha=$(jq -r .head_sha build/run.json)
           missing=()
           for workflow in regression vst3 lv2 au fuzz lint; do
-            runs="repos/$REPO/actions/workflows/$workflow.yml/runs?event=workflow_dispatch&head_sha=$sha&status=success"
+            runs="repos/$REPO/actions/workflows/$workflow.yml/runs?event=workflow_dispatch&branch=$TAG&head_sha=$sha&status=success"
             # On its own line, so that a failed lookup stops the step.
             count=$(gh api "$runs" --jq .total_count)
             if [ "$count" -lt 1 ]; then
@@ -124,7 +125,7 @@ jobs:
             fi
           done
           if [ "${#missing[@]}" -gt 0 ]; then
-            message="No passed run started by hand on $TAG's commit ($sha) for: ${missing[*]}."
+            message="No passed run started by hand on $TAG ($sha) for: ${missing[*]}."
             message="$message Start each on the tag (gh workflow run <name>.yml --ref $TAG) and wait for it to pass."
             if [ "$EVENT" = pull_request ]; then
               echo "::warning::Dry run: $message"
@@ -133,7 +134,7 @@ jobs:
               exit 1
             fi
           else
-            echo "Every workflow passed when started by hand on $TAG's commit."
+            echo "Every workflow passed when started by hand on $TAG ($sha)."
           fi
       - uses: actions/checkout@v7
         with:
