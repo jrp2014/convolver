@@ -1,0 +1,133 @@
+---
+# SPDX-License-Identifier: GPL-2.0-or-later
+name: Workload measurements
+
+# PERF-3: callback times, preparation and peak memory of the supported
+# plug-in workloads on GitHub's Linux, macOS arm64 and Windows runners, with
+# the FFT library each platform's plug-ins ship (Ooura on Linux and Windows,
+# Accelerate on macOS). Shared runners give indicative figures only
+# (docs/develop/fft-measurements.md#supported-workloads). Started by hand, or
+# by a pull request that changes this workflow or the script it runs.
+'on':
+  pull_request:
+    paths:
+      - .github/workflows/workloads.yml
+      - tests/native/benchmarks/workloads.py
+  workflow_dispatch:
+    inputs:
+      rounds:
+        description: Rounds of every workload
+        default: '3'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    name: ${{ matrix.os }} / ${{ matrix.fft }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            fft: OOURA
+          - os: macos-latest
+            fft: ACCELERATE
+          - os: windows-latest
+            fft: OOURA
+    env:
+      ROUNDS: ${{ inputs.rounds || '3' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.x'
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libsndfile1-dev
+      - name: macOS dependencies
+        if: runner.os == 'macOS'
+        run: brew install libsndfile
+      - uses: ./.github/actions/newest-compiler
+        if: runner.os != 'Windows'
+        with:
+          compiler: ${{ runner.os == 'macOS' && 'xcode' || 'clang' }}
+      - name: Configure and build (Linux, macOS)
+        if: runner.os != 'Windows'
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCONVOLVER_BUILD_BENCHMARKS=ON \
+            -DCONVOLVER_BUILD_TESTS=OFF -DCONVOLVER_FFT_BACKEND=${{ matrix.fft }} \
+            -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverFFTW=ON
+          cmake --build build --target convolver_callback_benchmark --parallel
+          echo "BENCHMARK=build/convolver_callback_benchmark" >> "$GITHUB_ENV"
+      - name: Prepare vcpkg binary cache
+        if: runner.os == 'Windows'
+        id: vcpkg-cache
+        shell: pwsh
+        run: |
+          $cache = Join-Path $env:RUNNER_TEMP 'vcpkg-binary-cache'
+          New-Item -ItemType Directory -Force -Path $cache | Out-Null
+          "VCPKG_DEFAULT_BINARY_CACHE=$cache" >> $env:GITHUB_ENV
+          "VCPKG_BINARY_SOURCES=clear;default,readwrite" >> $env:GITHUB_ENV
+          "VCPKG_DISABLE_METRICS=1" >> $env:GITHUB_ENV
+          $revision = git -C $env:VCPKG_INSTALLATION_ROOT rev-parse HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot identify the vcpkg revision' }
+          "revision=$revision" >> $env:GITHUB_OUTPUT
+          "image=$env:ImageVersion" >> $env:GITHUB_OUTPUT
+      # Restores the native workflow's archives (same key prefix); saves its own.
+      - name: Cache vcpkg binary archives
+        if: runner.os == 'Windows'
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/vcpkg-binary-cache
+          key: >-
+            ${{ format('vcpkg-v1-{0}-{1}-x64-windows--{2}-{3}-{4}',
+            runner.os, runner.arch, steps.vcpkg-cache.outputs.image,
+            steps.vcpkg-cache.outputs.revision, hashFiles('.github/workflows/workloads.yml')) }}
+          restore-keys: |
+            vcpkg-v1-${{ runner.os }}-${{ runner.arch }}-x64-windows--
+      - name: Configure and build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          vcpkg install 'libsndfile[core]:x64-windows'
+          if ($LASTEXITCODE -ne 0) { throw 'vcpkg failed' }
+          cmake -S . -B build -A x64 `
+            "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows -DCONVOLVER_BUILD_BENCHMARKS=ON `
+            -DCONVOLVER_BUILD_TESTS=OFF -DCONVOLVER_FFT_BACKEND=${{ matrix.fft }} `
+            -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverFFTW=ON
+          if ($LASTEXITCODE -ne 0) { throw 'configure failed' }
+          cmake --build build --config Release --target convolver_callback_benchmark --parallel
+          if ($LASTEXITCODE -ne 0) { throw 'build failed' }
+          "BENCHMARK=build/Release/convolver_callback_benchmark.exe" >> $env:GITHUB_ENV
+      - name: Compiler
+        shell: bash
+        run: grep -E '^CMAKE_CXX_COMPILER(_VERSION)?:|CMAKE_CXX_COMPILER_ID:' build/CMakeCache.txt || true
+      # The summary and every run go to the log and the job summary, so the
+      # results can be read without downloading the artifact.
+      - name: Measure
+        shell: bash
+        env:
+          PYTHON: ${{ runner.os == 'Windows' && 'python' || 'python3' }}
+        run: |
+          "$PYTHON" tests/native/benchmarks/workloads.py "$BENCHMARK" --rounds "$ROUNDS" \
+            --label "${{ matrix.os }} runner, $(date -u +%Y-%m-%d)" --csv workloads.csv > workloads.md
+          cat workloads.md >> "$GITHUB_STEP_SUMMARY"
+          cat workloads.md
+          echo '--- raw CSV ---'
+          cat workloads.csv
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: workloads-${{ matrix.os }}
+          path: |
+            workloads.md
+            workloads.csv
+          if-no-files-found: ignore
