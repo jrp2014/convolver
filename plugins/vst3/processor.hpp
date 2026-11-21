@@ -332,6 +332,12 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     static constexpr std::size_t inactive = std::numeric_limits<std::size_t>::max();
     std::atomic<std::size_t> active_latency_{inactive};
     std::atomic<Steinberg::uint32> tail_{0};
+    // The rate tail_ counts at when it is not the host's: the accepted
+    // filter's while no processor plays (its own tail, in its own frames);
+    // 0 while one plays. getTailSamples() converts it to the rate of the
+    // host's accepted setupProcessing (host_rate_, 0 before one).
+    std::atomic<int> tail_rate_{0};
+    std::atomic<double> host_rate_{0};
     int inputs_ = 2, outputs_ = 2;
     Steinberg::Vst::SpeakerArrangement input_arrangement_ = Steinberg::Vst::SpeakerArr::kStereo,
                                        output_arrangement_ = Steinberg::Vst::SpeakerArr::kStereo;

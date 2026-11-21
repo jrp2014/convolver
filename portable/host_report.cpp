@@ -313,13 +313,15 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
     // PLUG-22: the latency is not a fact here; the Latency setting shows the
     // time it adds, and the note says when a choice is not in use yet.
     const auto frames = [](std::size_t n) { return std::to_string(n) + " frames"; };
-    audio.push_back(
-        {"Ring-out",
-         facts.tail_frames == 0 ? std::string("none")
-         // Under 0.05 ms reads as frames, not "0.0 ms".
-         : rate && facts.tail_frames * 20000.0 >= rate ? duration(facts.tail_frames, rate)
-                                                       : frames(facts.tail_frames),
-         "", false, "How long the output goes on after the input stops (the filter's tail)."});
+    const int tail_rate = facts.tail_rate > 0 ? facts.tail_rate : rate;
+    audio.push_back({"Ring-out",
+                     facts.tail_frames == 0 ? std::string("none")
+                     // Under 0.05 ms reads as frames, not "0.0 ms".
+                     : tail_rate && facts.tail_frames * 20000.0 >= tail_rate
+                         ? duration(facts.tail_frames, tail_rate)
+                         : frames(facts.tail_frames),
+                     "", false,
+                     "How long the output goes on after the input stops (the filter's tail)."});
 
     if (c && filter.filter_peak() > 0) {
         // As HostProcessor::process() applies them: Gain on the filtered

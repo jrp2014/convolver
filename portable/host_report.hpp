@@ -32,6 +32,9 @@ struct HostReportFacts {
     // The latency the processor runs at (settings.latency is the one chosen,
     // not yet in use when they differ), and the tail.
     std::size_t latency_frames = 0, tail_frames = 0;
+    // The rate tail_frames counts at when it is not the host's: the accepted
+    // filter's while no processor plays (its own tail); 0 for the host's.
+    int tail_rate = 0;
     bool log_written = true; // host_log_written()
     // PLUG-22: the instance is bypassed (the host's switch or the window's).
     bool bypassed = false;

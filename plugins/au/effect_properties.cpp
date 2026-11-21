@@ -233,6 +233,7 @@ HostReport Effect::report_of(const Diagnostics& d) {
     facts.settings = settings();
     facts.latency_frames = latency_.load();
     facts.tail_frames = tail_.load();
+    facts.tail_rate = tail_rate_.load();
     facts.log_written = d.log_written;
     facts.bypassed = bypass_.load();
     facts.chooses_files = true; // Choose Filter in the window (load_property).

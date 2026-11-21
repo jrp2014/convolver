@@ -468,6 +468,18 @@ void cases() {
     // section does not repeat it.
     require(!has_fact(r, "Added delay"), "the latency repeated as a fact");
     check(fact(r, "Ring-out"), "2 frames", "");
+    // jrp's review, 21 November 2026: while no processor plays, the tail is
+    // the filter's own, in its frames, so a 1 s tail of a 22050 Hz filter
+    // reads 1 s, not the 0.5 s those frames last at the host's 44100 Hz.
+    {
+        auto own = facts(stereo, {-6, .25});
+        own.running = false;
+        own.tail_frames = 22050;
+        own.tail_rate = 22050;
+        check(fact(host_report(f, own), "Ring-out"), "1.00 s", "");
+        own.tail_rate = 0; // A processor's tail, at the host's rate.
+        check(fact(host_report(f, own), "Ring-out"), "500.0 ms", "");
+    }
     // The identity paths have peak 1.75 (1 + .5 + .25): +4.9 dB. Gain
     // scales only the filtered path, which Mix then adds to the dry input:
     // at Gain -6 dB and Mix 25%, .25 * .501 * 1.75 + .75 = .97.

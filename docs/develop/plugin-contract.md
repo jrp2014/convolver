@@ -828,7 +828,9 @@ a Convolver state carries, such as a VST3 state's, because their settings
 are parameters and ports), the bypass (restored state's, never a
 chosen file's; only VST3 applies it). The tail an adapter reports while
 no processor plays is the accepted filter's (`HostFilter::filter_tail()`,
-found when the filter was accepted, PLUG-39 step 6). The Latency in those settings goes through each format's
+found when the filter was accepted, PLUG-39 step 6), in the filter's own
+frames at its own rate: the Audio Unit's seconds, VST3's host samples and
+the report's Ring-out convert it at that rate, not the host's (PLUG-46). The Latency in those settings goes through each format's
 own Latency path, which builds a new processor only when it differs. A
 refused request returns nothing and changes none of it; every adapter then
 calls `HostFilter::fail_request()` with the processor that plays, which

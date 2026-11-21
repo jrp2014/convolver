@@ -14,6 +14,7 @@
 #include <array>
 #include <charconv>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <stdexcept>
 #include <string>
@@ -182,13 +183,22 @@ tresult Processor::arrange(SpeakerArrangement* in, int32 ni, SpeakerArrangement*
     return result;
 }
 uint32 PLUGIN_API Processor::getTailSamples() {
-    const auto tail = tail_.load();
+    std::uint64_t tail = tail_.load();
+    // The filter's own frames while inactive, in the host's samples (rounded
+    // up) when its rate differs (jrp's review, 21 November 2026).
+    const auto own = tail_rate_.load();
+    const auto host_rate = host_rate_.load();
+    if (own > 0 && host_rate > 0 && host_rate != own)
+        tail = static_cast<std::uint64_t>(
+            std::min(std::ceil(static_cast<double>(tail) * host_rate / own),
+                     static_cast<double>(kInfiniteTail)));
     const auto latency = getLatencySamples();
     return tail >= kInfiniteTail - latency ? kInfiniteTail - 1 : tail + latency;
 }
 void Processor::publish_timing() noexcept {
     const auto* const p = host();
     tail_.store(static_cast<uint32>(p ? p->tail_frames() : filter_.filter_tail()));
+    tail_rate_.store(!p && filter_.filter() ? filter_.filter()->sample_rate : 0);
     active_latency_.store(p ? p->latency_frames() : inactive);
 }
 HostSettings Processor::settings() const noexcept {
@@ -231,8 +241,11 @@ tresult PLUGIN_API Processor::setupProcessing(ProcessSetup& setup) {
                     " The host may report the plug-in as unusable, or offer other settings.");
             } catch (...) { // Out of memory for the message: refused all the same.
             }
-        } else
+        } else {
             result = AudioEffect::setupProcessing(setup);
+            if (result == kResultOk)
+                host_rate_.store(setup.sampleRate);
+        }
     }
     if (result == kResultOk)
         send_status(); // Whether the filter has been checked may have changed.
@@ -381,6 +394,7 @@ HostReport Processor::report_locked() const {
     facts.settings = settings();
     facts.latency_frames = host() ? host()->latency_frames() : facts.settings.latency;
     facts.tail_frames = tail_.load();
+    facts.tail_rate = tail_rate_.load();
     facts.bypassed = shown_bypass_.load();
     facts.log_written = host_log_written();
     facts.chooses_files = chooses_files();

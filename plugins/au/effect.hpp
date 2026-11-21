@@ -387,6 +387,10 @@ class Effect final : public ausdk::AUBase {
     // initialization uses) and the accepted filter's tail.
     std::atomic<std::size_t> latency_{default_host_latency};
     std::atomic<std::size_t> tail_{0};
+    // The rate `tail_` counts at when it is not the host's: the accepted
+    // filter's while no processor plays (its own tail, in its own frames);
+    // 0 while a processor plays, whose tail is at the host's rate.
+    std::atomic<int> tail_rate_{0};
     // PLUG-10, under control_: the Gain mode the queue last applied and logged.
     GainMode applied_gain_mode_ = GainMode::set;
     // PLUG-39 step 2: when the host has settled its formats. An

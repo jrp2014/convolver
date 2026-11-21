@@ -362,6 +362,9 @@ UInt32 Effect::SupportedNumChannels(const AUChannelInfo** out) {
 bool Effect::publish_timing() noexcept {
     const auto* const p = host();
     tail_.store(p ? p->tail_frames() : filter_.filter_tail());
+    // The filter's own frames count at its rate, which can differ from the
+    // host's after a start at another rate (jrp's review, 21 November 2026).
+    tail_rate_.store(!p && filter_.filter() ? filter_.filter()->sample_rate : 0);
     const auto latency = p ? p->latency_frames() : settings().latency;
     return latency_.exchange(latency) != latency;
 }
@@ -372,7 +375,9 @@ Float64 Effect::GetLatency() noexcept AUSDK_RTSAFE {
 }
 
 Float64 Effect::GetTailTime() noexcept AUSDK_RTSAFE {
-    const auto rate = GetOutput0().GetStreamFormat().mSampleRate;
+    const auto own = tail_rate_.load();
+    const auto rate =
+        own > 0 ? static_cast<Float64>(own) : GetOutput0().GetStreamFormat().mSampleRate;
     return rate > 0 ? static_cast<Float64>(tail_.load()) / rate : 0;
 }
 

@@ -377,6 +377,15 @@ void timing_in_seconds() {
             "no timing notifications after a sample-rate change");
     require(unit.seconds(kAudioUnitProperty_Latency) == 256.0 / 96000,
             "latency at 96 kHz is not 256 frames in seconds");
+    // jrp's review, 21 November 2026: uninitialized, the tail is the 48 kHz
+    // filter's own, so the host's new rate does not halve it, also after a
+    // start at 96 kHz and a stop.
+    require(unit.seconds(kAudioUnitProperty_TailTime) == static_cast<double>(short_tail) / 48000,
+            "at 96 kHz the uninitialized tail is not the 48 kHz filter's in seconds");
+    check(unit.initialize(), "initialization at 96 kHz");
+    unit.uninitialize();
+    require(unit.seconds(kAudioUnitProperty_TailTime) == static_cast<double>(short_tail) / 48000,
+            "after a start at 96 kHz and a stop, the tail is not the 48 kHz filter's in seconds");
 }
 
 std::string string_value(CFDictionaryRef dict, const char* key) {
