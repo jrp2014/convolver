@@ -54,8 +54,9 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 ### In progress
 
 PLUG-39's step 5, after step 4a (PR #236); HOST-11's exact Status
-check (PR #255), before jrp's second run. Check the open pull requests for
-an ID before starting anything.
+check (PR #255), before jrp's second run; PLUG-42, a filter refused only
+for the host's channels or rate kept until a start suits it. Check the open
+pull requests for an ID before starting anything.
 
 ### Ready
 
