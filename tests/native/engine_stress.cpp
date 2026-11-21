@@ -169,8 +169,11 @@ std::vector<std::size_t> chunk_pattern(std::mt19937& random) {
 
 std::string describe(const std::vector<std::size_t>& v) {
     std::string s;
-    for (auto x : v)
-        s += (s.empty() ? "" : ",") + std::to_string(x);
+    for (auto x : v) {
+        if (!s.empty())
+            s += ',';
+        s += std::to_string(x);
+    }
     return s;
 }
 

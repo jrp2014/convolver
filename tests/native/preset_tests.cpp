@@ -243,14 +243,14 @@ int main() {
             require(au.find(part) != std::string::npos, std::string("AU preset has ") + part);
 
         // LV2: one preset per fixed layout, chosen by the filter's counts.
+        const auto state_uri = presets::lv2_state_uri();
         for (const auto& layout : identity::fixed_layouts) {
             const auto preset = presets::lv2_preset(routed(layout.inputs, layout.outputs), "Room");
             require(preset.plugin_uri ==
                         std::string(identity::lv2_base_uri) + std::string(layout.id),
                     "LV2 plug-in URI");
             require(preset.manifest.find("<" + preset.plugin_uri + ">") != std::string::npos &&
-                        preset.preset.find("<" + presets::lv2_state_uri() + "> \"") !=
-                            std::string::npos,
+                        preset.preset.find("<" + state_uri + "> \"") != std::string::npos,
                     "LV2 manifest and state key");
         }
         const auto quoted = presets::lv2_preset(routed(2, 2), "Say \"hi\" \\ there");

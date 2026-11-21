@@ -599,6 +599,13 @@ plug-in's adapter build with `-Wall -Wextra -Wpedantic` (GCC and Clang) or
 adapter's sources themselves; the plug-in SDKs' headers are included as
 system headers. Warnings in the SDKs and libsndfile are theirs.
 
+GCC 12.3, which builds the Linux package on Ubuntu 22.04, wrongly warns
+`-Wrestrict` inside libstdc++'s string copy when an optimised build puts
+text in front of a temporary `std::string` (`"<" + name()`) or replaces part
+of a string in place; GCC 12.4 does not. Convolver's sources build such
+strings front to back instead: `+=` and `append` in order, or a named string
+before the `+` (CI-48).
+
 - **Runner images:** each job uses the newest generally available image:
   `ubuntu-latest`, `macos-latest` and `windows-latest`, or the label of the
   newest image (`macos-26`, `macos-26-intel`) where a job names one so that

@@ -152,6 +152,10 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
+- Builds (CI-48): the Linux package, built with GCC 12.3 on Ubuntu 22.04,
+  builds without warnings. That compiler wrongly warned `-Wrestrict` at nine
+  places in the core and the tests that put text in front of a temporary
+  string; they now build the string front to back. No output changes.
 - Builds (CI-46, from an outside audit of 20 November 2026): the VST3
   plug-in and the programs that compile its sources build with the warnings
   the core, the Audio Unit and the LV2 plug-in already had
