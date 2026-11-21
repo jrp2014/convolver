@@ -29,6 +29,9 @@
 --                     which has no input-pin setting for a VST3); "all"
 --                     sets its inputs to the track's too (Ardour 9's window
 --                     has an Audio Input Pins setting)
+--   CONVOLVER_STRICT_IO  optional; 1 makes the track Strict-I/O, as a track
+--                     added in Ardour's window is by default (a track the
+--                     script adds is otherwise Flexible-I/O)
 -- Each step that fails stops the script with an error, which the test reports.
 
 -- Unbuffered, so that if Ardour crashes the log shows the last step begun.
@@ -88,6 +91,11 @@ end
 local track = session:new_audio_track(inputs, outputs, no_group, 1, "Convolver",
 	ARDOUR.PresentationInfo.max_order, ARDOUR.TrackMode.Normal, true):front()
 assert(track, "cannot add a track")
+if os.getenv("CONVOLVER_STRICT_IO") == "1" then
+	step("make the track Strict-I/O")
+	track:set_strict_io(true)
+end
+print("Track Pin Mode: " .. (track:strict_io() and "Strict-I/O" or "Flexible-I/O"))
 -- Each output goes straight to the master bus channel of the same number,
 -- and on to the export: with more than two channels, the panners would
 -- spread each channel over its neighbours.

@@ -637,11 +637,12 @@ the one input to both of the VST3's inputs and kept its two outputs, so the
 mono example's preset did not fit and the export was silent (the session
 file showed `ConfiguredInput` 1 and `ConfiguredOutput` 2); Ardour saved the
 two parameters as not automatable, and setting them through its Lua API
-worked. HOST-10 explained it on 21 November 2026: with its automatic pin
-configuration, Ardour 8 keeps a VST3 plug-in's default buses and Ardour 9.0
-masks its request for the track's channels with the default width; set by
-hand, a mono track's 1 in, 1 out plays; and both hide parameters that
-cannot be automated ([Ardour, headless](testing.md#ardour-headless)). The
+worked. HOST-10 explained it on 21 November 2026: the test's tracks were
+Flexible-I/O, where, with its automatic pin configuration, Ardour 8 keeps a
+VST3 plug-in's default buses and Ardour 9.0 masks its request for the
+track's channels with the default width; set by hand, the mono example
+plays; on a Strict-I/O track, Ardour's default, it plays as it is; and both
+versions hide parameters that cannot be automated ([Ardour, headless](testing.md#ardour-headless)). The
 [plug-in guide](../use/plugins.md#ardour) says what Ardour users need.
 Before it, a new VST3 Latency that REAPER used only after a render, FX
 Offline then Online, or reopening the project, was fixed by VST3-16 and

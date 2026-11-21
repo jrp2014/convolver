@@ -249,7 +249,7 @@ jobs:
           cmake -S . -B build-lv2 -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCONVOLVER_BUILD_LV2=ON -DCONVOLVER_BUILD_TESTS=OFF
           cmake --build build-lv2 --parallel --target convolver_lv2 convolver_preset_tool
-      - name: Ardour plays the first-use examples, at Latency 0 and larger
+      - name: Ardour plays the first-use examples, at Latency 0 and larger, on both kinds of track
         run: python tests/plugins/ardour_tests.py build-lv2/lv2/convolver.lv2 build-lv2/convolver-preset
       - name: Explain a failure that may come from a new upstream release
         if: failure()

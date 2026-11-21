@@ -1320,10 +1320,20 @@ at a Latency:
 
 | Format | Cases |
 | --- | --- |
-| LV2 | Mono (1 in, 1 out), the stereo cross-feed (2 in, 2 out) and the crossover (2 in, 6 out) at Latency 0; the stereo cross-feed at 1024 and the crossover at 256 |
-| VST3 | The stereo cross-feed at Latency 0 and 1024; mono at Latency 0 with the plug-in's channels set by hand, outputs only and outputs with input pins |
+| LV2 | Mono (1 in, 1 out) at Latency 0 on both kinds of track; the stereo cross-feed (2 in, 2 out) at Latency 0 on a Strict-I/O track; the crossover (2 in, 6 out) at Latency 0; the stereo cross-feed at 1024 and the crossover at 256 |
+| VST3 | The stereo cross-feed at Latency 0 on a Strict-I/O track and at 1024; mono at Latency 0 on a Strict-I/O track, and on a Flexible-I/O track with the plug-in's channels set by hand, outputs only and outputs with input pins |
 
-With its automatic pin configuration, Ardour runs Convolver's VST3 with 2 in
+A track the script adds is Flexible-I/O unless the case asks for
+Strict-I/O (`Route::set_strict_io`), which is what Ardour's window gives a
+new track by default (the `strict-io` preference) and which keeps the
+track's channel count through its plug-ins. On a Strict-I/O track, both
+formats play mono and stereo as they are: for the VST3, Ardour connects
+only the track's channels and asks the plug-in for that layout through
+`enable_io`, which does not mask it. A crossover cannot play on one in
+either format, since the insert keeps 2 outputs (tried on Ardour 8.4: both
+exports differed from the oracle by about the output peak), so the
+crossover cases run on Flexible-I/O tracks. On a Flexible-I/O track, with
+its automatic pin configuration, Ardour runs Convolver's VST3 with 2 in
 and 2 out (HOST-10): on a mono track it feeds the one input to both, so a
 mono or crossover filter plays silence. Ardour 8 keeps a VST3 plug-in's
 default buses. Ardour 9 asks for the track's inputs and, unless they are set
