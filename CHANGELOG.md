@@ -37,6 +37,17 @@ first published preview, keep their original grouping.
 
 ### Changed
 
+- Plug-ins (DIAG-10): the VST3 and Audio Unit Status text also says when a
+  setting does not play as chosen: a Latency not in use yet (`Latency 1024
+  frames not in use yet.`), Estimate without an estimate for the filter
+  (`No estimate: No clipping's gain plays.`, or `Too loud to estimate: …`)
+  and a filter with no gain figure (`Silent: no gain figure for this
+  filter.`, or `… only the dry signal plays.` where Mix lets it through),
+  as the window's report does. LV2's `status` port keeps its
+  five values (jrp, 21 November 2026): while a new Latency is applied or
+  Estimate's figure is found the filter plays on and the port stays at
+  Active, and the host's log now says so before saying what happened.
+
 - Plug-ins (PLUG-39 step 6, which finishes PLUG-39): the latency and tail
   the host reads are written in one place in each of VST3 and the Audio
   Unit, from the newest processor or, with none, from the accepted filter

@@ -393,7 +393,7 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
         facts.host.reset();
     HostReport r;
     r.status = host_status(filter, facts.host, facts.log_written, facts.settings, facts.bypassed,
-                           facts.chooses_files);
+                           facts.chooses_files, facts.latency_frames);
     r.status_name = host_status_names.at(static_cast<std::size_t>(r.status.status));
     const auto program = host_program_name();
     // Out of process (GarageBand, Logic) the program is Apple's hosting

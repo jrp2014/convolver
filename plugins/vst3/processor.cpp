@@ -361,8 +361,10 @@ bool Processor::chooses_files() const noexcept {
     return files_ != nullptr && has_editor();
 }
 HostStatusLine Processor::status_locked() const {
+    // DIAG-10: the latency that plays, as report_locked() gives it.
     return host_status(filter_, known_layout(), host_log_written(), settings(),
-                       shown_bypass_.load(), chooses_files());
+                       shown_bypass_.load(), chooses_files(),
+                       host() ? host()->latency_frames() : settings().latency);
 }
 HostStatusLine Processor::status() {
     const Locked lock(*this);
