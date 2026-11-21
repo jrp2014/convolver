@@ -73,8 +73,9 @@ cannot be used ([when a filter does not fit](plugins.md#when-a-filter-does-not-f
 | The filter plays but some channels are missing, and Status ends "plug-in inputs … ignored" | The track gives more inputs than the filter reads: it reads the first ones only. Put the source on those inputs ([channels](plugins.md#channels)) |
 
 To see why, read the message in [Convolver's window](plugins.md#convolvers-window)
-(macOS) or the plug-in's **Status** parameter in the host's generic plug-in
-window or parameter list (VST3 and Audio Unit), then the
+(macOS, and the VST3 plug-in on Windows) or the plug-in's **Status**
+parameter in the host's generic plug-in window or parameter list (VST3 and
+Audio Unit), then the
 [Convolver log](plugins.md#status-and-the-convolver-log), which says what
 differs and what to change. The LV2 plug-in shows Load failed on its `status`
 output and writes the reason to the host's log.

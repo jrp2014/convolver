@@ -59,10 +59,10 @@ Contents: [formats](#formats) · [channels](#channels) ·
 | Channel counts | Any pairing of 1 to 8 in and out | Any pairing of 1 to 8 in and out | [Fixed layouts](#lv2-channel-layouts) |
 | Preset file | `.vstpreset` | `.aupreset` | A `NAME.preset.lv2` folder |
 | Libraries it needs on macOS | None beyond macOS: Accelerate for the FFT, AudioToolbox to read the files chosen in its window | None beyond macOS: Accelerate for the FFT, AudioToolbox to read the files chosen in its window | Not on macOS |
-| Choose a `.cfg` or IR file directly | [On macOS](#convolvers-window), in its window | [Yes](#convolvers-window), in its window | [Yes](#lv2-filter-files) |
+| Choose a `.cfg` or IR file directly | [On macOS and Windows](#convolvers-window), in its window | [Yes](#convolvers-window), in its window | [Yes](#lv2-filter-files) |
 | Where a failure is explained | The Status parameter and the [Convolver log](#status-and-the-convolver-log) | The Status parameter and the [Convolver log](#status-and-the-convolver-log), also in the macOS system log | The `status` output and the host's log |
 | Tail reported to the host | Yes | Yes, in seconds | No |
-| [Settings](#settings): gain, mix, latency | Yes | Yes | Yes, as control ports ([LV2 ports](#lv2-ports)) |
+| [Settings](#settings): gain, gain mode, mix, latency | Yes | Yes | Yes, as control ports ([LV2 ports](#lv2-ports)) |
 | Licence | GPL-2.0-or-later | [GPL-3.0-or-later](#audio-unit-licence) | GPL-2.0-or-later |
 
 ## Channels
@@ -171,29 +171,29 @@ played, and while the host has stopped the plug-in (some hosts keep it
 running after the transport stops), the host may not have given its real
 rate yet (Audacity sets up the plug-in at 44.1 kHz until it first plays,
 whatever the project's rate), so a single IR file or `.cfg` is kept, saved
-with the project, and checked when the host plays audio through the
-plug-in. Until then the window keeps the file's name and Status says
-"Filter selected. Waiting for the host's audio settings.", even if the
-host has started the plug-in briefly at another rate, as Audacity does at
-44.1 kHz to pass on an edit. Once the host plays, the filter plays if it
-fits; if not, it plays silence and Status says "Silent" with the filter's
-and the host's rates. Convolver takes that result when its window is
-open during playback; the Audio Unit also takes it when the host reads
-Status. In the VST3 plug-in, the host's Status control does not ask by
-itself: with the window closed it may keep saying it is waiting until the
-window is opened while the host plays, or a setting such as Bypass
-changes. If playback stops before the result is taken, Status may say it
-is waiting again, and the filter stays selected either way. A configuration list
-needs the rate and channels to choose its entry, so it uses the ones the
-host last ran the plug-in with; before the host has run it with them, the
-list is not loaded, and the window says: "Play audio once so Convolver can
-check the host's sample rate and channel counts, then choose the
-configuration list again." If the list has no entry for the rate and
-channels the host last ran with, it is refused naming them, and whenever
-the host is not playing audio through the plug-in at that moment the
-advice adds the same step, for a host such as Audacity that runs the
-plug-in briefly at 44.1 kHz before it first plays. LV2 knows its host's rate and channels from the
-start, so it checks every file at once.
+with the project, and checked when the host plays audio through the plug-in.
+Until then the window keeps the file's name and Status says "Filter
+selected. Waiting for the host's audio settings.", even if the host has
+started the plug-in briefly at another rate, as Audacity does at 44.1 kHz to
+pass on an edit. Once the host plays, the filter plays if it fits; if not,
+it plays silence and Status says "Silent" with the filter's and the host's
+rates. Convolver takes that result when its window is open during playback;
+the Audio Unit also takes it when the host reads Status. In the VST3
+plug-in, the host's Status control does not ask by itself: with the window
+closed it may keep saying it is waiting until the window is opened while the
+host plays, or a setting such as Bypass changes. If playback stops before
+the result is taken, Status may say it is waiting again, and the filter
+stays selected either way. A configuration list needs the rate and channels
+to choose its entry, so it uses the ones the host last ran the plug-in with;
+before the host has run it with them, the list is not loaded, and the window
+says: "Play audio once so Convolver can check the host's sample rate and
+channel counts, then choose the configuration list again." If the list has
+no entry for the rate and channels the host last ran with, it is refused
+naming them, and whenever the host is not playing audio through the plug-in
+at that moment the advice adds the same step, for a host such as Audacity
+that runs the plug-in briefly at 44.1 kHz before it first plays. LV2 knows
+its host's rate and channels from the start, so it checks every file at
+once.
 
 ## When a filter does not fit
 
@@ -268,8 +268,8 @@ How each format reports a refusal:
 ## Status and the Convolver log
 
 The VST3 and the Audio Unit say what they are doing in two places, the Status
-parameter and the Convolver log; on macOS both also show them in
-[Convolver's window](#convolvers-window).
+parameter and the Convolver log; on macOS, and the VST3 plug-in on Windows,
+also in [Convolver's window](#convolvers-window).
 
 **The Status parameter** is a read-only parameter that hosts can list with the
 plug-in's controls, for example in their generic plug-in window or parameter
@@ -605,7 +605,7 @@ window updates twice a second while it is on screen. While the host restores
 a project or preset on another thread, it shows the last report until the
 filter is ready.
 
-**In VST3** (VST3-11 on macOS, VST3-12 on Windows) the window behaves as
+**In VST3**, on macOS and Windows, the window behaves as
 above, except:
 
 - The title line names the instance as the log does (`VST3 #2`).
@@ -629,9 +629,9 @@ above, except:
 - The window grows when the file, software and log lines are shown, and
   asks the host to make its window fit; the user cannot resize it.
 - The software line names macOS AudioToolbox as the reader of filter files,
-  as in the Audio Unit. Not yet tried in REAPER or Audacity (HOST-1).
+  as in the Audio Unit. Not yet tried in REAPER or Audacity.
 
-**On Windows** (VST3-12, new since 0.13.2) the VST3 window is built from
+**On Windows** (new since 0.13.2) the VST3 window is built from
 Windows' own controls, with the same parts in the same order, and behaves
 as the VST3 window above, except:
 
