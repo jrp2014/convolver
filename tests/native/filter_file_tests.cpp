@@ -477,7 +477,7 @@ void before_host_settles(const fs::path& dir) {
     require(!read_filter_file((dir / "early-list.txt").string(), std::nullopt,
                               detail::libsndfile_files(), why, &files),
             "a list's entry chosen before the host's rate is known");
-    require(files.empty() && why.kind == HostFailureKind::filter_file && !why.filter(),
+    require(files.empty() && why.kind == HostFailureKind::settings_unknown && !why.filter(),
             "a waiting list's failure");
     require(has(why.message.problem, "early-list.txt: no entry selected") &&
                 why.message.fix ==

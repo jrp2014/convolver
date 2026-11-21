@@ -3166,6 +3166,77 @@ void chosen_preset_before_activation() {
 // waits for the host's rate, with jrp's words (20 November 2026); once the
 // host has played at 48 kHz and stopped, it chooses its 48 kHz entry. While
 // the host plays, a file that does not suit is refused, as before.
+// PLUG-40 (jrp, 21 November 2026): a list refused before the host's settings
+// were known. After Audacity's flush at 44.1 kHz, which plays no audio for
+// the window to see, the window's report says the settings are known now,
+// naming that 44.1 kHz, and nothing is read again. Once the window reads its
+// report while the host plays at 48 kHz, the list is read again by itself,
+// as if chosen: its 48 kHz entry is saved, and a host without setDirty
+// (Audacity) is told the project changed by the Latency edit (VST3-17).
+void list_read_again() {
+    HostApplication context;
+    Handler handler;
+    handler.offers_dirty = false; // Audacity 4.0.2.
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk && p.connect(&c) == kResultOk &&
+                c.connect(&p) == kResultOk,
+            "list read again: initialize");
+    SpeakerArrangement mono = SpeakerArr::kMono;
+    require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "list read again: buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    ProcessSetup placeholder{kOffline, kSample32, 512, 44100};
+    require(p.setupProcessing(placeholder) == kResultOk, "list read again: Audacity's setup");
+    const auto folder = private_temp("convolver-vst3-list-again");
+    std::filesystem::create_directories(folder);
+    write_wav(folder / "room.wav", 48000, 1, 8);
+    write_wav(folder / "slow.wav", 44100, 1, 8);
+    std::ofstream(folder / "room.cfg") << "48000 1 1 0\n0\n0\nroom.wav\n0\n0\n0\n";
+    std::ofstream(folder / "slow.cfg") << "44100 1 1 0\n0\n0\nslow.wav\n0\n0\n0\n";
+    std::ofstream(folder / "rates.txt") << "slow.cfg\nroom.cfg\n";
+    require(!c.load_file((folder / "rates.txt").string()), "list read again: refused at first");
+    const auto edits = handler.edits.size();
+    // FlushParameters: started at 44.1 kHz with one block, then stopped.
+    require(p.setActive(true) == kResultOk, "list read again: the flush starts");
+    play_block(p, 1, 1, 64);
+    require(p.setActive(false) == kResultOk, "list read again: the flush stops");
+    auto r = c.report();
+    require(r &&
+                r->fix == "The host's settings are now known (44100 Hz, 1 in, 1 out): choose the "
+                          "configuration list again." &&
+                p.failure() && handler.edits.size() == edits,
+            ("list read again: after the flush, the window's Fix: " +
+             (r ? r->fix : std::string("none")))
+                .c_str());
+    // The host plays at 48 kHz and the window reads its report.
+    ProcessSetup project{kRealtime, kSample32, 512, 48000};
+    require(p.setupProcessing(project) == kResultOk && p.setActive(true) == kResultOk,
+            "list read again: the host starts at 48 kHz");
+    play_block(p, 1, 1, 64);
+    r = c.report();
+    require(!p.failure() && r && r->status_name == "Active",
+            ("list read again: the list was not read again while playing: " +
+             (r ? r->status_name + ": " + r->explanation : std::string("none")))
+                .c_str());
+    MemoryStream saved;
+    require(p.getState(&saved) == kResultOk, "list read again: save");
+    saved.seek(0, IBStream::kIBSeekSet, nullptr);
+    const auto state = read_state(&saved);
+    require(state.configuration && state.configuration->sample_rate == 48000 && !state.failed,
+            "list read again: the 48 kHz entry is not in the saved state");
+    require(handler.edits.size() == edits + 3 && handler.edits[edits].kind == 'b' &&
+                handler.edits[edits].id == latency_id,
+            "list read again: Audacity was not told the project changed");
+    // Read once: a later read changes nothing.
+    r = c.report();
+    require(handler.edits.size() == edits + 3, "list read again: read again twice");
+    p.setActive(false);
+    c.terminate();
+    p.terminate();
+}
+
 void chosen_before_host_plays() {
     HostApplication context;
     Handler handler;
@@ -4095,6 +4166,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"chosen_preset_without_set_dirty", [] { chosen_preset(false); }},
         {"chosen_preset_before_activation", chosen_preset_before_activation},
         {"chosen_before_host_plays", chosen_before_host_plays},
+        {"list_read_again", list_read_again},
         {"load_without_set_dirty", [] { load_without_set_dirty(false); }},
         {"load_with_failing_set_dirty", [] { load_without_set_dirty(true); }},
         {"saved_filter_name", saved_filter_name},

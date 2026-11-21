@@ -150,7 +150,22 @@ before they set the sample rate and channel layout (VST3 `setState` before
   started with (`known_layout()`), and before any start it is refused as
   any file is, with jrp's words, "No entry selected. ... Play audio once so
   Convolver can check the host's sample rate and channel counts, then
-  choose the configuration list again." The saved state format is
+  choose the configuration list again." (`HostFailureKind::settings_unknown`).
+  PLUG-40 (jrp, 21 November 2026: "don't make the user choose again
+  unnecessarily"): such a list is read again by itself, as if chosen, once,
+  when the window reads its report while the host plays audio through the
+  plug-in (`HostSettling::playing()`, `HostFilter::take_unsettled_list()`),
+  on the window's thread: VST3's processor in its `report_message`, which
+  answers with `"retried"` so the controller marks the project changed as for
+  a chosen file (setDirty, or VST3-17's Latency edit), and the Audio Unit in
+  its `report()`, through `load_file()`. Audacity's flush plays no audio a
+  window could see, so it never triggers this. Until then, once a
+  configuration is known, Status and the window say so with it,
+  from the same known layout: the window's Fix "The host's settings are now
+  known (48000 Hz, 2 in, 2 out): choose the configuration list again."
+  (`settings_now_known()`, `shown_failure_message()`), Status "now known:
+  48000 Hz, 2 in, 2 out; choose the list again.". The window offers its drop
+  hint only when nothing was refused. The saved state format is
   unchanged. One case stays wrong: in Audacity, a list chosen after a
   parameter edit (choosing a file reports one, VST3-17) but before the
   first playback chooses its 44.1 kHz entry,

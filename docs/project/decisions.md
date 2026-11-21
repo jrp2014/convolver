@@ -1001,6 +1001,21 @@ Contents: [direction](#direction) · [releases](#releases) ·
   — drop the one-block rule", 21 November 2026). See [Contract: loading and
   failure](../develop/plugin-contract.md#loading-and-failure),
   [plug-ins](../use/plugins.md#loading-a-filter).
+- **21 November 2026.** PLUG-40, from jrp's Audacity pass: once the host's
+  settings are known, a list refused before them says so, in Status and the
+  window from the same known layout ("The host's settings are now known
+  (48000 Hz, 2 in, 2 out): choose the configuration list again.", rather
+  than "now plays at", since the host may have stopped; jrp chose "Say the
+  settings are known now" over loading it automatically on first playback
+  or leaving the old text). Then jrp: "Make this the least clunky possible
+  while safe? Don't make the user choose again unnecessarily": the list is
+  read again by itself, as if chosen, when Convolver's window reads its
+  report while the host plays audio through the plug-in, on the window's
+  thread, so the project is marked changed as for a chosen file; never from
+  the audio thread or a start, and once per refusal. The drop hint is not
+  offered after a refusal. See [Contract: loading and
+  failure](../develop/plugin-contract.md#loading-and-failure),
+  [plug-ins](../use/plugins.md#loading-a-filter).
 
 ## Identities and file formats
 

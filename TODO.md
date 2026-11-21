@@ -54,8 +54,7 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 ### In progress
 
 PLUG-39's step 5, after step 4a (PR #236); HOST-11's first version (PR #245),
-which waits for a run on jrp's Mac; PLUG-40, as jrp chose on 21 November
-2026 (PR #252). Check the open pull requests for an ID
+which waits for a run on jrp's Mac. Check the open pull requests for an ID
 before starting anything.
 
 ### Ready
@@ -201,14 +200,6 @@ done once for all three formats:
   **Done when** the plan's
   [success criterion](docs/project/plans/2026-11-13-load-restore-consolidation.md#success-criterion)
   is met.
-- [ ] **PLUG-40 — Keep a refused list's advice current.** From jrp's
-  Audacity pass (21 November 2026,
-  [record](docs/archive/reviews/2026-11-21-vst3-17-audacity-pass.md)): a
-  list refused before the host played still says the host's settings are
-  unknown after it has played, until the list is chosen again, and the
-  window adds "Or drop a file on this window." to a message that says to
-  play first. **Done when** neither shows and the window model and report
-  tests cover both.
 - [ ] **PLUG-24 — `HostProcessor` in its own source file.** Move its audio
   code out of `host.cpp`, with public APIs, saved state, messages and
   results unchanged, as its own pull request in PLUG-39's sequence.
@@ -536,3 +527,8 @@ move to the archive.
   ([in Audacity](docs/use/first-sound-in-a-host.md#in-audacity),
   [record](docs/archive/reviews/2026-11-21-vst3-17-audacity-pass.md));
   the drafted upstream issue stays in the project files for jrp.
+- [x] **PLUG-40 — Keep a refused list's advice current.** 21 November
+  2026, PR #252: a list refused before the host's settings were known is
+  read again by itself once the window sees the host playing, and says the
+  settings are known meanwhile
+  ([plug-ins](docs/use/plugins.md#loading-a-filter)).

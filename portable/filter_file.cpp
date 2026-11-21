@@ -108,6 +108,7 @@ read_filter_file(const std::string& path, const std::optional<HostLayout>& known
     // chosen for the configuration the host last started with, if any.
     const bool list = !settled || !known ? configuration_list(path) : false;
     if (!known && list) {
+        failure.kind = HostFailureKind::settings_unknown;
         failure.message = list_waits_refusal(path);
         return std::nullopt;
     }

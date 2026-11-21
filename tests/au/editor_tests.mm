@@ -918,6 +918,39 @@ void files() {
     wide.uninitialize();
 }
 
+// PLUG-40 (jrp, 21 November 2026), as in VST3: a list refused before the
+// unit rendered is read again by itself, as if chosen, once the window reads
+// its report while the host renders; until then the report says what to do.
+void list_read_again() {
+    TemporaryFolder folder;
+    write_wav(folder / "room.wav", 48000, 2, 8);
+    write_wav(folder / "slow.wav", 44100, 2, 8);
+    std::ofstream(folder / "slow.cfg") << "44100 2 2 0\n0 0\n0 0\nslow.wav\n0\n0\n0\n"
+                                       << "slow.wav\n1\n1\n1\n";
+    std::ofstream(folder / "room.cfg") << "48000 2 2 0\n0 0\n0 0\nroom.wav\n0\n0\n0\n"
+                                       << "room.wav\n1\n1\n1\n";
+    std::ofstream(folder / "rates.txt") << "slow.cfg\nroom.cfg\n";
+    Unit unit;
+    // Initialized at 44.1 kHz, nothing rendered: the formats are not known.
+    check(unit.configure(44100, 2, 2, 512), "44.1 kHz formats for the list");
+    check(unit.initialize(), "44.1 kHz initialization for the list");
+    require(choose(unit, (folder / "rates.txt").string()) != noErr,
+            "a list chosen before rendering");
+    unit.uninitialize();
+    auto r = report(unit);
+    require(r.fix.find("Play audio once") != std::string::npos,
+            "before rendering, the list's Fix: " + r.fix);
+    check(unit.configure(48000, 2, 2, 512), "48 kHz formats for the list");
+    check(unit.initialize(), "48 kHz initialization for the list");
+    render_block(unit, 2, 2);
+    r = report(unit);
+    const auto saved = unit.saved();
+    require(r.status_name == "Active" && saved.configuration && !saved.failed &&
+                saved.configuration->sample_rate == 48000,
+            "the list was not read again while rendering: " + r.status_name + ": " + r.explanation);
+    unit.uninitialize();
+}
+
 // PLUG-27, as vst3.adapter chosen_before_host_plays: a single filter chosen
 // before the host renders is kept and saved, and checked when the host
 // initializes the unit; a list waits for formats the host has rendered
@@ -1137,6 +1170,7 @@ int main() {
             window();
             files();
             chosen_before_rendering();
+            list_read_again();
             responsive();
             faults(log);
         } catch (const std::exception& e) {

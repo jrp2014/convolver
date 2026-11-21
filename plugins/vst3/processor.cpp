@@ -404,8 +404,11 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
             return;
         attributes->setBinary("report", report.data(), static_cast<uint32>(report.size()));
         attributes->setBinary("format", tag_.data(), static_cast<uint32>(tag_.size()));
-        if (answer.load_request) {
-            attributes->setInt("load request", answer.load_request);
+        if (answer.load_request || answer.retried) {
+            if (answer.load_request)
+                attributes->setInt("load request", answer.load_request);
+            if (answer.retried)
+                attributes->setInt("retried", 1);
             attributes->setInt("accepted", answer.accepted ? 1 : 0);
             if (answer.accepted && answer.settings) {
                 attributes->setFloat("gain", answer.settings->gain_db);
@@ -476,6 +479,7 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
     }
     if (id == report_message) {
         bool faulted = false;
+        std::string list;
         {
             const Locked lock(*this);
             const auto now = std::chrono::steady_clock::now();
@@ -483,9 +487,25 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
                 faulted = observe_faults();
                 report_faults_at_ = now;
             }
+            // PLUG-40: a list refused before the host's settings were known
+            // is read again once the window sees the host playing audio, as
+            // if chosen again; the window's read comes on the UI thread, as a
+            // chosen file does.
+            if (settling_.playing())
+                try {
+                    list = filter_.take_unsettled_list();
+                } catch (...) { // Out of memory: the refusal's advice stays.
+                }
         }
         if (faulted)
             write_log();
+        if (!list.empty()) {
+            std::optional<HostSettings> settings;
+            const bool accepted = load_file(list, settings);
+            write_log();
+            send_status({.retried = true, .accepted = accepted, .settings = settings});
+            return kResultOk;
+        }
         send_status();
         return kResultOk;
     }

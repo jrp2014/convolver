@@ -186,7 +186,14 @@ stays selected either way. A configuration list needs the rate and channels
 to choose its entry, so it uses the ones the host last ran the plug-in with;
 before the host has run it with them, the list is not loaded, and the window
 says: "Play audio once so Convolver can check the host's sample rate and
-channel counts, then choose the configuration list again." If the list has
+channel counts, then choose the configuration list again." With Convolver's
+window open, you need not choose it again: when the host plays, the window
+loads the list itself, as if you had chosen it, and it chooses its entry for
+the host's rate and channels. If the window was closed while the host
+played, it says "The host's settings are now known (48000 Hz, 2 in, 2 out):
+choose the configuration list again." (with the host's values), and Status
+says the same in short; play again with the window open, or choose the list
+again. If the list has
 no entry for the rate and channels the host last ran with, it is refused
 naming them, and whenever the host is not playing audio through the plug-in
 at that moment the advice adds the same step, for a host such as Audacity

@@ -294,6 +294,7 @@ HostReport Effect::report() {
     std::string faults;
     bool confirmed = false;
     HostReport r;
+    std::string list;
     {
         // A load or the Latency work holds the lock while it prepares a
         // filter, which can take a while: the window then gets the report of
@@ -305,7 +306,24 @@ HostReport Effect::report() {
         if (!lock.owns_lock())
             return report_of(*diagnostics());
         playing_.reclaim(); // As every control call does (Locked).
-        r = report_locked(faults, confirmed);
+        // PLUG-40, as in VST3: a list refused before the host's formats
+        // were known is read again, as if chosen, once the window sees the
+        // host rendering.
+        if (settling_.playing())
+            try {
+                list = filter_.take_unsettled_list();
+            } catch (...) { // Out of memory: the refusal's advice stays.
+            }
+        if (list.empty())
+            r = report_locked(faults, confirmed);
+    }
+    if (!list.empty()) {
+        try {
+            static_cast<void>(load_file(list)); // Records, logs and notifies either way.
+        } catch (...) {
+            fail_unrecorded(); // As the load property does (ROBUST-7).
+        }
+        return report();
     }
     if (!faults.empty()) // As when a host reads the Status text.
         log_faults(faults);

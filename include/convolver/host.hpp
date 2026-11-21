@@ -252,6 +252,9 @@ enum class HostFailureKind {
     activation,       // The processor could not be built when the host activated.
     saved_failure,    // The restored state records an earlier failed load.
     too_large,        // The filter is too large to save in the plug-in's state (PLUG-12).
+    // PLUG-27, PLUG-40: a configuration list chosen before the host's rate
+    // and channels were known, so no entry could be chosen.
+    settings_unknown,
 };
 // Where a filter came from. Plug-ins cannot tell a preset from a saved
 // session: both arrive as state.
@@ -526,6 +529,15 @@ class HostFilter {
     const std::optional<HostFailure>& rejection() const noexcept {
         return load_failure_;
     }
+    // PLUG-40 (jrp, 21 November 2026: "don't make the user choose again
+    // unnecessarily"): the configuration list the newest request refused
+    // because the host's settings were not known
+    // (HostFailureKind::settings_unknown), which an adapter reads again, as
+    // if chosen, when its window reads the report while the host plays audio
+    // through the plug-in (HostSettling::playing()), on that thread. Given
+    // once for each refused request, so a read again that fails no other way
+    // (out of memory) is not repeated at every read; empty otherwise.
+    std::string take_unsettled_list();
     // The request that supplied the accepted filter (or the saved failure);
     // number 0 before any was accepted.
     const HostRequest& accepted() const noexcept {
@@ -645,7 +657,8 @@ class HostFilter {
     std::optional<OfferedName> offered_name_;
     std::uint64_t requests_ = 0;
     bool failed_ = false;
-    bool awaiting_ = false; // awaiting()
+    bool awaiting_ = false;          // awaiting()
+    std::uint64_t list_retaken_ = 0; // take_unsettled_list()'s last request
     std::optional<HostFailure> load_failure_, activation_failure_;
     Advice notice_;
     // faults(); the processor's totals at the last clear (the audio side's

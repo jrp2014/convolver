@@ -568,9 +568,10 @@ preparation and steps 2, 3 and 9 below include what it found.
     check a configuration list: in a new project, choose a list (a text
     file in the package folder naming `presets/echo-44100-stereo/filter.cfg`
     and then `examples/first-use/stereo/filter.cfg`) before playing; it must
-    be refused with "Play audio once…". Play a second, stop, choose the list
-    again, and export and compare as above: the list's 48000 Hz entry must
-    play.
+    be refused with "Play audio once…". With the window still open, play a
+    second and stop: the window must show the list loaded (Active, 48000
+    Hz) without choosing it again (PLUG-40). Export and compare as above:
+    the list's 48000 Hz entry must play.
 
 ### GarageBand (Audio Unit)
 

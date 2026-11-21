@@ -37,6 +37,17 @@ first published preview, keep their original grouping.
 
 ### Changed
 
+- Plug-ins (PLUG-40, from jrp's Audacity pass of 21 November 2026): a
+  configuration list chosen in Convolver's window before the host has
+  played is no longer something to choose again. With the window open, it
+  loads by itself, as if chosen, when the host plays, and the project is
+  marked changed. If the window was closed meanwhile, Status and the window
+  say "The host's settings are now known (48000 Hz, 2 in, 2 out): choose the
+  configuration list again." (Status in short) instead of still saying the
+  settings are unknown. The window no longer suggests dropping a file beside
+  a refusal whose advice says to play first. VST3 and the Audio Unit; the
+  Audio Unit's part is checked only on macOS CI
+  ([when a chosen file is checked](docs/use/plugins.md#loading-a-filter)).
 - Documentation (VST3-17): in Audacity, Convolver's **Choose…** and
   **Recent** are now checked routes alongside Audacity's preset menu. jrp
   checked the 0.16.14 candidate in Audacity 4.0.2 on macOS on 21 November
