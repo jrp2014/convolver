@@ -1171,10 +1171,10 @@ other orders of events (AU-18):
 
 | Case | Order of events | Latency |
 | --- | --- | --- |
-| Mono at 44.1 kHz, 512-frame blocks | GarageBand's: the engine starts the unit at its defaults and renders, then the preset is restored on the running unit, at GarageBand's fixed rate on a mono track (the fixture's samples, filter included, labelled 44.1 kHz) | 0 |
+| Mono at 44.1 kHz, 509-frame blocks | GarageBand's: the engine starts the unit at its defaults and renders, then the preset is restored on the running unit, at GarageBand's fixed rate on a mono track (the fixture's samples, filter included, labelled 44.1 kHz) | 0 |
 | Stereo, 300 | GarageBand's, then Latency chosen through its parameter while the engine runs | 1024 |
 | Crossover, 1000 | Restored before starting, then Latency chosen while the engine runs | 256 |
-| Stereo, 256 | A project's round trip: one unit takes the preset and Latency, and a second, restored from the first one's `ClassInfo`, plays | 512 |
+| Stereo, 250 | A project's round trip: one unit takes the preset and Latency, and a second, restored from the first one's `ClassInfo`, plays | 512 |
 
 After a change made while the engine runs, the renderer renders silence and
 runs the main queue until the Status parameter reads Active and the unit

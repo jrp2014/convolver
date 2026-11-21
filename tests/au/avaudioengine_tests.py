@@ -38,24 +38,23 @@ from fixtures import LATENCY, TOLERANCE, read_float_wav, worst_error, write_floa
 EXAMPLES = REPOSITORY / 'examples' / 'first-use'
 REGISTRY = json.loads((REPOSITORY / 'plugins' / 'identities.json').read_text(encoding='utf-8'))
 CODES = ','.join(REGISTRY['au'][key] for key in ('type', 'subtype', 'manufacturer'))
-# Fixture, filter file and block size. None is a multiple of the engine's
-# 64-frame first block, so its blocks straddle render calls.
 # Fixture, filter file, block size, the rate to play it at (None: the
 # fixture's own), the renderer's options for the host's order of events, and
-# the latency the unit must then report. A rate other than the fixture's
-# plays the same samples, filter included, labelled with that rate, so the
-# oracle's output is the same.
+# the latency the unit must then report. No block size is a multiple of the
+# engine's 64-frame first block, so blocks straddle render calls. A rate
+# other than the fixture's plays the same samples, filter included, labelled
+# with that rate, so the oracle's output is the same.
 CASES = [
     ('mono', 'impulse.wav', 61, None, [], LATENCY),
     ('stereo', 'filter.cfg', 300, None, [], LATENCY),
     ('crossover', 'filter.cfg', 1000, None, [], LATENCY),
     # GarageBand: 44.1 kHz, a mono track, the project restored while running.
-    ('mono', 'impulse.wav', 512, 44100, ['--start-first'], LATENCY),
+    ('mono', 'impulse.wav', 509, 44100, ['--start-first'], LATENCY),
     # GarageBand's order, then a Latency chosen while the project plays.
     ('stereo', 'filter.cfg', 300, None, ['--start-first', '--latency', '1024'], 1024),
     ('crossover', 'filter.cfg', 1000, None, ['--latency', '256'], 256),
     # A project saved and reopened: ClassInfo from one unit restores another.
-    ('stereo', 'filter.cfg', 256, None, ['--round-trip', '--latency', '512'], 512),
+    ('stereo', 'filter.cfg', 250, None, ['--round-trip', '--latency', '512'], 512),
 ]
 
 
