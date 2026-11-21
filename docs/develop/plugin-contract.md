@@ -164,7 +164,9 @@ before they set the sample rate and channel layout (VST3 `setState` before
   counts, then choose the configuration list again." (jrp, 21 November
   2026; no guess at whether a start was Audacity's) (`vst3.adapter` `chosen_before_host_plays` replays
   Audacity's order; `native.filter_file` `before_host_settles`,
-  `native.host_settling` `chosen_file`).
+  `native.host_settling` `chosen_file`; in a host, jrp's
+  [Audacity pass](../archive/reviews/2026-11-21-vst3-17-audacity-pass.md)
+  on 0.16.14).
 - One shared record holds both formats' rules: `HostSettling` in
   [`host_settling.hpp`](../../portable/host_settling.hpp) (PLUG-39 step 2,
   `native.host_settling`), which each adapter tells when the host starts

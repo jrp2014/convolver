@@ -521,7 +521,8 @@ move to the archive.
 - [x] **PLUG-27 — Read a chosen filter before the host's audio settings
   are known.** 21 November 2026, PR #233: a chosen file waits ("Filter
   selected. Waiting for the host's audio settings.") until the host plays
-  ([plug-ins](docs/use/plugins.md#loading-a-filter)).
+  ([plug-ins](docs/use/plugins.md#loading-a-filter)); checked in Audacity
+  on 0.16.14 ([record](docs/archive/reviews/2026-11-21-vst3-17-audacity-pass.md)).
 - [x] **HOST-9 — Play the VST3 and a saved Latency in the Ardour test.** 21
   November 2026, PR #237 ([Ardour, headless](docs/develop/testing.md#ardour-headless)).
 - [x] **AU-18 — Render the Audio Unit in the hosts' orders of events.** 21

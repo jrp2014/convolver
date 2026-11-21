@@ -168,8 +168,13 @@ first published preview, keep their original grouping.
   no entry for the rate the host last ran at is refused naming it, with
   the same step added to the advice while the host is not playing. While the
   host plays, a file that does not suit it is still refused and the working
-  filter keeps playing. VST3 and the Audio Unit; not yet checked in
-  Audacity ([when a chosen file is checked](docs/use/plugins.md#loading-a-filter)).
+  filter keeps playing. VST3 and the Audio Unit
+  ([when a chosen file is checked](docs/use/plugins.md#loading-a-filter));
+  checked in Audacity 4.0.2 on macOS with the 0.16.14 candidate (jrp, 21
+  November 2026, [record](docs/archive/reviews/2026-11-21-vst3-17-audacity-pass.md)):
+  Status said it was waiting, both exports had the filter, and a list
+  chosen after one playback took its 48 kHz entry. The Audio Unit's part
+  is checked only by automated tests.
 - Documentation (DOC-18, from an outside audit of 20 November 2026): the
   user guides no longer contradict the plug-ins. **Choose…** opens a
   Convolver `.vstpreset` (the first-sound guide said it read no presets);
