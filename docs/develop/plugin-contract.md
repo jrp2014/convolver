@@ -415,7 +415,16 @@ format.
   entry chosen for a wider bus "is used" rather than "plays". The start
   line's Settings part still names what the Gain mode would play. Before the
   host's configuration is known it cannot tell whether a dry signal will
-  play, so it says "no filter plays". The Audio Unit
+  play, so it says "no filter plays". DIAG-10 adds what the window's report
+  says about the settings, in short, after the line's own words: a Latency
+  chosen but not in use yet ("Latency 1024 frames not in use yet.", from
+  the latency the processor plays at, except after a load failure or a
+  fault, which say more), and, with a filter, Estimate chosen without an
+  estimate ("No estimate: No clipping's gain plays." or "Too loud to
+  estimate: …") or no gain figure at all ("Silent: no gain figure for this
+  filter."); the 127-character limit cuts what does not fit
+  (`native.host_settings` `status_names_settings`). The Status value does
+  not change for these. The Audio Unit
   recomputes the line each time a host reads it, as Gain and Mix may have
   changed. The parameter is not automatable and is not part of the host
   state. VST3: parameter ID 1001 (Bypass is 1000), a list parameter with `kIsReadOnly`; the

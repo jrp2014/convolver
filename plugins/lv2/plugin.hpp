@@ -122,6 +122,9 @@ enum class WorkerPoint : int {
     // LV2-7: a processor with a new Latency is built; offering it to run()
     // is next.
     latency_built = 5,
+    // DIAG-10: the filter's estimate for a newly chosen Estimate is about to
+    // be found (the log already says so).
+    estimating = 6,
 };
 struct TestWorkerAccess {
     // Sets or (with null) clears the pause hook, under the control lock.

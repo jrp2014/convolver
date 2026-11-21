@@ -521,6 +521,8 @@ void record_activation_failure(Instance& p, const std::exception* error) noexcep
     }
 }
 
+void pause_at(const Instance& p, WorkerPoint point);
+
 // PLUG-10, under the control lock: applies the newest Gain mode. Estimate
 // finds the filter's figure if it has none (HostFilter::estimate, which
 // filters noise for a long filter) and, while active, gives it to the playing
@@ -532,6 +534,17 @@ void apply_gain_mode(Instance& p) noexcept {
     const bool changed = p.gain_mode_settled.exchange(mode, std::memory_order_relaxed) != mode;
     if (!changed && p.filter.estimating() == estimate)
         return;
+    // DIAG-10 (jrp, 21 November 2026): the status port stays at Active while
+    // the estimate is found, as the filter plays on; the log says what is
+    // happening, as the other formats' Status text does.
+    if (estimate && p.filter.filter() && !p.filter.gains().estimate_db) {
+        try { // Best effort: out of memory for the line changes nothing else.
+            p.log_note("Finding the filter's estimate for Estimate; the filter plays at No "
+                       "clipping's gain until it is found.");
+        } catch (...) {
+        }
+        pause_at(p, WorkerPoint::estimating);
+    }
     std::string why;
     try {
         p.filter.estimate(estimate, [&](const FilterGains& gains) {
@@ -758,6 +771,13 @@ void apply_latency(Instance& p) noexcept {
     if (before == frames)
         return;
     p.log_faults(); // Before the processor that counted them goes.
+    // DIAG-10 (jrp, 21 November 2026): the status port stays at Active while
+    // the new processor is built, as the old one plays on; the log says so.
+    try { // Best effort: out of memory for the line changes nothing else.
+        p.log_note("Latency " + std::to_string(frames) + " frames chosen; the plug-in keeps " +
+                   std::to_string(before) + " frames while a processor for it is built.");
+    } catch (...) {
+    }
     std::string why;
     bool changed = false;
     try {

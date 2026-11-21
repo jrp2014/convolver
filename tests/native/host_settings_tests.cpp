@@ -1020,6 +1020,87 @@ void filter_estimates() {
     require(!none.estimate_db && none.estimate_failed && !none.no_clipping_db,
             "an overflowing filter has no figures");
 }
+// DIAG-10: Status says what the window's report says about the settings, in
+// short: a Latency chosen but not in use yet, Estimate with no estimate (so
+// No clipping's gain plays) and a filter with no gain figure (silence).
+void status_names_settings() {
+    const auto contains = [](const std::string& text, const std::string& part) {
+        return text.find(part) != std::string::npos;
+    };
+    const HostLayout layout{48000, 1, 1};
+    HostFilter filter;
+    filter.load(HostState{Configuration{48000, 1, 1, 0, {}, {}, {{{.5f}, {{0, 1}}, {{0, 1}}}}}},
+                layout);
+    HostSettings chosen;
+    chosen.latency = 256;
+    auto line = host_status(filter, layout, true, chosen, false, false, 256);
+    require(line.status == HostStatus::active && !contains(line.text, "Latency"),
+            "Latency in use: " + line.text);
+    line = host_status(filter, layout, true, chosen, false, false, 0);
+    require(line.status == HostStatus::active &&
+                contains(line.text, " Latency 256 frames not in use yet."),
+            "Latency waiting: " + line.text);
+    require(!contains(host_status(filter, layout, true, chosen).text, "Latency"),
+            "no latency in use given");
+    // Bypassed and an empty instance say it too; the latency plays there as well.
+    require(contains(host_status(filter, layout, true, chosen, true, false, 0).text,
+                     "Latency 256 frames not in use yet."),
+            "bypassed: Latency waiting");
+    HostFilter empty;
+    require(contains(host_status(empty, layout, true, chosen, false, false, 0).text,
+                     "Latency 256 frames not in use yet."),
+            "no filter: Latency waiting");
+    // A failure says more than this, and keeps its pointer to the log.
+    HostFilter refused;
+    try {
+        refused.load(HostState{Configuration{44100, 1, 1, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}}},
+                     layout);
+    } catch (const std::invalid_argument&) {
+    }
+    line = host_status(refused, layout, true, chosen, false, false, 0);
+    require(line.status == HostStatus::load_failed && !contains(line.text, "Latency"),
+            "load failed: " + line.text);
+
+    // Estimate chosen, and the filter's estimate not found (a failed
+    // update): No clipping's gain plays, and Status says so.
+    HostSettings estimate;
+    estimate.gain_mode = GainMode::estimate;
+    try {
+        filter.estimate(true, [](const FilterGains&) { throw std::bad_alloc(); });
+    } catch (const std::bad_alloc&) {
+    }
+    line = host_status(filter, layout, true, estimate);
+    require(contains(line.text, " No estimate: No clipping's gain plays."),
+            "estimate missing: " + line.text);
+    require(filter.estimate(true) &&
+                !contains(host_status(filter, layout, true, estimate).text, "estimate"),
+            "estimate found: " + host_status(filter, layout, true, estimate).text);
+    require(!contains(host_status(filter, layout, true, HostSettings{}).text, "estimate"),
+            "Set mode says nothing about the estimate");
+
+    // Too loud to estimate, with a bound: No clipping's gain plays.
+    Configuration loud{48000, 1, 1, 0, {}, {}, {{{3e38f}, {{0, 1}}, {{0, 1}}}}};
+    const auto loud_gains = filter_gains(loud);
+    require(!loud_gains.estimate_db && loud_gains.estimate_failed && loud_gains.no_clipping_db,
+            "the loud filter should fail its estimate and keep its bound");
+    HostFilter too_loud;
+    too_loud.estimate(true);
+    too_loud.load(HostState{loud}, layout);
+    line = host_status(too_loud, layout, true, estimate);
+    require(contains(line.text, " Too loud to estimate: No clipping's gain plays."),
+            "too loud: " + line.text);
+    // No figure at all: silence, whichever mode needs one.
+    Configuration huge{48000, 1, 1, 0, {}, {}, {}};
+    for (int i = 0; i < 2; ++i)
+        huge.paths.push_back({{3e38f}, {{0, 1}}, {{0, 1}}});
+    HostFilter no_figure;
+    no_figure.load(HostState{huge}, layout);
+    HostSettings no_clipping;
+    no_clipping.gain_mode = GainMode::no_clipping;
+    line = host_status(no_figure, layout, true, no_clipping);
+    require(contains(line.text, " Silent: no gain figure for this filter."),
+            "no figure: " + line.text);
+}
 } // namespace
 
 int main() {
@@ -1038,6 +1119,7 @@ int main() {
             {"no_filter_names_choosing", no_filter_names_choosing},
             {"gain_modes", gain_modes},
             {"filter_estimates", filter_estimates},
+            {"status_names_settings", status_names_settings},
             {"estimate_keeps_history", estimate_keeps_history},
             {"restore_keeps_history_with_estimate", restore_keeps_history_with_estimate},
         },

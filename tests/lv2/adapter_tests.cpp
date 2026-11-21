@@ -2203,6 +2203,53 @@ void settings_ports(host::World& world, const fs::path& work) {
     }
 }
 
+// DIAG-10 (jrp, 21 November 2026): the status port keeps its five values.
+// With a filter playing, a Latency being applied and an estimate being found
+// leave it at Active, as the filter plays on, and the host's log says what
+// is happening. The worker pauses in each, after logging.
+void pending_settings_stay_active(host::World& world, const fs::path& work) {
+    const auto files = worker_files(work);
+    auto p = worker_instance(world, host::Worker::threaded);
+    p->activate();
+    p->set_filter(files.original.string());
+    settle(*p);
+    check(p->status == as_float(lv2::Status::running), "pending: the filter plays");
+
+    p->pause_at(lv2::WorkerPoint::latency_built);
+    p->latency_frames = 256;
+    p->run_empty();
+    p->wait_until_paused();
+    const auto latency_out = play_constant(*p, 1024);
+    check(p->status == as_float(lv2::Status::running) && p->latency == 0 &&
+              close_to(latency_out.back(), .5),
+          "pending: Active, at 0 frames, while a new Latency is applied");
+    check(p->log.contains(LV2_LOG__Note,
+                          "Latency 256 frames chosen; the plug-in keeps 0 frames while a "
+                          "processor for it is built."),
+          "pending: the log says the Latency is being applied");
+    p->resume();
+    settle(*p);
+    check(p->status == as_float(lv2::Status::running) && p->latency == 256,
+          "pending: Active at 256 frames once it plays");
+
+    p->pause_at(lv2::WorkerPoint::estimating);
+    p->gain_mode = 1;
+    p->run_empty();
+    p->wait_until_paused();
+    const auto estimate_out = play_constant(*p, 1024);
+    check(p->status == as_float(lv2::Status::running) && close_to(estimate_out.back(), 1),
+          "pending: Active, at No clipping's gain, while the estimate is found");
+    check(p->log.contains(LV2_LOG__Note,
+                          "Finding the filter's estimate for Estimate; the filter plays at No "
+                          "clipping's gain until it is found."),
+          "pending: the log says the estimate is being found");
+    p->resume();
+    settle(*p);
+    check(p->status == as_float(lv2::Status::running) &&
+              p->log.contains(LV2_LOG__Note, "Gain mode set to Estimate"),
+          "pending: Active once Estimate plays its figure");
+}
+
 int main(int argc, char** argv) {
     if (argc != 5) {
         std::cerr << "usage: " << argv[0]
@@ -2225,6 +2272,7 @@ int main(int argc, char** argv) {
         worker_loads(world, work);
         rechosen_files(world, work);
         settings_ports(world, work);
+        pending_settings_stay_active(world, work);
         oversized_files(world, work);
         path_state(world, work);
         refused_first_loads(world, work);

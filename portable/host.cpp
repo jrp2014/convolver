@@ -1110,7 +1110,7 @@ HostStatus host_status_value(const HostFilter& filter, bool host_known, bool byp
 
 HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLayout>& known,
                            bool log_written, const HostSettings& settings, bool bypassed,
-                           bool chooses_files) {
+                           bool chooses_files, std::optional<std::size_t> latency_in_use) {
     // PLUG-27: a chosen filter awaiting validation is not judged against a
     // start that may have been at a placeholder rate.
     const auto host = filter.waiting() ? std::optional<HostLayout>() : known;
@@ -1203,6 +1203,13 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
                                      : " Speaker labels differ.";
         if (dry_known && clamp_mix(settings.mix) == 0)
             line.text += " Mix 0%: only the dry signal plays.";
+        // DIAG-10: what the window's Gain mode note says, in short.
+        if (!applied_gain_db(settings, filter.gains()))
+            line.text += " Silent: no gain figure for this filter.";
+        else if (settings.gain_mode == GainMode::estimate && !filter.gains().estimate_db)
+            line.text += filter.gains().estimate_failed
+                             ? " Too loud to estimate: No clipping's gain plays."
+                             : " No estimate: No clipping's gain plays.";
         break;
     }
     case HostStatus::no_filter: {
@@ -1221,6 +1228,11 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
         break;
     }
     }
+    // DIAG-10: a Latency chosen but not in use yet, after anything that needs
+    // attention (a failure or a fault says more than this).
+    if (latency_in_use && *latency_in_use != settings.latency &&
+        line.status != HostStatus::load_failed && line.status != HostStatus::fault)
+        line.text += " Latency " + std::to_string(settings.latency) + " frames not in use yet.";
     if (line.text.size() > max_status_text)
         line.text.resize(max_status_text);
     return line;
