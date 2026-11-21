@@ -502,6 +502,9 @@ move to the archive.
 - [x] **CI-48 — No GCC 12 warnings from our sources in the Linux package.** 21
   November 2026, PR #244
   ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
+- [x] **CI-47 — Every plug-in target builds with the same warnings.** 21
+  November 2026, PR #243
+  ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
 - [x] **CI-46 — The VST3 plug-in builds with the others' warnings.** 20
   November 2026, PR #235
   ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
