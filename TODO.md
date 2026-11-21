@@ -54,7 +54,7 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 ### In progress
 
 PLUG-39's step 5, after step 4a (PR #236); HOST-11's Status reading during playback
-(PR #NNN), after the first version passed in jrp's run of 21 November 2026. Check the open pull requests for an ID
+(PR #251), after the first version passed in jrp's run of 21 November 2026. Check the open pull requests for an ID
 before starting anything.
 
 ### Ready
