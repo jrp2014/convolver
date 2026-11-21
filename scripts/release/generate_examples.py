@@ -48,7 +48,7 @@ def generate(output, converter):
                         old.unlink()  # Only this generator's own output directory.
                 subprocess.run([str(converter), str(folder / 'impulse.wav'), str(preset)], check=True)
                 examples.append(
-                    {'name': name, 'rate': rate, 'channels': channels, 'kind': kind, 'taps': taps, 'latency': 256}
+                    {'name': name, 'rate': rate, 'channels': channels, 'kind': kind, 'taps': taps, 'latency': 0}
                 )
     (output / 'examples.json').write_text(json.dumps(examples, indent=2) + '\n', encoding='utf-8')
 

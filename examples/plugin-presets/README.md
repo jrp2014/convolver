@@ -15,7 +15,7 @@ Repeat is 0.5 at sample 0 and 0.25 a quarter of a second later (sample 11025,
 Stereo applies the same response independently to each channel; no crossfeed.
 
 Expected output is the convolution of input with those taps, delayed by the
-plug-in's reported 256 samples. `examples.json` records the exact coefficients.
+plug-in's reported latency, which is 0 samples at the default Latency. `examples.json` records the exact coefficients.
 Each directory contains `impulse.wav`, a relative-path `filter.cfg`, and a
 self-contained preset named after the directory, such as
 `repeat-48000-stereo.vstpreset`, so hosts that list presets by file name
