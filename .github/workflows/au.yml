@@ -167,6 +167,14 @@ jobs:
       # with Latency chosen while running, and after a ClassInfo round trip.
       - name: AVAudioEngine renders the first-use examples in the hosts' orders
         run: python tests/au/avaudioengine_tests.py build-au/convolver-preset
+      # COMPAT-1: the ClassInfo each published preview's Audio Unit saved
+      # (tests/upgrade/*/au.json), restored in this build's installed unit
+      # through AVAudioEngine; the same latency, and the expected audio
+      # within upgrade.cli's bound.
+      - name: Restores the published previews' Audio Unit state
+        run: |
+          xcrun swiftc -O -o "$RUNNER_TEMP/avaudioengine_render" tests/au/avaudioengine_render.swift
+          python tests/upgrade/run_upgrade.py --au-render "$RUNNER_TEMP/avaudioengine_render"
       # AU-3: pluginval, a JUCE host, on the installed component, with its
       # editor tests opening the window. The formal check uses the newest
       # full release (CI-6).

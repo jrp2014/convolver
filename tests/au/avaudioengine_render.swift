@@ -20,6 +20,11 @@
 //                  the engine runs, as a user does while a project plays
 //   --round-trip   configure one unit, read its ClassInfo as a host saves a
 //                  project, and render with a second unit restored from it
+//   --parameter ID=VALUE  set the unit's parameter ID to VALUE after the
+//                  preset is restored, as a user does in the host's controls
+//                  (the first unit's, with --round-trip); repeatable
+//   --save PATH    with --round-trip, write the first unit's ClassInfo to
+//                  PATH as an XML property list (COMPAT-1's Audio Unit capture)
 // With --start-first or --latency, silence is rendered until the change has
 // been applied (the Status parameter reads Active and the latency the unit
 // reports is the one chosen), then for the latency and 50 ms more, while
@@ -46,6 +51,8 @@ let arguments = CommandLine.arguments
 var startFirst = false
 var roundTrip = false
 var chosenLatency: Int?
+var parameters = [(AudioUnitParameterID, AudioUnitParameterValue)]()
+var savePath: String?
 var positional = [String]()
 var index = 1
 while index < arguments.count {
@@ -58,13 +65,33 @@ while index < arguments.count {
             fail("--latency needs a number of frames")
         }
         chosenLatency = frames
+    case "--parameter":
+        index += 1
+        let parts = index < arguments.count ? arguments[index].split(separator: "=").map(String.init) : []
+        guard parts.count == 2, let id = AudioUnitParameterID(parts[0]), let value = AudioUnitParameterValue(parts[1])
+        else {
+            fail("--parameter needs ID=VALUE")
+        }
+        parameters.append((id, value))
+    case "--save":
+        index += 1
+        guard index < arguments.count else {
+            fail("--save needs a path")
+        }
+        savePath = arguments[index]
     default: positional.append(arguments[index])
     }
     index += 1
 }
 guard positional.count == 9 else {
     fail("usage: avaudioengine_render CODES PRESET INPUT OUTPUT RATE INPUTS OUTPUTS BLOCK FRAMES"
-        + " [--start-first] [--latency N] [--round-trip]")
+        + " [--start-first] [--latency N] [--round-trip] [--parameter ID=VALUE] [--save PATH]")
+}
+guard savePath == nil || roundTrip else {
+    fail("--save needs --round-trip")
+}
+guard parameters.isEmpty || !startFirst else {
+    fail("--parameter does not combine with --start-first")
 }
 let codes = positional[0].split(separator: ",").map(String.init)
 guard codes.count == 3, codes.allSatisfy({ $0.utf8.count == 4 }) else {
@@ -143,6 +170,15 @@ func setLatency(_ unit: AudioUnit, _ latency: Int) {
     }
 }
 
+func setParameters(_ unit: AudioUnit) {
+    for (id, value) in parameters {
+        let status = AudioUnitSetParameter(unit, id, kAudioUnitScope_Global, 0, value, 0)
+        guard status == noErr else {
+            fail("the unit refused parameter \(id) = \(value) (OSStatus \(status))")
+        }
+    }
+}
+
 func parameter(_ unit: AudioUnit, _ id: AudioUnitParameterID) -> AudioUnitParameterValue {
     var value: AudioUnitParameterValue = -1
     let status = AudioUnitGetParameter(unit, id, kAudioUnitScope_Global, 0, &value)
@@ -169,6 +205,7 @@ let effect = AVAudioUnitEffect(audioComponentDescription: description)
 if roundTrip {
     let saved = AVAudioUnitEffect(audioComponentDescription: description)
     restore(saved.audioUnit, preset, "the preset")
+    setParameters(saved.audioUnit)
     if let latency = chosenLatency {
         setLatency(saved.audioUnit, latency)
     }
@@ -179,11 +216,19 @@ if roundTrip {
     guard status == noErr, let classInfo = state?.takeRetainedValue() else {
         fail("cannot read the first unit's ClassInfo (OSStatus \(status))")
     }
+    if let path = savePath {
+        guard let data = try? PropertyListSerialization.data(fromPropertyList: classInfo, format: .xml, options: 0),
+              FileManager.default.createFile(atPath: path, contents: data)
+        else {
+            fail("cannot write the ClassInfo to \(path)")
+        }
+    }
     restore(effect.audioUnit, classInfo, "the first unit's ClassInfo")
     print("restored a second unit from the first one's ClassInfo")
 } else if !startFirst {
     // The preset, before the engine starts the unit, as a host restores a project.
     restore(effect.audioUnit, preset, "the preset")
+    setParameters(effect.audioUnit)
 }
 
 // The host's property listener, as GarageBand and Logic register one for
