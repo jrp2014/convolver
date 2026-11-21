@@ -148,8 +148,10 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     if (!attributes || attributes->getBinary("report", data, size) != kResultOk || (size && !data))
         return kInvalidArgument;
     // VST3-15: the answer to a request, when the message follows one.
-    int64 load_request = 0, load_accepted = 0, latency_request = 0;
+    int64 load_request = 0, load_retried = 0, load_accepted = 0, latency_request = 0;
     attributes->getInt("load request", load_request);
+    attributes->getInt("retried", load_retried); // PLUG-40 (StatusAnswer).
+    const bool loaded = load_request || load_retried;
     attributes->getInt("accepted", load_accepted);
     attributes->getInt("latency request", latency_request);
     // PLUG-26: the settings an accepted .vstpreset applied, which the
@@ -157,7 +159,7 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     double preset_gain = 0, preset_mix = 0;
     int64 preset_latency = -1, preset_mode = 0;
     const bool preset_settings =
-        load_request && load_accepted && attributes->getFloat("gain", preset_gain) == kResultOk &&
+        loaded && load_accepted && attributes->getFloat("gain", preset_gain) == kResultOk &&
         attributes->getFloat("mix", preset_mix) == kResultOk &&
         attributes->getInt("latency frames", preset_latency) == kResultOk &&
         std::isfinite(preset_gain) && std::isfinite(preset_mix) &&
@@ -247,7 +249,7 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     // The component state now holds the file's filter: the host saves it
     // only if it knows the project changed. Edits reported for a preset's
     // settings tell a host without setDirty already.
-    if (load_request && load_accepted && setDirty(true) != kResultOk && !edited) {
+    if (loaded && load_accepted && setDirty(true) != kResultOk && !edited) {
         // VST3-17, a narrow fix: setDirty did not succeed, so the host may
         // not know the state changed. Audacity 4.0.2 offers no
         // IComponentHandler2 and, while the window stays open and playback

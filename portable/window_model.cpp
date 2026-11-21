@@ -117,10 +117,11 @@ WindowContent window_content(const HostReport* report, bool can_load) {
         for (const auto& file : r.filter_files)
             c.filter_files += file + "\n";
     }
-    if (can_load)
-        c.filter_note = c.filter_note.empty()
-                            ? "Or drop an IR file, .cfg or .vstpreset on this window."
-                            : c.filter_note + " Or drop a file on this window.";
+    // PLUG-40 (jrp's Audacity pass, 21 November 2026): after a refusal the
+    // message's Fix says what to do, which may be to play first; the drop
+    // hint is offered only when nothing was refused.
+    if (can_load && c.filter_note.empty())
+        c.filter_note = "Or drop an IR file, .cfg or .vstpreset on this window.";
     return c;
 }
 

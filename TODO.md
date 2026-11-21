@@ -71,7 +71,7 @@ an ID before starting anything.
 | Item | What remains | Waits for |
 | --- | --- | --- |
 | **REL-3** | The independent walkthrough of the published 0.14.0 files | A tester, whom jrp chooses |
-| **HOST-1**, **VST3-11**, **AU-4**, **AU-6**, **VST3-17**, **PERF-2**, **COMPAT-1** | [Checks left](docs/project/status.md#checks-left-before-publication) 1 to 5 and 8 to 10; COMPAT-1's REAPER project saved with 0.14.0 | jrp's Mac session on 0.14.0 |
+| **HOST-1**, **VST3-11**, **AU-4**, **AU-6**, **PERF-2**, **COMPAT-1** | [Checks left](docs/project/status.md#checks-left-before-publication) 1 to 5, 8 and 9; COMPAT-1's REAPER project saved with 0.14.0 | jrp's Mac session on 0.14.0 |
 | **PERF-2**, after its session | The CPU indication beside the Latency menu, and block sizes tuned on Apple silicon (first a largest block above 8,192 frames for filters over 30 s) | Check 9 and the [workload measurements](docs/develop/fft-measurements.md#supported-workloads) run on jrp's Mac |
 | **VST3-12**, **HOST-4** | The Windows window in hosts and a screen reader; Equalizer APO on a real device | A Windows tester or device |
 | **LV2-4** | Desktop LV2 hosts and PipeWire on a real sound card | A Linux tester |
@@ -127,8 +127,9 @@ Foundation items are parked by owner decision instead.
   at each preview, and for 0.13.12, which added LV2, the community posts and
   the LV2 list proposal those steps name. Recurs with each preview.
 - [ ] **HOST-1 — Named host matrix.** REAPER and Audacity on jrp's Mac
-  ([checks left](docs/project/status.md#checks-left-before-publication) 1 to 4
-  and 10) on the published 0.14.0 files, then Windows hosts. **Done when**
+  ([checks left](docs/project/status.md#checks-left-before-publication) 1 to
+  4) on the published 0.14.0 files, with REAPER step 11's check that a file
+  chosen in the window adds no undo entry (from VST3-17), then Windows hosts. **Done when**
   each check passes or jrp narrows it, recorded as
   [every report](docs/develop/host-testing.md#every-report) asks.
 - [ ] **HOST-2 — Additional formats.** CLAP, only on request: every CLAP
@@ -299,15 +300,6 @@ relevant to a convolver unless the product changes.
 - [ ] **VST3-11 — Editor window on macOS.** The window's steps in REAPER and
   Audacity, keyboard isolation and VoiceOver (checks 1 and 4). **Done
   when** they pass or jrp narrows them.
-- [ ] **VST3-17 — Audacity keeps a filter chosen in the window.** Fixed in
-  0.13.12 (PR #177) and checked only by `vst3.adapter`; jrp's run of
-  0.14.0 never reached it, as **Choose…** was refused first (PLUG-27,
-  [record](docs/archive/reviews/2026-11-20-vst3-17-audacity.md)).
-  **Remains:** jrp's Audacity check (check 10) on a build with PLUG-27's
-  fix, with a list chosen again after one playback, with whether undo brings back the previous
-  filter, a REAPER check that a chosen file adds no undo entry, and the
-  drafted upstream issue for jrp to post. **Done when** the Audacity check
-  passes and the guides drop "not yet checked in Audacity".
 - [ ] **VST3-12 — Editor window on Windows.** **Done when** a tester has
   used it in REAPER, another Windows host and a screen reader, and the
   release notes drop the limitation.
@@ -518,7 +510,8 @@ move to the archive.
 - [x] **PLUG-27 — Read a chosen filter before the host's audio settings
   are known.** 21 November 2026, PR #233: a chosen file waits ("Filter
   selected. Waiting for the host's audio settings.") until the host plays
-  ([plug-ins](docs/use/plugins.md#loading-a-filter)).
+  ([plug-ins](docs/use/plugins.md#loading-a-filter)); checked in Audacity
+  on 0.16.14 ([record](docs/archive/reviews/2026-11-21-vst3-17-audacity-pass.md)).
 - [x] **HOST-9 — Play the VST3 and a saved Latency in the Ardour test.** 21
   November 2026, PR #237 ([Ardour, headless](docs/develop/testing.md#ardour-headless)).
 - [x] **AU-18 — Render the Audio Unit in the hosts' orders of events.** 21
@@ -526,3 +519,18 @@ move to the archive.
 - [x] **PLUG-30 — One rule for state a busy lock makes a call skip.**
   21 November 2026, PR #236, with PLUG-39 step 4a
   ([calls that do not wait for the control lock](docs/develop/plugin-contract.md#calls-that-do-not-wait-for-the-control-lock)).
+- [x] **VST3-17 — Audacity keeps a filter chosen in the window.** 21
+  November 2026, PRs #177, #233 and #252: jrp's Audacity pass on 0.16.14
+  ([in Audacity](docs/use/first-sound-in-a-host.md#in-audacity),
+  [record](docs/archive/reviews/2026-11-21-vst3-17-audacity-pass.md));
+  the drafted upstream issue stays in the project files for jrp.
+- [x] **PLUG-40 — Keep a refused list's advice current.** 21 November
+  2026, PR #252: a list refused before the host's settings were known is
+  read again by itself once the window sees the host playing, and says the
+  settings are known meanwhile
+  ([plug-ins](docs/use/plugins.md#loading-a-filter)).
+- [x] **PLUG-41 — A chosen file waits for audio in this start.** 21
+  November 2026, PR #252, from jrp's review of the same day: VST3 no longer
+  refuses a file chosen after a restart from the earlier start's audio, and
+  an Audio Unit render of zero frames no longer counts as playing
+  ([contract](docs/develop/plugin-contract.md#loading-and-failure)).
