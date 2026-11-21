@@ -936,9 +936,12 @@ void chosen_before_rendering() {
     // to do.
     require(choose(unit, (folder / "rates.txt").string()) != noErr,
             "a list chosen before the host rendered");
-    auto f = unit.failure();
-    const std::string waits = f.message;
-    require(f.present && waits.find("no entry selected") != std::string::npos &&
+    // The kept room.cfg's silence at the 44.1 kHz start still comes first in
+    // the failure record; the window shows the refusal, as room.cfg awaits
+    // validation (HostFilter::shown_failure()).
+    r = report(unit);
+    const std::string waits = text(r[@"explanation"]);
+    require(waits.find("no entry selected") != std::string::npos &&
                 waits.find("Play audio once so Convolver can check the host's sample rate and "
                            "channel counts, then choose the configuration list again.") !=
                     std::string::npos,
@@ -963,7 +966,7 @@ void chosen_before_rendering() {
     render_block(unit, 2, 2);
     require(choose(unit, (folder / "slow.wav").string()) != noErr,
             "a 44.1 kHz file accepted while rendering");
-    f = unit.failure();
+    const auto f = unit.failure();
     require(f.present && !f.silent && rate_of(unit) == 48000,
             "a refused file replaced the playing filter: " + std::string(f.message));
     unit.uninitialize();
