@@ -29,6 +29,16 @@ first published preview, keep their original grouping.
 
 ### Changed
 
+- Library and tools (PLUG-39 step 5b): exceptions keep their message's
+  parts (problem, cause, fix, note) typed beside their text, and every catch
+  block reads the parts rather than parsing the "Cause: ", "Fix: " and
+  "Note: " lines back. The exception types and their `what()` text are
+  unchanged, so nothing a user reads changes. `HostFilter::fail_activation()`
+  is documented to take the reason as a phrase (the exception's problem),
+  which is what the adapters now pass. One log line differs, and only when
+  memory runs out twice: an activation failure whose message could not be
+  recorded now logs the same "memory ran out" message the window shows,
+  where it logged nothing.
 - Plug-ins (PLUG-39 step 5a): the window's report travels as one typed
   value. `encode_report()` and `decode_report()` in
   `portable/host_report.hpp` encode it once for the VST3 message between the

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include "convolver/advice.hpp"
+#include <exception>
+#include <memory>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 
@@ -8,13 +11,14 @@
 // convolver/advice.hpp; docs/archive/plans/2026-11-05-actionable-diagnostics.md):
 // the problem in one sentence, then its cause, the fix and, where an
 // environment, host or design limit is the reason, a note. DIAG-4: failure
-// records (HostFailure::message, HostFilter::notice()) keep the parts, and
-// only exceptions carry them as text (advice_text()), with each part after
-// the problem on its own line starting "Cause: ", "Fix: " or "Note: ". A part
-// can go on over more lines (an example .cfg, say); those lines start with
-// spaces. Text without labels is all problem, so older messages still read
-// as before. parse_advice() recovers the parts from an exception's text.
-// Internal to Convolver's tools and adapters.
+// records (HostFailure::message, HostFilter::notice()) keep the parts.
+// PLUG-39 step 5b: so do exceptions. An AdvisedError keeps its Advice typed
+// beside its what() text, which is advice_text(): each part after the
+// problem on its own line starting "Cause: ", "Fix: " or "Note: ", a part
+// going on over more lines (an example .cfg, say) on lines that start with
+// spaces. advice_of() reads the parts back without parsing the text; an
+// exception that is not advised (the standard library's, a decoder's) is
+// all problem. Internal to Convolver's tools and adapters.
 namespace convolver::detail {
 using convolver::Advice;
 
@@ -36,42 +40,42 @@ inline std::string advice_text(const Advice& a) {
     return text;
 }
 
-inline Advice parse_advice(std::string_view text) {
-    Advice a;
-    std::string* parts[] = {&a.problem, &a.cause, &a.fix, &a.note};
-    std::string* current = &a.problem;
-    bool first = true;
-    while (true) {
-        const auto end = text.find('\n');
-        const auto line = text.substr(0, end);
-        bool labelled = false;
-        if (!first)
-            for (std::size_t i = 0; i < 3; ++i)
-                if (line.starts_with(advice_labels[i])) {
-                    current = parts[i + 1];
-                    if (!current->empty())
-                        *current += ' ';
-                    *current += line.substr(advice_labels[i].size());
-                    labelled = true;
-                    break;
-                }
-        if (!labelled) {
-            if (!first)
-                *current += '\n';
-            *current += line;
-        }
-        first = false;
-        if (end == std::string_view::npos)
-            break;
-        text.remove_prefix(end + 1);
+// An exception's Advice, whatever its standard type. Shared, so copying the
+// exception cannot throw.
+class Advised {
+  public:
+    explicit Advised(Advice a) : advice_(std::make_shared<const Advice>(std::move(a))) {}
+    const Advice& advice() const noexcept {
+        return *advice_;
     }
-    return a;
-}
 
-// The problem alone: what another message quotes when it explains the
-// failure in its own words.
-inline std::string advice_problem(std::string_view text) {
-    return parse_advice(text).problem;
+  protected:
+    ~Advised() = default;
+    Advised(const Advised&) noexcept = default;
+    Advised& operator=(const Advised&) noexcept = default;
+    void advise(Advice a) {
+        advice_ = std::make_shared<const Advice>(std::move(a));
+    }
+
+  private:
+    std::shared_ptr<const Advice> advice_;
+};
+// A standard exception (std::runtime_error, std::invalid_argument, ...) or
+// one of Convolver's, whose what() is advice_text() of its Advice, so code
+// that catches the standard type reads the same text as before.
+template <class Error> class AdvisedError final : public Error, public Advised {
+  public:
+    explicit AdvisedError(Advice a) : Error(advice_text(a)), Advised(std::move(a)) {}
+};
+template <class Error = std::runtime_error> [[noreturn]] void throw_advice(Advice a) {
+    throw AdvisedError<Error>(std::move(a));
+}
+// The parts of a caught exception: as thrown when it was advised, otherwise
+// its text as the problem.
+inline Advice advice_of(const std::exception& e) {
+    if (const auto* advised = dynamic_cast<const Advised*>(&e))
+        return advised->advice();
+    return Advice{e.what()};
 }
 
 // Whether a sentence or phrase already ends as a sentence does.
@@ -111,10 +115,6 @@ inline std::string advice_line(const Advice& a) {
         join(*parts[i]);
     }
     return line;
-}
-// The same for text that may hold labelled lines (an exception's message).
-inline std::string advice_line(std::string_view text) {
-    return advice_line(parse_advice(text));
 }
 
 // A problem phrase as a sentence of its own, for the plug-in window and the

@@ -190,9 +190,9 @@ class AudioUnitDriver final : public lc::Driver {
         f.kind = static_cast<HostFailureKind>(t.kind);
         f.request.number = t.request;
         f.silent = t.silent != 0;
-        // The property carries the message as text: empty while memory ran
+        // The property carries the message's parts: empty while memory ran
         // out for it (ROBUST-7).
-        f.message = convolver::detail::parse_advice(t.message);
+        f.message = {t.problem, t.cause, t.fix, t.note};
         return f;
     }
     std::size_t max_block() const override {

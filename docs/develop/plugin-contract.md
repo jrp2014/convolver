@@ -306,9 +306,12 @@ is shown is in [status and log](#status-and-log) (DIAG-1):
   failed, why, and what to change. It is kept in its parts (`Advice` in
   [`advice.hpp`](../../include/convolver/advice.hpp): problem, cause, fix,
   note), and each surface formats it where it leaves the library: the log's
-  one line, the window's rows, the text `HostFilter::error()` gives an
-  adapter (DIAG-4). Only exceptions carry it as text, one labelled line per
-  part, which the adapters' and tools' catch blocks read back.
+  one line, the window's rows, the text `HostFilter::error()` gives a report
+  or a test (DIAG-4). Exceptions keep the parts too (PLUG-39 step 5b:
+  `detail::AdvisedError`, read with `detail::advice_of()` in
+  [`portable/advice.hpp`](../../portable/advice.hpp)), with `what()` the
+  same parts as text, one labelled line per part; nothing parses that text
+  back.
 
 The reason lives on the control side (in `HostFilter` or beside it) and never
 on the audio thread: the audio callback only plays what it was given. Every
@@ -445,8 +448,9 @@ format.
   filter and the audio comes from here, so the VST3 windows (VST3-11 to
   VST3-13) show the same; the control labels, hints and tooltips are the
   view's own. Messages passed to `HostFilter::reject()` and the other
-  failure records use the same parts (the problem, then labelled lines);
-  `host_log()` and the LV2 log join them into one line.
+  failure records use the same parts; the adapters log them on one line
+  (`advice_line()`), so `host_log()` and the LV2 log only join any other
+  lines with " / ".
   `encode_report()` gives the whole report as bytes for a format's
   transport, which `decode_report()` reads back whole or not at all
   (PLUG-39 step 5: one codec, so no window parses text lines back),

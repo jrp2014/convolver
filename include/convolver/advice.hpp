@@ -11,9 +11,9 @@ namespace convolver {
 // design limit is the reason, a note. A part may go on over more lines (an
 // example .cfg, say), whose continuation lines start with spaces.
 // DIAG-4: failure records carry these parts as they are; each tool, log or
-// window formats them where the message leaves the library. Exceptions carry
-// the same parts as text, one labelled line each ("Cause: ", "Fix: ",
-// "Note: ") after the problem.
+// window formats them where the message leaves the library. Exceptions
+// keep them too, with what() the same parts as text, one labelled line each
+// ("Cause: ", "Fix: ", "Note: ") after the problem.
 struct Advice {
     // The empty initializers let `Advice{"problem"}` name only the problem
     // without a missing-field warning.

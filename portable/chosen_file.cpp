@@ -39,20 +39,20 @@ read_chosen_file(const std::string& path, const std::optional<HostLayout>& host,
         state = presets::read_vst3_preset_file(file).state;
     } catch (const NewerHostState& e) {
         failure.kind = HostFailureKind::state_newer;
-        failure.message = detail::parse_advice(e.what());
+        failure.message = detail::advice_of(e);
         failure.message.problem = path + ": " + failure.message.problem;
         return std::nullopt;
     } catch (const std::invalid_argument& e) {
         // Another plug-in's preset, or a damaged one.
         failure.kind = HostFailureKind::state_unreadable;
-        failure.message = {path + ": " + detail::advice_problem(e.what()),
+        failure.message = {path + ": " + detail::advice_of(e).problem,
                            "Only a .vstpreset that holds a Convolver filter can be loaded here.",
                            use_instead,
                            {}};
         return std::nullopt;
     } catch (const std::exception& e) { // Cannot be opened, too large, or out of memory.
         failure.kind = HostFailureKind::filter_file;
-        failure.message = detail::parse_advice(e.what());
+        failure.message = detail::advice_of(e);
         // Too large, or out of memory: name the file and say what to do.
         if (failure.message.fix.empty()) {
             if (failure.message.problem.find(path) == std::string::npos)

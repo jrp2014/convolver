@@ -12,10 +12,9 @@
 #include <sstream>
 
 namespace convolver::detail {
-ConfigurationError::ConfigurationError(std::string code, SourceLocation location,
-                                       std::string reason)
-    : std::runtime_error(reason), code_(std::move(code)), location_(std::move(location)),
-      reason_(std::move(reason)) {
+ConfigurationError::ConfigurationError(std::string code, SourceLocation location, Advice reason)
+    : std::runtime_error(reason.problem), Advised(reason), code_(std::move(code)),
+      location_(std::move(location)), reason_(std::move(reason)) {
     format();
 }
 const char* ConfigurationError::what() const noexcept {
@@ -26,24 +25,27 @@ void ConfigurationError::included_from(SourceLocation list) {
     format();
 }
 // DIAG-2: "FILE:LINE:COLUMN: problem; included from LIST:LINE", then the
-// reason's cause, fix and note lines (advice.hpp).
+// reason's cause, fix and note lines (advice.hpp). The lists follow the
+// problem's first line, before any line it goes on over.
 void ConfigurationError::format() {
-    message_.clear();
+    auto a = reason_;
+    std::string where;
     if (!location_.file.empty()) {
-        message_ += utf8_string(location_.file);
+        where += utf8_string(location_.file);
         if (location_.line) {
-            message_ += ':' + std::to_string(location_.line);
+            where += ':' + std::to_string(location_.line);
             if (location_.column)
-                message_ += ':' + std::to_string(location_.column);
+                where += ':' + std::to_string(location_.column);
         }
-        message_ += ": ";
+        where += ": ";
     }
-    const auto newline = reason_.find('\n');
-    message_ += reason_.substr(0, newline);
+    const auto newline = std::min(a.problem.find('\n'), a.problem.size());
+    std::string lists;
     for (auto it = chain_.rbegin(); it != chain_.rend(); ++it)
-        message_ += "; included from " + utf8_string(it->file) + ':' + std::to_string(it->line);
-    if (newline != std::string::npos)
-        message_ += reason_.substr(newline);
+        lists += "; included from " + utf8_string(it->file) + ':' + std::to_string(it->line);
+    a.problem = where + a.problem.substr(0, newline) + lists + a.problem.substr(newline);
+    message_ = advice_text(a);
+    advise(std::move(a));
 }
 
 namespace {
@@ -80,12 +82,9 @@ struct Parser {
     SourceLocation at(std::size_t line, std::size_t column = 0) const {
         return {source, line, column};
     }
-    [[noreturn]] void fail(std::size_t line, std::size_t column, const std::string& why,
+    [[noreturn]] void fail(std::size_t line, std::size_t column, Advice why,
                            const char* code = "syntax") const {
-        throw ConfigurationError(code, at(line, column), why);
-    }
-    [[noreturn]] void fail(std::size_t line, std::size_t column, const Advice& why) const {
-        fail(line, column, advice_text(why));
+        throw ConfigurationError(code, at(line, column), std::move(why));
     }
     // `what` names the number ("the sample rate"), `range` its allowed values
     // ("a whole number from 1 to 768000").

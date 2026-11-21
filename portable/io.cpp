@@ -162,7 +162,7 @@ void validate_raw_stdin(std::size_t frame_bytes) {
 #endif
     if (position < 0 || status.st_size < position ||
         static_cast<std::uint64_t>(status.st_size - position) % frame_bytes)
-        throw std::runtime_error(detail::raw_incomplete_frame);
+        throw detail::AdvisedError<std::runtime_error>(detail::raw_incomplete_frame());
 }
 SNDFILE* open(const std::filesystem::path& path, int mode, SF_INFO& info) {
     if (path == "-") {
@@ -240,7 +240,7 @@ SNDFILE* open_or_throw(const std::filesystem::path& path, int mode, SF_INFO& inf
                       library + ").";
             a.fix = "Export it again from the program that made it.";
         }
-        throw std::runtime_error(detail::advice_text(a));
+        throw detail::AdvisedError<std::runtime_error>(a);
     }
     return file;
 }
@@ -566,7 +566,7 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
             validate_raw_stdin(frame_bytes);
         if (path != "-" && std::filesystem::is_regular_file(path) &&
             std::filesystem::file_size(path) % frame_bytes)
-            throw std::runtime_error(detail::raw_incomplete_frame);
+            throw detail::AdvisedError<std::runtime_error>(detail::raw_incomplete_frame());
     } else
         (void)detail::validate_wave(path); // libsndfile reads an unsized WAV to its end.
 #ifdef _WIN32
@@ -591,8 +591,8 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
         if (!raw && path != "-" && std::filesystem::is_regular_file(path, regular_error) &&
             !available(Container::flac))
             if (const auto codec = compressed_codec(path))
-                throw std::runtime_error(detail::advice_text(
-                    {detail::advice_problem(e.what()),
+                throw detail::AdvisedError<std::runtime_error>(
+                    {detail::advice_of(e).problem,
                      std::string("This is ") + codec +
                          ", but this Convolver's libsndfile was built without FLAC and Ogg.",
                      std::string("Convert it to WAV first, for example with ") +
@@ -601,7 +601,7 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
                               : "oggdec, SoX or FFmpeg") +
                          ".",
                      "Or build Convolver against a libsndfile that has them: see 'FLAC and Ogg' "
-                     "in the command-line guide."}));
+                     "in the command-line guide."});
         throw;
     }
     if (raw) {
@@ -673,7 +673,7 @@ std::size_t AudioReader::read(std::span<float> data) {
         }
         const auto frame_bytes = static_cast<sf_count_t>(width * impl_->info.channels);
         if (bytes % frame_bytes)
-            throw std::runtime_error(detail::raw_incomplete_frame);
+            throw detail::AdvisedError<std::runtime_error>(detail::raw_incomplete_frame());
         for (std::size_t i = 0; i < static_cast<std::size_t>(bytes) / width; ++i)
             data[i] = detail::decode_raw(buffer + i * width, impl_->encoding);
         got = bytes / frame_bytes;
@@ -685,7 +685,7 @@ std::size_t AudioReader::read(std::span<float> data) {
     const auto channels = impl_->info.channels;
     for (std::size_t i = 0; i < static_cast<std::size_t>(got) * channels; ++i)
         if (!std::isfinite(data[i]))
-            throw std::runtime_error(detail::invalid_sample_message(
+            throw detail::AdvisedError<std::runtime_error>(detail::invalid_sample_message(
                 impl_->path, impl_->position + i / channels, i % channels + 1,
                 impl_->info.sample_rate,
                 impl_->raw ? std::optional(impl_->encoding) : std::nullopt));
@@ -778,12 +778,12 @@ AudioWriter::AudioWriter(const std::filesystem::path& path, AudioInfo info, Outp
     : impl_(std::make_unique<Impl>()) {
     validate(info);
     if (supported(encoding) && !available(encoding.container))
-        throw std::runtime_error(detail::advice_text(
+        throw detail::AdvisedError<std::runtime_error>(
             {"this build of Convolver cannot write FLAC",
              "Its libsndfile was built without FLAC support.",
              "Choose another container, such as wav or rf64, or use a build whose libsndfile "
              "includes FLAC.",
-             {}}));
+             {}});
     validate_speakers(metadata.channel_mask, info.channels, encoding.container);
     SF_INFO sf{};
     sf.samplerate = info.sample_rate;

@@ -203,7 +203,11 @@ cases.
 - `native.config_parse`: the private configuration parser on its own: physical
   line/column locations after BOM, comments, blank lines and CRLF, original
   tokens with effective signed-zero/fractional routes and truncated delays, list
-  detection and include-chain formatting.
+  detection and include-chain formatting. The shared message shape (DIAG-2)
+  and PLUG-39 step 5b's typed advice: an advised exception keeps its parts
+  under its standard type with the same text, one that is not advised is all
+  problem, and a configuration error's parts carry its location and the
+  lists that include it.
 - `native.cli`: subprocess file renders compared with independent expected
   output; empty, exact and partial last blocks, gain/matrix routing, both latency
   modes, real RAW pipelines, protection against overwriting inputs/IRs/configs,

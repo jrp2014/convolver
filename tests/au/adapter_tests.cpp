@@ -448,7 +448,7 @@ void rejected_presets() {
         const auto f = unit.failure();
         require(f.present && f.kind == static_cast<UInt32>(kind) &&
                     (!request || f.request == request) && (f.silent != 0) == silent &&
-                    f.message[0] != 0,
+                    f.problem[0] != 0,
                 std::string(what) + " not recorded as its failure");
     };
     const auto keep = encode_host_state(state_of(filter));
@@ -542,7 +542,7 @@ void rejected_presets() {
         const auto f = failed.failure();
         require(f.present && f.kind == static_cast<UInt32>(HostFailureKind::sample_rate) &&
                     f.request == 1 && f.silent && f.sample_rate == 44100 &&
-                    std::string(f.message).find("44100 Hz") != std::string::npos,
+                    std::string(f.problem).find("44100 Hz") != std::string::npos,
                 "a failed first load not recorded as a sample-rate failure");
     }
     const auto saved = failed.saved();
@@ -717,7 +717,7 @@ void failed_initialization() {
     const auto f = unit.failure();
     require(f.present && f.kind == static_cast<UInt32>(HostFailureKind::activation) && f.silent &&
                 f.request == 0 &&
-                std::string(f.message).find("could not be started") != std::string::npos,
+                std::string(f.problem).find("could not be started") != std::string::npos,
             "a failed initialization was not recorded as an activation failure");
 }
 
@@ -1560,10 +1560,9 @@ void chosen_preset() {
     const auto refused = [&](const std::string& path, const char* says, const std::string& what) {
         require(!choose(unit, path), what + " was accepted");
         const auto f = unit.failure();
-        const std::string message = f.message;
+        const std::string message = std::string(f.problem) + "\n" + f.cause;
         require(f.present && f.kind == static_cast<UInt32>(HostFailureKind::state_unreadable) &&
-                    message.find(says) != std::string::npos &&
-                    message.find("Fix: ") != std::string::npos,
+                    message.find(says) != std::string::npos && f.fix[0] != 0,
                 what + " not refused as it should be: " + message);
         require(encode_host_state(unit.saved()) == keep, what + " replaced the running filter");
         settings_kept(what);

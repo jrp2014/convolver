@@ -4,6 +4,7 @@
 #include "config_parse.hpp"
 #include <cmath>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 
 using namespace convolver::detail;
@@ -40,14 +41,19 @@ int main() {
                             "channel.\nFix: Use channel 0.\n    0\n    0\nNote: Letter case "
                             "counts.",
                     "advice text");
-            const auto parsed = parse_advice(text);
-            require(parsed.problem == advice.problem && parsed.cause == advice.cause &&
-                        parsed.fix == advice.fix && parsed.note == advice.note,
-                    "advice round trip");
-            require(advice_problem(text) == advice.problem, "advice problem");
-            require(advice_line(text) == "route channel out of range: 2. Cause: The header "
-                                         "declares 1 channel. Fix: Use channel 0. / 0 / 0 "
-                                         "Note: Letter case counts.",
+            // PLUG-39 step 5b: an exception keeps the parts as they were,
+            // under its standard type and with the same text.
+            try {
+                throw_advice<std::invalid_argument>(advice);
+            } catch (const std::invalid_argument& e) {
+                require(e.what() == text && advice_of(e) == advice, "advised exception");
+            }
+            require(advice_of(std::runtime_error("plain\nCause: not a label")) ==
+                        Advice{"plain\nCause: not a label"},
+                    "an exception that is not advised is all problem");
+            require(advice_line(advice) == "route channel out of range: 2. Cause: The header "
+                                           "declares 1 channel. Fix: Use channel 0. / 0 / 0 "
+                                           "Note: Letter case counts.",
                     "advice on one log line");
             require(cli_error("convolver", "a\nFix: b") == "convolver: error: a\n  Fix: b\n",
                     "command-line error shape");
@@ -101,6 +107,17 @@ int main() {
 
         located("// c\n\n48000 1 1 0\n0\n0\nir.wav\n0\n 1\n0\n", 8, 2,
                 "route channel after comment and blank lines");
+        {
+            // PLUG-39 step 5b: the error's parts carry its location and the
+            // lists that include it in the problem, as its text does.
+            auto e = rejected("// c\n\n48000 1 1 0\n0\n0\nir.wav\n0\n 1\n0\n");
+            e.included_from({"lists.txt", 3, 0});
+            const auto& a = e.advice();
+            require(a.problem.starts_with("t.cfg:8:2: ") &&
+                        a.problem.find("; included from lists.txt:3") != std::string::npos &&
+                        !a.cause.empty() && advice_text(a) == e.what() && advice_of(e) == a,
+                    "a configuration error's parts");
+        }
         located("\xef\xbb\xbf"
                 "48000 1 1 0\n0\n0\nir.wav\n0\n0\nnan\n",
                 7, 1, "malformed output route after BOM");

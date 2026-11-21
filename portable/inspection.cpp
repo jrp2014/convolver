@@ -331,8 +331,9 @@ class Inspector {
                 !report_.traversal.empty() && report_.traversal.front().outcome == "list";
             add({"no-match",
                  DiagnosticSeverity::error,
-                 detail::explain_no_match(report_.path, list, candidates_, selection(options_),
-                                          "the requested selection"),
+                 detail::advice_text(detail::explain_no_match(report_.path, list, candidates_,
+                                                              selection(options_),
+                                                              "the requested selection")),
                  {report_.path, 0, 0},
                  {}});
             report_.selection_reason = "no entry matches " + wanted;
@@ -350,12 +351,12 @@ class Inspector {
         const auto& path = report_.path;
         report_.selection_reason = "syntax-only check of one configuration file";
         std::unique_ptr<AudioReader> audio;
-        std::optional<std::string> refused; // DIAG-6, as Resolver::visit() reports it.
+        std::optional<Advice> refused; // DIAG-6, as Resolver::visit() reports it.
         try {
             audio = std::make_unique<AudioReader>(path);
         } catch (const std::runtime_error& e) { // Not a sound file: parse as text.
             if (detail::header_marker(path) == detail::HeaderMarker::container)
-                refused = e.what();
+                refused = detail::advice_of(e);
         }
         auto scope = [&](const char* what) {
             add({"syntax-only-scope",
@@ -397,10 +398,10 @@ class Inspector {
         if (!outcome.empty())
             add({"no-match",
                  DiagnosticSeverity::error,
-                 detail::explain_no_match(
+                 detail::advice_text(detail::explain_no_match(
                      path, false,
                      {{path, false, p.sample_rate, p.input_channels, p.output_channels}},
-                     selection(options_), "the requested selection"),
+                     selection(options_), "the requested selection")),
                  {path, p.header_line, 0},
                  {}});
         else

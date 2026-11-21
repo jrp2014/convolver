@@ -70,14 +70,14 @@ inline constexpr std::array<AudioUnitParameterID, 5> parameter_order{
 // For the tests only, never offered to hosts as a feature: a custom global
 // property (custom IDs start at 64000) giving the PLUG-8 failure record, which
 // a host sees only as an OSStatus and the system log. Not a stable interface;
-// it may change any time. The message is cut to fit.
+// it may change any time. The message's parts are each cut to fit.
 inline constexpr AudioUnitPropertyID test_failure_property = 64800;
 struct TestFailure {
     UInt32 present = 0, kind = 0, source = 0, silent = 0;
     UInt64 request = 0;
     SInt32 sample_rate = 0;
     UInt32 inputs = 0, outputs = 0;
-    char message[4096] = {};
+    char problem[2048] = {}, cause[4096] = {}, fix[2048] = {}, note[2048] = {};
 };
 
 // For the tests only: when set, a load (RestoreState or a chosen file) calls
@@ -244,7 +244,8 @@ class Effect final : public ausdk::AUBase {
     void fail_unrecorded() noexcept;
     // Records an initialization that could not build the processor (PLUG-8);
     // returns the message to log. Called under `control_`.
-    std::string activation_failed(const char* why) noexcept;
+    // `error` is null when something other than a std::exception was thrown.
+    std::string activation_failed(const std::exception* error) noexcept;
     void timing_changed();
     // AU-17: tells the host's property listeners about the unit's own
     // changes (the `notice_*` bits), on the main thread. AUBase keeps its
