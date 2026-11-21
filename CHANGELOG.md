@@ -96,8 +96,10 @@ Until 1.0 the C++ API may change between minor versions.
   has done since PLUG-36. VST3's log line for restored state kept until the
   host suits it says what plays meanwhile (silence, Mix's dry share or
   bypass) instead of always "plays silence", and the log says a list entry
-  chosen for a wider bus "is used" rather than "plays". The audio is
-  unchanged.
+  chosen for a wider bus "is used" rather than "plays". A fault counted
+  before the host stopped, with bypass off, reads "The filter is kept and
+  plays when the host starts again." instead of "The filter keeps
+  playing.", since no processor runs then. The audio is unchanged.
 - Plug-ins and Library (PLUG-39 step 4b): one rule in the library shows a
   filter's saved name only while that filter plays (`HostFilter::offer_name()`).
   VST3 offers the name from its controller state there instead of keeping

@@ -406,7 +406,8 @@ cases.
   with no filter; a stereo filter on a mono track; a wrong rate; a failed
   first load at Mix 50%; a refused replacement; playing; not checked yet; a
   fault; a fault and a refused replacement with bypass on, PLUG-39 step 4,
-  for equal and unequal channel counts and before the host starts),
+  for equal and unequal channel counts and before the host starts; a fault
+  once the host has stopped, with bypass off),
   checking the status, the explanation's wording and what it must
   not say, the fields and the plain text; the Audio facts in order with
   their values, notes and help (a refused rate and a mono track's channels

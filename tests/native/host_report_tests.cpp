@@ -371,6 +371,20 @@ void cases() {
          HostStatus::fault,
          {"Bypass is on: no filter is applied."},
          {"keeps playing", "plays unfiltered"}},
+        // A fault counted before the host stopped, with bypass off: no
+        // processor runs, so nothing keeps playing until the host starts.
+        {"fault, not started",
+         [&] {
+             HostFilter f(8);
+             f.load(HostState{filter(44100, 2)}, std::nullopt);
+             HostFaults totals;
+             totals.rejected_input = 3;
+             static_cast<void>(f.observe(totals));
+             return host_report(f, facts(std::nullopt));
+         },
+         HostStatus::fault,
+         {"The filter is kept and plays when the host starts again."},
+         {"keeps playing", "Bypass is on"}},
         {"refused replacement, bypassed",
          [&] {
              HostFilter f(8);
