@@ -62,7 +62,8 @@ CHANGES = (
     (
         "A filter that does not suit the host's sample rate or channels, as a preset, an IR file or a `.cfg`, is now "
         'refused only while another filter that suits the host is playing. With nothing playing it is kept and saved '
-        'with the project, plays silence with the reason in Status, and plays when the host next starts the plug-in '
+        "with the project, plays silence (or, where the channel counts are equal, Mix's dry share or bypass) with "
+        'the reason in Status, and plays when the host next starts the plug-in '
         'at a rate and channels that suit it. In Ardour 8.4, a filter chosen just before Ardour restarted the '
         'plug-in with the outputs set in Pin Connections used to be refused, and the export was silent. A filter '
         'refused while another plays stays refused, and restarting the host does not switch to it. A configuration '
@@ -75,10 +76,11 @@ CHANGES = (
         "the host's log says so."
     ),
     (
-        "In Audacity, Convolver's Choose… and Recent are now checked routes beside Audacity's own preset menu "
-        '(Audacity 4.0.2 on macOS, 21 November 2026): a filter chosen before playing reached the export, and the '
-        'next export after saving, quitting and reopening; a list chosen after one playback took its 48 kHz entry. '
-        'All four exports matched the reference within -137 dB.'
+        "In Audacity, Convolver's Choose… and Recent have been checked beside Audacity's own preset menu, on a "
+        'candidate build before this version (0.16.14, Audacity 4.0.2 on macOS, 21 November 2026): a filter chosen '
+        'before playing reached the export, and the next export after saving, quitting and reopening; a list chosen '
+        'after one playback took its 48 kHz entry. All four exports matched the reference within -137 dB. Later '
+        'changes to choosing a file, listed here, have not yet been checked in Audacity.'
     ),
     (
         "Once the host stops the plug-in, the tail it reports, and the Ring-out row in the window's details, are "
@@ -128,9 +130,10 @@ CHANGES = (
         'package with GCC 12 (still for glibc 2.35), and every plug-in builds without compiler warnings; output may '
         'differ from 0.14.0 within the tested tolerance. Automated host tests now play the VST3 and LV2 plug-ins in '
         'headless Ardour 9 sessions (mono, stereo, Strict-I/O, saved at Latency 256 and 1024), render the Audio '
-        "Unit in GarageBand's order of events, run part of the REAPER check from one command, and check that "
+        "Unit in GarageBand's order of events, and check that "
         'presets and saved state from the published 0.14.0 still load and render the same, within the tested '
-        'tolerance, in the command-line tool, VST3, LV2 and the Audio Unit.'
+        'tolerance, in the command-line tool, VST3, LV2 and the Audio Unit. A script, run by hand on a Mac, now '
+        'runs part of the REAPER check from one command.'
     ),
 )
 TAG = re.compile(r'v(\d+\.\d+\.\d+)')
@@ -264,7 +267,8 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'project following the guides. Not yet repeated on this version: in REAPER, a render, save and reopen, '
             'a refused preset while playing and the wrong host rate, the render, save and reopen from one command, '
             'and reopening a project saved with an earlier preview; in GarageBand, presets, bypass, settings, a '
-            'Latency change stopped and while playing, Recent and Reload. The Windows and Linux packages were '
+            'Latency change stopped and while playing, Recent and Reload; in Audacity, Choose… before playing, Recent, '
+            'and save and reopen. The Windows and Linux packages were '
             'checked only automatically, on CI machines that had never built Convolver: the tools and examples ran '
             "from them, the plug-in's library loaded and listed its classes, and the Windows installer installed "
             'and removed itself. Nobody has used them in a host yet. '
@@ -272,18 +276,17 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'Other hosts are untested.\n'
             "- In Audacity, a filter chosen with Convolver's Choose…, even before playing, is kept for exports and "
             'saved projects, and one chosen from Recent for exports (checked in Audacity 4.0.2 on macOS on 21 '
-            "November 2026, as is Audacity's own preset menu). Reload and reloading when the file changes are "
-            'checked only by automated tests.\n'
+            "November 2026 with the 0.16.14 candidate, as is Audacity's own preset menu; not yet repeated on this "
+            'version). Reload and reloading when the file changes are checked only by automated tests.\n'
             '- In Ardour, the VST3 plug-in on a Flexible-I/O track gets 2 inputs and 2 outputs whatever the track '
-            'has, so a mono filter plays silence until its outputs are set by hand in Pin Connections, and a '
-            "crossover cannot play; nor can a crossover on a Strict-I/O track, Ardour's default, in either format. "
+            'has, so a mono filter plays silence until its outputs are set by hand in Pin Connections (steps not yet '
+            "confirmed in Ardour's window), and a crossover cannot play; nor can a crossover on a Strict-I/O track, "
+            "Ardour's default, in either format. "
             'On Linux use the LV2 plug-in on a Flexible-I/O track for a crossover '
             f'([Ardour]({docs}/plugins.md#ardour)).\n'
-            '- Checked only by automated tests: new in 0.18, a configuration list loading by itself once the host '
-            'plays, a chosen file waiting for audio in the current start, a filter that does not suit the host '
-            'kept until it does, Status naming a setting not in use, the tail reported after a stop, choosing '
-            "the playing file again in LV2, and the Audio Unit's part of keeping a filter chosen before the host "
-            'plays; new in 0.14, the quicker restore of the playing filter and the saving once the sound '
+            '- Checked only by automated tests: new in 0.18, everything under What changed except the Audacity '
+            'routes checked on the 0.16.14 candidate; new in 0.14, the quicker restore of the playing filter and '
+            'the saving once the sound '
             'has stopped; new in 0.13.20, the Gain mode, a `.vstpreset` chosen in the window, Choose… on a track '
             "with more inputs than the filter's, and a preset or undo that keeps the playing filter.\n"
             '- Since 0.13, Latency starts at 0 frames. Some projects saved with 0.12.12 at its default of 256 frames '

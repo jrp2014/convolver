@@ -124,7 +124,7 @@ published preview. The steps are those of the
 | 7 | The independent walkthrough of 0.14.0 (REL-3) | [Above](#next-milestone-an-independent-user-runs-a-preview) | The tester | Not started |
 | 8 | GarageBand with the window open: Latency changed stopped and while playing, then save and reopen (AU-17 changed how the unit reports latency) | GarageBand steps 4 to 6 | 5 min | Not run |
 | 9 | PERF-2's session: a long filter at Latency 0 by ear in REAPER and GarageBand, Latency changes and replacement while playing, projects from 0.12.12 reopening at the Latency the [plug-in guide](../use/plugins.md#settings) gives, and a saved Latency of 1024 reopening in time | PERF-2 in [TODO](../../TODO.md) | 30 min | Not run |
-| 10 | Audacity, VST3-17's fix: choose `filter.cfg` with **Choose…**, export without playing, compare with the CLI; save, reopen and export again; a list chosen again after one playback | [Audacity](../develop/host-testing.md#audacity-vst3) step 11 | 10 min | **Passed** on 0.16.14, 21 November 2026, in Audacity 4.0.2 on macOS ([record](../archive/reviews/2026-11-21-vst3-17-audacity-pass.md)): `filter.cfg` chosen before playback reached the export with the window open and, after save, quit and reopen, the next export; **Recent** worked; the list took its 48 kHz entry after one playback. All four exports matched `expected.wav`, the direct-convolution reference, within 7.45e-8 (−137 dB). It ran on the candidate, not the published 0.14.0, because 0.14.0 lacks PLUG-27's fix; under the rule above it runs again on the next published preview if later fixes change the chosen-file path. Failed on 0.14.0 before PLUG-27's fix ([record](../archive/reviews/2026-11-20-vst3-17-audacity.md)) |
+| 10 | Audacity, VST3-17's fix: choose `filter.cfg` with **Choose…**, export without playing, compare with the CLI; save, reopen and export again; a list chosen again after one playback | [Audacity](../develop/host-testing.md#audacity-vst3) step 11 | 10 min | **Passed** on 0.16.14, 21 November 2026, in Audacity 4.0.2 on macOS ([record](../archive/reviews/2026-11-21-vst3-17-audacity-pass.md)): `filter.cfg` chosen before playback reached the export with the window open and, after save, quit and reopen, the next export; **Recent** worked; the list took its 48 kHz entry after one playback. All four exports matched `expected.wav`, the direct-convolution reference, within 7.45e-8 (−137 dB). It ran on the candidate, not the published 0.14.0, because 0.14.0 lacks PLUG-27's fix; the chosen-file path changed after that candidate (PLUG-40, PLUG-41, PLUG-42, DIAG-10), so under the rule above it runs again on the next published preview. Failed on 0.14.0 before PLUG-27's fix ([record](../archive/reviews/2026-11-20-vst3-17-audacity.md)) |
 
 Accepted on earlier builds and not repeated
 ([decisions](decisions.md#plug-in-behaviour)): VST3-16's latency
@@ -144,7 +144,11 @@ settings when chosen in the window (PLUG-35, 0.13.20); the quicker restore
 of the playing filter (PLUG-39 step 1a) and the idle after the tail
 (EDGE-11), both 0.14.0; the rest of PLUG-39's consolidation of the load
 and restore path (0.15.0 to 0.17.x), whose REAPER and GarageBand check is
-checks 2, 5 and 8 on the next published preview. **Unverified, not defects:** listening in every
+checks 2, 5 and 8 on the next published preview; and, in 0.18.x, a
+configuration list loading by itself once the host plays (PLUG-40), a
+chosen file waiting for audio in the current start (PLUG-41), a filter
+that does not suit the host kept until it does (PLUG-42) and Status
+naming a setting not in use (DIAG-10). **Unverified, not defects:** listening in every
 host, VoiceOver, playback while REAPER refuses a preset, and the Audacity
 steps not yet run; the required ones among them need running or a scope
 decision from jrp. The Audio Unit in REAPER, other hosts and two instances
