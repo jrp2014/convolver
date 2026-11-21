@@ -245,7 +245,7 @@ OSStatus Effect::Initialize() {
             next->reset();
             playing_.offer(std::move(next));
             filter_.activate(std::move(activation));
-            publish_timing();
+            (void)publish_timing(); // Notified below, with the tail.
             settling_.started(now);
             reset_requested_.store(false);
             started = true;
@@ -305,8 +305,10 @@ void Effect::Cleanup() {
         // still mark the formats as rendered or take a reset meant for the next
         // initialization; it can no longer use a freed processor.
         playing_.offer(nullptr);
-        publish_timing(); // Uninitialized: the chosen Latency, and the filter's tail.
-        update_status();  // Read when the host next asks; no notification while it tears down.
+        // Uninitialized: the chosen Latency, and the filter's tail; read when
+        // the host next asks, with no notification while it tears down.
+        (void)publish_timing();
+        update_status(); // Read when the host next asks; no notification while it tears down.
     }
     log_faults(faults);
 }
@@ -357,10 +359,11 @@ UInt32 Effect::SupportedNumChannels(const AUChannelInfo** out) {
     return static_cast<UInt32>(infos.size());
 }
 
-void Effect::publish_timing() noexcept {
+bool Effect::publish_timing() noexcept {
     const auto* const p = host();
     tail_.store(p ? p->tail_frames() : filter_.filter_tail());
-    latency_.store(p ? p->latency_frames() : settings().latency);
+    const auto latency = p ? p->latency_frames() : settings().latency;
+    return latency_.exchange(latency) != latency;
 }
 
 Float64 Effect::GetLatency() noexcept AUSDK_RTSAFE {
@@ -400,9 +403,9 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
             // Only a bypass to show (request_status()): a Latency that could
             // not be built is not tried again for it.
         } else if (!host()) {
-            const auto before = latency_.load();
-            publish_timing(); // The chosen Latency, which the next Initialize uses.
-            changed = latency_.load() != before;
+            // The parameter as it is now, which the next Initialize uses; a
+            // later change wakes the queue again.
+            changed = publish_timing();
         } else if (const auto& started = settling_.last_start();
                    host()->latency_frames() != chosen && started) {
             const auto before = host()->latency_frames();
@@ -424,7 +427,7 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
                 // freed by a later control call once Render has let it go.
                 playing_.offer(std::move(next));
                 filter_.activate(std::move(activation));
-                publish_timing();
+                (void)publish_timing();
                 changed = true;
             } catch (const std::exception& e) {
                 try {

@@ -534,10 +534,12 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
    - **Text written and parsed back:** none (steps 1b, 5a and 5b).
 
    The rows of [what stays](#what-stays-and-why) are unchanged. Step 6's
-   code changes no audio, saved state or message. What the host reads
-   changes in one case: once the host has stopped the plug-in, VST3's and
-   the Audio Unit's tail is the accepted filter's, where it stayed at the
-   last processor's (the longest filter it had played).
+   code changes no audio or saved state. What the host reads, and the
+   window's Ring-out row, change in one case: once the host has stopped the
+   plug-in, VST3's and the Audio Unit's tail is the accepted filter's, where
+   it stayed at the last processor's (the longest filter it had played, or
+   0 for a filter that did not suit the host). Removing
+   `HostChange::inactive_tail` from the public header takes version 0.18.0.
 
 ## Relation to other work
 

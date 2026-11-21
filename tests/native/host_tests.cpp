@@ -1671,11 +1671,18 @@ void request_changes() {
     f.load(HostState{a}, std::nullopt);
     require(f.filter_tail() > 0 && f.filter_tail() == configuration_tail_frames(a),
             "the tail while inactive: " + std::to_string(f.filter_tail()));
+    Configuration longer = a;
+    longer.paths[0].impulse.resize(100);
+    require(configuration_tail_frames(longer) != configuration_tail_frames(a),
+            "the longer filter's tail is not different");
+    bool refused_longer = false;
     try {
-        f.load(estimate, HostLayout{44100, 1, 1}, install, chosen);
+        f.load(HostState{longer}, HostLayout{44100, 1, 1}, install, chosen);
     } catch (const std::invalid_argument&) {
+        refused_longer = true;
     }
-    require(f.filter_tail() == configuration_tail_frames(a), "a refused request changed the tail");
+    require(refused_longer && f.filter_tail() == configuration_tail_frames(a),
+            "a refused request changed the tail");
     f.load(HostState{}, std::nullopt);
     require(f.filter_tail() == 0, "an empty instance has a tail");
     HostProcessor host(a, 64, 8);

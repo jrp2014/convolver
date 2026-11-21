@@ -214,8 +214,9 @@ class Effect final : public ausdk::AUBase {
     // Under `control_`, after a request failed: marks it failed
     // (HostFilter::fail_request(), in case it could not be recorded), so
     // that a failed first load plays silence rather than the unfiltered
-    // input; uninitialized, a failed filter's tail is 0.
-    void silence_failed_first_load() noexcept;
+    // input; uninitialized, a failed filter's tail is 0. Returns
+    // publish_timing()'s answer, for the caller to notify after the lock.
+    bool silence_failed_first_load() noexcept;
     // The settings as a saved state holds them.
     using SavedSettings = std::vector<std::pair<AudioUnitParameterID, AudioUnitParameterValue>>;
     // The settings `saved` holds, over the present ones for any it leaves
@@ -353,7 +354,11 @@ class Effect final : public ausdk::AUBase {
     // processor or the accepted filter, the one place that writes the latency
     // and tail the host reads, from host() or, with none, filter_. Before the
     // host is notified, so it reads at once what the next render uses.
-    void publish_timing() noexcept;
+    // Returns whether the latency changed: uninitialized, it is the Latency
+    // parameter as it is now, which a chosen file or a restore may publish
+    // before the Latency queue runs, so whichever call publishes a new value
+    // tells the listeners.
+    bool publish_timing() noexcept;
     // `control_`, held for this object's lifetime. Taking it first frees the
     // replaced processors Render no longer holds, so a processor a new
     // Latency replaced lives until the first control call after Render lets

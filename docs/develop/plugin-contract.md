@@ -1125,7 +1125,8 @@ most one transition and one pending replacement are retained, with up to two
 old engines awaiting control-thread collection after the last publication.
 Collection does not hold up pending changes. The tail is available before
 activation and includes routed delays; it can grow conservatively during a
-session, and reactivation recomputes it.
+session, and once the host stops the plug-in it is the accepted filter's
+again (PLUG-39 step 6).
 
 A new Latency while active (the Audio Unit, VST3 since VST3-16, and LV2
 with a worker) replaces the whole `HostProcessor`, since the block size
@@ -1345,10 +1346,12 @@ How each adapter meets the contract where its format differs:
   tail plus the latency (`getLatencySamples()`), measured at the output as Steinberg's tail
   test does. 32- and 64-bit host buffers both use the float engine.
 - **Audio Unit:** latency and tail are reported in seconds, with a property
-  change notification when either changes; the tail stays at the longest
-  filter used until the host uninitializes the unit, and is then the
-  accepted filter's; the latency uninitialized is the chosen Latency, read
-  from its parameter. Bypass is
+  change notification when either changes, except while the host
+  uninitializes the unit, which reads them again when it next asks; the
+  tail stays at the longest filter used until the host uninitializes the
+  unit, and is then the accepted filter's; the latency uninitialized is the
+  chosen Latency, read from its parameter, and whichever call publishes a
+  new one (the Latency queue, a chosen file or a restore) notifies. Bypass is
   `kAudioUnitProperty_BypassEffect` driving `HostProcessor::set_bypass`, not
   `AUEffectBase`'s pass-through, and is saved in `ClassInfo`. The output is
   marked silent only once the tail has decayed. Rejections are returned to the

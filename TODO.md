@@ -53,8 +53,8 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 
 ### In progress
 
-PLUG-39's last step (PR #256), then PLUG-24 and DIAG-10. Check the open
-pull requests for an ID before starting anything.
+PLUG-24, then DIAG-10. Check the open pull requests for an ID before
+starting anything.
 
 ### Ready
 
