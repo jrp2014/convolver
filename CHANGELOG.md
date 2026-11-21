@@ -12,6 +12,13 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Tests (AU-18): the AVAudioEngine render of the Audio Unit also follows
+  the hosts' other orders of events: GarageBand's, which starts the unit at
+  its defaults and restores the project while it runs (at 44.1 kHz on a
+  mono track, and with a Latency chosen after it); a Latency chosen while
+  the engine runs, which the host's property listener must hear of; and a
+  project's round trip into a second unit through `ClassInfo`. Each must
+  report the expected latency and match the oracle within 1e-5.
 - Tests (COMPAT-1, in progress): the example presets of the published
   0.14.0 and the audio its own CLI and VST3 plug-in rendered from them are
   kept in `tests/upgrade/0.14.0/`, beside those of 0.13.2, 0.13.12,

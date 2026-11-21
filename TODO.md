@@ -1219,6 +1219,12 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **AU-18 — Render the Audio Unit in the hosts' orders of events.**
+  21 November 2026, PR (this branch): the AVAudioEngine render (AU-15) also
+  restores a preset on the running unit as GarageBand does, at 44.1 kHz,
+  chooses Latency while the engine runs and restores a second unit from the
+  first one's `ClassInfo`, each against the oracle
+  ([AVAudioEngine render](docs/develop/testing.md#avaudioengine-render)).
 - [x] **HOST-7 — Run the Ardour test with Ardour 9.**
   20 November 2026, PR #229, from CI-43: Ardour 9's Lua tool crashed in
   `Session:new_audio_track`, which takes an empty `ARDOUR.RouteGroup()`

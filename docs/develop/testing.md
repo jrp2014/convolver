@@ -1160,18 +1160,32 @@ the unit as an `AVAudioUnitEffect`. This shares no code with Convolver's
 tests or with pluginval. It is a workflow step, not a CTest test, because it
 needs the component installed for the runner's user, as pluginval does.
 [`tests/au/avaudioengine_render.swift`](../../tests/au/avaudioengine_render.swift)
-applies an `.aupreset` from `convolver-preset` through `ClassInfo` before the
-engine starts, as a host restores a project, then feeds the input through
-the engine's input node and renders. Each fixture uses a block size that is
-not a multiple of the 256-frame partition: mono (1 in, 1 out) at 61 frames,
-the stereo cross-feed (2 in, 2 out) at 300 and the crossover (2 in, 6 out,
-discrete channels) at 1000.
+applies an `.aupreset` from `convolver-preset` through `ClassInfo`, then
+feeds the input through the engine's input node and renders. Each case uses
+a block size that is not a multiple of the engine's 64-frame first block.
+The first three restore the preset before the engine starts, as a host
+restores a project, at the default Latency (AU-15): mono (1 in, 1 out) at
+61 frames, the stereo cross-feed (2 in, 2 out) at 300 and the crossover
+(2 in, 6 out, discrete channels) at 1000. The others follow the hosts'
+other orders of events (AU-18):
+
+| Case | Order of events | Latency |
+| --- | --- | --- |
+| Mono at 44.1 kHz, 512-frame blocks | GarageBand's: the engine starts the unit at its defaults and renders, then the preset is restored on the running unit, at GarageBand's fixed rate on a mono track (the fixture's samples, filter included, labelled 44.1 kHz) | 0 |
+| Stereo, 300 | GarageBand's, then Latency chosen through its parameter while the engine runs | 1024 |
+| Crossover, 1000 | Restored before starting, then Latency chosen while the engine runs | 256 |
+| Stereo, 256 | A project's round trip: one unit takes the preset and Latency, and a second, restored from the first one's `ClassInfo`, plays | 512 |
+
+After a change made while the engine runs, the renderer renders silence and
+runs the main queue until the Status parameter reads Active and the unit
+reports the new latency, at most 30 seconds, then starts the input.
 [`tests/au/avaudioengine_tests.py`](../../tests/au/avaudioengine_tests.py)
-checks that the unit reports 256 frames of latency and that nothing comes out
-before them. After them, the output must match the fixture's
-`expected.wav` from the direct double-precision oracle within 1e-5. It
-prints the worst error. To run it on a Mac with the component installed
-and Xcode's command-line tools:
+checks that the unit reports the case's latency and that nothing comes out
+before it; for a Latency chosen while running, that the unit told the
+host's property listener (AU-17's notices on the main thread). After the
+latency, the output must match the fixture's `expected.wav` from the direct
+double-precision oracle within 1e-5. It prints the worst error. To run it on
+a Mac with the component installed and Xcode's command-line tools:
 
 ```sh
 python3 tests/au/avaudioengine_tests.py build-au/convolver-preset
