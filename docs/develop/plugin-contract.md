@@ -247,7 +247,8 @@ before they set the sample rate and channel layout (VST3 `setState` before
   the settings fit, and a refused replacement leaves the working filter
   selected across a restart; and the mute), `native.host_settling`,
   `vst3.adapter` `kept_until_channels_fit` and
-  `chosen_file_kept_until_it_fits`, `au.adapter` `chosen_file_kept`.
+  `chosen_file_kept_until_it_fits`, `au.adapter` `chosen_file_kept` and
+  `au.editor` `files` (a mono file chosen on an empty stereo unit).
 - VST3 counts its configuration as known once the plug-in has been activated
   with it and has played audio with it (a `process` call with samples, in
   that activation or an earlier one since the rate or buses last changed),
