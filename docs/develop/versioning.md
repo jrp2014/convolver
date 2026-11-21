@@ -4,8 +4,9 @@
 [Documentation index](../README.md) · [Changelog](../../CHANGELOG.md)
 
 **In short:** `VERSION` holds the one version number. Each source change merged
-to `main` gets the next patch number and a `vX.Y.Z` tag automatically; edit
-`VERSION` yourself only for a deliberate minor or major step. Changes confined to
+to `main` gets the next patch number and a `vX.Y.Z` tag automatically; for a
+deliberate minor or major step, label the pull request `version:minor` or
+`version:major` rather than editing `VERSION`. Changes confined to
 `docs/` and top-level Markdown files do not bump the version. A tag identifies a
 revision; it does not certify a tested release.
 
@@ -42,14 +43,31 @@ binary release validation remains a separate step.
 
 ## Minor and major versions
 
-For a deliberate feature/API milestone, change `VERSION` to a higher minor version
-with PATCH reset, for example `0.3.0`, in the same change. Use a higher major version
-for a major compatibility milestone. The workflow honours that explicit number
-instead of incrementing it. Until 1.0, API incompatibilities belong in minor
-versions; CMake consumers continue to require a matching minor version.
+For a deliberate feature/API milestone, add the label `version:minor` to the
+pull request; for a major compatibility milestone, `version:major`. Leave
+`VERSION` itself alone: every pull request that edited it conflicted with the
+version bot's next commit and with every other such pull request
+([decision](../project/decisions.md#documentation)). If you cannot add a
+label yourself, ask jrp to add it before he merges, and say so in the pull
+request. Only these two exact names count: any other label, a misspelt one
+included, leaves the automatic patch. When the merge reaches `main`, the workflow reads the
+labels of the merged pull requests behind every source change since the last
+tag (`scripts/version_source.py --labels-from`, through the GitHub CLI with
+the workflow's token) and takes the largest step any of them asks for: from
+`0.17.8`, a `version:minor` label gives `0.18.0` and `version:major` gives
+`1.0.0`. A label on a pull request that changes no source counts for nothing,
+since such a merge gets no version. If the labels cannot be read, the run
+fails without committing or tagging; run it again once GitHub answers. Add
+the label before merging: the run that versions the merge reads it once, and
+a tag is never moved.
 
-Use `CHANGELOG.md` for noteworthy human-readable changes. It need not acquire an
-entry for every automatic patch. Do not edit archived release records or change
+An explicit higher number in `VERSION` is still honoured, for recovery by
+hand, and a label never lowers it. Until 1.0, API incompatibilities belong in
+minor versions; CMake consumers continue to require a matching minor version.
+
+Use the changelog, through each pull request's
+[change fragment](workflow.md#change-fragments), for noteworthy human-readable
+changes. It need not acquire an entry for every automatic patch. Do not edit archived release records or change
 plug-in IDs or serialized-state versions to match the package number.
 
 ## LV2 versions
@@ -94,9 +112,13 @@ python3 tests/versioning_tests.py
 For manual recovery in a clean, fully fetched checkout of `main`:
 
 ```sh
-python3 scripts/version_source.py --push
+python3 scripts/version_source.py --push --labels-from jrp2014/convolver
 ```
 
-Omit `--push` to create only the local version commit and tag. This is a mutation,
-not a dry run. If publication failed after local creation, use a fresh clone for
+This reads the version labels through the GitHub CLI, which must be signed
+in, as the workflow does. `--push` refuses to run without `--labels-from`,
+since a missed `version:minor` would publish a patch that no tag move can
+undo; `--ignore-labels` replaces it only when you have checked that no pull
+request merged since the last tag has a version label. Omit `--push` to create only
+the local version commit and tag. This is a mutation, not a dry run. If publication failed after local creation, use a fresh clone for
 recovery; do not force-push or move a published tag.
