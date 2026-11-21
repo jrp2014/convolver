@@ -842,7 +842,10 @@ class Command(unittest.TestCase):
     def run_script(self, *args, cwd=ROOT, event='pull_request'):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / 'output'
-            environment = dict(CLEAN, GITHUB_EVENT_NAME=event)
+            # Not the event of a CI run that runs these tests: a draft's would
+            # answer full=false.
+            environment = {key: value for key, value in CLEAN.items() if not key.startswith('GITHUB_')}
+            environment['GITHUB_EVENT_NAME'] = event
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), '--github-output', str(output), *args],
                 cwd=cwd,
