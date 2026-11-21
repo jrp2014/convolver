@@ -261,9 +261,18 @@ void Effect::notify_status() noexcept {
 }
 
 bool Effect::confirm_rendered() noexcept {
-    if (!settling_.playing() || !filter_.awaiting())
+    if (!settling_.playing())
         return false;
-    update_status(); // Confirms it.
+    // PLUG-40 (Codex's review of PR #252): a list refused before the
+    // settings were known is told about a configuration the host renders
+    // with too, when the host reads Status with the window closed, so the
+    // advice can say the settings are known now.
+    const auto& refused = filter_.rejection();
+    const bool list_waits = refused && refused->kind == HostFailureKind::settings_unknown &&
+                            !filter_.played_with(known_layout());
+    if (!filter_.awaiting() && !list_waits)
+        return false;
+    update_status(); // Confirms it, with the configuration.
     return true;
 }
 

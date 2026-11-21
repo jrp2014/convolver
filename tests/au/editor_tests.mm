@@ -942,8 +942,27 @@ void list_read_again() {
     auto r = report(unit);
     require(r.fix.find("Play audio once") != std::string::npos,
             "before rendering, the list's Fix: " + r.fix);
+    // The host renders at 48 kHz and reads Status with the window closed,
+    // then stops: the report says the settings are known now, and nothing
+    // is read again while stopped.
     check(unit.configure(48000, 2, 2, 512), "48 kHz formats for the list");
     check(unit.initialize(), "48 kHz initialization for the list");
+    render_block(unit, 2, 2);
+    {
+        AudioUnitParameterStringFromValue request{au::status_parameter, nullptr, nullptr};
+        UInt32 bytes = sizeof request;
+        check(AudioUnitGetProperty(unit.get(), kAudioUnitProperty_ParameterStringFromValue,
+                                   kAudioUnitScope_Global, 0, &request, &bytes),
+              "the host's Status read");
+        if (request.outString)
+            CFRelease(request.outString);
+    }
+    unit.uninitialize();
+    r = report(unit);
+    require(r.fix == "The host's settings are now known (48000 Hz, 2 in, 2 out): choose the "
+                     "configuration list again.",
+            "after a Status read while rendering, the list's Fix: " + r.fix);
+    check(unit.initialize(), "48 kHz initialization again for the list");
     render_block(unit, 2, 2);
     for (const auto id : {kAudioUnitProperty_ClassInfo, kAudioUnitProperty_PresentPreset})
         check(AudioUnitAddPropertyListener(unit.get(), id, state_changed, nullptr),
@@ -1068,8 +1087,8 @@ void chosen_before_rendering() {
     std::vector<float> in(512), out(512), in2(512), out2(512);
     const std::array<const float*, 2> ins{in.data(), in2.data()};
     const std::array<float*, 2> outs{out.data(), out2.data()};
-    bool silent = false;
-    check(fresh.render(ins, outs, 0, false, silent), "a zero-frame render");
+    bool zero_silent = false;
+    check(fresh.render(ins, outs, 0, false, zero_silent), "a zero-frame render");
     check(choose(fresh, (folder / "slow.wav").string()),
           "a 44.1 kHz file chosen after a zero-frame render");
     r = report(fresh);

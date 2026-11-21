@@ -193,7 +193,8 @@ and Convolver tells the host the project has changed, as for a chosen file
 (the list is not added to Recent). This is checked by automated tests, not
 yet in a host. If the window was closed while the host played, choose the
 list again, or play again with the window open. Once Convolver has seen the
-host play (for example when the host reads the Audio Unit's Status), the
+host play (for example when the host reads the Audio Unit's Status while it
+plays; the VST3 plug-in's Status is not read that way), the
 window says "The host's settings are now known (48000 Hz, 2 in, 2 out):
 choose the configuration list again." (with the host's values), and Status
 says the same in short; a brief start the host makes without playing, such
