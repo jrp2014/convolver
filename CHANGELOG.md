@@ -172,6 +172,16 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
+- Tests (COMPAT-1, in progress): LV2 state saved by the published 0.14.0's
+  own LV2 plug-in is kept in `tests/upgrade/0.14.0/lv2-state/`: for each of
+  the 21 cases, a session lilv saved after the plug-in chose the case's
+  filter through its filter parameter, and two more with Gain, Mix, Latency
+  and Gain mode away from their defaults. The new `lv2.upgrade` restores
+  each through lilv, ports included, in today's bundle and checks the
+  reported latency and the render against the release's own (within the
+  `upgrade.cli` bound; identical where built as the release was). The
+  release's plug-in rendered every default-settings case exactly as its CLI
+  did. `capture_lv2.py` captures later releases.
 - Tests (HOST-11, first version): `scripts/reaper_check.py` runs part of
   the REAPER host check from one command on a Mac. REAPER renders the
   stereo example through its `.vstpreset`, saves, quits, reopens the

@@ -14,6 +14,12 @@ compiler flags, FFT backend and CPU kernels.
     python3 tests/upgrade/run_upgrade.py --cli build/convolver
     python3 tests/upgrade/run_upgrade.py --vst3-render build/.../convolver_vst3_render \
         --vst3-bundle build/VST3/Release/Convolver.vst3 --vst3-backend OOURA
+    python3 tests/upgrade/run_upgrade.py --lv2-render build/.../convolver_lv2_render \
+        --lv2-bundle build/.../convolver.lv2 --lv2-backend OOURA
+
+A folder's lv2.json, where a release shipped the LV2 plug-in, lists LV2
+state that release saved through lilv; each is restored as a host reopens a
+session, ports included, and must reproduce the release's own render.
 
 CTest also passes --compiler, --configuration and --flags; without all
 three the check is held to the tolerance only.
@@ -195,12 +201,49 @@ def check_vst3(folder, case, check, render, bundle, exact, work, worst_seen):
     return compare(label, actual, expected, exact, worst_seen)
 
 
+def check_lv2(folder, case, render, bundle, exact, work, worst_seen):
+    label = f'{folder.name} {case["name"]} lv2'
+    expected = fixtures.read_float_wav(folder / case['expected'])
+    planar = fixtures.read_float_wav(folder / case['input'])
+    interleaved = [planar[c][i] for i in range(len(planar[0])) for c in range(len(planar))]
+    raw_in, raw_out = work / 'in.f32', work / 'out.f32'
+    raw_in.write_bytes(struct.pack(f'={len(interleaved)}f', *interleaved))
+    code, text = run(
+        [
+            render,
+            'render',
+            bundle,
+            folder / case['state'],
+            case['rate'],
+            case['inputs'],
+            case['outputs'],
+            raw_in,
+            raw_out,
+            len(expected[0]),
+        ]
+    )
+    if code != 0:
+        return f'{label}: exit {code}\n{text}'
+    reported = text.split()
+    if len(reported) != 2 or reported[0] != 'latency' or int(reported[1]) != case['latency']:
+        # The latency port is what hosts compensate, so a change is audible
+        # in a session even when the aligned audio matches.
+        return f'{label}: reported {text.strip()!r}; the release reported latency {case["latency"]}'
+    data = raw_out.read_bytes()
+    samples = struct.unpack(f'={len(data) // 4}f', data)
+    actual = [list(samples[c :: case['outputs']]) for c in range(case['outputs'])]
+    return compare(label, actual, expected, exact, worst_seen)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--cli', type=Path, help='the convolver command-line tool to check')
     parser.add_argument('--vst3-render', type=Path, help='convolver_vst3_render')
     parser.add_argument('--vst3-bundle', type=Path, help='the Convolver.vst3 bundle to check')
     parser.add_argument('--vst3-backend', help="the bundle's FFT backend, as CMake names it (OOURA)")
+    parser.add_argument('--lv2-render', type=Path, help='convolver_lv2_render')
+    parser.add_argument('--lv2-bundle', type=Path, help='the convolver.lv2 bundle to check')
+    parser.add_argument('--lv2-backend', help="the bundle's FFT backend, as CMake names it (OOURA)")
     parser.add_argument('--compiler', help='this build\'s compiler and version, as CMake names them ("GNU 11.4.0")')
     parser.add_argument('--configuration', help="this build's configuration (Release)")
     parser.add_argument(
@@ -210,8 +253,9 @@ def main(argv=None):
         '--kernels-from', type=Path, help='a convolver CLI from this build, asked which CPU kernels run here'
     )
     args = parser.parse_args(argv)
-    if not args.cli and not (args.vst3_render and args.vst3_bundle):
-        parser.error('give --cli, or --vst3-render with --vst3-bundle')
+    lv2 = bool(args.lv2_render and args.lv2_bundle)
+    if not args.cli and not (args.vst3_render and args.vst3_bundle) and not lv2:
+        parser.error('give --cli, --vst3-render with --vst3-bundle, or --lv2-render with --lv2-bundle')
 
     folders = sorted(p.parent for p in HERE.glob('*/manifest.json'))
     if not folders:
@@ -257,6 +301,24 @@ def main(argv=None):
                         )
                     else:
                         continue
+                    if failure:
+                        failures.append(failure)
+            lv2_path = folder / 'lv2.json'
+            if lv2 and lv2_path.is_file():
+                lv2_record = json.loads(lv2_path.read_text(encoding='utf-8'))
+                failures += check_files(folder, lv2_record)
+                lv2_build = lv2_record['captured']['build']
+                lv2_exact = (
+                    args.compiler == lv2_build['compiler']
+                    and args.configuration == lv2_build['configuration']
+                    and args.flags is not None
+                    and normal_flags(args.flags) == normal_flags(lv2_build['flags'])
+                    and same_kernels(record, kernel_lines)
+                    and args.lv2_backend == lv2_build['backend']
+                )
+                print(f'  lv2: {"identical samples required" if lv2_exact else "within the bound"}')
+                for case in lv2_record['cases']:
+                    failure = check_lv2(folder, case, args.lv2_render, args.lv2_bundle, lv2_exact, work, worst_seen)
                     if failure:
                         failures.append(failure)
     if worst_seen:

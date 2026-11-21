@@ -15,9 +15,15 @@ python3 tests/upgrade/run_upgrade.py --vst3-render build-vst3/plugins/vst3/convo
   --compiler "GNU 11.4.0" --configuration Release "--flags= -O3 -DNDEBUG -g"
 ```
 
-CTest runs them as `upgrade.cli` (whenever the CLI is built) and
+CTest runs them as `upgrade.cli` (whenever the CLI is built),
 `vst3.upgrade` (in VST3 builds that load the bundle, the same condition as
-`vst3.validator`).
+`vst3.validator`) and `lv2.upgrade` (in LV2 builds with tests, which build
+the CLI too). By hand, the LV2 check is:
+
+```sh
+python3 tests/upgrade/run_upgrade.py --lv2-render build/.../convolver_lv2_render \
+  --lv2-bundle build/.../convolver.lv2 --lv2-backend OOURA --kernels-from build/convolver
+```
 
 ## What each folder holds
 
@@ -38,6 +44,21 @@ CTest runs them as `upgrade.cli` (whenever the CLI is built) and
   release CLI's `--version` lines and build; every retained file's SHA-256;
   and each case: the preset, the filter the CLI is given, the input, rate and
   channel counts, and each check with its expected file.
+- `lv2-state/` and `lv2.json`, for a release that shipped the LV2 plug-in
+  (0.14.0 so far): one folder per case, each a session the release's own LV2
+  plug-in saved through lilv (`state.ttl` and `manifest.ttl`, as Jalv and
+  other lilv hosts save one), with a copy of the case's filter files, which
+  the plug-in chose through its filter parameter as a host's file chooser
+  does, so the state holds the filter's path relative to the folder. Each
+  case at the default settings, and the first-use stereo and crossover
+  examples again with settings away from their defaults (`NAME-settings`:
+  Gain −6 dB, Mix 50 % and Latency 256; Latency 1024 and Gain mode Estimate),
+  so that a renamed port or a setting no longer restored shows. `lv2.json`
+  records how they were made, each file's SHA-256 and, for each case, its
+  settings, the latency the release reported and the expected render: the
+  CLI's file where the release's plug-in, restoring the state, rendered the
+  same samples (every case at the default settings did), otherwise
+  `expected/NAME.lv2.wav`.
 
 ## The checks
 
@@ -52,6 +73,12 @@ For each case, `run_upgrade.py`:
   repeated), and renders the input, dropping the latency the plug-in
   reports, which must be the latency the release reported (a host delays
   the other tracks by it);
+- restores each LV2 state in this build's LV2 bundle with
+  [`lv2_render.cpp`](lv2_render.cpp): lilv reads `state.ttl` and restores it,
+  ports included, into a new instance of the layout for the case's channel
+  counts, as a host reopening a session does; the instance plays the input
+  in the same irregular host blocks, and the latency its port reports, which
+  must be the release's, is dropped;
 - requires the same rate, channel count and frame count, and samples within
   the bound: 1e-5 (the PLUG-2 oracle tolerance), times the expected file's
   peak when it is louder than full scale, since float rounding grows with the
@@ -87,7 +114,7 @@ so.
 - Never regenerate or edit a retained file; the runner fails if one changes.
   The version folders are checked out byte for byte (`.gitattributes`), left
   alone by the formatters and markdownlint, and any change in this folder
-  runs the native and VST3 workflows, the two whose tests read it
+  runs the native, VST3 and LV2 workflows, the three whose tests read it
   ([CI triggers](../../docs/develop/testing.md#pull-requests-for-one-plug-in-format)).
   A deliberate incompatibility is jrp's decision, recorded in the
   [decisions log](../../docs/project/decisions.md), and the check it breaks is
@@ -96,15 +123,18 @@ so.
   breaks an identical-samples check.
 - Capture each published preview once, after publication, with
   [`capture.py`](capture.py) on Linux x86-64 from that release's Linux ZIP
-  ([publication steps](../../docs/develop/releasing.md#publishing-an-unsigned-preview)).
-  Its docstring gives the command; it refuses to write into an existing
-  folder.
+  ([publication steps](../../docs/develop/releasing.md#publishing-an-unsigned-preview)),
+  then its LV2 state with [`capture_lv2.py`](capture_lv2.py) from the same
+  ZIP. Their docstrings give the commands; each refuses to write files it
+  would replace.
 
 ## Not yet kept
 
 - A saved REAPER project containing Convolver, made with the release, kept
   for reopening by hand; the runner will take the plug-in state out of it and
   restore it through the adapters (COMPAT-1 in [TODO](../../TODO.md)).
-- The Audio Unit and LV2 adapters: the VST3 check runs on each CI system that
-  builds the bundle, but no Audio Unit state from a release is kept yet, and
-  no release has shipped LV2.
+- Audio Unit state from a release: the VST3 check runs on each CI system
+  that builds the bundle and the LV2 check in the LV2 workflow, but no Audio
+  Unit state is kept yet.
+- LV2 state from 0.13.12, 0.13.20 and 0.13.24, which shipped the LV2
+  plug-in before 0.14.0; only 0.14.0's is kept.

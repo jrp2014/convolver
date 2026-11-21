@@ -357,8 +357,12 @@ limitation that no longer holds is removed. Its merge makes the tag.
    [`tests/upgrade/capture.py`](../../tests/upgrade/capture.py) with the
    tag's version, commit and candidate run, as its docstring shows. It copies
    the example presets, renders them with the package's own CLI and VST3
-   plug-in, and writes `tests/upgrade/X.Y.Z/` with each file's SHA-256; open
-   a pull request with that folder. Then save a REAPER project with the
+   plug-in, and writes `tests/upgrade/X.Y.Z/` with each file's SHA-256. Then
+   build `convolver_lv2_render` (an LV2 build with tests) and run
+   [`tests/upgrade/capture_lv2.py`](../../tests/upgrade/capture_lv2.py) on
+   the same ZIP: the package's LV2 plug-in saves each case's state through
+   lilv and renders it, into the same folder. Open a pull request with that
+   folder. Then save a REAPER project with the
    released plug-in for the same folder (COMPAT-1 in [TODO](../../TODO.md)).
    What the folder holds and how later builds are checked against it:
    [files from released builds](../../tests/upgrade/README.md).

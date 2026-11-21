@@ -143,10 +143,36 @@ if(CONVOLVER_BUILD_TESTS)
         # skipped, not passed, when an entry did not qualify (PERF-10).
         set_tests_properties(lv2.load_timing PROPERTIES LABELS "lv2;real-libraries;timing" TIMEOUT 600
             RUN_SERIAL TRUE SKIP_RETURN_CODE 77)
+        # COMPAT-1: LV2 state saved by published releases, restored through
+        # lilv as a host reopens a session, must reproduce the audio those
+        # releases rendered. The program loads the bundle from its folder, so
+        # tests/upgrade/capture_lv2.py uses it with a release's bundle too.
+        add_executable(convolver_lv2_render "${PROJECT_SOURCE_DIR}/tests/upgrade/lv2_render.cpp"
+            "${PROJECT_SOURCE_DIR}/tests/lv2/host.cpp")
+        target_include_directories(convolver_lv2_render PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${PROJECT_SOURCE_DIR}/tests/lv2" "${PROJECT_SOURCE_DIR}/portable" "${Convolver_BINARY_DIR}/generated")
+        target_link_libraries(convolver_lv2_render PRIVATE Convolver::host Convolver::io
+            convolver_presets convolver_lv2_headers PkgConfig::CONVOLVER_LILV)
+        convolver_sanitize(convolver_lv2_render)
+        if(MSVC)
+            target_compile_options(convolver_lv2_render PRIVATE /W4 /permissive- /utf-8)
+        else()
+            target_compile_options(convolver_lv2_render PRIVATE -Wall -Wextra -Wpedantic)
+        endif()
+        add_dependencies(convolver_lv2_render convolver_lv2)
+        add_dependencies(check convolver_lv2_render)
+        add_test(NAME lv2.upgrade COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
+            "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tests/upgrade/run_upgrade.py"
+            --lv2-render "$<TARGET_FILE:convolver_lv2_render>" --lv2-bundle "${lv2_bundle_dir}"
+            --lv2-backend "${fft_backend}" --kernels-from "$<TARGET_FILE:convolver_cli>"
+            --compiler "${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}" --configuration "$<CONFIG>"
+            # As the package manifest records them; "=" keeps a leading "-" a value.
+            "--flags=${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}")
+        set_tests_properties(lv2.upgrade PROPERTIES LABELS "lv2;real-libraries;upgrade" TIMEOUT 300)
         # Everything the lv2.* tests and examples.first_use (the harness's
         # fixtures) run, so CI can build these alone rather than every test.
         add_custom_target(convolver_lv2_tests)
         add_dependencies(convolver_lv2_tests convolver_lv2 convolver_lv2_adapter convolver_lv2_harness
-            convolver_lv2_lifecycle convolver_cli convolver_preset_tool)
+            convolver_lv2_lifecycle convolver_lv2_render convolver_cli convolver_preset_tool)
     endif()
 endif()

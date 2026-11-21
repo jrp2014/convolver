@@ -209,15 +209,15 @@ class Classification(unittest.TestCase):
         self.assertEqual(runs(['scripts/release/resolve.py']), unfuzzed)
         self.assertEqual(runs(['packaging/release-policy.json']), unfuzzed)
         self.assertEqual(runs(['scripts/release/candidate.py', 'plugins/au/effect.hpp']), {'au', 'release'})
-        # The files kept from releases run the native and VST3 workflows,
-        # whose upgrade.cli and vst3.upgrade read them, and not the Audio
-        # Unit or LV2 ones (CI-42).
-        upgrade = {'regression', 'vst3'}
+        # The files kept from releases run the native, VST3 and LV2
+        # workflows, whose upgrade.cli, vst3.upgrade and lv2.upgrade read
+        # them, and not the Audio Unit one (CI-42, COMPAT-1).
+        upgrade = {'regression', 'vst3', 'lv2'}
         self.assertEqual(runs(['tests/upgrade/0.13.2/expected/echo-44100-mono.wav']), upgrade)
         self.assertEqual(runs(['tests/upgrade/0.14.0/manifest.json', 'tests/upgrade/README.md', 'TODO.md']), upgrade)
         self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'tests/upgrade/vst3_render.cpp']), upgrade)
         self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'plugins/au/effect.hpp']), upgrade | {'au'})
-        self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'plugins/lv2/plugin.cpp']), upgrade | {'lv2'})
+        self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'plugins/lv2/plugin.cpp']), upgrade)
         self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'portable/engine.cpp']), builds)
         self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'cmake/X.cmake']), everything)
         # The headless Ardour test runs only where it runs: the VST3 and LV2
@@ -664,16 +664,18 @@ class ReleaseIsolation(unittest.TestCase):
 UPGRADE_REFERENCES = {
     'CMakeLists.txt': 'registers upgrade.cli wherever the CLI is built',
     'plugins/vst3/CMakeLists.txt': 'registers vst3.upgrade and builds convolver_vst3_render',
+    'plugins/lv2/CMakeLists.txt': 'registers lv2.upgrade and builds convolver_lv2_render',
     '.gitattributes': 'keeps the version folders byte for byte; builds nothing',
     '.markdownlint-cli2.yaml': 'Lint leaves the version folders alone',
     '.pre-commit-config.yaml': 'Lint leaves the version folders alone',
+    'tests/identities_tests.py': "skips the version folders' release-made files; Lint runs it for every pull request",
 }
 
 
 class UpgradeIsolation(unittest.TestCase):
     """A pull request that changes only the files kept from releases runs
-    the native and VST3 workflows, so only the tests those workflows run may
-    read them (CI-42)."""
+    the native, VST3 and LV2 workflows, so only the tests those workflows
+    run may read them (CI-42)."""
 
     def test_only_the_vst3_and_lv2_workflows_run_the_ardour_test(self):
         pattern = re.compile(r'\bardour_(?:tests|session|reopen|harness_tests)\b')
@@ -692,7 +694,7 @@ class UpgradeIsolation(unittest.TestCase):
     def test_only_listed_files_name_the_upgrade_files(self):
         # A relative path such as parents[1] / 'upgrade/x' counts too.
         pattern = re.compile(
-            r'tests/upgrade\b|(?<![\w./-])upgrade/|\brun_upgrade\b|\bvst3_render\.cpp\b|\bcapture\.py\b'
+            r'tests/upgrade\b|(?<![\w./-])upgrade/|\brun_upgrade\b|\b(?:vst3|lv2)_render\.cpp\b|\bcapture(?:_lv2)?\.py\b'
         )
         own = (*ci_scope.UPGRADE, 'scripts/ci_scope.py', 'tests/ci_scope_tests.py')
         found = {path for path, contents in tracked() if not path.startswith(own) and pattern.search(contents)}
@@ -700,19 +702,28 @@ class UpgradeIsolation(unittest.TestCase):
 
     def test_the_tests_that_read_them(self):
         """upgrade.cli is registered with the CLI, which the native jobs
-        build, and vst3.upgrade with the VST3 plug-in; no other CTest entry
-        runs the checker."""
+        build, vst3.upgrade with the VST3 plug-in and lv2.upgrade with the
+        LV2 plug-in; no other CTest entry runs the checker."""
         registered = {}
         for path in UPGRADE_REFERENCES:
             text = (ROOT / path).read_text(encoding='utf-8')
             for name, body in re.findall(r'add_test\(NAME (\S+) (.*?)\)\n', text, re.DOTALL):
                 if 'run_upgrade.py' in body:
                     registered[name] = path
-        self.assertEqual(registered, {'upgrade.cli': 'CMakeLists.txt', 'vst3.upgrade': 'plugins/vst3/CMakeLists.txt'})
+        self.assertEqual(
+            registered,
+            {
+                'upgrade.cli': 'CMakeLists.txt',
+                'vst3.upgrade': 'plugins/vst3/CMakeLists.txt',
+                'lv2.upgrade': 'plugins/lv2/CMakeLists.txt',
+            },
+        )
         self.assertEqual(ci_scope.classify('plugins/vst3/CMakeLists.txt'), 'format:vst3')
+        self.assertEqual(ci_scope.classify('plugins/lv2/CMakeLists.txt'), 'format:lv2')
         self.assertLessEqual(ci_scope.UPGRADE_WORKFLOWS, set(ci_scope.WORKFLOWS))
         self.assertIn('vst3', ci_scope.UPGRADE_WORKFLOWS)
         self.assertIn('regression', ci_scope.UPGRADE_WORKFLOWS)
+        self.assertIn('lv2', ci_scope.UPGRADE_WORKFLOWS)
 
 
 class Command(unittest.TestCase):

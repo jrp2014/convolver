@@ -24,8 +24,9 @@ changed file is one of these kinds:
   uses them.
 - upgrade files (CI-42): tests/upgrade/, the files kept from published
   releases (Markdown included, as the version folders hash it) and the
-  programs that check them. Only upgrade.cli and vst3.upgrade read them, so
-  they need the native and VST3 workflows, not the Audio Unit or LV2 ones.
+  programs that check them. Only upgrade.cli, vst3.upgrade and lv2.upgrade
+  read them, so they need the native, VST3 and LV2 workflows, not the Audio
+  Unit one.
 - manual host scripts (HOST-11): scripts that jrp runs by hand on his Mac,
   and their tests. No workflow builds or runs them; lint's pre-commit runs
   their tests, so they need no other workflow.
@@ -119,17 +120,20 @@ FORMAT_WORKFLOWS = {
     'editor': {'vst3', 'au'},
 }
 # The files kept from published releases and the programs that check them
-# (COMPAT-1, CI-42). Two CTest entries read them: upgrade.cli, which the root
-# CMakeLists.txt registers wherever the CLI is built, and vst3.upgrade, which
+# (COMPAT-1, CI-42). Three CTest entries read them: upgrade.cli, which the
+# root CMakeLists.txt registers wherever the CLI is built; vst3.upgrade, which
 # plugins/vst3/CMakeLists.txt registers with convolver_vst3_render
-# (tests/upgrade/vst3_render.cpp). The native workflow runs upgrade.cli in
-# every job and the VST3 workflow runs both. The LV2 jobs run neither. The
-# Audio Unit job's suite includes upgrade.cli too; a change to these files
+# (tests/upgrade/vst3_render.cpp); and lv2.upgrade, which
+# plugins/lv2/CMakeLists.txt registers with convolver_lv2_render
+# (tests/upgrade/lv2_render.cpp). The native workflow runs upgrade.cli in
+# every job, the VST3 workflow runs it and vst3.upgrade, and the LV2
+# workflow's sanitizer job runs lv2.upgrade. The Audio Unit job's suite
+# includes upgrade.cli too; a change to these files
 # alone leaves that run to main (CI-42). Since CI-43 the VST3 macOS job's
 # suite runs it with the same compiler (the newest Xcode on macos-26, which
 # macos-latest also is today), and every macOS run checks the same bound.
 UPGRADE = ('tests/upgrade/',)
-UPGRADE_WORKFLOWS = {'regression', 'vst3'}
+UPGRADE_WORKFLOWS = {'regression', 'vst3', 'lv2'}
 # The headless Ardour test (HOST-9), which only the VST3 and LV2 workflows
 # run. It sits in the shared tests/plugins/ because both use it, but it is
 # no other build's code; the fixtures it imports count as code as usual.
