@@ -149,12 +149,13 @@ Full rules: [source versioning](docs/develop/versioning.md).
 
 ## Rules
 
-- Shared records: never edit the top of `CHANGELOG.md`, TODO's done list or
-  a section of `docs/project/decisions.md` in a pull request. Add the pull
-  request's own fragment, `changes/<ID>.md`, which
-  `scripts/fold_changes.py` folds into those pages
-  ([change fragments](docs/develop/workflow.md#change-fragments)). Every
-  finished TODO item still gets a changelog entry, in its fragment.
+- Shared records: add new entries to `CHANGELOG.md`, TODO's done list and
+  `docs/project/decisions.md` only through the pull request's own fragment,
+  `changes/<ID>.md`, which `scripts/fold_changes.py` folds into those pages
+  ([change fragments](docs/develop/workflow.md#change-fragments), which
+  also lists the direct edits that remain, such as a fold or a release
+  heading). Every finished TODO item still gets a changelog entry, in its
+  fragment.
 - Clear what has been processed: once something is consolidated into its
   lasting home, delete the original (folded fragments, scratch files) or move
   dated evidence and finished plans to `docs/archive/`, in the same change

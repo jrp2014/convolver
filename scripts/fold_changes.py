@@ -85,8 +85,16 @@ def parse(path):
             )
         if line.startswith('#'):
             raise FragmentError(f'{name}:{number}: only "## " sections are allowed in a fragment')
-        if stripped:  # The records keep tight lists: blank lines are dropped.
-            current[1].append(line.rstrip())
+        if not stripped:
+            continue  # The records keep tight lists: blank lines are dropped.
+        if not line.startswith(('- ', '  ')):
+            raise FragmentError(
+                f'{name}:{number}: only list entries ("- ") and their indented continuation lines '
+                'are folded; put notes for reviewers in the pull request instead'
+            )
+        if re.match(r'^\s*\[[^\]]+\]:', line):
+            raise FragmentError(f'{name}:{number}: use inline links; reference definitions are not rewritten')
+        current[1].append(line.rstrip())
     if not title:
         raise FragmentError(f'{name}: start with a "# " title, such as "# PLUG-40"')
     if not sections:
@@ -205,11 +213,22 @@ def fold_decision(lines, section, entries):
 
 
 def added_time(root, path):
-    """When the fragment was first committed (seconds), so entries keep the
-    order their pull requests merged in; uncommitted fragments come last."""
+    """When the fragment reached the main line (seconds), so entries keep the
+    order their pull requests merged in: --first-parent dates a fragment from
+    a merged branch by its merge, not by the branch's own commit. Uncommitted
+    fragments come last."""
     try:
         stamp = subprocess.run(
-            ['git', 'log', '--diff-filter=A', '--format=%ct', '-1', '--', str(path.relative_to(root))],
+            [
+                'git',
+                'log',
+                '--first-parent',
+                '--diff-filter=A',
+                '--format=%ct',
+                '-1',
+                '--',
+                str(path.relative_to(root)),
+            ],
             cwd=root,
             capture_output=True,
             text=True,
@@ -243,10 +262,25 @@ def check(root):
     return parsed
 
 
+def shallow(root):
+    try:
+        answer = subprocess.run(
+            ['git', 'rev-parse', '--is-shallow-repository'], cwd=root, capture_output=True, text=True, check=True
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return False  # Not a Git checkout: every fragment counts as uncommitted.
+    return answer == 'true'
+
+
 def fold(root):
     parsed = check(root)
     if not parsed:
         return []
+    if shallow(root):
+        raise FragmentError(
+            'this is a shallow clone, which cannot tell when older fragments reached main, so entries '
+            'would fold out of order; run "git fetch --unshallow" and fold from an up-to-date main'
+        )
     parsed.sort(key=lambda item: (added_time(root, item[0]), item[0].name))
     pages = {name: read_page(root, name) for name in (CHANGELOG, TODO, DECISIONS)}
     # Oldest first: newest-first lists insert at the top, so the newest ends up

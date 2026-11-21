@@ -46,8 +46,11 @@ binary release validation remains a separate step.
 For a deliberate feature/API milestone, add the label `version:minor` to the
 pull request; for a major compatibility milestone, `version:major`. Leave
 `VERSION` itself alone: every pull request that edited it conflicted with the
-version bot's next commit and with every other such pull request (jrp, 21
-November 2026, DOC-20). When the merge reaches `main`, the workflow reads the
+version bot's next commit and with every other such pull request
+([decision](../project/decisions.md#documentation)). If you cannot add a
+label yourself, ask jrp to add it before he merges, and say so in the pull
+request. Only these two exact names count: any other label, a misspelt one
+included, leaves the automatic patch. When the merge reaches `main`, the workflow reads the
 labels of the merged pull requests behind every source change since the last
 tag (`scripts/version_source.py --labels-from`, through the GitHub CLI with
 the workflow's token) and takes the largest step any of them asks for: from

@@ -270,7 +270,9 @@ Before the tag, a pull request updates the release notes. It first runs
 `python3 scripts/fold_changes.py`, which folds every
 [change fragment](workflow.md#change-fragments) into the changelog, TODO's
 done list and the decisions log and deletes them, so that the tag carries
-the whole changelog. Then `PREVIOUS_PREVIEW` and `CHANGES` in
+the whole changelog. Just before jrp merges it, it merges `main` and folds
+again, so that fragments merged meanwhile are in the tag's changelog too
+and `changes/` holds only its README. Then `PREVIOUS_PREVIEW` and `CHANGES` in
 [`prepare_release.py`](../../scripts/release/prepare_release.py) name the
 preview published before and list, in a user's words, what changed since
 (the [changelog](../../CHANGELOG.md) holds every change), and any known
@@ -352,8 +354,11 @@ limitation that no longer holds is removed. Its merge makes the tag.
    ([debugging symbols](#debugging-symbols)): artifacts expire after 90 days.
    Then record the published version in the
    [changelog](../../CHANGELOG.md): a heading for the tag above the entries it
-   contains. That pull request's merge bumps `VERSION` again, which is
-   expected: the tag, not `main`, is what was published.
+   contains. If `main` holds fragments that the tag holds too (compare
+   `git ls-tree --name-only vX.Y.Z changes/` with `changes/`), merged after
+   the release-notes pull request's last fold, fold them in the same pull
+   request and move their entries under that heading. The change
+   touches no source, so it gets no new version.
 7. Keep the release's files for later builds (COMPAT-1): on Linux x86-64,
    download every published ZIP, unpack the Linux one, build
    `convolver_vst3_render` (a VST3 build without sanitizers), and run

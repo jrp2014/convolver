@@ -381,25 +381,36 @@ TODO ID (`changes/<ID>.md`, such as PLUG-40.md), with a section for each record 
 the changelog groups (**Added**, **Changed**, **Fixed**, **For
 contributors** and the rest), **Done** for the item's ticked TODO line and
 **Decisions:** *section* for a decision of jrp's. The
-[form](../../changes/README.md#the-form) shows an example. No pull request
-edits the top of `CHANGELOG.md`, the done list or a section of
-`decisions.md` by hand (jrp, 21 November 2026, DOC-20). The every-item rule
-is unchanged: every finished TODO item still gets a changelog entry, in its
-fragment.
+[form](../../changes/README.md#the-form) shows an example. New entries
+reach those three pages only through fragments
+([decision](../project/decisions.md#documentation)). The pages are still
+edited directly for work on what they already hold: a fold, the heading for
+a published release ([releasing](releasing.md)), moving the done list to
+the archive, marking a decision replaced, and correcting an entry. The
+every-item rule is unchanged: every finished TODO item still gets a
+changelog entry, in its fragment.
 
 Fragments are folded, which moves each entry into its page in the order the
-fragments reached `main` and deletes the fragments:
+fragments reached `main` and deletes the fragments. Fold on a branch made
+from an up-to-date `main` with full history; the script refuses a shallow
+clone, which cannot tell when older fragments arrived (`git fetch
+--unshallow` first):
 
 ```sh
 python3 scripts/fold_changes.py
 ```
 
-- The release-notes pull request for a preview folds them first, so the tag
-  it makes carries a complete changelog ([releasing](releasing.md)).
+- The release-notes pull request for a preview folds them, and merges
+  `main` and folds again just before it is merged, so the tag it makes
+  carries a complete changelog and `changes/` holds only its README
+  ([releasing](releasing.md)).
 - Anyone may fold sooner in a pull request that does nothing else, for
   example after a round of merges. Other pull requests only add fragments,
   so a fold conflicts with none of them; a fragment merged while it is open
-  waits for the next fold.
+  waits for the next fold. A fold pull request needs no TODO ID or fragment
+  of its own (title it `Records: fold change fragments`), and its
+  independent review checks only that the diff moves entries unchanged
+  apart from their links.
 
 Until then, read the open fragments alongside the pages:
 `changes/` holds jrp's newest decisions and the newest finished items. A
@@ -412,7 +423,7 @@ could not be folded.
 
 Once something has been processed or consolidated into its lasting home,
 remove the original in the same change, so that nothing stale is left to
-contradict the record (jrp, 21 November 2026, DOC-20):
+contradict the record ([decision](../project/decisions.md#documentation)):
 
 - Change fragments are deleted when they are folded (the script does this).
 - A plan that is fully implemented or superseded moves to

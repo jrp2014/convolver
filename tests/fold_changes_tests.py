@@ -138,7 +138,15 @@ class FoldChanges(unittest.TestCase):
             'changes/plug-3.md': (fragment('PLUG-3', '## Changed\n\n- Entry.\n'), 'name a fragment after its TODO ID'),
             'changes/PLUG-6.md': (fragment('PLUG-6', '## Improved\n\n- Entry.\n'), 'unknown section "Improved"'),
             'changes/PLUG-7.md': (fragment('PLUG-7', '## Changed\n\n'), 'section "Changed" is empty'),
-            'changes/PLUG-8.md': (fragment('PLUG-8', '## Changed\n\nProse.\n'), 'must be a list'),
+            'changes/PLUG-8.md': (fragment('PLUG-8', '## Changed\n\nProse.\n'), 'only list entries'),
+            'changes/PLUG-12.md': (
+                fragment('PLUG-12', '## Changed\n\n- Entry.\n<!-- note -->\n'),
+                'only list entries',
+            ),
+            'changes/PLUG-13.md': (
+                fragment('PLUG-13', '## Changed\n\n- [Entry][ref].\n  [ref]: docs/a.md\n'),
+                'use inline links',
+            ),
             'changes/PLUG-9.md': (fragment('PLUG-9', '## Done\n\n- PLUG-9 finished.\n'), 'not a ticked TODO line'),
             'changes/PLUG-10.md': (SPDX_MD + '## Changed\n\n- Entry.\n', 'start with a "# " title'),
             'changes/PLUG-11.md': (
@@ -155,6 +163,42 @@ class FoldChanges(unittest.TestCase):
                 self.assertEqual(self.read('CHANGELOG.md'), CHANGELOG)
                 self.assertTrue((self.root / name).exists())
                 (self.root / name).unlink()
+
+    def test_merged_branch_fragment_is_dated_by_its_merge(self):
+        # Written on a branch before PLUG-4 reached main, merged after it.
+        self.git('checkout', '-q', '-b', 'branch')
+        self.write('changes/PLUG-5.md', fragment('PLUG-5', '## Changed\n\n- Merged later (PLUG-5).\n'))
+        self.commit('PLUG-5', '2026-11-10T00:00:00Z')
+        self.git('checkout', '-q', 'main')
+        self.write('changes/PLUG-4.md', fragment('PLUG-4', '## Changed\n\n- Merged first (PLUG-4).\n'))
+        self.commit('PLUG-4', '2026-11-11T00:00:00Z')
+        date = '2026-11-12T00:00:00Z'
+        self.git(
+            'merge',
+            '-q',
+            '--no-ff',
+            '-m',
+            'Merge PLUG-5',
+            'branch',
+            env={**os.environ, 'GIT_AUTHOR_DATE': date, 'GIT_COMMITTER_DATE': date},
+        )
+        self.run_fold()
+        self.assertIn('- Merged later (PLUG-5).\n- Merged first (PLUG-4).\n- Old change', self.read('CHANGELOG.md'))
+
+    def test_shallow_clone_is_refused(self):
+        self.write('changes/PLUG-4.md', fragment('PLUG-4', '## Changed\n\n- Entry (PLUG-4).\n'))
+        self.commit('PLUG-4', '2026-11-11T00:00:00Z')
+        self.write('later.txt', 'later\n')
+        self.commit('Later', '2026-11-12T00:00:00Z')
+        clone = Path(self.temp.name) / 'shallow'
+        subprocess.run(
+            ['git', 'clone', '-q', '--depth=1', self.root.as_uri(), str(clone)], check=True, capture_output=True
+        )
+        self.root = clone
+        self.run_fold('--check')
+        self.assertIn('shallow clone', self.run_fold(ok=False).stderr)
+        self.assertTrue((clone / 'changes/PLUG-4.md').exists())
+        self.assertEqual(self.read('CHANGELOG.md'), CHANGELOG)
 
     def test_missing_group_is_created_in_order(self):
         self.write('changes/PLUG-3.md', fragment('PLUG-3', '## Added\n\n- New feature (PLUG-3).\n'))
