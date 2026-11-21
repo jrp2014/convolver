@@ -40,8 +40,9 @@ CHANGES = (
         'settings." and the filter is checked against the rate and channels the host then plays at, rather than '
         'against a brief start at a placeholder rate. In Audacity 4, which starts the plug-in at 44.1 kHz until it '
         "first plays, whatever the project's rate, 0.14.0 refused a 48 kHz filter chosen before playback and saved "
-        'that failure, so exports were dry or silent. While the host plays, a file that does not suit it is still '
-        'refused and the working filter keeps playing. VST3 and the Audio Unit.'
+        'that failure, so exports were dry or silent. A file that turns out not to suit the host is refused only '
+        'while another filter that suits it is playing, which keeps playing; with no such filter, it is kept until '
+        'the host starts at settings that suit it (described below). VST3 and the Audio Unit.'
     ),
     (
         "A configuration list needs the host's rate and channels to choose its entry. Chosen before the host has "
