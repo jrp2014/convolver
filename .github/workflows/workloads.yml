@@ -102,7 +102,7 @@ jobs:
           "BENCHMARK=build/Release/convolver_callback_benchmark.exe" >> $env:GITHUB_ENV
       - name: Compiler
         shell: bash
-        run: grep -E '^CMAKE_CXX_COMPILER(_VERSION)?:|CMAKE_CXX_COMPILER_ID:' build/CMakeCache.txt || true
+        run: grep -hE 'CMAKE_CXX_COMPILER(_ID|_VERSION)? ' build/CMakeFiles/*/CMakeCXXCompiler.cmake || true
       # The summary and every run go to the log and the job summary, so the
       # results can be read without downloading the artifact.
       - name: Measure

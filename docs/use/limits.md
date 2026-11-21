@@ -8,9 +8,11 @@ to use or do instead.
 and channel counts they were made for. It does not design filters, resample
 or play audio to a device by itself, and its VST® 3 plug-in has a window on
 macOS and Windows only, as has the Audio Unit on macOS. Its packages are unsigned developer previews.
-One plug-in instance played room correction for up to 8 channels and
-reverbs up to 60 s in real time on the machines measured; a full 8 × 8
-matrix at 96 kHz was beyond them ([processor load](#filter-length-channels-and-processor-load)).
+On four shared machines, Convolver's processing, run as its plug-ins run
+it, kept up with room to spare with room correction for up to 8 channels,
+stereo reverbs up to 60 s and true-stereo reverbs up to 60 s at 48 kHz or
+30 s at 96 kHz; a full 8 × 8 matrix at 96 kHz did not on every machine
+([processor load](#filter-length-channels-and-processor-load)).
 
 | Convolver does not… | Instead |
 | --- | --- |
@@ -36,18 +38,20 @@ need small changes first; see [other programs](other-programs.md).
 
 How much one plug-in instance handles was measured in November 2026 on four
 shared machines: three x86-64 servers, with Linux and Windows, and an Apple
-M1 virtual machine, each playing filters as a host would
+M1 virtual machine. A test program ran Convolver's processing as its
+plug-ins run it, without a host or the plug-in format's own small share of
+each buffer
 ([measurements](../develop/fft-measurements.md#supported-workloads)). On
-each of them, the filters below played in real time with room to spare: on
-average at most a fifth of one processor core, and even the slowest 1 in 100
-audio buffers took less than half the buffer's time, with buffers of 64 and
-512 frames and at Latency 0 and 256. The percentages are the highest of the
-four machines.
+each machine, the filters below kept up with room to spare: on average they
+used at most a fifth of one processor core, and the slowest 1 in 100 audio
+buffers took less than half the buffer's time, with buffers of 64 and 512
+frames and at Latency 0 and 256. The percentages are the highest of the
+four machines, rounded up.
 
 | Filter | At 48 kHz | At 96 kHz |
 | --- | --- | --- |
 | Room correction or a crossover, up to 8 channels, one filter per output (1.4 s at 48 kHz) | Up to 4% of a core | Up to 9% |
-| A full 8 × 8 matrix (64 filters of 1.4 s at 48 kHz) | Up to 19% | Beyond these machines: up to half a core, and the slowest buffers near their limit |
+| A full 8 × 8 matrix (64 filters of 1.4 s at 48 kHz) | Up to 19% | Not on every machine: up to half a core, and the slowest 1 in 100 buffers took up to two-thirds of their time |
 | A stereo or true-stereo reverb of up to 30 s | Up to 4% | Up to 17% |
 | A 60 s reverb | Stereo up to 5%, true stereo up to 10% | Stereo up to 20%; true stereo is too large to save in a project ([size limit](plugins.md#when-a-filter-does-not-fit)), so the command line only |
 | A 10 s reverb on 8 channels | Up to 6% | Up to 19% |
@@ -55,14 +59,15 @@ four machines.
 Your computer and host differ from these machines, and the host and its
 other plug-ins share the processor.
 Latency 0 costs up to about half as much again as Latency 256 for room
-correction and crossovers, and little more for long reverbs.
+correction and crossovers; for long reverbs it showed no consistent extra
+cost.
 
-A filter takes about three to five times the memory of its samples while it
+A large filter takes about two to five times the memory of its samples while it
 plays, and twice that while a newly chosen filter replaces it: a 30 s
 true-stereo filter at 48 kHz (22 MiB of samples) used 76 MiB, and 165 MiB
-during a replacement. Preparing it took under 0.1 s; the 60 s filters and
-the 10 s 8-channel reverb at 96 kHz took up to 0.2 s, during which the host
-can pause ([loading a filter](plugins.md#loading-a-filter)).
+during a replacement. Preparing it took under 0.1 s; larger filters, such
+as 30 s reverbs at 96 kHz, the 8-channel ones at 96 kHz and the 60 s
+filters, took up to 0.2 s, during which the host can pause ([loading a filter](plugins.md#loading-a-filter)).
 
 <!-- VST trademark notice: written by scripts/trademarks.py from packaging/trademarks/vst.json -->
 

@@ -413,14 +413,18 @@ and the owner's decision its row names, and keeps its
 - [ ] **EDGE-10 — Sound-aware and platform-aware optimisation.** A
   [catalogue](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#sound-aware-and-platform-aware-optimisation),
   investigated one candidate at a time when a measured limitation points at
-  it. **Done when** PERF-3 shows none is justified, or each one tried is
-  adopted as its own item or stopped with its numbers.
+  it; PERF-3's [measurements](docs/develop/fft-measurements.md#supported-workloads)
+  found none in the supported workloads, only a full 7.1 matrix at 96 kHz
+  beyond them. **Done when** no workload users need is out of reach, or
+  each one tried is adopted as its own item or stopped with its numbers.
 - [ ] **EDGE-11 — Savings in today's engine.** Idling after the tail is in
   (PR #209). **Remains:** the plan's
   [other candidates](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#2-savings-in-todays-engine),
-  each only when PERF-3 points at it, and Apple silicon measurements.
-  **Done when** PERF-3 shows none is justified, or each one tried is kept or
-  stopped with its numbers, the oracle tests passing.
+  each only when a workload users need falls short (PERF-3 found only a full
+  7.1 matrix at 96 kHz, which the shared-mix candidates target), and Apple
+  silicon measurements. **Done when** no workload users need falls short,
+  or each one tried is kept or stopped with its numbers, the oracle tests
+  passing.
 - [ ] **EDGE-12 — Filters larger than the saved-state limit.** **Done
   when** a plug-in saves and restores a filter over 64 MiB through the
   storage jrp chooses, and refuses clearly when it is missing or changed.

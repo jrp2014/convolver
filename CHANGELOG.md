@@ -21,11 +21,13 @@ first published preview, keep their original grouping.
 ### Added
 
 - Documentation (PERF-3): the [limits guide](docs/use/limits.md#filter-length-channels-and-processor-load)
-  states what one plug-in instance handles, from measurements on four shared
+  states what one plug-in instance handles, from measurements of
+  Convolver's processing, run as its plug-ins run it, on four shared
   machines (an Apple M1 virtual machine and Linux and Windows x86-64
-  servers): room correction for up to 8 channels and reverbs up to 60 s in
-  real time with room to spare, a full 8 × 8 matrix only at 48 kHz, and the
-  memory and preparation time a filter takes.
+  servers): room correction for up to 8 channels, stereo reverbs up to 60 s
+  and true-stereo reverbs up to 60 s at 48 kHz or 30 s at 96 kHz kept up
+  with room to spare, a full 8 × 8 matrix only at 48 kHz; and the memory
+  and preparation time a filter takes.
 - Releases: jrp published Convolver 0.14.0, the sixth unsigned developer
   preview, on 19 November 2026
   ([release](https://github.com/jrp2014/convolver/releases/tag/v0.14.0)).

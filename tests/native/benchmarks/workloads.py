@@ -40,6 +40,7 @@ import platform
 import statistics
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -131,19 +132,23 @@ def peak_rss_windows(process):
 
 def run(command):
     """Run the benchmark; return its result row and peak resident bytes."""
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    if os.name == 'nt':
-        out, err = process.communicate()
-        peak = peak_rss_windows(process)
-        status = process.returncode
-    else:
-        # wait4 gives this child's own peak, not the largest of all children.
-        out = process.stdout.read()
-        err = process.stderr.read()
-        _, wait_status, usage = os.wait4(process.pid, 0)
-        process.returncode = os.waitstatus_to_exitcode(wait_status)
-        status = process.returncode
-        peak = usage.ru_maxrss * (1 if sys.platform == 'darwin' else 1024)
+    # Errors go to a file, so a child that writes much to both streams
+    # cannot block on a full pipe while this reads the other.
+    with tempfile.TemporaryFile(mode='w+') as errors:
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=errors, text=True)
+        if os.name == 'nt':
+            out, _ = process.communicate()
+            peak = peak_rss_windows(process)
+            status = process.returncode
+        else:
+            # wait4 gives this child's own peak, not the largest of all children.
+            out = process.stdout.read()
+            _, wait_status, usage = os.wait4(process.pid, 0)
+            process.returncode = os.waitstatus_to_exitcode(wait_status)
+            status = process.returncode
+            peak = usage.ru_maxrss * (1 if sys.platform == 'darwin' else 1024)
+        errors.seek(0)
+        err = errors.read()
     if status != 0:
         raise SystemExit(f'{" ".join(command)} failed ({status}): {err.strip()}')
     header, row = out.strip().splitlines()[-2:]

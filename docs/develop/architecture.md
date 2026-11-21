@@ -316,9 +316,11 @@ by jrp, 8 November 2026). Machines with many cores are used as follows:
 - **The command line** renders one file per run; several runs at once use
   every core with no change ([file rendering](../use/command-line.md#file-rendering)).
 
-Revisit only if a measured workload on a named machine shows one instance
-needing a large share of a core (PERF-3), and then with Apple's audio
-workgroups or Windows MMCSS for any helper thread, as EDGE-10 lists.
+Revisit only if a workload users need shows one instance needing a large
+share of a core on a named machine, and then with Apple's audio workgroups
+or Windows MMCSS for any helper thread, as EDGE-10 lists. PERF-3's
+[measurements](fft-measurements.md#supported-workloads) found that only for
+a full 7.1 matrix at 96 kHz (up to half a core).
 
 ## Where future work belongs
 
