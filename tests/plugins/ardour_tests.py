@@ -126,6 +126,16 @@ def explain_vst3_discovery(directory):
         print(f'--- {module.relative_to(directory)} (mtime {module.stat().st_mtime:.3f})')
 
 
+def show_convolver_log(directory):
+    """For a failure: the Convolver log in the test's home folder, which explains a refused layout."""
+    path = directory / 'home' / '.local' / 'state' / 'convolver' / 'convolver.log'
+    if path.is_file():
+        print(f'--- {path.relative_to(directory)}')
+        print(path.read_text(encoding='utf-8', errors='replace')[-8000:])
+    else:
+        print(f'--- no Convolver log at {path.relative_to(directory)}')
+
+
 def plugin_uri(inputs, outputs):
     """The LV2 URI of the discrete layout with these channel counts."""
     for layout in REGISTRY['fixed_layouts']:
@@ -319,6 +329,8 @@ def check(tools, environment, directory, plugin_tool, format_name, fixture_name,
     # unsuited and the export silent.
     channels = re.search(r'^Plug-in channels: (\d+) in, (\d+) out', log, re.MULTILINE)
     assert channels, f"{name}: the script did not report the plug-in's channels"
+    if (int(channels[1]), int(channels[2])) != (inputs, outputs):
+        show_convolver_log(directory)  # A refused layout is explained there.
     assert (int(channels[1]), int(channels[2])) == (inputs, outputs), (
         f'{name}: Ardour runs the plug-in with {channels[1]} in, {channels[2]} out, '
         f"not the track's {inputs} in, {outputs} out"
