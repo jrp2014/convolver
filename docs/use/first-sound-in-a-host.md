@@ -13,8 +13,9 @@ hollow) and `repeat-48000-stereo/filter.cfg` (each sound again a quarter of a
 second later), then save, close and reopen the project: the filter is still
 there. Your own IR file, `.cfg` or configuration list loads the same way,
 from any folder. Presets are an [optional route](#optional-load-a-preset);
-in Audacity both the preset menu and **Choose…** are checked
-([In Audacity](#in-audacity)).
+in Audacity both the preset menu and **Choose…** are checked (Audacity
+4.0.2 on macOS, Convolver previews after 0.14.0;
+[In Audacity](#in-audacity)).
 
 You need a plug-in host that loads VST® 3, such as REAPER or Audacity
 (version 4 or later), or one that loads Audio Units, such as GarageBand or
@@ -37,8 +38,9 @@ see the [Equalizer APO export](equalizer-apo.md) on Windows and
   resample. Audacity plays effects at its Default sample rate, which can
   differ from the rate it exports at.
 - **In Audacity**, Audacity's own preset menu and Convolver's **Choose…**
-  and **Recent** are checked ways to load filters (VST3, on macOS), as
-  [In Audacity](#in-audacity) says.
+  and **Recent** are checked ways to load filters (Audacity 4.0.2, VST3 on
+  macOS, Convolver previews after 0.14.0; in 0.14.0 use the preset menu),
+  as [In Audacity](#in-audacity) says.
 - Changing **Latency** during playback leaves a short gap and cuts off a
   tail that is still sounding; hosts differ in when they line the audio up
   again ([latency and tail](plugins.md#latency-and-tail)).

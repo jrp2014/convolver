@@ -587,7 +587,12 @@ OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp&
     AUSDK_RT_UNSAFE_END
     if (!processed)
         return kAudio_ParamError;
-    settling_.played();
+    // Only a render with frames is the host playing audio (as in the VST3's
+    // process()): after a zero-frame render a chosen file still waits, and
+    // restored state is still kept until it suits (jrp's review, 21 November
+    // 2026).
+    if (frames)
+        settling_.played();
     // Silent only once the output is: a filter's tail outlasts silent input.
     bool silent = silent_input;
     for (UInt32 c = 0; silent && c < outputs; ++c)

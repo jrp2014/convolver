@@ -533,3 +533,8 @@ move to the archive.
   read again by itself once the window sees the host playing, and says the
   settings are known meanwhile
   ([plug-ins](docs/use/plugins.md#loading-a-filter)).
+- [x] **PLUG-41 — A chosen file waits for audio in this start.** 21
+  November 2026, PR #252, from jrp's review of the same day: VST3 no longer
+  refuses a file chosen after a restart from the earlier start's audio, and
+  an Audio Unit render of zero frames no longer counts as playing
+  ([contract](docs/develop/plugin-contract.md#loading-and-failure)).

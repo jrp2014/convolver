@@ -164,6 +164,14 @@ first published preview, keep their original grouping.
 
 ### Fixed
 
+- Plug-ins (PLUG-41, from jrp's review of 21 November 2026): a filter file
+  chosen in Convolver's window waits for audio in the current start in both
+  formats. The VST3 plug-in refused a file chosen just after the host
+  stopped and started again with the same settings, before any audio of
+  that start, from audio played in the earlier start. The Audio Unit
+  counted a render of zero frames as the host playing, so after one it
+  refused a chosen file that should wait, and refused restoring a 48 kHz
+  project after a 44.1 kHz probe (error -10851). No change to the sound.
 - Plug-ins (PLUG-27): a filter file chosen in Convolver's window before the
   host plays is kept and saved with the project, and checked when the host
   plays audio through the plug-in; until then Status says "Filter selected.

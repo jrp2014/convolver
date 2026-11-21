@@ -117,9 +117,14 @@ before they set the sample rate and channel layout (VST3 `setState` before
   below.
 - **A file chosen in the window** (PLUG-27, jrp, 20 November 2026), in VST3
   and the Audio Unit alike: it is refused for not suiting the host only
-  while the host plays audio through the plug-in (started, and audio has
-  played with that configuration: `HostSettling::check()` answers
-  `refuse_mismatch`), and is then read for the host's configuration, so a
+  while the host plays audio through the plug-in (started, and audio with
+  samples processed in this start: `HostSettling::playing()`, for which
+  `HostSettling::check()` answers `refuse_mismatch`; audio from an earlier
+  start does not count, nor does a render or `process` call of zero frames,
+  jrp's review of 21 November 2026, so a file chosen just after a restart
+  waits in VST3 as in the Audio Unit, and an Audio Unit render of zero
+  frames neither refuses a later choice nor binds restored state), and is
+  then read for the host's configuration, so a
   list chooses its entry for it. Otherwise the host's rate and channels may
   be a placeholder: Audacity 4.0.2 sets up its window's copy at 44.1 kHz
   until it first plays, whatever the project's rate, and starts it only for

@@ -1043,6 +1043,24 @@ void chosen_before_rendering() {
     require(f.present && !f.silent && rate_of(unit) == 48000,
             "a refused file replaced the playing filter: " + std::string(f.message));
     unit.uninitialize();
+
+    // jrp's review (21 November 2026): a render of zero frames is not the
+    // host playing, so a 44.1 kHz file chosen after one is kept and waits.
+    Unit fresh;
+    check(fresh.configure(48000, 2, 2, 512), "48 kHz formats for a zero-frame render");
+    check(fresh.initialize(), "48 kHz initialization for a zero-frame render");
+    std::vector<float> in(512), out(512), in2(512), out2(512);
+    const std::array<const float*, 2> ins{in.data(), in2.data()};
+    const std::array<float*, 2> outs{out.data(), out2.data()};
+    bool silent = false;
+    check(fresh.render(ins, outs, 0, false, silent), "a zero-frame render");
+    check(choose(fresh, (folder / "slow.wav").string()),
+          "a 44.1 kHz file chosen after a zero-frame render");
+    r = report(fresh);
+    require(r.status_name == "Waiting" && rate_of(fresh) == 44100,
+            "chosen after a zero-frame render: " + text(r.status_name) + ": " +
+                text(r.status.text));
+    fresh.uninitialize();
 }
 
 // TODO AU-6: a report read while a load holds the unit's control lock on

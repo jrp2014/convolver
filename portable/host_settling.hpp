@@ -105,10 +105,14 @@ class HostSettling {
         return started_;
     }
     HostLoadCheck check(HostRequestKind kind) const noexcept {
-        if (kind == HostRequestKind::chosen_file) // PLUG-27, both formats.
-            return active_ && played_.load(std::memory_order_relaxed)
-                       ? HostLoadCheck::refuse_mismatch
-                       : HostLoadCheck::keep_until_suited;
+        // PLUG-27, both formats: a chosen file is refused only while the
+        // host plays audio in this start. Not from audio played in an
+        // earlier start with the same configuration, which VST3 remembers
+        // for restored state: a file chosen after a restart, before its
+        // first block, waits as the Audio Unit's does (jrp's review, 21
+        // November 2026).
+        if (kind == HostRequestKind::chosen_file)
+            return playing() ? HostLoadCheck::refuse_mismatch : HostLoadCheck::keep_until_suited;
         if (binding_ == HostBinding::rendering)
             return HostLoadCheck::refuse_mismatch;
         switch (kind) {
