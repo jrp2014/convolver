@@ -3,13 +3,21 @@
 
 > **Archived 20 November 2026.** The entries of the
 > [done](../../../TODO.md#done) list in `TODO.md` as they stood at `549ec9c`
-> (0.16.8), moved here unchanged so that TODO holds open work only; only
-> relative links were changed, so they resolve from this folder. The
+> (0.16.8), and DOC-18 as it merged at `ddf5440`, moved here unchanged so
+> that TODO holds open work only; only relative links were changed, so they
+> resolve from this folder. The
 > [repository checks](../../develop/workflow.md#automated-checks) treat an
 > ID listed here as defined and done. Earlier finished items are in the
 > [list to 8 November 2026](2026-11-08-done-items.md). Use the
 > [current documentation](../../README.md) for how Convolver behaves now.
 
+- [x] **DOC-18 — User guides that match the plug-ins.** 20 November
+  2026, PR #234, from an outside audit's findings in `docs/use/`: the
+  first-sound guide's **Choose…** reads Convolver presets, the concepts
+  page's engine and settings are current, the Windows window is named
+  wherever the macOS one is, the package list has the LV2 plug-in, and no
+  TODO IDs remain in the user guides
+  ([documentation](../../develop/documentation.md#writing-rules)).
 - [x] **HOST-7 — Run the Ardour test with Ardour 9.**
   20 November 2026, PR #229, from CI-43: Ardour 9's Lua tool crashed in
   `Session:new_audio_track`, which takes an empty `ARDOUR.RouteGroup()`
