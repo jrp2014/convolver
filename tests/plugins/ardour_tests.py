@@ -77,14 +77,40 @@ LATENCIES = [
 ]
 # Each fixture at the default Latency, 0; then a session saved at a larger
 # Latency, which Ardour must compensate when the export restores it: the
-# largest delay a user is likely to choose, and a multichannel one. Ardour
-# 8.4 runs a VST3 plug-in only with its default buses (Convolver's: 2 in,
-# 2 out), feeding a mono track to both inputs, so the mono and crossover
-# presets do not fit there and only the stereo cases run; Ardour's LV2 host
-# chooses the layout by URI.
+# largest delay a user is likely to choose, and a multichannel one. Ardour's
+# LV2 host chooses the layout by URI. With its automatic pin configuration,
+# Ardour (8.4 and 9.0) runs Convolver's VST3 with 2 in, 2 out on a
+# Flexible-I/O track, the kind its Lua adds, feeding a mono track to both
+# inputs, so a mono or crossover preset plays silence there (HOST-10):
+# Ardour 9.0's request for one channel reaches the plug-in as none
+# (VST3PI::request_bus_layout masks kMono with the default bus width), and a
+# request for more as two. On a Strict-I/O track, the kind Ardour's window
+# adds by default ('strict'), the mono preset plays as it is: Ardour
+# connects one output and asks for a mono layout without the mask. On a
+# Flexible-I/O track it plays once set by hand, as the Pin Connections
+# window's Manual Config does: with the outputs set to 1 ('outputs', all
+# Ardour 8's window can set for a VST3) and with the input pins set to 1 as
+# well ('all', which Ardour 9's window can set). A crossover set by hand
+# still gets 2 outputs (tried on Ardour 8.4), so it is not run. Strict-I/O
+# keeps the track's channel count, so a crossover cannot play on such a
+# track in either format (tried on Ardour 8.4) and runs on Flexible-I/O
+# tracks only; mono and stereo run on both kinds.
 CASES = {
-    'LV2': [('mono', 0), ('stereo', 0), ('crossover', 0), ('stereo', 1024), ('crossover', 256)],
-    'VST3': [('stereo', 0), ('stereo', 1024)],
+    'LV2': [
+        ('mono', 0),
+        ('mono', 0, 'strict'),
+        ('stereo', 0, 'strict'),
+        ('crossover', 0),
+        ('stereo', 1024),
+        ('crossover', 256),
+    ],
+    'VST3': [
+        ('stereo', 0, 'strict'),
+        ('stereo', 1024),
+        ('mono', 0, 'strict'),
+        ('mono', 0, 'outputs'),
+        ('mono', 0, 'all'),
+    ],
 }
 
 
@@ -115,6 +141,46 @@ def explain_vst3_discovery(directory):
                 print(path.read_text(encoding='utf-8', errors='replace')[:4000])
     for module in sorted((directory / 'home' / '.vst3').rglob('*.so')):
         print(f'--- {module.relative_to(directory)} (mtime {module.stat().st_mtime:.3f})')
+
+
+def convolver_log(directory):
+    return directory / 'home' / '.local' / 'state' / 'convolver' / 'convolver.log'
+
+
+def log_size(directory):
+    path = convolver_log(directory)
+    return path.stat().st_size if path.is_file() else 0
+
+
+def print_layout_lines(directory, name, start):
+    """The layout lines the Convolver log gained since start: what the plug-in was given.
+
+    A refused layout is followed by the one Ardour gave next, so a Refused
+    line is not by itself a failure; the export says what was heard.
+    """
+    path = convolver_log(directory)
+    if not path.is_file():
+        print(f'{name}: no Convolver log')
+        return
+    with path.open('rb') as log:
+        log.seek(start)
+        text = log.read().decode('utf-8', errors='replace')
+    last = None
+    for line in text.splitlines():
+        found = re.search(r"(Refused the host's channel layout: .*|Started at .*?, blocks of up to \d+ frames\.)", line)
+        if found and found[1] != last:  # Repeats in a row say nothing new.
+            last = found[1]
+            print(f'{name}: log: {found[1]}')
+
+
+def show_convolver_log(directory):
+    """For a failure: the Convolver log in the test's home folder, which explains a refused layout."""
+    path = convolver_log(directory)
+    if path.is_file():
+        print(f'--- {path.relative_to(directory)}')
+        print(path.read_text(encoding='utf-8', errors='replace')[-8000:])
+    else:
+        print(f'--- no Convolver log at {path.relative_to(directory)}')
 
 
 def plugin_uri(inputs, outputs):
@@ -270,7 +336,7 @@ def preset_path(directory, format_name, fixture_name, label):
     return directory / 'home' / '.vst3' / 'presets' / REGISTRY['vendor']['name'] / VST3_CLASS / f'{label}.vstpreset'
 
 
-def check(tools, environment, directory, plugin_tool, format_name, fixture_name, fixture, latency):
+def check(tools, environment, directory, plugin_tool, format_name, fixture_name, fixture, latency, *, mode=''):
     inputs, outputs = fixture['inputs'], fixture['outputs']
     label = f'Convolver {fixture_name}'
     preset = preset_path(directory, format_name, fixture_name, label)
@@ -278,7 +344,7 @@ def check(tools, environment, directory, plugin_tool, format_name, fixture_name,
         preset.parent.mkdir(parents=True, exist_ok=True)
         run([plugin_tool, '--name', label, EXAMPLES / fixture_name / fixture['filter'], preset], environment)
 
-    name = f'{fixture_name}-{latency}'
+    name = f'{fixture_name}-{latency}' + (f'-{mode}' if mode else '')
     session = directory / 'sessions' / name
     new_session(tools['new_session'], environment, session, name, outputs, tools['version'])
     filter_tail = tail(fixture['paths'], fixture['input_delays'], fixture['output_delays'])
@@ -298,13 +364,25 @@ def check(tools, environment, directory, plugin_tool, format_name, fixture_name,
         'CONVOLVER_FRAMES': str(RECORD),
         'CONVOLVER_TAIL': str(filter_tail + MARGIN),
         'CONVOLVER_LEAD': str(LEAD),
+        'CONVOLVER_PINS': mode if mode in {'outputs', 'all'} else '',
+        'CONVOLVER_LOG': str(convolver_log(directory)),
+        'CONVOLVER_STRICT_IO': '1' if mode == 'strict' else '',
     }
+    log_start = log_size(directory)
     result = run([tools['lua'], SCRIPT], {**environment, **settings}, check=False)
     if result.returncode != 0:
         if format_name == 'VST3':
             explain_vst3_discovery(directory)
         sys.exit(f'{name}: {pathlib.Path(tools["lua"]).name} failed with exit code {result.returncode}')
     log = result.stdout
+    # HOST-10: the channels Ardour gives the plug-in are printed, not
+    # asserted: what users hear is the export, checked against the oracle
+    # below, and a filter Ardour's channels do not suit exports silence.
+    # The Convolver log says what the plug-in was given.
+    for line in log.splitlines():
+        if line.startswith(('Track Pin Mode:', 'Natural streams:', 'Insert channels:')):
+            print(f'{name}: {line}')
+    print_layout_lines(directory, name, log_start)
     # The region can be a few frames shorter than the take's files.
     recorded = re.search(r'^Recorded (\d+) frames', log, re.MULTILINE)
     assert recorded, f'{name}: the script did not report the recording'
@@ -318,7 +396,9 @@ def check(tools, environment, directory, plugin_tool, format_name, fixture_name,
     assert int(reopened[1]) == latency, f'{name}: reopened with latency {reopened[1]}, saved with {latency}'
 
     exported = directory / f'{name}.wav'
+    log_start = log_size(directory)
     export(tools['export'], environment, exported, session, name)
+    print_layout_lines(directory, f'{name} export', log_start)
 
     take = recorded_take(session, name)
     assert len(take) == inputs, f'{name}: recorded {len(take)} channels, expected {inputs}'
@@ -343,6 +423,7 @@ def check(tools, environment, directory, plugin_tool, format_name, fixture_name,
                 lag, error = best_lag(got, want)
                 print(f'{name}: output {c} matches best {lag:+d} frames from where expected (error {error:.3g})')
         print(f'{name}: the region is at {region_position(session, name)} in the session file')
+        show_convolver_log(directory)  # Says which channels the plug-in was given, and why it is silent.
     peak = max(abs(v) for channel in expected for v in channel)
     print(
         f'{format_name} {name}: {inputs} in, {outputs} out, Latency {latency}, {len(take[0])} recorded frames, '
@@ -384,6 +465,7 @@ def main():
             'LV2_PATH': str(directory / 'lv2'),
             'XDG_CONFIG_HOME': str(directory / 'config'),
             'XDG_CACHE_HOME': str(directory / 'cache'),
+            'XDG_STATE_HOME': str(directory / 'home' / '.local' / 'state'),
         }
         if format_name == 'LV2':
             shutil.copytree(bundle, directory / 'lv2' / bundle.name)
@@ -406,7 +488,7 @@ def main():
             library = {'LD_LIBRARY_PATH': ':'.join(filter(None, [str(scan.parent), os.environ.get('LD_LIBRARY_PATH')]))}
             run([scan, '--force', installed], {**environment, **library})
         all_fixtures = fixtures()
-        for fixture_name, latency in CASES[format_name]:
+        for fixture_name, latency, *mode in CASES[format_name]:
             worst = max(
                 worst,
                 check(
@@ -418,6 +500,7 @@ def main():
                     fixture_name,
                     all_fixtures[fixture_name],
                     latency,
+                    mode=mode[0] if mode else '',
                 ),
             )
     print(f'Ardour ({format_name}): worst error against the oracle {worst:.3g}')

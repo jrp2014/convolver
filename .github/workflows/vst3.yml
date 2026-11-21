@@ -412,7 +412,7 @@ jobs:
             "-DCONVOLVER_VST3_SDK=${{ steps.sdk.outputs.vst3sdk }}" \
             -DCONVOLVER_BUILD_TESTS=OFF -DCONVOLVER_LEGACY_TESTS=OFF
           cmake --build build-vst3 --parallel --target convolver_vst3 convolver_preset_tool
-      - name: Ardour plays the stereo example, at Latency 0 and 1024
+      - name: Ardour plays the stereo and mono examples, on Strict-I/O and Flexible-I/O tracks
         run: python tests/plugins/ardour_tests.py build-vst3/VST3/Release/Convolver.vst3 build-vst3/convolver-preset
       - name: Explain a failure that may come from a new upstream release
         if: failure()
