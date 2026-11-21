@@ -60,6 +60,21 @@ CHANGES = (
         '48 kHz project restored after a 44.1 kHz probe (error -10851).'
     ),
     (
+        "A filter that does not suit the host's sample rate or channels, as a preset, an IR file or a `.cfg`, is now "
+        'refused only while another filter that suits the host is playing. With nothing playing it is kept and saved '
+        'with the project, plays silence with the reason in Status, and plays when the host next starts the plug-in '
+        'at a rate and channels that suit it. In Ardour 8.4, a filter chosen just before Ardour restarted the '
+        'plug-in with the outputs set in Pin Connections used to be refused, and the export was silent. A filter '
+        'refused while another plays stays refused, and restarting the host does not switch to it. A configuration '
+        'list with no entry for the host is still refused. VST3 and the Audio Unit; LV2 refuses as before.'
+    ),
+    (
+        'Status also says when a setting does not play as chosen, as the window already did: a Latency not in use '
+        'yet ("Latency 1024 frames not in use yet."), Gain mode Estimate without an estimate for the filter ("No '
+        'estimate: No clipping\'s gain plays."), and a filter with no gain figure. VST3 and the Audio Unit; in LV2 '
+        "the host's log says so."
+    ),
+    (
         "In Audacity, Convolver's Choose… and Recent are now checked routes beside Audacity's own preset menu "
         '(Audacity 4.0.2 on macOS, 21 November 2026): a filter chosen before playing reached the export, and the '
         'next export after saving, quitting and reopening; a list chosen after one playback took its 48 kHz entry. '
@@ -265,7 +280,8 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'On Linux use the LV2 plug-in on a Flexible-I/O track for a crossover '
             f'([Ardour]({docs}/plugins.md#ardour)).\n'
             '- Checked only by automated tests: new in 0.18, a configuration list loading by itself once the host '
-            'plays, a chosen file waiting for audio in the current start, the tail reported after a stop, choosing '
+            'plays, a chosen file waiting for audio in the current start, a filter that does not suit the host kept until '
+            'it does, Status naming a setting not in use, the tail reported after a stop, choosing '
             "the playing file again in LV2, and the Audio Unit's part of keeping a filter chosen before the host "
             'plays; new in 0.14, the quicker restore of the playing filter and the saving once the sound '
             'has stopped; new in 0.13.20, the Gain mode, a `.vstpreset` chosen in the window, Choose… on a track '
