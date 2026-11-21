@@ -484,6 +484,32 @@ class HostFilter {
     const std::optional<HostFailure>& failure() const noexcept {
         return activation_failure_ ? activation_failure_ : load_failure_;
     }
+    // PLUG-27 (jrp, 20 November 2026): a file chosen while the host was not
+    // playing audio through the plug-in (accepted with keep_until_suited)
+    // awaits validation until the host plays it, which the adapter reports
+    // with confirm(). A start before then may be at a placeholder rate
+    // (Audacity 4.0.2 starts its window's copy at 44.1 kHz whatever the
+    // project's), too little evidence to tell the user the filter is wrong:
+    // while waiting(), the status and the window say the filter is selected
+    // and waiting for the host's audio settings (shown_failure()), though it
+    // plays silence at that start and the log says so.
+    bool awaiting() const noexcept {
+        return awaiting_ && filter_.has_value();
+    }
+    // A start that could not be done at all (fail_activation()) is shown:
+    // it is not a check against a rate that may be a placeholder.
+    bool waiting() const noexcept {
+        return awaiting() && activation_failure_.has_value() &&
+               activation_failure_->kind != HostFailureKind::activation;
+    }
+    void confirm() noexcept {
+        awaiting_ = false;
+    }
+    // failure() as the status and the window show it: without the failure a
+    // filter that is waiting() found at a start.
+    const std::optional<HostFailure>& shown_failure() const noexcept {
+        return waiting() ? load_failure_ : failure();
+    }
     // failure()'s message as text, one labelled line per part after the
     // problem (as exceptions carry it), for an adapter to log; empty if none.
     std::string error() const;
@@ -612,6 +638,7 @@ class HostFilter {
     std::optional<OfferedName> offered_name_;
     std::uint64_t requests_ = 0;
     bool failed_ = false;
+    bool awaiting_ = false; // awaiting()
     std::optional<HostFailure> load_failure_, activation_failure_;
     Advice notice_;
     // faults(); the processor's totals at the last clear (the audio side's

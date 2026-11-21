@@ -105,6 +105,23 @@ first published preview, keep their original grouping.
 
 ### Fixed
 
+- Plug-ins (PLUG-27): a filter file chosen in Convolver's window before the
+  host plays is kept and saved with the project, and checked when the host
+  plays audio through the plug-in; until then Status says "Filter selected.
+  Waiting for the host's audio settings." rather than judging it against a
+  brief start at a placeholder rate. In Audacity 4.0.2, which sets up the
+  plug-in at 44.1 kHz until it first plays whatever the project's rate, a
+  48 kHz filter chosen before playback was refused, and the project then
+  saved that failure, so exports were dry or silent (jrp's run of 0.14.0,
+  20 November 2026, [record](docs/archive/reviews/2026-11-20-vst3-17-audacity.md)).
+  A configuration list needs the host's rate and channels to choose its
+  entry: before the host has started the plug-in it is not loaded, and the
+  window says to play audio once, then choose the list again; a list with
+  no entry for the rate the host last ran at is refused naming it, with
+  the same step added to the advice while the host is not playing. While the
+  host plays, a file that does not suit it is still refused and the working
+  filter keeps playing. VST3 and the Audio Unit; not yet checked in
+  Audacity ([when a chosen file is checked](docs/use/plugins.md#loading-a-filter)).
 - Documentation (DOC-18, from an outside audit of 20 November 2026): the
   user guides no longer contradict the plug-ins. **Choose…** opens a
   Convolver `.vstpreset` (the first-sound guide said it read no presets);
@@ -135,6 +152,19 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
+- Tests (HOST-9): the headless Ardour test plays the VST3 plug-in too, in
+  the VST3 workflow, on Ardour's own VST3 host, and saves sessions at a
+  larger Latency (LV2 at 256 and 1024, VST3 at 1024): Ardour must be told
+  the new latency without reopening the session, report it again after
+  reopening, and export in time, within 1e-5 of the oracle. The test moved
+  to `tests/plugins/`.
+- Tests (AU-18): the AVAudioEngine render of the Audio Unit also follows
+  the hosts' other orders of events: GarageBand's, which starts the unit at
+  its defaults and restores the project while it runs (at 44.1 kHz on a
+  mono track, and with a Latency chosen after it); a Latency chosen while
+  the engine runs, which the host's property listener must hear of; and a
+  project's round trip into a second unit through `ClassInfo`. Each must
+  report the expected latency and match the oracle within 1e-5.
 - Builds (CI-47): the Audio Unit component's own sources (its factory and
   the window it shares with the VST3 plug-in) and the Audio Unit and LV2
   tests build with `-Wall -Wextra -Wpedantic`, as everything else now does;

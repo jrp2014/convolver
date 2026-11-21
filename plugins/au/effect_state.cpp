@@ -343,8 +343,8 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
 }
 
 // AU-6: a filter file chosen in Convolver's window, read with the step
-// convolver-preset uses (PLUG-9) for the unit's rate and channels, so a list
-// chooses its entry as in the CLI. The state then saved holds the filter
+// convolver-preset uses (PLUG-9) for the unit's rate and channels while it
+// renders, so a list chooses its entry as in the CLI. The state then saved holds the filter
 // itself, not the path, as a preset does. PLUG-26: or a Convolver .vstpreset,
 // read as convolver-preset reads it (read_chosen_file()); the Gain, Mix and
 // Latency it holds apply with its filter, as a preset from the host's menu
@@ -354,10 +354,17 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
 OSStatus Effect::load_file(const std::string& path) {
     HostRequest request{HostFilterSource::file, path, 0};
     request.kind = HostRequestKind::chosen_file;
-    HostLayout host;
+    // PLUG-27: a file that does not suit the unit's formats is refused only
+    // while the host renders audio through it; otherwise a single filter is
+    // read as it is and kept until an initialization checks it, and a list
+    // chooses its entry for the formats last rendered with, or waits for
+    // them (read_filter_file()), as in VST3.
+    std::optional<HostLayout> host;
+    bool settled = false;
     {
         const Locked lock(*this);
-        host = known_layout().value_or(layout());
+        settled = settling_.check(request.kind) == HostLoadCheck::refuse_mismatch;
+        host = known_layout();
     }
     FilterFileFailure why;
     // macOS's reader, not libsndfile, so the component needs nothing beyond
@@ -369,7 +376,8 @@ OSStatus Effect::load_file(const std::string& path) {
     const auto& reader = detail::audio_toolbox_files();
 #endif
     // The files it was read from, so the window can reload it.
-    auto next = read_chosen_file(path, host, reader, why, &request.files, &request.wider_entry);
+    auto next =
+        read_chosen_file(path, host, reader, why, &request.files, &request.wider_entry, settled);
     bool accepted = false;
     if (!next) {
         reject(why.kind, why.message, request, why.filter());

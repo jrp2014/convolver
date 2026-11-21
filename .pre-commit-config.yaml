@@ -116,10 +116,10 @@ repos:
         files: ^(scripts/ci_evidence\.py|tests/ci_evidence_tests\.py)$
       - id: ardour-harness-tests
         name: Ardour test's accepted new_session abort (HOST-7)
-        entry: python tests/lv2/ardour_harness_tests.py
+        entry: python tests/plugins/ardour_harness_tests.py
         language: python
         pass_filenames: false
-        files: ^tests/lv2/ardour_(tests|harness_tests)\.py$
+        files: ^tests/plugins/ardour_(tests|harness_tests)\.py$
       - id: fuzz-scheduler-tests
         name: Fuzz campaign scheduler failure paths
         entry: python tests/fuzz/scheduler_tests.py

@@ -1160,18 +1160,43 @@ the unit as an `AVAudioUnitEffect`. This shares no code with Convolver's
 tests or with pluginval. It is a workflow step, not a CTest test, because it
 needs the component installed for the runner's user, as pluginval does.
 [`tests/au/avaudioengine_render.swift`](../../tests/au/avaudioengine_render.swift)
-applies an `.aupreset` from `convolver-preset` through `ClassInfo` before the
-engine starts, as a host restores a project, then feeds the input through
-the engine's input node and renders. Each fixture uses a block size that is
-not a multiple of the 256-frame partition: mono (1 in, 1 out) at 61 frames,
-the stereo cross-feed (2 in, 2 out) at 300 and the crossover (2 in, 6 out,
-discrete channels) at 1000.
+applies an `.aupreset` from `convolver-preset` through `ClassInfo`, then
+feeds the input through the engine's input node and renders. Each case uses
+a block size that is not a multiple of the engine's 64-frame first block.
+The first three restore the preset before the engine starts, as a host
+restores a project, at the default Latency (AU-15): mono (1 in, 1 out) at
+61 frames, the stereo cross-feed (2 in, 2 out) at 300 and the crossover
+(2 in, 6 out, discrete channels) at 1000. The others follow the hosts'
+other orders of events (AU-18):
+
+| Case | Order of events | Latency |
+| --- | --- | --- |
+| Mono at 44.1 kHz, 509-frame blocks | GarageBand's: the engine starts the unit at its defaults and renders, then the preset is restored on the running unit, at GarageBand's fixed rate on a mono track (the fixture's samples, filter included, labelled 44.1 kHz) | 0 |
+| Stereo, 300 | GarageBand's, then Latency chosen through its parameter while the engine runs | 1024 |
+| Crossover, 1000 | Restored before starting, then Latency chosen while the engine runs | 256 |
+| Stereo, 250 | A project's round trip: one unit takes the preset and Latency, and a second, restored from the first one's `ClassInfo`, plays | 512 |
+
+After a change made while the engine runs, the renderer renders silence and
+runs the main queue until the Status parameter reads Active and the unit
+reports the new latency, at most 30 seconds. Both change when the
+replacement is accepted, before the audio thread has filled its latency and
+finished the 5.33 ms crossfade of a
+[live replacement](plugin-contract.md#initial-restoration-and-live-replacement),
+so silence renders on for the latency and 50 ms more before the input
+starts: the test checks the filter that plays after the change, not the
+crossfade, which `tests/plugins/lifecycle.cpp` and
+`native.host_settings` check against the oracle.
 [`tests/au/avaudioengine_tests.py`](../../tests/au/avaudioengine_tests.py)
-checks that the unit reports 256 frames of latency and that nothing comes out
-before them. After them, the output must match the fixture's
-`expected.wav` from the direct double-precision oracle within 1e-5. It
-prints the worst error. To run it on a Mac with the component installed
-and Xcode's command-line tools:
+checks that the unit reports the case's latency and that nothing comes out
+before it; for a Latency chosen while running, that the host's property
+listener was called after the change while the unit reported the new
+latency (AU-17's notices on the main thread), not just at initialization. After the
+latency, the output must match the fixture's `expected.wav` from the direct
+double-precision oracle within 1e-5. It prints the worst error: on CI's
+macOS 26 runner at `07ad81f` (21 November 2026), 5.96e-8 to 8.94e-8 for the
+AU-15 cases and 7.45e-8 (GarageBand's order), 1.79e-7 (then Latency 1024),
+5.96e-8 (Latency 256) and 1.94e-7 (round trip) for AU-18's. To run it on
+a Mac with the component installed and Xcode's command-line tools:
 
 ```sh
 python3 tests/au/avaudioengine_tests.py build-au/convolver-preset
@@ -1241,35 +1266,67 @@ than reporting the refusal).
 
 ### Ardour, headless
 
-A further job of the LV2 workflow plays the plug-in in Ardour, a full DAW
-whose LV2 host is its own code rather than lilv's or JUCE's (HOST-5). It is
-a job of its own, not a CTest test, because it needs Ardour, a large package
-that the other LV2 jobs do not install.
-[`tests/lv2/ardour_tests.py`](../../tests/lv2/ardour_tests.py) uses Ardour's
+A job of the LV2 workflow and one of the VST3 workflow play the plug-in in
+Ardour, a full DAW whose LV2 and VST3 hosts are its own code rather than
+lilv's, Steinberg's or JUCE's (HOST-5, HOST-9). Each is a job of its own,
+not a CTest test, because it needs Ardour, a large package that the other
+jobs do not install.
+[`tests/plugins/ardour_tests.py`](../../tests/plugins/ardour_tests.py) uses Ardour's
 headless tools from Ubuntu's `ardour` package (Ardour 9 on Ubuntu 26.04
 in CI; it also finds Ardour 8's tools, which CI used until 20 November
-2026) on
-each [first-use fixture](#plug-in-comparisons-plug-2): mono (1 in, 1 out),
-the stereo cross-feed (2 in, 2 out) and the crossover (2 in, 6 out).
+2026); the bundle it is given, `convolver.lv2` or `Convolver.vst3`, chooses
+the format. Its cases are [first-use fixtures](#plug-in-comparisons-plug-2)
+at a Latency:
 
-1. `convolver-preset` makes an LV2 preset from the fixture's filter, and
-   `ardour9-new_session` makes a session whose master bus has one channel
-   per plug-in output.
-2. [`ardour_session.lua`](../../tests/lv2/ardour_session.lua), run by
+| Format | Cases |
+| --- | --- |
+| LV2 | Mono (1 in, 1 out), the stereo cross-feed (2 in, 2 out) and the crossover (2 in, 6 out) at Latency 0; the stereo cross-feed at 1024 and the crossover at 256 |
+| VST3 | The stereo cross-feed at Latency 0 and 1024 |
+
+The VST3 runs only the stereo cases because Ardour 8.4 runs a VST3 plug-in
+with its default buses, which for Convolver are 2 in and 2 out: on a mono
+track it feeds the one input to both, and it does not ask for another
+arrangement, so a mono or crossover filter does not fit. Ardour 8.4 also
+names every VST3 parameter that cannot be automated (Gain mode and Latency)
+"hidden", so the script finds the Latency parameter by its shape: the one input with as many entries as the Latency menu. For
+each case:
+
+1. `convolver-preset` makes a preset from the fixture's filter: an LV2
+   preset bundle on `LV2_PATH`, or a `.vstpreset` in
+   `~/.vst3/presets/Convolver/Convolver/`, where Ardour lists VST3 presets
+   (`HOME` is a temporary folder). For VST3, Ardour's
+   `ardour-vst3-scanner` first indexes the bundle in `~/.vst3`, as Ardour's
+   window does when it finds a new one; the headless tools list only
+   indexed plug-ins, and only while the module is older than the index in
+   whole seconds, so the test dates its copy of the bundle a minute back
+   (a bundle built in the same second as the scan was listed as nothing,
+   intermittently, in CI). `ardour9-new_session` makes a session whose master bus
+   has one channel per plug-in output.
+2. [`ardour_session.lua`](../../tests/plugins/ardour_session.lua), run by
    `ardour9-lua` on Ardour's Dummy backend, adds a track with the plug-in,
-   loads the preset from Ardour's preset list, records the backend's white
-   noise onto the track, turns off the region's fades and bypasses the
-   panners. It then starts the take 9600 frames into the session, after
-   the ramp Ardour's gain stages make at the start of an export (0.3 % low
-   after 1000 frames), and saves the session.
-3. `ardour9-export`, a second process, restores the session, plug-in state
-   included, and exports it offline with Ardour's latency compensation.
-4. The export must match the direct double-precision oracle applied to the
-   recorded take within 1e-5, with no offset (Ardour compensates the
-   reported 256 frames) and with the whole tail.
+   loads the preset from Ardour's preset list and sets the case's Latency
+   through Ardour's parameter; within 10 seconds Ardour must report that
+   latency for the plug-in, without the session being reopened. It records
+   the backend's white noise onto the track, turns off the region's fades
+   and bypasses the panners. It then starts the take 9600 frames into the
+   session, after the ramp Ardour's gain stages make at the start of an
+   export (0.3 % low after 1000 frames), and saves the session.
+3. [`ardour_reopen.lua`](../../tests/plugins/ardour_reopen.lua), a second
+   `ardour9-lua` process, reopens the session: the restored plug-in must
+   report the Latency the session was saved with. At Latency 0, the
+   default, this shows nothing; the 256 and 1024 cases test the restore.
+4. `ardour9-export`, a third process, restores the session, plug-in state
+   and Latency included, and exports it offline with Ardour's latency
+   compensation.
+5. The export must match the direct double-precision oracle applied to the
+   recorded take within 1e-5, with no offset (Ardour compensates the latency
+   the restored plug-in reports, so a session saved at Latency 1024 plays in
+   time) and with the whole tail.
 
 The worst error was 4.7e-8 when the test was written (Linux, Ardour 8.4)
-and at most 3.42e-8 in three runs with Ardour 9.0 on 20 November 2026.
+and at most 3.42e-8 in three runs with Ardour 9.0 on 20 November 2026. With
+the Latency cases and the VST3, in CI with Ardour 9.0 on 21 November 2026
+(`9fe6333`), it was 5.05e-8 for LV2 and 4.68e-8 for VST3.
 
 Ardour 9 takes the new track's route group as an empty `ARDOUR.RouteGroup()`,
 as its own scripts pass, where Ardour 8 took `nil`; given `nil`, Ardour 9's
@@ -1281,7 +1338,7 @@ warning, only on Ardour 9.0 (from `ardourN-lua --version`), with exactly
 that message after `new_session` has said it created the session, and with
 the session file present; any other abort fails. The Lua script then opens
 the session, so a damaged one fails there.
-[`ardour_harness_tests.py`](../../tests/lv2/ardour_harness_tests.py) (in
+[`ardour_harness_tests.py`](../../tests/plugins/ardour_harness_tests.py) (in
 pre-commit) checks that rule both ways. HOST-8 drops it once a fixed Ardour
 ships.
 
@@ -1299,13 +1356,15 @@ oracle, fails at once. A failing comparison prints the shift at which the
 export matches best and the region's position in the session file; one
 local export came out 16 frames early, unexplained so far (HOST-6).
 
-Ardour's configuration goes to a temporary folder;
+Ardour's configuration and home folder go to a temporary folder;
 `CONVOLVER_ARDOUR_KEEP=DIR` keeps the sessions and exports in `DIR`, a new
-or empty folder, to inspect. To run it:
+or empty folder, to inspect. To run it on the LV2 bundle, then on the VST3
+bundle of a [VST3 build](build.md#vst3):
 
 ```sh
 sudo apt-get install --no-install-recommends ardour
-python3 tests/lv2/ardour_tests.py build/lv2/convolver.lv2 build/convolver-preset
+python3 tests/plugins/ardour_tests.py build/lv2/convolver.lv2 build/convolver-preset
+python3 tests/plugins/ardour_tests.py build-vst3/VST3/Release/Convolver.vst3 build-vst3/convolver-preset
 ```
 
 ## Equalizer APO export tests
@@ -1756,6 +1815,7 @@ of their own.
 | `plugins/editor/mac/` (the macOS window, CI-26) | VST3, Audio Unit and the candidates: only those builds compile it, and their `editor_tests.mm` test it |
 | `scripts/release/`, `tests/release/`, `packaging/`, apart from the files other workflows use (CI-34) | the [candidates](#plug-in-candidate-checks) |
 | `tests/upgrade/`, the [files kept from releases](../../tests/upgrade/README.md) and their checks (CI-42) | native and VST3, whose `upgrade.cli` and `vst3.upgrade` read them |
+| `tests/plugins/ardour_*`, the [headless Ardour test](#ardour-headless) (HOST-9) | VST3 and LV2, the only workflows that run it (`ARDOUR_WORKFLOWS`); the fixtures it imports count as shared |
 | `.github/workflows/NAME.yml` | that workflow |
 
 The shared parts are not a format's files: the PLUG-2 harness in

@@ -26,6 +26,7 @@
 #include <iostream>
 #include <iterator>
 #include <limits>
+#include <map>
 #include <memory>
 #include <optional>
 #include <random>
@@ -2721,6 +2722,7 @@ void report_and_files() {
             "saved state does not hold the file's filter");
     // Refused: the filter stays, the report says why, the project is not
     // marked changed.
+    play_block(p, 1, 1, 64); // PLUG-27: refused only while the host plays audio.
     require(!c.load_file(wrong.string()) && handler.dirty == 1, "a wrong-rate file accepted");
     f = p.failure();
     require(f && f->request.source == convolver::HostFilterSource::file &&
@@ -2780,8 +2782,9 @@ void chosen_file_on_wider_bus() {
     require(state.configuration && state.configuration->input_channels == 2 &&
                 state.configuration->output_channels == 6,
             "the chosen crossover saved with other channel counts");
-    // Outputs stay exact: a filter for 2 outputs is still refused, and the
-    // crossover keeps playing.
+    // Outputs stay exact: a filter for 2 outputs is still refused while the
+    // host plays, and the crossover keeps playing.
+    play_block(p, 6, 6, 64);
     require(!c.load_file((folder / "fewer outputs.cfg").string()),
             "a 2-out filter chosen on 6 outputs");
     const auto f = p.failure();
@@ -3045,6 +3048,7 @@ void chosen_preset(bool offers_dirty) {
             "cannot open", "a missing preset");
     auto slow = filter(44100, .5f);
     slow.settings = convolver::HostSettings{3, 1, 64};
+    play_block(p, 1, 1, 64); // PLUG-27: refused only while the host plays audio.
     refused(write("slow.vstpreset", convolver::presets::vst3_preset(slow)),
             convolver::HostFailureKind::sample_rate, "", "a 44.1 kHz preset at 48 kHz");
     std::filesystem::remove_all(folder);
@@ -3097,6 +3101,186 @@ void chosen_preset_before_activation() {
             "inactive preset: activate");
     require(p.getLatencySamples() == 1024 && p.status().status == convolver::HostStatus::active,
             "inactive preset: the first activation does not play the preset's Latency");
+    std::filesystem::remove_all(folder);
+    p.setActive(false);
+    p.disconnect(&c);
+    c.disconnect(&p);
+    c.terminate();
+    p.terminate();
+}
+// PLUG-27: Audacity 4.0.2's order for the copy behind its window. Until it
+// first plays, it sets the copy up at 44.1 kHz whatever the project's rate,
+// and starts it only for a moment, with one block of silence, to pass on a
+// parameter edit (FlushParameters); exports run in other copies made from
+// the state this one saves. A single filter chosen there is kept and checked
+// when the host starts the plug-in, so the saved state holds it. A list
+// waits for the host's rate, with jrp's words (20 November 2026); once the
+// host has played at 48 kHz and stopped, it chooses its 48 kHz entry. While
+// the host plays, a file that does not suit is refused, as before.
+void chosen_before_host_plays() {
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk && p.connect(&c) == kResultOk &&
+                c.connect(&p) == kResultOk,
+            "before play: initialize");
+    SpeakerArrangement mono = SpeakerArr::kMono;
+    require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "before play: buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    ProcessSetup placeholder{kOffline, kSample32, 512, 44100};
+    require(p.setupProcessing(placeholder) == kResultOk, "before play: Audacity's setup");
+    const auto folder = private_temp("convolver-vst3-before-play");
+    std::filesystem::create_directories(folder);
+    write_wav(folder / "room.wav", 48000, 1, 8);
+    write_wav(folder / "hall.wav", 48000, 1, 16);
+    write_wav(folder / "slow.wav", 44100, 1, 8);
+    std::ofstream(folder / "room.cfg") << "48000 1 1 0\n0\n0\nroom.wav\n0\n0\n0\n";
+    std::ofstream(folder / "slow.cfg") << "44100 1 1 0\n0\n0\nslow.wav\n0\n0\n0\n";
+    std::ofstream(folder / "rates.txt") << "slow.cfg\nroom.cfg\n";
+    const auto saved_filter = [&](Processor& from) {
+        MemoryStream saved;
+        require(from.getState(&saved) == kResultOk, "before play: save");
+        saved.seek(0, IBStream::kIBSeekSet, nullptr);
+        return read_state(&saved);
+    };
+    // A list waits for the host's rate: refused as any file is, saying what
+    // to do.
+    require(!c.load_file((folder / "rates.txt").string()), "a list chosen before the host played");
+    auto f = p.failure();
+    require(f && f->message.problem.find("no entry selected") != std::string::npos &&
+                f->message.fix ==
+                    "Play audio once so Convolver can check the host's sample rate and channel "
+                    "counts, then choose the configuration list again.",
+            ("a waiting list's message: " +
+             (f ? convolver::detail::advice_text(f->message) : std::string("none")))
+                .c_str());
+    // jrp's Audacity run on 0.14.0 (20 November 2026): refused here, against
+    // 44.1 kHz, and the failure was what the project saved.
+    require(c.load_file((folder / "room.cfg").string()) && !p.failure(),
+            "a 48 kHz .cfg chosen before the host played was refused");
+    auto state = saved_filter(p);
+    require(state.configuration && state.configuration->sample_rate == 48000 && !state.failed,
+            "the chosen filter is not in the saved state");
+    const std::string waiting = "Filter selected. Waiting for the host's audio settings.";
+    const auto status_is = [&](const std::string& text, const char* when) {
+        const auto s = p.status();
+        require(s.text == text && s.status == convolver::HostStatus::unchecked,
+                (std::string(when) + ": status " + s.text).c_str());
+    };
+    status_is(waiting, "chosen before the host played");
+    // FlushParameters: started at 44.1 kHz with one block of silence, then
+    // stopped. The filter is kept, silent there, and still saved.
+    require(p.setActive(true) == kResultOk, "before play: Audacity's flush starts the copy");
+    play_block(p, 1, 1, 64);
+    require(p.setActive(false) == kResultOk, "before play: Audacity's flush stops the copy");
+    state = saved_filter(p);
+    require(state.configuration && state.configuration->sample_rate == 48000 && !state.failed,
+            "a moment's start at 44.1 kHz lost the chosen filter");
+    // jrp (20 November 2026): that start is too little evidence to say the
+    // filter is wrong, so Status still says it is waiting.
+    status_is(waiting, "after Audacity's flush at 44.1 kHz");
+    // The window's report says the same, not Load failed against 44.1 kHz.
+    {
+        std::map<std::string, std::string> fields;
+        for (const auto& [key, value] : c.report())
+            fields[key] = value;
+        require(fields["status name"] == "Waiting" && fields["summary"] == waiting &&
+                    fields["plays"].find(waiting) == 0 &&
+                    fields["explanation"].find("44100") == std::string::npos,
+                ("after Audacity's flush, the window's report: " + fields["status name"] + ": " +
+                 fields["explanation"])
+                    .c_str());
+    }
+    // Stopped: another file chosen is kept too.
+    require(c.load_file((folder / "hall.wav").string()), "a second file chosen while stopped");
+    state = saved_filter(p);
+    require(state.configuration && state.configuration->paths.at(0).impulse.size() == 16,
+            "the second file is not in the saved state");
+    // A copy made from that state that plays at 48 kHz, as an export does.
+    {
+        Processor playing;
+        require(playing.initialize(&context) == kResultOk &&
+                    playing.setBusArrangements(&mono, 1, &mono, 1) == kResultOk,
+                "playing copy: initialize");
+        playing.activateBus(kAudio, kInput, 0, true);
+        playing.activateBus(kAudio, kOutput, 0, true);
+        MemoryStream saved;
+        require(p.getState(&saved) == kResultOk, "playing copy: save");
+        saved.seek(0, IBStream::kIBSeekSet, nullptr);
+        ProcessSetup project{kOffline, kSample32, 512, 48000};
+        require(playing.setState(&saved) == kResultOk &&
+                    playing.setupProcessing(project) == kResultOk &&
+                    playing.setActive(true) == kResultOk,
+                "playing copy: restore and start");
+        play_block(playing, 1, 1, 64);
+        require(playing.status().status == convolver::HostStatus::active && !playing.failure(),
+                ("playing copy: " + playing.status().text).c_str());
+        playing.setActive(false);
+        playing.terminate();
+    }
+    // Played once at 48 kHz, then stopped: the list chooses its 48 kHz entry.
+    ProcessSetup project{kRealtime, kSample32, 512, 48000};
+    require(p.setupProcessing(project) == kResultOk && p.setActive(true) == kResultOk,
+            "before play: the host starts at 48 kHz");
+    play_block(p, 1, 1, 64);
+    require(p.setActive(false) == kResultOk, "before play: playback stops");
+    require(c.load_file((folder / "rates.txt").string()) && !p.failure(),
+            "the list refused after the host played");
+    state = saved_filter(p);
+    require(state.configuration && state.configuration->sample_rate == 48000 &&
+                state.configuration->paths.at(0).impulse.size() == 8,
+            "the list's 48 kHz entry was not chosen");
+    // While the host plays, a 44.1 kHz file is refused and the list's filter
+    // keeps playing.
+    require(p.setActive(true) == kResultOk, "before play: playback starts again");
+    play_block(p, 1, 1, 64);
+    require(!c.load_file((folder / "slow.wav").string()), "a 44.1 kHz file accepted while playing");
+    state = saved_filter(p);
+    require(state.configuration && state.configuration->sample_rate == 48000 &&
+                p.status().text.find("previous filter kept") != std::string::npos,
+            ("a refused file replaced the playing filter: " + p.status().text).c_str());
+    // Stopped, the 44.1 kHz file is kept, waiting; the window's read while
+    // the host plays at 48 kHz says Silent with both rates, and Status still
+    // does after it stops: that read confirmed the mismatch.
+    require(p.setActive(false) == kResultOk, "before play: playback stops again");
+    require(c.load_file((folder / "slow.wav").string()), "a 44.1 kHz file refused while stopped");
+    status_is(waiting, "a 44.1 kHz file chosen while stopped");
+    // jrp (21 November 2026): a start that processes several blocks and stops
+    // with no Status read while it runs confirms nothing, however many blocks
+    // it had, so the filter is still waiting.
+    require(p.setActive(true) == kResultOk, "before play: a provisional start");
+    for (int i = 0; i < 4; ++i)
+        play_block(p, 1, 1, 64);
+    require(p.setActive(false) == kResultOk, "before play: the provisional start stops");
+    status_is(waiting, "after a start of several blocks with no Status read");
+    require(p.setActive(true) == kResultOk, "before play: playback starts at 48 kHz");
+    play_block(p, 1, 1, 64);
+    play_block(p, 1, 1, 64);
+    const auto silent = [&](const char* when) {
+        const auto s = p.status();
+        require(s.status == convolver::HostStatus::load_failed && s.text.find("Silent: ") == 0 &&
+                    s.text.find("44100 Hz") != std::string::npos &&
+                    s.text.find("48000 Hz") != std::string::npos,
+                (std::string(when) + ": status " + s.text).c_str());
+    };
+    // The window reads its report while the host plays (send_status()):
+    // that confirms the check.
+    {
+        std::map<std::string, std::string> fields;
+        for (const auto& [key, value] : c.report())
+            fields[key] = value;
+        const auto& summary = fields["summary"];
+        require(fields["status name"] == "Load failed" && summary.find("Silent: ") == 0 &&
+                    summary.find("44100 Hz") != std::string::npos &&
+                    summary.find("48000 Hz") != std::string::npos,
+                ("the window's report while playing at 48 kHz: " + summary).c_str());
+    }
+    silent("a 44.1 kHz file played at 48 kHz");
+    require(p.setActive(false) == kResultOk, "before play: playback stops at last");
+    silent("stopped after playback confirmed the mismatch");
     std::filesystem::remove_all(folder);
     p.setActive(false);
     p.disconnect(&c);
@@ -3181,6 +3365,7 @@ void load_without_set_dirty(bool offers_dirty) {
     require(p.process(flush) == kResultOk, "no-dirty process");
     require(p.getLatencySamples() == 1024, "the edit's value in process() changed the latency");
     handler.edits.clear();
+    play_block(p, 1, 1, 64); // PLUG-27: refused only while the host plays audio.
     require(!c.load_file(wrong.string()) && handler.edits.empty(),
             "a refused file reported an edit");
     std::filesystem::remove_all(folder);
@@ -3330,6 +3515,7 @@ void saved_filter_name() {
         require(at44.c.load_file(slow.string()) && at44.p.getState(&slow_component) == kResultOk &&
                     at44.c.getState(&slow_controller) == kResultOk,
                 "44.1 kHz preset");
+        play_block(at44.p, 1, 1, 64); // PLUG-27: refused only while the host plays audio.
         require(at44.c.load_file(other.string()) == false, "a 48 kHz file loaded at 44.1 kHz");
     }
     {
@@ -3590,8 +3776,10 @@ void messages_through_proxies() {
         auto shown = report();
         check(handler.dirty == 1 && field(shown, "filter name") == "room.wav",
               "proxy file not playing, or the project not marked changed");
-        // Refused: never marked changed. A forwarding proxy brings the
-        // refusal at once; a deferring one later, in the report.
+        // Refused (the host plays audio, PLUG-27): never marked changed. A
+        // forwarding proxy brings the refusal at once; a deferring one later,
+        // in the report.
+        play_block(p, 1, 1, 64);
         const bool refused_result = c.load_file(wrong.string());
         deliver();
         shown = report();
@@ -3780,6 +3968,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"chosen_preset", [] { chosen_preset(true); }},
         {"chosen_preset_without_set_dirty", [] { chosen_preset(false); }},
         {"chosen_preset_before_activation", chosen_preset_before_activation},
+        {"chosen_before_host_plays", chosen_before_host_plays},
         {"load_without_set_dirty", [] { load_without_set_dirty(false); }},
         {"load_with_failing_set_dirty", [] { load_without_set_dirty(true); }},
         {"saved_filter_name", saved_filter_name},
