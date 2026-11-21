@@ -498,8 +498,9 @@ move to the archive.
 
 - [x] **HOST-10 — Ardour's VST3 channels and settings.** 21 November 2026,
   PR #247: on Ardour's default Strict-I/O tracks mono and stereo play; a
-  crossover needs a Flexible-I/O track and the LV2, where the VST3 gets 2
-  in, 2 out unless set by hand; Gain mode and Latency are hidden
+  crossover needs a Flexible-I/O track and the LV2, since there the VST3
+  gets 2 in, 2 out unless set by hand; the VST3's Gain mode and Latency
+  are hidden
   ([plug-ins](docs/use/plugins.md#ardour)).
 - [x] **PERF-3 — One measurement exercise: budgets, supported workloads and
   published evidence.** 21 November 2026, PR #248

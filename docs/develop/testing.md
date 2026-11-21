@@ -1364,18 +1364,28 @@ example plays. Ardour 8's window can set only the outputs for a VST3 (its
 "Audio Input Pins" setting is for plug-ins whose inputs can change, which
 9.0 extends to VST3), so one case sets the outputs to 1 and leaves the
 input pins as Ardour has them (2), and the other sets the input pins to 1
-as well. On Ardour 8.4, locally, both played within 2.4e-8 of the oracle,
-the Convolver log saying 2 in, 1 out with the second input ignored. On
-Ardour 9.0 both played too, within 2.1e-8 (outputs only) and 1.9e-8 (input
-pins as well) in the Ardour job at `75b615b`
-([run 44915756335](https://github.com/jrp2014/convolver/actions/runs/44915756335)).
+as well. On Ardour 8.4, locally, the outputs-only case played within
+2.7e-8 of the oracle in every run, the Convolver log saying 2 in, 1 out
+with the second input ignored. The case with the input pins as well
+exported silence in 4 of 8 local runs on 21 November 2026, with the same
+log line, whichever cases ran before it; since Ardour 8's window cannot
+make that setting, it matters only to Ardour 9, and the guide leaves the
+input pins alone. On Ardour 9.0 both played, within 2.1e-8 (outputs only)
+and 1.9e-8 (input pins as well) in the Ardour job at `75b615b`
+([run 44915756335](https://github.com/jrp2014/convolver/actions/runs/44915756335))
+and within 2.14e-8 and 2.05e-8 at `3627960`
+([run 44928692792](https://github.com/jrp2014/convolver/actions/runs/44928692792)).
 The crossover set by hand (2 in, 6 out) still got 2 outputs on Ardour 8.4
-and played silence, so the VST3 crossover is not run. The script prints
+and played silence, so the VST3 crossover is not run; for Ardour 9 that
+it gets 2 outputs too comes from reading `request_bus_layout`, not from a
+run. The script prints
 Ardour's natural streams, its count of the plug-in's pins (2 in, 2 out in
 every VST3 case, even when the plug-in runs 2 in, 1 out), and the insert's
 channels on the track side, for the record; the export, checked against
-the oracle, is what the test asserts, and when it fails the test prints the
-Convolver log, which says what the plug-in was given. Ardour, 8.4 and 9.0 alike, names every VST3
+the oracle, is what the test asserts. For every case it prints the layout
+lines the Convolver log gained (`Started at`, and any `Refused the host's
+channel layout`), which say what the plug-in was given, and the whole log
+when the export fails. Ardour, 8.4 and 9.0 alike, names every VST3
 parameter that cannot be automated (Gain mode and Latency) "hidden" and
 leaves it out of its generic controls, while its LV2 host lists all four
 settings by name; the script prints each input parameter's name, and finds

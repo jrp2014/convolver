@@ -633,30 +633,19 @@ preparation and steps 2, 3 and 9 below include what it found.
 Results from a host that differ from what the guides describe and are not yet
 explained or fixed. Each names the host and build it was seen in; it is not a
 claim about other hosts or versions. Do not add host steps to work around one
-until its cause is known: record what was observed, as below.
+until its cause is known: record what was observed, with the host and
+build, what is not yet known, and the evidence.
 
-| Finding | Host and build | Observed | Not yet known | Evidence |
-| --- | --- | --- | --- | --- |
-
-None is open. The last, Ardour running the VST3 plug-in only at 2 in, 2 out
-and naming Latency and Gain mode "hidden", was seen in Ardour 8.4 (Ubuntu
-24.04's 8.4.0~ds1, headless, 20 November 2026): on a mono track Ardour fed
-the one input to both of the VST3's inputs and kept its two outputs, so the
-mono example's preset did not fit and the export was silent (the session
-file showed `ConfiguredInput` 1 and `ConfiguredOutput` 2); Ardour saved the
-two parameters as not automatable, and setting them through its Lua API
-worked. HOST-10 explained it on 21 November 2026: the test's tracks were
-Flexible-I/O, where, with its automatic pin configuration, Ardour 8 keeps a
-VST3 plug-in's default buses and Ardour 9.0 masks its request for the
-track's channels with the default width; set by hand, the mono example
-plays; on a Strict-I/O track, Ardour's default, it plays as it is; and both
-versions hide parameters that cannot be automated ([Ardour, headless](testing.md#ardour-headless)). The
+None is open. The last, Ardour 8.4 running the VST3 plug-in at 2 in, 2 out
+on a mono track and hiding Latency and Gain mode (headless, 20 November
+2026), was explained by HOST-10 on 21 November 2026: the test's tracks were
+Flexible-I/O, and on Ardour's default Strict-I/O tracks the mono example
+plays ([Ardour, headless](testing.md#ardour-headless)). The
 [plug-in guide](../use/plugins.md#ardour) says what Ardour users need.
 Before it, a new VST3 Latency that REAPER used only after a render, FX
 Offline then Online, or reopening the project, was fixed by VST3-16 and
 checked in REAPER on 8 November 2026
 ([acceptance](../archive/reviews/2026-11-08-vst3-16-reaper-acceptance.md)).
-Record the next with the same columns.
 
 ## Production qualification
 

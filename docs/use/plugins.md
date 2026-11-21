@@ -874,6 +874,7 @@ afresh.
 
 Tried with Ardour 8.4 and 9.0. What Convolver gets in Ardour depends on the
 track's **Pin Mode**. A track added in Ardour's window is **Strict-I/O**
+by default (the preference **Use 'Strict-I/O' for new tracks or busses**)
 unless you choose **Flexible-I/O** as its Pin Mode in the Add Track
 dialog, or untick **Strict I/O** in the menu of the track's name button in
 the mixer before adding Convolver. The Convolver log's `Started at` line
@@ -899,11 +900,12 @@ names the channels Ardour gave it
   channels and the log says `Refused the host's channel layout: it has 0
   input and 0 output channels`. A mono filter plays once you set the
   channels by hand: right-click Convolver, choose **Pin Connections…**,
-  click **Manual Config**, and set **Audio Out** to 1 with its − button
-  (Ardour 9's window also has **Audio Input Pins**; the filter plays
-  whether you leave them or set them to 1). These steps were tried through
-  the same settings from a script, not yet in the window. A crossover
-  cannot be set up this way: Convolver still gets only 2 outputs.
+  click **Manual Config**, and set **Audio Out** to 1 with its − button;
+  leave Ardour 9's **Audio Input Pins** as they are. The log's next
+  `Started at` line then says `2 in, 1 out`: Convolver plays the first
+  input and ignores the second. These steps are not yet confirmed in
+  Ardour's window. A crossover cannot be set up this way: Convolver still
+  gets only 2 outputs.
 - **Settings.** Ardour leaves Gain mode and Latency out of its own controls
   for the VST3 plug-in, because they cannot be automated; Gain and Mix are
   there. On macOS and Windows, Convolver's window has all four (not yet

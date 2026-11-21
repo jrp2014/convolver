@@ -222,8 +222,10 @@ first published preview, keep their original grouping.
   for a VST3) and outputs and input pins (Ardour 9's). It prints the
   track's Pin Mode, Ardour's
   natural streams, the insert's channels and the name Ardour gives each
-  input parameter, and prints the Convolver log when an export does not
-  match the oracle.
+  input parameter, the layout lines the Convolver log gained in each case,
+  and the whole log when an export does not match the oracle. On Ardour
+  8.4 the case with input pins set exported silence in 4 of 8 local runs,
+  so the guide leaves them alone.
 - Benchmarks (PERF-3): `tests/native/benchmarks/workloads.py` measures
   callback times, peak memory and preparation for long and multichannel
   filters through `HostProcessor`, and the manual Workload measurements

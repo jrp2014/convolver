@@ -143,9 +143,39 @@ def explain_vst3_discovery(directory):
         print(f'--- {module.relative_to(directory)} (mtime {module.stat().st_mtime:.3f})')
 
 
+def convolver_log(directory):
+    return directory / 'home' / '.local' / 'state' / 'convolver' / 'convolver.log'
+
+
+def log_size(directory):
+    path = convolver_log(directory)
+    return path.stat().st_size if path.is_file() else 0
+
+
+def print_layout_lines(directory, name, start):
+    """Each different layout line the Convolver log gained since start: what the plug-in was given.
+
+    A refused layout is followed by the one Ardour gave next, so a Refused
+    line is not by itself a failure; the export says what was heard.
+    """
+    path = convolver_log(directory)
+    if not path.is_file():
+        print(f'{name}: no Convolver log')
+        return
+    with path.open('rb') as log:
+        log.seek(start)
+        text = log.read().decode('utf-8', errors='replace')
+    seen = []
+    for line in text.splitlines():
+        found = re.search(r"(Refused the host's channel layout: .*|Started at .*?, blocks of up to \d+ frames\.)", line)
+        if found and found[1] not in seen:
+            seen.append(found[1])
+            print(f'{name}: log: {found[1]}')
+
+
 def show_convolver_log(directory):
     """For a failure: the Convolver log in the test's home folder, which explains a refused layout."""
-    path = directory / 'home' / '.local' / 'state' / 'convolver' / 'convolver.log'
+    path = convolver_log(directory)
     if path.is_file():
         print(f'--- {path.relative_to(directory)}')
         print(path.read_text(encoding='utf-8', errors='replace')[-8000:])
@@ -337,6 +367,7 @@ def check(tools, environment, directory, plugin_tool, format_name, fixture_name,
         'CONVOLVER_PINS': mode if mode in {'outputs', 'all'} else '',
         'CONVOLVER_STRICT_IO': '1' if mode == 'strict' else '',
     }
+    log_start = log_size(directory)
     result = run([tools['lua'], SCRIPT], {**environment, **settings}, check=False)
     if result.returncode != 0:
         if format_name == 'VST3':
@@ -350,6 +381,7 @@ def check(tools, environment, directory, plugin_tool, format_name, fixture_name,
     for line in log.splitlines():
         if line.startswith(('Track Pin Mode:', 'Natural streams:', 'Insert channels:')):
             print(f'{name}: {line}')
+    print_layout_lines(directory, name, log_start)
     # The region can be a few frames shorter than the take's files.
     recorded = re.search(r'^Recorded (\d+) frames', log, re.MULTILINE)
     assert recorded, f'{name}: the script did not report the recording'
