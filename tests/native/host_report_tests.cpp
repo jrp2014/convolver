@@ -696,6 +696,10 @@ void cases() {
                                      "the plug-in keeps 256 frames for now.") &&
                 contains(waiting.explanation, "\nNote: Latency 1024 frames"),
             "waiting latency explanation: " + waiting.explanation);
+    // DIAG-10: the Status line says so too, in short.
+    require(contains(waiting.status.text, " Latency 1024 frames not in use yet.") &&
+                !contains(r.status.text, "Latency"),
+            "waiting latency Status: " + waiting.status.text);
     require(waiting.latency_waits && !r.latency_waits && waiting.sample_rate == 44100,
             "latency waits field");
 }

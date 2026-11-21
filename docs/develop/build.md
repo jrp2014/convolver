@@ -405,8 +405,8 @@ The defaults are what to ship. Specific to the Audio Unit:
   fallback build it lists them instead.
 - The window's Software detail names the FFT library and the file reader,
   so a report shows which build it came from.
-- The Audio Unit workflow's `au-sanitizers` job builds both fallbacks in
-  its ASan and UBSan entry.
+- The Audio Unit workflow's ASan and UBSan build, in its `au` job, builds
+  both fallbacks.
 
 The AU target builds as C++23 because AudioUnitSDK needs it; the core
 and other formats stay C++20.
@@ -518,7 +518,11 @@ system (pluginval, lv2lint) are still resolved by each job that runs them.
 
 The VST3, LV2, Audio Unit and candidate workflows also run every Monday, so a
 new upstream release is built and tested within a week even when nothing in
-Convolver changes. GitHub Actions versions are updated by Dependabot instead.
+Convolver changes. The three with macOS jobs start half an hour apart
+(candidates at 06:23 UTC, Audio Unit at 06:53, VST3 at 07:23), so they do not
+queue for the same five macOS runners; LV2 and the fuzz workflow run on
+Linux at 06:23 (CI-49). GitHub Actions versions are updated by Dependabot
+instead.
 
 ### Pre-releases and newer upstream versions
 
@@ -552,7 +556,9 @@ exception below).
   and sratom (`resolve.py checkout`, from the policy's `test_sources`; a
   pre-release when it is newer than the newest release) with the newest lv2
   headers, runs the same LV2 tests against them and reports any failure,
-  including a failed download or build, as a warning.
+  including a failed download or build, as a warning. Like the advisory
+  pluginval runs, it runs on pushes to `main`, the weekly and manual runs,
+  not for pull requests (CI-49).
 
 When an advisory run's tests report a problem, the job keeps their evidence,
 as a failed job does, in an artifact named `advisory-evidence-…` (CI-8;

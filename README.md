@@ -171,6 +171,7 @@ the usual causes; Windows builds use vcpkg ([Windows](docs/develop/build.md#wind
 | [`docs/`](docs/README.md) | Guides by reader ([`use/`](docs/use/README.md), [`develop/`](docs/develop/), [`project/`](docs/project/)) and dated records ([`archive/`](docs/archive/)) |
 | [`examples/`](examples/) | First-use filters with expected output |
 | [`cmake/`](cmake/), [`packaging/`](packaging/), [`scripts/`](scripts/) | Build helpers, release packaging, and release and repository checks |
+| [`changes/`](changes/README.md) | Each open or recently merged pull request's entries for the changelog, TODO and decisions, until they are folded in |
 | [`historical/`](historical/) | The preserved 2005–2006 Windows implementation; not built |
 
 ## About this project

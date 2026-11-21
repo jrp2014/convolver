@@ -11,10 +11,14 @@ releases, newest first.
 **In short:** jrp decides anything permanent or user-facing: identities, state
 and preset formats, `.cfg` syntax, licences, defaults that change the sound,
 shipped dependencies and publishing ([workflow](../develop/workflow.md)). When
-jrp decides, record it here with its date; no other page carries decision
-notes or their dates ([workflow](../develop/workflow.md#while-working)). A
-change users will notice, and every finished TODO item, also goes in the
-[changelog](../../CHANGELOG.md). Changing a decision is a new decision: add an
+jrp decides, the pull request records it with its date in its
+[change fragment](../develop/workflow.md#change-fragments), which folding
+moves here; no other page carries decision notes or their dates
+([workflow](../develop/workflow.md#while-working)). Decisions not yet folded
+in are in the **Decisions:** sections of the files in
+[`changes/`](../../changes/README.md). A change users will notice, and every
+finished TODO item, also goes in the [changelog](../../CHANGELOG.md), through
+the same fragment. Changing a decision is a new decision: add an
 entry and mark the old one replaced, rather than editing it. Entries that are
 wholly replaced, such as the earlier baselines for the checks left, move
 unchanged to the [superseded decisions](../archive/releases/2026-11-20-superseded-decisions.md).
@@ -1270,6 +1274,17 @@ were recorded in the repository; this log is their first written record.
   correction only: the audio rules stay, including silence after a failed load
   with no filter kept (jrp chose "Load failed, dry signal plays", with this
   wording; PLUG-36). See [Contract: status and
+  log](../develop/plugin-contract.md#status-and-log),
+  [plug-ins](../use/plugins.md#status-and-the-convolver-log).
+- **21 November 2026.** DIAG-10: LV2's `status` port keeps its five values
+  and labels (0 Active, 1 No filter, 2 Load failed, 3 Loading, 4 Fault).
+  While the filter plays on during a Latency change or while Estimate's
+  figure is found, Active still tells the user what they hear; the details
+  go to the host's log, and Fault stays for an actual fault (jrp chose
+  "Keep its five values", asking for a test that each pending operation
+  leaves the port at Active and logs its detail). The VST3 and Audio Unit
+  Status text names a Latency not in use yet and a missing estimate, with
+  the values unchanged. See [Contract: status and
   log](../develop/plugin-contract.md#status-and-log),
   [plug-ins](../use/plugins.md#status-and-the-convolver-log).
 
