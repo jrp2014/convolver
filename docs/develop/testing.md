@@ -1296,8 +1296,8 @@ each case:
 
 The worst error was 4.7e-8 when the test was written (Linux, Ardour 8.4)
 and at most 3.42e-8 in three runs with Ardour 9.0 on 20 November 2026. With
-the Latency cases and the VST3 (Linux, Ardour 8.4, 20 November 2026), it was
-5.2e-8 for LV2 and 5.1e-8 for VST3, both at Latency 1024.
+the Latency cases and the VST3, in CI with Ardour 9.0 on 21 November 2026
+(`9fe6333`), it was 5.05e-8 for LV2 and 4.68e-8 for VST3.
 
 Ardour 9 takes the new track's route group as an empty `ARDOUR.RouteGroup()`,
 as its own scripts pass, where Ardour 8 took `nil`; given `nil`, Ardour 9's
