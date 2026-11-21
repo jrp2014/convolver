@@ -1343,10 +1343,10 @@ example plays. Ardour 8's window can set only the outputs for a VST3 (its
 9.0 extends to VST3), so one case sets the outputs to 1 and leaves the
 input pins as Ardour has them (2), and the other sets the input pins to 1
 as well. On Ardour 8.4, locally, both played within 2.4e-8 of the oracle,
-the Convolver log saying 2 in, 1 out with the second input ignored. With
-both set, the mono example played on Ardour 9.0 within 2.2e-8 in the
-Ardour job at `df9dcf7`
-([run 44912433237](https://github.com/jrp2014/convolver/actions/runs/44912433237)).
+the Convolver log saying 2 in, 1 out with the second input ignored. On
+Ardour 9.0 both played too, within 2.1e-8 (outputs only) and 1.9e-8 (input
+pins as well) in the Ardour job at `75b615b`
+([run 44915756335](https://github.com/jrp2014/convolver/actions/runs/44915756335)).
 The crossover set by hand (2 in, 6 out) still got 2 outputs on Ardour 8.4
 and played silence, so the VST3 crossover is not run. The script prints
 Ardour's natural streams, its count of the plug-in's pins (2 in, 2 out in
