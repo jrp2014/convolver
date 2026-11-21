@@ -267,6 +267,24 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
+- CI (CI-53): a later push to a pull request runs only the workflows that
+  the files changed since that workflow's last full passed run need; the
+  `scope` job names the run whose result stands. On `main`, a merge that
+  changes anything but documentation still runs everything; one that
+  changes only documentation runs Lint. Every release and preview gets the
+  full CI: the draft-release workflow refuses a tag on which the native,
+  VST3, LV2, Audio Unit, fuzz and Lint workflows have not passed when
+  started by hand.
+- CI (CI-54): a draft pull request runs Lint and the Linux jobs only;
+  marking it ready, or starting the workflows by hand on the branch, runs
+  macOS and Windows.
+- Process (DOC-21): fewer pushes and review rounds for simple changes.
+  Merge `main` into a branch only on a conflict or when jrp asks; answer a
+  review round in one push and never push only to record a pull request
+  number; an independent review is needed only for code, DSP, plug-in,
+  saved-state, `.cfg` and release changes, and its wording findings never
+  block or start another round; a ready pull request's handoff note keeps
+  only its State line; the status page changes only at milestones.
 - Code (PLUG-24): `HostProcessor`, the plug-ins' audio path, moved out of
   `portable/host.cpp` into `portable/host_processor.cpp` unchanged; the
   gain, Mix and dry-signal rules it shares with `HostFilter` are in

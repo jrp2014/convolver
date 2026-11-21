@@ -15,7 +15,7 @@ Open as a draft when you start; that is the claim. See docs/develop/workflow.md.
 
 ## Handoff note
 
-<!-- Keep this current; replace rather than append. -->
+<!-- Keep this current; replace rather than append. Once ready, with nothing left to hand over, keep only State. -->
 
 - **State:** draft / ready for review / blocked on …
 - **Done:**
@@ -42,4 +42,4 @@ Open as a draft when you start; that is the claim. See docs/develop/workflow.md.
 
 ## Independent review
 
-<!-- Who or what reviewed this (a person, or a fresh session using the review-change skill), where the findings are, and how each was answered. -->
+<!-- Who or what reviewed this (a person, or a fresh session using the review-change skill), where the findings are, and how each blocking one was answered. Or "Not needed" and why (docs/develop/workflow.md#which-changes-need-one). -->

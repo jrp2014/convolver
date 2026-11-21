@@ -3,6 +3,7 @@
 """Tests for scripts/ci_scope.py and for the workflows that rely on it."""
 
 import importlib.util
+import json
 import os
 import re
 import subprocess
@@ -23,7 +24,15 @@ UNGATED = {'lint.yml'}  # Runs for every change, documentation included.
 # commands at the real one.
 CLEAN = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
 OVERRIDE = re.compile(r'^    if:.*(always|cancelled)\(\)', re.MULTILINE)
-GATE = re.compile(r"^    if: needs\.scope\.outputs\.(build|package) == 'true'$", re.MULTILINE)
+GATE = re.compile(
+    r"^    if: needs\.scope\.outputs\.(build|package) == 'true'( && needs\.scope\.outputs\.full == 'true')?$",
+    re.MULTILINE,
+)
+# What gates a job to every platform (CI-54): a draft pull request skips it.
+FULL_GATE = re.compile(r"^    if: .*needs\.scope\.outputs\.full == 'true'$", re.MULTILINE)
+SCOPED_MATRIX = re.compile(
+    r'^        include: \$\{\{ fromJSON\(needs\.scope\.outputs\.([a-z0-9]+)\) \}\}$', re.MULTILINE
+)
 # Advisory jobs, which only warn, also leave out pull requests (CI-49). Only
 # the jobs listed here may: a required job that skipped pull requests would
 # still pass every other check here.
@@ -501,13 +510,65 @@ class Workflows(unittest.TestCase):
                 for name, body in found.items():
                     if name == 'scope':
                         continue
-                    needs = re.search(r'^    needs: (\S+)$', body, re.MULTILINE)
+                    needs = re.search(r'^    needs: (\S+|\[[a-z0-9_, -]+\])$', body, re.MULTILINE)
                     self.assertIsNotNone(needs, f'{name} must need scope or another job')
                     if needs.group(1) == 'scope':
                         gate = ADVISORY_GATE if (workflow.name, name) in ADVISORY else GATE
                         self.assertRegex(body, gate, name)
                     # A job that runs despite a skipped dependency would undo the gate.
                     self.assertNotRegex(body, OVERRIDE, name)
+
+    def test_scope_jobs_carry_and_limit_drafts(self):
+        """Every gated workflow's scope job can read earlier runs, marks a full
+        run with PROVING_STEP (CI-53), and a draft pull request starts no
+        macOS or Windows job (CI-54): such a job is gated on full, needs one
+        that is, or takes its matrix from the scope job."""
+        for workflow in sorted(WORKFLOWS.glob('*.yml')):
+            if workflow.stem not in ci_scope.WORKFLOWS:
+                continue
+            text = workflow.read_text(encoding='utf-8')
+            found = jobs(text)
+            with self.subTest(workflow=workflow.name):
+                self.assertIn('types: [opened, synchronize, reopened, ready_for_review]', text)
+                scope = found['scope']
+                self.assertIn('      actions: read\n', scope)
+                self.assertIn('GITHUB_TOKEN: ${{ github.token }}', scope)
+                self.assertIn(f"      - name: '{ci_scope.PROVING_STEP}'\n", scope)
+                self.assertIn("        if: steps.scope.outputs.proving == 'true'\n", scope)
+                self.assertIn('      full: ${{ steps.scope.outputs.full }}\n', scope)
+                limited = {name for name, body in found.items() if FULL_GATE.search(body)}
+                for name, body in found.items():
+                    runner = re.search(r'^    runs-on: (.+)$', body, re.MULTILINE).group(1)
+                    if runner == '${{ matrix.os }}':
+                        matrix = SCOPED_MATRIX.search(body)
+                        self.assertIsNotNone(matrix, f'{name} must take its matrix from the scope job')
+                        self.assertIn(f'--matrix {matrix.group(1)}=', scope)
+                        self.assertIn(
+                            f'      {matrix.group(1)}: ${{{{ steps.scope.outputs.{matrix.group(1)} }}}}', scope
+                        )
+                    elif not runner.startswith('ubuntu'):
+                        needs = re.search(r'^    needs: (.+)$', body, re.MULTILINE).group(1).strip('[]')
+                        self.assertTrue(
+                            name in limited or limited & {need.strip() for need in needs.split(',')},
+                            f'{name} runs on {runner}, so a draft must skip it',
+                        )
+
+    def test_scoped_matrices_parse(self):
+        """Each matrix listed in a scope job is JSON once its comment lines go,
+        names a runner for every entry, and keeps a Linux entry for drafts."""
+        for workflow in sorted(WORKFLOWS.glob('*.yml')):
+            scope = jobs(workflow.read_text(encoding='utf-8')).get('scope', '')
+            for name, variable in re.findall(r'--matrix ([a-z0-9]+)=([A-Z0-9_]+)', scope):
+                with self.subTest(workflow=workflow.name, matrix=name):
+                    block = re.search(rf'^          {variable}: \|\n((?:            .*\n)+)', scope, re.MULTILINE)
+                    self.assertIsNotNone(block)
+                    text = block.group(1)
+                    every = ci_scope.matrix(text, full=True)
+                    drafts = ci_scope.matrix(text, full=False)
+                    self.assertTrue(all(entry.get('os') for entry in every))
+                    self.assertTrue(drafts)
+                    self.assertTrue(all(entry['os'].startswith('ubuntu') for entry in drafts))
+                    self.assertLess(len(drafts), len(every))
 
     def test_every_named_workflow_exists(self):
         for name in ci_scope.WORKFLOWS:
@@ -754,20 +815,20 @@ class Command(unittest.TestCase):
 
     def test_explicit_paths(self):
         written, printed = self.run_script('TODO.md', 'docs/develop/build.md')
-        self.assertEqual(written, 'build=false\npackage=false\n')
+        self.assertEqual(written, 'build=false\npackage=false\nfull=true\nproving=false\n')
         self.assertIn('Only documentation changed', printed)
 
     def test_push_and_manual_runs_test_everything(self):
         for event in ('push', 'workflow_dispatch', 'schedule'):
             with self.subTest(event=event):
-                self.assertEqual(self.run_script(event=event)[0], 'build=true\npackage=true\n')
+                self.assertEqual(self.run_script(event=event)[0], 'build=true\npackage=true\nfull=true\nproving=true\n')
 
     def test_fuzz_workflow_answer(self):
         written, printed = self.run_script('--workflow', 'fuzz', 'portable/host.cpp')
-        self.assertEqual(written, 'build=false\npackage=false\n')
+        self.assertEqual(written, 'build=false\npackage=false\nfull=true\nproving=false\n')
         self.assertIn('The fuzz targets do not run', printed)
         written, printed = self.run_script('--workflow', 'fuzz', 'portable/config_parse.cpp')
-        self.assertEqual(written, 'build=true\npackage=false\n')
+        self.assertEqual(written, 'build=true\npackage=false\nfull=true\nproving=true\n')
         self.assertNotIn('The fuzz targets do not run', printed)
 
     def test_fuzz_sources(self):
@@ -852,14 +913,14 @@ class Command(unittest.TestCase):
             git('commit', '-q', '-am', 'main moves on')
             git('merge', '-q', '--no-ff', '-m', 'merge', 'topic')
             written, printed = self.run_script(cwd=repository)
-            self.assertEqual(written, 'build=false\npackage=false\n')
+            self.assertEqual(written, 'build=false\npackage=false\nfull=true\nproving=false\n')
             self.assertIn('documentation docs/guide.md', printed)
             self.assertIn('documentation docs/guidé.md', printed)
             self.assertNotIn('engine.cpp', printed)
             # Without a merge commit the changes are unknown, so everything runs.
             git('checkout', '-q', 'topic')
             written, printed = self.run_script(cwd=repository)
-            self.assertEqual(written, 'build=true\npackage=true\n')
+            self.assertEqual(written, 'build=true\npackage=true\nfull=true\nproving=true\n')
             self.assertIn('cannot list the changed files', printed)
 
     def test_guide_examples_read_from_both_sides_of_the_merge(self):
@@ -908,17 +969,190 @@ class Command(unittest.TestCase):
             (repository / 'docs/use/marked.md').write_text('<!-- executable-example -->\n```sh\nconvolver\n```\n')
             git('add', '.')
             git('commit', '-q', '-m', 'base')
-            self.assertEqual(merged('docs/use/prose.md', 'Changed prose.\n'), 'build=false\npackage=false\n')
-            self.assertEqual(merged('docs/use/marked.md', 'No commands now.\n'), 'build=true\npackage=true\n')
+            self.assertEqual(
+                merged('docs/use/prose.md', 'Changed prose.\n'),
+                'build=false\npackage=false\nfull=true\nproving=false\n',
+            )
+            self.assertEqual(
+                merged('docs/use/marked.md', 'No commands now.\n'),
+                'build=true\npackage=true\nfull=true\nproving=true\n',
+            )
             self.assertEqual(
                 merged('docs/use/prose.md', '<!-- refused-example -->\n```sh\nconvolver\n```\n'),
-                'build=true\npackage=true\n',
+                'build=true\npackage=true\nfull=true\nproving=true\n',
             )
-            self.assertEqual(merged('docs/use/added.md', 'New prose.\n'), 'build=false\npackage=false\n')
-            self.assertEqual(merged('docs/use/marked.md', None), 'build=true\npackage=true\n')  # Deleted.
-            self.assertEqual(merged('docs/use/prose.md', None), 'build=false\npackage=false\n')
+            self.assertEqual(
+                merged('docs/use/added.md', 'New prose.\n'), 'build=false\npackage=false\nfull=true\nproving=false\n'
+            )
+            self.assertEqual(
+                merged('docs/use/marked.md', None), 'build=true\npackage=true\nfull=true\nproving=true\n'
+            )  # Deleted.
+            self.assertEqual(
+                merged('docs/use/prose.md', None), 'build=false\npackage=false\nfull=true\nproving=false\n'
+            )
             # A page that cannot be read counts as marked, even when the other side is prose.
-            self.assertEqual(merged('docs/use/prose.md', b'\xff<!-- prose -->\n'), 'build=true\npackage=true\n')
+            self.assertEqual(
+                merged('docs/use/prose.md', b'\xff<!-- prose -->\n'),
+                'build=true\npackage=true\nfull=true\nproving=true\n',
+            )
+
+
+class CarryForward(unittest.TestCase):
+    """CI-53: a push carries a passed result forward when nothing the workflow
+    needs changed since its last full run; CI-54: drafts run Linux only."""
+
+    REPOSITORY = 'owner/name'
+    BASE = 'a' * 40
+    HEAD = 'b' * 40
+
+    def setUp(self):
+        environment = {
+            'GITHUB_TOKEN': 'token',
+            'GITHUB_REPOSITORY': self.REPOSITORY,
+            'GITHUB_RUN_ID': '99',
+            'GITHUB_RUN_ATTEMPT': '1',
+            'GITHUB_REF': 'refs/heads/main',
+            'GITHUB_SHA': self.HEAD,
+        }
+        patcher = mock.patch.dict(os.environ, environment)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.runs = [
+            self.run_record(99, self.HEAD),  # This run: never compared with.
+            self.run_record(7, self.BASE, proving=False),  # Carried or draft-limited.
+            self.run_record(5, self.BASE),
+        ]
+        self.comparison = {'status': 'ahead', 'files': [{'filename': 'TODO.md'}]}
+        self.requests = []
+        patcher = mock.patch.object(ci_scope, 'github', self.github)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def run_record(self, number, sha, *, proving=True):
+        return {
+            'id': number,
+            'head_sha': sha,
+            'html_url': f'https://example.invalid/{number}',
+            'head_repository': {'full_name': self.REPOSITORY},
+            'proving': proving,
+        }
+
+    def github(self, path):
+        self.requests.append(path)
+        if '/compare/' in path:
+            return self.comparison
+        if path.endswith('/jobs?filter=latest&per_page=100'):
+            number = int(path.split('/runs/')[1].split('/')[0])
+            run = next(run for run in self.runs if run['id'] == number)
+            conclusion = 'success' if run['proving'] else 'skipped'
+            steps = [{'name': 'Run actions/checkout@v7', 'conclusion': 'success'}]
+            steps.append({'name': ci_scope.PROVING_STEP, 'conclusion': conclusion})
+            return {'jobs': [{'name': 'sdk', 'steps': []}, {'name': 'scope', 'steps': steps}]}
+        return {'workflow_runs': self.runs}
+
+    def pull_request(self, *, draft=False, repository=REPOSITORY):
+        return {
+            'pull_request': {
+                'draft': draft,
+                'head': {'ref': 'topic', 'sha': self.HEAD, 'repo': {'full_name': repository}},
+            }
+        }
+
+    def test_compares_with_the_last_full_passed_run(self):
+        paths, run = ci_scope.carried_from('vst3', 'pull_request', self.pull_request())
+        self.assertEqual((paths, run['id']), (['TODO.md'], 5))
+        self.assertIn('event=pull_request&branch=topic&status=success', self.requests[0])
+        self.assertTrue(self.requests[-1].endswith(f'/compare/{self.BASE}...{self.HEAD}'))
+        paths, run = ci_scope.carried_from('vst3', 'push', {})
+        self.assertEqual(run['id'], 5)
+        self.assertIn('event=push&branch=main', self.requests[-4])
+
+    def test_renames_count_both_names(self):
+        self.comparison['files'] = [{'filename': 'docs/new.md', 'previous_filename': 'portable/old.cpp'}]
+        paths, _ = ci_scope.carried_from('regression', 'pull_request', self.pull_request())
+        self.assertEqual(paths, ['docs/new.md', 'portable/old.cpp'])
+
+    def test_nothing_carried(self):
+        def why(event='pull_request', payload=None):
+            paths, reason = ci_scope.carried_from('vst3', event, self.pull_request() if payload is None else payload)
+            self.assertIsNone(paths)
+            return reason
+
+        self.assertIn('another repository', why(payload=self.pull_request(repository='fork/name')))
+        self.assertIn('carry nothing', why('workflow_dispatch'))
+        self.comparison['status'] = 'diverged'
+        self.assertIn('not an ancestor', why())
+        self.comparison = {'status': 'ahead', 'files': [{'filename': f'f{n}'} for n in range(300)]}
+        self.assertIn('more than 299 files', why())
+        self.runs[2]['proving'] = False
+        self.assertIn('no full passed run', why())
+        with mock.patch.dict(os.environ, {'GITHUB_RUN_ATTEMPT': '2'}):
+            self.assertIn('re-ran', why())
+        with mock.patch.dict(os.environ, {'GITHUB_TOKEN': ''}):
+            self.assertIn('no token', why())
+        with mock.patch.object(ci_scope, 'github', side_effect=OSError('refused')):
+            self.assertIn('could not look up', why())
+
+    def answer(self, event, changed, since, workflow='vst3', *, draft=False):
+        """What main() writes for a run, given the pull request's files and
+        those changed since the last full run (None: nothing to carry)."""
+        with tempfile.TemporaryDirectory() as temporary:
+            output, payload = Path(temporary) / 'output', Path(temporary) / 'event.json'
+            payload.write_text(json.dumps(self.pull_request(draft=draft) if event == 'pull_request' else {}))
+            carried = (since, self.run_record(5, self.BASE)) if since is not None else (None, 'no run')
+            environment = {'GITHUB_EVENT_PATH': str(payload), 'GITHUB_STEP_SUMMARY': ''}
+            with mock.patch.dict(os.environ, environment), mock.patch.object(
+                ci_scope, 'changed_files', return_value=changed
+            ), mock.patch.object(ci_scope, 'carried_from', return_value=carried), mock.patch('sys.stdout'):
+                ci_scope.main(['--event', event, '--workflow', workflow, '--github-output', str(output)])
+            return dict(line.split('=', 1) for line in output.read_text().splitlines())
+
+    def test_pull_request_decisions(self):
+        code = ['portable/host.cpp']
+        # Only documentation since the last full run: the result stands.
+        self.assertEqual(
+            self.answer('pull_request', code, ['TODO.md']),
+            {'build': 'false', 'package': 'false', 'full': 'true', 'proving': 'false'},
+        )
+        # Nothing changed at all (marked ready again, say): it stands too.
+        self.assertEqual(self.answer('pull_request', code, [])['build'], 'false')
+        # Another format's files: this workflow's result stands, that one runs.
+        self.assertEqual(self.answer('pull_request', code, ['plugins/au/adapter.mm'])['build'], 'false')
+        self.assertEqual(self.answer('pull_request', code, ['plugins/au/adapter.mm'], 'au')['build'], 'true')
+        # Code since then runs, and later pushes compare with it.
+        self.assertEqual(self.answer('pull_request', code, code)['proving'], 'true')
+        # No run to compare with: as before CI-53.
+        self.assertEqual(self.answer('pull_request', code, None)['proving'], 'true')
+        # A draft builds, on Linux only, and proves nothing for later pushes.
+        self.assertEqual(
+            self.answer('pull_request', code, code, draft=True),
+            {'build': 'true', 'package': 'false', 'full': 'false', 'proving': 'false'},
+        )
+        # A pull request this workflow does not need stays skipped.
+        self.assertEqual(self.answer('pull_request', ['TODO.md'], code)['build'], 'false')
+
+    def test_main_runs_everything_after_code(self):
+        """jrp, 21 November 2026: main keeps the full run when code or tests
+        change; a merge of documentation alone runs Lint."""
+        self.assertEqual(self.answer('push', None, ['TODO.md', 'docs/develop/build.md'])['build'], 'false')
+        self.assertEqual(self.answer('push', None, ['TODO.md'], 'release')['package'], 'false')
+        for since in (['plugins/au/adapter.mm'], ['tests/plugins/fixtures.py'], ['portable/host.cpp']):
+            with self.subTest(since=since):
+                self.assertEqual(
+                    self.answer('push', None, since),
+                    {'build': 'true', 'package': 'true', 'full': 'true', 'proving': 'true'},
+                )
+        self.assertEqual(self.answer('push', None, None)['proving'], 'true')
+
+    def test_draft_matrices(self):
+        text = '[\n  # A comment\n  {"os": "ubuntu-latest"},\n  {"os": "macos-latest"},\n  {"os": "windows-2022"}\n]'
+        self.assertEqual(
+            ci_scope.matrix(text, full=True), [{'os': 'ubuntu-latest'}, {'os': 'macos-latest'}, {'os': 'windows-2022'}]
+        )
+        self.assertEqual(ci_scope.matrix(text, full=False), [{'os': 'ubuntu-latest'}])
+        self.assertFalse(ci_scope.full_run('pull_request', self.pull_request(draft=True)))
+        self.assertTrue(ci_scope.full_run('pull_request', self.pull_request()))
+        self.assertTrue(ci_scope.full_run('push', {}))
 
 
 if __name__ == '__main__':

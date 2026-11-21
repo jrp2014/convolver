@@ -1409,3 +1409,18 @@ were recorded in the repository; this log is their first written record.
   releases"). This replaces the 12 November form of an open item, not its
   rule against progress narratives. See
   [Workflow](../develop/workflow.md#recording-progress-in-todo).
+- **21 November 2026.** Simple changes take fewer CI runs and review rounds
+  (DOC-21, CI-53, CI-54), from a count of that day's pull requests: a later
+  push runs only what changed since the last full run that passed; a draft
+  runs Lint and the Linux jobs; `main` is merged into a branch only on a
+  conflict or on request; a review round is answered in one push; an
+  independent review is needed only for code, DSP, plug-in, saved-state,
+  `.cfg` and release changes, and wording findings never block; a ready pull
+  request's handoff note keeps only its State; the status page changes only
+  at milestones. jrp kept two safeguards: every release and preview gets the
+  full CI, and `main` keeps the full post-merge run whenever a merge changes
+  code or tests ("keep the full post merge ci as now, when there have been
+  code or test changes"); he chose that over skipping post-merge runs whose
+  code a pull request had already tested. See
+  [Workflow](../develop/workflow.md#while-working) and
+  [CI triggers](../develop/testing.md#drafts-and-later-pushes).

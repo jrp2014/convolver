@@ -1873,7 +1873,10 @@ measurement workflow runs only when started by hand
 ([supported workloads](fft-measurements.md#supported-workloads)). A commit pushed to a branch that has a pull request runs
 once, as part of that pull request; a branch without one gets no automatic
 run, so open the draft pull request early ([workflow](workflow.md#before-you-start))
-or use Actions, then "Run workflow" on the branch. A new commit on a pull request
+or use Actions, then "Run workflow" on the branch. A draft pull request runs
+Lint and the Linux jobs only, and a later push runs only what changed since
+the last full run that passed
+([drafts and later pushes](#drafts-and-later-pushes)). A new commit on a pull request
 cancels the runs still going for the commit it replaces. Runs on `main` and
 manual runs are never cancelled this way. Re-run only the latest commit's runs:
 re-running an older commit's run cancels the current one.
@@ -1891,6 +1894,47 @@ When the same commit also ran for the branch push, and older
 commits kept running, jobs on 22 October 2026 waited a median of 10 minutes for
 a macOS runner (up to an hour) while taking about 3 minutes to run.
 
+### Drafts and later pushes
+
+Two rules keep a pull request from rebuilding everything for every push
+(jrp, 21 November 2026; measured on that day's pull requests, where 13 of 60
+follow-up pushes changed only prose or hand-run scripts and 9 merged `main`,
+yet each ran every workflow the pull request needed).
+
+**A draft runs Lint and the Linux jobs** (CI-54). Each gated workflow's
+`scope` job answers `full=false` for a draft: the macOS and Windows jobs are
+gated on `full`, the matrices that mix platforms (the native `unix` job, the
+`vst3` job and the candidates) are listed in the `scope` job and keep only
+their Linux entries, and the complete-candidate `collect` job and the Audio
+Unit workflow are skipped. Marking the pull request ready
+(`ready_for_review`) runs every platform. To see macOS or Windows sooner,
+start the workflows by hand on the branch (Actions, then "Run workflow", or
+`gh workflow run vst3.yml --ref BRANCH`): a manual run tests the branch head
+on every platform.
+
+**A later push carries a passed result forward** (CI-53). Each gated
+workflow looks up its own newest run on the same branch that passed and ran
+in full, which its `scope` job marks with the step "Full run: later pushes
+compare with this commit", and lists the files changed between that run's
+commit and this one ([`ci_scope.py`](../../scripts/ci_scope.py),
+`carried_from()`). On a pull request, when none of those files needs the
+workflow (by the same rules as below), its jobs are skipped, and the
+`scope` job's log and summary name the run whose result stands. On `main`,
+any change other than documentation runs every workflow in full as before,
+so every merge that changes code or tests gets the full post-merge run; a
+merge of documentation alone runs Lint. Nothing is carried, and the
+workflow runs as before, when no such run exists (a draft's runs do not
+count, nor do runs before CI-53), when the earlier commit is not an
+ancestor (a rebase), when 300 or more files changed, when the lookup fails,
+for a re-run (attempt 2 or later) and for scheduled and manual runs.
+
+A carried result was tested against the `main` of its own run. That is no
+weaker than before: a pull request's runs were never repeated when `main`
+moved on, and the full run after a merge of code is the backstop. Merging
+`main` into the branch changes its code, so it runs again. Every release and
+preview also passes every workflow started by hand on its tag
+([publishing](releasing.md#publishing-an-unsigned-preview)).
+
 ### Documentation-only pull requests
 
 A pull request that changes only documentation runs Lint, which has every
@@ -1898,7 +1942,9 @@ documentation check: Markdown, links and anchors, the repository rules and the
 plug-in identity check. The workflows that build or package start with a short
 `scope` job on Linux, which runs [`ci_scope.py`](../../scripts/ci_scope.py) on
 the files the pull request changes; their other jobs then show as skipped.
-Pushes to `main` and manual runs always run everything, as a backstop.
+Manual and scheduled runs always run everything; pushes to `main` run
+everything unless only documentation changed since the last full run
+([above](#drafts-and-later-pushes)).
 The `scope` jobs add six short Linux jobs to every commit (a full run was 18
 jobs before them); a documentation-only commit starts 7, none on macOS, and one
 that changes a packaged page that builds the candidates starts 13, two of them
@@ -2040,7 +2086,8 @@ counts as marked. Only `docs/use/*.md` are guides; Markdown in a subfolder
 builds the candidates whatever it holds.
 
 Any other change, ordinary code included, can still break a package, so the
-candidates keep building for every push to `main`, each Monday and when
+candidates keep building for every push to `main` that changes anything but
+documentation ([later pushes](#drafts-and-later-pushes)), each Monday and when
 started by hand. When a pull request needs them anyway (before jrp tests it
 in a host, or when a change might affect what is packaged in a way the list
 misses), start "Plug-in distribution candidates" by hand on its branch:
@@ -2085,7 +2132,8 @@ unlisted header.
 | Pull request that changes a file in `FUZZED` or `fuzz.yml` | Run | 60 |
 | Other pull request | Skipped; the `scope` job says why | — |
 | Pull request whose changed files cannot be listed, or that changes nothing | Run | 60 |
-| Push to `main` | Run | 60 |
+| Later push to a pull request, when nothing it needs changed since the last full run that passed | Skipped; the `scope` job names that run ([CI-53](#drafts-and-later-pushes)) | — |
+| Push to `main` that changes anything but documentation since the last full run | Run | 60 |
 | Each Monday at 06:23 UTC | Run | 600 |
 | Started by hand ("Run workflow" on any branch) | Run | the `seconds` input, 600 by default |
 

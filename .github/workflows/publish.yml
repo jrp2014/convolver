@@ -102,6 +102,37 @@ jobs:
           fi
           echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      # jrp, 21 November 2026: every release and preview gets the full CI.
+      # Pull requests and main can carry a passed result forward (CI-53), so
+      # each workflow must also have passed when started by hand on the tag,
+      # which always runs everything (docs/develop/releasing.md#publishing-an-unsigned-preview).
+      - name: Check that the full CI passed on the tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ steps.run.outputs.tag }}
+        run: |
+          sha=$(jq -r .head_sha build/run.json)
+          missing=()
+          for workflow in regression vst3 lv2 au fuzz lint; do
+            runs="repos/$REPO/actions/workflows/$workflow.yml/runs?event=workflow_dispatch&head_sha=$sha&status=success"
+            if [ "$(gh api "$runs" --jq .total_count)" = 0 ]; then
+              missing+=("$workflow")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            message="No passed run started by hand on $TAG ($sha) for: ${missing[*]}."
+            message="$message Start each on the tag (gh workflow run <name>.yml --ref $TAG) and wait for it to pass."
+            if [ "$EVENT" = pull_request ]; then
+              echo "::warning::Dry run: $message"
+            else
+              echo "::error::$message"
+              exit 1
+            fi
+          else
+            echo "Every workflow passed when started by hand on $TAG."
+          fi
       - uses: actions/checkout@v7
         with:
           ref: refs/tags/${{ steps.run.outputs.tag }}

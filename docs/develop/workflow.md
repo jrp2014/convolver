@@ -68,11 +68,24 @@ repository; recording a review's or a host test's results in it is a change.
    [template](../../.github/pull_request_template.md), including the handoff note.
    The open draft pull request is the claim, and CI runs
    automatically only once it exists ([CI triggers](testing.md#ci-triggers)).
+   A draft runs Lint and the Linux jobs; marking it ready runs every
+   platform, and you can start the workflows by hand on the branch sooner
+   when you need macOS or Windows evidence
+   ([drafts and later pushes](testing.md#drafts-and-later-pushes)).
 
 ## While working
 
 - **Push at every stopping point.** Cloud sessions are discarded when they end,
-  and unpushed work is lost.
+  and unpushed work is lost. Pushing to a draft is cheap: it runs Lint and
+  the Linux jobs.
+- **Make each push to a ready pull request count** (DOC-21). Every push
+  starts its workflows again, and a push that changes only prose still runs
+  Lint. Answer a whole review round, lint fixes included, in one push. Do
+  not push a commit only to record the pull request's number: give it with
+  the next real change, or leave it to the merge, whose title carries it.
+  Later pushes run only what changed since the last full run that passed
+  ([CI-53](testing.md#drafts-and-later-pushes)), so a prose fix to a code
+  pull request no longer rebuilds everything.
 - **Run `pre-commit run --all-files` before every push,** draft commits
   included; stage any files it changed and run it again until it passes. jrp
   sees every red CI run. Never bypass the Git hook with `--no-verify`.
@@ -94,8 +107,11 @@ repository; recording a review's or a host test's results in it is a change.
 - **Keep shared files small to merge.** Several streams edit `TODO.md`,
   `CHANGELOG.md`, `CMakeLists.txt`, `packaging/release-policy.json`,
   and `docs/README.md`.
-  Change only the lines your item needs, and merge `main` into your branch
-  often. A change to something every stream relies on (the
+  Change only the lines your item needs. Merge `main` into your branch only
+  when it conflicts, when your change needs something merged since, or when
+  jrp asks (DOC-21): each pull request run already tests the branch merged
+  with the `main` of that moment, and merging `main` changes the branch's
+  code, so every workflow runs again. A change to something every stream relies on (the
   [shared adapter contract](plugin-contract.md),
   the PLUG-2 harness, the PLUG-4 identity list) goes in its own pull request,
   not inside one stream's.
@@ -127,7 +143,11 @@ Whenever you stop, even part-way:
    ([recording progress](#recording-progress-in-todo)).
 
 The pull request description holds one handoff note, kept current. Replace it
-rather than appending, so it always describes the branch as it is now:
+rather than appending, so it always describes the branch as it is now. Once
+the pull request is ready and nothing is left for someone else to pick up,
+the note shrinks to its **State** line (DOC-21): the description's other
+sections already say what changed, what ran and how the review was answered.
+While it is a draft, or when you hand it over, it has every line:
 
 - **State:** draft, ready for review, or blocked (and on what).
 - **Done:** what works, with the commands that show it.
@@ -201,16 +221,30 @@ checklist says so:
   what would justify it and when it is done. A plan that is now fully implemented, or superseded,
   moves to [`archive/plans/`](../archive/plans/README.md)
   ([rule](documentation.md#current-claims-and-dated-evidence)).
-- **Reviewed:** an [independent review](#independent-review) has been done and
-  its findings answered in the pull request.
+- **Reviewed:** when the change [needs one](#which-changes-need-one), an
+  [independent review](#independent-review) has been done and its blocking
+  findings answered in the pull request; otherwise jrp's review is the
+  review, and the pull request says so.
 
 ## Independent review
 
-Before marking a pull request ready, get it reviewed by someone or something
+Before marking a pull request ready, when the change
+[needs one](#which-changes-need-one), get it reviewed by someone or something
 that did not write it: a person, or a fresh agent session with no stake in the
 change. In Claude Code, the repository's `review-change` skill starts this
 procedure. The reviewer assumes nothing the author says is true until they have
 checked it.
+
+### Which changes need one
+
+An independent review is needed when the change touches code (C++, CMake or
+a test CTest runs), the DSP path, a plug-in adapter or window, saved state,
+presets or `.cfg` reading, or what a release builds and publishes (release
+scripts, the candidate and publish workflows). For other changes, such as
+prose, records (TODO, the changelog, host results, decisions) and tooling
+that has its own tests and changes neither of those, the author's own check
+against the [definition of done](#definition-of-done) and jrp's review
+are enough (jrp, 21 November 2026, DOC-21). When unsure, have one.
 
 ### Gather
 
@@ -286,8 +320,14 @@ and say what you ran.
 
 Post the review on the pull request it reviews: each finding with file and
 line, why it matters and a suggested fix; then a short list of what you checked
-and found sound. Change no files and push nothing: the author fixes the
-findings. Once the author has answered, a further round reviews the commits
+and found sound. Put wording and style findings, where nothing is wrong or
+misleading, in one list marked non-blocking (DOC-21): the author may take
+them in the same push as the blocking fixes or leave them, and they never
+start another round. A claim that is false, or an instruction that would
+mislead a user, is blocking, however it is worded. Change no files and push nothing: the author fixes the
+findings. A further round happens only when a blocking finding's fix changed code,
+tests or behaviour; when the fixes were prose, the author's answer closes
+the review. That round reviews the commits
 since the reviewed one (`git diff -M REVIEWED..HEAD`) and whether each
 finding is resolved, not the whole pull request again; review it whole only
 when those commits change its approach or reach files the first round did
@@ -301,8 +341,11 @@ approve or merge; jrp does that.
 
 - jrp reviews and merges. Agents never merge, approve, push to `main`, or
   move tags.
-- CI must be green on the final commit. A failure that is also red on `main`
-  is reported in the pull request, not ignored.
+- CI must be green on the final commit. A workflow that carried an earlier
+  commit's passed result forward
+  ([CI-53](testing.md#drafts-and-later-pushes)) counts as green: its `scope`
+  job names that run. A failure that is also red on `main` is reported in the
+  pull request, not ignored.
 - After a merge, the version workflow bumps `VERSION` and tags `main`
   ([source versioning](versioning.md)).
 - Merged branches are kept for a while, so their history can still be
@@ -329,9 +372,10 @@ evidence (jrp, 12 November 2026, DOC-14, and 20 November 2026, DOC-19). The item
 The item is the one home for its open work. The
 [status page](../project/status.md) gives only each feature's level and
 each milestone condition's status in a sentence, names what remains and
-links the item. Update status in the same pull request when a gate, feature
-readiness or scope changes; internal progress alone belongs in TODO rather
-than another retelling in status (DOC-6). During preview qualification use the
+links the item. Update status only when a milestone condition, a feature's
+level or the scope changes (a preview, a gate passing or failing), in the
+pull request that changes it; progress within an item belongs in TODO
+rather than another retelling in status (DOC-6, DOC-21). During preview qualification use the
 [acceptance plan](releasing.md#what-blocks-a-preview)
 to distinguish blocking findings from deferred suggestions. Report audio,
 safety, state retention, host behaviour and required-gate failures first;

@@ -273,13 +273,19 @@ preview published before and list, in a user's words, what changed since
 (the [changelog](../../CHANGELOG.md) holds every change), and any known
 limitation that no longer holds is removed. Its merge makes the tag.
 
-1. Run the "Plug-in distribution candidates" workflow by hand on the chosen tag
-   (`vX.Y.Z`; the first preview comes from a 0.12.x tag): Actions, then
-   "Run workflow", choosing the tag, or
-   `gh workflow run release.yml --ref vX.Y.Z`. The version bot's tag push does
-   not start it, because pushes made with the workflow token do not trigger
-   other workflows. Wait for the whole run to pass (about 25 minutes, most of
-   it waiting for macOS runners).
+1. Run every workflow by hand on the chosen tag (`vX.Y.Z`; the first preview
+   comes from a 0.12.x tag): the "Plug-in distribution candidates" workflow
+   and, since every release and preview gets the full CI (jrp, 21 November
+   2026), the native, VST3, LV2, Audio Unit, fuzz and Lint workflows. Use
+   Actions, then "Run workflow", choosing the tag, or
+   `for w in release regression vst3 lv2 au fuzz lint; do gh workflow run "$w.yml" --ref vX.Y.Z; done`.
+   A manual run always runs every job on every platform, whereas pushes can
+   carry an earlier result forward
+   ([drafts and later pushes](testing.md#drafts-and-later-pushes)). The
+   version bot's tag push does not start them, because pushes made with the
+   workflow token do not trigger other workflows. Wait for every run to pass
+   (the candidates take about 25 minutes, most of it waiting for macOS
+   runners); step 4 refuses a tag without them.
 2. For the first preview, the independent walkthrough (REL-3 in
    [TODO](../../TODO.md)) uses that run's files before anything is uploaded:
    the `candidate-macos-arm64` or `candidate-macos-x86_64` artifact, or
@@ -294,7 +300,8 @@ limitation that no longer holds is removed. Its merge makes the tag.
    responsiveness result in one sentence, or
    `gh workflow run publish.yml -f run_id=<ID> -f qualification="<result>"`.
    It refuses a run that was not started by hand on a `vX.Y.Z` tag, did not
-   pass, or whose tag holds another commit or `VERSION`; it checks every file
+   pass, or whose tag holds another commit or `VERSION`, and a tag on which
+   any of the other workflows has no passed run started by hand; it checks every file
    against `SHA256SUMS` and the candidate record, and refuses if a release or
    draft for the tag already exists. Next, its clean-machine jobs (REL-9,
    [`clean_machine.py`](../../tests/release/clean_machine.py)) run the exact

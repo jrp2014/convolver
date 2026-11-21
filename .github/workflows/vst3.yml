@@ -7,6 +7,8 @@ name: VST3 compatibility
   push:
     branches: [main]
   pull_request:
+    # ready_for_review: a draft runs Lint and the Linux jobs only (CI-54).
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
   # Each Monday, so that a new upstream release of an SDK or tool shows up
   # within a week even when nothing here changes (CI-6).
@@ -28,14 +30,49 @@ jobs:
   # (scripts/ci_scope.py, docs/develop/testing.md#documentation-only-pull-requests).
   scope:
     runs-on: ubuntu-latest
+    # Reads this workflow's earlier runs to carry a passed result forward
+    # (CI-53).
+    permissions:
+      contents: read
+      actions: read
     outputs:
       build: ${{ steps.scope.outputs.build }}
+      full: ${{ steps.scope.outputs.full }}
+      vst3: ${{ steps.scope.outputs.vst3 }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 2
       - id: scope
-        run: python3 scripts/ci_scope.py --workflow vst3 --github-output "$GITHUB_OUTPUT"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # The vst3 job's matrix, listed here so that a draft pull request
+          # runs its Linux entry alone (CI-54). Lines starting with # are
+          # comments.
+          # AUTO is what plug-in builds ship (Ooura, Accelerate on macOS);
+          # the sanitizer job builds the explicit FFTW override and runs
+          # its in-process tests (no job loads an FFTW bundle in the validator
+          # or pluginval, since FFTW plug-ins are not distributed).
+          # The core suite runs there only where no other job builds the same
+          # compiler, flags and backend: on Linux the native g++ jobs do,
+          # so that one runs the VST3 tests alone. On macOS the Audio Unit job
+          # builds the same today (the newest Xcode on macos-26, which
+          # macos-latest also is), but the vst3 job keeps the suite: a pull request
+          # that changes only the files kept from releases runs this workflow
+          # and not the Audio Unit one (CI-42), and macos-latest moves to a
+          # newer macOS first (docs/develop/testing.md#which-configurations-run-which-tests).
+          # A job that runs only the VST3 tests builds only what they run (CI-9).
+          VST3: |
+            [
+              {"os": "ubuntu-latest", "fft": "AUTO", "tests": "-L vst3", "targets": "--target convolver_vst3_suite"},
+              {"os": "macos-latest", "fft": "AUTO", "tests": "-LE 'repository|consumer'"},
+              {"os": "windows-latest", "fft": "AUTO", "tests": "-LE 'repository|consumer'"}
+            ]
+        run: >-
+          python3 scripts/ci_scope.py --workflow vst3 --github-output "$GITHUB_OUTPUT" --matrix vst3=VST3
+      - name: 'Full run: later pushes compare with this commit'
+        if: steps.scope.outputs.proving == 'true'
+        run: echo "Every job of this workflow runs, on every platform (CI-53)."
   # CI-7: the newest SDK release is resolved once per run, here, and every
   # job below builds exactly that release from this lock file, so the jobs
   # of one run cannot build against different releases.
@@ -63,35 +100,14 @@ jobs:
         run: python3 scripts/release/resolve.py explain-failure
   vst3:
     # Skipped with the sdk job when the scope job finds nothing to build.
-    needs: sdk
+    needs: [scope, sdk]
     name: vst3 (${{ matrix.os }}, ${{ matrix.fft }})
     strategy:
       fail-fast: false
       matrix:
-        # AUTO is what plug-in builds ship (Ooura, Accelerate on macOS);
-        # the sanitizer job below builds the explicit FFTW override and runs
-        # its in-process tests (no job loads an FFTW bundle in the validator
-        # or pluginval, since FFTW plug-ins are not distributed).
-        # The core suite runs here only where no other job builds the same
-        # compiler, flags and backend: on Linux the native g++ jobs do,
-        # so this one runs the VST3 tests alone. On macOS the Audio Unit job
-        # builds the same today (the newest Xcode on macos-26, which
-        # macos-latest also is), but this job keeps the suite: a pull request
-        # that changes only the files kept from releases runs this workflow
-        # and not the Audio Unit one (CI-42), and macos-latest moves to a
-        # newer macOS first (docs/develop/testing.md#which-configurations-run-which-tests).
-        # A job that runs only the VST3 tests builds only what they run (CI-9).
-        include:
-          - os: ubuntu-latest
-            fft: AUTO
-            tests: -L vst3
-            targets: --target convolver_vst3_suite
-          - os: macos-latest
-            fft: AUTO
-            tests: -LE 'repository|consumer'
-          - os: windows-latest
-            fft: AUTO
-            tests: -LE 'repository|consumer'
+        # Listed in the scope job (VST3), which keeps only the Linux entry
+        # for a draft pull request (CI-54).
+        include: ${{ fromJSON(needs.scope.outputs.vst3) }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:

@@ -42,12 +42,19 @@ Follow `docs/develop/workflow.md`. In short:
   request titled with the ID** as soon as you start; that is the claim. Check
   open pull requests for the ID first.
 - Keep the **handoff note** in the pull request description current, and push
-  at every stopping point: cloud sessions are discarded without warning.
+  at every stopping point: cloud sessions are discarded without warning. A
+  draft runs only Lint and the Linux jobs, so pushing to it is cheap; on a
+  ready pull request, answer a review round in one push, never push only to
+  record the pull request number, and merge `main` only on a conflict or when
+  jrp asks ([while working](docs/develop/workflow.md#while-working)).
 - Ask jrp before deciding anything permanent or user-facing (identities,
   state/preset formats, `.cfg` syntax, licences, sound-changing defaults,
   shipped dependencies, publishing).
-- Before marking ready: the definition of done in the workflow guide, and an
-  **independent review** by someone who did not write the change.
+- Before marking ready: the definition of done in the workflow guide, and,
+  for code, DSP, plug-in, saved-state, `.cfg` or release changes, an
+  **independent review** by someone who did not write the change
+  ([which changes](docs/develop/workflow.md#which-changes-need-one)). Wording
+  findings never block or start another round.
 - jrp merges. Never merge, approve, push to `main` or move tags.
 
 The procedures, for any agent, are these sections of the workflow guide.

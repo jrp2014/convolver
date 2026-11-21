@@ -489,6 +489,13 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **CI-53 — Later pushes carry a passed result forward.** 21 November
+  2026, PR #TBD ([drafts and later pushes](docs/develop/testing.md#drafts-and-later-pushes)).
+- [x] **CI-54 — Drafts run Lint and the Linux jobs.** 21 November 2026,
+  PR #TBD ([drafts and later pushes](docs/develop/testing.md#drafts-and-later-pushes)).
+- [x] **DOC-21 — Fewer pushes and review rounds for simple changes.**
+  21 November 2026, PR #TBD ([while working](docs/develop/workflow.md#while-working),
+  [which changes need a review](docs/develop/workflow.md#which-changes-need-one)).
 - [x] **PLUG-24 — `HostProcessor` in its own source file.** 21 November
   2026, PR #260 ([architecture](docs/develop/architecture.md#components-and-source-of-truth)).
 - [x] **CI-51 — One Audio Unit job instead of three.** 21 November 2026,
