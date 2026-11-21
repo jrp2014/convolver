@@ -11,6 +11,7 @@
 #include <iterator>
 #include <stdexcept>
 #include <string>
+#include <vector>
 using namespace Steinberg;
 using namespace Steinberg::Vst;
 using namespace convolver::vst3;
@@ -19,13 +20,22 @@ void require(bool ok, const char* message) {
     if (!ok)
         throw std::runtime_error(message);
 }
+struct Tap {
+    int position;
+    float gain;
+};
 // The examples' taps (scripts/release/generate_examples.py): identity; the
-// echo, half at once and a quarter 257 samples later; the repeat, the same a
-// quarter of a second later.
-int delay_of(const std::string& kind, int rate) {
+// echo, half at once and three repeats 0.3 s apart, each half the one before;
+// the repeat, half at once and a quarter a quarter of a second later.
+std::vector<Tap> taps_of(const std::string& kind, int rate) {
     require(kind == "identity" || kind == "echo" || kind == "repeat",
             "unknown example kind: the probe knows identity, echo and repeat");
-    return kind == "echo" ? 257 : kind == "repeat" ? rate / 4 : 0;
+    if (kind == "identity")
+        return {{0, 1.f}};
+    if (kind == "repeat")
+        return {{0, .5f}, {rate / 4, .25f}};
+    const int step = rate * 3 / 10;
+    return {{0, .5f}, {step, .25f}, {2 * step, .125f}, {3 * step, .0625f}};
 }
 
 int probe(const std::filesystem::path& path, int rate, int count, const std::string& kind) {
@@ -59,11 +69,11 @@ int probe(const std::filesystem::path& path, int rate, int count, const std::str
         data.inputs = &in;
         data.outputs = &out;
         // Independent time-domain oracle: channel impulses of 1 and -0.5.
-        const int delay = delay_of(kind, rate);
-        const bool delayed = delay > 0;
+        const auto taps = taps_of(kind, rate);
+        const int delay = taps.back().position;
         constexpr std::array<int, 8> blocks{1, 73, 137, 3, 129, 137, 137, 137};
         int position = 0;
-        // Past the delayed tap (for the repeat, a quarter of a second).
+        // Past the last tap (for the echo, 0.9 s).
         for (std::size_t b = 0; b < blocks.size() || position <= latency + delay + 137; ++b) {
             const int block = blocks[b % blocks.size()];
             left.fill(0);
@@ -77,9 +87,10 @@ int probe(const std::filesystem::path& path, int rate, int count, const std::str
             require(p.process(data) == kResultOk, "process");
             for (int i = 0; i < block; ++i) {
                 const int sample = position + i;
-                const float expected = sample == latency ? (delayed ? .5f : 1.f)
-                                       : (delayed && sample == latency + delay) ? .25f
-                                                                                : 0.f;
+                float expected = 0.f;
+                for (const auto& tap : taps)
+                    if (sample == latency + tap.position)
+                        expected = tap.gain;
                 for (int c = 0; c < count; ++c)
                     require(std::isfinite(channels[c][i]) &&
                                 std::abs(channels[c][i] - expected * (c == 0 ? 1.f : -.5f)) < 1e-5f,

@@ -21,13 +21,19 @@ def generate(output, converter):
                 name = f'{kind}-{rate}-' + ('mono' if channels == 1 else 'stereo')
                 folder = output / name
                 folder.mkdir(exist_ok=True)
-                # Exactly representable coefficients: identity; or -6 dB direct
-                # plus a quarter-amplitude delayed tap, with headroom. The echo's
-                # tap (257 samples, about 5 ms) is heard only as a hollow tone;
-                # the repeat's (a quarter of a second) is heard as a repeat.
-                delay = {'identity': 0, 'echo': 257, 'repeat': rate // 4}[kind]
-                taps = [[0, 1.0]] if kind == 'identity' else [[0, 0.5], [delay, 0.25]]
-                impulse = [0.0] * (delay + 1)
+                # Exactly representable coefficients, each kind plain by ear and
+                # on a level meter (REL-10): identity; the echo, half at once and
+                # three repeats 0.3 s apart, each 6 dB quieter (a sum of 0.9375,
+                # for headroom); the repeat, half at once and one quarter-level
+                # copy a quarter of a second later.
+                if kind == 'identity':
+                    taps = [[0, 1.0]]
+                elif kind == 'echo':
+                    step = rate * 3 // 10
+                    taps = [[0, 0.5], [step, 0.25], [2 * step, 0.125], [3 * step, 0.0625]]
+                else:
+                    taps = [[0, 0.5], [rate // 4, 0.25]]
+                impulse = [0.0] * (taps[-1][0] + 1)
                 for position, value in taps:
                     impulse[position] = value
                 (folder / 'impulse.wav').write_bytes(float_wav_bytes(rate, [impulse] * channels))
