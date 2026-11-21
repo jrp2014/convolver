@@ -97,8 +97,7 @@ How the first preview was qualified (its gates, journeys and the defects
 jrp's reviews found) is [archived](../archive/releases/2026-11-08-first-preview-gates.md).
 
 Not part of this milestone, but tracked: signing and notarization (REL-1),
-resource budgets and supported workloads (PERF-3), other `.cfg` readers
-(CFG-1) and Equalizer APO on a real device (HOST-4).
+other `.cfg` readers (CFG-1) and Equalizer APO on a real device (HOST-4).
 
 <a id="what-still-blocks-the-first-preview"></a><a id="user-journeys-for-the-first-preview"></a>
 
@@ -173,8 +172,13 @@ none qualifies a workload by itself ([responsiveness qualification](../develop/r
 - **Idle after the tail** (EDGE-11): silence after the tail costs 93 to 99%
   less on the Linux cloud VM, music unchanged within the spread; Apple
   silicon and Windows not yet measured.
-- **Supported workloads** (PERF-3): not yet measured, so the guides state
-  none.
+- **Supported workloads** (PERF-3, 21 November 2026): on the Linux cloud
+  VM and GitHub's Linux, macOS arm64 and Windows runners, every filter that
+  fits the saved state, except a full 7.1 matrix at 96 kHz, used at most 20%
+  of one core with its 99th-percentile callback under half its period;
+  shared machines, so indicative only. The [limits
+  guide](../use/limits.md#filter-length-channels-and-processor-load) states
+  them; jrp's Mac has not run them.
 
 ## Compatibility guarantees
 

@@ -20,6 +20,14 @@ first published preview, keep their original grouping.
 
 ### Added
 
+- Documentation (PERF-3): the [limits guide](docs/use/limits.md#filter-length-channels-and-processor-load)
+  states what one plug-in instance handles, from measurements of
+  Convolver's processing, run as its plug-ins run it, on four shared
+  machines (an Apple M1 virtual machine and Linux and Windows x86-64
+  servers): room correction for up to 8 channels, stereo reverbs up to 60 s
+  and true-stereo reverbs up to 60 s at 48 kHz or 30 s at 96 kHz kept up
+  with room to spare, a full 8 × 8 matrix only at 48 kHz; and the memory
+  and preparation time a filter takes.
 - Releases: jrp published Convolver 0.14.0, the sixth unsigned developer
   preview, on 19 November 2026
   ([release](https://github.com/jrp2014/convolver/releases/tag/v0.14.0)).
@@ -182,6 +190,15 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
+- Benchmarks (PERF-3): `tests/native/benchmarks/workloads.py` measures
+  callback times, peak memory and preparation for long and multichannel
+  filters through `HostProcessor`, and the manual Workload measurements
+  workflow runs it on GitHub's Linux, macOS arm64 and Windows runners. The
+  first runs (21 November 2026) are in [FFT measurements](docs/develop/fft-measurements.md#supported-workloads):
+  no supported workload needs FFT-2, PLUG-11 or EDGE-11's other candidates;
+  cost grows in proportion to length beyond about 30 s, the first target for
+  PERF-2's tuning; VST3-5 may be needed for 60 s and large 96 kHz
+  multichannel filters. No shipped code changed.
 - Tests (COMPAT-1, in progress): LV2 state saved by the published 0.14.0's
   own LV2 plug-in is kept in `tests/upgrade/0.14.0/lv2-state/`: for each of
   the 21 cases, a session lilv saved after the plug-in chose the case's

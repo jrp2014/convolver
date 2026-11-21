@@ -64,7 +64,6 @@ before starting anything.
 | **PLUG-39** | Step 5's typed advice and step 6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps); steps 0 to 4, step 5a's typed report and ROBUST-8 are merged | Each step is its own reviewed pull request (jrp, 13 and 19 November 2026) |
 | **PLUG-24** | `HostProcessor` in its own source file | In PLUG-39's sequence, as its own pull request, never with a DSP change (jrp, 19 November 2026) |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
-| **PERF-3** | One measurement exercise: resource budgets and supported workloads | Changes no shipped code; decides whether FFT-2, VST3-5, PLUG-11 and PERF-2's tuning are worth doing |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 
 ### Depends on
@@ -73,13 +72,13 @@ before starting anything.
 | --- | --- | --- |
 | **REL-3** | The independent walkthrough of the published 0.14.0 files | A tester, whom jrp chooses |
 | **HOST-1**, **VST3-11**, **AU-4**, **AU-6**, **VST3-17**, **PERF-2**, **COMPAT-1** | [Checks left](docs/project/status.md#checks-left-before-publication) 1 to 5 and 8 to 10; COMPAT-1's REAPER project saved with 0.14.0 | jrp's Mac session on 0.14.0 |
-| **PERF-2**, after its session | The CPU indication beside the Latency menu, and block sizes tuned on Apple silicon | Check 9 and PERF-3's measurements on jrp's Mac |
+| **PERF-2**, after its session | The CPU indication beside the Latency menu, and block sizes tuned on Apple silicon (first a largest block above 8,192 frames for filters over 30 s) | Check 9 and the [workload measurements](docs/develop/fft-measurements.md#supported-workloads) run on jrp's Mac |
 | **VST3-12**, **HOST-4** | The Windows window in hosts and a screen reader; Equalizer APO on a real device | A Windows tester or device |
 | **LV2-4** | Desktop LV2 hosts and PipeWire on a real sound card | A Linux tester |
 | **HOST-8** | Ardour 9.0's abort as `new_session` exits | A fixed Ardour on `ubuntu-latest` |
 | **HOST-11** | Step 3 of the [host-test automation plan](docs/project/plans/2026-11-21-host-test-automation.md#steps): one command for the REAPER checks | A run on jrp's Mac |
 | **CFG-1**, then **CFG-2** | Other `.cfg` readers, then importing and exporting their formats | Access to Roon, JRiver or Audiolense workflows |
-| **FFT-2**, **VST3-5**, **PLUG-11** | Optimisation | PERF-3 showing a need |
+| **FFT-2**, **VST3-5**, **PLUG-11** | Optimisation | A workload that needs it; PERF-3's [measurements](docs/develop/fft-measurements.md#supported-workloads) showed none, though VST3-5 may for 60 s and large 96 kHz multichannel filters |
 | **VST3-13**, **VST3-2**, **VST3-6**, **HOST-2**, **LV2-3**, **LV2-6**, **DIAG-9** | The Linux window, switching filters from the host, replacing the old VST2 plug-in, CLAP, named LV2 layouts, an LV2 window, numbers in the user's locale | A stated user need |
 | **IO-1** | Large files | A reproducible defect or a user need |
 
@@ -179,7 +178,10 @@ done once for all three formats:
   change, with an oracle-backed test and nothing new allocating or locking.
 - [ ] **PLUG-11 — FFT planning in FFTW-built plug-ins (optional).** A Quick
   or Measured planning choice, only in plug-ins built with FFTW, applied
-  while preparing. **Worth doing when** PERF-3 shows a gain.
+  while preparing. **Worth doing when** a workload needs it: with estimate
+  plans FFTW was already cheaper than Ooura where the transforms matter
+  ([measurements](docs/develop/fft-measurements.md#supported-workloads)),
+  and no release ships FFTW-built plug-ins.
 - [ ] **PLUG-20 — The VST logo in the window (optional).** **Done when**
   the macOS window shows the logo and notice without crowding the settings,
   and its tests cover it ([trademarks](packaging/trademarks/README.md)).
@@ -282,7 +284,10 @@ relevant to a convolver unless the product changes.
   program list (`IUnitInfo`, `IProgramListData`) over a configuration
   list's entries, switched with the usual crossfade.
 - [ ] **VST3-5 — Progress for slow filter preparation.** `IProgress` or a
-  worker, only if PERF-3 shows `setState` stalling hosts.
+  worker. **Worth doing when** the load-timing tests, run with 60 s or large
+  96 kHz multichannel filters, show `setState` holding a host's thread over
+  its limit: preparing those took up to 0.2 s on shared machines
+  ([measurements](docs/develop/fft-measurements.md#supported-workloads)).
 - [ ] **VST3-6 — Replacing the old VST2 plug-in.** Only with a migration
   requirement: declare `'Conv'` as compatible and convert old state and
   Gain's mapping.
@@ -307,7 +312,10 @@ relevant to a convolver unless the product changes.
 
 ## FFT libraries and performance
 
-- [ ] **FFT-2 — Evaluate alternatives only against a measured need.** PFFFT
+- [ ] **FFT-2 — Evaluate alternatives only against a measured need.** None
+  yet: a faster library could save up to about a third on room correction,
+  which needs at most 9% of a core
+  ([measurements](docs/develop/fft-measurements.md#supported-workloads)). PFFFT
   first ([integration review](docs/develop/fft-backends.md#alternatives-for-linux-and-windows));
   adopt a backend only with Windows and Linux measurements, no allocation or
   locks while processing and the same oracles.
@@ -315,11 +323,6 @@ relevant to a convolver unless the product changes.
   non-uniform engine shipped in 0.13.2. **Remains:** check 9's session, the
   CPU indication beside the Latency menu and block sizes tuned on Apple
   silicon ([measurements](docs/develop/fft-measurements.md#the-non-uniform-engine)).
-- [ ] **PERF-3 — One measurement exercise: budgets, supported workloads and
-  published evidence.** Dated runs on named machines of callback times,
-  memory and preparation for long and multichannel filters. **Done when**
-  they are in [FFT measurements](docs/develop/fft-measurements.md) and the
-  guides state the supported workloads.
 - [ ] **PERF-16 — Loading stages timed inside the plug-in.** Split a load's
   hold into its stages outside the audio path, so a failed run names the
   stage.
@@ -410,14 +413,18 @@ and the owner's decision its row names, and keeps its
 - [ ] **EDGE-10 — Sound-aware and platform-aware optimisation.** A
   [catalogue](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#sound-aware-and-platform-aware-optimisation),
   investigated one candidate at a time when a measured limitation points at
-  it. **Done when** PERF-3 shows none is justified, or each one tried is
-  adopted as its own item or stopped with its numbers.
+  it; PERF-3's [measurements](docs/develop/fft-measurements.md#supported-workloads)
+  found none in the supported workloads, only a full 7.1 matrix at 96 kHz
+  beyond them. **Done when** no workload users need is out of reach, or
+  each one tried is adopted as its own item or stopped with its numbers.
 - [ ] **EDGE-11 — Savings in today's engine.** Idling after the tail is in
   (PR #209). **Remains:** the plan's
   [other candidates](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#2-savings-in-todays-engine),
-  each only when PERF-3 points at it, and Apple silicon measurements.
-  **Done when** PERF-3 shows none is justified, or each one tried is kept or
-  stopped with its numbers, the oracle tests passing.
+  each only when a workload users need falls short (PERF-3 found only a full
+  7.1 matrix at 96 kHz, which the shared-mix candidates target), and Apple
+  silicon measurements. **Done when** no workload users need falls short,
+  or each one tried is kept or stopped with its numbers, the oracle tests
+  passing.
 - [ ] **EDGE-12 — Filters larger than the saved-state limit.** **Done
   when** a plug-in saves and restores a filter over 64 MiB through the
   storage jrp chooses, and refuses clearly when it is missing or changed.
@@ -496,6 +503,10 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **PERF-3 — One measurement exercise: budgets, supported workloads and
+  published evidence.** 21 November 2026, PR #248
+  ([supported workloads](docs/develop/fft-measurements.md#supported-workloads),
+  [limits](docs/use/limits.md#filter-length-channels-and-processor-load)).
 - [x] **CI-48 — No GCC 12 warnings from our sources in the Linux package.** 21
   November 2026, PR #244
   ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
