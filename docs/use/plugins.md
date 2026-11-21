@@ -163,6 +163,38 @@ The filter is prepared away from the audio, then installed. A filter loaded
 before any audio plays starts at once; one loaded during playback fades in
 ([replacing a filter](#replacing-a-filter)).
 
+**When a chosen file is checked.** In the Audio Unit and the VST3 plug-in, a
+file chosen while the host plays audio through the plug-in is checked at
+once against the host's sample rate and channels, and one that does not fit
+is refused while the working filter keeps playing. Before the host has
+played, and while the host has stopped the plug-in (some hosts keep it
+running after the transport stops), the host may not have given its real
+rate yet (Audacity sets up the plug-in at 44.1 kHz until it first plays,
+whatever the project's rate), so a single IR file or `.cfg` is kept, saved
+with the project, and checked when the host plays audio through the plug-in.
+Until then the window keeps the file's name and Status says "Filter
+selected. Waiting for the host's audio settings.", even if the host has
+started the plug-in briefly at another rate, as Audacity does at 44.1 kHz to
+pass on an edit. Once the host plays, the filter plays if it fits; if not,
+it plays silence and Status says "Silent" with the filter's and the host's
+rates. Convolver takes that result when its window is open during playback;
+the Audio Unit also takes it when the host reads Status. In the VST3
+plug-in, the host's Status control does not ask by itself: with the window
+closed it may keep saying it is waiting until the window is opened while the
+host plays, or a setting such as Bypass changes. If playback stops before
+the result is taken, Status may say it is waiting again, and the filter
+stays selected either way. A configuration list needs the rate and channels
+to choose its entry, so it uses the ones the host last ran the plug-in with;
+before the host has run it with them, the list is not loaded, and the window
+says: "Play audio once so Convolver can check the host's sample rate and
+channel counts, then choose the configuration list again." If the list has
+no entry for the rate and channels the host last ran with, it is refused
+naming them, and whenever the host is not playing audio through the plug-in
+at that moment the advice adds the same step, for a host such as Audacity
+that runs the plug-in briefly at 44.1 kHz before it first plays. LV2 knows
+its host's rate and channels from the start, so it checks every file at
+once.
+
 ## When a filter does not fit
 
 A filter, chosen as a file or loaded as a preset, has one sample rate and
@@ -251,7 +283,7 @@ example (some hosts show only the status name in the first column):
 | No filter | `No filter: audio passes unchanged. Choose a filter or load a Convolver preset.` (without a window, on Linux: `… Load a Convolver preset.`) |
 | Load failed (silence) | `Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in the Convolver log.` |
 | Load failed (previous filter kept) | `Load failed, previous filter kept: the filter has 2 in, 6 out, the host 2 in, 2 out. Details in the Convolver log.` |
-| Waiting | `Filter loaded: 44100 Hz, 2 in, 2 out; waiting for audio settings from the host.` |
+| Waiting | `Filter loaded: 44100 Hz, 2 in, 2 out; waiting for audio settings from the host.` (for a file chosen in the window: `Filter selected. Waiting for the host's audio settings.`, see [when a chosen file is checked](#loading-a-filter)) |
 | Fault | `Fault: output too large, silenced and the filter restarted. Details in the Convolver log.` |
 | Bypassed | `Bypassed: the input plays unfiltered.` (`Bypassed: silent, as the filter's inputs and outputs differ.` for a filter with different input and output counts, such as a crossover) |
 

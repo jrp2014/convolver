@@ -123,6 +123,23 @@ first published preview, keep their original grouping.
 
 ### Fixed
 
+- Plug-ins (PLUG-27): a filter file chosen in Convolver's window before the
+  host plays is kept and saved with the project, and checked when the host
+  plays audio through the plug-in; until then Status says "Filter selected.
+  Waiting for the host's audio settings." rather than judging it against a
+  brief start at a placeholder rate. In Audacity 4.0.2, which sets up the
+  plug-in at 44.1 kHz until it first plays whatever the project's rate, a
+  48 kHz filter chosen before playback was refused, and the project then
+  saved that failure, so exports were dry or silent (jrp's run of 0.14.0,
+  20 November 2026, [record](docs/archive/reviews/2026-11-20-vst3-17-audacity.md)).
+  A configuration list needs the host's rate and channels to choose its
+  entry: before the host has started the plug-in it is not loaded, and the
+  window says to play audio once, then choose the list again; a list with
+  no entry for the rate the host last ran at is refused naming it, with
+  the same step added to the advice while the host is not playing. While the
+  host plays, a file that does not suit it is still refused and the working
+  filter keeps playing. VST3 and the Audio Unit; not yet checked in
+  Audacity ([when a chosen file is checked](docs/use/plugins.md#loading-a-filter)).
 - Documentation (DOC-18, from an outside audit of 20 November 2026): the
   user guides no longer contradict the plug-ins. **Choose…** opens a
   Convolver `.vstpreset` (the first-sound guide said it read no presets);
@@ -153,6 +170,19 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
+- Builds (CI-46, from an outside audit of 20 November 2026): the VST3
+  plug-in and the programs that compile its sources build with the warnings
+  the core, the Audio Unit and the LV2 plug-in already had
+  (`-Wall -Wextra -Wpedantic`, or `/W4 /permissive- /utf-8` with MSVC); the
+  SDK's headers are system headers. Everything they found is fixed in the
+  code, none silenced: on Windows, a bounded copy of the window's font name,
+  the accessibility IDs passed as the type the interface takes, a copied
+  environment variable in the tests, shadowed names, and compile-time
+  branches for `convolver-vst3-preset`'s differences; on macOS, standard
+  `std::min`/`std::max` and a full conditional in the window instead of GNU
+  extensions; on Linux, an unused variable in `host_report.cpp`, a
+  signed/unsigned comparison and two partly initialised timing results in
+  the VST3 tests, and an unused test helper. No output changes.
 - Records (DOC-19, from an outside audit jrp accepted): `TODO.md`
   holds open work only, each item in a line or two, and its documented
   limitations one line each, pointing at the page that owns the detail; the

@@ -22,8 +22,15 @@ namespace convolver::test_log {
 // it, since build folders may hold characters outside the ANSI code page.
 inline std::filesystem::path use_test_log(const char* name) {
 #ifdef _WIN32
-    if (const wchar_t* configured = _wgetenv(L"CONVOLVER_LOG"); configured && *configured)
-        return configured;
+    // _wdupenv_s copies the value, so nothing else can change it under us.
+    wchar_t* configured = nullptr;
+    std::size_t length = 0;
+    if (_wdupenv_s(&configured, &length, L"CONVOLVER_LOG") == 0 && configured) {
+        const std::filesystem::path chosen = configured;
+        std::free(configured);
+        if (!chosen.empty())
+            return chosen;
+    }
     const auto path = std::filesystem::absolute(name);
     _wputenv_s(L"CONVOLVER_LOG", path.wstring().c_str());
 #else

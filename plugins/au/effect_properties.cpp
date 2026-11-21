@@ -191,6 +191,8 @@ void Effect::update_status() noexcept {
         // PLUG-39 step 4a: one snapshot of the control side, built whole and
         // then published, so a reader never mixes two generations. Copying
         // the HostFilter shares the accepted filter rather than copying it.
+        if (settling_.playing()) // PLUG-27: the host renders the filter.
+            filter_.confirm();
         auto next = std::make_shared<const Diagnostics>(
             Diagnostics{filter_, known_layout(), host_log_written(),
                         host() ? static_cast<std::size_t>(GetMaxFramesPerSlice()) : 0});
@@ -257,9 +259,17 @@ void Effect::notify_status() noexcept {
     tell_listeners(notice_report);
 }
 
-HostReport Effect::report_locked(std::string& faults) {
-    // As for the Status text: faults Render signalled are explained here.
-    // Only an update that has observed new faults rewrites the Status value,
+bool Effect::confirm_rendered() noexcept {
+    if (!settling_.playing() || !filter_.awaiting())
+        return false;
+    update_status(); // Confirms it.
+    return true;
+}
+
+HostReport Effect::report_locked(std::string& faults, bool& confirmed) {
+    // As for the Status text: faults Render signalled are explained here,
+    // and a chosen filter the host renders is confirmed (PLUG-27). Only an
+    // update that has observed new faults rewrites the Status value,
     // which Render may have just set to Fault. A Fault Render wrote that is
     // not explained yet is taken in at once; faults that go on after it at
     // most every report_fault_interval, so an open window does not log a
@@ -273,13 +283,15 @@ HostReport Effect::report_locked(std::string& faults) {
         faults = observe_faults();
         report_faults_at_ = now;
     }
-    if (!faults.empty())
+    confirmed = confirm_rendered();
+    if (!faults.empty() && !confirmed)
         update_status();
     return report_of(*diagnostics());
 }
 
 HostReport Effect::report() {
     std::string faults;
+    bool confirmed = false;
     HostReport r;
     {
         // A load or the Latency work holds the lock while it prepares a
@@ -292,12 +304,12 @@ HostReport Effect::report() {
         if (!lock.owns_lock())
             return report_of(*diagnostics());
         playing_.reclaim(); // As every control call does (Locked).
-        r = report_locked(faults);
+        r = report_locked(faults, confirmed);
     }
-    if (!faults.empty()) { // As when a host reads the Status text.
+    if (!faults.empty()) // As when a host reads the Status text.
         log_faults(faults);
+    if (!faults.empty() || confirmed)
         notify_status();
-    }
     return r;
 }
 
@@ -579,12 +591,14 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         if (request->inParamID != status_parameter)
             return kAudioUnitErr_InvalidParameter;
         std::string text, faults;
+        bool confirmed = false;
         try {
             const Locked lock(*this);
             // A host showing Fault, which Render wrote, asks for its text:
             // the faults are explained here, on the host's control thread.
             faults = observe_faults();
-            if (!faults.empty())
+            confirmed = confirm_rendered(); // PLUG-27: read while it renders.
+            if (!faults.empty() && !confirmed)
                 update_status();
             // Gain or Mix may have changed, on any thread (PLUG-10).
             const auto line = status_line(*diagnostics());
@@ -598,10 +612,10 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         } catch (...) {
             return kAudioUnitErr_InvalidPropertyValue;
         }
-        if (!faults.empty()) {
+        if (!faults.empty())
             log_faults(faults);
+        if (!faults.empty() || confirmed)
             notify_status();
-        }
         if (text.empty())
             return kAudioUnitErr_InvalidPropertyValue;
         request->outString =

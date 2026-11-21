@@ -17,14 +17,16 @@ namespace convolver {
 // HostState::settings for the adapter to apply when the filter is accepted
 // (none in a preset from convolver-preset or, until PLUG-35, one saved at
 // the default settings, so the current ones stay). Its bypass flag is
-// cleared: the host's Bypass stays as it is. The preset is not checked against `host` here: the
-// adapter's HostFilter::load() checks it as for a preset from the host's
-// menu. `files` receives the preset alone and `wider_entry` is emptied. A
+// cleared: the host's Bypass stays as it is. `host` and `settled` as for
+// read_filter_file() (PLUG-27). The preset is not checked
+// against `host` here: the adapter's HostFilter::load() checks it as for a
+// preset from the host's menu. `files` receives the preset alone and `wider_entry` is emptied. A
 // preset that cannot be read, belongs to another plug-in, is damaged or
 // holds no filter is refused with `failure` saying what to do.
-std::optional<HostState> read_chosen_file(const std::string& path, const HostLayout& host,
+std::optional<HostState> read_chosen_file(const std::string& path,
+                                          const std::optional<HostLayout>& host,
                                           const detail::SoundFiles& reader,
                                           FilterFileFailure& failure,
                                           std::vector<std::string>* files = nullptr,
-                                          std::string* wider_entry = nullptr);
+                                          std::string* wider_entry = nullptr, bool settled = true);
 } // namespace convolver

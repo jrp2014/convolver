@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -439,6 +440,102 @@ void non_ansi_names(const fs::path& dir) {
                 "a damaged file with a non-ANSI name: " + why.message.problem);
     }
 }
+// PLUG-27: before the host plays audio through the plug-in, its rate and
+// channels may be placeholders (Audacity 4.0.2 sets its window's copy up at
+// 44.1 kHz whatever the project's rate), so a chosen file is read with no
+// host: a single filter as it is, with every file it was read from, and a
+// list refused with jrp's words (20 November 2026), since choosing its entry
+// needs them. The adapter keeps the single filter and checks it when the
+// host starts (vst3.adapter chosen_before_host_plays).
+void before_host_settles(const fs::path& dir) {
+    impulse(dir / "early.wav", 48000, 1);
+    impulse(dir / "early-slow.wav", 44100, 1);
+    {
+        std::ofstream cfg(dir / "early.cfg");
+        cfg << "48000 2 2 0\n0 0\n0 0\nearly.wav\n0\n0\n0\nearly.wav\n0\n1\n1\n";
+        std::ofstream slow(dir / "early-slow.cfg");
+        slow << "44100 2 2 0\n0 0\n0 0\nearly-slow.wav\n0\n0\n0\nearly-slow.wav\n0\n1\n1\n";
+        std::ofstream list(dir / "early-list.txt");
+        list << "early-slow.cfg\nearly.cfg\n";
+    }
+    std::vector<std::string> files;
+    FilterFileFailure why;
+    auto cfg = read_filter_file((dir / "early.cfg").string(), std::nullopt,
+                                detail::libsndfile_files(), why, &files);
+    require(cfg && cfg->configuration && cfg->configuration->sample_rate == 48000 &&
+                cfg->configuration->input_channels == 2 && cfg->configuration->output_channels == 2,
+            "a single .cfg not read as it is: " + detail::advice_text(why.message));
+    require(files.size() >= 2 && fs::path(files[0]).filename() == "early.cfg" &&
+                fs::path(files.back()).filename() == "early.wav",
+            "a single .cfg's files: " + std::to_string(files.size()));
+    auto wav = read_filter_file((dir / "early.wav").string(), std::nullopt,
+                                detail::libsndfile_files(), why, &files);
+    require(wav && wav->configuration && wav->configuration->sample_rate == 48000 &&
+                wav->configuration->input_channels == 1,
+            "an IR file not read as it is: " + detail::advice_text(why.message));
+    files = {"stale"};
+    require(!read_filter_file((dir / "early-list.txt").string(), std::nullopt,
+                              detail::libsndfile_files(), why, &files),
+            "a list's entry chosen before the host's rate is known");
+    require(files.empty() && why.kind == HostFailureKind::filter_file && !why.filter(),
+            "a waiting list's failure");
+    require(has(why.message.problem, "early-list.txt: no entry selected") &&
+                why.message.fix ==
+                    "Play audio once so Convolver can check the host's sample rate and channel "
+                    "counts, then choose the configuration list again.",
+            "a waiting list's message: " + detail::advice_text(why.message));
+    // Once the host has started at 48 kHz, the list chooses that entry, also
+    // while it is not playing (stopped after playing)...
+    const HostLayout started{48000, 2, 2};
+    for (const bool settled : {true, false}) {
+        auto chosen = read_filter_file((dir / "early-list.txt").string(), started,
+                                       detail::libsndfile_files(), why, nullptr, nullptr, settled);
+        require(chosen && chosen->configuration && chosen->configuration->sample_rate == 48000,
+                "the list's 48 kHz entry not chosen once the host started");
+    }
+    // ... while a single filter for another rate is read as it is, to be
+    // kept and checked when the host starts, unless the host is playing.
+    auto slow = read_filter_file((dir / "early-slow.cfg").string(), started,
+                                 detail::libsndfile_files(), why, nullptr, nullptr, false);
+    require(slow && slow->configuration && slow->configuration->sample_rate == 44100,
+            "a single filter for another rate refused while the host is not playing");
+    require(!read_filter_file((dir / "early-slow.cfg").string(), started,
+                              detail::libsndfile_files(), why) &&
+                why.kind == HostFailureKind::sample_rate,
+            "a single filter for another rate accepted while the host plays");
+    // jrp (21 November 2026): a list with no entry for a configuration the
+    // host has started with but is not playing (Audacity's placeholder
+    // 44.1 kHz) is refused as a normal mismatch naming that rate, and the fix
+    // adds what to do if the host has not played at the project's rate yet;
+    // while the host plays, the fix is the normal one alone.
+    {
+        std::ofstream list(dir / "early-48k.txt");
+        list << "early.cfg\n";
+    }
+    const std::string play_once =
+        "If the host has not played audio at your project's rate yet, play audio once so "
+        "Convolver can check the host's sample rate and channel counts, then choose the "
+        "configuration list again.";
+    const HostLayout placeholder{44100, 2, 2};
+    for (const bool settled : {false, true}) {
+        require(!read_filter_file((dir / "early-48k.txt").string(), placeholder,
+                                  detail::libsndfile_files(), why, nullptr, nullptr, settled) &&
+                    why.kind == HostFailureKind::sample_rate &&
+                    has(why.message.problem, "44100 Hz") &&
+                    has(why.message.fix, play_once) == !settled && why.message.fix != play_once,
+                "a list with no entry for the host's rate, settled " + std::to_string(settled) +
+                    ": " + detail::advice_text(why.message));
+    }
+    // Something that is not a filter is refused as before, naming the file.
+    {
+        std::ofstream junk(dir / "early-junk.cfg");
+        junk << "not a configuration\n";
+    }
+    require(!read_filter_file((dir / "early-junk.cfg").string(), std::nullopt,
+                              detail::libsndfile_files(), why) &&
+                has(why.message.problem, "early-junk.cfg"),
+            "an unreadable file: " + detail::advice_text(why.message));
+}
 } // namespace
 
 int main() {
@@ -455,6 +552,7 @@ int main() {
         {"run", [&] { run(dir); }},
         {"non_ansi_names", [&] { non_ansi_names(dir); }},
         {"wider_bus", [&] { wider_bus(dir); }},
+        {"before_host_settles", [&] { before_host_settles(dir); }},
     });
     std::error_code ec;
     fs::remove_all(dir, ec);

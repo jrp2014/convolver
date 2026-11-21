@@ -12,21 +12,33 @@
 // - known(): the host's configuration if it counts as known, to check
 //   requests against (HostFilter::load()'s `host`);
 // - check(): what a request that does not suit that configuration means
-//   (HostFilter::load()'s HostLoadCheck).
+//   (HostFilter::load()'s HostLoadCheck); a chosen single filter is read for
+//   that configuration only when the answer is to refuse it, while a
+//   configuration list always chooses its entry for known() (PLUG-27).
 //
-// The two formats keep their own rule, as jrp decided (13 November 2026), and
-// the adapter contract records ("state that arrives before the host is
-// configured"):
+// A file chosen in the window follows one rule in both formats (PLUG-27,
+// jrp, 20 November 2026): it is refused for not suiting the host only while
+// the host is playing audio through the plug-in with its configuration
+// (started, and audio has played with that configuration); otherwise it is
+// kept and checked when the host starts with its configuration, as a preset
+// is. Audacity 4.0.2 sets its window's copy up at 44.1 kHz and starts it only
+// for a moment to pass on parameter edits, whatever rate the project plays
+// at, so a 48 kHz filter chosen there before playback was refused (jrp's
+// Audacity run, 20 November 2026).
+//
+// For restored state the two formats keep their own rule, as jrp decided (13
+// November 2026), and the adapter contract records ("state that arrives
+// before the host is configured"):
 // - HostBinding::activation (VST3): a start binds the configuration for as
-//   long as it stays the same, so a chosen file is refused at once; restored
-//   state is refused only once audio has played with it (in that start or an
-//   earlier one since it last changed), and a project the host says it is
-//   opening never is: hosts start the plug-in on placeholder buses before
-//   they restore a project (REAPER; jrp's crossover retest, 7 November 2026).
+//   long as it stays the same; restored state is refused only once audio has
+//   played with it (in that start or an earlier one since it last changed),
+//   and a project the host says it is opening never is: hosts start the
+//   plug-in on placeholder buses before they restore a project (REAPER;
+//   jrp's crossover retest, 7 November 2026).
 // - HostBinding::rendering (Audio Unit): while started, the configuration is
-//   the host's and every request is checked against it; stopped, it stays
-//   known only if audio rendered with that start, and then still binds every
-//   request. JUCE hosts
+//   the host's and restored state is checked against it; stopped, it stays
+//   known only if audio rendered with that start, and then still binds
+//   restored state. JUCE hosts
 //   initialize at AUBase's default 44.1 kHz to try a layout, then restore the
 //   project before preparing to play; counting that probe would turn a
 //   48 kHz project's filter into a failed load.
@@ -53,9 +65,11 @@ class HostSettling {
             played_.store(false, std::memory_order_relaxed);
         started_ = now;
         active_ = true;
+        played_now_.store(false, std::memory_order_relaxed);
     }
     void played() noexcept {
         played_.store(true, std::memory_order_relaxed);
+        played_now_.store(true, std::memory_order_relaxed);
     }
     void stopped() noexcept {
         active_ = false;
@@ -74,17 +88,32 @@ class HostSettling {
             return now;
         return std::nullopt;
     }
+    // PLUG-27 (jrp, 20 and 21 November 2026): whether the host is playing
+    // audio through the plug-in now: started, and audio processed in this
+    // start. Adapters confirm a chosen filter's check (HostFilter::confirm())
+    // only when they see this on a control call while the host is still
+    // running the plug-in, never at the stop, so a brief start such as
+    // Audacity 4.0.2's FlushParameters (start, one block, stop, with no
+    // control call between) confirms nothing, without guessing which starts
+    // are brief.
+    bool playing() const noexcept {
+        return active_ && played_now_.load(std::memory_order_relaxed);
+    }
     // The configuration of the current or last start, which processors are
     // built for (VST3 builds one for a new Latency with it).
     const std::optional<HostLayout>& last_start() const noexcept {
         return started_;
     }
     HostLoadCheck check(HostRequestKind kind) const noexcept {
+        if (kind == HostRequestKind::chosen_file) // PLUG-27, both formats.
+            return active_ && played_.load(std::memory_order_relaxed)
+                       ? HostLoadCheck::refuse_mismatch
+                       : HostLoadCheck::keep_until_suited;
         if (binding_ == HostBinding::rendering)
             return HostLoadCheck::refuse_mismatch;
         switch (kind) {
-        case HostRequestKind::chosen_file:
-            return HostLoadCheck::refuse_mismatch;
+        case HostRequestKind::chosen_file: // Answered above.
+            return HostLoadCheck::keep_until_suited;
         case HostRequestKind::restore:
             return played_.load(std::memory_order_relaxed) ? HostLoadCheck::refuse_mismatch
                                                            : HostLoadCheck::keep_until_suited;
@@ -100,6 +129,7 @@ class HostSettling {
     std::optional<HostLayout> started_;   // The current or last start.
     std::optional<HostLayout> committed_; // Audio Unit: the last start that rendered.
     std::atomic<bool> played_{false};     // Since the binding start (see started()).
+    std::atomic<bool> played_now_{false}; // Audio processed in this start.
 };
 
 } // namespace convolver
