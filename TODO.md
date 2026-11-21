@@ -500,6 +500,9 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **CI-49 — Advisory upstream lilv off pull requests; Monday runs
+  staggered.** 21 November 2026, PR #TBD
+  ([pre-releases](docs/develop/build.md#pre-releases-and-newer-upstream-versions)).
 - [x] **PERF-3 — One measurement exercise: budgets, supported workloads and
   published evidence.** 21 November 2026, PR #248
   ([supported workloads](docs/develop/fft-measurements.md#supported-workloads),

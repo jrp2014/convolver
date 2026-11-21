@@ -360,10 +360,12 @@ jobs:
   # serd, sord, sratom; a newer pre-release where there is one) with the
   # newest lv2 headers and runs the same LV2
   # tests against them, so problems that later packages would bring show up
-  # early. It reports them as warnings and never fails the run (CI-6).
+  # early. It reports them as warnings and never fails the run (CI-6). Like
+  # the advisory pluginval pre-release (CI-38), it runs on pushes to main and
+  # the weekly and manual runs, not for pull requests (CI-49).
   upstream-lilv:
     needs: scope
-    if: needs.scope.outputs.build == 'true'
+    if: needs.scope.outputs.build == 'true' && github.event_name != 'pull_request'
     name: Newest upstream lilv (advisory)
     runs-on: ubuntu-latest
     timeout-minutes: 30

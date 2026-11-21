@@ -18,7 +18,10 @@ name: Audio Unit
   # Each Monday, so that a new AudioUnitSDK release shows up within a week
   # even when nothing here changes (CI-6).
   schedule:
-    - cron: '23 6 * * 1'
+    # The Monday runs with macOS jobs start half an hour apart (candidates
+    # 06:23, Audio Unit 06:53, VST3 07:23 UTC), so they do not wait for one
+    # another's macOS runners (CI-49).
+    - cron: '53 6 * * 1'
 
 permissions:
   contents: read

@@ -202,6 +202,22 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
+- CI (CI-49, from an outside CI analysis jrp passed on on 21 November
+  2026): pull requests no longer run the advisory **Newest upstream lilv**
+  job, which builds the newest lilv, zix, serd, sord and sratom from source;
+  like the advisory pluginval pre-release (CI-38) it still runs on pushes to
+  `main`, the weekly and manual runs
+  ([pre-releases](docs/develop/build.md#pre-releases-and-newer-upstream-versions));
+  `tests/ci_scope_tests.py` accepts that one extra condition beside a job's
+  scope gate. The Monday runs with macOS jobs now start half an hour apart (candidates
+  06:23, Audio Unit 06:53, VST3 07:23 UTC) instead of together, so they no
+  longer queue for the same five macOS runners. The analysis's other
+  proposals were not taken: the Accelerate and Ooura builds keep the
+  package consumer tests, because the installed package's configuration
+  differs for each FFT backend and those builds are the only check of the
+  Accelerate and Ooura packages; the Ardour and LV2 tools jobs stay without
+  a compiler cache (builds of 17 to 35 s, never the last job, and the
+  repository's cache space is shared).
 - Benchmarks (PERF-3): `tests/native/benchmarks/workloads.py` measures
   callback times, peak memory and preparation for long and multichannel
   filters through `HostProcessor`, and the manual Workload measurements

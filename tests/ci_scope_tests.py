@@ -23,7 +23,12 @@ UNGATED = {'lint.yml'}  # Runs for every change, documentation included.
 # commands at the real one.
 CLEAN = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
 OVERRIDE = re.compile(r'^    if:.*(always|cancelled)\(\)', re.MULTILINE)
-GATE = re.compile(r"^    if: needs\.scope\.outputs\.(build|package) == 'true'$", re.MULTILINE)
+# An advisory job may also leave out pull requests (CI-49), which only narrows the gate.
+GATE = re.compile(
+    r"^    if: needs\.scope\.outputs\.(build|package) == 'true'"
+    r"(?: && github\.event_name != 'pull_request')?$",
+    re.MULTILINE,
+)
 
 
 def jobs(text):
