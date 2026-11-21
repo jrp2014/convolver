@@ -24,9 +24,9 @@ changed file is one of these kinds:
   uses them.
 - upgrade files (CI-42): tests/upgrade/, the files kept from published
   releases (Markdown included, as the version folders hash it) and the
-  programs that check them. Only upgrade.cli, vst3.upgrade and lv2.upgrade
-  read them, so they need the native, VST3 and LV2 workflows, not the Audio
-  Unit one.
+  programs that check them. upgrade.cli, vst3.upgrade, lv2.upgrade and the
+  Audio Unit workflow's state step read them, so they need the native, VST3,
+  LV2 and Audio Unit workflows.
 - manual host scripts (HOST-11): scripts that jrp runs by hand on his Mac,
   and their tests. No workflow builds or runs them; lint's pre-commit runs
   their tests, so they need no other workflow.
@@ -129,8 +129,8 @@ FORMAT_WORKFLOWS = {
 # every job, the VST3 workflow runs it and vst3.upgrade, and the LV2
 # workflow's sanitizer job runs lv2.upgrade. The Audio Unit workflow's
 # Release job runs upgrade.cli in its suite and restores the Audio Unit state
-# (run_upgrade.py --au-render) through AVAudioEngine (CI-42). Since CI-43 the VST3 macOS job's
-# suite runs it with the same compiler (the newest Xcode on macos-26, which
+# (run_upgrade.py --au-render) through AVAudioEngine (COMPAT-1). Since CI-43 the VST3 macOS job's
+# suite runs upgrade.cli with the same compiler (the newest Xcode on macos-26, which
 # macos-latest also is today), and every macOS run checks the same bound.
 UPGRADE = ('tests/upgrade/',)
 UPGRADE_WORKFLOWS = {'regression', 'vst3', 'lv2', 'au'}

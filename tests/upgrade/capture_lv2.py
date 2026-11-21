@@ -153,6 +153,9 @@ def main():
             'from': linux_zip,
             'machine': machine(),
             'lilv': run(['pkg-config', '--modversion', 'lilv-0']).strip(),
+            # The kernels this machine's CPU gives the release, which an
+            # identical-samples check of the .lv2.wav files must match.
+            'cli_version': run([package / 'bin' / 'convolver', '--version']).splitlines(),
             'build': record['captured']['build'],
             'host_blocks': HOST_BLOCKS,
             'how': 'the filter chosen through the filter parameter, then lilv_state_new_from_instance and '

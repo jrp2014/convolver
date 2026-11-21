@@ -130,6 +130,11 @@ def main():
             latency = int(settings['latency_frames'])
             if reported != [latency] or early != 0.0:
                 sys.exit(f'{name}: the release reported latency {reported} with {early} before it; expected {latency}')
+            if [len(c) for c in audio] != [len(c) for c in expected]:
+                sys.exit(
+                    f'{name}: the release rendered {len(audio)} channels of {len(audio[0])} frames; '
+                    f'{expected_name} has {len(expected)} of {len(expected[0])}'
+                )
             worst = max(abs(a - e) for ca, ce in zip(audio, expected) for a, e in zip(ca, ce))
             limit = bound(expected)
             if worst > limit:

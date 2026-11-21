@@ -4,10 +4,12 @@
 // folder, so the same program captures state and audio with a published
 // package's plug-in and checks the plug-in just built against them.
 //
-// Usage:
-//   convolver_lv2_render capture BUNDLE STATE_DIR FILTER RATE INPUTS OUTPUTS GAIN MIX LATENCY
-//   GAIN_MODE convolver_lv2_render render BUNDLE STATE_DIR RATE INPUTS OUTPUTS IN.f32 OUT.f32
-//   FRAMES
+// Usage (each command one line):
+//
+//   convolver_lv2_render capture BUNDLE STATE_DIR FILTER RATE INPUTS OUTPUTS
+//       GAIN MIX LATENCY GAIN_MODE
+//   convolver_lv2_render render BUNDLE STATE_DIR RATE INPUTS OUTPUTS
+//       IN.f32 OUT.f32 FRAMES
 //
 // capture: instantiates the discrete INPUTS in, OUTPUTS out layout at RATE,
 // sets its settings ports (Gain in dB, Mix in percent, Latency in frames,
@@ -100,6 +102,9 @@ float* port(host::Plugin& p, const char* symbol) {
 struct PortContext {
     host::Plugin* plugin = nullptr;
     LV2_URID atom_float = 0;
+    // set_port runs inside lilv, which is C, so it records what went wrong
+    // here instead of throwing through it; render checks it afterwards.
+    std::string error;
 };
 
 const void* get_port(const char* symbol, void* data, std::uint32_t* size, std::uint32_t* type) {
@@ -115,11 +120,15 @@ const void* get_port(const char* symbol, void* data, std::uint32_t* size, std::u
 void set_port(const char* symbol, void* data, const void* value, std::uint32_t size,
               std::uint32_t type) {
     auto* context = static_cast<PortContext*>(data);
+    if (!context->error.empty())
+        return;
     float* target = port(*context->plugin, symbol);
-    require(target != nullptr, std::string("the saved state sets an unknown port ") + symbol);
-    require(type == context->atom_float && size == sizeof(float),
-            std::string("the saved state's value for ") + symbol + " is not a float");
-    std::memcpy(target, value, sizeof(float));
+    if (target == nullptr)
+        context->error = std::string("the saved state sets an unknown port ") + symbol;
+    else if (type != context->atom_float || size != sizeof(float))
+        context->error = std::string("the saved state's value for ") + symbol + " is not a float";
+    else
+        std::memcpy(target, value, sizeof(float));
 }
 
 std::vector<float> read_floats(const std::string& path) {
@@ -204,6 +213,7 @@ int render(const std::vector<std::string>& args) {
     PortContext context{p.get(), world.urids().map(atom_float_uri)};
     lilv_state_restore(state, p->instance(), set_port, &context, 0, nullptr);
     lilv_state_free(state);
+    require(context.error.empty(), context.error);
     p->activate();
     settle(*p);
     require(p->status == running,

@@ -359,7 +359,7 @@ def main(argv=None):
                     and args.configuration == lv2_build['configuration']
                     and args.flags is not None
                     and normal_flags(args.flags) == normal_flags(lv2_build['flags'])
-                    and same_kernels(record, kernel_lines)
+                    and same_kernels(lv2_record if 'cli_version' in lv2_record['captured'] else record, kernel_lines)
                     and args.lv2_backend == lv2_build['backend']
                 )
                 print(f'  lv2: {"identical samples required" if lv2_exact else "within the bound"}')
@@ -377,6 +377,8 @@ def main(argv=None):
                     failure = check_au(folder, case, args.au_render, block, work, worst_seen)
                     if failure:
                         failures.append(failure)
+    if lv2 and not any((folder / 'lv2.json').is_file() for folder in folders):
+        failures.append('no folder holds LV2 state (lv2.json) for --lv2-render to check')
     if args.au_render and not any((folder / 'au.json').is_file() for folder in folders):
         failures.append('no folder holds Audio Unit state (au.json) for --au-render to check')
     if worst_seen:

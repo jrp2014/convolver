@@ -77,12 +77,21 @@ python3 tests/upgrade/run_upgrade.py --au-render ./avaudioengine_render
   each file's SHA-256 and, for each case, its settings, latency, the
   expected file (the same as the LV2 case's) and how far the release's own
   unit, restoring that ClassInfo through AVAudioEngine, fell from it.
+  0.14.0's were made by `capture_au.py` on a macOS CI runner (Apple
+  silicon) from the release ZIP, in a temporary job of the pull request
+  that added them (#249, run 44910834415). The job could not hand back
+  files, so it printed each ClassInfo with its large `convolver-state`
+  values replaced by their SHA-256, and the files were rebuilt from that
+  printout with the state bytes the release's Linux `convolver-preset`
+  makes from the same filters; every value and every file matched the
+  SHA-256 the runner recorded, and `au.json` is the one it printed.
 
 ## The checks
 
 For each case, `run_upgrade.py`:
 
-- checks every retained file against its SHA-256 in the manifest;
+- checks every retained file against its SHA-256 in the manifest,
+  `lv2.json` or `au.json`;
 - renders the input with this build's CLI, at each recorded block size, from
   the case's filter;
 - restores the case's `.vstpreset` in this build's VST3 bundle, loaded from
