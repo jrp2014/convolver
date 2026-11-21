@@ -97,6 +97,39 @@ class RepositoryChecks(unittest.TestCase):
             'PLUG-2 is also listed as done in docs/archive/todo/',
         )
 
+    def test_change_fragments_define_finished_ids(self):
+        # DOC-20: a finished item's done line waits in its fragment until folded.
+        done = SPDX_MD + '# PLUG-3\n\n## Done\n\n- [x] **PLUG-3 — Presets.** Done.\n'
+        result = self.run_check(
+            {
+                'changes/README.md': SPDX_MD + '# Fragments\n',
+                'changes/PLUG-3.md': done,
+                'docs/use/guide.md': SPDX_MD + 'PLUG-3 is done; LV2-1 is next.\n',
+            }
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertBroken(
+            self.run_check({'changes/PLUG-2.md': SPDX_MD + '## Done\n\n- [x] **PLUG-2 — Harness.** Done.\n'}),
+            'changes/PLUG-2.md: PLUG-2 is already defined in TODO.md',
+        )
+        self.assertBroken(
+            self.run_check({'changes/PLUG-4.md': SPDX_MD + '## Done\n\n- [ ] **PLUG-4 — Open.** Open.\n'}),
+            'changes/PLUG-4.md: PLUG-4 is not ticked',
+        )
+        self.assertBroken(
+            self.run_check({'changes/PLUG-3.md': SPDX_MD + '## Changed\n\n- Uses PLUG-9.\n'}),
+            'changes/PLUG-3.md:4: PLUG-9 is not defined',
+        )
+        self.assertBroken(self.run_check({'changes/PLUG-3.md': '# PLUG-3\n'}), 'changes/PLUG-3.md: add an SPDX')
+        # A ticked line outside Done would fold into another page: it defines nothing.
+        misplaced = SPDX_MD + '# PLUG-3\n\n## Changed\n\n- [x] **PLUG-3 — Presets.** Done.\n'
+        self.assertBroken(
+            self.run_check(
+                {'changes/PLUG-3.md': misplaced, 'docs/use/guide.md': SPDX_MD + 'PLUG-3 is done; LV2-1 is next.\n'}
+            ),
+            'docs/use/guide.md:2: PLUG-3 is not defined',
+        )
+
     def test_unindexed_page(self):
         self.assertBroken(
             self.run_check({'docs/new.md': SPDX_MD + '# New\n'}), 'docs/new.md: not listed in docs/README.md'

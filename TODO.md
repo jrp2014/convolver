@@ -53,9 +53,8 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 
 ### In progress
 
-DIAG-10; HOST-11 waits for jrp's second run of the REAPER
-check (PR #255). Check the open pull requests for an ID before starting
-anything.
+HOST-11 waits for jrp's second run of the REAPER check (PR #255). Check
+the open pull requests for an ID before starting anything.
 
 ### Ready
 
@@ -157,13 +156,7 @@ Foundation items are parked by owner decision instead.
   records what [every report](docs/develop/host-testing.md#every-report) lists.
 - [ ] **DIAG-9 — Numbers in the user's locale.** Low priority. **Done when**
   the window shows numbers in the system locale from one formatting path,
-  Status and the log stay plain, and a test covers other separators; best
-  after DIAG-10.
-- [ ] **DIAG-10 — Status says what the window says.** Status also names a
-  Latency not in use yet, the Estimate being found or failing, and a filter
-  still loading ([what Status leaves out](docs/use/plugins.md#status-and-the-convolver-log)),
-  from the typed report. **Done when** each format's tests cover them and
-  jrp has decided LV2's `status` port values.
+  Status and the log stay plain, and a test covers other separators.
 
 ## Plug-ins: VST3, LV2 and AU
 
@@ -486,16 +479,15 @@ everything finished up to 20 November 2026 is in
 listed there as defined and done. What each item delivered is described on
 its linked page and in the [CHANGELOG](CHANGELOG.md).
 
-Items finished since then are listed here, one line each, until the next
-move to the archive.
+Items finished since then are listed here, newest first, one line each, until the next
+move to the archive. Each line arrives in the **Done** section of its pull
+request's [change fragment](changes/README.md), and the lines of items
+finished since the last fold are still there
+([change fragments](docs/develop/workflow.md#change-fragments)).
 
-- [x] **CI-53 — Later pushes carry a passed result forward.** 21 November
-  2026, PR #TBD ([drafts and later pushes](docs/develop/testing.md#drafts-and-later-pushes)).
-- [x] **CI-54 — Drafts run Lint and the Linux jobs.** 21 November 2026,
-  PR #TBD ([drafts and later pushes](docs/develop/testing.md#drafts-and-later-pushes)).
-- [x] **DOC-21 — Fewer pushes and review rounds for simple changes.**
-  21 November 2026, PR #TBD ([while working](docs/develop/workflow.md#while-working),
-  [which changes need a review](docs/develop/workflow.md#which-changes-need-one)).
+- [x] **DIAG-10 — Status says what the window says.** 21 November 2026,
+  PR #261 ([plug-ins](docs/use/plugins.md#status-and-the-convolver-log),
+  [decision](docs/project/decisions.md#diagnostics)).
 - [x] **PLUG-24 — `HostProcessor` in its own source file.** 21 November
   2026, PR #260 ([architecture](docs/develop/architecture.md#components-and-source-of-truth)).
 - [x] **CI-51 — One Audio Unit job instead of three.** 21 November 2026,
@@ -516,33 +508,6 @@ move to the archive.
   in, 2 out (a mono filter plays once its outputs are set by hand); the
   VST3's Gain mode and Latency are hidden
   ([plug-ins](docs/use/plugins.md#ardour)).
-- [x] **PERF-3 — One measurement exercise: budgets, supported workloads and
-  published evidence.** 21 November 2026, PR #248
-  ([supported workloads](docs/develop/fft-measurements.md#supported-workloads),
-  [limits](docs/use/limits.md#filter-length-channels-and-processor-load)).
-- [x] **CI-48 — No GCC 12 warnings from our sources in the Linux package.** 21
-  November 2026, PR #244
-  ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
-- [x] **CI-47 — Every plug-in target builds with the same warnings.** 21
-  November 2026, PR #243
-  ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
-- [x] **CI-46 — The VST3 plug-in builds with the others' warnings.** 20
-  November 2026, PR #235
-  ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
-- [x] **DOC-19 — Shorter project records.** 21 November 2026, PRs #238 to
-  #241 ([recording progress](docs/develop/workflow.md#recording-progress-in-todo)).
-- [x] **PLUG-27 — Read a chosen filter before the host's audio settings
-  are known.** 21 November 2026, PR #233: a chosen file waits ("Filter
-  selected. Waiting for the host's audio settings.") until the host plays
-  ([plug-ins](docs/use/plugins.md#loading-a-filter)); checked in Audacity
-  on 0.16.14 ([record](docs/archive/reviews/2026-11-21-vst3-17-audacity-pass.md)).
-- [x] **HOST-9 — Play the VST3 and a saved Latency in the Ardour test.** 21
-  November 2026, PR #237 ([Ardour, headless](docs/develop/testing.md#ardour-headless)).
-- [x] **AU-18 — Render the Audio Unit in the hosts' orders of events.** 21
-  November 2026, PR #242 ([AVAudioEngine render](docs/develop/testing.md#avaudioengine-render)).
-- [x] **PLUG-30 — One rule for state a busy lock makes a call skip.**
-  21 November 2026, PR #236, with PLUG-39 step 4a
-  ([calls that do not wait for the control lock](docs/develop/plugin-contract.md#calls-that-do-not-wait-for-the-control-lock)).
 - [x] **VST3-17 — Audacity keeps a filter chosen in the window.** 21
   November 2026, PRs #177, #233 and #252: jrp's Audacity pass on 0.16.14
   ([in Audacity](docs/use/first-sound-in-a-host.md#in-audacity),
@@ -558,3 +523,30 @@ move to the archive.
   refuses a file chosen after a restart from the earlier start's audio, and
   an Audio Unit render of zero frames no longer counts as playing
   ([contract](docs/develop/plugin-contract.md#loading-and-failure)).
+- [x] **PERF-3 — One measurement exercise: budgets, supported workloads and
+  published evidence.** 21 November 2026, PR #248
+  ([supported workloads](docs/develop/fft-measurements.md#supported-workloads),
+  [limits](docs/use/limits.md#filter-length-channels-and-processor-load)).
+- [x] **PLUG-30 — One rule for state a busy lock makes a call skip.**
+  21 November 2026, PR #236, with PLUG-39 step 4a
+  ([calls that do not wait for the control lock](docs/develop/plugin-contract.md#calls-that-do-not-wait-for-the-control-lock)).
+- [x] **CI-48 — No GCC 12 warnings from our sources in the Linux package.** 21
+  November 2026, PR #244
+  ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
+- [x] **CI-47 — Every plug-in target builds with the same warnings.** 21
+  November 2026, PR #243
+  ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
+- [x] **AU-18 — Render the Audio Unit in the hosts' orders of events.** 21
+  November 2026, PR #242 ([AVAudioEngine render](docs/develop/testing.md#avaudioengine-render)).
+- [x] **HOST-9 — Play the VST3 and a saved Latency in the Ardour test.** 21
+  November 2026, PR #237 ([Ardour, headless](docs/develop/testing.md#ardour-headless)).
+- [x] **PLUG-27 — Read a chosen filter before the host's audio settings
+  are known.** 21 November 2026, PR #233: a chosen file waits ("Filter
+  selected. Waiting for the host's audio settings.") until the host plays
+  ([plug-ins](docs/use/plugins.md#loading-a-filter)); checked in Audacity
+  on 0.16.14 ([record](docs/archive/reviews/2026-11-21-vst3-17-audacity-pass.md)).
+- [x] **CI-46 — The VST3 plug-in builds with the others' warnings.** 20
+  November 2026, PR #235
+  ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
+- [x] **DOC-19 — Shorter project records.** 21 November 2026, PRs #238 to
+  #241 ([recording progress](docs/develop/workflow.md#recording-progress-in-todo)).

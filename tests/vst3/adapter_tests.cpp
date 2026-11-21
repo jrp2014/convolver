@@ -2116,6 +2116,11 @@ void settings_parameters() {
         require(log.text().find("Latency 2048 frames could not be applied, so the plug-in keeps "
                                 "512 frames: no memory for the test") != std::string::npos,
                 "a failed Latency preparation not logged");
+        // DIAG-10: Status says the chosen Latency is not in use, as the window does.
+        const auto waiting = c.report();
+        require(waiting && waiting->status.text.find(" Latency 2048 frames not in use yet.") !=
+                               std::string::npos,
+                "Status after a failed Latency does not say it is not in use");
     }
     require(impulse_delay() == 512, "a failed Latency preparation changed the output");
     // The next activation builds the chosen one.

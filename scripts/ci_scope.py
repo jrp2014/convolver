@@ -30,6 +30,12 @@ changed file is one of these kinds:
 - manual host scripts (HOST-11): scripts that jrp runs by hand on his Mac,
   and their tests. No workflow builds or runs them; lint's pre-commit runs
   their tests, so they need no other workflow.
+- record checks (DOC-20): the repository and link checks and the change
+  fragment folder, and their tests. Only lint's pre-commit runs them, so they
+  need no other workflow.
+- versioning (DOC-20): the version helper and its tests, which the native
+  workflow's CTest entry `versioning` runs (and pre-commit, and the version
+  workflow on main). They need the native workflow only.
 - one workflow file: that workflow alone.
 - everything else, including documentation that a build test reads or runs.
   Every workflow but the candidates and the fuzz targets runs.
@@ -169,6 +175,22 @@ ARDOUR_WORKFLOWS = {'vst3', 'lv2'}
 # Host scripts jrp runs by hand (HOST-11), and their tests, which pre-commit
 # runs. No workflow builds or runs them.
 MANUAL = ('scripts/reaper_check.py', 'tests/reaper_check_tests.py')
+# The record checks and the fragment folder (DOC-20), and their tests: only
+# lint's pre-commit runs them, so they build nothing.
+RECORD_CHECKS = (
+    'scripts/check_repository.py',
+    'scripts/check_doc_links.py',
+    'scripts/fold_changes.py',
+    'tests/repository_checks_tests.py',
+    'tests/documentation_links_tests.py',
+    'tests/fold_changes_tests.py',
+)
+# The version helper and its tests (DOC-20): the CTest entry `versioning`
+# (root CMakeLists.txt) runs the tests, which the native workflow covers;
+# pre-commit and the version workflow on main run them too. No build reads
+# the helper: CMake reads VERSION itself.
+VERSIONING = ('scripts/version_source.py', 'tests/versioning_tests.py')
+VERSIONING_WORKFLOWS = {'regression'}
 # Files only the candidate workflow uses (CI-34), apart from RELEASE_SHARED.
 RELEASE = ('scripts/release/', 'tests/release/', 'packaging/')
 # Release files that other workflows use too: they count as code.
@@ -281,14 +303,18 @@ def matches(path, entries):
 
 def classify(path):
     """Return 'documentation', 'packaged', 'format:NAME', 'release',
-    'upgrade', 'ardour', 'manual', 'workflow:NAME' or 'code' for a
-    repository path."""
+    'upgrade', 'ardour', 'manual', 'records', 'versioning', 'workflow:NAME'
+    or 'code' for a repository path."""
     if matches(path, UPGRADE):
         return 'upgrade'
     if matches(path, ARDOUR):
         return 'ardour'
     if path in MANUAL:
         return 'manual'
+    if path in RECORD_CHECKS:
+        return 'records'
+    if path in VERSIONING:
+        return 'versioning'
     if matches(path, TESTED):
         return 'code'
     if matches(path, PACKAGED):
@@ -409,6 +435,8 @@ def needed(paths, kind_of=page_kind):
                 workflows |= UPGRADE_WORKFLOWS
             elif kind == 'ardour':
                 workflows |= ARDOUR_WORKFLOWS
+            elif kind == 'versioning':
+                workflows |= VERSIONING_WORKFLOWS
             elif kind.startswith('workflow:'):
                 workflows.add(kind.split(':', 1)[1])
     workflows.discard('release')

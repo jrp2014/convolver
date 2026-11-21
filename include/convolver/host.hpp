@@ -732,6 +732,11 @@ inline constexpr std::size_t max_status_text = 127; // VST3's String128, less it
 // there is a dry signal; PLUG-36).
 // `chooses_files`: the plug-in has a window that chooses filter files, so
 // with no filter the text names choosing one before a preset (PLUG-33).
+// `latency_in_use`: the latency the processor plays at, where the adapter
+// knows it; when it differs from settings.latency, the Latency chosen is not
+// in use yet, and the line says so (DIAG-10). The line also says when Estimate
+// is chosen and the filter has no estimate, so No clipping's gain plays, or
+// when the filter has no gain figure at all and plays silence.
 // The status alone, in the order host_status() gives it (PLUG-39 step 4): a
 // load failure, then a fault (unless a failed load left no filter), then
 // Bypassed with a filter, then the filter (Active once the host's
@@ -742,7 +747,8 @@ inline constexpr std::size_t max_status_text = 127; // VST3's String128, less it
 HostStatus host_status_value(const HostFilter&, bool host_known, bool bypassed = false) noexcept;
 HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& host,
                            bool log_written = true, const HostSettings& settings = {},
-                           bool bypassed = false, bool chooses_files = false);
+                           bool bypassed = false, bool chooses_files = false,
+                           std::optional<std::size_t> latency_in_use = std::nullopt);
 // Whether a dry signal exists under `host` (Mix's dry share and bypass pass
 // input c to output c), and if not, why.
 enum class HostDrySignal {

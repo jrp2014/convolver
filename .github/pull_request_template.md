@@ -36,9 +36,10 @@ Open as a draft when you start; that is the claim. See docs/develop/workflow.md.
 
 - [ ] Owning guide updated (docs/develop/documentation.md#one-home-for-each-topic)
 - [ ] Affected product claims and summaries checked against current evidence (docs/develop/documentation.md#current-claims-and-dated-evidence)
-- [ ] CHANGELOG updated for user-visible changes and for every finished TODO item (by ID)
-- [ ] TODO item ticked with evidence, or its Remains, Worth doing when and Done when rewritten
-- [ ] Shared files touched (TODO, CHANGELOG, CMakeLists.txt, release policy, docs index, plug-in plan) are listed here:
+- [ ] Change fragment `changes/<ID>.md` added (docs/develop/workflow.md#change-fragments): a changelog entry for user-visible changes and for every finished TODO item (by ID), the Done line, any decision of jrp's; CHANGELOG.md, TODO's done list, decisions.md and VERSION not edited (a version step is a `version:minor` or `version:major` label)
+- [ ] TODO item removed with its Done line in the fragment, or its Remains, Worth doing when and Done when rewritten
+- [ ] Processed records cleared: folded fragments, finished plans, scratch files (docs/develop/workflow.md#clearing-processed-records)
+- [ ] Shared files touched (TODO, CMakeLists.txt, release policy, docs index, plug-in plan) are listed here:
 
 ## Independent review
 

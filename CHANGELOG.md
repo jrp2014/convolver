@@ -16,6 +16,12 @@ records) follows under **For contributors**, where contributor-only TODO
 items keep their entries until formal releases. Releases before 0.12.12, the
 first published preview, keep their original grouping.
 
+Pull requests add entries to this page only through their own
+[change fragment](changes/README.md), and `scripts/fold_changes.py` folds the
+fragments into `[Unreleased]` before each preview, and sometimes sooner
+([change fragments](docs/develop/workflow.md#change-fragments)). Entries not
+yet folded in are in [`changes/`](changes/README.md).
+
 ## [Unreleased]
 
 ### Added
@@ -36,6 +42,17 @@ first published preview, keep their original grouping.
   ([decision](docs/project/decisions.md#releases)).
 
 ### Changed
+
+- Plug-ins (DIAG-10): the VST3 and Audio Unit Status text also says when a
+  setting does not play as chosen: a Latency not in use yet (`Latency 1024
+  frames not in use yet.`), Estimate without an estimate for the filter
+  (`No estimate: No clipping's gain plays.`, or `Too loud to estimate: …`)
+  and a filter with no gain figure (`Silent: no gain figure for this
+  filter.`, or `… only the dry signal plays.` where Mix lets it through),
+  as the window's report does. LV2's `status` port keeps its
+  five values (jrp, 21 November 2026): while a new Latency is applied or
+  Estimate's figure is found the filter plays on and the port stays at
+  Active, and the host's log now says so before saying what happened.
 
 - Plug-ins (PLUG-39 step 6, which finishes PLUG-39): the latency and tail
   the host reads are written in one place in each of VST3 and the Audio
@@ -267,24 +284,6 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
-- CI (CI-53): a later push to a pull request runs only the workflows that
-  the files changed since that workflow's last full passed run need; the
-  `scope` job names the run whose result stands. On `main`, a merge that
-  changes anything but documentation still runs everything; one that
-  changes only documentation runs Lint. Every release and preview gets the
-  full CI: the draft-release workflow refuses a tag on which the native,
-  VST3, LV2, Audio Unit, fuzz and Lint workflows have not passed when
-  started by hand.
-- CI (CI-54): a draft pull request runs Lint and the Linux jobs only;
-  marking it ready, or starting the workflows by hand on the branch, runs
-  macOS and Windows.
-- Process (DOC-21): fewer pushes and review rounds for simple changes.
-  Merge `main` into a branch only on a conflict or when jrp asks; answer a
-  review round in one push and never push only to record a pull request
-  number; an independent review is needed only for code, DSP, plug-in,
-  saved-state, `.cfg` and release changes, and its wording findings never
-  block or start another round; a ready pull request's handoff note keeps
-  only its State line; the status page changes only at milestones.
 - Code (PLUG-24): `HostProcessor`, the plug-ins' audio path, moved out of
   `portable/host.cpp` into `portable/host_processor.cpp` unchanged; the
   gain, Mix and dry-signal rules it shares with `HostFilter` are in
