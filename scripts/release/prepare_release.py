@@ -213,9 +213,9 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'and removed itself. Nobody has used them in a host yet. '
             f'[Status]({base}/blob/{tag}/docs/project/status.md#checks-left-before-publication) lists what is open. '
             'Other hosts are untested.\n'
-            "- In Audacity, Convolver's window (Choose…, Recent or Reload) should now keep the filter for exports and "
-            "saved projects, but this has been checked only by automated tests, not yet in Audacity. Audacity's own "
-            'preset menu is the route that has been checked.\n'
+            "- In Audacity, a filter chosen with Convolver's Choose… or Recent, even before playing, is kept for "
+            "exports and saved projects (checked in Audacity 4.0.2 on macOS on 21 November 2026, as is Audacity's "
+            'own preset menu). Reload and reloading when the file changes are checked only by automated tests.\n'
             '- Checked only by automated tests: new in 0.14, the quicker restore of the playing filter and the '
             'saving once the sound '
             'has stopped; new in 0.13.20, the Gain mode, a `.vstpreset` chosen in the window, Choose… on a track '

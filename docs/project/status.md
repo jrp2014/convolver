@@ -18,10 +18,10 @@ added is in the [CHANGELOG](../../CHANGELOG.md). The command-line renderer,
 the preset tool, the Equalizer APO export and the VST3, Audio Unit and LV2
 plug-ins are implemented and tested automatically, with Gain, Mix, Latency
 and the Gain mode in all three plug-ins and a window for VST3 and the Audio
-Unit on macOS and for VST3 on Windows. jrp ran one check on 0.14.0, in
-Audacity on 20 November 2026, and it failed before the fix it was checking
-could matter ([check 10](#checks-left-before-publication), PLUG-27).
-Otherwise nobody has tried 0.14.0, the non-uniform engine (0.13.2), the
+Unit on macOS and for VST3 on Windows. jrp's Audacity check failed on 0.14.0 on 20
+November 2026, before the fix it was checking could matter (PLUG-27), and
+passed on the 0.16.14 candidate on 21 November
+([check 10](#checks-left-before-publication)). Otherwise nobody has tried 0.14.0, the non-uniform engine (0.13.2), the
 Windows window or the packaged LV2 plug-in in a host: jrp's other REAPER,
 Audacity and GarageBand results are from 0.12.x builds and stay records of
 those builds. No independent user has followed
@@ -118,13 +118,13 @@ published preview. The steps are those of the
 | 1 | REAPER, by ear: scan, the identity, echo and repeat presets, a click on bypass, Gain and Mix; where REAPER shows the Status parameter (HOST-1, VST3-11) | [REAPER](../develop/host-testing.md#reaper-vst3) steps 1 to 5 and the listening in 11 | 10 min | v0.12.8: Status display passed. Listening open |
 | 2 | REAPER: a render, save, quit and reopen with the echo playing, a refused preset, the wrong host rate | REAPER steps 6 to 9 | 10 min | v0.12.8: passed; runs again, since the heading after a refused preset was fixed later |
 | 3 | REAPER: the stereo journey and the 2→6 crossover, each following its guide, with **Choose…** on a six-channel track | REAPER steps 10 and 12 | 25 min | Not run since the guides were rewritten (DOC-10) |
-| 4 | Audacity, through its preset menu only ([decision](decisions.md#plug-in-behaviour)): packaged presets and one of your own, listening, an export compared with the CLI, save and reopen, a refused preset, a mono track, a Latency change, the window's layout (HOST-1, VST3-11) | [Prepare the Mac](../develop/host-testing.md#prepare-the-mac) step 3; [Audacity](../develop/host-testing.md#audacity-vst3) steps 1 to 8 and 10; step 9 only for the window's layout, Gain, Mix and Latency | 30 min | v0.12.8: failed through **Choose…** (VST3-17, fixed in 0.13.12, see check 10); the rest open |
+| 4 | Audacity, through its preset menu only ([decision](decisions.md#plug-in-behaviour)): packaged presets and one of your own, listening, an export compared with the CLI, save and reopen, a refused preset, a mono track, a Latency change, the window's layout (HOST-1, VST3-11) | [Prepare the Mac](../develop/host-testing.md#prepare-the-mac) step 3; [Audacity](../develop/host-testing.md#audacity-vst3) steps 1 to 8 and 10; step 9 only for the window's layout, Gain, Mix and Latency | 30 min | v0.12.8: failed through **Choose…** (VST3-17), which passed on 0.16.14 in check 10; the rest open |
 | 5 | GarageBand: a packaged preset and save and reopen, listening, a click on bypass, the track in time after a Latency change, **Recent** and **Reload**, VoiceOver (AU-4, AU-6) | [GarageBand](../develop/host-testing.md#garageband-audio-unit) steps 4 to 6, 9 and 10 | 20 min | v0.12.8: the preset, save and reopen, **Recent** and **Reload** passed; the rest open |
 | 6 | The exact candidate: the candidates workflow on the preview's tag, and the draft release's clean-machine checks | [Releasing](../develop/releasing.md#candidates) | CI | **Passed** for 0.14.0: [run 44611563339](https://github.com/jrp2014/convolver/actions/runs/44611563339), then [run 44616436091](https://github.com/jrp2014/convolver/actions/runs/44616436091) |
 | 7 | The independent walkthrough of 0.14.0 (REL-3) | [Above](#next-milestone-an-independent-user-runs-a-preview) | The tester | Not started |
 | 8 | GarageBand with the window open: Latency changed stopped and while playing, then save and reopen (AU-17 changed how the unit reports latency) | GarageBand steps 4 to 6 | 5 min | Not run |
 | 9 | PERF-2's session: a long filter at Latency 0 by ear in REAPER and GarageBand, Latency changes and replacement while playing, projects from 0.12.12 reopening at the Latency the [plug-in guide](../use/plugins.md#settings) gives, and a saved Latency of 1024 reopening in time | PERF-2 in [TODO](../../TODO.md) | 30 min | Not run |
-| 10 | Audacity, VST3-17's fix: choose `filter.cfg` with **Choose…**, export without playing, compare with the CLI; save, reopen and export again; a list chosen again after one playback | [Audacity](../develop/host-testing.md#audacity-vst3) step 11 | 10 min | 0.14.0, 20 November 2026: **failed** in Audacity 4.0.2 on macOS ([record](../archive/reviews/2026-11-20-vst3-17-audacity.md)). Before Audacity had played, **Choose…** refused the 48 kHz filter because the plug-in had been set up at a provisional 44.1 kHz (PLUG-27); the export with the window open was dry and the export after closing it was silent; save and reopen were not reached. It runs again after PLUG-27's fix (PR #233). Until it passes, the guides keep Audacity's preset menu as the checked route |
+| 10 | Audacity, VST3-17's fix: choose `filter.cfg` with **Choose…**, export without playing, compare with the CLI; save, reopen and export again; a list chosen again after one playback | [Audacity](../develop/host-testing.md#audacity-vst3) step 11 | 10 min | **Passed** on 0.16.14, 21 November 2026, in Audacity 4.0.2 on macOS ([record](../archive/reviews/2026-11-21-vst3-17-audacity-pass.md)): `filter.cfg` chosen before playback reached the export with the window open and, after save, quit and reopen, the next export; **Recent** worked; the list took its 48 kHz entry after one playback. All four exports matched the CLI within 7.45e-8 (−137 dB). Failed on 0.14.0 before PLUG-27's fix ([record](../archive/reviews/2026-11-20-vst3-17-audacity.md)) |
 
 Accepted on earlier builds and not repeated
 ([decisions](decisions.md#plug-in-behaviour)): VST3-16's latency
@@ -136,7 +136,7 @@ for narrowing, for jrp to decide, required until he does: VoiceOver once,
 in GarageBand, since VST3 and the Audio Unit share the window; and a tail
 longer than an Audacity clip's silent ending, recorded as unverified.
 
-**Checked only by automated tests so far:** VST3-17's fix (0.13.12); keeping
+**Checked only by automated tests so far:** keeping
 the playing filter and its tail when restored state or a preset holds it
 (PLUG-38, 0.13.20); **Choose…** accepting a filter with fewer inputs than the
 host's bus (PLUG-33, 0.13.20); a preset saved at the defaults resetting the

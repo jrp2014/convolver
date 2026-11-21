@@ -152,11 +152,10 @@ preset's, as choosing it again would.
 `convolver-preset`, which reads an IR file, a `.cfg`, a configuration list
 or a Convolver `.vstpreset`, and lists the folders where hosts look for
 presets. A preset is needed where the plug-in has no window (the VST3
-plug-in on Linux, and on Windows up to 0.13.2), in an LV2 host with no file chooser, and is
-the checked route in Audacity: up to 0.13.2, Audacity 4.0.2 did not keep a
-filter loaded in the window (with Choose…, Recent, Reload or reloading when
-the file changes) for exports or saved projects. Later versions should keep
-it, checked so far only by automated tests, not in Audacity
+plug-in on Linux, and on Windows up to 0.13.2), and in an LV2 host with no file chooser. In
+Audacity both routes are checked: its preset menu, and Choose… and Recent
+in the window, whose filter Audacity 4.0.2 keeps for exports and saved
+projects (checked with 0.16.14; up to 0.13.2 it did not)
 ([in Audacity](first-sound-in-a-host.md#in-audacity)).
 
 The filter is prepared away from the audio, then installed. A filter loaded

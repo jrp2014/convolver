@@ -669,8 +669,10 @@ separate processes, so each carries values, never pointers:
   `IComponentHandler2`, such as Audacity 4.0.2), the controller instead
   reports one edit of Latency that keeps its value (`beginEdit`,
   `performEdit` with the current value, `endEdit`), so that such a host
-  stores the new state (VST3-17 in [TODO](../../TODO.md) has the Audacity
-  reasoning), unless a chosen preset's settings were already reported as
+  stores the new state (VST3-17; the Audacity reasoning is in its
+  [archived TODO text](../archive/todo/2026-11-20-open-item-history.md),
+  and jrp's [Audacity pass](../archive/reviews/2026-11-21-vst3-17-audacity-pass.md)
+  confirms it), unless a chosen preset's settings were already reported as
   edits. Latency is used because it is not automatable and `process()`
   ignores it (the controller sends a new Latency as a message, only when the
   value changes), so neither the sound nor Gain, Mix or automation change.

@@ -37,6 +37,16 @@ first published preview, keep their original grouping.
 
 ### Changed
 
+- Documentation (VST3-17): in Audacity, Convolver's **Choose…** and
+  **Recent** are now checked routes alongside Audacity's preset menu. jrp
+  checked the 0.16.14 candidate in Audacity 4.0.2 on macOS on 21 November
+  2026: a filter chosen before playing was in the export with the window
+  open and, after saving, quitting and reopening, in the next export; a
+  configuration list chosen after one playback took its 48 kHz entry
+  ([record](docs/archive/reviews/2026-11-21-vst3-17-audacity-pass.md)).
+  The guides, status and the release notes' text say so; **Reload**,
+  reloading when the file changes and a `.vstpreset` chosen in the window
+  remain checked only by automated tests.
 - Plug-ins (PLUG-39 step 5a): the window's report travels as one typed
   value. `encode_report()` and `decode_report()` in
   `portable/host_report.hpp` encode it once for the VST3 message between the
