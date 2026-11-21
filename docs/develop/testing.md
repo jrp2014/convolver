@@ -1178,7 +1178,14 @@ other orders of events (AU-18):
 
 After a change made while the engine runs, the renderer renders silence and
 runs the main queue until the Status parameter reads Active and the unit
-reports the new latency, at most 30 seconds, then starts the input.
+reports the new latency, at most 30 seconds. Both change when the
+replacement is accepted, before the audio thread has filled its latency and
+finished the 5.33 ms crossfade of a
+[live replacement](plugin-contract.md#initial-restoration-and-live-replacement),
+so silence renders on for the latency and 50 ms more before the input
+starts: the test checks the filter that plays after the change, not the
+crossfade, which `tests/plugins/lifecycle.cpp` and
+`native.host_settings` check against the oracle.
 [`tests/au/avaudioengine_tests.py`](../../tests/au/avaudioengine_tests.py)
 checks that the unit reports the case's latency and that nothing comes out
 before it; for a Latency chosen while running, that the host's property

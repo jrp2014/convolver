@@ -22,7 +22,8 @@
 //                  project, and render with a second unit restored from it
 // With --start-first or --latency, silence is rendered until the change has
 // been applied (the Status parameter reads Active and the latency the unit
-// reports is the one chosen), and the input starts after it. The input's
+// reports is the one chosen), then for the latency and 50 ms more, while
+// the replacement's crossfade ends; the input starts after it. The input's
 // first frame is OUTPUT's first frame.
 // Prints the latency the unit reports, in frames, as "latency N", and, for
 // --latency without --round-trip, "latency notified N" once the host's
@@ -284,6 +285,21 @@ func settle(_ what: String, until done: () -> Bool) {
     }
 }
 
+// A filter or Latency applied while the engine runs replaces the playing
+// one: the new one fills its latency and then crossfades for 5.33 ms (the
+// plug-in contract's live replacement). Status and the reported latency
+// change when the replacement is accepted, before the audio thread has
+// finished it, so silence renders on for the latency and 50 ms more; the
+// input then starts on the new filter alone.
+func finishReplacement() {
+    let frames = reportedLatency(effect.audioUnit) + Int((0.05 * rate).rounded(.up))
+    var silent = 0
+    while silent < frames {
+        renderBlock(block)
+        silent += Int(block)
+    }
+}
+
 if startFirst {
     // GarageBand starts the unit at its defaults, plays, then restores the
     // project on the main thread while the engine runs.
@@ -292,6 +308,7 @@ if startFirst {
     }
     restore(effect.audioUnit, preset, "the preset while running")
     settle("the restored filter's Active Status") { parameter(effect.audioUnit, statusParameter) == statusActive }
+    finishReplacement()
     print("restored the preset while running")
 }
 if let latency = chosenLatency, !roundTrip {
@@ -304,6 +321,7 @@ if let latency = chosenLatency, !roundTrip {
         reportedLatency(effect.audioUnit) == latency && parameter(effect.audioUnit, statusParameter) == statusActive
             && notifiedLatencies().contains(latency)
     }
+    finishReplacement()
     print("chose Latency \(latency) while running")
     print("latency notified \(latency)")
 }
