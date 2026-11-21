@@ -12,6 +12,8 @@ name: Plug-in distribution candidates
   # Each Monday, so that a new upstream release of a library or NSIS shows up
   # within a week even when nothing here changes (CI-6).
   schedule:
+    # The first Monday run with macOS jobs; the Audio Unit and VST3 ones
+    # follow half an hour apart (CI-49).
     - cron: '23 6 * * 1'
 
 permissions:
