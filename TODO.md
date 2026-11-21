@@ -53,7 +53,7 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 
 ### In progress
 
-PLUG-39's last step (PR STEP6PR), then PLUG-24 and DIAG-10. Check the open
+PLUG-39's last step (PR #256), then PLUG-24 and DIAG-10. Check the open
 pull requests for an ID before starting anything.
 
 ### Ready
@@ -495,7 +495,7 @@ move to the archive.
 
 - [x] **PLUG-39 — One consolidation of the load and restore path.** 21
   November 2026, PRs #200, #205, #213, #217, #219, #224, #226, #230 to
-  #232, #236, #246, #250 and STEP6PR ([plan](docs/archive/plans/2026-11-13-load-restore-consolidation.md),
+  #232, #236, #246, #250 and #256 ([plan](docs/archive/plans/2026-11-13-load-restore-consolidation.md),
   [adapter contract](docs/develop/plugin-contract.md#replacement-and-threads)).
 - [x] **PERF-3 — One measurement exercise: budgets, supported workloads and
   published evidence.** 21 November 2026, PR #248
