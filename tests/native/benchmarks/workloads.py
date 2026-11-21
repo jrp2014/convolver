@@ -144,7 +144,11 @@ def run(command):
             # wait4 gives this child's own peak, not the largest of all children.
             out = process.stdout.read()
             _, wait_status, usage = os.wait4(process.pid, 0)
-            process.returncode = os.waitstatus_to_exitcode(wait_status)
+            # os.waitstatus_to_exitcode needs Python 3.9; scripts support 3.8.
+            if os.WIFSIGNALED(wait_status):
+                process.returncode = -os.WTERMSIG(wait_status)
+            else:
+                process.returncode = os.WEXITSTATUS(wait_status)
             status = process.returncode
             peak = usage.ru_maxrss * (1 if sys.platform == 'darwin' else 1024)
         errors.seek(0)
