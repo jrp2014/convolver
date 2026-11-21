@@ -440,18 +440,8 @@ void cases() {
                     contains(text, "Status: " + r.status_name + ". " + r.status.text) &&
                     contains(text, "Software: Convolver "),
                 name + ": report text");
-        const auto fields = report_fields(r);
-        for (const char* key :
-             {"status",      "status name",   "summary",     "title",       "explanation",
-              "problem",     "plays",         "cause",       "fix",         "note",
-              "action",      "filter name",   "filter note", "filter path", "filter files",
-              "sample rate", "latency waits", "mix note",    "audio",       "reference",
-              "log path",    "log written"}) {
-            bool found = false;
-            for (const auto& [k, v] : fields)
-                found = found || k == key;
-            require(found, name + ": no field " + key);
-        }
+        // PLUG-39 step 5: every field survives the transport's encoding.
+        require(decode_report(encode_report(r)) == r, name + ": the encoded report differs");
         std::cout << name << ": " << r.status_name << ". " << r.explanation << "\n";
     }
 
@@ -481,18 +471,9 @@ void cases() {
     check(fact(r, "Host block size"), "up to 512 frames", "(11.6 ms)");
     // jrp, 7 November 2026: the filter's own facts, under its name in the
     // window; the Audio section gives the host's.
-    const auto fields = report_fields(r);
-    const auto field = [&](const std::string& name) {
-        for (const auto& [key, value] : fields)
-            if (key == name)
-                return value;
-        throw std::runtime_error("no report field " + name);
-    };
     require(r.filter_rate == "44100 Hz" && r.filter_channels == "2 in → 2 out" &&
                 r.filter_length == "0.1 ms" && r.filter_taps == "3 taps" &&
-                r.filter_speakers.empty() && field("filter taps") == "3 taps" &&
-                field("filter rate") == "44100 Hz" && field("filter channels") == "2 in → 2 out" &&
-                field("filter length") == "0.1 ms" && field("filter speakers").empty(),
+                r.filter_speakers.empty(),
             "filter facts: " + r.filter_rate + " | " + r.filter_channels + " | " + r.filter_length +
                 " | " + r.filter_speakers);
     {
@@ -513,7 +494,7 @@ void cases() {
         // digits, the same for the same filter, different for another.
         require(r.filter_identity.size() == 16 &&
                     r.filter_identity.find_first_not_of("0123456789abcdef") == std::string::npos &&
-                    field("filter identity") == r.filter_identity &&
+                    decode_report(encode_report(r))->filter_identity == r.filter_identity &&
                     host_report(f, facts(stereo)).filter_identity == r.filter_identity &&
                     w.filter_identity.size() == 16 && w.filter_identity != r.filter_identity,
                 "filter identity: " + r.filter_identity + " | " + w.filter_identity);
@@ -691,12 +672,9 @@ void cases() {
     unnamed.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {});
     require(host_report(unnamed, facts(stereo)).filter_name == "Restored filter",
             "no saved name: " + host_report(unnamed, facts(stereo)).filter_name);
-    std::string files;
-    for (const auto& [key, value] : report_fields(rc))
-        if (key == "filter files")
-            files = value;
-    require(files == "/filters/room.cfg\n/filters/left.wav\n/filters/right.wav\n",
-            "filter files field: " + files);
+    require(rc.filter_files == std::vector<std::string>{"/filters/room.cfg", "/filters/left.wav",
+                                                        "/filters/right.wav"},
+            "filter files: " + std::to_string(rc.filter_files.size()));
     // A stereo filter the host started on a mono track: not playing.
     HostFilter idle(8);
     idle.load(HostState{filter(44100, 2)}, std::nullopt);
@@ -1000,6 +978,51 @@ void awaiting_validation() {
             "restored state waits as a chosen file does");
 }
 
+// PLUG-39 step 5: the report's one encoding for a format's transport (the
+// VST3 message, the Audio Unit property): every field read back as written,
+// text with tabs, line breaks and zero bytes kept, and anything not read
+// whole refused.
+void encoding() {
+    HostReport r;
+    r.status = {HostStatus::fault, "Fault: invalid samples."};
+    r.status_name = "Fault";
+    r.title = "Convolver 0.17.0, Test #7 in a host";
+    r.problem = std::string("tab\tline\nzero") + '\0' + "end";
+    r.filter_files = {"/a.cfg", "", "/b.wav"};
+    r.audio = {{"Host channels", "1 in, 1 out", "the filter has 2 in, 2 out", true, "help"},
+               {"Ring-out", "2 frames", "", false, ""}};
+    r.reference = {{"Software", "Convolver"}, {"", "a line without a label"}};
+    r.sample_rate = 96000;
+    r.latency_waits = true;
+    r.log_written = false;
+    const auto bytes = encode_report(r);
+    const auto back = decode_report(bytes);
+    require(back && *back == r, "the report does not read back as written");
+    require(decode_report(encode_report(HostReport{})) == HostReport{}, "an empty report");
+    // Cut short at every length, and with a byte left over: refused.
+    for (std::size_t n = 0; n < bytes.size(); ++n)
+        require(!decode_report(std::string_view(bytes).substr(0, n)),
+                "a report cut to " + std::to_string(n) + " bytes was read");
+    require(!decode_report(bytes + '\0'), "a report with a byte left over was read");
+    // Another encoding version, or a status out of range: refused.
+    auto other = bytes;
+    other[0] = 2;
+    require(!decode_report(other), "another encoding version was read");
+    auto status = bytes;
+    status[8] = static_cast<char>(host_status_names.size());
+    require(!decode_report(status), "an out-of-range status was read");
+    // A list count no bytes could hold is refused before anything is
+    // allocated for it.
+    HostReport listed;
+    listed.filter_files = {"x"};
+    auto huge = encode_report(listed);
+    const auto at = huge.find(std::string("\x01\0\0\0\0\0\0\0\x01\0\0\0\0\0\0\0x", 17));
+    require(at != std::string::npos, "the file list's count not found");
+    for (std::size_t i = 0; i < 8; ++i)
+        huge[at + i] = static_cast<char>(0xff);
+    require(!decode_report(huge), "a huge list count was read");
+}
+
 int main() {
     if (convolver::test::run_cases({
             {"awaiting_validation", awaiting_validation},
@@ -1008,6 +1031,7 @@ int main() {
             {"log_agrees", log_agrees},
             {"diagnostics", diagnostics},
             {"wider_inputs", wider_inputs},
+            {"encoding", encoding},
         }))
         return 1;
     std::cout << "host report tests passed\n";

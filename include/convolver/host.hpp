@@ -677,6 +677,7 @@ struct HostStatusLine {
     // instance plays and, after a failure, why, in short; the full
     // explanation is HostFilter::failure()'s message, which adapters log.
     std::string text;
+    bool operator==(const HostStatusLine&) const = default;
 };
 inline constexpr std::size_t max_status_text = 127; // VST3's String128, less its terminator.
 // `host` is the configuration the instance plays under, or nullopt while it

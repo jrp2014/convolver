@@ -409,7 +409,8 @@ cases.
   for equal and unequal channel counts and before the host starts; a fault
   once the host has stopped, with bypass off),
   checking the status, the explanation's wording and what it must
-  not say, the fields and the plain text; the Audio facts in order with
+  not say, the plain text, and that each case's report reads back equal
+  through the transport codec (PLUG-39 step 5); the Audio facts in order with
   their values, notes and help (a refused rate and a mono track's channels
   marked as problems, the Routing of a filter that is not playing, what is
   known before the host starts), the Loudest peak and the Gain that rules
@@ -426,14 +427,17 @@ cases.
   Bypassed message for each dry-signal case, and the filter identity (16
   hex digits, the same for the same filter, different for another or for
   one changed sample, also in the middle of a 1024-tap filter), cached
-  when the filter is accepted.
+  when the filter is accepted. The codec (`encoding`): a full report and
+  an empty one read back equal, and nothing is read from a report cut
+  short at any byte, one with a byte left over, another encoding version,
+  a status out of range or a list count larger than the bytes left.
 - `native.recent_files`: the windows' recent filter files (VST3-11) beside
   the log: newest first, no repeats, ten kept, paths with spaces and
   accents, no path with a line break, nothing left beside the list after
   it is replaced, a list with Windows line ends, Clear Menu, and no list
   with the log turned off.
 - `native.window_model`: what every system's window does (PLUG-34), from
-  real report fields: the content for each status (tone, symbol, message,
+  a typed report: the content for each status (tone, symbol, message,
   box, the fix's button with and without loading, the drop hint, the
   filter's facts, Audio and reference lines) and with no report; the
   Latency note; typed values (decimal comma, minus sign, a unit after the
@@ -842,7 +846,7 @@ that the next control call frees it, and that the next blocks play the new
 processor (an impulse comes out 1024 frames later). And a filter at the
 saved-state limit (PLUG-13) that is restored, given Gain −6 dB, saved and
 restored in a second instance, with one sample more refused. And the window's messages
-(VST3-3): the report's fields, a fresh report on request after a Gain
+(VST3-3): the decoded report, a fresh report on request after a Gain
 change, no request for the host to reread the parameters while the
 Status line stays the same, a chosen WAV accepted (the project marked changed, the status
 Active, the filter named and saved) or refused for its rate, and an empty
@@ -1094,7 +1098,7 @@ Five CTest tests run when the adapter is built (label `au`):
   with a log past 1 MiB, so the line it writes rotates the earlier text to
   `.old`, and both files must be collected.
 - `au.editor`: the window (AU-6). The report and diagnostics properties
-  (types, read-only, change notifications) for a stereo preset on a mono
+  (types, read-only, change notifications; the report decodes whole) for a stereo preset on a mono
   track (and a preset restored again and again, whose identical failure is
   logged once), then the view the factory makes, attached to an off-screen
   window: its size fitted to the content whatever size the host offers

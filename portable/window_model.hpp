@@ -3,23 +3,19 @@
 // PLUG-34: what Convolver's window does, apart from how a system draws it
 // (docs/project/plans/2026-11-10-windows-linux-plugin-windows.md#what-comes-first).
 // Each system's window (AppKit on macOS, Win32 on Windows) reads the
-// report's fields (report_fields() in host_report.hpp), asks this file what
+// report (HostReport, decode_report() in host_report.hpp), asks this file what
 // to show and what a user's action means, and keeps only its controls and
 // layout, so every window behaves the same. Control thread only (a window's
 // main thread): never from audio processing.
+#include "host_report.hpp"
 #include <cstdint>
 #include <filesystem>
-#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 namespace convolver::view {
-// The report's fields by name, as report_fields() gives them.
-using ReportFields = std::map<std::string, std::string, std::less<>>;
-ReportFields report_map(const std::vector<std::pair<std::string, std::string>>& fields);
 
 // How the status is drawn beside its word, which is always written too, so
 // the colour and symbol are never the only signal.
@@ -93,7 +89,7 @@ struct WindowContent {
 // What to show for `report` (nullptr: the plug-in could not give one).
 // `can_load` says whether this window can load a file (Choose…, a drop): it
 // adds the drop hint and keeps the Choose action.
-WindowContent window_content(const ReportFields* report, bool can_load);
+WindowContent window_content(const HostReport* report, bool can_load);
 
 // The time a Latency choice of `frames` adds at the host's rate ("adds 5.3
 // ms"), and "not in use yet" while `waits`; empty when there is nothing to

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // PLUG-34: what Convolver's window does on every system (portable/window_model.hpp),
-// from the report's fields as the formats pass them: the content shown, the
+// from the typed report the formats pass: the content shown, the
 // Latency note, typed values, Choose… requests, the Recent menu and
 // reloading when a filter's files change.
 #include "host_report.hpp"
@@ -56,7 +56,7 @@ HostReport sample_report() {
 }
 
 void content_tests() {
-    const auto fields = report_map(report_fields(sample_report()));
+    const auto fields = sample_report();
     const auto c = window_content(&fields, true);
     require(c.available && c.status == static_cast<int>(HostStatus::load_failed), "status");
     require(c.status_name == "Load failed" && c.tone == StatusTone::failure &&
@@ -101,7 +101,7 @@ void content_tests() {
     auto report = sample_report();
     report.action = "copy diagnostics";
     report.filter_note.clear();
-    const auto copy = report_map(report_fields(report));
+    const auto& copy = report;
     const auto c2 = window_content(&copy, false);
     require(c2.action == WindowAction::copy_diagnostics && c2.filter_note.empty(),
             "copy diagnostics");
@@ -113,7 +113,7 @@ void content_tests() {
     HostReport active;
     active.status.status = HostStatus::active;
     active.status_name = "Active";
-    const auto quiet = report_map(report_fields(active));
+    const auto& quiet = active;
     const auto c3 = window_content(&quiet, true);
     require(c3.tone == StatusTone::positive && c3.symbol == StatusSymbol::active &&
                 !c3.message_shown() && !c3.boxed() && !c3.facts_shown && c3.audio.empty(),
@@ -124,8 +124,7 @@ void content_tests() {
           std::tuple{HostStatus::fault, StatusTone::warning, StatusSymbol::fault},
           std::tuple{HostStatus::bypassed, StatusTone::plain, StatusSymbol::bypassed}}) {
         active.status.status = status;
-        const auto f = report_map(report_fields(active));
-        const auto c4 = window_content(&f, true);
+        const auto c4 = window_content(&active, true);
         require(c4.tone == tone && c4.symbol == symbol,
                 "status look for " + std::to_string(static_cast<int>(status)));
     }
