@@ -81,8 +81,8 @@ repository; recording a review's or a host test's results in it is a change.
 - **Make each push to a ready pull request count** (DOC-21). Every push
   starts its workflows again, and a push that changes only prose still runs
   Lint. Answer a whole review round, lint fixes included, in one push. Do
-  not push a commit only to record the pull request's number: give it with
-  the next real change, or leave it to the merge, whose title carries it.
+  not push a commit only to record the pull request's number: open the draft
+  early, as above, and give the number with the next real change.
   Later pushes run only what changed since the last full run that passed
   ([CI-53](testing.md#drafts-and-later-pushes)), so a prose fix to a code
   pull request no longer rebuilds everything.
@@ -109,9 +109,10 @@ repository; recording a review's or a host test's results in it is a change.
   and `docs/README.md`.
   Change only the lines your item needs. Merge `main` into your branch only
   when it conflicts, when your change needs something merged since, or when
-  jrp asks (DOC-21): each pull request run already tests the branch merged
-  with the `main` of that moment, and merging `main` changes the branch's
-  code, so every workflow runs again. A change to something every stream relies on (the
+  jrp asks (DOC-21): each pull request run that builds tests the branch
+  merged with the `main` of that moment, the full run after a merge of code
+  is the backstop, and merging `main` changes the branch's code, so every
+  workflow runs again. A change to something every stream relies on (the
   [shared adapter contract](plugin-contract.md),
   the PLUG-2 harness, the PLUG-4 identity list) goes in its own pull request,
   not inside one stream's.

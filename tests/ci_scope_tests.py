@@ -1065,7 +1065,15 @@ class CarryForward(unittest.TestCase):
         self.assertTrue(self.requests[-1].endswith(f'/compare/{self.BASE}...{self.HEAD}'))
         paths, run = ci_scope.carried_from('vst3', 'push', {})
         self.assertEqual(run['id'], 5)
-        self.assertIn('event=push&branch=main', self.requests[-4])
+        self.assertIn('event=push&branch=main&status=success', self.requests[-4])
+        # A run of another repository's branch of the same name is passed over.
+        self.runs[2]['head_repository'] = {'full_name': 'fork/name'}
+        self.runs.append(self.run_record(3, self.BASE))
+        _, run = ci_scope.carried_from('vst3', 'pull_request', self.pull_request())
+        self.assertEqual(run['id'], 3)
+        # The same commit (a pull request marked ready again): nothing changed.
+        self.comparison = {'status': 'identical', 'files': []}
+        self.assertEqual(ci_scope.carried_from('vst3', 'pull_request', self.pull_request())[0], [])
 
     def test_renames_count_both_names(self):
         self.comparison['files'] = [{'filename': 'docs/new.md', 'previous_filename': 'portable/old.cpp'}]
@@ -1080,8 +1088,9 @@ class CarryForward(unittest.TestCase):
 
         self.assertIn('another repository', why(payload=self.pull_request(repository='fork/name')))
         self.assertIn('carry nothing', why('workflow_dispatch'))
-        self.comparison['status'] = 'diverged'
-        self.assertIn('not an ancestor', why())
+        for status in ('diverged', 'behind'):
+            self.comparison['status'] = status
+            self.assertIn('not an ancestor', why())
         self.comparison = {'status': 'ahead', 'files': [{'filename': f'f{n}'} for n in range(300)]}
         self.assertIn('more than 299 files', why())
         self.runs[2]['proving'] = False
@@ -1128,6 +1137,10 @@ class CarryForward(unittest.TestCase):
             self.answer('pull_request', code, code, draft=True),
             {'build': 'true', 'package': 'false', 'full': 'false', 'proving': 'false'},
         )
+        # A page whose first-use commands a test runs counts as code once
+        # carried, whatever page_kind() says when comparing with main.
+        with mock.patch.object(ci_scope, 'commands_changed', return_value=False):
+            self.assertEqual(self.answer('pull_request', code, ['README.md'])['build'], 'true')
         # A pull request this workflow does not need stays skipped.
         self.assertEqual(self.answer('pull_request', ['TODO.md'], code)['build'], 'false')
 
@@ -1136,7 +1149,20 @@ class CarryForward(unittest.TestCase):
         change; a merge of documentation alone runs Lint."""
         self.assertEqual(self.answer('push', None, ['TODO.md', 'docs/develop/build.md'])['build'], 'false')
         self.assertEqual(self.answer('push', None, ['TODO.md'], 'release')['package'], 'false')
-        for since in (['plugins/au/adapter.mm'], ['tests/plugins/fixtures.py'], ['portable/host.cpp']):
+        # The version bot's commit after the previous merge is always there.
+        self.assertEqual(self.answer('push', None, ['VERSION', 'CHANGELOG.md'])['build'], 'false')
+        changes = (
+            ['plugins/au/adapter.mm'],
+            ['tests/plugins/fixtures.py'],
+            ['portable/host.cpp'],
+            # No workflow but Lint runs these, yet they are code and tests.
+            ['scripts/reaper_check.py'],
+            ['tests/reaper_check_tests.py'],
+            ['.github/workflows/lint.yml'],
+            ['.github/workflows/publish.yml'],
+            ['README.md', 'VERSION'],
+        )
+        for since in changes:
             with self.subTest(since=since):
                 self.assertEqual(
                     self.answer('push', None, since),

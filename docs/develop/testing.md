@@ -1919,19 +1919,26 @@ compare with this commit", and lists the files changed between that run's
 commit and this one ([`ci_scope.py`](../../scripts/ci_scope.py),
 `carried_from()`). On a pull request, when none of those files needs the
 workflow (by the same rules as below), its jobs are skipped, and the
-`scope` job's log and summary name the run whose result stands. On `main`,
-any change other than documentation runs every workflow in full as before,
-so every merge that changes code or tests gets the full post-merge run; a
-merge of documentation alone runs Lint. Nothing is carried, and the
+`scope` job's log and summary name the run whose result stands. A page
+whose first-use commands a test runs counts as code here, whatever changed
+in it. On `main`, any change other than documentation runs every workflow
+in full as before, so every merge that changes code or tests gets the full
+post-merge run; a merge of documentation alone (packaged pages included,
+unless the candidates need them) runs Lint. The version bot's `VERSION`
+commit after each merge starts no run, so it is left out of that
+comparison; the runs started by hand on a release's tag test it. Nothing is carried, and the
 workflow runs as before, when no such run exists (a draft's runs do not
 count, nor do runs before CI-53), when the earlier commit is not an
 ancestor (a rebase), when 300 or more files changed, when the lookup fails,
 for a re-run (attempt 2 or later) and for scheduled and manual runs.
 
-A carried result was tested against the `main` of its own run. That is no
-weaker than before: a pull request's runs were never repeated when `main`
-moved on, and the full run after a merge of code is the backstop. Merging
-`main` into the branch changes its code, so it runs again. Every release and
+A carried result was tested against the `main` of its own run. That is
+slightly weaker than before, when any later push also retested the branch
+merged with the `main` of that moment; a pull request was never retested
+when `main` moved on without a push, and the full run after a merge of code
+is the backstop. Merging `main` into the branch changes its code, so it
+runs again. Each `scope` job makes at most seven API calls with the run's
+token (a list of runs, the jobs of up to five, one comparison). Every release and
 preview also passes every workflow started by hand on its tag
 ([publishing](releasing.md#publishing-an-unsigned-preview)).
 

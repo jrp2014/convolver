@@ -59,7 +59,7 @@ run, nothing is carried. On a pull request the comparison decides for each
 workflow; on main every workflow runs as before when anything but
 documentation changed, so a merge that changes code or tests gets the full
 run (jrp, 21 November 2026), and one that changes only documentation runs
-Lint alone.
+Lint alone (main_carries()).
 
 A draft pull request runs Lint and the Linux jobs only (CI-54): the scope
 job answers full=false, the macOS and Windows jobs are gated on full, and
@@ -271,7 +271,7 @@ WORKFLOWS = ('regression', 'fuzz', 'vst3', 'au', 'lv2', 'release')
 # (CI-53); the name is how they find it, so the workflows use it exactly.
 PROVING_STEP = 'Full run: later pushes compare with this commit'
 # Runs inspected for one, newest first, and the most files a comparison lists.
-CARRY_RUNS = 10
+CARRY_RUNS = 5
 COMPARE_LIMIT = 300
 
 
@@ -365,10 +365,17 @@ def guide_needs_candidates(path):
     return texts is None or any(EXAMPLE.search(text) or IMAGE.search(text) for text in texts)
 
 
-def candidates(paths):
+def carried_kind(path):
+    """page_kind() for a file changed since an earlier run (CI-53). A page in
+    COMMANDED counts as code, as page_kind() compares its commands with the
+    base commit, not with the earlier run's."""
+    return classify(path) if path in COMMANDED else page_kind(path)
+
+
+def candidates(paths, kind_of=page_kind):
     """Whether a pull request changing these paths builds the candidates."""
     for path in paths:
-        what = page_kind(path)
+        what = kind_of(path)
         if what == 'documentation':
             continue
         if what == 'packaged' and guide(path):
@@ -380,17 +387,17 @@ def candidates(paths):
     return False
 
 
-def fuzzed(paths):
+def fuzzed(paths, kind_of=page_kind):
     """Whether a pull request changing these paths runs the fuzz targets."""
-    return any(matches(path, FUZZED) and page_kind(path) == 'code' for path in paths)
+    return any(matches(path, FUZZED) and kind_of(path) == 'code' for path in paths)
 
 
-def needed(paths):
+def needed(paths, kind_of=page_kind):
     """The workflows that must run for a pull request's changed paths. An
     empty list (a merge that changes nothing) runs everything."""
     if not paths:
         return set(WORKFLOWS)
-    kinds = {page_kind(path) for path in paths}
+    kinds = {kind_of(path) for path in paths}
     if 'code' in kinds:
         workflows = set(WORKFLOWS)
     else:
@@ -405,19 +412,19 @@ def needed(paths):
             elif kind.startswith('workflow:'):
                 workflows.add(kind.split(':', 1)[1])
     workflows.discard('release')
-    if candidates(paths):
+    if candidates(paths, kind_of):
         workflows.add('release')
-    if 'workflow:fuzz' not in kinds and not fuzzed(paths):
+    if 'workflow:fuzz' not in kinds and not fuzzed(paths, kind_of):
         workflows.discard('fuzz')
     # Lint and the version workflow are not gated; changing them builds nothing.
     return workflows & set(WORKFLOWS)
 
 
-def decide(paths, workflow=None):
+def decide(paths, workflow=None, kind_of=page_kind):
     """What one workflow must do: build (and test), and package, which only
     the candidate workflow reads; for the candidates the two are the same.
     Without a workflow name, build says whether any other workflow builds."""
-    workflows = needed(paths)
+    workflows = needed(paths, kind_of)
     package = 'release' in workflows
     build = bool(workflows - {'release'}) if workflow is None else workflow in workflows
     return {'build': build, 'package': package}
@@ -619,6 +626,20 @@ def carried_from(workflow, event, payload):
     return sorted(paths), base
 
 
+def main_carries(since):
+    """Whether a push to main carries the last full run's result forward:
+    only when everything changed since is documentation, packaged pages
+    included, that the candidates need not run for (jrp, 21 November 2026:
+    keep the full post-merge run whenever code or tests change). The version
+    bot's VERSION commit after each merge starts no run, so it is always in
+    the comparison; it is left out, and the tag's own runs test it before a
+    release."""
+    paths = [path for path in since if path != 'VERSION']
+    return all(carried_kind(path) in ('documentation', 'packaged') for path in paths) and not candidates(
+        paths, carried_kind
+    )
+
+
 def matrix(text, *, full):
     """A matrix's entries, listed as JSON (lines starting with # are
     comments), keeping only the Linux ones unless every platform runs."""
@@ -694,15 +715,14 @@ def main(argv=None):
             lines.append(f'Nothing carried forward: {base}.')
         else:
             if args.event == 'push':
-                # On main, any change but documentation runs everything.
-                carried = not since or not needed(since)
+                carried = main_carries(since)
             else:
-                carried = not since or not runs(decide(since, args.workflow))
+                carried = not since or not runs(decide(since, args.workflow, carried_kind))
             lines.append(
                 f'Since run {base["id"]} passed in full on {base["head_sha"][:12]} ({base.get("html_url", "")}), '
                 f'{len(since)} file(s) changed:'
             )
-            lines.extend(f'  {page_kind(path):13} {path}' for path in since)
+            lines.extend(f'  {carried_kind(path):13} {path}' for path in since)
             if carried:
                 answer = {'build': False, 'package': False}
                 lines.append(

@@ -117,12 +117,14 @@ jobs:
           missing=()
           for workflow in regression vst3 lv2 au fuzz lint; do
             runs="repos/$REPO/actions/workflows/$workflow.yml/runs?event=workflow_dispatch&head_sha=$sha&status=success"
-            if [ "$(gh api "$runs" --jq .total_count)" = 0 ]; then
+            # On its own line, so that a failed lookup stops the step.
+            count=$(gh api "$runs" --jq .total_count)
+            if [ "$count" -lt 1 ]; then
               missing+=("$workflow")
             fi
           done
           if [ "${#missing[@]}" -gt 0 ]; then
-            message="No passed run started by hand on $TAG ($sha) for: ${missing[*]}."
+            message="No passed run started by hand on $TAG's commit ($sha) for: ${missing[*]}."
             message="$message Start each on the tag (gh workflow run <name>.yml --ref $TAG) and wait for it to pass."
             if [ "$EVENT" = pull_request ]; then
               echo "::warning::Dry run: $message"
@@ -131,7 +133,7 @@ jobs:
               exit 1
             fi
           else
-            echo "Every workflow passed when started by hand on $TAG."
+            echo "Every workflow passed when started by hand on $TAG's commit."
           fi
       - uses: actions/checkout@v7
         with:
