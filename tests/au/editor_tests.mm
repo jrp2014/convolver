@@ -18,6 +18,7 @@
 #include "filter_file.hpp"
 #include "host_log.hpp"
 #include "host_report.hpp"
+#include "recent_files.hpp"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -954,8 +955,16 @@ void list_read_again() {
     check(unit.configure(44100, 2, 2, 512), "44.1 kHz formats for the list");
     check(unit.initialize(), "44.1 kHz initialization for the list");
     unit.uninitialize();
-    require(choose(unit, (folder / "rates.txt").string()) != noErr,
-            "a list chosen before rendering");
+    // Chosen in the window (PLUG-47): refused, so not a recent file yet.
+    Class factory_class = NSClassFromString(@CONVOLVER_TEXT(CONVOLVER_AU_VIEW_FACTORY));
+    id<AUCocoaUIBase> factory = [[factory_class alloc] init];
+    CONVOLVER_DIAGNOSTIC_VIEW* view =
+        (CONVOLVER_DIAGNOSTIC_VIEW*)[factory uiViewForAudioUnit:unit.get()
+                                                       withSize:NSMakeSize(0, 0)];
+    const auto list = (folder / "rates.txt").string();
+    convolver::forget_recent_files();
+    require(![view loadFile:@(list.c_str())], "a list chosen before rendering");
+    require(convolver::recent_files().empty(), "a refused list is a recent file");
     auto r = report(unit);
     require(r.fix.find("Play audio once") != std::string::npos,
             "before rendering, the list's Fix: " + r.fix);
@@ -986,6 +995,13 @@ void list_read_again() {
               "state listener for the list");
     class_info_changes = 0;
     preset_changes = 0;
+    // The window reads the report, which reads the list again; it then
+    // shows the list playing, so the list joins the recent files, as when
+    // chosen (PLUG-47, jrp's review, 21 November 2026).
+    [view refresh];
+    require(convolver::recent_files() == std::vector<std::string>{list},
+            "the list read again is not the recent file: " +
+                std::to_string(convolver::recent_files().size()) + " files");
     r = report(unit);
     const auto saved = unit.saved();
     require(r.status_name == "Active" && saved.configuration && !saved.failed &&

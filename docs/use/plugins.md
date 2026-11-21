@@ -190,8 +190,8 @@ says: "Play audio once so Convolver can check the host's sample rate and
 channel counts, then choose the configuration list again." With Convolver's
 window open, you need not choose it again: when the host plays, the window
 loads the list itself, choosing its entry for the host's rate and channels,
-and Convolver tells the host the project has changed, as for a chosen file
-(the list is not added to Recent). This is checked by automated tests, not
+and Convolver tells the host the project has changed, as for a chosen file;
+a list chosen in that window then joins Recent. This is checked by automated tests, not
 yet in a host. If the window was closed while the host played, choose the
 list again, or play again with the window open. Once Convolver has seen the
 host play (for example when the host reads the Audio Unit's Status while it

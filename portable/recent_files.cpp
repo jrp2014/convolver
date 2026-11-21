@@ -78,6 +78,20 @@ bool remember_recent_file(const std::string& path) noexcept {
     }
 }
 
+void RefusedRecentFile::refused(const std::string& path, const std::string& playing) {
+    if (path == playing)
+        path_.clear();
+    else
+        path_ = path;
+}
+
+bool RefusedRecentFile::shown(const std::string& playing) noexcept {
+    if (path_.empty() || playing != path_)
+        return false;
+    path_.clear();
+    return remember_recent_file(playing);
+}
+
 bool forget_recent_files() noexcept {
     try {
         return save({});
