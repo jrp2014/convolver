@@ -287,6 +287,14 @@ Contents: [direction](#direction) · [releases](#releases) ·
 
 ## Releases
 
+- **21 November 2026.** A seventh unsigned developer preview, for live
+  host testing, cut once the open pull requests of that evening were in
+  `main`, PLUG-42's fixes from jrp's review included (jrp: "When the current
+  set of PRs is in main, cut a further preview release for live testing",
+  and "don't make another preview release without these changes"). The
+  host checks not repeated on it stay listed in its notes as not checked.
+  The full CI runs for every release and preview release (jrp, the same
+  day). See [Releasing](../develop/releasing.md#publishing-an-unsigned-preview).
 - **21 November 2026.** Version 0.18.0, after 0.17.x, for PLUG-39 step 6's
   library change (`HostChange::inactive_tail` is removed;
   `HostFilter::filter_tail()` gives the accepted filter's tail), following
@@ -1043,6 +1051,26 @@ Contents: [direction](#direction) · [releases](#releases) ·
   seen playing with. See [Contract: loading and
   failure](../develop/plugin-contract.md#loading-and-failure),
   [plug-ins](../use/plugins.md#loading-a-filter).
+- **21 November 2026.** PLUG-42, from HOST-10's Ardour 8.4 runs (a preset
+  loaded just before Ardour restarted the VST3 plug-in with the outputs set
+  in Pin Connections was refused, never tried at the outputs that suited
+  it, and saved as a failure). Asked whether a filter refused only for the
+  channels should be tried again when the host restarts the plug-in with
+  channels that fit, jrp: "Yes. That's what the user would expect." Then,
+  choosing "fix the Ardour case now and record the other case in TODO":
+  in VST3 and the Audio Unit, when no working filter plays, a filter that
+  does not suit the host's rate or channels is kept, saved as the filter,
+  and the user is told it waits for compatible audio settings; it plays at
+  the next start with a matching rate and channel layout. When another
+  filter already plays, it stays and the new choice is refused, so "a user
+  who sees that refusal should be able to trust that restarting playback
+  won't unexpectedly switch filters". The latest choice is the one kept,
+  and the rate counts as the channels do. Holding a refused replacement
+  beside the playing filter is revisited only if a user asks (PLUG-43).
+  LV2, whose configuration never changes, refuses as before. See
+  [Contract: loading and
+  failure](../develop/plugin-contract.md#loading-and-failure),
+  [plug-ins](../use/plugins.md#when-a-filter-does-not-fit).
 
 ## Identities and file formats
 
@@ -1424,3 +1452,16 @@ were recorded in the repository; this log is their first written record.
   releases"). This replaces the 12 November form of an open item, not its
   rule against progress narratives. See
   [Workflow](../develop/workflow.md#recording-progress-in-todo).
+- **21 November 2026.** Pull requests record their changelog entries,
+  finished TODO items and jrp's decisions in their own change fragments
+  under `changes/`, folded into the CHANGELOG, TODO and this log before each
+  preview or sooner, instead of editing those pages; a version step is a
+  `version:minor` or `version:major` label applied by the version workflow
+  on merge, not an edit to `VERSION`. Whatever has been processed or
+  consolidated is deleted or archived in the same change (jrp: "Yes,
+  complete with a rule to get rid of, or archive, cruft once things are
+  processed or consolidated"; DOC-20). Every finished TODO item still gets
+  a changelog entry. See [Change
+  fragments](../develop/workflow.md#change-fragments), [clearing
+  processed records](../develop/workflow.md#clearing-processed-records),
+  [source versioning](../develop/versioning.md#minor-and-major-versions).

@@ -224,6 +224,26 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### Fixed
 
+- Plug-ins (PLUG-42, jrp's decision of 21 November 2026): in the VST3 and
+  Audio Unit plug-ins, a filter that does not suit the host's sample rate or
+  channels, as a preset, an IR file or a `.cfg`, is refused only while
+  another filter that suits the host is playing. With nothing playing it is
+  kept and saved with the project, plays silence with the reason in Status,
+  and plays when the host next starts the plug-in at its rate and with its
+  channels; the log says it waits for audio settings that suit it. Until
+  then Mix's dry share and bypass pass the input where the host's and the
+  filter's counts are all equal, as for any filter kept that way, where a
+  refused first filter played silence. A filter or the input that played
+  before it mutes within 1.3 ms; a filter kept that way before is replaced
+  without a gap in the dry share or bypass where the new one passes them
+  too. Before, it was refused and
+  the project saved the failure: in Ardour 8.4, a filter chosen just
+  before Ardour restarted the plug-in with the outputs set in Pin
+  Connections was refused and the export was silent. A configuration list with no entry for the host is still
+  refused. A filter refused while another plays stays refused, and the
+  refusal now says the filter Convolver has stays selected when the host
+  restarts the plug-in, even with settings that suit the refused one. The
+  LV2 plug-in, whose settings never change, refuses as before.
 - Plug-ins (PLUG-41, from jrp's review of 21 November 2026): a filter file
   chosen in Convolver's window waits for audio in the current start in both
   formats. The VST3 plug-in refused a file chosen just after the host
@@ -284,6 +304,43 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### For contributors
 
+- Releases (REL-3): the draft release's notes describe the seventh
+  unsigned developer preview, made for jrp's live host testing and the
+  independent walkthrough: `PREVIOUS_PREVIEW` is 0.14.0, and `CHANGES` in
+  `scripts/release/prepare_release.py` lists in users' words what changed
+  since (a filter chosen before the host plays is kept, a configuration
+  list loads by itself once the host plays, a filter that does not suit the
+  host waits for a start that suits it, Status names a setting not in use,
+  the tail after a stop, bypass wording, and the new Ardour and limits
+  guides). The known limitations add the host checks not repeated on this
+  version, Ardour's VST3 channels, and the features new since 0.14.0 that
+  only automated tests have checked
+  ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)).
+- Records (DOC-20): pull requests no longer edit the top of `CHANGELOG.md`,
+  TODO's done list, the decisions log or `VERSION`, the places where two
+  open pull requests used to conflict whenever one merged. Each adds its
+  own file, `changes/<ID>.md`, with its changelog entries, its finished
+  item's done line and any decision of jrp's
+  ([form](changes/README.md#the-form)), and `scripts/fold_changes.py` folds
+  the fragments into those pages, in the order they merged, and deletes
+  them: in the release-notes pull request before each preview, or sooner
+  in a pull request of its own. Pre-commit refuses a fragment that could
+  not be folded, and the repository checks count an ID ticked in one as
+  done. A minor or major version step is now a `version:minor` or
+  `version:major` label on the pull request, which the version workflow
+  reads through the GitHub CLI on merge; an explicit `VERSION` edit is
+  still honoured. A new rule clears whatever a change has processed:
+  folded fragments and scratch files are deleted, finished plans and dated
+  evidence archived
+  ([change fragments](docs/develop/workflow.md#change-fragments),
+  [clearing processed records](docs/develop/workflow.md#clearing-processed-records),
+  [source versioning](docs/develop/versioning.md#minor-and-major-versions)).
+  Pre-commit now also runs the versioning tests when the version helper
+  or its tests change, as CTest's `versioning` test already did. A pull
+  request that changes only the record checks, the fragment folder or their
+  tests now runs Lint alone, and one that changes the version helper adds
+  only the native workflow, instead of every plug-in workflow
+  ([CI triggers](docs/develop/testing.md#ci-triggers)).
 - Code (PLUG-24): `HostProcessor`, the plug-ins' audio path, moved out of
   `portable/host.cpp` into `portable/host_processor.cpp` unchanged; the
   gain, Mix and dry-signal rules it shares with `HostFilter` are in
