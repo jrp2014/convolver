@@ -627,7 +627,8 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
                                        "this one: choose this one again after changing them.";
                     refuse(m->kind, std::move(m->why), request, carried);
                 }
-                change.kept = unsettled ? HostChange::Kept::unsettled : HostChange::Kept::nothing_plays;
+                change.kept =
+                    unsettled ? HostChange::Kept::unsettled : HostChange::Kept::nothing_plays;
                 // Kept, as activation() keeps a filter that does not suit.
                 HostFailure f;
                 f.kind = m->kind;
@@ -759,8 +760,8 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
     estimating_ = estimating;
     identity_ = identity;
     failed_ = state.failed;
-    awaiting_ = request.kind == HostRequestKind::chosen_file &&
-                check == HostLoadCheck::keep_until_suited;
+    awaiting_ =
+        request.kind == HostRequestKind::chosen_file && check == HostLoadCheck::keep_until_suited;
     accepted_ = std::move(request);
     if (offered)
         offered_name_ = std::move(offered);

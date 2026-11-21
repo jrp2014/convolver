@@ -486,11 +486,21 @@ void failed_replacement_inactive(const Context& x) {
 
 // A first filter that cannot be used: rejected, and the instance plays
 // silence (never the unfiltered input), with separate and shared buffers.
+// PLUG-42: where the format keeps it instead (nothing plays that a refusal
+// would protect), it is saved as the filter and still plays silence.
 void failed_initial_load(const Context& x) {
     const auto& a = x.c();
+    const auto other = wrong_rate(a);
     x.adapter.create(x.setup());
-    require(!x.adapter.load({"wrong rate", {}, wrong_rate(a)}), "wrong sample rate accepted");
-    require(!x.adapter.saved(), "a rejected first filter became the saved state");
+    if (x.adapter.keeps_unsuited_when_nothing_plays()) {
+        require(x.adapter.load({"wrong rate", {}, other}),
+                "a wrong-rate first filter refused with nothing playing");
+        const auto saved = x.adapter.saved();
+        require(saved && same(*saved, other), "the kept first filter is not the saved state");
+    } else {
+        require(!x.adapter.load({"wrong rate", {}, other}), "wrong sample rate accepted");
+        require(!x.adapter.saved(), "a rejected first filter became the saved state");
+    }
     require(x.adapter.activate(), "activation after a failed load failed");
     Stream s{x.adapter, x.setup()};
     silent(s.render(x.f.input, 0, 1000), "after a failed first load");

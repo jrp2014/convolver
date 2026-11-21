@@ -6,6 +6,7 @@
 // allocation while rendering.
 #include "../native/cases.hpp"
 #include "au/au_host.hpp"
+#include "host_log.hpp"
 #include "host_report.hpp"
 #include <algorithm>
 #include <array>
@@ -546,34 +547,39 @@ void rejected_presets() {
     const auto text = CFSTR("not a preset");
     require(unit.restore(text) != noErr, "a string accepted as ClassInfo");
 
-    // A failed first load is saved as such, and restoring it plays silence.
+    // PLUG-42 (jrp, 21 November 2026): with nothing playing, a first filter
+    // for another rate is kept rather than refused, silent with the reason,
+    // and saved as the filter, so reopening the project still plays silence
+    // at 48 kHz, and the filter plays once the host runs at its rate.
     Unit failed;
     check(failed.configure(48000, 2, 2, 512), "formats");
     check(failed.initialize(), "initialization");
-    require(failed.load(state_of(stereo(44100))) != noErr, "a 44.1 kHz filter accepted at 48 kHz");
+    require(failed.load(state_of(stereo(44100))) == noErr,
+            "a 44.1 kHz first filter refused at 48 kHz with nothing playing");
     {
         const auto f = failed.failure();
         require(f.present && f.kind == static_cast<UInt32>(HostFailureKind::sample_rate) &&
                     f.request == 1 && f.silent && f.sample_rate == 44100 &&
                     std::string(f.problem).find("44100 Hz") != std::string::npos,
-                "a failed first load not recorded as a sample-rate failure");
+                "a kept first load not recorded as a sample-rate failure");
     }
     const auto saved = failed.saved();
-    require(saved.failed && !saved.configuration, "a failed first load was not saved as failed");
+    require(!saved.failed && saved.configuration && saved.configuration->sample_rate == 44100,
+            "a kept first load was not saved as the filter");
     Unit reopened;
     check(reopened.configure(48000, 2, 2, 512), "formats");
-    check(reopened.load(saved), "restoring a saved failed load");
+    check(reopened.load(saved), "restoring a kept first load");
     check(reopened.initialize(), "initialization");
     require(reopened.failure().present &&
-                reopened.failure().kind == static_cast<UInt32>(HostFailureKind::saved_failure) &&
+                reopened.failure().kind == static_cast<UInt32>(HostFailureKind::sample_rate) &&
                 reopened.failure().silent,
-            "a reopened failed load not recorded as a saved failure");
+            "a reopened kept load not recorded as a sample-rate failure");
     Buffers b(2, 2, 512);
     std::uint32_t seed = 3;
     b.noise(seed);
     bool silent = false;
     check(render(reopened, b, 512, false, silent), "render");
-    require(b.output_silent(), "a reopened failed load is not silent");
+    require(b.output_silent(), "a reopened kept load is not silent at 48 kHz");
 }
 
 void bypass_property() {
@@ -1636,24 +1642,28 @@ void settings_in_diagnostics() {
     check(unit.configure(48000, 2, 2, 512), "mix status formats");
     set_parameter(unit, au::mix_parameter, 50);
     check(unit.initialize(), "mix status initialization");
-    require(unit.load(state_of(stereo(44100))) != noErr, "wrong-rate preset accepted");
-    // PLUG-23 (jrp, 7 November 2026): a failed load with no filter kept has
-    // no dry signal, so Mix 50% plays silence too, and Status says so.
-    require(std::abs(steady_output(unit, 3)) < 1e-6, "Mix 50% after a refused first load");
+    // PLUG-42 (jrp, 21 November 2026): with nothing playing, the 44.1 kHz
+    // preset is kept rather than refused. A kept filter with equal counts on
+    // both sides lets Mix's dry share through (PLUG-23 gives no dry signal
+    // only when no filter is kept: native.host_report's "failed first load,
+    // Mix 50%"), and Status says so.
+    require(unit.load(state_of(stereo(44100))) == noErr,
+            "a wrong-rate first preset refused with nothing playing");
+    require(std::abs(steady_output(unit, 3) - .25f) < 1e-5, "Mix 50% after a kept first load");
     const auto shown = status_text(unit);
-    require(shown == "Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in "
-                     "the Convolver log.",
-            "refused first load at Mix 50%: " + shown);
-    // Started again, the start line says why Mix plays nothing.
+    require(shown == "Load failed, only the dry signal plays: the filter is for 44100 Hz, the "
+                     "host runs at 48000 Hz. Details in the Convolver log.",
+            "kept first load at Mix 50%: " + shown);
+    // Started again, the start line says what Mix lets through.
     unit.uninitialize();
     check(unit.initialize(), "mix status restart");
-    require(contains(log.text(), "mix 100% wet (a load failed and no filter is kept, so there "
-                                 "is no dry signal)"),
-            "start line after a refused first load at Mix 50%: " + log.text());
-    require(std::abs(steady_output(unit, 3)) < 1e-6, "Mix 50% after a restart");
-    // At Mix 100% it is silent as well, and Status says so.
+    require(contains(log.text(), "With Mix at 50% wet, only the dry signal plays: the input at "
+                                 "-6.0 dB."),
+            "start line after a kept first load at Mix 50%: " + log.text());
+    require(std::abs(steady_output(unit, 3) - .25f) < 1e-5, "Mix 50% after a restart");
+    // At Mix 100% it is silent, and Status says so.
     set_parameter(unit, au::mix_parameter, 100);
-    require(std::abs(steady_output(unit, 3)) < 1e-6, "Mix 100% after a refused first load");
+    require(std::abs(steady_output(unit, 3)) < 1e-6, "Mix 100% after a kept first load");
     require(contains(status_text(unit), "Silent: the filter is for 44100 Hz"),
             "Status at Mix 100%: " + status_text(unit));
     unit.uninitialize();
@@ -1727,15 +1737,18 @@ void status_parameter() {
                 contains(log_text(), "Started at 48000 Hz, 2 in, 2 out, blocks of up to 512 "
                                      "frames. No filter, so audio passes unchanged."),
             "empty start not shown or logged: " + shown());
-    // A preset for another rate as the first load: silence, said and explained.
-    require(unit.load(state_of(stereo(44100))) != noErr, "wrong-rate preset accepted");
+    // A preset for another rate as the first load: silence, said and
+    // explained. With nothing playing it is kept rather than refused, and
+    // the log says it waits for settings that suit it (PLUG-42).
+    require(unit.load(state_of(stereo(44100))) == noErr, "wrong-rate first preset refused");
     require(shown() == "Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in "
                        "the Convolver log." &&
                 value() == HostStatus::load_failed,
-            "failed first load not shown: " + shown());
-    require(contains(log_text(), "Not loaded, so Convolver plays silence: the filter is for "
-                                 "44100 Hz, and the host runs at 48000 Hz."),
-            "failed first load not logged");
+            "kept first load not shown: " + shown());
+    require(contains(log_text(), "It does not suit the host's present configuration: the filter "
+                                 "is for 44100 Hz, and the host runs at 48000 Hz.") &&
+                contains(log_text(), convolver::kept_rather_than_refused_sentence),
+            "kept first load not logged: " + log_text());
     check(unit.load(state_of(stereo(48000))), "status good preset");
     require(shown() == "Filter loaded: 48000 Hz, 2 in, 2 out." && value() == HostStatus::active,
             "good load not shown: " + shown());

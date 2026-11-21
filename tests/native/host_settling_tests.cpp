@@ -97,9 +97,9 @@ void rendering_binding() {
 // PLUG-27, both formats: a chosen file is checked as settled for not suiting
 // the host (keep_unless_one_plays, PLUG-42) only while the host plays audio
 // through the plug-in (started, and audio has played with that
-// configuration); otherwise it waits and is checked at the next start. Audacity 4.0.2's order for its window's copy: set up at
-// 44.1 kHz, started for a moment with one block of silence to pass on an
-// edit, stopped, while the project plays at 48 kHz in other copies.
+// configuration); otherwise it waits and is checked at the next start. Audacity 4.0.2's order for
+// its window's copy: set up at 44.1 kHz, started for a moment with one block of silence to pass on
+// an edit, stopped, while the project plays at 48 kHz in other copies.
 void chosen_file() {
     for (const auto binding : {HostBinding::activation, HostBinding::rendering}) {
         const auto name = binding == HostBinding::activation ? std::string("VST3: ")
@@ -155,8 +155,9 @@ void out_of_order() {
         require(!s.known(stereo), "the first start still binds after a second");
         // VST3: audio played with the first configuration, not this one;
         // the Audio Unit checks every request.
-        const auto expected = binding == HostBinding::activation ? HostLoadCheck::keep_until_suited
-                                                                 : HostLoadCheck::keep_unless_one_plays;
+        const auto expected = binding == HostBinding::activation
+                                  ? HostLoadCheck::keep_until_suited
+                                  : HostLoadCheck::keep_unless_one_plays;
         require(s.check(HostRequestKind::restore) == expected,
                 "restored state after a second start without a stop");
     }
