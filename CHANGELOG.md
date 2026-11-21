@@ -29,6 +29,12 @@ first published preview, keep their original grouping.
 
 ### Changed
 
+- Documentation (DOC-19, from an outside audit jrp accepted): `TODO.md`
+  holds open work only, each item in a line or two, and its documented
+  limitations one line each, pointing at the page that owns the detail; the
+  48 finished items and the items' earlier text moved unchanged to
+  `docs/archive/todo/`. PLUG-39's step 1b is no longer listed as both in
+  progress and done.
 - Plug-ins (PLUG-39 step 1b): in LV2, choosing the file of the filter
   already playing again keeps it and what it is playing, so its tail rings
   on, as choosing it again in the VST3 and Audio Unit windows already did
@@ -105,6 +111,15 @@ first published preview, keep their original grouping.
 
 ### Fixed
 
+- Documentation (DOC-18, from an outside audit of 20 November 2026): the
+  user guides no longer contradict the plug-ins. **Choose…** opens a
+  Convolver `.vstpreset` (the first-sound guide said it read no presets);
+  the concepts page describes the non-uniform engine of 0.13.0 and lists
+  Gain mode among the settings; the pages that named only macOS for
+  Convolver's window include the VST3 window on Windows, with its Copy
+  Diagnostics for a problem report; the package list names the Linux LV2
+  plug-in, and presets and the plug-ins table name Gain mode; and TODO IDs
+  no longer appear in the user guides.
 - Plug-ins (PLUG-36): while bypassed, Status and the window's report say
   what bypass plays when no filter is heard. A kept filter that does not
   suit the host (another sample rate, say) showed "Silent:" while bypass
