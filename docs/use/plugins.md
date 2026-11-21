@@ -857,7 +857,7 @@ afresh.
 
 ## Ardour
 
-In Ardour 8 and 9.0, the LV2 plug-in plays its mono, stereo and 2→6
+In Ardour 8 and 9 (tried with 8.4 and 9.0), the LV2 plug-in plays its mono, stereo and 2→6
 layouts as it does elsewhere. The VST3 plug-in gets 2 inputs and 2 outputs
 unless you set its channels by hand, and two of its settings are missing
 from Ardour's controls.
@@ -866,9 +866,10 @@ from Ardour's controls.
   plug-in runs with 2 inputs and 2 outputs whatever the track has; on a
   mono track Ardour feeds the track's channel to both inputs. A filter with
   other outputs, such as a mono filter (1 in, 1 out) or a 2→6 crossover,
-  then plays silence and Convolver's Status says why. (Ardour 9.0 does ask
+  then plays silence and Convolver's Status says why. (Ardour 9 does ask
   for a mono track's channel, but the request reaches Convolver as a layout
-  with no channels, which it refuses: the
+  with no channels, which it refuses; seen with 9.0, and the code that does
+  it is the same in 9.10. The
   [Convolver log](#status-and-the-convolver-log) says `Refused the host's
   channel layout: it has 0 input and 0 output channels`.)
 - **A mono filter on a mono track** plays once you set the channels by

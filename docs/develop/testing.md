@@ -1309,7 +1309,8 @@ mono or crossover filter plays silence. Ardour 8 keeps a VST3 plug-in's
 default buses. Ardour 9 asks for the track's inputs and, unless they are set
 by hand, as many outputs (`request_bus_layout` in its `vst3_plugin.cc`, which
 8.12 lacks), but 9.0 masks each request with the bus's default width, 2 for
-Convolver: a mono request (`kMono`, bit 19) arrives as an arrangement with
+Convolver (the function is unchanged in 9.1, 9.5 and 9.10 and on Ardour's
+master branch, read on 21 November 2026): a mono request (`kMono`, bit 19) arrives as an arrangement with
 no channels, which Convolver refuses, and a wider one as stereo. The Ardour
 job showed the mono case so at `4a7d4f0` on 21 November 2026
 ([run 44910071468](https://github.com/jrp2014/convolver/actions/runs/44910071468)):
