@@ -483,7 +483,7 @@ Items finished since then are listed here, one line each, until the next
 move to the archive.
 
 - [x] **DIAG-10 — Status says what the window says.** 21 November 2026,
-  PR #NNN ([plug-ins](docs/use/plugins.md#status-and-the-convolver-log),
+  PR #261 ([plug-ins](docs/use/plugins.md#status-and-the-convolver-log),
   [decision](docs/project/decisions.md#diagnostics)).
 - [x] **PLUG-24 — `HostProcessor` in its own source file.** 21 November
   2026, PR #260 ([architecture](docs/develop/architecture.md#components-and-source-of-truth)).
