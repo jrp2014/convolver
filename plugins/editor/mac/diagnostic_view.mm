@@ -3,6 +3,7 @@
 #include "recent_files.hpp"
 #import "view_layout.h"
 #include "window_model.hpp"
+#include <algorithm>
 #include <cmath>
 #include <optional>
 #include <string>
@@ -610,7 +611,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [layout ensureLayoutForTextContainer:_explanationView.textContainer];
     const CGFloat text =
         ceil(NSHeight([layout usedRectForTextContainer:_explanationView.textContainer]));
-    scrollHeight_.constant = MIN(MAX(text, 17), most_text);
+    scrollHeight_.constant = std::min(std::max(text, CGFloat{17}), most_text);
     [stack_ layoutSubtreeIfNeeded];
     [self setFrameSize:NSMakeSize(width, ceil(stack_.fittingSize.height))];
     [self layoutSubtreeIfNeeded];
