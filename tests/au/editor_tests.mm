@@ -958,7 +958,15 @@ void faults(const au_test::LogSince& log) {
     const auto fault = static_cast<AudioUnitParameterValue>(HostStatus::fault);
     render();
     require(status_value(unit) == fault, "Render did not signal Fault");
+    // PLUG-39 step 4a: a read while another call holds the lock (here the
+    // Latency run Initialize queued) gets the snapshot at once, which does
+    // not know Render's faults yet; the window's next read, half a second
+    // later, explains them.
     auto r = report(unit);
+    for (int i = 0; i < 200 && ![r[@"status name"] isEqualToString:@"Fault"]; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        r = report(unit);
+    }
     require([r[@"status name"] isEqualToString:@"Fault"] && contains(r[@"explanation"], logged),
             "fault report: " + text(r[@"status name"]) + ": " + text(r[@"explanation"]));
     require(status_value(unit) == fault, "reading the report cleared Fault");

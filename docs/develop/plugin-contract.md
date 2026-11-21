@@ -1139,7 +1139,7 @@ what the host sees stale. These are every such call; the audio threads
 | Adapter | Call | When the lock is taken | Why nothing stays stale | Held-lock test |
 | --- | --- | --- | --- | --- |
 | Audio Unit | The window's report (`Effect::report()`) | Builds the report from the diagnostics snapshot (`Effect::Diagnostics`) and the Gain, Mix, bypass, latency and tail set now | Every control change publishes a new snapshot (`update_status()`) before it lets the lock go, and then notifies the window, so the snapshot describes what plays until the holder finishes. Faults `Render` counted since are explained at the next read that gets the lock | `au.adapter` `report_while_latency_work_holds_lock`; `au.editor` (a restore held open) |
-| Audio Unit | Bypass (`SetProperty`, `kAudioUnitProperty_BypassEffect`) | Stores the bypass and wakes the Latency work's serial queue (AU-16) | The queue may wait for the lock, and updates the Status whenever its value differs from the one the record and bypass give (`host_status_value()`) | `au.adapter` `bypass_while_latency_work_holds_lock` |
+| Audio Unit | Bypass (`SetProperty`, `kAudioUnitProperty_BypassEffect`) | Stores the bypass and wakes the Latency work's serial queue (AU-16) | The queue may wait for the lock, and updates the Status when its value is still the one for the other bypass setting (`host_status_value()`); a Fault that Render wrote stays until the host reads the Status text, which explains it | `au.adapter` `bypass_while_latency_work_holds_lock` |
 | LV2 | `deactivate()` | Waits for it: it only tries first, to signal the tests (`WorkerPoint::deactivate_waits`) | It does not skip | `lv2.adapter` `held_while_deactivating` |
 | VST3 | None | Every call takes its locks without trying | | |
 

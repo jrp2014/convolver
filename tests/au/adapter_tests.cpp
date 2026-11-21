@@ -1227,6 +1227,11 @@ void latency_parameter() {
         throw;
     }
     stop();
+    // Runs queued for earlier choices may still apply one of them after the
+    // reported latency first equals the last choice (an earlier run may have
+    // applied that value too): wait for every run to finish before measuring
+    // (the ThreadSanitizer job on PR #237, 20 November 2026).
+    require(latency_settled(unit), "the Latency work for the concurrent choices did not finish");
     const auto last =
         host_latencies[static_cast<std::size_t>(parameter(unit, au::latency_parameter))];
     require(reports(unit, static_cast<double>(last)),

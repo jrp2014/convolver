@@ -474,12 +474,17 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
         }
         // AU-16: a bypass switched while another call held the lock
         // (SetProperty) is shown here, with Render's faults explained first
-        // as SetProperty does. Not needed when the Status value already
-        // shows it (the update above read it), and a Fault Render wrote
-        // differs too, which explains it.
-        if (Globals()->GetParameter(status_parameter) !=
-            static_cast<AudioUnitParameterValue>(
-                host_status_value(filter_, known_layout().has_value(), bypass_.load()))) {
+        // as SetProperty does: the Status value is still the one for the
+        // other bypass setting. Not needed when it already shows this one
+        // (the update above read it). A Fault that Render wrote is neither,
+        // and stays until the host reads the Status text, which explains it.
+        const auto status_for = [&](bool bypassed) {
+            return static_cast<AudioUnitParameterValue>(
+                host_status_value(filter_, known_layout().has_value(), bypassed));
+        };
+        const auto shown = Globals()->GetParameter(status_parameter);
+        const bool bypassed = bypass_.load();
+        if (shown != status_for(bypassed) && shown == status_for(!bypassed)) {
             // Kept apart from any faults the old processor counted above.
             bypass_faults = observe_faults();
             update_status();
