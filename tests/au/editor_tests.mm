@@ -16,6 +16,7 @@
 #include "au/au_host.hpp"
 #import "diagnostic_view.h"
 #include "filter_file.hpp"
+#include "host_report.hpp"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -51,6 +52,12 @@ std::string text(NSString* s) {
 bool contains(NSString* s, const char* part) {
     return s && [s rangeOfString:@(part)].location != NSNotFound;
 }
+std::string text(const std::string& s) {
+    return s;
+}
+bool contains(const std::string& s, const char* part) {
+    return s.find(part) != std::string::npos;
+}
 
 Configuration identity(int rate, std::size_t channels) {
     Configuration c{rate, channels, channels, 0, {}, {}, {}};
@@ -64,15 +71,34 @@ HostState state_of(const Configuration& c) {
     return s;
 }
 
-NSDictionary<NSString*, NSString*>* report(Unit& unit) {
+// PLUG-39 step 5: the report property holds encode_report()'s bytes.
+HostReport report(Unit& unit) {
     CFTypeRef value = nullptr;
     UInt32 size = sizeof value;
     check(AudioUnitGetProperty(unit.get(), au::report_property, kAudioUnitScope_Global, 0, &value,
                                &size),
           "report property");
-    id report = CFBridgingRelease(value);
-    require([report isKindOfClass:[NSDictionary class]], "the report is not a dictionary");
-    return report;
+    id data = CFBridgingRelease(value);
+    require([data isKindOfClass:[NSData class]], "the report is not data");
+    NSData* bytes = data;
+    auto r = decode_report(std::string_view(static_cast<const char*>(bytes.bytes), bytes.length));
+    require(r.has_value(), "the report property does not decode");
+    return *r;
+}
+// The Audio facts (label, value, note, "problem" or empty, help, between
+// tabs) and reference lines as text, to search.
+std::string facts_text(const HostReport& r) {
+    std::string text;
+    for (const auto& f : r.audio)
+        text += f.label + "\t" + f.value + "\t" + f.note + "\t" + (f.problem ? "problem" : "") +
+                "\t" + f.help + "\n";
+    return text;
+}
+std::string reference_text(const HostReport& r) {
+    std::string text;
+    for (const auto& [label, value] : r.reference)
+        text += label + ": " + value + "\n";
+    return text;
 }
 NSString* diagnostics(Unit& unit) {
     CFTypeRef value = nullptr;
@@ -237,10 +263,9 @@ void properties(const au_test::LogSince& log) {
             "a window offered without the component bundle");
 
     auto r = report(unit);
-    require([r[@"status name"] isEqualToString:@"No filter"], "empty: " + text(r[@"status name"]));
-    require(contains(r[@"explanation"], "load a Convolver preset"),
-            "empty: " + text(r[@"explanation"]));
-    require(contains(r[@"title"], "Audio Unit #"), "title: " + text(r[@"title"]));
+    require(r.status_name == "No filter", "empty: " + text(r.status_name));
+    require(contains(r.explanation, "load a Convolver preset"), "empty: " + text(r.explanation));
+    require(contains(r.title, "Audio Unit #"), "title: " + text(r.title));
 
     check(AudioUnitAddPropertyListener(unit.get(), au::report_property, report_changed, nullptr),
           "report listener");
@@ -249,30 +274,27 @@ void properties(const au_test::LogSince& log) {
     check(unit.load(state_of(identity(44100, 2))), "stereo preset");
     require(report_changes.load() > 0, "no report change after a load");
     r = report(unit);
-    require([r[@"status name"] isEqualToString:@"Waiting"],
-            "before start: " + text(r[@"status name"]));
+    require(r.status_name == "Waiting", "before start: " + text(r.status_name));
     check(unit.configure(44100, 1, 1, 512), "mono formats");
     const auto before = report_changes.load();
     check(unit.initialize(), "mono initialization");
     require(report_changes.load() > before, "no report change after initialization");
     r = report(unit);
-    require([r[@"status"] isEqualToString:@"2"] &&
-                [r[@"status name"] isEqualToString:@"Load failed"],
-            "mono track: " + text(r[@"status name"]));
+    require(r.status.status == HostStatus::load_failed && r.status_name == "Load failed",
+            "mono track: " + text(r.status_name));
     for (const char* part : {"plays silence", "Give the plug-in 2 inputs and 2 outputs",
                              "put Convolver on a stereo track"})
-        require(contains(r[@"explanation"], part), "mono track explanation lacks \"" +
-                                                       std::string(part) +
-                                                       "\": " + text(r[@"explanation"]));
-    require(contains(r[@"audio"],
+        require(contains(r.explanation, part), "mono track explanation lacks \"" +
+                                                   std::string(part) +
+                                                   "\": " + text(r.explanation));
+    require(contains(facts_text(r),
                      "Host channels\t1 in, 1 out\tthe filter has 2 in, 2 out\tproblem\t") &&
-                contains(r[@"audio"], "Host block size\tup to 512 frames\t"),
-            "mono track Audio facts: " + text(r[@"audio"]));
-    require(contains(r[@"reference"], "Software: Convolver "),
-            "mono track reference: " + text(r[@"reference"]));
-    require(r[@"summary"].length > 0, "no summary");
-    require([r[@"log path"] isEqualToString:@(log.path().c_str())],
-            "log path " + text(r[@"log path"]));
+                contains(facts_text(r), "Host block size\tup to 512 frames\t"),
+            "mono track Audio facts: " + text(facts_text(r)));
+    require(contains(reference_text(r), "Software: Convolver "),
+            "mono track reference: " + text(reference_text(r)));
+    require(!r.status.text.empty(), "no summary");
+    require(r.log_path == log.path().string(), "log path " + text(r.log_path));
 
     // Copy diagnostics: the report and this instance's log lines, including
     // the start line that explains the silence.
@@ -355,20 +377,20 @@ void window() {
     // DIAG-2: the problem and what plays, then the cause and the fix as
     // labelled rows; the note in its own row; and Choose Filter… under the
     // fix, since a filter for the track's channels puts it right.
-    require([view.explanationView.string hasPrefix:r[@"problem"]] && r[@"problem"].length > 0 &&
-                contains(view.explanationView.string, text(r[@"plays"]).c_str()) &&
-                contains(view.explanationView.string, ("\tCause:\t" + text(r[@"cause"])).c_str()) &&
-                contains(view.explanationView.string, ("\tFix:\t" + text(r[@"fix"])).c_str()) &&
+    require([view.explanationView.string hasPrefix:@(r.problem.c_str())] && !r.problem.empty() &&
+                contains(view.explanationView.string, text(r.plays).c_str()) &&
+                contains(view.explanationView.string, ("\tCause:\t" + text(r.cause)).c_str()) &&
+                contains(view.explanationView.string, ("\tFix:\t" + text(r.fix)).c_str()) &&
                 contains(view.noteField.stringValue, "put Convolver on a stereo track") &&
                 !view.noteField.hidden,
             "window text:\n" + text(view.explanationView.string) +
                 "\nNote: " + text(view.noteField.stringValue));
     // jrp, 7 November 2026: one Choose… button, highlighted, not a second
     // one in the message.
-    require([r[@"action"] isEqualToString:@"choose filter"] &&
+    require(r.action == "choose filter" &&
                 [view.chooseButton.bezelColor isEqual:[NSColor controlAccentColor]] &&
                 view.diagnosticsButton.bezelColor == nil,
-            "fix button: " + text(r[@"action"]));
+            "fix button: " + text(r.action));
     // The Audio facts in plain words, the mismatch marked in words too. The
     // sign is U+26A0 with its text-style selector U+FE0E: NSString matches
     // whole composed characters, so the sign alone would not be found.
@@ -391,7 +413,7 @@ void window() {
             text([[view.audioLabels valueForKey:@"stringValue"] componentsJoinedByString:@", "]) +
             "\n" +
             text([[view.audioValues valueForKey:@"stringValue"] componentsJoinedByString:@"\n"]));
-    require([view.filterNameField.stringValue isEqualToString:r[@"filter name"]] &&
+    require([view.filterNameField.stringValue isEqualToString:@(r.filter_name.c_str())] &&
                 [view.filterNameField.stringValue isEqualToString:@"test"] &&
                 contains(view.filterNoteField.stringValue, "drop"),
             "Filter row: " + text(view.filterNameField.stringValue) + " / " +
@@ -746,12 +768,11 @@ void files() {
             "a chosen file sent no ClassInfo or PresentPreset notification");
     require(present_preset(unit) == "stereo.wav", "present preset: " + present_preset(unit));
     auto r = report(unit);
-    require([r[@"status name"] isEqualToString:@"Active"] &&
-                [view.statusField.stringValue isEqualToString:@"Active"],
-            "after the stereo file: " + text(r[@"status name"]) + ": " + text(r[@"explanation"]));
-    require(contains(r[@"reference"], stereo.c_str()) &&
+    require(r.status_name == "Active" && [view.statusField.stringValue isEqualToString:@"Active"],
+            "after the stereo file: " + text(r.status_name) + ": " + text(r.explanation));
+    require(contains(reference_text(r), stereo.c_str()) &&
                 [view.filterNameField.stringValue isEqualToString:@"stereo.wav"],
-            "the window does not name the file:\n" + text(r[@"reference"]) + "\n" +
+            "the window does not name the file:\n" + text(reference_text(r)) + "\n" +
                 text(view.filterNameField.stringValue));
     // jrp, 7 November 2026: the filter's own facts under its name, as
     // labelled columns (here the same as the host's).
@@ -770,23 +791,23 @@ void files() {
     render_block(unit, 2, 2); // PLUG-27: refused only while the host renders.
     require(![view loadFile:@(mono.c_str())], "a mono file accepted by a stereo unit");
     r = report(unit);
-    require(contains(r[@"explanation"], mono.c_str()) &&
-                contains(r[@"explanation"], "cannot be used with this host"),
-            "mono file refusal: " + text(r[@"explanation"]));
+    require(contains(r.explanation, mono.c_str()) &&
+                contains(r.explanation, "cannot be used with this host"),
+            "mono file refusal: " + text(r.explanation));
     require([view.filterNameField.stringValue isEqualToString:@"stereo.wav"] &&
                 [view.filterNoteField.stringValue hasPrefix:@"mono.wav was refused."] &&
-                contains(r[@"reference"], "Refused file: "),
+                contains(reference_text(r), "Refused file: "),
             "Filter row after a refused file: " + text(view.filterNameField.stringValue) + " / " +
                 text(view.filterNoteField.stringValue));
     // The short summary (Status, Copy diagnostics) gives the refused file's
     // own counts (jrp's GarageBand run: it read "0 in, 0 out"), and the
     // explanation speaks of Convolver and the host, not command-line options.
-    require(contains(r[@"summary"], "the filter has 1 in, 1 out, the host 2 in, 2 out") &&
-                !contains(r[@"summary"], "0 in, 0 out"),
-            "mono file summary: " + text(r[@"summary"]));
-    require(!contains(r[@"explanation"], "--") &&
-                contains(r[@"explanation"], "load it in Convolver instead"),
-            "mono file advice: " + text(r[@"explanation"]));
+    require(contains(r.status.text, "the filter has 1 in, 1 out, the host 2 in, 2 out") &&
+                !contains(r.status.text, "0 in, 0 out"),
+            "mono file summary: " + text(r.status.text));
+    require(!contains(r.explanation, "--") &&
+                contains(r.explanation, "load it in Convolver instead"),
+            "mono file advice: " + text(r.explanation));
     require(loaded_path(unit) == stereo.string(), "the refused file replaced the stereo one");
     require(present_preset(unit) == "stereo.wav", "a refused file renamed the present preset");
     {
@@ -808,9 +829,9 @@ void files() {
         require(present_preset(reopened) == "stereo.wav",
                 "restored present preset: " + present_preset(reopened));
         const auto reopened_report = report(reopened);
-        require([reopened_report[@"filter name"] isEqualToString:@"stereo.wav"] &&
-                    [reopened_report[@"filter path"] length] == 0,
-                "reopened filter name: " + text(reopened_report[@"filter name"]));
+        require((reopened_report.filter_name == "stereo.wav") &&
+                    reopened_report.filter_path.empty(),
+                "reopened filter name: " + text(reopened_report.filter_name));
         reopened.uninitialize();
     }
     const auto kept = unit.failure();
@@ -818,8 +839,8 @@ void files() {
             "after a refused file the stereo filter must still play and be saved");
     const auto missing = folder / "missing.cfg";
     require(![view loadFile:@(missing.c_str())], "a missing file accepted");
-    require(contains(report(unit)[@"explanation"], missing.c_str()),
-            "missing file: " + text(report(unit)[@"explanation"]));
+    require(contains(report(unit).explanation, missing.c_str()),
+            "missing file: " + text(report(unit).explanation));
 
     // Choose Filter's dialog answers later, perhaps after the window has
     // closed and the host has begun disposing of the unit (jrp's review).
@@ -863,9 +884,9 @@ void files() {
     render_block(empty, 2, 2);
     require(choose(empty, mono.string()) != noErr, "a mono file accepted by an empty unit");
     const auto first = empty.failure();
-    require(first.present && first.silent && contains(report(empty)[@"explanation"], mono.c_str()),
+    require(first.present && first.silent && contains(report(empty).explanation, mono.c_str()),
             "a refused first file must leave the unit silent and say why: " +
-                text(report(empty)[@"explanation"]));
+                text(report(empty).explanation));
     empty.uninitialize();
 
     // PLUG-33: a chosen file follows the rule a preset follows (PLUG-23):
@@ -883,8 +904,8 @@ void files() {
     check(wide.initialize(), "6 to 6 initialization");
     check(choose(wide, crossover.string()), "the crossover chosen on 6 inputs");
     const auto wide_report = report(wide);
-    require([wide_report[@"status name"] isEqualToString:@"Active"],
-            "the chosen crossover on 6 inputs: " + text(wide_report[@"explanation"]));
+    require((wide_report.status_name == "Active"),
+            "the chosen crossover on 6 inputs: " + text(wide_report.explanation));
     const auto wide_saved = wide.saved();
     require(wide_saved.configuration && wide_saved.configuration->input_channels == 2 &&
                 wide_saved.configuration->output_channels == 6,
@@ -927,10 +948,9 @@ void chosen_before_rendering() {
     // jrp (20 November 2026): an unrendered start at 44.1 kHz is too little
     // evidence to say the filter is wrong.
     auto r = report(unit);
-    require([r[@"status name"] isEqualToString:@"Waiting"] &&
-                [r[@"summary"] isEqualToString:@"Filter selected. Waiting for the host's audio "
-                                               @"settings."],
-            "chosen before rendering: " + text(r[@"status name"]) + ": " + text(r[@"summary"]));
+    require(r.status_name == "Waiting" &&
+                r.status.text == "Filter selected. Waiting for the host's audio settings.",
+            "chosen before rendering: " + text(r.status_name) + ": " + text(r.status.text));
     unit.uninitialize();
     // Nothing rendered: a list waits, refused as any file is, saying what
     // to do.
@@ -940,7 +960,7 @@ void chosen_before_rendering() {
     // the failure record; the window shows the refusal, as room.cfg awaits
     // validation (HostFilter::shown_failure()).
     r = report(unit);
-    const std::string waits = text(r[@"explanation"]);
+    const std::string waits = text(r.explanation);
     require(waits.find("no entry selected") != std::string::npos &&
                 waits.find("Play audio once so Convolver can check the host's sample rate and "
                            "channel counts, then choose the configuration list again.") !=
@@ -957,18 +977,18 @@ void chosen_before_rendering() {
     render_block(unit, 2, 2);
     unit.uninitialize();
     r = report(unit);
-    require([r[@"status name"] isEqualToString:@"Waiting"],
-            "rendered, stopped, unread: " + text(r[@"status name"]) + ": " + text(r[@"summary"]));
+    require(r.status_name == "Waiting",
+            "rendered, stopped, unread: " + text(r.status_name) + ": " + text(r.status.text));
     // A report read while the host renders at 44.1 kHz confirms the
     // mismatch: Silent, with both rates.
     check(unit.initialize(), "44.1 kHz initialization for the read");
     render_block(unit, 2, 2);
     r = report(unit);
-    const std::string silent = text(r[@"summary"]);
-    require([r[@"status name"] isEqualToString:@"Load failed"] && silent.find("Silent: ") == 0 &&
+    const std::string silent = text(r.status.text);
+    require(r.status_name == "Load failed" && silent.find("Silent: ") == 0 &&
                 silent.find("44100 Hz") != std::string::npos &&
                 silent.find("48000 Hz") != std::string::npos,
-            "read while rendering a 48 kHz file at 44.1 kHz: " + text(r[@"status name"]) + ": " +
+            "read while rendering a 48 kHz file at 44.1 kHz: " + text(r.status_name) + ": " +
                 silent);
     unit.uninitialize();
     // Rendered at 48 kHz, then stopped: the list chooses its 48 kHz entry.
@@ -1004,7 +1024,7 @@ void responsive() {
     Unit unit;
     check(unit.configure(44100, 2, 2, 512), "stereo formats");
     check(unit.initialize(), "stereo initialization");
-    const auto before = text(report(unit)[@"status name"]); // What the window shows.
+    const auto before = text(report(unit).status_name); // What the window shows.
     require(before == "No filter", "before the load: " + before);
 
     std::promise<void> started, release;
@@ -1019,8 +1039,7 @@ void responsive() {
     OSStatus loaded = noErr;
     std::thread loader([&] { loaded = unit.restore(plist); });
     load_has_started.wait(); // The load holds the control lock until released.
-    auto reading =
-        std::async(std::launch::async, [&] { return text(report(unit)[@"status name"]); });
+    auto reading = std::async(std::launch::async, [&] { return text(report(unit).status_name); });
     const bool prompt = reading.wait_for(std::chrono::seconds(10)) == std::future_status::ready;
     release.set_value(); // Whatever happened, so that nothing is left waiting.
     loader.join();
@@ -1036,7 +1055,7 @@ void responsive() {
     // up to 10 s (CI-22: one read failed on a busy runner).
     std::string after;
     for (int i = 0; i < 1000; ++i) {
-        after = text(report(unit)[@"status name"]);
+        after = text(report(unit).status_name);
         if (after == "Active")
             break;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -1078,12 +1097,12 @@ void faults(const au_test::LogSince& log) {
     // not know Render's faults yet; the window's next read, half a second
     // later, explains them.
     auto r = report(unit);
-    for (int i = 0; i < 200 && ![r[@"status name"] isEqualToString:@"Fault"]; ++i) {
+    for (int i = 0; i < 200 && r.status_name != "Fault"; ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         r = report(unit);
     }
-    require([r[@"status name"] isEqualToString:@"Fault"] && contains(r[@"explanation"], logged),
-            "fault report: " + text(r[@"status name"]) + ": " + text(r[@"explanation"]));
+    require(r.status_name == "Fault" && contains(r.explanation, logged),
+            "fault report: " + text(r.status_name) + ": " + text(r.explanation));
     require(status_value(unit) == fault, "reading the report cleared Fault");
     require(count(log.text(), logged) == 1, "fault not logged once");
     // Faults that go on, read as an open window does.
@@ -1091,20 +1110,20 @@ void faults(const au_test::LogSince& log) {
         render();
         r = report(unit);
     }
-    require([r[@"status name"] isEqualToString:@"Fault"] && status_value(unit) == fault,
+    require(r.status_name == "Fault" && status_value(unit) == fault,
             "Fault lost while faults go on");
     require(count(log.text(), logged) == 1,
             "polling logged the faults again: " + std::to_string(count(log.text(), logged)));
-    require(contains(r[@"plays"], "The filter keeps playing."),
-            "a fault while rendering: " + text(r[@"plays"]));
+    require(contains(r.plays, "The filter keeps playing."),
+            "a fault while rendering: " + text(r.plays));
     // jrp's review of PR #236: stopped after rendering, the unit keeps the
     // formats it rendered with, but no processor runs.
     unit.uninitialize();
     r = report(unit);
-    require([r[@"status name"] isEqualToString:@"Fault"] &&
-                contains(r[@"plays"], "The filter is kept and plays when the host starts again.") &&
-                !contains(r[@"plays"], "keeps playing"),
-            "a fault, then stopped: " + text(r[@"status name"]) + ": " + text(r[@"plays"]));
+    require(r.status_name == "Fault" &&
+                contains(r.plays, "The filter is kept and plays when the host starts again.") &&
+                !contains(r.plays, "keeps playing"),
+            "a fault, then stopped: " + text(r.status_name) + ": " + text(r.plays));
 }
 } // namespace
 

@@ -5,18 +5,12 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
-#include <cstdlib>
 #include <locale>
 #include <sstream>
 #include <system_error>
 
 namespace convolver::view {
 namespace {
-std::string field(const ReportFields& report, std::string_view key) {
-    const auto found = report.find(key);
-    return found == report.end() ? std::string() : found->second;
-}
-
 constexpr int status_number(HostStatus status) {
     return static_cast<int>(status);
 }
@@ -64,41 +58,6 @@ std::vector<std::string> lines(const std::string& text) {
     return result;
 }
 
-// The report's "audio" field: one fact per line, label, value, note,
-// "problem" or empty, and help, between tabs.
-std::vector<AudioFact> audio_facts(const std::string& text) {
-    std::vector<AudioFact> facts;
-    for (const auto& line : lines(text)) {
-        std::vector<std::string> parts;
-        std::size_t start = 0;
-        while (true) {
-            const auto tab = line.find('\t', start);
-            parts.push_back(line.substr(start, tab == std::string::npos ? tab : tab - start));
-            if (tab == std::string::npos)
-                break;
-            start = tab + 1;
-        }
-        if (parts.size() < 5)
-            continue;
-        facts.push_back({parts[0], parts[1], parts[2], parts[4], parts[3] == "problem"});
-    }
-    return facts;
-}
-
-// The report's "reference" field: "Label: value" per line; a line without
-// ": " is all value.
-std::vector<ReferenceLine> reference_lines(const std::string& text) {
-    std::vector<ReferenceLine> result;
-    for (const auto& line : lines(text)) {
-        const auto colon = line.find(": ");
-        if (colon == std::string::npos)
-            result.push_back({"", line});
-        else
-            result.push_back({line.substr(0, colon), line.substr(colon + 2)});
-    }
-    return result;
-}
-
 void replace_all(std::string& text, std::string_view from, std::string_view to) {
     std::string out;
     std::size_t start = 0;
@@ -112,14 +71,7 @@ void replace_all(std::string& text, std::string_view from, std::string_view to) 
 }
 } // namespace
 
-ReportFields report_map(const std::vector<std::pair<std::string, std::string>>& fields) {
-    ReportFields report;
-    for (const auto& [key, value] : fields)
-        report.insert_or_assign(key, value);
-    return report;
-}
-
-WindowContent window_content(const ReportFields* report, bool can_load) {
+WindowContent window_content(const HostReport* report, bool can_load) {
     WindowContent c;
     if (!report) {
         c.title = "Convolver";
@@ -130,39 +82,40 @@ WindowContent window_content(const ReportFields* report, bool can_load) {
     } else {
         const auto& r = *report;
         c.available = true;
-        const auto status = field(r, "status");
-        c.status = status.empty() ? -1 : std::atoi(status.c_str());
-        c.title = field(r, "title");
-        c.status_name = field(r, "status name");
+        c.status = status_number(r.status.status);
+        c.title = r.title;
+        c.status_name = r.status_name;
         c.tone = tone_of(c.status);
         c.symbol = symbol_of(c.status);
-        c.problem = field(r, "problem");
-        c.plays = field(r, "plays");
-        c.cause = field(r, "cause");
-        c.fix = field(r, "fix");
-        c.note = field(r, "note");
-        const auto action = field(r, "action");
-        if (action == "choose filter" && can_load)
+        c.problem = r.problem;
+        c.plays = r.plays;
+        c.cause = r.cause;
+        c.fix = r.fix;
+        c.note = r.note;
+        if (r.action == "choose filter" && can_load)
             c.action = WindowAction::choose_filter;
-        else if (action == "copy diagnostics")
+        else if (r.action == "copy diagnostics")
             c.action = WindowAction::copy_diagnostics;
-        c.filter_name = field(r, "filter name");
-        c.filter_note = field(r, "filter note");
-        c.filter_rate = field(r, "filter rate");
-        c.filter_channels = field(r, "filter channels");
-        c.filter_length = field(r, "filter length");
-        c.filter_taps = field(r, "filter taps");
-        c.filter_speakers = field(r, "filter speakers");
+        c.filter_name = r.filter_name;
+        c.filter_note = r.filter_note;
+        c.filter_rate = r.filter_rate;
+        c.filter_channels = r.filter_channels;
+        c.filter_length = r.filter_length;
+        c.filter_taps = r.filter_taps;
+        c.filter_speakers = r.filter_speakers;
         c.facts_shown = !c.filter_rate.empty();
-        c.audio = audio_facts(field(r, "audio"));
-        c.reference = reference_lines(field(r, "reference"));
-        c.mix_note = field(r, "mix note");
-        c.gain_note = field(r, "gain note");
-        c.sample_rate = std::atoi(field(r, "sample rate").c_str());
-        c.latency_waits = field(r, "latency waits") == "yes";
-        c.log_path = field(r, "log path");
-        c.filter_path = field(r, "filter path");
-        c.filter_files = field(r, "filter files");
+        for (const auto& f : r.audio)
+            c.audio.push_back({f.label, f.value, f.note, f.help, f.problem});
+        for (const auto& [label, value] : r.reference)
+            c.reference.push_back({label, value});
+        c.mix_note = r.mix_note;
+        c.gain_note = r.gain_note;
+        c.sample_rate = r.sample_rate;
+        c.latency_waits = r.latency_waits;
+        c.log_path = r.log_path;
+        c.filter_path = r.filter_path;
+        for (const auto& file : r.filter_files)
+            c.filter_files += file + "\n";
     }
     if (can_load)
         c.filter_note = c.filter_note.empty()

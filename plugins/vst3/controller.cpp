@@ -20,14 +20,6 @@ using namespace Steinberg::Vst;
 namespace {
 constexpr std::size_t max_controller_state = 4096; // Name, identity and headers fit easily.
 
-// A report field's value, or empty.
-std::string field(const std::vector<std::pair<std::string, std::string>>& report,
-                  std::string_view name) {
-    for (const auto& [key, value] : report)
-        if (key == name)
-            return value;
-    return {};
-}
 void copy(const std::string& text, String128 out) {
     std::size_t i = 0;
     for (; i < text.size() && i < 127; ++i) // ASCII (HostStatusLine), widened.
@@ -80,11 +72,10 @@ tresult PLUGIN_API Controller::getState(IBStream* stream) {
         // The name of the filter that plays, as the processor's filter gives
         // it (a refused preset's controller state names one that does not
         // play); otherwise the pair setState brought.
-        const auto playing = field(report_, "filter identity");
-        const auto playing_name = field(report_, "filter saved name");
-        const bool named = !playing.empty() && !playing_name.empty();
-        const auto& name = named ? playing_name : name_;
-        const auto& identity = named ? playing : identity_;
+        const bool named =
+            report_ && !report_->filter_identity.empty() && !report_->filter_saved_name.empty();
+        const auto& name = named ? report_->filter_saved_name : name_;
+        const auto& identity = named ? report_->filter_identity : identity_;
         if (name.empty() || identity.empty())
             return kResultOk; // Nothing to keep: the empty state of earlier versions.
         bytes = encode_controller_state({name, identity});
@@ -151,12 +142,10 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         std::string_view(message->getMessageID()) != status_message)
         return EditController::notify(message);
     auto* attributes = message->getAttributes();
-    int64 status = 0;
+    // PLUG-39 step 5: the report, which holds the Status line too.
     const void* data = nullptr;
     uint32 size = 0;
-    if (!attributes || attributes->getInt("status", status) != kResultOk || status < 0 ||
-        status >= static_cast<int64>(status_names.size()) ||
-        attributes->getBinary("text", data, size) != kResultOk || (size && !data))
+    if (!attributes || attributes->getBinary("report", data, size) != kResultOk || (size && !data))
         return kInvalidArgument;
     // VST3-15: the answer to a request, when the message follows one.
     int64 load_request = 0, load_accepted = 0, latency_request = 0;
@@ -178,26 +167,22 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     attributes->getInt("gain mode", preset_mode);
     if (preset_mode < 0 || preset_mode >= static_cast<int64>(gain_mode_count))
         preset_mode = 0;
-    std::string text, report_text, format;
-    std::vector<std::pair<std::string, std::string>> report;
+    std::optional<HostReport> report;
+    std::string format;
     try {
-        text.assign(static_cast<const char*>(data), size);
-        // VST3-3: the window's report, when the message carries it.
-        const auto binary = [&](const char* id) -> std::optional<std::string> {
-            const void* bytes = nullptr;
-            uint32 length = 0;
-            if (attributes->getBinary(id, bytes, length) != kResultOk || (length && !bytes))
-                return std::nullopt;
-            return std::string(static_cast<const char*>(bytes), length);
-        };
-        if (const auto fields = binary("report")) {
-            report = decode_report(*fields);
-            report_text = binary("report text").value_or("");
-            format = binary("format").value_or("");
-        }
+        report = decode_report(std::string_view(static_cast<const char*>(data), size));
+        const void* bytes = nullptr;
+        uint32 length = 0;
+        if (attributes->getBinary("format", bytes, length) == kResultOk && (bytes || !length))
+            format.assign(static_cast<const char*>(bytes), length);
     } catch (...) {
         return kOutOfMemory;
     }
+    // A report that does not decode (a damaged message) is not shown, but
+    // the answer the message carries still counts, so a load or Latency
+    // request is never left waiting.
+    const bool readable = report.has_value();
+    const auto status = readable ? report->status.status : HostStatus{};
     auto* parameter = getParameterObject(status_id);
     if (!parameter) // Not initialized, or terminated: nothing to show it on.
         return kResultFalse;
@@ -214,12 +199,10 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
             latency_waiting_ = false;
             restart = true;
         }
-        changed = status_text_ != text || status_value_ != static_cast<int>(status);
-        status_text_.swap(text);
-        status_value_ = static_cast<int>(status);
-        if (!report.empty()) {
+        if (readable) {
+            changed = !report_ || report_->status.text != report->status.text ||
+                      report_->status.status != status;
             report_.swap(report);
-            report_text_.swap(report_text);
             format_.swap(format);
         }
     }
@@ -293,7 +276,7 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     // status messages from setActive.
     if (restart && componentHandler)
         componentHandler->restartComponent(kLatencyChanged);
-    return kResultOk;
+    return readable ? kResultOk : kInvalidArgument;
 }
 void Controller::latency_chosen(std::size_t frames) {
     int64 request = 0;
@@ -359,7 +342,7 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
         return result;
     {
         std::lock_guard lock(status_lock_);
-        if (status_value_ == static_cast<int>(HostStatus::fault))
+        if (report_ && report_->status.status == HostStatus::fault)
             return result; // The processor has explained it already.
     }
     // Outside the lock: the processor answers with its status_message.
@@ -375,8 +358,9 @@ tresult PLUGIN_API Controller::getParamStringByValue(ParamID id, ParamValue valu
         std::lock_guard lock(status_lock_);
         // The text belongs to the status the processor sent last; a Fault
         // value from the audio thread reads as its name until it explains.
-        if (!status_text_.empty() && status_index(value) == status_value_) {
-            copy(status_text_, string);
+        if (report_ && !report_->status.text.empty() &&
+            status_index(value) == static_cast<long>(report_->status.status)) {
+            copy(report_->status.text, string);
             return kResultOk;
         }
     }
@@ -437,7 +421,7 @@ IPlugView* PLUGIN_API Controller::createView(FIDString name) {
         return nullptr;
     return create_editor(*this);
 }
-std::vector<std::pair<std::string, std::string>> Controller::report() {
+std::optional<HostReport> Controller::report() {
     // Outside the lock: the processor answers with its status_message.
     if (auto message = owned(allocateMessage())) {
         message->setMessageID(report_message);
@@ -447,15 +431,16 @@ std::vector<std::pair<std::string, std::string>> Controller::report() {
     return report_;
 }
 std::string Controller::diagnostics() {
-    std::string text, format;
+    std::optional<HostReport> report;
+    std::string format;
     {
         std::lock_guard lock(status_lock_);
-        text = report_text_;
+        report = report_;
         format = format_;
     }
-    if (format.empty())
+    if (!report || format.empty())
         return {};
-    return diagnostics_text(text, format);
+    return diagnostics_text(*report, format);
 }
 bool Controller::load_file(const std::string& path) {
     auto message = owned(allocateMessage());

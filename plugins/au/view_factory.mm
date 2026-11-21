@@ -103,9 +103,17 @@ NSDictionary<NSString*, id>* choice(AudioUnit unit, AudioUnitParameterID paramet
     if (!unit)
         return nil;
     const NSRect frame = NSZeroRect;
-    ConvolverReportSource report = ^NSDictionary<NSString*, NSString*>*(void) {
+    ConvolverReportSource report = ^std::optional<convolver::HostReport>(void) {
         id value = CFBridgingRelease(property_value(unit, convolver::au::report_property));
-        return [value isKindOfClass:[NSDictionary class]] ? value : nil;
+        if (![value isKindOfClass:[NSData class]])
+            return std::nullopt;
+        NSData* data = value;
+        try {
+            return convolver::decode_report(
+                std::string_view(static_cast<const char*>(data.bytes), data.length));
+        } catch (...) { // Out of memory: no report this time.
+            return std::nullopt;
+        }
     };
     ConvolverDiagnosticsSource diagnostics = ^NSString*(void) {
       id value = CFBridgingRelease(property_value(unit, convolver::au::diagnostics_property));

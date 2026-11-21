@@ -447,12 +447,14 @@ format.
   view's own. Messages passed to `HostFilter::reject()` and the other
   failure records use the same parts (the problem, then labelled lines);
   `host_log()` and the LV2 log join them into one line.
-  `report_fields()` gives it as named text values for a format's
-  transport, `report_text()` as plain text, and `diagnostics_text()` adds
+  `encode_report()` gives the whole report as bytes for a format's
+  transport, which `decode_report()` reads back whole or not at all
+  (PLUG-39 step 5: one codec, so no window parses text lines back),
+  `report_text()` gives it as plain text, and `diagnostics_text()` adds
   this instance's recent log lines (`host_log_recent()`, at most the last
   64 KiB of the file). Built on the control side; reading the log happens
   only when diagnostics are asked for. Audio Unit (AU-6): global custom
-  properties 64000 (the fields as a `CFDictionary` of `CFString`s) and 64001
+  properties 64000 (`encode_report()`'s bytes as a `CFData`) and 64001
   (the diagnostics text as a `CFString`), read-only, values released by the
   caller, with a property-change notification for 64000 wherever the Status
   parameter's event is sent. They are internal between the unit and its own
@@ -627,11 +629,15 @@ VST3 carries the window's traffic in `IMessage`s between the processor and
 the controller (VST3-3), which hosts may deliver on any thread and may run in
 separate processes, so each carries values, never pointers:
 
-- The processor's `ConvolverStatus` message also carries the editor report:
-  `report_fields()` encoded as one binary attribute, `report_text()` and the
-  log tag ("VST3 #2"). The controller keeps a copy under its own lock for a
-  view, and asks the host to reread the parameters only when the Status line
-  changed; Copy diagnostics joins its text with the recent log lines
+- The processor's `ConvolverStatus` message carries the editor report,
+  which holds the Status line too: `encode_report()`'s bytes as one binary
+  attribute, and the log tag ("VST3 #2"). The controller keeps the decoded
+  report under its own lock, derives the Status parameter, its text and the
+  window's content from it, does not show a report that does not decode
+  (answering kInvalidArgument, though the load or Latency answer the message
+  carries still counts; `vst3.adapter` `damaged_report_message`), and asks
+  the host to reread the parameters only when the Status line changed; Copy
+  diagnostics joins the report's text with the recent log lines
   (`diagnostics_text()`).
 - A window reading the report sends `ConvolverReport`, and the processor
   answers with a fresh `ConvolverStatus`, so faults the audio thread counted

@@ -42,6 +42,11 @@ void require(bool v, const char* m) {
     if (!v)
         throw std::runtime_error(m);
 }
+// The report the window would show; an empty report when there is none,
+// so a missing report fails the check that reads it.
+convolver::HostReport shown(const std::optional<convolver::HostReport>& report) {
+    return report ? *report : convolver::HostReport{};
+}
 // One block of silence through an active processor: a host that has played
 // audio with its configuration has settled it, so restored state that does
 // not suit it is refused from then on (until then REAPER may still change
@@ -2707,13 +2712,6 @@ void write_wav(const std::filesystem::path& path, int rate, int channels, int fr
 // controller keeps it, and a filter file chosen in the window loads through
 // a message as a state restore would, marking the project changed.
 void report_and_files() {
-    const auto field = [](const std::vector<std::pair<std::string, std::string>>& report,
-                          const char* name) {
-        for (const auto& [key, value] : report)
-            if (key == name)
-                return value;
-        return std::string("(missing)");
-    };
     HostApplication context;
     Handler handler;
     Processor p;
@@ -2721,12 +2719,12 @@ void report_and_files() {
     require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
                 c.setComponentHandler(&handler) == kResultOk,
             "report initialize");
-    require(c.report().empty() && c.diagnostics().empty(), "a report before connecting");
+    require(!c.report() && c.diagnostics().empty(), "a report before connecting");
     require(p.connect(&c) == kResultOk && c.connect(&p) == kResultOk, "report connect");
     auto report = c.report();
-    require(field(report, "status name") == "No filter" &&
-                field(report, "title").find("VST3 #") != std::string::npos &&
-                field(report, "filter name") == "None",
+    require(shown(report).status_name == "No filter" &&
+                shown(report).title.find("VST3 #") != std::string::npos &&
+                shown(report).filter_name == "None",
             "report of an empty instance");
     require(c.diagnostics().find("Recent Convolver log lines for VST3 #") != std::string::npos,
             "diagnostics text");
@@ -2738,7 +2736,7 @@ void report_and_files() {
     require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
             "report activate");
     report = c.report();
-    require(field(report, "sample rate") == "48000", "report rate after activation");
+    require(shown(report).sample_rate == 48000, "report rate after activation");
     // A window reads twice a second; the host is asked to reread the
     // parameters only when the Status line changes.
     handler.restarts.clear();
@@ -2768,7 +2766,7 @@ void report_and_files() {
     // A host that hears setDirty is shown no edit (VST3-17 is for the others).
     require(handler.edits.empty(), "a load reported an edit to a host that offers setDirty");
     report = c.report();
-    require(field(report, "status name") == "Active" && field(report, "filter name") == "room.wav",
+    require(shown(report).status_name == "Active" && shown(report).filter_name == "room.wav",
             "report after loading a file");
     auto f = p.failure();
     require(!f, "a loaded file left a failure");
@@ -2788,9 +2786,7 @@ void report_and_files() {
                 f->request.path == wrong.string(),
             "the refused file is not the failure's request");
     report = c.report();
-    require(field(report, "filter name") == "room.wav" &&
-                field(report, "filter note") != "(missing)" &&
-                !field(report, "filter note").empty(),
+    require(shown(report).filter_name == "room.wav" && !shown(report).filter_note.empty(),
             "report after a refused file");
     require(!c.load_file(""), "an empty path accepted");
     std::filesystem::remove_all(folder);
@@ -2858,9 +2854,8 @@ void chosen_file_on_wider_bus() {
     require(c.load_file((folder / "layouts.txt").string()) && !p.failure(),
             "a list chosen on 6 inputs refused");
     std::string reference;
-    for (const auto& [key, value] : c.report())
-        if (key == "reference")
-            reference = value;
+    for (const auto& [label, value] : shown(c.report()).reference)
+        reference += label + ": " + value + "\n";
     require(reference.find("List entry: ") != std::string::npos &&
                 reference.find("filter.cfg (when the list was chosen, no entry had") !=
                     std::string::npos,
@@ -2920,12 +2915,6 @@ void chosen_preset(bool offers_dirty) {
     auto hall = filter(48000, .5f);
     hall.settings = chosen;
     const auto hall_path = write("hall.vstpreset", convolver::presets::vst3_preset(hall));
-    const auto field = [&](const char* name) {
-        for (const auto& [key, value] : c.report())
-            if (key == name)
-                return value;
-        return std::string("(missing)");
-    };
     const auto gestures = [&] {
         std::vector<ParamID> ids;
         for (std::size_t i = 0; i + 2 < handler.edits.size(); i += 3) {
@@ -2945,7 +2934,7 @@ void chosen_preset(bool offers_dirty) {
     handler.edits.clear();
     handler.restarts.clear();
     require(c.load_file(hall_path), "chosen preset: refused");
-    require(!p.failure() && field("filter name") == "hall.vstpreset",
+    require(!p.failure() && shown(c.report()).filter_name == "hall.vstpreset",
             "chosen preset: not loaded as the chosen file");
     require(p.settings() == chosen && p.getLatencySamples() == 512,
             "chosen preset: its settings do not play");
@@ -3000,7 +2989,8 @@ void chosen_preset(bool offers_dirty) {
         write("plain.VSTPRESET", convolver::presets::vst3_preset(filter(48000, .25f)));
     handler.edits.clear();
     handler.restarts.clear();
-    require(c.load_file(plain_path) && !p.failure() && field("filter name") == "plain.VSTPRESET",
+    require(c.load_file(plain_path) && !p.failure() &&
+                shown(c.report()).filter_name == "plain.VSTPRESET",
             "plain preset: refused");
     require(std::abs(p.settings().gain_db + 6) < 1e-9 && p.settings().mix == .5 &&
                 p.settings().latency == 512 &&
@@ -3038,7 +3028,7 @@ void chosen_preset(bool offers_dirty) {
     handler.edits.clear();
     handler.restarts.clear();
     require(c.load_file(defaults_path) && !p.failure() &&
-                field("filter name") == "defaults.vstpreset",
+                shown(c.report()).filter_name == "defaults.vstpreset",
             "defaults preset: refused");
     require(p.settings() == convolver::HostSettings{} && p.getLatencySamples() == 0,
             "defaults preset: the default settings do not play");
@@ -3243,14 +3233,12 @@ void chosen_before_host_plays() {
     status_is(waiting, "after Audacity's flush at 44.1 kHz");
     // The window's report says the same, not Load failed against 44.1 kHz.
     {
-        std::map<std::string, std::string> fields;
-        for (const auto& [key, value] : c.report())
-            fields[key] = value;
-        require(fields["status name"] == "Waiting" && fields["summary"] == waiting &&
-                    fields["plays"].find(waiting) == 0 &&
-                    fields["explanation"].find("44100") == std::string::npos,
-                ("after Audacity's flush, the window's report: " + fields["status name"] + ": " +
-                 fields["explanation"])
+        const auto r = c.report();
+        require(r && r->status_name == "Waiting" && r->status.text == waiting &&
+                    r->plays.find(waiting) == 0 &&
+                    r->explanation.find("44100") == std::string::npos,
+                ("after Audacity's flush, the window's report: " +
+                 (r ? r->status_name + ": " + r->explanation : std::string("none")))
                     .c_str());
     }
     // Stopped: another file chosen is kept too.
@@ -3328,11 +3316,9 @@ void chosen_before_host_plays() {
     // The window reads its report while the host plays (send_status()):
     // that confirms the check.
     {
-        std::map<std::string, std::string> fields;
-        for (const auto& [key, value] : c.report())
-            fields[key] = value;
-        const auto& summary = fields["summary"];
-        require(fields["status name"] == "Load failed" && summary.find("Silent: ") == 0 &&
+        const auto r = c.report();
+        const auto summary = r ? r->status.text : std::string();
+        require(r && r->status_name == "Load failed" && summary.find("Silent: ") == 0 &&
                     summary.find("44100 Hz") != std::string::npos &&
                     summary.find("48000 Hz") != std::string::npos,
                 ("the window's report while playing at 48 kHz: " + summary).c_str());
@@ -3459,13 +3445,6 @@ void saved_filter_name() {
         encode_controller_state({std::string(convolver::max_filter_name_bytes + 1, 'a'), "1"});
     require(decode_controller_state(long_name).name.empty(), "an over-long name read");
 
-    const auto field = [](const std::vector<std::pair<std::string, std::string>>& report,
-                          const char* name) {
-        for (const auto& [key, value] : report)
-            if (key == name)
-                return value;
-        return std::string("(missing)");
-    };
     struct Instance {
         HostApplication context;
         Handler handler;
@@ -3511,14 +3490,14 @@ void saved_filter_name() {
         Instance first;
         require(first.c.load_file(good.string()), "name file not loaded");
         const auto report = first.c.report();
-        identity = field(report, "filter identity");
+        identity = shown(report).filter_identity;
         require(identity.size() == 16, "no filter identity");
         // Bypass from the host or the window: Bypassed before audio runs.
         require(first.c.setParamNormalized(bypass_id, 1) == kResultOk &&
-                    field(first.c.report(), "status name") == "Bypassed",
+                    shown(first.c.report()).status_name == "Bypassed",
                 "bypass not shown at once");
         require(first.c.setParamNormalized(bypass_id, 0) == kResultOk &&
-                    field(first.c.report(), "status name") == "Active",
+                    shown(first.c.report()).status_name == "Active",
                 "bypass off not shown at once");
         require(first.p.getState(&component) == kResultOk &&
                     first.c.getState(&controller) == kResultOk,
@@ -3533,7 +3512,7 @@ void saved_filter_name() {
         // Another filter's state, for the mismatch below.
         require(first.c.load_file(other.string()) && first.p.getState(&hall) == kResultOk,
                 "second file");
-        require(field(first.c.report(), "filter identity") != identity,
+        require(shown(first.c.report()).filter_identity != identity,
                 "two filters with one identity");
     }
     {
@@ -3547,7 +3526,7 @@ void saved_filter_name() {
                     reopened.c.setState(&controller) == kResultOk,
                 "reopen controller");
         auto report = reopened.c.report();
-        require(field(report, "filter name") == "room.wav" && field(report, "filter path").empty(),
+        require(shown(report).filter_name == "room.wav" && shown(report).filter_path.empty(),
                 "name not shown after reopening");
         require(reopened.c.diagnostics().find("\nFilter: room.wav") != std::string::npos,
                 "diagnostics do not name the file after reopening");
@@ -3559,7 +3538,7 @@ void saved_filter_name() {
         hall.seek(0, IBStream::kIBSeekSet, nullptr);
         require(reopened.p.setState(&hall) == kResultOk, "other preset");
         report = reopened.c.report();
-        require(field(report, "filter name") == "Restored filter",
+        require(shown(report).filter_name == "Restored filter",
                 "a saved name shown for another filter");
     }
     // A refused preset (jrp's v0.12.8 REAPER check): the host sends its
@@ -3599,7 +3578,7 @@ void saved_filter_name() {
         require(playing.p.setState(&component) == kResultOk &&
                     playing.c.setState(&controller) == kResultOk,
                 "restore room.wav");
-        require(field(playing.c.report(), "filter name") == "room.wav", "room.wav not restored");
+        require(shown(playing.c.report()).filter_name == "room.wav", "room.wav not restored");
         play_block(playing.p, 1, 1, 512); // Playing, so a preset for 44.1 kHz is refused.
         slow_component.seek(0, IBStream::kIBSeekSet, nullptr);
         slow_controller.seek(0, IBStream::kIBSeekSet, nullptr);
@@ -3611,9 +3590,9 @@ void saved_filter_name() {
             playing.c.setState(&slow_controller);
         }
         auto report = playing.c.report();
-        require(field(report, "filter identity") == identity,
+        require(shown(report).filter_identity == identity,
                 "the refused preset replaced the playing filter");
-        require(field(report, "filter name") == "room.wav",
+        require(shown(report).filter_name == "room.wav",
                 "a refused preset renamed the playing filter");
         require(saved_name(playing.c) == "room.wav",
                 "a refused preset's name saved for the playing filter");
@@ -3630,7 +3609,7 @@ void saved_filter_name() {
                         playing.c.setState(&hall_controller) == kResultOk,
                     "hall after the refusal");
         }
-        require(field(playing.c.report(), "filter name") == "hall.wav" &&
+        require(shown(playing.c.report()).filter_name == "hall.wav" &&
                     saved_name(playing.c) == "hall.wav",
                 "a preset after a refusal lost its name");
     }
@@ -3658,17 +3637,12 @@ void preset_filter_name(const std::filesystem::path& preset_path, const std::str
     std::vector<char> bytes((std::istreambuf_iterator<char>(file)), {});
     MemoryStream preset(bytes.data(), static_cast<TSize>(bytes.size()));
     require(PresetFile::loadPreset(&preset, processor_id, &p, &c), "SDK preset loading");
-    std::string shown = "(missing)", identity;
-    for (const auto& [key, value] : c.report()) {
-        if (key == "filter name")
-            shown = value;
-        if (key == "filter identity")
-            identity = value;
-    }
+    const auto report = shown(c.report());
+    const auto& name = report.filter_name;
+    const auto& identity = report.filter_identity;
     require(!identity.empty(), "a generated preset loaded no filter");
-    if (!expected.empty() && shown != expected)
-        throw std::runtime_error("a generated preset shows '" + shown + "', not '" + expected +
-                                 "'");
+    if (!expected.empty() && name != expected)
+        throw std::runtime_error("a generated preset shows '" + name + "', not '" + expected + "'");
     // Saved again by the host: the name stays with the filter.
     MemoryStream again;
     require(c.getState(&again) == kResultOk, "save after a generated preset");
@@ -3686,7 +3660,7 @@ void preset_filter_name(const std::filesystem::path& preset_path, const std::str
     c.disconnect(&p);
     c.terminate();
     p.terminate();
-    std::cout << "A generated preset shows: " << shown << '\n';
+    std::cout << "A generated preset shows: " << name << '\n';
 }
 // VST3-15: what a host may put between the components
 // (IConnectionPoint): a proxy that passes each message on at once and
@@ -3750,13 +3724,6 @@ class Proxy final : public IConnectionPoint {
 // file was accepted, the project marked changed and the host asked to
 // restart must not depend on the message arriving during sendMessage().
 void messages_through_proxies() {
-    const auto field = [](const std::vector<std::pair<std::string, std::string>>& report,
-                          const char* name) {
-        for (const auto& [key, value] : report)
-            if (key == name)
-                return value;
-        return std::string("(missing)");
-    };
     const auto folder = private_temp("convolver-vst3-proxies");
     std::filesystem::create_directories(folder);
     const auto good = folder / "room.wav", wrong = folder / "other rate.wav";
@@ -3790,7 +3757,7 @@ void messages_through_proxies() {
             return c.report();
         };
         deliver();
-        check(field(report(), "status name") == "No filter", "proxy report");
+        check(shown(report()).status_name == "No filter", "proxy report");
         SpeakerArrangement mono = SpeakerArr::kMono;
         check(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "proxy buses");
         p.activateBus(kAudio, kInput, 0, true);
@@ -3798,7 +3765,7 @@ void messages_through_proxies() {
         ProcessSetup setup{kRealtime, kSample32, 512, 48000};
         check(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
               "proxy activate");
-        check(field(report(), "sample rate") == "48000", "proxy report after activation");
+        check(shown(report()).sample_rate == 48000, "proxy report after activation");
         // A new Latency: the host reads it when asked to restart, so it must
         // be asked only once the processor has it.
         std::vector<std::size_t> latency_at_restart;
@@ -3832,8 +3799,8 @@ void messages_through_proxies() {
         // Accepted: the project is marked changed once, when the answer arrives.
         check(c.load_file(good.string()), "proxy file not loaded");
         deliver();
-        auto shown = report();
-        check(handler.dirty == 1 && field(shown, "filter name") == "room.wav",
+        auto seen = shown(report());
+        check(handler.dirty == 1 && seen.filter_name == "room.wav",
               "proxy file not playing, or the project not marked changed");
         // Refused (the host plays audio, PLUG-27): never marked changed. A
         // forwarding proxy brings the refusal at once; a deferring one later,
@@ -3841,10 +3808,10 @@ void messages_through_proxies() {
         play_block(p, 1, 1, 64);
         const bool refused_result = c.load_file(wrong.string());
         deliver();
-        shown = report();
+        seen = shown(report());
         check(defer || !refused_result, "a refused file reported as accepted");
         check(handler.dirty == 1, "a refused file marked the project changed");
-        check(field(shown, "filter name") == "room.wav" && !field(shown, "filter note").empty(),
+        check(seen.filter_name == "room.wav" && !seen.filter_note.empty(),
               "refused file not explained in the report");
         p.setActive(false);
         p.disconnect(&to_controller);
@@ -3853,6 +3820,105 @@ void messages_through_proxies() {
         c.terminate();
         p.terminate();
     }
+    std::filesystem::remove_all(folder);
+}
+// PLUG-39 step 5a (the independent review of PR #246): a status message
+// whose report does not decode, as a damaged message would, is not shown,
+// but the load answer it carries still counts, and notify says the message
+// was not valid.
+class Damaging final : public IConnectionPoint {
+  public:
+    explicit Damaging(IConnectionPoint& to) : to_(to) {}
+    tresult PLUGIN_API connect(IConnectionPoint*) override {
+        return kResultOk;
+    }
+    tresult PLUGIN_API disconnect(IConnectionPoint*) override {
+        return kResultOk;
+    }
+    tresult PLUGIN_API notify(IMessage* message) override {
+        const void* data = nullptr;
+        uint32 size = 0;
+        auto* attributes = message ? message->getAttributes() : nullptr;
+        if (damage && attributes && attributes->getBinary("report", data, size) == kResultOk &&
+            size > 1) {
+            // The same message with the report cut short. A new message,
+            // since the SDK's HostAttributeList leaks the value setBinary
+            // replaces.
+            IPtr<HostMessage> cut = owned(new HostMessage);
+            cut->setMessageID(message->getMessageID());
+            auto* to = cut->getAttributes();
+            to->setBinary("report", data, size / 2);
+            for (const char* key : {"load request", "accepted", "latency request"}) {
+                int64 value = 0;
+                if (attributes->getInt(key, value) == kResultOk)
+                    to->setInt(key, value);
+            }
+            last = to_.notify(cut);
+            ++damaged;
+            return last;
+        }
+        return to_.notify(message);
+    }
+    tresult PLUGIN_API queryInterface(const TUID _iid, void** obj) override {
+        QUERY_INTERFACE(_iid, obj, FUnknown::iid, IConnectionPoint)
+        QUERY_INTERFACE(_iid, obj, IConnectionPoint::iid, IConnectionPoint)
+        *obj = nullptr;
+        return kNoInterface;
+    }
+    uint32 PLUGIN_API addRef() override {
+        return 1;
+    }
+    uint32 PLUGIN_API release() override {
+        return 1;
+    }
+    bool damage = false;
+    tresult last = kResultOk;
+    int damaged = 0;
+
+  private:
+    IConnectionPoint& to_;
+};
+void damaged_report_message() {
+    const auto folder = private_temp("convolver-vst3-damaged-report");
+    std::filesystem::create_directories(folder);
+    const auto good = folder / "room.wav";
+    write_wav(good, 48000, 1, 8);
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk,
+            "damaged report: initialize");
+    Damaging to_controller(c);
+    require(p.connect(&to_controller) == kResultOk && c.connect(&p) == kResultOk,
+            "damaged report: connect");
+    const auto before = shown(c.report());
+    const auto text_before = c.status_text();
+    require(before.status_name == "No filter",
+            ("damaged report: first report " + before.status_name).c_str());
+    to_controller.damage = true;
+    require(c.load_file(good.string()), "a load whose answer came with a damaged report was "
+                                        "not answered as accepted");
+    require(to_controller.damaged > 0 && to_controller.last == kInvalidArgument,
+            "notify accepted a report that does not decode");
+    const auto during = shown(c.report());
+    require(during.status_name == "No filter" && during.filter_name == before.filter_name &&
+                c.status_text() == text_before,
+            ("a damaged report replaced the one shown: " + during.status_name + " " +
+             during.filter_name)
+                .c_str());
+    require(handler.dirty == 1, "the accepted load did not mark the project changed");
+    // Whole again: the next report shows the filter.
+    to_controller.damage = false;
+    const auto after = shown(c.report());
+    require(after.filter_name == "room.wav" && c.status_text() != text_before,
+            ("the next whole report not shown: " + after.status_name + " " + after.filter_name)
+                .c_str());
+    p.disconnect(&to_controller);
+    c.disconnect(&p);
+    c.terminate();
+    p.terminate();
     std::filesystem::remove_all(folder);
 }
 // PLUG-13 (jrp's review of 276c7dc): a filter that fills the saved state at
@@ -4033,6 +4099,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"load_with_failing_set_dirty", [] { load_without_set_dirty(true); }},
         {"saved_filter_name", saved_filter_name},
         {"messages_through_proxies", messages_through_proxies},
+        {"damaged_report_message", damaged_report_message},
         {"settings_at_state_limit", settings_at_state_limit},
         {"tail_measured_at_output", tail_measured_at_output},
         {"output_silence_flags", output_silence_flags},

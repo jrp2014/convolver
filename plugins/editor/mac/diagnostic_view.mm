@@ -30,25 +30,10 @@ constexpr NSTimeInterval refresh_interval = 0.5;
 constexpr unsigned ticks_per_check = 2; // Files are checked once a second.
 
 // UTF-8 text from the shared window model (portable/window_model.hpp) as a
-// string, and back.
+// string.
 NSString* ns(const std::string& text) {
     NSString* value = [NSString stringWithUTF8String:text.c_str()];
     return value ? value : @"";
-}
-std::string utf8(NSString* text) {
-    const char* chars = text.UTF8String;
-    return chars ? chars : "";
-}
-
-// The report's fields, as the format's block gives them, for the model.
-ReportFields report_fields_of(NSDictionary<NSString*, NSString*>* report) {
-    ReportFields fields;
-    for (NSString* key in report) {
-        NSString* value = report[key];
-        if ([key isKindOfClass:[NSString class]] && [value isKindOfClass:[NSString class]])
-            fields.insert_or_assign(utf8(key), utf8(value));
-    }
-    return fields;
 }
 
 // The status as a symbol and a colour; the status word is always written
@@ -734,9 +719,9 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 - (void)refresh {
     // What to show comes from the shared model (portable/window_model.hpp),
     // so every system's window shows the same for the same report.
-    NSDictionary<NSString*, NSString*>* report = report_ ? report_() : nil;
-    const ReportFields fields = report_fields_of(report);
-    const WindowContent c = window_content(report ? &fields : nullptr, loader_ != nil);
+    const std::optional<convolver::HostReport> report =
+        report_ ? report_() : std::optional<convolver::HostReport>();
+    const WindowContent c = window_content(report ? &*report : nullptr, loader_ != nil);
     _titleField.stringValue = ns(c.title);
     _statusField.stringValue = ns(c.status_name);
     _statusField.textColor = status_colour(c.tone);
