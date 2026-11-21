@@ -14,7 +14,7 @@
   guides). The known limitations add the host checks not repeated on this
   version, Ardour's VST3 channels, and the features new since 0.14.0 that
   only automated tests have checked
-  ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)).
+  ([releasing](../docs/develop/releasing.md#publishing-an-unsigned-preview)).
 
 ## Decisions: Releases
 
@@ -25,4 +25,4 @@
   and "don't make another preview release without these changes"). The
   host checks not repeated on it stay listed in its notes as not checked.
   The full CI runs for every release and preview release (jrp, the same
-  day). See [Releasing](docs/develop/releasing.md#publishing-an-unsigned-preview).
+  day). See [Releasing](../docs/develop/releasing.md#publishing-an-unsigned-preview).
