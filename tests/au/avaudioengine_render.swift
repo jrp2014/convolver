@@ -188,12 +188,21 @@ if roundTrip {
 // The host's property listener, as GarageBand and Logic register one for
 // the latency; the unit calls it on the main thread (AU-17). Each call
 // records the latency the unit reports then, so that the notice for a
-// chosen Latency is told apart from the one initialization sends.
-var notifiedLatencies = [Int]()
+// chosen Latency is told apart from the one initialization sends. A C
+// callback cannot call reportedLatency (a top-level function, which
+// captures context), so it records the seconds and the frames are worked
+// out after.
+var notifiedSeconds = [Float64]()
 let listener: AudioUnitPropertyListenerProc = { _, unit, id, _, _ in
     if id == kAudioUnitProperty_Latency {
-        notifiedLatencies.append(reportedLatency(unit))
+        var seconds: Float64 = -1
+        var size = UInt32(MemoryLayout<Float64>.size)
+        _ = AudioUnitGetProperty(unit, kAudioUnitProperty_Latency, kAudioUnitScope_Global, 0, &seconds, &size)
+        notifiedSeconds.append(seconds)
     }
+}
+func notifiedLatencies() -> [Int] {
+    notifiedSeconds.map { Int(($0 * rate).rounded()) }
 }
 guard AudioUnitAddPropertyListener(effect.audioUnit, kAudioUnitProperty_Latency, listener, nil) == noErr else {
     fail("cannot add a property listener")
@@ -289,11 +298,11 @@ if let latency = chosenLatency, !roundTrip {
     // Chosen while the engine runs: the unit prepares it on its Latency
     // queue, then reports it and tells the host's listener.
     RunLoop.main.run(until: Date().addingTimeInterval(0.1))
-    notifiedLatencies.removeAll()
+    notifiedSeconds.removeAll()
     setLatency(effect.audioUnit, latency)
     settle("Latency \(latency) and its notice") {
         reportedLatency(effect.audioUnit) == latency && parameter(effect.audioUnit, statusParameter) == statusActive
-            && notifiedLatencies.contains(latency)
+            && notifiedLatencies().contains(latency)
     }
     print("chose Latency \(latency) while running")
     print("latency notified \(latency)")
