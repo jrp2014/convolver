@@ -536,12 +536,13 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
         // (HostFilter::offer_name()): a host sends a refused preset's
         // controller state too, and that names a filter that does not play.
         // An identity this version could not have written names none.
-        const auto id = parse_filter_identity_text(
+        const auto filter_identity = parse_filter_identity_text(
             std::string_view(static_cast<const char*>(identity), identity_size));
         try {
-            if (name_size && id) {
+            if (name_size && filter_identity) {
                 const Locked lock(*this);
-                filter_.offer_name(std::string(static_cast<const char*>(name), name_size), *id);
+                filter_.offer_name(std::string(static_cast<const char*>(name), name_size),
+                                   *filter_identity);
             }
         } catch (...) {
             return kOutOfMemory;

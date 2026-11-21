@@ -88,6 +88,11 @@ constexpr CLSID access_services = {
     0xb5f8350b, 0x0548, 0x48b1, {0xa6, 0xee, 0x88, 0xbd, 0x00, 0xb4, 0xa5, 0xe7}};
 constexpr MSAAPROPID accessible_name = {
     0x608d3df8, 0x8128, 0x4aa7, {0xa4, 0x28, 0xf5, 0x5e, 0x49, 0x26, 0x72, 0x91}};
+// IAccPropServices takes the object and child IDs as DWORD, while winuser.h
+// defines OBJID_CLIENT as a (negative) LONG: the same 32 bits, as the DWORD
+// the interface expects.
+constexpr DWORD client_object = static_cast<DWORD>(OBJID_CLIENT);
+constexpr DWORD self_child = CHILDID_SELF;
 
 // The layout, in units of 1/96 inch, as the macOS window's points
 // (the AppKit window VST3 and the Audio Unit share): a fixed width and a height that
@@ -560,7 +565,7 @@ void Editor::forget_controls() {
                                        reinterpret_cast<void**>(&services)))) {
             MSAAPROPID name = accessible_name;
             for (HWND control : named_)
-                services->ClearHwndProps(control, OBJID_CLIENT, CHILDID_SELF, &name, 1);
+                services->ClearHwndProps(control, client_object, self_child, &name, 1);
             services->Release();
         }
         named_.clear();
@@ -797,7 +802,7 @@ void Editor::name_for_screen_readers(HWND control, const std::wstring& name) {
     if (FAILED(CoCreateInstance(access_services, nullptr, CLSCTX_INPROC_SERVER,
                                 IID_IAccPropServices, reinterpret_cast<void**>(&services))))
         return;
-    if (SUCCEEDED(services->SetHwndPropStr(control, OBJID_CLIENT, CHILDID_SELF, accessible_name,
+    if (SUCCEEDED(services->SetHwndPropStr(control, client_object, self_child, accessible_name,
                                            name.c_str())))
         named_.push_back(control);
     services->Release();
@@ -955,7 +960,7 @@ void Editor::make_fonts() {
         base = metrics.lfMessageFont;
     else {
         base.lfHeight = -px(12);
-        std::wcscpy(base.lfFaceName, L"Segoe UI");
+        wcscpy_s(base.lfFaceName, LF_FACESIZE, L"Segoe UI");
     }
     body_ = CreateFontIndirectW(&base);
     LOGFONTW font = base;
