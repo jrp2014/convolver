@@ -55,10 +55,10 @@ class Handler final : public IComponentHandler, public IComponentHandler2 {
     tresult PLUGIN_API finishGroupEdit() override {
         return kNotImplemented;
     }
-    tresult PLUGIN_API queryInterface(const TUID iid, void** obj) override {
-        QUERY_INTERFACE(iid, obj, FUnknown::iid, IComponentHandler)
-        QUERY_INTERFACE(iid, obj, IComponentHandler::iid, IComponentHandler)
-        QUERY_INTERFACE(iid, obj, IComponentHandler2::iid, IComponentHandler2)
+    tresult PLUGIN_API queryInterface(const TUID _iid, void** obj) override {
+        QUERY_INTERFACE(_iid, obj, FUnknown::iid, IComponentHandler)
+        QUERY_INTERFACE(_iid, obj, IComponentHandler::iid, IComponentHandler)
+        QUERY_INTERFACE(_iid, obj, IComponentHandler2::iid, IComponentHandler2)
         *obj = nullptr;
         return kNoInterface;
     }
@@ -96,9 +96,9 @@ class Frame final : public IPlugFrame {
         asked.push_back(*size);
         return view->onSize(size);
     }
-    tresult PLUGIN_API queryInterface(const TUID iid, void** obj) override {
-        QUERY_INTERFACE(iid, obj, FUnknown::iid, IPlugFrame)
-        QUERY_INTERFACE(iid, obj, IPlugFrame::iid, IPlugFrame)
+    tresult PLUGIN_API queryInterface(const TUID _iid, void** obj) override {
+        QUERY_INTERFACE(_iid, obj, FUnknown::iid, IPlugFrame)
+        QUERY_INTERFACE(_iid, obj, IPlugFrame::iid, IPlugFrame)
         *obj = nullptr;
         return kNoInterface;
     }

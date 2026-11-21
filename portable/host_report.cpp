@@ -103,7 +103,7 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
                                             fault_advice(filter.faults(), true).problem));
     } else if (status == HostStatus::fault) {
         take(fault_advice(filter.faults(), false));
-        if (const auto& c = filter.filter()) {
+        if (filter.filter()) {
             m.plays = !facts.bypassed ? std::string("The filter keeps playing.")
                       : !host         ? std::string("Bypass is on: no filter is applied.")
                       : dry_signal(filter, *host)

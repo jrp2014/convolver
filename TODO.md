@@ -486,5 +486,8 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **CI-46 — The VST3 plug-in builds with the others' warnings.** 20
+  November 2026, PR #235
+  ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
 - [x] **DOC-19 — Shorter project records.** 21 November 2026, PRs #238 to
   #241 ([recording progress](docs/develop/workflow.md#recording-progress-in-todo)).

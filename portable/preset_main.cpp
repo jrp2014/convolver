@@ -104,7 +104,10 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
         // PLUG-31: the name a .vstpreset keeps for the window, as a file chosen
         // there gives it (PLUG-22): the file's name with its extension.
         std::string filter_file_name;
-        if (!alias && convolver::presets::format_for(input) == Format::vst3) {
+        bool from_preset = false; // The alias never reads a .vstpreset.
+        if constexpr (!alias)
+            from_preset = convolver::presets::format_for(input) == Format::vst3;
+        if (from_preset) {
             if (selected)
                 throw std::invalid_argument(advice_text(
                     {"--sample-rate, --input-channels and --output-channels cannot choose from a "
@@ -170,14 +173,16 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
                      "Use the command-line tool, convolver, for filters with more channels.",
                      {}}));
             }
-            std::error_code error;
-            if (!alias && fs::symlink_status(outputs[i], error).type() != fs::file_type::not_found)
-                throw std::invalid_argument(
-                    advice_text({utf8_string(outputs[i]) + " already exists",
-                                 "convolver-preset writes only to new paths, so it never "
-                                 "replaces a preset.",
-                                 "Choose another name, or remove the old preset first.",
-                                 {}}));
+            if constexpr (!alias) {
+                std::error_code error;
+                if (fs::symlink_status(outputs[i], error).type() != fs::file_type::not_found)
+                    throw std::invalid_argument(
+                        advice_text({utf8_string(outputs[i]) + " already exists",
+                                     "convolver-preset writes only to new paths, so it never "
+                                     "replaces a preset.",
+                                     "Choose another name, or remove the old preset first.",
+                                     {}}));
+            }
         }
         for (std::size_t i = 0; i < outputs.size(); ++i) {
             try {
@@ -246,9 +251,11 @@ template <class Char> int run(int argc, Char** argv) {
     std::vector<int> positional;
     for (; i < argc; ++i) {
         auto option = ascii(argv[i]);
-        if (!alias && (option == "--help" || option == "-h")) {
-            std::cout << text;
-            return 0;
+        if constexpr (!alias) {
+            if (option == "--help" || option == "-h") {
+                std::cout << text;
+                return 0;
+            }
         }
         if (option.rfind("--", 0) != 0) {
             if (alias)
@@ -280,6 +287,26 @@ template <class Char> int run(int argc, Char** argv) {
         }
         auto value_text = ascii(argv[++i]);
         unsigned long value = 0;
+        // The alias has no --name.
+        if constexpr (!alias) {
+            if (option == "--name") {
+                try {
+                    name = utf8_string(fs::path(argv[i]));
+                } catch (const std::exception&) { // Windows: unpaired UTF-16 surrogates
+                    name.clear();
+                }
+                if (name.empty()) {
+                    std::cerr << cli_error("convolver-preset",
+                                           advice_text({"--name needs a name in Unicode text",
+                                                        {},
+                                                        "Write the preset's name after --name.",
+                                                        {}}))
+                              << text;
+                    return 2;
+                }
+                continue;
+            }
+        }
         if (option == "--sample-rate" && positive(value_text, convolver::max_sample_rate, value))
             selection.sample_rate = static_cast<int>(value);
         else if (option == "--input-channels" &&
@@ -288,23 +315,7 @@ template <class Char> int run(int argc, Char** argv) {
         else if (option == "--output-channels" &&
                  positive(value_text, convolver::max_channel_count, value))
             selection.output_channels = value;
-        else if (!alias && option == "--name") {
-            try {
-                name = utf8_string(fs::path(argv[i]));
-            } catch (const std::exception&) { // Windows: unpaired UTF-16 surrogates
-                name.clear();
-            }
-            if (name.empty()) {
-                std::cerr << cli_error("convolver-preset",
-                                       advice_text({"--name needs a name in Unicode text",
-                                                    {},
-                                                    "Write the preset's name after --name.",
-                                                    {}}))
-                          << text;
-                return 2;
-            }
-            continue;
-        } else {
+        else {
             if (alias) {
                 std::cerr << "Invalid option or value: " << option << '\n' << text;
                 return 2;
