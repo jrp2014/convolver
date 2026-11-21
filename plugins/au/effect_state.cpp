@@ -227,8 +227,7 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
 // failure could be recorded (ROBUST-7).
 void Effect::silence_failed_first_load() noexcept {
     filter_.fail_request(host());
-    if (!host() && filter_.failed())
-        tail_.store(0);
+    publish_timing();
 }
 
 // ROBUST-7: a request that failed before its failure could be recorded
@@ -296,7 +295,7 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                 },
                 request, host(), settling_.check(request.kind));
             // Nothing from here on can throw: the request is accepted.
-            tail_.store(host() ? host()->tail_frames() : change.inactive_tail);
+            publish_timing();
             accepted = true;
             if ((applied = change.settings)) {
                 store(*applied);

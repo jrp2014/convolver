@@ -248,6 +248,11 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     HostProcessor* host() const noexcept {
         return playing_.newest();
     }
+    // PLUG-39 step 6: under control_, after every change to the newest
+    // processor or the accepted filter, the one place that writes the latency
+    // and tail the host reads, from host() or, with none, filter_. Before the
+    // host is notified, so it reads at once what the next block uses.
+    void publish_timing() noexcept;
     // control_, held for this object's lifetime. Taking it first frees the
     // replaced processors neither process() nor setProcessing() still
     // holds, so a processor a new Latency replaced lives until the first
@@ -316,8 +321,10 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // PLUG-10: the Gain mode the audio thread plays (choose_gain_mode()).
     std::atomic<GainMode> gain_mode_{GainMode::set};
     static_assert(std::atomic<GainMode>::is_always_lock_free);
-    // The running processor's latency; `inactive` while inactive (0 is a
-    // latency since PERF-2).
+    // What getLatencySamples() and getTailSamples() read without control_,
+    // written only by publish_timing(): the newest processor's latency,
+    // `inactive` with none (0 is a latency since PERF-2), and its tail, or
+    // with none the accepted filter's.
     static constexpr std::size_t inactive = std::numeric_limits<std::size_t>::max();
     std::atomic<std::size_t> active_latency_{inactive};
     std::atomic<Steinberg::uint32> tail_{0};

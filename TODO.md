@@ -53,17 +53,14 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 
 ### In progress
 
-PLUG-39's step 5, after step 4a (PR #236); HOST-11's Status reading
-during playback (PR #251), after the first version passed in jrp's run of
-21 November 2026. Check the open pull requests for an ID before starting
-anything.
+PLUG-39's last step (PR STEP6PR), then PLUG-24 and DIAG-10. Check the open
+pull requests for an ID before starting anything.
 
 ### Ready
 
 | Item | What to do | Note |
 | --- | --- | --- |
-| **PLUG-39** | Step 6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps); steps 0 to 5 and ROBUST-8 are merged | Each step is its own reviewed pull request (jrp, 13 and 19 November 2026) |
-| **PLUG-24** | `HostProcessor` in its own source file | In PLUG-39's sequence, as its own pull request, never with a DSP change (jrp, 19 November 2026) |
+| **PLUG-24** | `HostProcessor` in its own source file | After PLUG-39, as its own pull request, never with a DSP change (jrp, 19 November 2026) |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 
@@ -164,12 +161,12 @@ Foundation items are parked by owner decision instead.
 - [ ] **DIAG-9 — Numbers in the user's locale.** Low priority. **Done when**
   the window shows numbers in the system locale from one formatting path,
   Status and the log stay plain, and a test covers other separators; best
-  after PLUG-39's typed reporting.
+  after DIAG-10.
 - [ ] **DIAG-10 — Status says what the window says.** Status also names a
   Latency not in use yet, the Estimate being found or failing, and a filter
-  still loading ([what Status leaves out](docs/use/plugins.md#status-and-the-convolver-log));
-  in PLUG-39's typed reporting. **Done when** each format's tests cover
-  them and jrp has decided LV2's `status` port values.
+  still loading ([what Status leaves out](docs/use/plugins.md#status-and-the-convolver-log)),
+  from the typed report. **Done when** each format's tests cover them and
+  jrp has decided LV2's `status` port values.
 
 ## Plug-ins: VST3, LV2 and AU
 
@@ -200,14 +197,9 @@ done once for all three formats:
 - [ ] **PLUG-29 — Keep the Recent list out of the log folder.** Save it in
   each platform's application-support folder, reading the old file once.
   **Done when** the tests cover both paths and the guide names the folder.
-- [ ] **PLUG-39 — One consolidation of the load and restore path.** Step
-  6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md).
-  **Done when** the plan's
-  [success criterion](docs/project/plans/2026-11-13-load-restore-consolidation.md#success-criterion)
-  is met.
 - [ ] **PLUG-24 — `HostProcessor` in its own source file.** Move its audio
   code out of `host.cpp`, with public APIs, saved state, messages and
-  results unchanged, as its own pull request in PLUG-39's sequence.
+  results unchanged, as its own pull request after PLUG-39.
 
 LV2 (Linux first; also PipeWire system audio):
 
@@ -501,6 +493,10 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **PLUG-39 — One consolidation of the load and restore path.** 21
+  November 2026, PRs #200, #205, #213, #217, #219, #224, #226, #230 to
+  #232, #236, #246, #250 and STEP6PR ([plan](docs/archive/plans/2026-11-13-load-restore-consolidation.md),
+  [adapter contract](docs/develop/plugin-contract.md#replacement-and-threads)).
 - [x] **PERF-3 — One measurement exercise: budgets, supported workloads and
   published evidence.** 21 November 2026, PR #248
   ([supported workloads](docs/develop/fft-measurements.md#supported-workloads),

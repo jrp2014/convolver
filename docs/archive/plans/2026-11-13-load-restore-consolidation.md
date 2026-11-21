@@ -79,7 +79,7 @@ where that decision is made since step 1b (PR #224):
 | Keep the playing filter or replace it (PLUG-38) | `install()`'s callback, with its own exception for `Origin::project` | `install()`'s callback | `restore_locked()`'s callback; a file chosen through `patch:Set` (`load_request()`) always replaces. Since step 1b: `HostFilter::load()` (a session is never counted as playing) and `HostProcessor::play()`, in every format, LV2's chosen file included |
 | Which settings an accepted request applies | `install()`: state's settings, or a chosen `.vstpreset`'s when it holds them; bypass from state | `install()`: `store()` for each saved parameter | None: the host restores the ports. Since step 1b: `HostChange::settings` and `bypass`, the request's own; VST3 fills its defaults for state without them and the Audio Unit lays its parameters over the present values where they read the state, and LV2 drops any a state carries |
 | Find the estimate for the request's Gain mode, and undo that on refusal | `install()`: `set_estimating()` and back | `install()`: the same | `apply_gain_mode()`, later, on the worker. Since step 1b: `HostFilter::load()` follows the settings' Gain mode, committed on acceptance; LV2's port changes still go through `apply_gain_mode()` |
-| The tail while inactive | `install()`: `configuration_tail_frames()` | `install()`: the same | None: LV2 core reports no tail. Since step 1b: `HostChange::inactive_tail` |
+| The tail while inactive | `install()`: `configuration_tail_frames()` | `install()`: the same | None: LV2 core reports no tail. Since step 1b: `HostChange::inactive_tail`; since step 6, `HostFilter::filter_tail()`, found when the filter is accepted |
 | A failed first load plays silence | `refused()` | `silence_failed_first_load()` | `silence_failed_first_load()`, plus `unfiltered` and `refused_mute` for `run()`. Since step 1b: `HostFilter::fail_request()` with the playing processor; LV2's `unfiltered` and `refused_mute` stay, for a first load `run()` itself refuses on the audio thread |
 | Whether a filter that does not suit the host is refused or kept until it does | `load_check()` from `Origin` and `played_` | `known_layout()`: while uninitialized, nothing until a configuration has rendered, so such a request is not checked | Always checked: LV2 fixes the rate and channels at instantiation. Since step 2: `HostSettling::check()` and `known()` for VST3 and the Audio Unit |
 
@@ -97,8 +97,8 @@ group to a row:
 
 | Value | What it copies or derives from | Target |
 | --- | --- | --- |
-| VST3 `tail_`, written in four places; Audio Unit `tail_` | The playing processor's tail and the accepted filter's | Computed by one function from the processor and filter, which already follows a replacement inside a processor (the harness's `tail-after-replacement`) |
-| VST3 `active_latency_`; Audio Unit `latency_` (the newest processor's latency, or the chosen one while uninitialized) | The newest processor's latency, and the chosen setting | The newest processor's latency, written by the ownership mechanism when it offers that processor, so the host reads at once the latency the next callback uses; the Audio Unit's second meaning comes from its parameter |
+| VST3 `tail_`, written in four places; Audio Unit `tail_` | The playing processor's tail and the accepted filter's | Computed by one function from the processor and filter, which already follows a replacement inside a processor (the harness's `tail-after-replacement`). Since step 6: written only by each adapter's `publish_timing()`, from the newest processor or, with none, `HostFilter::filter_tail()`; the atomic stays, because the host reads it without the control lock |
+| VST3 `active_latency_`; Audio Unit `latency_` (the newest processor's latency, or the chosen one while uninitialized) | The newest processor's latency, and the chosen setting | The newest processor's latency, written by the ownership mechanism when it offers that processor, so the host reads at once the latency the next callback uses; the Audio Unit's second meaning comes from its parameter. Since step 6: written only by `publish_timing()`, right after each offer; with no processor, VST3's is a mark that the getter answers with the chosen Latency, and the Audio Unit's is the chosen Latency, from its parameter |
 | Audio Unit `status_`, `status_log_written_`, `status_bypassed_`, `report_cache_` | `host_status()` and `host_report()` of `HostFilter`, the settings and bypass | One control-side snapshot, combined when read with the live audio-side values (step 4). Since step 4a: gone; `Effect::Diagnostics`, which shares the accepted filter, is published whole by `update_status()`, and the Status line and report are built from it with the Gain, Mix, bypass, latency and tail read then |
 | VST3 controller `status_text_`, `status_value_`, `report_text_` | The report the controller already holds (`report_`) | Derived from it. Since step 5a: gone; the controller holds the decoded report and the log tag only |
 | VST3 processor `kept_name_` and `kept_identity_`, controller `kept_name_` and `kept_identity_` | The name pair of the playing filter, kept beside the newest offered pair | Removed by the shared name rule; the processor's offered pair moves into `HostFilter`. Since step 4b: gone; `HostFilter` keeps the offered name, and state of the filter that plays keeps the name it shows |
@@ -150,7 +150,7 @@ step may simplify their code but does not try to remove them:
 jrp asked on 13 November 2026 how this compares with similar plug-ins. The
 commercial convolution reverbs (Altiverb, Space Designer, Reverberate, Hang
 Loose Convolver) do not publish their code, so only their behaviour can be
-compared, which the [edges plan](2026-11-06-edges-over-other-convolvers.md)
+compared, which the [edges plan](../../project/plans/2026-11-06-edges-over-other-convolvers.md)
 does. These open-source ones were read at the commits given:
 
 | Plug-in | What decides what a change requires | How the playing engine is replaced and freed | What the status and window read | What is saved |
@@ -502,7 +502,42 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
    changes against this plan's inventory; the CHANGELOG entry and PLUG-39
    moved to done; jrp's
    REAPER and GarageBand check on the next candidate. This plan then moves
-   to the archive.
+   to the archive. Done on 21 November 2026, as below; the host check is
+   checks 2, 5 and 8 of the [status page](../../project/status.md#checks-left-before-publication),
+   which run again on the next published preview because plug-in code
+   changed.
+
+   **The recount**, on `main` with step 5b merged, against the
+   [inventory](#inventory):
+   - **Decisions:** none of the six is made in an adapter.
+     `HostFilter::load()` decides keep or replace (with
+     `HostProcessor::play()`), the settings and bypass (`HostChange`) and
+     the estimate; `HostFilter::fail_request()` silences a failed first load;
+     `HostSettling::check()` says whether a filter that does not suit the
+     host is refused or kept; and the tail while no processor plays was the
+     last one an adapter took from the load's result, which step 6 replaced
+     with `HostFilter::filter_tail()`. The adapters translate the host's
+     calls and the formats' own settings: VST3 fills its defaults for state
+     without settings (VST3-4), the Audio Unit lays its parameters over the
+     present values, and LV2's port changes go through
+     `apply_gain_mode()`, which is a port change, not an accepted request.
+   - **Mechanisms:** one each. `PlayingProcessor` for VST3 and the Audio
+     Unit, with LV2 keeping `stage()` and `retire()` for the reason step 3
+     records; `HostSettling`, which LV2 does not need; `host_status_value()`;
+     and `HostFilter::offer_name()`.
+   - **Values:** the Audio Unit's four status copies, the VST3 controller's
+     three and the four kept names are gone (steps 4a, 5a and 4b); LV2's
+     `shown` is written through the shared ordering (step 4c); the tail and
+     latency the host reads stay as atomics, because the host reads them
+     without the control lock, and are written in one function in each
+     adapter (step 6).
+   - **Text written and parsed back:** none (steps 1b, 5a and 5b).
+
+   The rows of [what stays](#what-stays-and-why) are unchanged. Step 6's
+   code changes no audio, saved state or message. What the host reads
+   changes in one case: once the host has stopped the plug-in, VST3's and
+   the Audio Unit's tail is the accepted filter's, where it stayed at the
+   last processor's (the longest filter it had played).
 
 ## Relation to other work
 

@@ -243,10 +243,9 @@ OSStatus Effect::Initialize() {
             bypassed = bypass_.load();
             next->set_bypass(bypassed);
             next->reset();
-            tail_.store(next->tail_frames());
-            latency_.store(next->latency_frames());
             playing_.offer(std::move(next));
             filter_.activate(std::move(activation));
+            publish_timing();
             settling_.started(now);
             reset_requested_.store(false);
             started = true;
@@ -306,8 +305,8 @@ void Effect::Cleanup() {
         // still mark the formats as rendered or take a reset meant for the next
         // initialization; it can no longer use a freed processor.
         playing_.offer(nullptr);
-        latency_.store(settings().latency); // What the next initialization uses.
-        update_status(); // Read when the host next asks; no notification while it tears down.
+        publish_timing(); // Uninitialized: the chosen Latency, and the filter's tail.
+        update_status();  // Read when the host next asks; no notification while it tears down.
     }
     log_faults(faults);
 }
@@ -358,6 +357,12 @@ UInt32 Effect::SupportedNumChannels(const AUChannelInfo** out) {
     return static_cast<UInt32>(infos.size());
 }
 
+void Effect::publish_timing() noexcept {
+    const auto* const p = host();
+    tail_.store(p ? p->tail_frames() : filter_.filter_tail());
+    latency_.store(p ? p->latency_frames() : settings().latency);
+}
+
 Float64 Effect::GetLatency() noexcept AUSDK_RTSAFE {
     const auto rate = GetOutput0().GetStreamFormat().mSampleRate;
     return rate > 0 ? static_cast<Float64>(latency_.load()) / rate : 0;
@@ -395,7 +400,9 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
             // Only a bypass to show (request_status()): a Latency that could
             // not be built is not tried again for it.
         } else if (!host()) {
-            changed = latency_.exchange(chosen) != chosen; // The next Initialize uses it.
+            const auto before = latency_.load();
+            publish_timing(); // The chosen Latency, which the next Initialize uses.
+            changed = latency_.load() != before;
         } else if (const auto& started = settling_.last_start();
                    host()->latency_frames() != chosen && started) {
             const auto before = host()->latency_frames();
@@ -413,12 +420,11 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
                 // Nothing below can fail: the audio, the reported latency and
                 // the status change together, from the processor that now
                 // plays (ROBUST-8).
-                tail_.store(next->tail_frames());
-                latency_.store(next->latency_frames());
                 // Render plays it from its next call; the one it replaces is
                 // freed by a later control call once Render has let it go.
                 playing_.offer(std::move(next));
                 filter_.activate(std::move(activation));
+                publish_timing();
                 changed = true;
             } catch (const std::exception& e) {
                 try {

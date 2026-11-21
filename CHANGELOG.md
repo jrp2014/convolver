@@ -37,6 +37,16 @@ first published preview, keep their original grouping.
 
 ### Changed
 
+- Plug-ins (PLUG-39 step 6, which finishes PLUG-39): the latency and tail
+  the host reads are written in one place in each of VST3 and the Audio
+  Unit, from the newest processor or, with none, from the accepted filter
+  (`HostFilter::filter_tail()`, which replaces `HostChange::inactive_tail`).
+  One reading changes, while no audio runs: once the host has stopped the
+  plug-in, the tail is the accepted filter's, where it stayed at the
+  longest filter the last processor had played (`vst3.adapter`'s
+  `edge_cases` checks it). Audio, saved state and messages are unchanged. The
+  [plan](docs/archive/plans/2026-11-13-load-restore-consolidation.md) is
+  archived with its recount.
 - Library and tools (PLUG-39 step 5b): exceptions keep their message's
   parts (problem, cause, fix, note) typed beside their text, and every catch
   block reads the parts rather than parsing the "Cause: ", "Fix: " and

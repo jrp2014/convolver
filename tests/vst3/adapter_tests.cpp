@@ -275,7 +275,15 @@ void edge_cases() {
     require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk &&
                 p.getTailSamples() == 1010 + latency_samples,
             "corrected rate does not bring the filter back");
+    // PLUG-39 step 6: while active the tail stays at the longest filter the
+    // processor has played; once the host stops, nothing rings on, so the
+    // tail is the accepted filter's.
+    state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&state) == kResultOk && p.getTailSamples() == 1010 + latency_samples,
+            "a shorter filter shortened the tail while active");
     p.setActive(false);
+    require(p.getTailSamples() == 1 + latency_samples,
+            "the tail after stopping is not the accepted filter's");
     p.terminate();
 }
 void multichannel() {

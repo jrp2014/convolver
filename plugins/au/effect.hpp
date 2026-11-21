@@ -349,6 +349,11 @@ class Effect final : public ausdk::AUBase {
     HostProcessor* host() const noexcept {
         return playing_.newest();
     }
+    // PLUG-39 step 6: under `control_`, after every change to the newest
+    // processor or the accepted filter, the one place that writes the latency
+    // and tail the host reads, from host() or, with none, filter_. Before the
+    // host is notified, so it reads at once what the next render uses.
+    void publish_timing() noexcept;
     // `control_`, held for this object's lifetime. Taking it first frees the
     // replaced processors Render no longer holds, so a processor a new
     // Latency replaced lives until the first control call after Render lets
@@ -371,8 +376,12 @@ class Effect final : public ausdk::AUBase {
     PlayingProcessor<HostProcessor, 1> playing_;
     std::atomic<bool> bypass_{false};
     std::atomic<bool> reset_requested_{false};
+    // What GetLatency, GetTailTime and the report read without `control_`,
+    // in frames, written only by publish_timing(): the newest processor's
+    // latency and tail, or with none the chosen Latency (what the next
+    // initialization uses) and the accepted filter's tail.
+    std::atomic<std::size_t> latency_{default_host_latency};
     std::atomic<std::size_t> tail_{0};
-    std::atomic<std::size_t> latency_{default_host_latency}; // In frames; see GetLatency.
     // PLUG-10, under control_: the Gain mode the queue last applied and logged.
     GainMode applied_gain_mode_ = GainMode::set;
     // PLUG-39 step 2: when the host has settled its formats. An
