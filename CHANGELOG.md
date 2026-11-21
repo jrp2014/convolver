@@ -273,6 +273,34 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### For contributors
 
+- CI (CI-51): the Audio Unit workflow's two
+  sanitizer jobs, the AU tests with ASan and UBSan and the fallbacks, and
+  `au.adapter` under ThreadSanitizer, run as steps of its `au` job after the
+  Release build and tests, each in its own build folder and even when an
+  earlier part failed. A pull request that changes the core takes three of
+  the account's five macOS runners instead of five, or five instead of seven
+  with the candidates, and every test still runs
+  ([CI triggers](docs/develop/testing.md#ci-triggers)).
+- Tests (CI-50): `vst3.lifecycle` has a 600-second CTest limit, as
+  `au.lifecycle` and `lv2.lifecycle` have, instead of 300. The Intel macOS
+  candidate took 124 to 221 seconds in ten passing runs on 20 and 21
+  November 2026 and timed out at 300 on a slow runner (run 44934007168).
+- CI (CI-49, from an outside CI analysis jrp passed on on 21 November
+  2026): pull requests no longer run the advisory **Newest upstream lilv**
+  job, which builds the newest lilv, zix, serd, sord and sratom from source;
+  like the advisory pluginval pre-release (CI-38) it still runs on pushes to
+  `main`, the weekly and manual runs
+  ([pre-releases](docs/develop/build.md#pre-releases-and-newer-upstream-versions));
+  `tests/ci_scope_tests.py` accepts that extra condition only for the
+  advisory jobs it lists, and requires it of them. The Monday runs with macOS jobs now start half an hour apart
+  (candidates 06:23, Audio Unit 06:53, VST3 07:23 UTC) instead of together,
+  so they no longer queue for the same five macOS runners. The analysis's other
+  proposals were not taken: the Accelerate and Ooura builds keep the
+  package consumer tests, because the installed package's configuration
+  differs for each FFT backend and those builds are the only check of the
+  Accelerate and Ooura packages; the Ardour and LV2 tools jobs stay without
+  a compiler cache (builds of 17 to 35 s, never the last job, and the
+  repository's cache space is shared).
 - Tests (HOST-10): the headless Ardour test plays the mono and stereo
   examples on Strict-I/O tracks too, as Ardour's window adds by default
   (`CONVOLVER_STRICT_IO`), and the mono example in the VST3 plug-in on a
