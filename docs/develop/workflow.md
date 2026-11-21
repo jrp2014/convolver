@@ -324,8 +324,7 @@ finished (**Done when**) and, when it is not to be done now, what would
 justify it (**Worth doing when**). When a pull request advances an item,
 rewrite those words in place rather than adding a narrative of the work:
 the pull request, the plan the item links and the CHANGELOG keep the
-evidence (jrp, 12 November 2026, DOC-14; shortened by DOC-19, 20 November
-2026). The items' earlier, longer text is in
+evidence (jrp, 12 November 2026, DOC-14, and 20 November 2026, DOC-19). The items' earlier, longer text is in
 [`docs/archive/todo/`](../archive/todo/README.md).
 
 The item is the one home for its open work. The

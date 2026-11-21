@@ -53,9 +53,10 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 
 ### In progress
 
-PLUG-39's steps go one pull request at a time (step 4a with PLUG-30 is next),
-and DOC-19's parts each have their own pull request. Check the open pull
-requests for an ID before starting anything.
+PLUG-39's step 4a with PLUG-30 (PR #236); PLUG-27, which jrp brought
+forward on 20 November 2026 (PR #233); and DOC-19, whose parts each have
+their own pull request. Check the open pull requests for an ID before
+starting anything.
 
 ### Ready
 
@@ -99,7 +100,7 @@ Foundation items are parked by owner decision instead.
 
 | Items | Note |
 | --- | --- |
-| **ROBUST-1**, **PLUG-27**, **PLUG-29**, **HOST-6** | Robustness and lifecycle corner cases; PLUG-27 is being done anyway in PR #233 |
+| **ROBUST-1**, **PLUG-29**, **HOST-6** | Robustness and lifecycle corner cases |
 | **CI-32** | The most extreme numerical cases less often; dormant (jrp, 12 November 2026) |
 | **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19** | Profiling and measurement-only optimisations |
 | The rest of **PLUG-25** and **CFG-3** | Marking a host rate as not yet confirmed, and reading Windows-1252 names; each also needs jrp's decision |
@@ -113,16 +114,19 @@ Foundation items are parked by owner decision instead.
   ([signing plan](docs/project/plans/2026-11-09-macos-signing.md)),
   Authenticode on Windows, verified minimum versions, dependency closure and
   the final licence review. **Done when** one candidate run gives signed,
-  verified packages and jrp publishes them.
+  verified packages for every shipped format, each gate recorded as passed,
+  and jrp publishes them.
 - [ ] **REL-3 — Independent walkthrough of an exact preview.** Someone who
-  did not write the code follows the REL-2 journeys from the published
-  0.14.0 files using only the documentation. **Done when** the record gives
-  the tester, package hash, system, host and each step's result, and each
-  finding has fixed the guides or the product.
-- [ ] **REL-4 — Make the preview findable.** At each preview, the
-  [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable),
-  including the community posts and the LV2 list proposal. **Done when**
-  those steps are done for the latest preview.
+  wrote neither the code nor the guides follows the REL-2 journeys from the
+  published 0.14.0 files on their own machine, using only the documentation.
+  **Done when** the record gives the tester, package hash, system and host,
+  and for each step whether it worked, where they hesitated and what needed
+  help; and each finding has fixed the guides or the product, with the
+  affected steps repeated.
+- [ ] **REL-4 — Make the preview findable.** The
+  [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable)
+  at each preview, and for 0.13.12, which added LV2, the community posts and
+  the LV2 list proposal those steps name. Recurs with each preview.
 - [ ] **HOST-1 — Named host matrix.** REAPER and Audacity on jrp's Mac
   ([checks left](docs/project/status.md#checks-left-before-publication) 1 to 4
   and 10) on the published 0.14.0 files, then Windows hosts. **Done when**
@@ -169,7 +173,8 @@ done once for all three formats:
   and its tests cover it ([trademarks](packaging/trademarks/README.md)).
 - [ ] **PLUG-25 — Say which rate the host plays at.** The rate refusal's
   advice is done (PR #210). **Remains:** whether the window marks a host
-  rate as not yet confirmed; parked, and jrp decides.
+  rate as not yet confirmed; parked. **Done when** jrp has decided and, if
+  he wants it, the marking is shown and its message tests cover it.
 - [ ] **PLUG-27 — Read a chosen filter before the host's audio settings
   are known.** Check a chosen IR or `.cfg` when audio starts, as a preset
   is, in VST3 and the Audio Unit. **Done when** tests cover choosing before
@@ -183,9 +188,9 @@ done once for all three formats:
   step 4a.
 - [ ] **PLUG-39 — One consolidation of the load and restore path.** Steps
   4a, 5 and 6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md).
-  **Done when** each decision is made once in shared code, each mechanism
-  has one implementation and each copied value one writer, with audio,
-  saved state and host behaviour unchanged.
+  **Done when** the plan's
+  [success criterion](docs/project/plans/2026-11-13-load-restore-consolidation.md#success-criterion)
+  is met.
 - [ ] **PLUG-24 — `HostProcessor` in its own source file.** Move its audio
   code out of `host.cpp`, with public APIs, saved state, messages and
   results unchanged, as its own pull request in PLUG-39's sequence.
@@ -208,10 +213,12 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   [checks left](docs/project/status.md#checks-left-before-publication), on
   0.14.0's files; other hosts on request. **Done when** they pass or jrp
   narrows them.
-- [ ] **AU-6 — Editor window.** VoiceOver (check 5), the host's
-  responsiveness while a long chosen filter loads, and a host that runs the
-  unit out of process. **Done when** VoiceOver passes or jrp narrows it,
-  and the rest are recorded.
+- [ ] **AU-6 — Editor window.** VoiceOver (check 5); the host's
+  responsiveness while a long chosen filter loads; a host that runs the unit
+  out of process (REAPER, or Rosetta); and from the 1 November redesign, in
+  GarageBand, the typed boxes, a light rendering, a manual Mix drag and
+  listening to the Latency gap. **Done when** VoiceOver passes or jrp
+  narrows it, and the rest are recorded.
 
 ## FFmpeg integration
 
@@ -239,7 +246,9 @@ upstream, or state support in FFmpeg's `lv2` filter
   CamillaDSP, each refusing what it cannot represent; after CFG-1.
 - [ ] **CFG-3 — Read configurations saved in Windows-1252.** Non-UTF-8 names
   are refused with advice (PR #211). **Remains:** jrp's decision whether to
-  read them, a `.cfg` compatibility choice.
+  read them, a `.cfg` compatibility choice recorded in the decisions log
+  either way. **Done when** he has decided and, if he wants it, such names
+  load with a test.
 - [ ] **COMPAT-1 — Files from released builds.** Five previews' files are
   kept and checked ([upgrade tests](tests/upgrade/README.md)). **Remains:**
   a REAPER project saved with 0.14.0 and Audio Unit state from a release.
@@ -247,9 +256,10 @@ upstream, or state support in FFmpeg's `lv2` filter
 - [ ] **IO-1 — Large files.** **Done when** each container's 4 GiB boundary
   and pipes beyond it have a test; only for a defect or a user need.
 - [ ] **IO-2 — The rate-mismatch workflow, and offline IR resampling.** A
-  documented route for an IR at one rate and a host at another, any
-  conversion an explicit, tested operation; a mismatch stays refused by
-  default, and jrp decides whether Convolver resamples
+  documented route for an IR at one rate and a host at another. **Done
+  when** that route is documented and any conversion is an explicit
+  operation tested for gain, delay, length and metadata, with a mismatch
+  still refused by default; jrp decides whether Convolver resamples
   ([edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#1-a-filter-for-every-sample-rate)).
 - [ ] **ROBUST-1 — Longer fuzz and transition stress.** Worst callback
   times under repeated filter changes, with found inputs kept as
@@ -274,9 +284,11 @@ relevant to a convolver unless the product changes.
   Audacity, keyboard isolation and VoiceOver (checks 1 and 4). **Done
   when** they pass or jrp narrows them.
 - [ ] **VST3-17 — Audacity keeps a filter chosen in the window.** Fixed in
-  0.13.12 (PR #177) and checked only by `vst3.adapter`. **Done when** jrp's
-  Audacity check (check 10) passes and the guides drop "not yet checked in
-  Audacity".
+  0.13.12 (PR #177) and checked only by `vst3.adapter`. **Remains:** jrp's
+  Audacity check (check 10) with whether undo brings back the previous
+  filter, a REAPER check that a chosen file adds no undo entry, and the
+  drafted upstream issue for jrp to post. **Done when** the Audacity check
+  passes and the guides drop "not yet checked in Audacity".
 - [ ] **VST3-12 — Editor window on Windows.** **Done when** a tester has
   used it in REAPER, another Windows host and a screen reader, and the
   release notes drop the limitation.
@@ -321,8 +333,9 @@ relevant to a convolver unless the product changes.
 Guidance, not an item (jrp, 5 November 2026): when
 [`kernels.inc`](portable/kernels.inc) next changes, try whether ordinary
 compiler arithmetic can replace its special rounding while staying within
-the oracle and `native.kernel_divergence` bounds; nothing changes before
-then. The reasoning is in the
+the oracle and `native.kernel_divergence` bounds and the performance
+targets. The AVX2 kernels stay; routing, gain, delay and scaling stay exact;
+nothing changes before then. The reasoning is in the
 [archived text](docs/archive/todo/2026-11-20-open-item-history.md#kernel-rounding).
 
 ### Loading responsiveness
@@ -339,7 +352,7 @@ Three narrow simplifications from jrp's review of 12 November 2026 go with
 PLUG-39's [steps](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)
 1 and 5: typed `Advice` in exceptions, refusals returned directly in VST3's
 `load_file()`, and the window report kept typed until the transport
-boundary ([archived text](docs/archive/todo/2026-11-20-open-item-history.md#keeping-hostcpp-manageable)).
+boundary; none changes a message a user reads ([archived text](docs/archive/todo/2026-11-20-open-item-history.md#keeping-hostcpp-manageable)).
 
 ## Edges over other convolvers
 
@@ -353,58 +366,77 @@ and the owner's decision its row names, and keeps its
 [non-negotiables](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#non-negotiables).
 
 - [ ] **EDGE-1 — A filter for every sample rate in one plug-in state.** Only
-  if IO-2's conversion proves inadequate; needs jrp's decision on the state
+  if IO-2's conversion proves inadequate. **Done when** a list's entries
+  that fit are saved in the state, the host's rate plays and a rate change
+  crossfades, other rates refused as now; needs jrp's decision on the state
   format. Effort M.
-- [ ] **EDGE-2 — Show what a filter does.** Magnitude, phase, group delay
-  and decay in `--inspect --json` and the macOS window, checked
-  independently. Effort M.
-- [ ] **EDGE-3 — Reverb file layouts without a configuration.** Mono on
-  stereo and true stereo without a `.cfg`, never guessing; needs jrp's
+- [ ] **EDGE-2 — Show what a filter does.** **Done when** `--inspect --json`
+  and the library report each path's magnitude, phase, group delay and
+  decay, checked independently, and the macOS window plots them. Effort M.
+- [ ] **EDGE-3 — Reverb file layouts without a configuration.** **Done
+  when** mono on stereo and true stereo load without a `.cfg`, matching the
+  equivalent `.cfg`, and an ambiguous file is never guessed; needs jrp's
   decision on the four-channel order. Effort S to M.
-- [ ] **EDGE-4 — Compare two filters, level-matched.** Two filters held and
-  switched at matched loudness; needs jrp's decision on state and the
+- [ ] **EDGE-4 — Compare two filters, level-matched.** **Done when** two
+  filters are held and switched with the crossfade at matched loudness,
+  within the saved-state limit; needs jrp's decision on state and the
   loudness measure. Effort M.
-- [ ] **EDGE-5 — Publish the workloads and the evidence.** PERF-3's
-  workloads beside other convolvers, and a `--compare` null test page, once
-  PERF-3 has results and jrp approves the claims. Effort S.
-- [ ] **EDGE-6 — A reverb's pre-delay, start, length and fades.** Shaping
-  when the filter loads, unchanged output at the defaults; needs jrp's
+- [ ] **EDGE-5 — Publish the workloads and the evidence.** **Done when**
+  the guides state PERF-3's workloads beside other convolvers and a
+  `docs/use/` page shows a `--compare` null test, with jrp's approval of the
+  claims; after PERF-3. Effort S.
+- [ ] **EDGE-6 — A reverb's pre-delay, start, length and fades.** **Done
+  when** they shape the filter as it loads, match an independent
+  computation and leave the output unchanged at their defaults; needs jrp's
   decision on parameter IDs. Effort M.
 - [ ] **EDGE-7 — Decay and damping.** Per-band decay reshaping, only after
   EDGE-6 is in use and jrp decides. Effort L.
-- [ ] **EDGE-8 — Immersive layouts beyond 8 channels.** 7.1.4, 9.1.6 or up
-  to 16 × 16 with existing identities and sessions kept. Effort M to L.
-- [ ] **EDGE-9 — Delays finer than a sample.** An opt-in fractional delay
-  baked into the filter, with its error stated; `.cfg` delays stay whole
-  samples. Effort S to M.
+- [ ] **EDGE-8 — Immersive layouts beyond 8 channels.** **Done when**
+  7.1.4, 9.1.6 or up to 16 × 16 load in the plug-ins with existing
+  identities and sessions kept. Effort M to L.
+- [ ] **EDGE-9 — Delays finer than a sample.** **Done when** an opt-in
+  fractional delay is baked into the filter, its cost, bandwidth and error
+  stated and tested independently; `.cfg` delays stay whole samples.
+  Effort S to M.
 - [ ] **EDGE-10 — Sound-aware and platform-aware optimisation.** A
   [catalogue](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#sound-aware-and-platform-aware-optimisation),
   investigated one candidate at a time when a measured limitation points at
-  it.
+  it. **Done when** PERF-3 shows none is justified, or each one tried is
+  adopted as its own item or stopped with its numbers.
 - [ ] **EDGE-11 — Savings in today's engine.** Idling after the tail is in
   (PR #209). **Remains:** the plan's
   [other candidates](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#2-savings-in-todays-engine),
   each only when PERF-3 points at it, and Apple silicon measurements.
-- [ ] **EDGE-12 — Filters larger than the saved-state limit.** Over 64 MiB
-  through the storage jrp chooses, refused clearly when it is missing.
+  **Done when** PERF-3 shows none is justified, or each one tried is kept or
+  stopped with its numbers, the oracle tests passing.
+- [ ] **EDGE-12 — Filters larger than the saved-state limit.** **Done
+  when** a plug-in saves and restores a filter over 64 MiB through the
+  storage jrp chooses, and refuses clearly when it is missing or changed.
   Effort M.
-- [ ] **EDGE-13 — Report a filter's own delay, as an option.** An opt-in
-  delay added to the reported latency, verified across paths
-  ([plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#5-report-a-filters-own-delay));
+- [ ] **EDGE-13 — Report a filter's own delay, as an option.** **Done
+  when** an opt-in delay, given or verified across paths, is added to the
+  reported latency with the dry signal delayed to match, tested as the
+  [plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#5-report-a-filters-own-delay)
+  proposes;
   needs jrp's decision. Effort S to M.
 - [ ] **EDGE-14 — Match the loudness of a reverb response, as an option.**
-  Off by default, one fixed gain computed at load
+  **Done when** an option, off by default, applies one fixed gain computed
+  at load, the same at every rate, and a `.cfg` always plays as designed
   ([plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#automatic-gain));
   needs jrp's decision on its ID and saving. Effort S to M.
-- [ ] **EDGE-15 — Optional output safety ceiling.** Off by default; no
-  sample above it leaves, output below it is bit-identical; needs jrp's
-  decision on the action. Waits for REL-3. Effort S to M.
+- [ ] **EDGE-15 — Optional output safety ceiling.** **Done when** an
+  opt-in ceiling lets no sample above it leave, output below it is
+  bit-identical and nothing new allocates or locks; needs jrp's decisions
+  on the action, per output or global, and saving. Waits for REL-3.
+  Effort S to M.
 
 ## Developer tooling
 
 - [ ] **CI-32 — Run the most extreme numerical cases less often.** Dormant:
   moving `native.kernel_divergence`'s largest cases would shorten no job
-  today. **Worth doing when** one of them sets a job's run time.
+  today. **Worth doing when** one of them sets a job's run time. **Done
+  when** they run less often with their evidence kept and the everyday gates
+  unchanged.
 - [ ] **DOC-19 — Shorter project records.** From an outside audit of
   20 November 2026, approved by jrp: this file cut to open work in a line or
   two per item; the [status page](docs/project/status.md) rewritten for
@@ -423,7 +455,7 @@ detail; change one only for an explicit need, with compatibility tests.
 | Changing the Audio Unit's or LV2's Latency while playing leaves a gap and cuts a tail | None | [Latency and tail](docs/use/plugins.md#latency-and-tail) |
 | Closing LV2 in a JUCE-based host can still let queued work reach the freed instance | Upstream (JUCE) | [Format notes](docs/develop/plugin-contract.md#format-notes) |
 | A host rate that is not a whole number of hertz plays silence or is refused | None | [When a filter does not fit](docs/use/plugins.md#when-a-filter-does-not-fit) |
-| A WAV with unfilled sizes is read to the end of the file; one of 4 GiB or more is refused | None | [Input files](docs/use/command-line.md#input-files) |
+| A WAV with unfilled sizes is read to the end of the file, so one left by an interrupted write reads as complete; one of 4 GiB or more is refused | None | [Input files](docs/use/command-line.md#input-files) |
 | No IR resampling or automatic channel adaptation | IO-2 | [Configuration](docs/use/configuration.md) |
 | One VST3 input and output bus of 1–8 channels; no window on Linux | VST3-13, VST3-2 | [Loading a filter](docs/use/plugins.md#loading-a-filter) |
 | No migration of old VST2 project state | VST3-6 | [Identities](docs/use/plugins.md#identities) |
