@@ -153,10 +153,10 @@ preset's, as choosing it again would.
 or a Convolver `.vstpreset`, and lists the folders where hosts look for
 presets. A preset is needed where the plug-in has no window (the VST3
 plug-in on Linux, and on Windows up to 0.13.2), and in an LV2 host with no file chooser. In
-Audacity both routes are checked: its preset menu, and Choose… and Recent
-in the window, whose filter Audacity 4.0.2 keeps for exports and saved
-projects (checked with 0.16.14; up to 0.13.2 it did not)
-([in Audacity](first-sound-in-a-host.md#in-audacity)).
+Audacity 4.0.2 (VST3, on macOS) both routes are checked: its preset menu,
+and the window, where a filter chosen with Choose… was kept for exports and
+saved projects and one chosen from Recent for an export (up to 0.13.2 it
+was not kept) ([in Audacity](first-sound-in-a-host.md#in-audacity)).
 
 The filter is prepared away from the audio, then installed. A filter loaded
 before any audio plays starts at once; one loaded during playback fades in
@@ -494,8 +494,8 @@ From the top, the window has:
   file, and Convolver tells the host the project has changed. What the
   host does with that differs: most mark the project unsaved. A host that
   cannot be told (Audacity 4.0.2) is shown a change of Latency that keeps
-  its value instead, so that it stores the new filter; this has not been
-  checked in Audacity yet ([loading a filter](#loading-a-filter)).
+  its value instead, so that it stores the new filter; this is checked in
+  Audacity 4.0.2 on macOS ([in Audacity](first-sound-in-a-host.md#in-audacity)).
   The
   file is read and the filter prepared before the window responds again,
   so a very long filter can make the window (and the host) pause for a

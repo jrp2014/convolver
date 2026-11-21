@@ -54,7 +54,8 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 ### In progress
 
 PLUG-39's step 5, after step 4a (PR #236); HOST-11's first version (PR #245),
-which waits for a run on jrp's Mac. Check the open pull requests for an ID
+which waits for a run on jrp's Mac; PLUG-40, as jrp chose on 21 November
+2026 (PR #252). Check the open pull requests for an ID
 before starting anything.
 
 ### Ready
@@ -128,8 +129,8 @@ Foundation items are parked by owner decision instead.
   the LV2 list proposal those steps name. Recurs with each preview.
 - [ ] **HOST-1 — Named host matrix.** REAPER and Audacity on jrp's Mac
   ([checks left](docs/project/status.md#checks-left-before-publication) 1 to
-  4) on the published 0.14.0 files, and a REAPER check that a file chosen
-  in the window adds no undo entry (from VST3-17), then Windows hosts. **Done when**
+  4) on the published 0.14.0 files, with REAPER step 11's check that a file
+  chosen in the window adds no undo entry (from VST3-17), then Windows hosts. **Done when**
   each check passes or jrp narrows it, recorded as
   [every report](docs/develop/host-testing.md#every-report) asks.
 - [ ] **HOST-2 — Additional formats.** CLAP, only on request: every CLAP
@@ -531,6 +532,7 @@ move to the archive.
   21 November 2026, PR #236, with PLUG-39 step 4a
   ([calls that do not wait for the control lock](docs/develop/plugin-contract.md#calls-that-do-not-wait-for-the-control-lock)).
 - [x] **VST3-17 — Audacity keeps a filter chosen in the window.** 21
-  November 2026, PR #177 (fix) and PR #233 (PLUG-27): jrp's Audacity pass
-  on 0.16.14 ([record](docs/archive/reviews/2026-11-21-vst3-17-audacity-pass.md));
+  November 2026, PRs #177, #233 and #252: jrp's Audacity pass on 0.16.14
+  ([in Audacity](docs/use/first-sound-in-a-host.md#in-audacity),
+  [record](docs/archive/reviews/2026-11-21-vst3-17-audacity-pass.md));
   the drafted upstream issue stays in the project files for jrp.

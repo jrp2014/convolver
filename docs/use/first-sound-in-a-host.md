@@ -12,8 +12,9 @@ window shows 48000 Hz and `2 in → 2 out`, and you hear no change. Choose `echo
 hollow) and `repeat-48000-stereo/filter.cfg` (each sound again a quarter of a
 second later), then save, close and reopen the project: the filter is still
 there. Your own IR file, `.cfg` or configuration list loads the same way,
-from any folder. Presets are an [optional route](#optional-load-a-preset),
-and the checked one [in Audacity](#in-audacity).
+from any folder. Presets are an [optional route](#optional-load-a-preset);
+in Audacity both the preset menu and **Choose…** are checked
+([In Audacity](#in-audacity)).
 
 You need a plug-in host that loads VST® 3, such as REAPER or Audacity
 (version 4 or later), or one that loads Audio Units, such as GarageBand or
@@ -36,7 +37,7 @@ see the [Equalizer APO export](equalizer-apo.md) on Windows and
   resample. Audacity plays effects at its Default sample rate, which can
   differ from the rate it exports at.
 - **In Audacity**, Audacity's own preset menu and Convolver's **Choose…**
-  and **Recent** are checked ways to load filters, as
+  and **Recent** are checked ways to load filters (VST3, on macOS), as
   [In Audacity](#in-audacity) says.
 - Changing **Latency** during playback leaves a short gap and cuts off a
   tail that is still sounding; hosts differ in when they line the audio up
@@ -154,13 +155,14 @@ choosing an entry from a list, and the folders where hosts look for presets.
 ## In Audacity
 
 Audacity's own preset menu and Convolver's **Choose…** and **Recent** are
-the routes checked in Audacity 4: a filter chosen in the window before
-playing was in the export and in the saved project after reopening it
-(checked in Audacity 4.0.2 with 0.16.14, 21 November 2026). Up to 0.13.2,
-Audacity 4.0.2 did not keep a filter loaded from the window for an export
-or a saved project, and up to 0.14.0 a filter chosen before Audacity had
-played was refused. **Reload**, reloading when the file changes, and a
-`.vstpreset` chosen in the window are not yet checked in Audacity.
+the routes checked in Audacity 4.0.2 (VST3, on macOS, from the preview
+after 0.14.0; [status](../project/status.md#checks-left-before-publication)):
+a filter chosen with **Choose…** before playing was in the export and, after
+saving and reopening the project, in the next export; one chosen from
+**Recent** was in the export. Up to 0.13.2, Audacity 4.0.2 did not keep a
+filter loaded from the window for an export or a saved project.
+**Reload**, reloading when the file changes, a `.vstpreset` chosen in the
+window, and Audacity on Windows are not yet checked.
 Audacity sets up the plug-in at 44.1 kHz until it first plays, so a single
 IR file or `.cfg` chosen before then is kept and checked when Audacity plays,
 and a configuration list needs one playback first

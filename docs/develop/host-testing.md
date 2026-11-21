@@ -312,9 +312,9 @@ Do this once. Run the commands in the extracted preview package folder.
    copies in the user's `~/Library/Audio/Presets` folder were not how
    Audacity found presets. Up to 0.13.2 a filter loaded with Convolver's
    **Choose…** played but was not exported or saved; the fix (VST3-17)
-   passed in Audacity on 0.16.14
-   ([record](../archive/reviews/2026-11-21-vst3-17-audacity-pass.md)), so
-   step 11 needs no administrator.
+   passed on 0.16.14
+   ([record](../archive/reviews/2026-11-21-vst3-17-audacity-pass.md)). Only
+   step 10's preset route needs this folder.
 4. Have a stereo test file at 44.1 kHz and one at 48 kHz, with clear
    transients (a click track or spoken word). For the 48 kHz checks, the
    repository includes a [quiet stereo listening clip](../../examples/host-audio/README.md)
@@ -386,7 +386,8 @@ Do this once. Run the commands in the extracted preview package folder.
     `examples/first-use/stereo/filter.cfg` (48 kHz). In Convolver's window
     click **Choose…**, pick that file: the status reads Active, the heading
     reads `filter.cfg`, and REAPER marks the project changed (an
-    asterisk in the title bar). Drag Gain to about −12 dB while playing:
+    asterisk in the title bar). Open *Edit* and record what *Undo* names:
+    the choice should add no undo entry (VST3-17). Drag Gain to about −12 dB while playing:
     the level drops without a click, and *Edit › Undo* undoes the whole drag
     in one step. Set Mix to 0%: you hear the dry track. Option-click both
     sliders to reset them. Choose 1024 frames in the Latency menu while
@@ -547,7 +548,10 @@ preparation and steps 2, 3 and 9 below include what it found.
     quit, reopen it, export again and compare again. Both comparisons must
     pass. Remove `own-filter.vstpreset` from the folder afterwards.
 11. A filter chosen in the window (VST3-17, fixed in 0.13.12; passed on
-    0.16.14, [record](../archive/reviews/2026-11-21-vst3-17-audacity-pass.md)). Import `examples/first-use/stereo/input.wav` into
+    0.16.14,
+    [record](../archive/reviews/2026-11-21-vst3-17-audacity-pass.md)). In
+    Audacity 4.0.2, Undo right after a choice removes the whole effect, so
+    it cannot show whether undo brings back an earlier filter. Import `examples/first-use/stereo/input.wav` into
     a new 48000 Hz project and add Convolver as a real-time effect with
     *Use vendor UI* on. With **Choose…**, pick
     `examples/first-use/stereo/filter.cfg` and touch no setting. Without

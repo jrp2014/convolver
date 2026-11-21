@@ -137,7 +137,8 @@ ignores them there.
   ([a preset in the window](plugins.md#a-preset-in-the-window)). Its Gain,
   Mix and Latency load with the filter, as from the host's preset menu.
   In Audacity 4 this avoids the preset folder, but it is not yet checked
-  in Audacity, and the window route's caveat above applies.
+  in Audacity, so export a few seconds and compare as
+  [in Audacity](first-sound-in-a-host.md#in-audacity) says.
 - **AU:** load the `.aupreset` from the host's preset menu. Logic and
   GarageBand list the user presets in their [preset folder](#preset-folders).
 - **LV2:** copy the whole `room.preset.lv2` folder into a
