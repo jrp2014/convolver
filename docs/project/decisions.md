@@ -283,6 +283,14 @@ Contents: [direction](#direction) · [releases](#releases) ·
 
 ## Releases
 
+- **21 November 2026.** Version 0.18.0, after 0.17.x, for PLUG-39 step 6's
+  library change (`HostChange::inactive_tail` is removed;
+  `HostFilter::filter_tail()` gives the accepted filter's tail), following
+  the rule that an incompatible API change before 1.0 needs a minor step
+  (jrp chose "A — close PLUG-39 when #256 merges and take 0.18.0"). LV2's
+  minor version 36 is even, which LV2 accepts. See
+  [Versioning](../develop/versioning.md#minor-and-major-versions),
+  [CHANGELOG](../../CHANGELOG.md).
 - **21 November 2026.** A plug-in workload is supported when, run as the
   plug-ins run it, its mean cost is at most 25% of one core and its
   99th-percentile callback at most half its period, on every machine
@@ -1001,6 +1009,17 @@ Contents: [direction](#direction) · [releases](#releases) ·
   — drop the one-block rule", 21 November 2026). See [Contract: loading and
   failure](../develop/plugin-contract.md#loading-and-failure),
   [plug-ins](../use/plugins.md#loading-a-filter).
+- **21 November 2026.** PLUG-39 closes with step 6. While the processor
+  runs, the tail the host reads stays at the longest filter it has played,
+  so audio already ringing out has time to finish after a short filter
+  replaces a long one; once the host deactivates the VST3 plug-in or
+  uninitializes the Audio Unit, the reported tail and the window's
+  Ring-out row describe the filter the user has selected. The plan's final
+  REAPER and GarageBand check stays open as status checks 2, 5 and 8 on
+  the next preview rather than holding the item open (jrp: "A — close
+  PLUG-39 when #256 merges and take 0.18.0"). See [Contract: replacement
+  and threads](../develop/plugin-contract.md#replacement-and-threads),
+  [consolidation plan](../archive/plans/2026-11-13-load-restore-consolidation.md#steps).
 
 ## Identities and file formats
 
