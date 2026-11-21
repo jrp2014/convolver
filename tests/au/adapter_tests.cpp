@@ -717,6 +717,16 @@ void layout_probe_before_restore() {
             "a 44.1 kHz filter accepted after rendering at 48 kHz");
     require(encode_host_state(unit.saved()) == encode_host_state(state_of(filter)),
             "a rejected restore replaced the filter");
+
+    // jrp's review (21 November 2026): a render of zero frames is not audio
+    // rendered, so after such a probe the 48 kHz project still restores.
+    Unit probed;
+    check(probed.configure(44100, 2, 6, 512), "zero-frame probe formats");
+    check(probed.initialize(), "zero-frame probe initialization");
+    Buffers none(2, 6, 512);
+    check(render(probed, none, 0, false, silent), "a zero-frame render");
+    probed.uninitialize();
+    check(probed.load(state_of(filter)), "restoring a 48 kHz project after a zero-frame render");
 }
 
 // PLUG-8: a processor that cannot be built at initialization is recorded as an

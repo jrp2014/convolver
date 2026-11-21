@@ -192,7 +192,7 @@ void Effect::update_status() noexcept {
         // then published, so a reader never mixes two generations. Copying
         // the HostFilter shares the accepted filter rather than copying it.
         if (settling_.playing()) // PLUG-27: the host renders the filter.
-            filter_.confirm();
+            filter_.confirm(known_layout());
         auto next = std::make_shared<const Diagnostics>(Diagnostics{
             filter_, known_layout(), host_log_written(),
             host() ? static_cast<std::size_t>(GetMaxFramesPerSlice()) : 0, host() != nullptr});
@@ -261,9 +261,18 @@ void Effect::notify_status() noexcept {
 }
 
 bool Effect::confirm_rendered() noexcept {
-    if (!settling_.playing() || !filter_.awaiting())
+    if (!settling_.playing())
         return false;
-    update_status(); // Confirms it.
+    // PLUG-40 (Codex's review of PR #252): a list refused before the
+    // settings were known is told about a configuration the host renders
+    // with too, when the host reads Status with the window closed, so the
+    // advice can say the settings are known now.
+    const auto& refused = filter_.rejection();
+    const bool list_waits = refused && refused->kind == HostFailureKind::settings_unknown &&
+                            !filter_.played_with(known_layout());
+    if (!filter_.awaiting() && !list_waits)
+        return false;
+    update_status(); // Confirms it, with the configuration.
     return true;
 }
 
@@ -294,6 +303,7 @@ HostReport Effect::report() {
     std::string faults;
     bool confirmed = false;
     HostReport r;
+    std::string list;
     {
         // A load or the Latency work holds the lock while it prepares a
         // filter, which can take a while: the window then gets the report of
@@ -305,7 +315,24 @@ HostReport Effect::report() {
         if (!lock.owns_lock())
             return report_of(*diagnostics());
         playing_.reclaim(); // As every control call does (Locked).
-        r = report_locked(faults, confirmed);
+        // PLUG-40, as in VST3: a list refused before the host's formats
+        // were known is read again, as if chosen, once the window sees the
+        // host rendering.
+        if (settling_.playing())
+            try {
+                list = filter_.take_unsettled_list();
+            } catch (...) { // Out of memory: the refusal's advice stays.
+            }
+        if (list.empty())
+            r = report_locked(faults, confirmed);
+    }
+    if (!list.empty()) {
+        try {
+            static_cast<void>(load_file(list)); // Records, logs and notifies either way.
+        } catch (...) {
+            fail_unrecorded(); // As the load property does (ROBUST-7).
+        }
+        return report();
     }
     if (!faults.empty()) // As when a host reads the Status text.
         log_faults(faults);

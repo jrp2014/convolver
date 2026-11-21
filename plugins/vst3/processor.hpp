@@ -75,8 +75,12 @@ inline constexpr const char* report_message = "ConvolverReport";
 // adds them, which the processor now plays: "gain" (dB) and "mix" (0 to 1)
 // as floats and "latency frames", for the controller to report to the host
 // as edits.
+// PLUG-40: "retried" 1 when the processor read a refused configuration list
+// again itself (HostFilter::take_unsettled_list()), with "accepted", so the
+// controller marks the project changed as for a file the user chose.
 struct StatusAnswer {
     Steinberg::int64 load_request = 0;
+    bool retried = false;
     bool accepted = false;
     Steinberg::int64 latency_request = 0;
     std::optional<HostSettings> settings = std::nullopt;

@@ -117,9 +117,14 @@ before they set the sample rate and channel layout (VST3 `setState` before
   below.
 - **A file chosen in the window** (PLUG-27, jrp, 20 November 2026), in VST3
   and the Audio Unit alike: it is refused for not suiting the host only
-  while the host plays audio through the plug-in (started, and audio has
-  played with that configuration: `HostSettling::check()` answers
-  `refuse_mismatch`), and is then read for the host's configuration, so a
+  while the host plays audio through the plug-in (started, and audio with
+  samples processed in this start: `HostSettling::playing()`, for which
+  `HostSettling::check()` answers `refuse_mismatch`; audio from an earlier
+  start does not count, nor does a render or `process` call of zero frames,
+  jrp's review of 21 November 2026, so a file chosen just after a restart
+  waits in VST3 as in the Audio Unit, and an Audio Unit render of zero
+  frames neither refuses a later choice nor binds restored state), and is
+  then read for the host's configuration, so a
   list chooses its entry for it. Otherwise the host's rate and channels may
   be a placeholder: Audacity 4.0.2 sets up its window's copy at 44.1 kHz
   until it first plays, whatever the project's rate, and starts it only for
@@ -150,7 +155,26 @@ before they set the sample rate and channel layout (VST3 `setState` before
   started with (`known_layout()`), and before any start it is refused as
   any file is, with jrp's words, "No entry selected. ... Play audio once so
   Convolver can check the host's sample rate and channel counts, then
-  choose the configuration list again." The saved state format is
+  choose the configuration list again." (`HostFailureKind::settings_unknown`).
+  PLUG-40 (jrp, 21 November 2026: "don't make the user choose again
+  unnecessarily"): such a list is read again by itself, as if chosen, once,
+  when the window reads its report while the host plays audio through the
+  plug-in (`HostSettling::playing()`, `HostFilter::take_unsettled_list()`),
+  on the window's thread: VST3's processor in its `report_message`, which
+  answers with `"retried"` so the controller marks the project changed as for
+  a chosen file (setDirty, or VST3-17's Latency edit), and the Audio Unit in
+  its `report()`, through `load_file()`. Audacity's flush plays no audio a
+  window could see, so it never triggers this. Until then, once a control
+  call has seen the host playing with the configuration it still has
+  (`HostFilter::confirm()` with it, `HostFilter::played_with()`; not a
+  configuration a brief start only passed, such as Audacity's flush at
+  44.1 kHz, which following the advice would load the wrong entry for; the
+  independent review), Status and the window say so with it,
+  from the same layout: the window's Fix "The host's settings are now
+  known (48000 Hz, 2 in, 2 out): choose the configuration list again."
+  (`settings_now_known()`, `shown_failure_message()`), Status "now known:
+  48000 Hz, 2 in, 2 out; choose the list again.". The window offers its drop
+  hint only when nothing was refused. The saved state format is
   unchanged. One case stays wrong: in Audacity, a list chosen after a
   parameter edit (choosing a file reports one, VST3-17) but before the
   first playback chooses its 44.1 kHz entry,
@@ -164,7 +188,10 @@ before they set the sample rate and channel layout (VST3 `setState` before
   counts, then choose the configuration list again." (jrp, 21 November
   2026; no guess at whether a start was Audacity's) (`vst3.adapter` `chosen_before_host_plays` replays
   Audacity's order; `native.filter_file` `before_host_settles`,
-  `native.host_settling` `chosen_file`).
+  `native.host_settling` `chosen_file`; in a host, jrp's
+  [Audacity pass](../archive/reviews/2026-11-21-vst3-17-audacity-pass.md)
+  on 0.16.14: a list refused before playback, then its 48 kHz entry after
+  one).
 - One shared record holds both formats' rules: `HostSettling` in
   [`host_settling.hpp`](../../portable/host_settling.hpp) (PLUG-39 step 2,
   `native.host_settling`), which each adapter tells when the host starts
@@ -675,8 +702,10 @@ separate processes, so each carries values, never pointers:
   `IComponentHandler2`, such as Audacity 4.0.2), the controller instead
   reports one edit of Latency that keeps its value (`beginEdit`,
   `performEdit` with the current value, `endEdit`), so that such a host
-  stores the new state (VST3-17 in [TODO](../../TODO.md) has the Audacity
-  reasoning), unless a chosen preset's settings were already reported as
+  stores the new state (VST3-17; the Audacity reasoning is in its
+  [archived TODO text](../archive/todo/2026-11-20-open-item-history.md),
+  and jrp's [Audacity pass](../archive/reviews/2026-11-21-vst3-17-audacity-pass.md)
+  confirms it), unless a chosen preset's settings were already reported as
   edits. Latency is used because it is not automatable and `process()`
   ignores it (the controller sends a new Latency as a message, only when the
   value changes), so neither the sound nor Gain, Mix or automation change.

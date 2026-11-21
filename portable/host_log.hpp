@@ -139,6 +139,17 @@ Advice preparation_message(const std::string& what);
 // A failure's message, or, for a failure recorded without one because memory
 // ran out (ROBUST-7), a message that says so.
 const Advice& failure_message(const HostFailure&);
+// PLUG-40 (jrp, 21 November 2026): a list refused because the host's
+// settings were not known, once they are: "The host's settings are now known
+// (48000 Hz, 2 in, 2 out): choose the configuration list again." The
+// window's Fix says it; Status says it shorter ("now known: 48000 Hz, 2 in,
+// 2 out; choose the list again."), from the same known layout.
+std::string settings_now_known(const HostLayout&);
+// The failure's message as the window shows it with this known layout:
+// failure_message(), with settings_now_known() in place of the advice to play
+// once when the failure is HostFailureKind::settings_unknown and the layout
+// is known now.
+Advice shown_failure_message(const HostFailure&, const std::optional<HostLayout>&);
 // DIAG-2: the most serious fault in `faults` as problem, cause and fix, with
 // any others and when the status clears in its note; `held` as for
 // HostFaultReport. Empty when there are none. For the window (host_report).

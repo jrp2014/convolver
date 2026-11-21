@@ -274,10 +274,26 @@ def check_au(folder, case, render, block, work, worst_seen):
     data = raw_out.read_bytes()
     samples = struct.unpack(f'<{len(data) // 4}f', data)
     rendered = [list(samples[c :: case['outputs']]) for c in range(case['outputs'])]
-    early = max((abs(v) for channel in rendered for v in channel[:latency]), default=0.0)
-    if early > bound(expected):
-        return f'{label}: {early:.3g} before the reported latency of {latency} frames'
+    failure = check_prefix(label, rendered, latency, bound(expected))
+    if failure:
+        return failure
     return compare(label, [channel[latency:] for channel in rendered], expected, exact=False, worst_seen=worst_seen)
+
+
+def check_prefix(label, rendered, latency, limit):
+    """None when the audio before the reported latency is finite and near silent.
+
+    The comparison drops these frames, so every one is checked here: a
+    maximum alone would pass a NaN, since no comparison with NaN is true.
+    """
+    for c, channel in enumerate(rendered):
+        for i, v in enumerate(channel[:latency]):
+            if not math.isfinite(v):
+                return f'{label}: sample {i} of channel {c} is {v}, before the reported latency of {latency} frames'
+    early = max((abs(v) for channel in rendered for v in channel[:latency]), default=0.0)
+    if early > limit:
+        return f'{label}: {early:.3g} before the reported latency of {latency} frames'
+    return None
 
 
 def main(argv=None):

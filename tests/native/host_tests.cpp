@@ -2269,8 +2269,10 @@ void status_lines() {
           "Load failed, previous filter kept: the filter is for 44100 Hz, the host runs at 48000 "
           "Hz. The log could not be written.",
           "unwritable log, refused rate");
-    const std::array<std::pair<HostFailureKind, const char*>, 7> kinds{{
+    const std::array<std::pair<HostFailureKind, const char*>, 8> kinds{{
         {HostFailureKind::filter_file, "filter file could not be read"},
+        // PLUG-40: the host is unknown here, so what to do first.
+        {HostFailureKind::settings_unknown, "play audio once, then choose it again."},
         {HostFailureKind::too_large, "too large to save with the project"},
         {HostFailureKind::state_unreadable, "saved project or preset could not be read"},
         {HostFailureKind::state_newer, "saved by a newer Convolver"},
