@@ -152,6 +152,12 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
+- Tests (HOST-9): the headless Ardour test plays the VST3 plug-in too, in
+  the VST3 workflow, on Ardour's own VST3 host, and saves sessions at a
+  larger Latency (LV2 at 256 and 1024, VST3 at 1024): Ardour must be told
+  the new latency without reopening the session, report it again after
+  reopening, and export in time, within 1e-5 of the oracle. The test moved
+  to `tests/plugins/`.
 - Builds (CI-48): the Linux package, built with GCC 12.3 on Ubuntu 22.04,
   builds without warnings from Convolver's own sources (libsndfile's and the
   VST3 SDK's remain theirs). That compiler wrongly warned `-Wrestrict` at nine
