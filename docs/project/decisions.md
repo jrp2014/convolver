@@ -1043,26 +1043,6 @@ Contents: [direction](#direction) · [releases](#releases) ·
   seen playing with. See [Contract: loading and
   failure](../develop/plugin-contract.md#loading-and-failure),
   [plug-ins](../use/plugins.md#loading-a-filter).
-- **21 November 2026.** PLUG-42, from HOST-10's Ardour 8.4 runs (a preset
-  loaded just before Ardour restarted the VST3 plug-in with the outputs set
-  in Pin Connections was refused, never tried at the outputs that suited
-  it, and saved as a failure). Asked whether a filter refused only for the
-  channels should be tried again when the host restarts the plug-in with
-  channels that fit, jrp: "Yes. That's what the user would expect." Then,
-  choosing "fix the Ardour case now and record the other case in TODO":
-  in VST3 and the Audio Unit, when no working filter plays, a filter that
-  does not suit the host's rate or channels is kept, saved as the filter,
-  and the user is told it waits for compatible audio settings; it plays at
-  the next start with a matching rate and channel layout. When another
-  filter already plays, it stays and the new choice is refused, so "a user
-  who sees that refusal should be able to trust that restarting playback
-  won't unexpectedly switch filters". The latest choice is the one kept,
-  and the rate counts as the channels do. Holding a refused replacement
-  beside the playing filter is revisited only if a user asks (PLUG-43).
-  LV2, whose configuration never changes, refuses as before. See
-  [Contract: loading and
-  failure](../develop/plugin-contract.md#loading-and-failure),
-  [plug-ins](../use/plugins.md#when-a-filter-does-not-fit).
 
 ## Identities and file formats
 

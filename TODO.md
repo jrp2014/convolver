@@ -484,12 +484,6 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
-- [x] **PLUG-42 — Keep a filter refused only for the host's channels or
-  rate.** 21 November 2026, PR #258, jrp's decision of the same day (found
-  in Ardour 8.4 by HOST-10): VST3 and the Audio Unit refuse a filter that
-  does not suit the host only while one that suits it plays; otherwise
-  they keep it, save it as the filter and play it at the next start that
-  suits it ([contract](docs/develop/plugin-contract.md#loading-and-failure)).
 - [x] **DIAG-10 — Status says what the window says.** 21 November 2026,
   PR #261 ([plug-ins](docs/use/plugins.md#status-and-the-convolver-log),
   [decision](docs/project/decisions.md#diagnostics)).
