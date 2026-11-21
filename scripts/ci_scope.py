@@ -556,7 +556,11 @@ def check_fuzz_sources(source):
 
 
 def runs(answer):
-    return answer['build'] or answer['package']
+    """Whether a workflow's own jobs run, given decide() for that workflow.
+
+    Only build: package says whether the candidates are needed, which only
+    the candidate workflow reads, and for that workflow build is the same."""
+    return answer['build']
 
 
 def event_payload():

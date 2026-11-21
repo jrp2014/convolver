@@ -1171,6 +1171,13 @@ class CarryForward(unittest.TestCase):
         # Another format's files: this workflow's result stands, that one runs.
         self.assertEqual(self.answer('pull_request', code, ['plugins/au/adapter.mm'])['build'], 'false')
         self.assertEqual(self.answer('pull_request', code, ['plugins/au/adapter.mm'], 'au')['build'], 'true')
+        # Candidate-only files since then: the candidates run, this
+        # workflow's result stands although the pull request needs both.
+        both = ['portable/host.cpp', 'scripts/release/candidate.py']
+        self.assertEqual(self.answer('pull_request', both, ['scripts/release/candidate.py'])['build'], 'false')
+        self.assertEqual(
+            self.answer('pull_request', both, ['scripts/release/candidate.py'], 'release')['package'], 'true'
+        )
         # Code since then runs, and later pushes compare with it.
         self.assertEqual(self.answer('pull_request', code, code)['proving'], 'true')
         # No run to compare with: as before CI-53.
