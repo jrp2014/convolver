@@ -170,8 +170,8 @@ holds simple filters for other rates.
    ./bin/convolver --filter presets/echo-48000-stereo/filter.cfg --input examples/first-use/stereo/input.wav --output echo.wav
    ```
 
-   It writes `echo.wav`: the stereo input at half level with a quieter copy
-   about 5 ms later, heard as a slightly hollow tone. Each refusal ends the
+   It writes `echo.wav`: the stereo input at half level, then three quieter
+   copies 0.3 s apart. Each refusal ends the
    command with exit status 1, so a script stops there too.
 
 ## 5. Filter your own file

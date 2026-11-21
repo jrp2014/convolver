@@ -8,9 +8,9 @@ that it fits the track, play, and save the project.
 **In short:** on macOS or Windows, on a stereo track at 48000 Hz, add
 Convolver, click **Choose…** in its window and pick
 `presets/identity-48000-stereo/filter.cfg` from the extracted package. The
-window shows 48000 Hz and `2 in → 2 out`, and you hear no change. Choose `echo-48000-stereo/filter.cfg` (quieter and
-hollow) and `repeat-48000-stereo/filter.cfg` (each sound again a quarter of a
-second later), then save, close and reopen the project: the filter is still
+window shows 48000 Hz and `2 in → 2 out`, and you hear no change. Choose `echo-48000-stereo/filter.cfg` (each sound
+three more times, fading) and `repeat-48000-stereo/filter.cfg` (each sound
+once more, a quarter of a second later), then save, close and reopen the project: the filter is still
 there. Your own IR file, `.cfg` or configuration list loads the same way,
 from any folder. Presets are an [optional route](#optional-load-a-preset);
 in Audacity both the preset menu and **Choose…** are checked (Audacity
@@ -100,12 +100,12 @@ audio when you chose the file: start playback, then choose it again.
 1. Play quiet audio and watch the meters. Identity leaves the sound
    unchanged, with no added delay at the default Latency of 0 frames.
 2. Choose the matching `echo` folder's `filter.cfg`. Its filter is half the
-   input at once plus a quarter of it 257 samples (about 5 ms) later: too
-   soon to hear as a separate repeat, so it sounds about 5 dB quieter and
-   hollow, like a comb filter. The change fades over while audio plays.
-3. Choose the matching `repeat` folder's `filter.cfg`: the same two taps, but
-   the second comes a quarter of a second later, so you hear each sound
-   again, quieter.
+   input at once, then three repeats 0.3 s apart, each 6 dB quieter than the
+   one before: each sound comes back three times, fading, and the meters
+   show each repeat. The change fades over while audio plays.
+3. Choose the matching `repeat` folder's `filter.cfg`: half the input at
+   once and a quarter of it a quarter of a second later, so you hear each
+   sound once more, quieter.
 4. Switch the host's bypass on and off to compare.
 
 Convolver does not lower the level for you, so leave headroom with your own

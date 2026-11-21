@@ -47,6 +47,11 @@ jobs:
     needs: scope
     if: needs.scope.outputs.build == 'true'
     runs-on: ubuntu-latest
+    # A hang stops after 45 minutes instead of six hours (CI-52). The Monday
+    # run's four 600-second campaigns, two at a time, take about 20 minutes
+    # after the build; a manual run sets its own length, so keeps GitHub's
+    # six-hour limit.
+    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && 360 || 45 }}
     env:
       CMAKE_C_COMPILER_LAUNCHER: ccache
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
