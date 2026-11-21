@@ -146,12 +146,12 @@ guides and TODO.
   each protected by tests of audio, saved state and host behaviour; steps 0
   to 3, 4b and 4c are merged, 4a, 5 and 6 remain.
 - [Plug-in windows on Windows and Linux](project/plans/2026-11-10-windows-linux-plugin-windows.md)
-  (VST3-12, VST3-13, Reference): what any route needs first (a sound-file
+  (PLUG-34, VST3-12, VST3-13, Reference): what any route needs first (a sound-file
   reader and the window's behaviour in shared code), the routes compared, and
   the chosen order (Windows first, Linux later). The Windows window shipped
   in 0.13.12; its host checks and the Linux window remain.
 - [Edges over the leading convolution plug-ins](project/plans/2026-11-06-edges-over-other-convolvers.md)
-  (EDGE-1 to EDGE-15, PERF-2, PERF-3, IO-2): how Convolver compares with Altiverb,
+  (EDGE-1 to EDGE-14, PERF-2, PERF-3, IO-2): how Convolver compares with Altiverb,
   Reverberate, Space Designer, Hang Loose Convolver, CamillaDSP and X-MCFX,
   the edges it already has, the ranked edges to build after the first
   walkthrough, and the rules each keeps. The non-uniform engine (PERF-2,

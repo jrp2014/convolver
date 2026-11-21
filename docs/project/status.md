@@ -71,9 +71,9 @@ documentation alone. None is demonstrated yet.
 | Preset tool `convolver-preset` ([guide](../use/presets.md)) | Yes | Yes: `native.presets`, `plugins.presets`, `vst3.preset_format` | Not applicable | Yes |
 | Equalizer APO export ([guide](../use/equalizer-apo.md)) | Yes | Yes: against a model of Equalizer APO 1.4.2, and in its own `Benchmark.exe` on Windows CI | Not yet on a real Windows device (HOST-4) | Yes |
 | Non-uniform engine, Latency 0 by default (PERF-2, [measurements](../develop/fft-measurements.md#the-non-uniform-engine)) | Yes | Yes: the engine oracle tests (worst error 5.2e-7 of the peak) and `native.engine_stress` | Not yet: check 9 | Since 0.13.2 |
-| Idle once silent input has outlasted the tail (EDGE-11, [measurements](../develop/fft-measurements.md#idle-after-the-tail)) | Yes | Yes: output bit-identical to processing the silence; measured on Linux only | Not yet | Since 0.14.0 |
+| Idle once silent input has outlasted the tail (EDGE-11, [measurements](../develop/fft-measurements.md#idle-after-the-tail)) | Yes | Yes: `native.engine` (`idle_after_tail`) checks the output is bit-identical to processing the silence; measured on Linux only | Not yet | Since 0.14.0 |
 | VST3 plug-in ([guide](../use/plugins.md)) | Yes: 1–8 in, 1–8 out; Gain, Mix, Latency, Gain mode; a window on macOS (VST3-11) and Windows (VST3-12), not on Linux | Yes: SDK validator, pluginval at strictness 10, `vst3.harness` (against the oracle and the CLI) and `vst3.adapter` on all three systems, under sanitizers on Linux; `vst3.editor` on macOS and Windows | On 0.12.x only: REAPER 7.85 and Audacity 4.0.2 on macOS, 6 to 8 November 2026 ([REAPER](../archive/reviews/2026-11-06-host1-reaper.md), [crossover](../archive/reviews/2026-11-07-reaper-crossover-retest.md), [window](../archive/reviews/2026-11-08-host1-reaper-window.md), [Audacity](../archive/reviews/2026-11-07-host1-audacity.md), [v0.12.8](../archive/reviews/2026-11-08-v0128-host-checks.md)) | macOS since 0.12.12; Windows and Linux since 0.13.2; the Windows window since 0.13.12 |
-| LV2 plug-in ([guide](../use/plugins.md)) | Yes: layouts (LV2-1), filter files through the worker (LV2-2), settings as control ports (LV2-7) | Yes: `lv2.harness`, `lv2.adapter`, `lv2lint` and pluginval on Linux; a headless Ardour 9 session against the oracle | PipeWire 1.6.8 from a source build only ([LV2 hosts](../develop/host-testing.md#lv2-hosts)) | Linux since 0.13.12 |
+| LV2 plug-in ([guide](../use/plugins.md)) | Yes: layouts (LV2-1), filter files through the worker (LV2-2), settings as control ports (LV2-7) | Yes: `lv2.harness`, `lv2.adapter`, `lv2lint` and pluginval on Linux; a headless Ardour 9 session against the oracle | Not yet from a package; a source build of Convolver ran in PipeWire 1.6.8 ([LV2 hosts](../develop/host-testing.md#lv2-hosts)) | Linux since 0.13.12 |
 | Audio Unit ([guide](../use/plugins.md)) | Yes: state and `.aupreset` loading (AU-1, AU-2), settings (AU-7), the window (AU-6) | Yes: `au.harness`, `au.adapter` (also under ThreadSanitizer), `au.lifecycle`, `au.editor`, `au.bundle`, `auval -strict`, pluginval and an AVAudioEngine render against the oracle, on macOS | On 0.12.x only: GarageBand 10.4.14, up to 8 November 2026 ([record](../archive/reviews/2026-11-08-au4-garageband.md)) | macOS since 0.12.12 |
 | C++ libraries ([CMake package](../develop/library.md)) | Yes | Yes: installed and source-tree consumer tests | Not applicable | Source only |
 | FFmpeg pipe ([example](../use/command-line.md#with-ffmpeg)) | Documented | Yes: `native.ffmpeg_pipe` with Ubuntu's FFmpeg (FFMPEG-1) | Not applicable | Not applicable |
@@ -103,7 +103,8 @@ resource budgets and supported workloads (PERF-3), other `.cfg` readers
 
 jrp published each preview without these checks
 ([decisions](decisions.md#releases)): they are follow-up work, not gates,
-and each release's notes list them as not checked. They run on the
+and each release's notes list them as not checked. Check 6, each preview's
+candidate run, still runs before publication. They run on the
 published 0.14.0 files; each record gives the package's SHA-256. Results
 recorded on earlier builds are records of those builds, not passes. If a fix
 changes plug-in code after a check, that check runs again on the next
@@ -115,21 +116,23 @@ published preview. The steps are those of the
 | 1 | REAPER, by ear: scan, the identity, echo and repeat presets, a click on bypass, Gain and Mix; where REAPER shows the Status parameter (HOST-1, VST3-11) | [REAPER](../develop/host-testing.md#reaper-vst3) steps 1 to 5 and the listening in 11 | 10 min | v0.12.8: Status display passed. Listening open |
 | 2 | REAPER: a render, save, quit and reopen with the echo playing, a refused preset, the wrong host rate | REAPER steps 6 to 9 | 10 min | v0.12.8: passed; runs again, since the heading after a refused preset was fixed later |
 | 3 | REAPER: the stereo journey and the 2→6 crossover, each following its guide, with **Choose…** on a six-channel track | REAPER steps 10 and 12 | 25 min | Not run since the guides were rewritten (DOC-10) |
-| 4 | Audacity, through its preset menu: packaged presets and one of your own, listening, an export compared with the CLI, save and reopen, a refused preset, a mono track, a Latency change, the window's layout (HOST-1, VST3-11) | [Prepare the Mac](../develop/host-testing.md#prepare-the-mac) step 3; [Audacity](../develop/host-testing.md#audacity-vst3) steps 1 to 10 | 30 min | v0.12.8: failed through **Choose…** (VST3-17, fixed in 0.13.12, see check 10); the rest open |
+| 4 | Audacity, through its preset menu only ([decision](decisions.md#plug-in-behaviour)): packaged presets and one of your own, listening, an export compared with the CLI, save and reopen, a refused preset, a mono track, a Latency change, the window's layout (HOST-1, VST3-11) | [Prepare the Mac](../develop/host-testing.md#prepare-the-mac) step 3; [Audacity](../develop/host-testing.md#audacity-vst3) steps 1 to 8 and 10; step 9 only for the window's layout, Gain, Mix and Latency | 30 min | v0.12.8: failed through **Choose…** (VST3-17, fixed in 0.13.12, see check 10); the rest open |
 | 5 | GarageBand: a packaged preset and save and reopen, listening, a click on bypass, the track in time after a Latency change, **Recent** and **Reload**, VoiceOver (AU-4, AU-6) | [GarageBand](../develop/host-testing.md#garageband-audio-unit) steps 4 to 6, 9 and 10 | 20 min | v0.12.8: the preset, save and reopen, **Recent** and **Reload** passed; the rest open |
 | 6 | The exact candidate: the candidates workflow on the preview's tag, and the draft release's clean-machine checks | [Releasing](../develop/releasing.md#candidates) | CI | **Passed** for 0.14.0: [run 44611563339](https://github.com/jrp2014/convolver/actions/runs/44611563339), then [run 44616436091](https://github.com/jrp2014/convolver/actions/runs/44616436091) |
 | 7 | The independent walkthrough of 0.14.0 (REL-3) | [Above](#next-milestone-an-independent-user-runs-a-preview) | The tester | Not started |
 | 8 | GarageBand with the window open: Latency changed stopped and while playing, then save and reopen (AU-17 changed how the unit reports latency) | GarageBand steps 4 to 6 | 5 min | Not run |
-| 9 | PERF-2's session: a long filter at Latency 0 by ear in REAPER and GarageBand, Latency changes and replacement while playing, projects from 0.12.12 reopening at the Latency the [plug-in guide](../use/plugins.md#settings) gives | PERF-2 in [TODO](../../TODO.md) | 30 min | Not run |
+| 9 | PERF-2's session: a long filter at Latency 0 by ear in REAPER and GarageBand, Latency changes and replacement while playing, projects from 0.12.12 reopening at the Latency the [plug-in guide](../use/plugins.md#settings) gives, and a saved Latency of 1024 reopening in time | PERF-2 in [TODO](../../TODO.md) | 30 min | Not run |
 | 10 | Audacity, VST3-17's fix: choose `filter.cfg` with **Choose…**, export without playing, compare with the CLI; save, reopen and export again | [Audacity](../develop/host-testing.md#audacity-vst3) step 11 | 10 min | Not run. Until it passes, the guides keep Audacity's preset menu as the checked route |
 
 Accepted on earlier builds and not repeated
 ([decisions](decisions.md#plug-in-behaviour)): VST3-16's latency
-compensation in REAPER, REAPER's and GarageBand's window controls and saved
-settings on 0.12.5, and REL-6's loading qualification of the 0.12.5 source.
-Candidates for narrowing, for jrp to decide: VoiceOver once, in GarageBand,
-since VST3 and the Audio Unit share the window; and a tail longer than an
-Audacity clip's silent ending, recorded as unverified.
+compensation in REAPER; REAPER's window controls and saved settings on
+0.12.5, and its packaged presets with save and reopen after PLUG-31
+(`f11a3dd`); GarageBand's controls, saved settings, refusal and exports on
+0.12.5; and REL-6's loading qualification of the 0.12.5 source. Candidates
+for narrowing, for jrp to decide, required until he does: VoiceOver once,
+in GarageBand, since VST3 and the Audio Unit share the window; and a tail
+longer than an Audacity clip's silent ending, recorded as unverified.
 
 **Checked only by automated tests so far:** VST3-17's fix (0.13.12); keeping
 the playing filter and its tail when restored state or a preset holds it
@@ -139,19 +142,22 @@ settings when chosen in the window (PLUG-35, 0.13.20); the quicker restore
 of the playing filter (PLUG-39 step 1a) and the idle after the tail
 (EDGE-11), both 0.14.0. **Unverified, not defects:** listening in every
 host, VoiceOver, playback while REAPER refuses a preset, and the Audacity
-steps not yet run. The Audio Unit in REAPER, other hosts and two instances
+steps not yet run; the required ones among them need running or a scope
+decision from jrp. The Audio Unit in REAPER, other hosts and two instances
 side by side are follow-up work under HOST-1 and AU-4.
 
 ## Performance: what is measured
 
 The figures and their sources are in
-[FFT measurements](../develop/fft-measurements.md) and
-[load timing](../develop/load-timing.md);
+[FFT measurements](../develop/fft-measurements.md),
+[load timing](../develop/load-timing.md) and TODO's
+[loading responsiveness](../../TODO.md#loading-responsiveness);
 none qualifies a workload by itself ([responsiveness qualification](../develop/releasing.md#responsiveness-qualification)).
 
-- **Loading** (PERF-9 to PERF-11): how long a load holds the host's thread.
-  With a 30 s filter, CI held it 28 to 154 ms against jrp's 250 ms limit. A
-  run whose callbacks cannot be judged counts as not qualified.
+- **Loading** (PERF-9 to PERF-11, 5 November 2026, before PERF-2): how
+  long a load holds the host's thread. With a 30 s filter, CI held it 28 to
+  154 ms and the Linux cloud VM 227 to 254 ms, against jrp's 250 ms limit.
+  A run whose callbacks cannot be judged counts as not qualified.
 - **Release qualification** (REL-6, 8 November 2026): on jrp's MacBook Pro,
   all 24 workload and entry-point combinations passed for the 0.12.5 source;
   longest hold 43.2 ms, longest judged callback 2.95 ms
