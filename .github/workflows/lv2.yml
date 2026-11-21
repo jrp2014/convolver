@@ -214,12 +214,13 @@ jobs:
         if: failure()
         run: python scripts/release/resolve.py explain-failure
 
-  # HOST-5: a full DAW, Ardour, hosts the plug-in headless. Its LV2 host is
-  # its own code, not lilv's or JUCE's: it loads a preset from its preset
-  # list, records, saves the session, restores it in a second process and
-  # exports it with latency compensation; the export must match the oracle
-  # (tests/lv2/ardour_tests.py). Ardour is the image's Ubuntu package
-  # (Ardour 9 on Ubuntu 26.04).
+  # HOST-5, HOST-9: a full DAW, Ardour, hosts the plug-in headless. Its LV2
+  # host is its own code, not lilv's or JUCE's: it loads a preset from its
+  # preset list, takes a Latency through its control port, records, saves
+  # the session, reopens it and exports it in separate processes with
+  # latency compensation; the export must match the oracle in time
+  # (tests/plugins/ardour_tests.py, which the VST3 workflow runs on the VST3
+  # bundle). Ardour is the image's Ubuntu package (Ardour 9 on Ubuntu 26.04).
   ardour:
     needs: scope
     if: needs.scope.outputs.build == 'true'
@@ -248,8 +249,8 @@ jobs:
           cmake -S . -B build-lv2 -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCONVOLVER_BUILD_LV2=ON -DCONVOLVER_BUILD_TESTS=OFF
           cmake --build build-lv2 --parallel --target convolver_lv2 convolver_preset_tool
-      - name: Ardour plays the first-use examples
-        run: python tests/lv2/ardour_tests.py build-lv2/lv2/convolver.lv2 build-lv2/convolver-preset
+      - name: Ardour plays the first-use examples, at Latency 0 and larger
+        run: python tests/plugins/ardour_tests.py build-lv2/lv2/convolver.lv2 build-lv2/convolver-preset
       - name: Explain a failure that may come from a new upstream release
         if: failure()
         run: python scripts/release/resolve.py explain-failure

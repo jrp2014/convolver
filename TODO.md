@@ -53,7 +53,8 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 
 ### In progress
 
-PLUG-39's step 5, after step 4a (PR #236). Check the open pull requests for an
+PLUG-39's step 5, after step 4a (PR #236); AU-18 (PR #242), step 2 of the
+[host-test automation plan](docs/project/plans/2026-11-21-host-test-automation.md#steps). Check the open pull requests for an
 ID before starting anything.
 
 ### Ready
@@ -76,6 +77,7 @@ ID before starting anything.
 | **VST3-12**, **HOST-4** | The Windows window in hosts and a screen reader; Equalizer APO on a real device | A Windows tester or device |
 | **LV2-4** | Desktop LV2 hosts and PipeWire on a real sound card | A Linux tester |
 | **HOST-8** | Ardour 9.0's abort as `new_session` exits | A fixed Ardour on `ubuntu-latest` |
+| **HOST-11** | Step 3 of the [host-test automation plan](docs/project/plans/2026-11-21-host-test-automation.md#steps): one command for the REAPER checks | AU-18 (PR #242), then a run on jrp's Mac |
 | **CFG-1**, then **CFG-2** | Other `.cfg` readers, then importing and exporting their formats | Access to Roon, JRiver or Audiolense workflows |
 | **FFT-2**, **VST3-5**, **PLUG-11** | Optimisation | PERF-3 showing a need |
 | **VST3-13**, **VST3-2**, **VST3-6**, **HOST-2**, **LV2-3**, **LV2-6**, **DIAG-9** | The Linux window, switching filters from the host, replacing the old VST2 plug-in, CLAP, named LV2 layouts, an LV2 window, numbers in the user's locale | A stated user need |
@@ -144,9 +146,26 @@ Foundation items are parked by owner decision instead.
   about 300 local runs on 6 November 2026. **Done when** a kept session
   (`CONVOLVER_ARDOUR_KEEP`) shows whether Ardour or Convolver moved it.
 - [ ] **HOST-8 — Ardour 9.0's abort as `new_session` exits.**
-  `known_new_session_abort()` in `tests/lv2/ardour_tests.py` accepts it on
+  `known_new_session_abort()` in `tests/plugins/ardour_tests.py` accepts it on
   9.0 only; jrp may report it upstream. **Done when** the Ardour on
   `ubuntu-latest` no longer aborts and the test stops accepting it.
+- [ ] **HOST-10 — Ardour's VST3 channels and settings.** From HOST-9:
+  Ardour 8.4 ran the VST3 only at its default 2 in, 2 out and named Latency
+  and Gain mode "hidden" ([unresolved host finding](docs/develop/host-testing.md#unresolved-host-findings)).
+  **Done when** it is known whether Ardour 9 does the same and the
+  [plug-in guide](docs/use/plugins.md) says what Ardour users need.
+- [ ] **AU-18 — Render the Audio Unit in the hosts' orders of events.**
+  Step 2 of the [host-test automation plan](docs/project/plans/2026-11-21-host-test-automation.md#steps)
+  (PR #242, which replaces this entry with its done line). **Done when**
+  GarageBand's order at 44.1 kHz, Latency chosen while running and a
+  `ClassInfo` round trip each match the oracle in the Audio Unit workflow.
+- [ ] **HOST-11 — One command for the REAPER checks.** Step 3 of the
+  [plan](docs/project/plans/2026-11-21-host-test-automation.md#steps): a
+  ReaScript-driven script for jrp's Mac (presets, renders compared with
+  `convolver --compare`, save and reopen, refusal, wrong rate, a Latency
+  change in time; VST3, then the Audio Unit) that writes one result file.
+  **Done when** jrp has run it on a published preview and its result file
+  records what [every report](docs/develop/host-testing.md#every-report) lists.
 - [ ] **DIAG-9 — Numbers in the user's locale.** Low priority. **Done when**
   the window shows numbers in the system locale from one formatting path,
   Status and the log stay plain, and a test covers other separators; best
@@ -491,6 +510,8 @@ move to the archive.
   are known.** 21 November 2026, PR #233: a chosen file waits ("Filter
   selected. Waiting for the host's audio settings.") until the host plays
   ([plug-ins](docs/use/plugins.md#loading-a-filter)).
+- [x] **HOST-9 — Play the VST3 and a saved Latency in the Ardour test.** 21
+  November 2026, PR #237 ([Ardour, headless](docs/develop/testing.md#ardour-headless)).
 - [x] **PLUG-30 — One rule for state a busy lock makes a call skip.**
   21 November 2026, PR #236, with PLUG-39 step 4a
   ([calls that do not wait for the control lock](docs/develop/plugin-contract.md#calls-that-do-not-wait-for-the-control-lock)).
