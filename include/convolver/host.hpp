@@ -496,8 +496,11 @@ class HostFilter {
     bool awaiting() const noexcept {
         return awaiting_ && filter_.has_value();
     }
+    // A start that could not be done at all (fail_activation()) is shown:
+    // it is not a check against a rate that may be a placeholder.
     bool waiting() const noexcept {
-        return awaiting() && activation_failure_.has_value();
+        return awaiting() && activation_failure_.has_value() &&
+               activation_failure_->kind != HostFailureKind::activation;
     }
     void confirm() noexcept {
         awaiting_ = false;

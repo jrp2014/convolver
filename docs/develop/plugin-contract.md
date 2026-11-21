@@ -133,9 +133,12 @@ before they set the sample rate and channel layout (VST3 `setState` before
   is known to have, kept silent if it does not suit, and checked again at
   the next start. Until the host plays it, it awaits validation
   (`HostFilter::awaiting()`, cleared by `confirm()`, which the adapters
-  call only when a control call, such as a status or window read, finds the
-  host running the plug-in with audio processed in that start,
-  `HostSettling::playing()`; never at the stop, so Audacity's start, one
+  call only when a control call finds the host running the plug-in with
+  audio processed in that start, `HostSettling::playing()`: in VST3
+  `Processor::status()` and `send_status()`, so the window's timed report
+  read or a message such as Bypass, as the controller's Status parameter
+  never asks the processor; in the Audio Unit `update_status()` and
+  `confirm_rendered()`, so also the host's Status and report reads; never at the stop, so Audacity's start, one
   block and stop with no call between confirms nothing, without guessing
   which starts are brief; jrp, 21 November 2026): a start
   that found it unsuited is too little evidence, so the status and the
@@ -154,8 +157,9 @@ before they set the sample rate and channel layout (VST3 `setState` before
   since that moment's start is indistinguishable from a real one; it then
   plays silence at the project's rate, with the reason, until chosen again
   after playing; and a list with no 44.1 kHz entry is refused there as a
-  normal mismatch naming 44100 Hz, whose fix adds, while the host is not
-  playing, "If the host has not played audio at your project's rate yet,
+  normal mismatch naming 44100 Hz, whose fix adds, whenever the host is
+  not playing at that moment (`settled` false; also when only the channels
+  do not match), "If the host has not played audio at your project's rate yet,
   play audio once so Convolver can check the host's sample rate and channel
   counts, then choose the configuration list again." (jrp, 21 November
   2026; no guess at whether a start was Audacity's) (`vst3.adapter` `chosen_before_host_plays` replays

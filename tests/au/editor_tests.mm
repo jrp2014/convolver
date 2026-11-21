@@ -951,6 +951,26 @@ void chosen_before_rendering() {
     auto saved = unit.saved();
     require(saved.configuration && saved.configuration->paths.at(0).impulse.size() == 16,
             "the second file is not in the saved state");
+    // jrp (21 November 2026): rendered at 44.1 kHz but stopped before
+    // anything read the result: still waiting.
+    check(unit.initialize(), "44.1 kHz initialization again");
+    render_block(unit, 2, 2);
+    unit.uninitialize();
+    r = report(unit);
+    require([r[@"status name"] isEqualToString:@"Waiting"],
+            "rendered, stopped, unread: " + text(r[@"status name"]) + ": " + text(r[@"summary"]));
+    // A report read while the host renders at 44.1 kHz confirms the
+    // mismatch: Silent, with both rates.
+    check(unit.initialize(), "44.1 kHz initialization for the read");
+    render_block(unit, 2, 2);
+    r = report(unit);
+    const std::string silent = text(r[@"summary"]);
+    require([r[@"status name"] isEqualToString:@"Load failed"] && silent.find("Silent: ") == 0 &&
+                silent.find("44100 Hz") != std::string::npos &&
+                silent.find("48000 Hz") != std::string::npos,
+            "read while rendering a 48 kHz file at 44.1 kHz: " + text(r[@"status name"]) + ": " +
+                silent);
+    unit.uninitialize();
     // Rendered at 48 kHz, then stopped: the list chooses its 48 kHz entry.
     check(unit.configure(48000, 2, 2, 512), "48 kHz formats");
     check(unit.initialize(), "48 kHz initialization");

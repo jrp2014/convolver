@@ -3243,9 +3243,9 @@ void chosen_before_host_plays() {
     require(state.configuration && state.configuration->sample_rate == 48000 &&
                 p.status().text.find("previous filter kept") != std::string::npos,
             ("a refused file replaced the playing filter: " + p.status().text).c_str());
-    // Stopped, the 44.1 kHz file is kept, waiting; Status read while the
-    // host plays at 48 kHz says Silent with both rates, and still does after
-    // it stops: that read confirmed the mismatch.
+    // Stopped, the 44.1 kHz file is kept, waiting; the window's read while
+    // the host plays at 48 kHz says Silent with both rates, and Status still
+    // does after it stops: that read confirmed the mismatch.
     require(p.setActive(false) == kResultOk, "before play: playback stops again");
     require(c.load_file((folder / "slow.wav").string()), "a 44.1 kHz file refused while stopped");
     status_is(waiting, "a 44.1 kHz file chosen while stopped");
@@ -3267,6 +3267,18 @@ void chosen_before_host_plays() {
                     s.text.find("48000 Hz") != std::string::npos,
                 (std::string(when) + ": status " + s.text).c_str());
     };
+    // The window reads its report while the host plays (send_status()):
+    // that confirms the check.
+    {
+        std::map<std::string, std::string> fields;
+        for (const auto& [key, value] : c.report())
+            fields[key] = value;
+        const auto& summary = fields["summary"];
+        require(fields["status name"] == "Load failed" && summary.find("Silent: ") == 0 &&
+                    summary.find("44100 Hz") != std::string::npos &&
+                    summary.find("48000 Hz") != std::string::npos,
+                ("the window's report while playing at 48 kHz: " + summary).c_str());
+    }
     silent("a 44.1 kHz file played at 48 kHz");
     require(p.setActive(false) == kResultOk, "before play: playback stops at last");
     silent("stopped after playback confirmed the mismatch");

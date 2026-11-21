@@ -116,11 +116,17 @@ void chosen_file() {
         s.stopped();
         require(chosen() == HostLoadCheck::keep_until_suited && !s.playing(),
                 name + "refused while stopped");
-        // A host that keeps the plug-in started and plays (REAPER).
+        // A host that keeps the plug-in started and plays (REAPER). A new
+        // start has processed nothing yet, even where VST3 remembers that
+        // audio played with that configuration before.
         s.started(stereo);
+        require(!s.playing(), name + "playing at a start before any audio");
         s.played();
         require(chosen() == HostLoadCheck::refuse_mismatch,
                 name + "kept while the host plays audio again");
+        s.stopped();
+        s.started(stereo);
+        require(!s.playing(), name + "a restart with the same configuration counted as playing");
     }
 }
 

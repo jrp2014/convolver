@@ -331,8 +331,11 @@ LV2 (Linux first; also PipeWire system audio):
   **Remains:** whether the window should mark a host rate as not yet
   confirmed when it comes from a copy that has not processed audio (the
   copy in Audacity's effect window, which a host may start briefly at
-  another rate). Since PLUG-27 (PR #233) a file chosen there is no longer
-  refused for that rate, but Status still judges it against that rate. **Done when** jrp has decided, and
+  another rate). Since PLUG-27 (PR #233) a file chosen there is neither
+  refused for that rate nor judged against it (Status says it is waiting);
+  what remains is a chosen file that matches the placeholder rate, shown
+  Active at 44.1 kHz, and a restored state, still judged against that
+  rate. **Done when** jrp has decided, and
   the marking, if he wants it, is shown and its message tests cover it.
   Diagnostic text only, no sound change; parked until after REL-3 unless
   jrp brings it forward.
@@ -1211,9 +1214,11 @@ move to the archive.
   ([record](docs/archive/reviews/2026-11-20-vst3-17-audacity.md)). In VST3
   and the Audio Unit a chosen file that does not suit is refused only while
   the host plays (`HostSettling::check()`); otherwise a single IR file or
-  `.cfg` is read as it is and kept until the host starts, and a list
-  chooses its entry for the configuration the host last started with, or
-  waits with jrp's message
+  `.cfg` is read as it is and kept, and Status says "Filter selected.
+  Waiting for the host's audio settings." until a read during playback
+  shows it Active or Silent with both rates; a list chooses its entry for
+  the configuration the host last started with, or waits with jrp's
+  message
   ([contract](docs/develop/plugin-contract.md#loading-and-failure),
   [plug-ins](docs/use/plugins.md#loading-a-filter)). Not yet checked in
   Audacity (VST3-17's re-run).

@@ -177,17 +177,22 @@ plug-in. Until then the window keeps the file's name and Status says
 host has started the plug-in briefly at another rate, as Audacity does at
 44.1 kHz to pass on an edit. Once the host plays, the filter plays if it
 fits; if not, it plays silence and Status says "Silent" with the filter's
-and the host's rates. Convolver takes that result when Status or the
-window is read during playback; if playback stops before then, Status may
-say it is waiting again, and the filter stays selected. A configuration list
+and the host's rates. Convolver takes that result when its window is
+open during playback; the Audio Unit also takes it when the host reads
+Status. In the VST3 plug-in, the host's Status control does not ask by
+itself: with the window closed it may keep saying it is waiting until the
+window is opened while the host plays, or a setting such as Bypass
+changes. If playback stops before the result is taken, Status may say it
+is waiting again, and the filter stays selected either way. A configuration list
 needs the rate and channels to choose its entry, so it uses the ones the
 host last ran the plug-in with; before the host has run it with them, the
 list is not loaded, and the window says: "Play audio once so Convolver can
 check the host's sample rate and channel counts, then choose the
-configuration list again." If the list has no entry for the rate the host
-last ran at, it is refused naming that rate, and while the host is not
-playing the advice adds the same step, for a host such as Audacity that
-runs the plug-in briefly at 44.1 kHz before it first plays. LV2 knows its host's rate and channels from the
+configuration list again." If the list has no entry for the rate and
+channels the host last ran with, it is refused naming them, and whenever
+the host is not playing audio through the plug-in at that moment the
+advice adds the same step, for a host such as Audacity that runs the
+plug-in briefly at 44.1 kHz before it first plays. LV2 knows its host's rate and channels from the
 start, so it checks every file at once.
 
 ## When a filter does not fit

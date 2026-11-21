@@ -914,6 +914,17 @@ void awaiting_validation() {
     require(!f.waiting() && s.status == HostStatus::load_failed && contains(s.text, "48000 Hz") &&
                 contains(s.text, "44100 Hz"),
             "after the host played it: " + s.text);
+    // A start that could not be done at all is shown, not waited out (the
+    // independent review): the processor could not be built.
+    HostFilter unstarted(8);
+    unstarted.load(HostState{filter(48000, 2)}, std::nullopt, {}, chosen, nullptr,
+                   HostLoadCheck::keep_until_suited);
+    static_cast<void>(test::started(unstarted, HostLayout{48000, 2, 2}));
+    unstarted.fail_activation("out of memory");
+    s = host_status(unstarted, HostLayout{48000, 2, 2}, true, {});
+    require(unstarted.awaiting() && !unstarted.waiting() && s.status == HostStatus::load_failed &&
+                s.text.find("Silent: ") == 0,
+            "a start that failed is shown as waiting: " + s.text);
     // Restored state does not wait: the earlier rule stands.
     HostFilter restored(8);
     restored.load(HostState{filter(48000, 2)}, std::nullopt, {}, {}, nullptr,

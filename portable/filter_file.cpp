@@ -221,8 +221,12 @@ read_filter_file(const std::string& path, const std::optional<HostLayout>& known
         // PLUG-27 (jrp, 21 November 2026): the host is not playing, so the
         // configuration the list was checked against may be a placeholder
         // (Audacity's 44.1 kHz before it first plays). The message keeps
-        // naming it, and the fix says what to do if it is one; a host that
-        // has played at that rate needs the normal fix, so this cannot loop.
+        // naming it, and the fix says what to do if it is one. settled is
+        // false whenever the host is not playing at this moment, so this is
+        // added after a real start too, and for channels as for rates;
+        // following it, the list is chosen while the host plays and gets
+        // the normal fix alone, so the advice cannot send anyone round in
+        // circles.
         if (e.list && !settled)
             failure.message.fix +=
                 std::string(failure.message.fix.empty() ? "" : " ") +
