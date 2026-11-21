@@ -593,11 +593,10 @@ with a newer compiler, within the stated tolerance
 ([decisions](../project/decisions.md#licences-and-dependencies)). A newer
 compiler's warnings in Convolver's own sources are fixed; where the compiler
 is wrong or its advice does not apply, the warning is silenced at that line
-with the reason, as for a clang-tidy false positive. The core and each
-plug-in's adapter build with `-Wall -Wextra -Wpedantic` (GCC and Clang) or
-`/W4 /permissive- /utf-8` (MSVC), as do the VST3 programs that compile the
-adapter's sources themselves; the plug-in SDKs' headers are included as
-system headers. Warnings in the SDKs and libsndfile are theirs.
+with the reason, as for a clang-tidy false positive. The core, each
+plug-in and the plug-ins' tests build with `-Wall -Wextra -Wpedantic` (GCC
+and Clang) or `/W4 /permissive- /utf-8` (MSVC); the plug-in SDKs' headers
+are included as system headers. Warnings in the SDKs and libsndfile are theirs.
 
 - **Runner images:** each job uses the newest generally available image:
   `ubuntu-latest`, `macos-latest` and `windows-latest`, or the label of the

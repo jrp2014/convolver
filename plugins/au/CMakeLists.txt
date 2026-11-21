@@ -82,7 +82,7 @@ set(mac_editor "${PROJECT_SOURCE_DIR}/plugins/editor/mac")
 set(au_view_sources "${CMAKE_CURRENT_SOURCE_DIR}/view_factory.mm"
     "${mac_editor}/diagnostic_view.mm" "${mac_editor}/setting_rows.mm")
 set_source_files_properties(${au_view_sources} PROPERTIES
-    COMPILE_OPTIONS "-fobjc-arc;-Wall;-Wextra"
+    COMPILE_OPTIONS "-fobjc-arc"
     COMPILE_DEFINITIONS "CONVOLVER_AU_VIEW_FACTORY=${au_view_factory};CONVOLVER_DIAGNOSTIC_VIEW=ConvolverDiagnosticView_${au_class_version};CONVOLVER_SETTING_ROWS=ConvolverSettingRows_${au_class_version}"
     INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR};${mac_editor}")
 # The unit names the factory class and finds its own bundle for hosts.
@@ -114,6 +114,9 @@ set_target_properties(convolver_au PROPERTIES
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in"
     CXX_EXTENSIONS OFF CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
 target_link_libraries(convolver_au PRIVATE convolver_au_adapter "-framework AppKit")
+# CI-47: the adapter's warnings for the component's own sources too (the
+# factory and the window).
+target_compile_options(convolver_au PRIVATE -Wall -Wextra -Wpedantic)
 # Export only the factory, so the host process sees none of the engine's symbols.
 target_link_options(convolver_au PRIVATE "LINKER:-exported_symbol,_ConvolverAUFactory")
 add_dependencies(convolver_au convolver_build_version)
@@ -199,6 +202,8 @@ if(CONVOLVER_BUILD_TESTS)
         if(TARGET ${target})
             set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
             target_include_directories(${target} PRIVATE "${PROJECT_SOURCE_DIR}/tests")
+            # CI-47: the adapter's warnings for the tests too.
+            target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
         endif()
     endforeach()
     add_dependencies(check ${au_test_targets})
