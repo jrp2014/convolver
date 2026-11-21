@@ -408,11 +408,6 @@ struct HostChange {
     // The state's bypass, for restored state; none for a chosen file. Only
     // VST3 applies it: the Audio Unit and LV2 leave bypass to the host.
     std::optional<bool> bypass;
-    // The accepted filter's tail in frames (configuration_tail_frames()) when
-    // no processor plays (load()'s `counting` was null), for the adapter to
-    // report until one is built; 0 otherwise, when the processor knows it,
-    // and for no filter.
-    std::size_t inactive_tail = 0;
     // Why an accepted filter that does not suit the host was kept instead of
     // refused, for the adapter's log line; `none` when it suits, or when the
     // host's configuration is not known.
@@ -456,6 +451,13 @@ class HostFilter {
     // worst_case_peak() of filter(), found when it was accepted; 0 without one.
     double filter_peak() const noexcept {
         return peak_;
+    }
+    // configuration_tail_frames() of filter(), found when it was accepted; 0
+    // without one. The tail an adapter reports while no processor plays; a
+    // processor reports its own (HostProcessor::tail_frames()), which also
+    // covers a filter it is still fading out (PLUG-39 step 6).
+    std::size_t filter_tail() const noexcept {
+        return tail_;
     }
     // PLUG-10: filter_gains() of filter(), found when it was accepted (the
     // estimate once found while estimating()); 0 dB for both without one.
@@ -593,8 +595,8 @@ class HostFilter {
     }
     // Load decoded state: a filter, none to return to an empty instance, or a
     // saved failed load (plays silence). Returns what else the accepted
-    // request requires (HostChange: the settings and bypass to apply, the
-    // tail while no processor plays), decided from `request.kind` and the
+    // request requires (HostChange: the settings and bypass to apply),
+    // decided from `request.kind` and the
     // state; the install callback receives what to play, which for a
     // request holding the filter already playing says so
     // (HostPlayback::playing), and passes it to HostProcessor::play(). A
@@ -690,6 +692,7 @@ class HostFilter {
     std::size_t max_channels_;
     std::shared_ptr<const Configuration> filter_;
     double peak_ = 0;            // filter_peak()
+    std::size_t tail_ = 0;       // filter_tail()
     FilterGains gains_;          // gains()
     bool estimating_ = false;    // estimating()
     std::uint64_t identity_ = 0; // filter_identity()

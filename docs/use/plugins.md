@@ -799,8 +799,9 @@ Unit in seconds, as Audio Units do). VST3 counts it at the plug-in's output,
 as Steinberg's own tests measure it, so it adds the latency: an instance
 with no filter reports 256 samples at a Latency of 256, because its output
 still carries the last 256 samples of input after the input stops. After a filter is replaced during
-playback, the Audio Unit keeps reporting the longest tail used until the host
-restarts it. LV2 cannot report a tail, so hosts that stop processing at the end
+playback, both keep reporting the longest tail used until the host stops the
+plug-in, and then report the filter's own, as the window's Ring-out row
+does. LV2 cannot report a tail, so hosts that stop processing at the end
 of a region may cut it off: render with a little silence after the audio.
 
 ## Bypass

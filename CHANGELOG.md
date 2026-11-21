@@ -37,6 +37,22 @@ first published preview, keep their original grouping.
 
 ### Changed
 
+- Plug-ins (PLUG-39 step 6, which finishes PLUG-39): the latency and tail
+  the host reads are written in one place in each of VST3 and the Audio
+  Unit, from the newest processor or, with none, from the accepted filter
+  (`HostFilter::filter_tail()`, which replaces `HostChange::inactive_tail`).
+  One reading changes, while no audio runs: once the host has stopped the
+  plug-in, the tail the host reads and the window's Ring-out row are the
+  accepted filter's, where they stayed at the longest filter the last
+  processor had played (or at 0 for a filter that did not suit the host).
+  `vst3.adapter`'s `edge_cases` and `au.adapter`'s `timing_in_seconds`
+  check it. Audio, saved state and every other message are unchanged.
+- Library (PLUG-39 step 6), in 0.18.0: `HostChange::inactive_tail` is
+  removed; `HostFilter::filter_tail()` gives the accepted filter's tail
+  instead, found when the filter is accepted. An incompatible API change,
+  so a minor version step. The
+  [plan](docs/archive/plans/2026-11-13-load-restore-consolidation.md) is
+  archived with its recount.
 - Documentation (HOST-10): the plug-in guide has an Ardour section, by the
   track's Pin Mode (tried with Ardour 8.4 and 9.0). On a Strict-I/O track,
   Ardour's default, a mono or stereo filter plays in the VST3 and the LV2

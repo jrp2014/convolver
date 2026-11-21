@@ -784,8 +784,9 @@ for restored state without them, VST3-4, and the Audio Unit lays its saved
 parameters over the present values; the Audio Unit and LV2 ignore settings
 a Convolver state carries, such as a VST3 state's, because their settings
 are parameters and ports), the bypass (restored state's, never a
-chosen file's; only VST3 applies it) and the filter's tail while no
-processor plays. The Latency in those settings goes through each format's
+chosen file's; only VST3 applies it). The tail an adapter reports while
+no processor plays is the accepted filter's (`HostFilter::filter_tail()`,
+found when the filter was accepted, PLUG-39 step 6). The Latency in those settings goes through each format's
 own Latency path, which builds a new processor only when it differs. A
 refused request returns nothing and changes none of it; every adapter then
 calls `HostFilter::fail_request()` with the processor that plays, which
@@ -1179,7 +1180,8 @@ most one transition and one pending replacement are retained, with up to two
 old engines awaiting control-thread collection after the last publication.
 Collection does not hold up pending changes. The tail is available before
 activation and includes routed delays; it can grow conservatively during a
-session, and reactivation recomputes it.
+session, and once the host stops the plug-in it is the accepted filter's
+again (PLUG-39 step 6).
 
 A new Latency while active (the Audio Unit, VST3 since VST3-16, and LV2
 with a worker) replaces the whole `HostProcessor`, since the block size
@@ -1198,7 +1200,11 @@ the Audio Unit do it with `PlayingProcessor` ([implementation map](architecture.
   moment it is offered, and the host is told in the same control call
   (VST3's restart request, the Audio Unit's property listeners), without
   waiting for a callback, which may never come while playback is stopped
-  (VST3-16).
+  (VST3-16). The latency and tail the host reads without the control lock
+  are atomics that one function in each adapter writes
+  (`publish_timing()`, PLUG-39 step 6), after every change to the newest
+  processor or the accepted filter: the newest processor's, or with none
+  the accepted filter's tail and, for the latency, the chosen Latency.
 - **The control side never waits for audio.** A replaced processor is freed
   by a later control call once no reader holds it; at most one replaced
   processor per reader stays alive, an offer no reader adopted is freed by
@@ -1395,8 +1401,12 @@ How each adapter meets the contract where its format differs:
   tail plus the latency (`getLatencySamples()`), measured at the output as Steinberg's tail
   test does. 32- and 64-bit host buffers both use the float engine.
 - **Audio Unit:** latency and tail are reported in seconds, with a property
-  change notification when either changes; the tail stays at the longest
-  filter used until the host reinitializes the unit. Bypass is
+  change notification when either changes, except while the host
+  uninitializes the unit, which reads them again when it next asks; the
+  tail stays at the longest filter used until the host uninitializes the
+  unit, and is then the accepted filter's; the latency uninitialized is the
+  chosen Latency, read from its parameter, and whichever call publishes a
+  new one (the Latency queue, a chosen file or a restore) notifies. Bypass is
   `kAudioUnitProperty_BypassEffect` driving `HostProcessor::set_bypass`, not
   `AUEffectBase`'s pass-through, and is saved in `ClassInfo`. The output is
   marked silent only once the tail has decayed. Rejections are returned to the

@@ -582,6 +582,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
     Advice notice;
     std::optional<HostFailure> saved_failure, kept_failure;
     double peak = 0;
+    std::size_t tail = 0;
     std::uint64_t identity = 0;
     FilterGains gains;
     std::optional<OfferedName> offered;
@@ -679,16 +680,15 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
         // the preparation, so a report never has to compute it.
         if (same) {
             peak = peak_;
+            tail = tail_;
             gains = gains_;
             if (estimating && !gains.estimate_db && !gains.estimate_failed)
                 find_estimate(gains, *accepted);
         } else if (accepted) {
             peak = worst_case_peak(*accepted);
+            tail = configuration_tail_frames(*accepted);
             gains = gains_for(*accepted, peak, estimating);
         }
-        // Until a processor is built, the adapter reports the filter's tail.
-        if (accepted && !counting)
-            change.inactive_tail = configuration_tail_frames(*accepted);
         if (state.failed) {
             HostFailure f;
             f.kind = HostFailureKind::saved_failure;
@@ -754,6 +754,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
                   std::is_nothrow_move_assignable_v<Advice>);
     filter_ = std::move(accepted);
     peak_ = peak;
+    tail_ = tail;
     gains_ = gains;
     estimating_ = estimating;
     identity_ = identity;
