@@ -32,52 +32,90 @@ CANDIDATE_WORKFLOW = '.github/workflows/release.yml'
 # in their words; each preview's release-notes change updates both
 # (docs/develop/releasing.md#publishing-an-unsigned-preview). The changelog
 # holds every change.
-PREVIOUS_PREVIEW = '0.13.24'
+PREVIOUS_PREVIEW = '0.14.0'
 CHANGES = (
     (
-        'Quicker restores of the playing filter: a preset, undo step or saved state restored into a plug-in that is '
-        'already playing the same filter no longer analyses that filter again. With a 10-second stereo filter under '
-        'Gain mode Estimate, that analysis step took about 590 ms before and 2 to 5 ms now (measured on Linux). '
-        'Opening a project in a fresh session still analyses its filter once. What plays, what is saved and the '
-        'figures shown are unchanged.'
+        "A filter file chosen in Convolver's window before the host plays is now kept and saved with the project. "
+        'Until the host plays audio through the plug-in, Status says "Filter selected. Waiting for the host\'s audio '
+        'settings." and the filter is checked against the rate and channels the host then plays at, rather than '
+        'against a brief start at a placeholder rate. In Audacity 4, which starts the plug-in at 44.1 kHz until it '
+        "first plays, whatever the project's rate, 0.14.0 refused a 48 kHz filter chosen before playback and saved "
+        'that failure, so exports were dry or silent. While the host plays, a file that does not suit it is still '
+        'refused and the working filter keeps playing. VST3 and the Audio Unit.'
     ),
     (
-        'Less CPU once the sound has stopped: when the input has been exactly silent (every sample zero, as a '
-        'stopped transport gives) for longer than anything can stay in '
-        'the engine (the latency, the filter and its delays, plus an additional interval determined by the partition '
-        'layout; approximately half a second or less in the measured 48 kHz workloads), each further silent '
-        'callback writes silence without convolving, and the next sound starts at once. The saving applies only to '
-        'that silence, not to playback: on a Linux test machine such silence cost 93 to 99% less CPU, and music cost '
-        'the same as before. Only Linux was measured; macOS and Windows are not yet. The output is what it was, '
-        'except that a sample where sound cancelled to a value too small for a normal float, which used to come out '
-        'as -0, now comes out as +0. The two are numerically equal and inaudible, but a bit-for-bit comparison of '
-        'float output with an earlier version can show the difference; integer output is unchanged.'
+        "A configuration list needs the host's rate and channels to choose its entry. Chosen before the host has "
+        'played, it is refused with "Play audio once so Convolver can check the host\'s sample rate and channel '
+        'counts, then choose the configuration list again." With the window open, it now loads by itself, as if '
+        'chosen, as soon as the host plays, and the project is marked changed. Once Convolver has seen the host '
+        'play, Status and the window say "The host\'s settings are now known (48000 Hz, 2 in, 2 out): choose the '
+        'configuration list again." instead of still calling them unknown. A brief start without audio, such as '
+        "Audacity's after a parameter edit, does not count. The window no longer suggests dropping a file beside "
+        'every refusal.'
     ),
     (
-        'The `convolver` command-line tool now warns after a render in which samples went beyond full scale, with '
-        "each affected channel's count of clipped samples and its peak in dBFS, and suggests `--gain-db no-clip` or "
-        'how far to lower `--gain-db`. Float output, which keeps such samples, gets a note that a later conversion '
-        'to integer samples will clip them. The samples written are unchanged.'
+        'A chosen file now waits for audio in the current start. The VST3 plug-in could refuse a file chosen just '
+        'after the host stopped and started again, judging it by the audio of the earlier start; the Audio Unit '
+        'counted a render of no frames as playing, so it could refuse a file that should wait, and refused a '
+        '48 kHz project restored after a 44.1 kHz probe (error -10851).'
     ),
     (
-        "When a filter is refused because its sample rate differs from the host's, the suggested fix now adds: "
-        '"The host may play at a different rate from the one it exports at." Audacity, for one, plays at its '
-        "Default sample rate while it exports at the project's."
+        "In Audacity, Convolver's Choose… and Recent are now checked routes beside Audacity's own preset menu "
+        '(Audacity 4.0.2 on macOS, 21 November 2026): a filter chosen before playing reached the export, and the '
+        'next export after saving, quitting and reopening; a list chosen after one playback took its 48 kHz entry. '
+        'All four exports matched the reference within -137 dB.'
     ),
     (
-        'A `.cfg` file or list whose file names are not UTF-8 text, as Notepad\'s old "ANSI" encoding saves them, '
-        'now stops with an error that names the line and the byte and says how to save the file as UTF-8, unless a '
-        'file with exactly that name exists (possible on Linux). Before, on Linux, it said the file was not found '
-        'and showed a garbled name. `convolver --inspect` and `--validate` report it with the new code `not-utf8`, '
-        'where they reported `missing-asset` or `unreadable`. Convolver still reads only UTF-8.'
+        "Once the host stops the plug-in, the tail it reports, and the Ring-out row in the window's details, are "
+        "the current filter's own. While audio plays it stays the longest tail used since the start, so a host "
+        'keeps rendering a tail that is still ringing; before, after a stop it stayed at the longest one the last '
+        'start had played.'
     ),
     (
-        'The plug-ins guide no longer promises that Reload when the file changes never reads a half-written file, '
-        'and recommends that tools which write filters write each file under a temporary name and then rename it.'
+        'In LV2, choosing again the file of the filter already playing keeps it playing, with its tail ringing on, '
+        'as the VST3 and Audio Unit windows already did. The decoded filter decides, not the file name: a file of '
+        'the same name whose contents changed loads as before.'
     ),
     (
-        'Behind the scenes: static analysis now covers every portable source file, and fuzz testing runs whenever '
-        'the code it covers changes, with a longer run each week.'
+        "With bypass on, Status, the window's report and the Convolver log say what bypass plays instead of "
+        'describing the filter: for example "No filter. Bypass is on: audio passes unchanged.", or "Load failed. '
+        'Bypass is on: only the dry signal plays." for a kept filter that does not suit the host, where Status '
+        'showed "Silent:" or a level the input was not played at. The audio is unchanged.'
+    ),
+    (
+        'The Audio Unit names restored state that brings no name of its own (an "Untitled" preset) after the same '
+        'filter\'s earlier file or preset name, as VST3 already did, instead of "Restored filter".'
+    ),
+    (
+        "Choosing a new Latency while audio plays no longer holds the host's control call until the audio thread "
+        "finishes its block, in VST3 and the Audio Unit. The Audio Unit's window no longer waits for a load or a "
+        'Latency change before showing its first report, and its report follows a bypass switched meanwhile. What '
+        'plays and the gap while the new size fills are unchanged.'
+    ),
+    (
+        "When memory runs out while applying a new Latency, Status and the window's report stay as they were. "
+        'Before, Status could show Fault again for faults a later load had cleared, or Active over a filter '
+        'playing silence.'
+    ),
+    (
+        'The limits guide now states, from measurements on four machines, what one instance handles: room '
+        'correction for up to 8 channels, stereo and true-stereo reverbs up to 60 s (true-stereo 30 s at 96 kHz), '
+        'a full 8 × 8 matrix only at 48 kHz, and the memory and preparation time a filter takes.'
+    ),
+    (
+        'The plug-ins guide has an Ardour section: what plays on Strict-I/O and Flexible-I/O tracks in the VST3 and '
+        'LV2 plug-ins, and which settings Ardour shows. The user guides no longer contradict the plug-ins: Choose… '
+        'opens a Convolver `.vstpreset`, the Windows window and its Copy Diagnostics are described beside the '
+        "Mac's, and Gain mode and the Linux LV2 plug-in are listed where they belong."
+    ),
+    (
+        'Behind the scenes: the Mac packages are built with Xcode 26.6 (still for macOS 14 and later) and the Linux '
+        'package with GCC 12 (still for glibc 2.35), and every plug-in builds without compiler warnings; output may '
+        'differ from 0.14.0 within the tested tolerance. Automated host tests now play the VST3 and LV2 plug-ins in '
+        'headless Ardour 9 sessions (mono, stereo, Strict-I/O, saved at Latency 256 and 1024), render the Audio '
+        "Unit in GarageBand's order of events, run part of the REAPER check from one command, and check that "
+        'presets and saved state from the published 0.14.0 still load and render the same, within the tested '
+        'tolerance, in the command-line tool, VST3, LV2 and the Audio Unit.'
     ),
 )
 TAG = re.compile(r'v(\d+\.\d+\.\d+)')
@@ -189,8 +227,8 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             "choose a filter with the host's file chooser for its Filter parameter, where the host shows one, or "
             f'load an LV2 preset made with `convolver-preset` ([plug-in presets]({docs}/presets.md)), and set Gain, '
             "Mix and Latency with the host's own controls. Each channel layout is "
-            'its own plug-in. It was checked automatically, with lilv, lv2lint, pluginval and a headless Ardour '
-            'session, and from a source build in PipeWire 1.6.8 on virtual devices; nobody has used it in a '
+            'its own plug-in. It was checked automatically, with lilv, lv2lint, pluginval and headless Ardour 9 '
+            'sessions, and from a source build in PipeWire 1.6.8 on virtual devices; nobody has used it in a '
             'desktop host yet. In hosts built on JUCE, pluginval among them, closing the plug-in waits up to '
             '100 ms for a queued Latency, Gain mode or fault report. Since 0.13.24 this mitigates a host crash '
             'rather than ruling it out: a file request the host works after closing, or a request delayed over '
@@ -208,7 +246,10 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             '(0.12.12), on one Mac, renders and exports from REAPER and Audacity (VST3) and GarageBand (Audio Unit) '
             'matched the command-line tool, and saved projects reopened with their filter. Not yet checked: '
             'listening in any host, VoiceOver, the latest Audio Unit changes in GarageBand, and anyone outside the '
-            'project following the guides. The Windows and Linux packages were '
+            'project following the guides. Not yet repeated on this version: in REAPER, a render, save and reopen, '
+            'a refused preset while playing and the wrong host rate, the render, save and reopen from one command, '
+            'and reopening a project saved with an earlier preview; in GarageBand, presets, bypass, settings, a '
+            'Latency change stopped and while playing, Recent and Reload. The Windows and Linux packages were '
             'checked only automatically, on CI machines that had never built Convolver: the tools and examples ran '
             "from them, the plug-in's library loaded and listed its classes, and the Windows installer installed "
             'and removed itself. Nobody has used them in a host yet. '
@@ -218,8 +259,15 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'saved projects, and one chosen from Recent for exports (checked in Audacity 4.0.2 on macOS on 21 '
             "November 2026, as is Audacity's own preset menu). Reload and reloading when the file changes are "
             'checked only by automated tests.\n'
-            '- Checked only by automated tests: new in 0.14, the quicker restore of the playing filter and the '
-            'saving once the sound '
+            '- In Ardour, the VST3 plug-in on a Flexible-I/O track gets 2 inputs and 2 outputs whatever the track '
+            'has, so a mono filter plays silence until its outputs are set by hand in Pin Connections, and a '
+            "crossover cannot play; nor can a crossover on a Strict-I/O track, Ardour's default, in either format. "
+            'On Linux use the LV2 plug-in on a Flexible-I/O track for a crossover '
+            f'([Ardour]({docs}/plugins.md#ardour)).\n'
+            '- Checked only by automated tests: new in 0.18, a configuration list loading by itself once the host '
+            'plays, a chosen file waiting for audio in the current start, the tail reported after a stop, choosing '
+            "the playing file again in LV2, and the Audio Unit's part of keeping a filter chosen before the host "
+            'plays; new in 0.14, the quicker restore of the playing filter and the saving once the sound '
             'has stopped; new in 0.13.20, the Gain mode, a `.vstpreset` chosen in the window, Choose… on a track '
             "with more inputs than the filter's, and a preset or undo that keeps the playing filter.\n"
             '- Since 0.13, Latency starts at 0 frames. Some projects saved with 0.12.12 at its default of 256 frames '
