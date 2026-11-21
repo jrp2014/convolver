@@ -352,9 +352,9 @@ Do this once. Run the commands in the extracted preview package folder.
 4. From the **+** button beside the FX window's preset menu, import
    `presets/identity-48000-stereo/identity-48000-stereo.vstpreset` (the import item for VST
    preset files). Play: the sound is unchanged. Import
-   `presets/echo-48000-stereo/echo-48000-stereo.vstpreset`: about 5 dB quieter, with a
-   hollow, comb-filtered tone. (Its echo comes 257 samples, about 5 ms, after
-   the direct sound, too soon to hear as a separate repeat.) Status reads
+   `presets/echo-48000-stereo/echo-48000-stereo.vstpreset`: each sound comes
+   back three times, 0.3 s apart and fading, and the meters show each
+   repeat. Status reads
    `Filter loaded: 48000 Hz, 2 in, 2 out.` Import
    `presets/repeat-48000-stereo/repeat-48000-stereo.vstpreset`: each sound comes again,
    quieter, a quarter of a second later. Import the echo preset again for the
@@ -495,7 +495,7 @@ preparation and steps 2, 3 and 9 below include what it found.
    (listed with the plug-in's own presets after [preparation](#prepare-the-mac);
    *Preset options › Import* reads only Audacity's own preset files, not
    `.vstpreset`).
-   Play: unchanged. Choose `echo-48000-stereo`: quieter and hollow, as in
+   Play: unchanged. Choose `echo-48000-stereo`: three fading repeats, as in
    REAPER. Choose `repeat-48000-stereo`: each sound comes again a quarter of a
    second later; then choose `echo-48000-stereo` again. Record whether a preset chosen during playback is heard at once or
    only after stopping and starting playback again. The effect's window lists
