@@ -100,8 +100,15 @@ std::vector<ReferenceLine> reference_lines(const std::string& text) {
 }
 
 void replace_all(std::string& text, std::string_view from, std::string_view to) {
-    for (auto at = text.find(from); at != std::string::npos; at = text.find(from, at + to.size()))
-        text.replace(at, from.size(), to);
+    std::string out;
+    std::size_t start = 0;
+    for (auto at = text.find(from); at != std::string::npos; at = text.find(from, start)) {
+        out.append(text, start, at - start);
+        out += to;
+        start = at + from.size();
+    }
+    out.append(text, start);
+    text = std::move(out);
 }
 } // namespace
 

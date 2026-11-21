@@ -335,8 +335,11 @@ std::string au_preset(const HostState& state, std::string_view name) {
     const auto encoded = encode_host_state(state);
     const auto text = base64(encoded);
     std::string data;
-    for (std::size_t i = 0; i < text.size(); i += 68)
-        data += "\t" + text.substr(i, 68) + "\n";
+    for (std::size_t i = 0; i < text.size(); i += 68) {
+        data += '\t';
+        data.append(text, i, 68);
+        data += '\n';
+    }
     auto code = [](std::string_view four) {
         return std::to_string(static_cast<std::int32_t>(identity::four_char(four)));
     };

@@ -14,7 +14,9 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     std::string_view rest(reinterpret_cast<const char*>(data), size);
     for (int i = 0; i < 8 && !rest.empty(); ++i) {
         const auto end = rest.find('\0');
-        files["f" + std::to_string(i)] = std::string(rest.substr(0, end));
+        std::string file_name = "f";
+        file_name += std::to_string(i);
+        files[file_name] = std::string(rest.substr(0, end));
         rest = end == std::string_view::npos ? std::string_view{} : rest.substr(end + 1);
     }
     const auto name = [](const std::filesystem::path& p) {

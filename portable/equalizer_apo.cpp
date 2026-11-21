@@ -119,8 +119,11 @@ void body(std::string& out, const Source& s, std::size_t number, Impulses& impul
     for (std::size_t k = 0; k < used.size(); ++k) {
         out += "  Copy: " + path_channel(k) + '=';
         const auto& inputs = c.paths[used[k]].inputs;
-        for (std::size_t r = 0; r < inputs.size(); ++r)
-            out += (r ? "+" : "") + term(inputs[r].gain, device_channel(inputs[r].channel));
+        for (std::size_t r = 0; r < inputs.size(); ++r) {
+            if (r)
+                out += '+';
+            out += term(inputs[r].gain, device_channel(inputs[r].channel));
+        }
         out += '\n';
     }
     // One Convolution per distinct impulse, on every path channel that uses it.
@@ -147,8 +150,11 @@ void body(std::string& out, const Source& s, std::size_t number, Impulses& impul
         std::string sum;
         for (std::size_t k = 0; o < c.output_channels && k < used.size(); ++k)
             for (const auto& route : c.paths[used[k]].outputs)
-                if (route.channel == o)
-                    sum += (sum.empty() ? "" : "+") + term(route.gain, path_channel(k));
+                if (route.channel == o) {
+                    if (!sum.empty())
+                        sum += '+';
+                    sum += term(route.gain, path_channel(k));
+                }
         out += "  Copy: " + device_channel(o) + '=' + (sum.empty() ? "0.0" : sum) + '\n';
     }
     if (std::any_of(c.output_delays.begin(), c.output_delays.end(),

@@ -640,6 +640,15 @@ the workflow. The release candidates have two:
 | Linux | `ubuntu-22.04`, newest GCC on it (GCC 12) | A newer Ubuntu's glibc would stop the package loading on Ubuntu 22.04 and other glibc 2.35 systems (`max_glibc` in the release policy); GCC 12 also needs no newer libstdc++ than Ubuntu 22.04 and Debian 12 ship (GLIBCXX_3.4.30 and CXXABI_1.3.13, `max_glibcxx` and `max_cxxabi`), so a newer GCC on the image fails the candidate's check instead of shipping |
 | Windows | `windows-2022`, Visual Studio 2022 | The packages use the Microsoft C++ runtime installed on the user's machine (`MultiThreadedDLL`); a Visual Studio 2026 build would need that runtime's 2026 version there. jrp kept Visual Studio 2022 for the packages when he chose the CI-43 changes (19 November 2026) |
 
+The Linux job's GCC 12.3 sometimes warns `-Wrestrict` inside libstdc++'s
+string copy, where an optimised build puts text in front of a temporary
+`std::string` (`"<" + name()`) or replaces part of a string in place. The
+warning is wrong (GCC 12.4 does not give it) and points into libstdc++, not
+at a line that could carry the reason, so where it appears the string is
+built front to back instead: `+=` and `append` in order, or a named string
+before the `+` (CI-48). It depends on what GCC inlines, so other joins of
+that shape that it does not warn about are left as they are.
+
 Contributors' own machines are not held to this; the
 [dependencies](#dependencies) above say what a source build needs.
 
