@@ -29,9 +29,11 @@
 --                     which has no input-pin setting for a VST3); "all"
 --                     sets its inputs to the track's too (Ardour 9's window
 --                     has an Audio Input Pins setting)
---   CONVOLVER_LOG     with CONVOLVER_PINS, Convolver's log file: the script
---                     waits for the plug-in to start with those outputs
---                     before it loads the preset (see below)
+--   CONVOLVER_LOG     Convolver's log file, which the plug-in also reads to
+--                     know where to write it (the test passes the same path
+--                     as XDG_STATE_HOME gives); with CONVOLVER_PINS the
+--                     script waits for the plug-in to start with those
+--                     outputs before it loads the preset (see below)
 --   CONVOLVER_STRICT_IO  optional; 1 makes the track Strict-I/O, as a track
 --                     added in Ardour's window is by default (a track the
 --                     script adds is otherwise Flexible-I/O)
@@ -152,7 +154,14 @@ if pins ~= "" then
 	-- as they do, until the log says the plug-in started with these outputs.
 	local started = "Started at %d+ Hz, %d+ in, " .. outputs .. " out"
 	local waited = 0
-	while not log_text():sub(before + 1):find(started) do
+	while true do
+		local text = log_text()
+		if #text < before then
+			before = 0 -- The log was rotated to convolver.log.old.
+		end
+		if text:sub(before + 1):find(started) then
+			break
+		end
 		assert(waited < 10000, "the plug-in did not start with " .. outputs .. " outputs within 10 s of setting them")
 		ARDOUR.LuaAPI.usleep(50000)
 		waited = waited + 50

@@ -198,8 +198,8 @@ done once for all three formats:
   the plug-in a little later, and a filter chosen while it still runs with
   the old outputs is refused ("Not loaded"). It is not tried again when the
   host restarts the plug-in with channels that fit, so the project saves
-  the refusal. The Ardour guide says to choose the filter again
-  ([testing](docs/develop/testing.md#ardour-headless)). **Needs** jrp's
+  the refusal. The [Ardour guide](docs/use/plugins.md#ardour) says to choose the
+  filter again ([evidence](docs/develop/testing.md#ardour-headless)). **Needs** jrp's
   decision: keep a filter refused only for its channels, and try it again
   at the next start whose channels fit, or keep the refusal final. **Done
   when** he has decided and, if he wants the retry, adapter tests cover it
