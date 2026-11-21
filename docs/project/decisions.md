@@ -283,6 +283,15 @@ Contents: [direction](#direction) · [releases](#releases) ·
 
 ## Releases
 
+- **21 November 2026.** A plug-in workload is supported when, run as the
+  plug-ins run it, its mean cost is at most 25% of one core and its
+  99th-percentile callback at most half its period, on every machine
+  measured, at both latencies and both callback sizes. By that rule every
+  workload that fits the saved state is supported except a full 7.1 (8×8)
+  matrix at 96 kHz, and the user guide states the measured loads (jrp chose
+  "Adopt as proposed" on PR #248: "Agree. Merge"; PERF-3). See [Supported
+  workloads](../develop/fft-measurements.md#supported-workloads),
+  [limits](../use/limits.md#filter-length-channels-and-processor-load).
 - **20 November 2026.** Version 0.17.0, after 0.16.x, for PLUG-39 step 4a's
   library change (`HostFilter::filter()` returns a
   `std::shared_ptr<const Configuration>` instead of a

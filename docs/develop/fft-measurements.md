@@ -11,6 +11,10 @@
 - In the uniform-engine measurements, long filters spent most of their time
   in the per-partition multiply-accumulate. That finding does not establish
   the FFT share of the nonuniform engine (PERF-2).
+- The supported workloads (PERF-3, 21 November 2026): every filter that
+  fits the plug-ins' saved state, except a full 7.1 matrix at 96 kHz,
+  played in real time with room to spare on four shared machines
+  ([supported workloads](#supported-workloads)).
 - Measure again on the target machine before a speed claim
   ([reproduce](#reproduce)).
 
@@ -37,6 +41,7 @@ Contents: [comparing Accelerate and FFTW](#comparing-accelerate-and-fftw) ·
 [long reverbs and zero latency](#long-reverbs-and-zero-latency) ·
 [the non-uniform engine](#the-non-uniform-engine) ·
 [idle after the tail](#idle-after-the-tail) ·
+[supported workloads](#supported-workloads) ·
 [reproduce](#reproduce)
 
 ## Comparing Accelerate and FFTW
@@ -1218,6 +1223,284 @@ the latency and tail for 4096 taps, 250 ms for 65,536 and 0.5 s for an
 4096 taps and 340 ms for 65,536 at Latency 16384. The longest found is
 just over 0.5 s (512k taps at Latency 64).
 
+## Supported workloads
+
+PERF-3's one measurement exercise (21 November 2026): callback times,
+memory and preparation for long and multichannel filters, played through
+`HostProcessor` as the plug-ins drive the engine, on the Linux cloud VM and
+on GitHub's Linux, macOS arm64 and Windows runners, each with the FFT
+library its plug-ins ship. These are shared machines, so the figures are
+indicative: they show the size of each cost and how it grows, not the exact
+figures a quiet desktop such as jrp's M5 Max would give, and they are no
+real-time guarantee. The user guides' statement of what a plug-in handles
+([limits](../use/limits.md#filter-length-channels-and-processor-load)) rests
+on this section.
+
+**Source.** `main` at `16cc484` (0.17.0) with PERF-3's
+[`workloads.py`](../../tests/native/benchmarks/workloads.py), which runs
+`convolver_callback_benchmark` once per measurement, in its own process, and
+records the process's peak resident memory. Release builds, sanitizers off.
+The runner figures come from the
+[Workload measurements](../../.github/workflows/workloads.yml) workflow's run
+44908995160 on `4b17fa4`. That run's Linux job asked the newest-compiler
+action for Clang, but CMake still took the image's plain `c++`, GCC 15.2.0
+(the action puts `clang++` first on the path, not `c++`); GCC 15.2.0 is
+also the newest GCC on the image, which the candidates build with, so the
+workflow now asks for GCC. A second run (44910521347 on `ab321ee`) drew
+other CPUs: an AMD EPYC 9V45 for Linux and an EPYC 9V74 for Windows. It
+cost 14 to 32% less on Linux and 20% less to 15% more on Windows. The
+overall verdict below did not change, though the 7.1 matrix at 96 kHz fell
+just under 25% of a core on the faster Linux CPU. The tables use the first,
+slower run; the raw data holds both.
+
+| Machine (`run` in the raw data) | CPU | System | Compiler | FFT, kernels |
+| --- | --- | --- | --- | --- |
+| Cloud VM (`cloud-vm-ooura`, `cloud-vm-fftw`) | Intel Xeon @ 2.30 GHz (KVM), 4 vCPUs | Ubuntu 24.04 | Clang 18.1.3 | Ooura, AVX2+FMA; FFTW 3.3.10 in the comparison below |
+| Linux runner (`linux-runner`) | Intel Xeon 6973P-C, 4 vCPUs | Ubuntu 26.04 image 20261116.202.1 | GCC 15.2.0 | Ooura, AVX2+FMA |
+| macOS runner (`macos-runner`) | Apple M1 (Virtual), 3 vCPUs | macOS 26.7.2, image 20261117.0516.1 | AppleClang 21.0.0 (Xcode 26.6) | Accelerate, baseline |
+| Windows runner (`windows-runner`) | AMD EPYC 7763, 4 vCPUs | Windows Server 2025, image 20261116.315.1 | MSVC 19.52 | Ooura, AVX2+FMA |
+| Second run (`linux-runner-2`, `windows-runner-2`) | AMD EPYC 9V45 (Linux), EPYC 9V74 (Windows), 4 vCPUs | As above | As above | As above |
+
+**Workloads.** Noise filters, whose cost does not depend on their content:
+room correction and crossovers at 65,536 taps (1.4 s at 48 kHz, typical of
+DRC and Audiolense output), stereo correction (2 paths), a 2-to-6 crossover
+(6), 5.1 and 7.1 correction (6 and 8, one per channel) and a full 7.1
+matrix (64); reverbs of 10, 30 and 60 s in stereo (2 paths) and true stereo
+(4), and a 10 s 7.1 reverb (8). Each at 48 and 96 kHz: the benchmark always
+builds 48 kHz filters, and the engine's work does not depend on the rate,
+so a 96 kHz workload is the same filter with twice the taps, and its share
+of a core and its callback period are given at 96 kHz. Each ran warm (a
+full history) at Latency 0, the plug-ins' default, and 256, in 64- and
+512-frame callbacks, 1 s timed per run; a first load (`startup`) and a live
+replacement (`replace`) ran at Latency 0 in 512-frame callbacks. Three
+rounds, every other one in reverse order; the tables give medians. The
+true-stereo 60 s filter at 96 kHz (88 MiB of samples) is over the plug-ins'
+64 MiB saved-state limit, so it is command-line work only; every other
+workload fits.
+[Raw data](../benchmarks/2026-11-21-perf3-workloads.csv): every run, labelled
+as in the machine table, with the columns these tables need (the script's
+own CSV also repeats the machine's description, routing and saved-state
+size on every row).
+
+Mean processing time as a percentage of one core, Latency 0, 64-frame
+callbacks. 512-frame callbacks are within about 15% of these on the runners
+and up to 26% on the VM. Every percentage that a later sentence or the
+user guide gives as "up to" is rounded up. Latency 0 costs 20 to 40% more than Latency 256 for
+the room-correction filters on the Linux and Windows runners (up to 60% on
+the VM and the virtual Mac), and 0 to 15% more for the reverbs on the Linux
+runner, the quietest machine:
+
+| Workload | Taps | Paths | Cloud VM | Linux | macOS | Windows |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| stereo correction, 48 kHz | 65,536 | 2 | 0.7 | 0.6 | 0.7 | 1.0 |
+| stereo correction, 96 kHz | 131,072 | 2 | 1.8 | 1.4 | 1.5 | 2.1 |
+| 2-to-6 crossover, 48 kHz | 65,536 | 6 | 1.6 | 1.3 | 1.4 | 2.1 |
+| 2-to-6 crossover, 96 kHz | 131,072 | 6 | 3.9 | 3.2 | 3.2 | 4.6 |
+| 5.1 correction, 48 kHz | 65,536 | 6 | 2.3 | 1.8 | 1.6 | 2.9 |
+| 5.1 correction, 96 kHz | 131,072 | 6 | 5.4 | 4.2 | 4.1 | 6.1 |
+| 7.1 correction, 48 kHz | 65,536 | 8 | 3.2 | 2.4 | 2.3 | 3.8 |
+| 7.1 correction, 96 kHz | 131,072 | 8 | 7.1 | 5.6 | 5.7 | 8.2 |
+| 7.1 matrix, 48 kHz | 65,536 | 64 | 18.1 | 12.2 | 10.7 | 18.6 |
+| 7.1 matrix, 96 kHz | 131,072 | 64 | 44.7 | 31.5 | 27.3 | 40.4 |
+| stereo reverb 10 s, 48 kHz | 480,000 | 2 | 1.2 | 1.0 | 1.0 | 1.4 |
+| stereo reverb 10 s, 96 kHz | 960,000 | 2 | 3.4 | 2.6 | 2.7 | 3.3 |
+| stereo reverb 30 s, 48 kHz | 1,440,000 | 2 | 2.1 | 1.6 | 1.7 | 2.0 |
+| stereo reverb 30 s, 96 kHz | 2,880,000 | 2 | 7.3 | 5.3 | 5.5 | 5.5 |
+| stereo reverb 60 s, 48 kHz | 2,880,000 | 2 | 3.6 | 2.7 | 2.8 | 2.7 |
+| stereo reverb 60 s, 96 kHz | 5,760,000 | 2 | 16.4 | 10.8 | 10.4 | 9.1 |
+| true stereo reverb 10 s, 48 kHz | 480,000 | 4 | 2.1 | 1.6 | 1.7 | 2.2 |
+| true stereo reverb 10 s, 96 kHz | 960,000 | 4 | 6.9 | 4.7 | 4.6 | 5.3 |
+| true stereo reverb 30 s, 48 kHz | 1,440,000 | 4 | 4.0 | 2.9 | 3.0 | 3.2 |
+| true stereo reverb 30 s, 96 kHz | 2,880,000 | 4 | 14.3 | 10.3 | 10.3 | 10.5 |
+| true stereo reverb 60 s, 48 kHz | 2,880,000 | 4 | 8.6 | 5.2 | 5.6 | 5.2 |
+| true stereo reverb 60 s, 96 kHz | 5,760,000 | 4 | 28.3 | 22.8 | 19.5 | 17.2 |
+| 7.1 reverb 10 s, 48 kHz | 480,000 | 8 | 5.2 | 4.0 | 3.8 | 5.9 |
+| 7.1 reverb 10 s, 96 kHz | 960,000 | 8 | 18.1 | 11.4 | 10.4 | 15.0 |
+
+The 99th-percentile callback, as a percentage of its period (1,333 µs for 64
+frames at 48 kHz, 667 µs at 96 kHz), the highest over the four settings; and
+the worst single callback of all rounds on the Linux runner, the quietest
+machine, over the same settings, also as a percentage of its period:
+
+| Workload | Cloud VM | Linux | macOS | Windows | Worst on Linux |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| stereo correction, 48 kHz | 3 | 3 | 2 | 4 | 19 |
+| stereo correction, 96 kHz | 8 | 5 | 6 | 8 | 21 |
+| 2-to-6 crossover, 48 kHz | 5 | 3 | 4 | 5 | 8 |
+| 2-to-6 crossover, 96 kHz | 14 | 7 | 8 | 11 | 28 |
+| 5.1 correction, 48 kHz | 7 | 4 | 3 | 7 | 42 |
+| 5.1 correction, 96 kHz | 14 | 8 | 11 | 13 | 14 |
+| 7.1 correction, 48 kHz | 8 | 5 | 5 | 8 | 13 |
+| 7.1 correction, 96 kHz | 16 | 10 | 14 | 16 | 46 |
+| 7.1 matrix, 48 kHz | 32 | 17 | 29 | 33 | 21 |
+| 7.1 matrix, 96 kHz | 68 | 41 | 63 | 67 | 52 |
+| stereo reverb 10 s, 48 kHz | 7 | 5 | 3 | 8 | 10 |
+| stereo reverb 10 s, 96 kHz | 15 | 10 | 7 | 17 | 19 |
+| stereo reverb 30 s, 48 kHz | 7 | 5 | 5 | 9 | 10 |
+| stereo reverb 30 s, 96 kHz | 18 | 12 | 12 | 18 | 28 |
+| stereo reverb 60 s, 48 kHz | 9 | 6 | 7 | 10 | 21 |
+| stereo reverb 60 s, 96 kHz | 32 | 17 | 30 | 22 | 38 |
+| true stereo reverb 10 s, 48 kHz | 8 | 6 | 5 | 10 | 11 |
+| true stereo reverb 10 s, 96 kHz | 19 | 14 | 10 | 20 | 20 |
+| true stereo reverb 30 s, 48 kHz | 9 | 6 | 6 | 10 | 10 |
+| true stereo reverb 30 s, 96 kHz | 31 | 16 | 24 | 24 | 23 |
+| true stereo reverb 60 s, 48 kHz | 15 | 8 | 14 | 12 | 13 |
+| true stereo reverb 60 s, 96 kHz | 53 | 29 | 60 | 38 | 75 |
+| 7.1 reverb 10 s, 48 kHz | 12 | 8 | 10 | 14 | 11 |
+| 7.1 reverb 10 s, 96 kHz | 32 | 19 | 25 | 37 | 39 |
+
+Peak resident memory beyond an empty processor (19 MiB on the Linux
+runner), in MiB, while playing and during a live replacement (two filters
+and two engines). The four machines agree to within a few MiB; these are
+the Linux runner's. Below about 10 MiB the figure is lost in the empty
+process's own pages. The figure includes the filter's samples, which a
+plug-in also keeps, and the benchmark's record of its callback times (8
+bytes a callback), which raises the empty process's figure on the macOS and
+Windows runners when many short callbacks are timed:
+
+| Workload | Filter samples | Playing | Replacing |
+| --- | ---: | ---: | ---: |
+| stereo correction, 48 kHz | 0.5 | < 10 | < 10 |
+| stereo correction, 96 kHz | 1.0 | < 10 | < 10 |
+| 2-to-6 crossover, 48 kHz | 1.5 | < 10 | < 10 |
+| 2-to-6 crossover, 96 kHz | 3.0 | < 10 | 10 (3.4×) |
+| 5.1 correction, 48 kHz | 1.5 | < 10 | < 10 |
+| 5.1 correction, 96 kHz | 3.0 | < 10 | 18 (6.1×) |
+| 7.1 correction, 48 kHz | 2.0 | < 10 | < 10 |
+| 7.1 correction, 96 kHz | 4.0 | < 10 | 29 (7.2×) |
+| 7.1 matrix, 48 kHz | 16.0 | 40 (2.5×) | 94 (5.9×) |
+| 7.1 matrix, 96 kHz | 32.0 | 92 (2.9×) | 198 (6.2×) |
+| stereo reverb 10 s, 48 kHz | 3.7 | < 10 | 25 (6.9×) |
+| stereo reverb 10 s, 96 kHz | 7.3 | 25 (3.4×) | 62 (8.5×) |
+| stereo reverb 30 s, 48 kHz | 11.0 | 43 (3.9×) | 99 (9.0×) |
+| stereo reverb 30 s, 96 kHz | 22.0 | 98 (4.4×) | 209 (9.5×) |
+| stereo reverb 60 s, 48 kHz | 22.0 | 98 (4.4×) | 209 (9.5×) |
+| stereo reverb 60 s, 96 kHz | 43.9 | 208 (4.7×) | 429 (9.8×) |
+| true stereo reverb 10 s, 48 kHz | 7.3 | 17 (2.3×) | 48 (6.5×) |
+| true stereo reverb 10 s, 96 kHz | 14.6 | 47 (3.2×) | 106 (7.3×) |
+| true stereo reverb 30 s, 48 kHz | 22.0 | 76 (3.4×) | 165 (7.5×) |
+| true stereo reverb 30 s, 96 kHz | 43.9 | 164 (3.7×) | 341 (7.8×) |
+| true stereo reverb 60 s, 48 kHz | 43.9 | 164 (3.7×) | 341 (7.8×) |
+| true stereo reverb 60 s, 96 kHz | 87.9 | 340 (3.9×) | 693 (7.9×) |
+| 7.1 reverb 10 s, 48 kHz | 14.6 | 62 (4.3×) | 138 (9.4×) |
+| 7.1 reverb 10 s, 96 kHz | 29.3 | 136 (4.6×) | 286 (9.7×) |
+
+Preparation (transforming the filter for the engine, off the audio thread),
+in ms; decoding the file or saved state comes on top:
+
+| Workload | Cloud VM | Linux | macOS | Windows |
+| --- | ---: | ---: | ---: | ---: |
+| stereo correction, 48 kHz | 3 | 2 | 3 | 2 |
+| stereo correction, 96 kHz | 5 | 3 | 3 | 4 |
+| 2-to-6 crossover, 48 kHz | 5 | 4 | 5 | 5 |
+| 2-to-6 crossover, 96 kHz | 11 | 8 | 6 | 10 |
+| 5.1 correction, 48 kHz | 6 | 4 | 4 | 6 |
+| 5.1 correction, 96 kHz | 13 | 10 | 8 | 11 |
+| 7.1 correction, 48 kHz | 8 | 7 | 5 | 8 |
+| 7.1 correction, 96 kHz | 17 | 13 | 8 | 15 |
+| 7.1 matrix, 48 kHz | 52 | 40 | 31 | 54 |
+| 7.1 matrix, 96 kHz | 111 | 80 | 47 | 106 |
+| stereo reverb 10 s, 48 kHz | 16 | 13 | 8 | 14 |
+| stereo reverb 10 s, 96 kHz | 32 | 26 | 18 | 28 |
+| stereo reverb 30 s, 48 kHz | 49 | 38 | 24 | 41 |
+| stereo reverb 30 s, 96 kHz | 107 | 71 | 35 | 84 |
+| stereo reverb 60 s, 48 kHz | 100 | 77 | 38 | 84 |
+| stereo reverb 60 s, 96 kHz | 198 | 151 | 92 | 162 |
+| true stereo reverb 10 s, 48 kHz | 29 | 24 | 19 | 27 |
+| true stereo reverb 10 s, 96 kHz | 57 | 43 | 24 | 53 |
+| true stereo reverb 30 s, 48 kHz | 85 | 62 | 45 | 79 |
+| true stereo reverb 30 s, 96 kHz | 181 | 132 | 79 | 160 |
+| true stereo reverb 60 s, 48 kHz | 194 | 134 | 83 | 161 |
+| true stereo reverb 60 s, 96 kHz | 392 | 280 | 146 | 311 |
+| 7.1 reverb 10 s, 48 kHz | 63 | 48 | 31 | 56 |
+| 7.1 reverb 10 s, 96 kHz | 133 | 102 | 75 | 114 |
+
+What the runs show:
+
+- **Every workload that fits the saved-state limit keeps up with room to
+  spare, except the full 7.1 matrix at 96 kHz,** by jrp's criteria for
+  supported workloads ([decisions](../project/decisions.md#releases)): mean at most 25% of one core and
+  99th-percentile callback at most half its period on every machine
+  measured, at both latencies and both callback sizes. Every other
+  workload used at most 20% of a core (the 60 s stereo reverb at 96 kHz on
+  the VM) and its 99th percentile at most 37% of the period. The 7.1
+  matrix at 96 kHz used 18 to 52% of a core over the settings (27 to 45% at
+  Latency 0 in 64-frame callbacks), with 99th percentiles up to 68% of the
+  period; at Latency 256 it met the criteria on the Linux and macOS
+  runners.
+- **Worst callbacks on shared machines are scheduling, not the engine.** On
+  the Linux runner the longest callback stayed within 46% of the period for
+  every supported workload (52% for the 7.1 matrix at 96 kHz, 75% for the
+  command-line-only filter); on the VM an empty 64-tap filter's longest
+  callback took 2.2 periods, and 1.3 on the Windows runner.
+- **Cost grows in proportion to length beyond about 30 s at 48 kHz.**
+  Doubling 2,880,000 taps to 5,760,000 cost 1.65 to 2.25 times as much,
+  where tripling 480,000 to 1,440,000 cost 1.45 to 1.9 times as much: the
+  engine's largest block is 8,192 frames, so beyond that every further
+  8,192 taps add the same work.
+- **Memory is about 2.3 to 5 times the filter's samples while playing, and
+  6 to 10 times during a replacement,** for the filters of 7 MiB and more,
+  large enough to measure. One filter per channel costs the most and true
+  stereo and the 7.1 matrix less, consistent with each path keeping an input
+  history unless it shares its input with others. A 30 s true-stereo filter at 48 kHz (22 MiB of samples) used
+  76 MiB playing and 165 MiB while being replaced.
+- **Preparation takes about 10 to 17 ms per million samples** on the x86
+  machines (up to 21 for the shortest filters on the VM; 6 to 10 on the
+  virtual M1), so a 30 s stereo filter at 48 kHz
+  prepares in 24 to 49 ms. The [load-timing limits](load-timing.md) were
+  set for stereo filters: 100 ms for filters up to 10 s and 250 ms for
+  30 s. The 10 s 7.1 reverb at 96 kHz prepares in 75 to 133 ms, over the
+  first on three of the four machines, and the 60 s filters that fit in up
+  to 198 ms, before decoding is counted.
+- **FFTW against Ooura on the cloud VM** (the same build otherwise; Ubuntu's
+  FFTW 3.3.10 with estimate plans, as the command-line tool uses on Linux):
+  FFTW cost 15 to 40% less for the room-correction and crossover filters
+  (the 7.1 matrix at 96 kHz was level) and for most of the 10 s reverbs.
+  For the 30 and 60 s reverbs the two were level within the VM's spread,
+  often 30% or more between rounds: there the multiply-accumulate, not the
+  transforms, takes the time. FFTW prepared short filters more slowly (6
+  against 3 ms for stereo correction at 48 kHz: its planning) and long ones
+  faster (144 against 194 ms for the 60 s true-stereo filter at 48 kHz).
+- **Windows is the slowest of the runners on short multichannel filters**
+  (Ooura, MSVC on an EPYC 7763: up to 1.7 times the Linux runner) and the
+  fastest on the longest reverbs. The CPU and compiler both differ, so this
+  does not separate the two.
+
+What this means for the items waiting on PERF-3:
+
+- **FFT-2** (another FFT library): where the transforms matter
+  (room correction and crossovers), FFTW cost up to 40% less than the
+  plug-ins' Ooura on the VM, so a faster library for the Linux and Windows
+  plug-ins could save up to about a third there; for long reverbs it would
+  save nothing measurable. Those filters already use at most 4% of a core
+  at 48 kHz and 9% at 96 kHz (the 7.1 matrix aside), so no supported workload needs it, and FFT-2
+  stays parked.
+- **PLUG-11** (FFTW planning in FFTW-built plug-ins): FFTW with estimate plans is
+  already the cheaper library where the transforms matter; measured plans
+  could add to that only in plug-ins built with FFTW, which no release
+  ships. Not shown to be needed.
+- **VST3-5** (progress for slow preparation): for the stereo filters up to
+  30 s the load-timing tests already judge, preparation stays well inside
+  the limits. The 10 s 7.1 reverb and the 7.1 matrix at 96 kHz pass the
+  100 ms limit on preparation alone on the slower machines, and the 60 s
+  filters approach 250 ms (no limit is set for them), so they may hold a
+  host's thread too long. Running the load-timing tests with those filters
+  would show whether they do, and decide VST3-5.
+- **PERF-2's tuning:** a largest block above 8,192 frames is the evident
+  experiment for filters longer than about 30 s, as long as the spreading
+  keeps its larger work out of any one callback. Latency 0's extra cost on
+  room-correction filters (20 to 40% on the quieter runners) is the other. Both need jrp's Apple
+  silicon measurements; the virtual M1 here is indicative only.
+- **EDGE-11's other candidates:** no supported workload needs them to play
+  in real time. The one that falls short, the full 7.1 matrix at 96 kHz,
+  is what the shared-mix candidates (fused accumulation and one inverse
+  transform per output) target; it is a measured limitation only if users
+  need full matrices at 96 kHz.
+- **Threads** ([architecture](architecture.md#threads-and-cores)): the
+  architecture page revisits a helper thread if one instance needs a large
+  share of a core. Only the 7.1 matrix at 96 kHz did (up to 52% on the VM);
+  like EDGE-11's candidates, that is a reason only if users need it.
+
 ## Reproduce
 
 The benchmark programs and scripts are in
@@ -1393,6 +1676,22 @@ for round in 1 2 3 4 5; do for case in 1 3 13 14 17 18; do
   done; done
 done; done
 ```
+
+### Supported workloads
+
+Build `convolver_callback_benchmark` (Release, `-DCONVOLVER_BUILD_BENCHMARKS=ON`,
+with the FFT library to measure), then run every workload for three rounds,
+about 15 minutes on a 4-core machine:
+
+```sh
+python3 tests/native/benchmarks/workloads.py build/convolver_callback_benchmark \
+    --rounds 3 --csv workloads.csv > workloads.md
+```
+
+`--quick` runs one round of three workloads in about 30 seconds. On GitHub's
+runners, start the [Workload measurements](../../.github/workflows/workloads.yml)
+workflow by hand (Actions, then "Run workflow"); each job writes the
+summary to its log and job summary, and keeps both files as an artifact.
 
 ### Comparing backends
 
