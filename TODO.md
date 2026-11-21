@@ -194,6 +194,24 @@ done once for all three formats:
   remember. **Needs** a user asking for it; jrp then decides. **Done when**
   he has decided and, if he wants it, the contract and adapter tests cover
   it.
+- [ ] **PLUG-44 — Say each fact once in the window and host views.** From
+  the interface review of 21 November 2026
+  ([page](https://claude.ai/artifact/7BMkjpvG5ABFikFbb5CXDw)), jrp chose
+  items 1 to 12: a filter kept for settings that suit it shows Waiting;
+  the window drops repeated facts (the drop hint, matching host rows, the
+  waiting phrase, Latency not in use yet, no-filter repeats, the build
+  suffix in the title) and says the named filter still plays after a
+  refusal; generic host views get the gain that plays, Latency times and
+  short names; LV2's reported latency gets its own name; Loudest peak
+  becomes Worst-case peak before PLUG-10's meters. **Done when** each is
+  built with its tests and the guide and contract describe it.
+- [ ] **PLUG-45 — Built-in example presets in hosts' preset menus.**
+  Identity, Echo and Repeat as Audio Unit factory presets and a VST3
+  program list, generated when chosen at the host's rate and channels, so
+  they always fit and need no files; Echo with three fading repeats
+  0.3 s apart, as the packaged example becomes in PR #266. A chosen preset
+  saves as any filter does. jrp, 21 November 2026: after the preview. **Done when** both formats offer them, host
+  tests choose each and the guide describes them.
 - [ ] **PLUG-29 — Keep the Recent list out of the log folder.** Save it in
   each platform's application-support folder, reading the old file once.
   **Done when** the tests cover both paths and the guide names the folder.
