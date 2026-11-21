@@ -21,6 +21,8 @@ jobs:
   version:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # A version commit and tag take seconds; a hang stops here (CI-52).
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
         with:

@@ -1687,7 +1687,9 @@ gave each campaign about half its executions; the
 [27 October 2026 counts](../archive/reviews/2026-11-08-testing-guide-evidence.md#fuzz-campaigns-side-by-side-27-october-2026)
 are archived). A manual workflow run defaults to
 600 seconds per target; set its `seconds` input to `60` to reproduce the
-smoke-test budget. Keep crashes
+smoke-test budget. The job stops after 45 minutes, so a hang does not run
+for GitHub's six hours; a manual run keeps the six hours, since its `seconds`
+input sets its length (CI-52). Keep crashes
 as committed regression inputs after investigating them.
 
 [`fuzz_campaigns.sh`](../../scripts/fuzz_campaigns.sh) is the scheduler: it
