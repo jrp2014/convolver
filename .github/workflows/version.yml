@@ -9,6 +9,8 @@ name: Version source changes
 
 permissions:
   contents: write
+  # Read version:minor and version:major labels on merged pull requests.
+  pull-requests: read
 
 # Check the latest main so a newer queued run also picks up earlier changes.
 concurrency:
@@ -30,7 +32,9 @@ jobs:
       - name: Verify versioning behavior
         run: python tests/versioning_tests.py
       - name: Commit version and publish tag
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          python scripts/version_source.py --push
+          python scripts/version_source.py --push --labels-from "$GITHUB_REPOSITORY"

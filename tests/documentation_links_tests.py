@@ -91,6 +91,20 @@ class DocumentationLinks(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn(f'{skill}:6: missing anchor', result.stderr)
 
+    def test_change_fragments_link_from_the_repository_root(self):
+        files = {
+            'README.md': '# Home\n',
+            'docs/use/guide.md': '# Guide\n## Loading\n',
+            'changes/README.md': '# Fragments\n[Guide](../docs/use/guide.md#loading)\n',
+            'changes/PLUG-1.md': '# PLUG-1\n## Changed\n- [Guide](docs/use/guide.md#loading).\n',
+        }
+        result = self.run_check(files)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        files['changes/PLUG-1.md'] += '- [Relative](../docs/use/guide.md).\n'
+        result = self.run_check(files)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('changes/PLUG-1.md:4: missing target: ../docs/use/guide.md', result.stderr)
+
     def test_html_anchors_in_markdown_code_are_not_destinations(self):
         result = self.run_check(
             {

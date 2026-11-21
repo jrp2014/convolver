@@ -490,7 +490,10 @@ listed there as defined and done. What each item delivered is described on
 its linked page and in the [CHANGELOG](CHANGELOG.md).
 
 Items finished since then are listed here, one line each, until the next
-move to the archive.
+move to the archive. Each line arrives in the **Done** section of its pull
+request's [change fragment](changes/README.md), and the lines of items
+finished since the last fold are still there
+([change fragments](docs/develop/workflow.md#change-fragments)).
 
 - [x] **PERF-3 — One measurement exercise: budgets, supported workloads and
   published evidence.** 21 November 2026, PR #248

@@ -11,10 +11,14 @@ releases, newest first.
 **In short:** jrp decides anything permanent or user-facing: identities, state
 and preset formats, `.cfg` syntax, licences, defaults that change the sound,
 shipped dependencies and publishing ([workflow](../develop/workflow.md)). When
-jrp decides, record it here with its date; no other page carries decision
-notes or their dates ([workflow](../develop/workflow.md#while-working)). A
-change users will notice, and every finished TODO item, also goes in the
-[changelog](../../CHANGELOG.md). Changing a decision is a new decision: add an
+jrp decides, the pull request records it with its date in its
+[change fragment](../develop/workflow.md#change-fragments), which folding
+moves here; no other page carries decision notes or their dates
+([workflow](../develop/workflow.md#while-working)). Decisions not yet folded
+in are in the **Decisions:** sections of the files in
+[`changes/`](../../changes/README.md). A change users will notice, and every
+finished TODO item, also goes in the [changelog](../../CHANGELOG.md), through
+the same fragment. Changing a decision is a new decision: add an
 entry and mark the old one replaced, rather than editing it. Entries that are
 wholly replaced, such as the earlier baselines for the checks left, move
 unchanged to the [superseded decisions](../archive/releases/2026-11-20-superseded-decisions.md).

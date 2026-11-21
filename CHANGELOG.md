@@ -16,6 +16,12 @@ records) follows under **For contributors**, where contributor-only TODO
 items keep their entries until formal releases. Releases before 0.12.12, the
 first published preview, keep their original grouping.
 
+Pull requests do not edit this page: each adds its entries in its own
+[change fragment](changes/README.md), and `scripts/fold_changes.py` folds the
+fragments into `[Unreleased]` before each preview, and sometimes sooner
+([change fragments](docs/develop/workflow.md#change-fragments)). Entries not
+yet folded in are in [`changes/`](changes/README.md).
+
 ## [Unreleased]
 
 ### Added

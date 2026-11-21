@@ -5,7 +5,8 @@
 Checks inline and reference-definition destinations, GitHub-style ATX heading
 anchors, and HTML id/name anchors. Fenced code and inline code are examples, not
 links. Dated archives/plans are not scanned as current instructions, but a link
-to one must still resolve. Repository skills under `.claude/skills/` are
+to one must still resolve. Change fragments under `changes/` write their links
+from the repository root, as the pages they fold into do. Repository skills under `.claude/skills/` are
 scanned too: they point agents at sections of the maintained pages. This is intentionally not a full Markdown renderer
 or an external-URL availability check.
 """
@@ -80,16 +81,26 @@ def anchors(path):
 
 def documents(root):
     yield from sorted(root.glob('*.md'))
+    yield from sorted((root / 'changes').glob('*.md'))
     yield from sorted((root / '.claude' / 'skills').rglob('*.md'))
     for path in sorted((root / 'docs').rglob('*.md')):
         if not (set(path.relative_to(root / 'docs').parts[:-1]) & EXCLUDED):
             yield path
 
 
+def link_base(root, source):
+    """Where a page's relative links start. Change fragments (DOC-20) write
+    them from the repository root, as the CHANGELOG and TODO they fold into
+    do; scripts/fold_changes.py rewrites them for the decisions log."""
+    fragment = source.parent == root / 'changes' and source.name != 'README.md'
+    return root if fragment else source.parent
+
+
 def check(root):
     errors, count, cached_anchors = [], 0, {}
     for source in documents(root):
         count += 1
+        base = link_base(root, source)
         for number, line in prose_lines(source.read_text(encoding='utf-8')):
             # A code example can mention a link without promising it resolves.
             prose = re.sub(r'(`+).*?\1', '', line)
@@ -102,7 +113,7 @@ def check(root):
                 url = urlsplit(html.unescape(raw))
                 if url.scheme or url.netloc:
                     continue
-                target = source.parent / unquote(url.path) if url.path else source
+                target = base / unquote(url.path) if url.path else source
                 if url.path.startswith('/'):
                     target = root / unquote(url.path).lstrip('/')
                 if not target.exists():

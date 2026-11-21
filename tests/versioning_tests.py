@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Exercise automatic versioning in disposable Git repositories."""
 
+import json
 import os
 import shutil
 import subprocess
@@ -41,9 +42,9 @@ class GitFixture(unittest.TestCase):
         self.git('add', '.')
         self.git('commit', '-m', 'Change fixture')
 
-    def run_version(self, *args, ok=True):
+    def run_version(self, *args, ok=True, env=None):
         result = subprocess.run(
-            [sys.executable, str(SCRIPT), *args], cwd=self.repo, text=True, capture_output=True, check=False
+            [sys.executable, str(SCRIPT), *args], cwd=self.repo, text=True, capture_output=True, check=False, env=env
         )
         self.assertEqual(result.returncode == 0, ok, result.stdout + result.stderr)
         if not ok:
@@ -182,6 +183,88 @@ class VersioningTests(GitFixture):
         self.git('clone', '--depth=1', self.repo.as_uri(), str(clone))
         self.repo = clone
         self.run_version(ok=False)
+
+
+class StepLabelTests(GitFixture):
+    """version:minor and version:major labels on merged pull requests (DOC-20),
+    read through a stand-in for the GitHub CLI that answers from a JSON map of
+    commit to labels."""
+
+    def setUp(self):
+        super().setUp()
+        self.bin = Path(self.temp.name) / 'bin'
+        self.bin.mkdir()
+        self.labels = Path(self.temp.name) / 'labels.json'
+        self.calls = Path(self.temp.name) / 'calls.txt'
+        gh = self.bin / 'gh'
+        gh.write_text(
+            '#!' + sys.executable + '\n'
+            'import json, sys\n'
+            f'open({str(self.calls)!r}, "a").write(" ".join(sys.argv[1:]) + "\\n")\n'
+            'commit = sys.argv[2].split("/")[-2]\n'
+            f'print("\\n".join(json.load(open({str(self.labels)!r})).get(commit, [])))\n',
+            encoding='utf-8',
+        )
+        gh.chmod(0o755)
+        self.env = dict(os.environ, PATH=str(self.bin) + os.pathsep + os.environ.get('PATH', ''))
+
+    def label(self, mapping):
+        self.labels.write_text(json.dumps(mapping), encoding='utf-8')
+
+    def change_source(self, text):
+        self.write('portable/example.cpp', text)
+        self.commit()
+        return self.git('rev-parse', 'HEAD')
+
+    def test_unlabelled_pull_requests_get_a_patch(self):
+        self.change_source('// patch\n')
+        self.label({})
+        self.run_version('--labels-from', 'owner/repo', env=self.env)
+        self.assertEqual((self.repo / 'VERSION').read_text(), '0.2.1\n')
+        self.assertIn('repos/owner/repo/commits/', self.calls.read_text())
+
+    def test_minor_label_resets_patch(self):
+        self.git('tag', '-d', 'v0.2.0')
+        self.write('VERSION', '0.2.3\n')
+        self.commit()
+        self.git('tag', '-a', 'v0.2.3', '-m', 'Patched baseline')
+        commit = self.change_source('// minor\n')
+        self.label({commit: ['documentation', 'version:minor']})
+        result = self.run_version('--labels-from', 'owner/repo', env=self.env)
+        self.assertEqual((self.repo / 'VERSION').read_text(), '0.3.0\n')
+        self.assertEqual(self.git('rev-parse', 'v0.3.0^{}'), self.git('rev-parse', 'HEAD'))
+        self.assertIn('version:minor', result.stdout)
+
+    def test_largest_label_since_the_last_tag_wins(self):
+        first = self.change_source('// minor\n')
+        second = self.change_source('// major\n')
+        third = self.change_source('// patch\n')
+        self.label({first: ['version:minor'], second: ['version:major'], third: []})
+        self.run_version('--labels-from', 'owner/repo', env=self.env)
+        self.assertEqual((self.repo / 'VERSION').read_text(), '1.0.0\n')
+
+    def test_label_does_not_lower_an_explicit_version(self):
+        self.write('VERSION', '0.4.0\n')
+        commit = self.change_source('// explicit\n')
+        self.label({commit: ['version:minor']})
+        self.run_version('--labels-from', 'owner/repo', env=self.env)
+        self.assertEqual((self.repo / 'VERSION').read_text(), '0.4.0\n')
+        self.assertEqual(self.git('rev-parse', 'v0.4.0^{}'), commit)
+
+    def test_documentation_only_label_is_not_read(self):
+        self.write('docs/guide.md', 'Documentation\n')
+        self.commit()
+        self.label({self.git('rev-parse', 'HEAD'): ['version:minor']})
+        self.run_version('--labels-from', 'owner/repo', env=self.env)
+        self.assertEqual(self.git('tag', '--list', 'v0.3.0'), '')
+        self.assertFalse(self.calls.exists())
+
+    def test_unreadable_labels_stop_versioning(self):
+        self.change_source('// labels unknown\n')
+        (self.bin / 'gh').write_text('#!/bin/sh\nexit 1\n', encoding='utf-8')
+        self.run_version('--labels-from', 'owner/repo', ok=False, env=self.env)
+        self.assertEqual((self.repo / 'VERSION').read_text(), '0.2.0\n')
+        self.assertEqual(self.git('tag', '--list', 'v0.2.1'), '')
 
 
 CMAKE = os.environ.get('CONVOLVER_TEST_CMAKE') or shutil.which('cmake')

@@ -266,8 +266,11 @@ jrp; he first did it on 8 November 2026 (0.12.12). The "Draft preview release" w
 mechanical part, but only as a draft: nothing is public until jrp presses
 **Publish**.
 
-Before the tag, a pull request updates the release notes: `PREVIOUS_PREVIEW`
-and `CHANGES` in
+Before the tag, a pull request updates the release notes. It first runs
+`python3 scripts/fold_changes.py`, which folds every
+[change fragment](workflow.md#change-fragments) into the changelog, TODO's
+done list and the decisions log and deletes them, so that the tag carries
+the whole changelog. Then `PREVIOUS_PREVIEW` and `CHANGES` in
 [`prepare_release.py`](../../scripts/release/prepare_release.py) name the
 preview published before and list, in a user's words, what changed since
 (the [changelog](../../CHANGELOG.md) holds every change), and any known
