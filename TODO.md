@@ -53,9 +53,10 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 
 ### In progress
 
-PLUG-39's step 5, after step 4a (PR #236); HOST-11's first version (PR #245),
-which waits for a run on jrp's Mac. Check the open pull requests for an ID
-before starting anything.
+PLUG-39's step 5, after step 4a (PR #236); HOST-11's Status reading
+during playback (PR #251), after the first version passed in jrp's run of
+21 November 2026. Check the open pull requests for an ID before starting
+anything.
 
 ### Ready
 
@@ -76,7 +77,7 @@ before starting anything.
 | **VST3-12**, **HOST-4** | The Windows window in hosts and a screen reader; Equalizer APO on a real device | A Windows tester or device |
 | **LV2-4** | Desktop LV2 hosts and PipeWire on a real sound card | A Linux tester |
 | **HOST-8** | Ardour 9.0's abort as `new_session` exits | A fixed Ardour on `ubuntu-latest` |
-| **HOST-11** | Step 3 of the [host-test automation plan](docs/project/plans/2026-11-21-host-test-automation.md#steps): one command for the REAPER checks | A run on jrp's Mac |
+| **HOST-11** | Step 3 of the [host-test automation plan](docs/project/plans/2026-11-21-host-test-automation.md#steps): one command for the REAPER checks. The first version passed on the 0.16.14 candidate ([record](docs/archive/reviews/2026-11-21-host11-reaper.md)) | A run on jrp's Mac with a published preview |
 | **CFG-1**, then **CFG-2** | Other `.cfg` readers, then importing and exporting their formats | Access to Roon, JRiver or Audiolense workflows |
 | **FFT-2**, **VST3-5**, **PLUG-11** | Optimisation | A workload that needs it; PERF-3's [measurements](docs/develop/fft-measurements.md#supported-workloads) showed none, though VST3-5 may for 60 s and large 96 kHz multichannel filters |
 | **VST3-13**, **VST3-2**, **VST3-6**, **HOST-2**, **LV2-3**, **LV2-6**, **DIAG-9** | The Linux window, switching filters from the host, replacing the old VST2 plug-in, CLAP, named LV2 layouts, an LV2 window, numbers in the user's locale | A stated user need |
