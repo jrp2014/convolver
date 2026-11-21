@@ -9,11 +9,15 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
-#include <bit>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <limits>
+#include <memory>
+#include <optional>
+#include <span>
 #include <stdexcept>
-#include <type_traits>
+#include <string>
 #include <vector>
 
 namespace convolver {

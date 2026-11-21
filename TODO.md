@@ -53,7 +53,7 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 
 ### In progress
 
-DIAG-10, then DIAG-9; HOST-11 waits for jrp's second run of the REAPER
+DIAG-10; HOST-11 waits for jrp's second run of the REAPER
 check (PR #255). Check the open pull requests for an ID before starting
 anything.
 

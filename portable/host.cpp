@@ -7,7 +7,6 @@
 #include "utf8.hpp"
 #include <algorithm>
 #include <array>
-#include <atomic>
 #include <bit>
 #include <cctype>
 #include <charconv>
