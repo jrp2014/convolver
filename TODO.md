@@ -91,6 +91,7 @@ starting.
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)); the gain modes are in 0.13.20 (PR #188) |
 | **PERF-3** | One measurement exercise: resource budgets and supported workloads | Changes no shipped code; its results decide whether FFT-2, VST3-5, PLUG-11 and PERF-2's tuning are worth doing (EDGE-5 publishes them) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
+| **AU-18**, then **HOST-11** | The [host-test automation plan](docs/project/plans/2026-11-21-host-test-automation.md#steps)'s steps 2 and 3 (step 1 is HOST-9, PR #237) | jrp asked for it on 20 November 2026. AU-18 runs in macOS CI; HOST-11 needs jrp to run it on his Mac |
 
 ### Depends on
 
@@ -247,6 +248,24 @@ is superseded.
   reports it to Ardour if he wishes; a draft is in the project files.
   **Done when** the Ardour on `ubuntu-latest` no longer aborts there and the
   test stops accepting it.
+- [ ] **AU-18 — Render the Audio Unit in the hosts' orders of events.**
+  Step 2 of the [host-test automation plan](docs/project/plans/2026-11-21-host-test-automation.md#steps):
+  the AVAudioEngine render (AU-15) also restores the preset on the running
+  unit as GarageBand does, at 44.1 kHz, chooses Latency while the engine
+  runs, and restores a second unit from the first one's `ClassInfo`.
+  **Remains:** its draft pull request, verified in macOS CI. **Done when**
+  each case matches the oracle in the Audio Unit workflow.
+- [ ] **HOST-11 — One command for the REAPER checks.** Step 3 of the
+  [host-test automation plan](docs/project/plans/2026-11-21-host-test-automation.md#steps):
+  a script in `scripts/` that drives REAPER on jrp's Mac through ReaScript
+  (packaged presets, renders compared with `convolver --compare`, save,
+  quit and reopen, a refused preset, the wrong host rate, a Latency change
+  rendered in time; VST3, then the Audio Unit) and writes one result file
+  to paste back. **Remains:** all of it, after AU-18. **Worth doing
+  because** checks 2 and 3 of [checks left](docs/project/status.md#checks-left-before-publication)
+  cost jrp about 35 minutes by hand before each preview. **Done when** jrp
+  has run it once on a published preview and its result file records what
+  [every report](docs/develop/host-testing.md#every-report) lists.
 - [ ] **HOST-10 — Ardour's VST3 channels and settings.** From HOST-9
   (20 November 2026): Ardour 8.4 ran Convolver's VST3 only at its default
   2 in, 2 out, never asking for another bus arrangement, and named Latency
@@ -1231,7 +1250,8 @@ Items finished since then are listed here, one line each, until the next
 move to the archive.
 
 - [x] **HOST-9 — Play the VST3 and a saved Latency in the Ardour test.**
-  20 November 2026, PR #237: the Ardour test
+  20 November 2026, PR #237, step 1 of the
+  [host-test automation plan](docs/project/plans/2026-11-21-host-test-automation.md): the Ardour test
   moved to `tests/plugins/` and now also runs in the VST3 workflow, on
   Ardour's own VST3 host (the stereo example; Ardour 8.4 runs a VST3 only
   at its default 2 in, 2 out, an [unresolved host finding](docs/develop/host-testing.md#unresolved-host-findings)

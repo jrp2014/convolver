@@ -149,6 +149,10 @@ guides and TODO.
   (PLUG-34, VST3-12, VST3-13, Reference): what any route needs first (a sound-file
   reader and the window's behaviour in shared code), the routes compared, and
   the chosen order (Windows first, Linux later); no code changes yet.
+- [Automate more of the host checks](project/plans/2026-11-21-host-test-automation.md)
+  (HOST-9, AU-18, HOST-11): which manual host checks move into CI or one
+  command on jrp's Mac, in three steps, what each can replace and what
+  stays manual.
 - [Edges over the leading convolution plug-ins](project/plans/2026-11-06-edges-over-other-convolvers.md)
   (EDGE-1 to EDGE-13, PERF-2, PERF-3, IO-2): how Convolver compares with Altiverb,
   Reverberate, Space Designer, Hang Loose Convolver, CamillaDSP and X-MCFX,
