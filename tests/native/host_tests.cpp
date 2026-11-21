@@ -1763,6 +1763,81 @@ void kept_unless_one_plays() {
         for (std::size_t i = 64; i < 512; ++i)
             require(data[5][i] == 0.f, "the faded-out input not muted by silence(through)");
     }
+    // The independent review of #258: silence() during a replacement's
+    // warm-up mutes the filter still playing as well as the replacement.
+    {
+        const HostLayout pair{48000, 2, 2};
+        HostSettings settings;
+        settings.latency = 4096;
+        HostProcessor p(unfiltered_playback(pair, false, true), 512, settings);
+        std::vector<std::vector<float>> data(2, std::vector<float>(512, 1.f));
+        std::vector<const float*> in{data[0].data(), data[1].data()};
+        std::vector<float*> out{data[0].data(), data[1].data()};
+        const auto block = [&] {
+            for (auto& c : data)
+                std::fill(c.begin(), c.end(), 1.f);
+            audio_thread = true;
+            const bool ok =
+                p.process(std::span<const float* const>(in), std::span<float* const>(out), 512);
+            audio_thread = false;
+            require(ok, "a block refused");
+        };
+        for (int k = 0; k < 10; ++k)
+            block();
+        p.play(unfiltered_playback(pair, false, true));
+        block(); // Adopted: the first one plays while the replacement warms up.
+        require(std::abs(data[0][511] - 1.f) < 1e-5f, "the warm-up did not play the input");
+        p.silence();
+        block();
+        for (std::size_t i = 64; i < 512; ++i)
+            require(data[0][i] == 0.f, "silence() during a warm-up left the playing filter");
+    }
+    // The independent review of #258: a kept filter replacing one kept
+    // before (a host restoring the same preset again, as GarageBand does)
+    // mutes nothing: bypass, and Mix's dry share, play on without a gap.
+    for (const bool bypassed : {true, false}) {
+        const HostLayout pair{48000, 2, 2};
+        HostSettings settings;
+        settings.latency = 4096;
+        settings.mix = bypassed ? 1 : 0.5;
+        HostProcessor p(unfiltered_playback(pair, false, true), 512, settings);
+        std::vector<std::vector<float>> data(2, std::vector<float>(512, 1.f));
+        std::vector<const float*> in{data[0].data(), data[1].data()};
+        std::vector<float*> out{data[0].data(), data[1].data()};
+        const float heard = bypassed ? 1.f : 0.5f;
+        const auto what = std::string(bypassed ? "bypass" : "Mix 50%");
+        const auto block = [&] {
+            for (auto& c : data)
+                std::fill(c.begin(), c.end(), 1.f);
+            audio_thread = true;
+            p.set_bypass(bypassed);
+            const bool ok =
+                p.process(std::span<const float* const>(in), std::span<float* const>(out), 512);
+            audio_thread = false;
+            require(ok, "a block refused");
+        };
+        HostFilter f(8);
+        const auto load = [&](float gain) {
+            auto slow = Configuration{44100, 2, 2, 0, {}, {}, {{{gain}, {{0, 1}}, {{0, 1}}}}};
+            f.load(HostState{slow}, pair, [&](const HostPlayback& c) { p.play(c); }, {}, &p, check);
+            require(f.failure() && f.failure()->silent, what + ": the 44.1 kHz filter not kept");
+        };
+        load(1);
+        for (int k = 0; k < 20; ++k) // Past the kept playback's warm-up.
+            block();
+        require(std::abs(data[0][511] - heard) < 1e-5f && std::abs(data[1][511] - heard) < 1e-5f,
+                what + ": the kept filter does not pass its dry signal");
+        for (const float gain : {1.f, .25f}) { // The same filter again, then another.
+            load(gain);
+            for (int k = 0; k < 20; ++k) {
+                block();
+                for (std::size_t i = 0; i < 512; ++i)
+                    require(std::abs(data[0][i] - heard) < 1e-5f &&
+                                std::abs(data[1][i] - heard) < 1e-5f,
+                            what + ": a kept filter replacing a kept one cut the dry signal");
+            }
+        }
+    }
     // LV2 (refuse_mismatch): its layout never changes, so a filter that does
     // not suit is refused even with nothing playing.
     {

@@ -916,7 +916,8 @@ class HostProcessor {
     // returned. An adapter that decides to mute from a flag its control side
     // clears before publishing reads the count first, then the flag, so a
     // filter published after the flag was cleared is never silenced. A count
-    // older than the filter already playing does nothing.
+    // older than the filter already playing mutes only the filter it is
+    // still fading out, if that was published up to the count.
     void mute(std::uint64_t through) noexcept;
     // Control side (ROBUST-3): mute() for a failure the control side finds,
     // a failed first load, without allocating, locking or throwing, so the

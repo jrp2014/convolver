@@ -216,8 +216,9 @@ first published preview, keep their original grouping.
   channels; the log says it waits for audio settings that suit it. Until
   then Mix's dry share and bypass pass the input where the host's and the
   filter's counts are all equal, as for any filter kept that way, where a
-  refused first filter played silence. What played before it mutes within
-  1.3 ms. Before, it was refused and the project saved the failure: in
+  refused first filter played silence. A filter or the input that played
+  before it mutes within 1.3 ms; a filter kept that way before is replaced
+  without a gap in the dry share or bypass. Before, it was refused and the project saved the failure: in
   Ardour 8.4, a filter chosen just before Ardour restarted the plug-in with
   the outputs set in Pin Connections was refused and the export was
   silent. A configuration list with no entry for the host is still

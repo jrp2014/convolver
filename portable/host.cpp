@@ -712,7 +712,13 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
             // PLUG-42: what plays before a kept filter that does not suit
             // mutes at once, as for a failed first load, rather than for
             // the new playback's warm-up (the Latency); the silent playback
-            // then takes over, with its dry share.
+            // then takes over, with its dry share. Only a filter that suits
+            // the host, or an empty instance's input, is heard there: a
+            // filter kept before, or a failure, plays silence with at most
+            // the dry share and bypass the kept one carries on, so muting
+            // would cut those for the warm-up (a host restoring the same
+            // preset again, as GarageBand does).
+            const bool heard_before = plays_suiting() || (!filter_ && !failed_);
             const auto before = counting ? counting->publications() : 0;
             try {
                 if (accepted && !kept_failure) {
@@ -728,7 +734,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
                     install(HostPlayback{accepted, dry, gains, unchanged});
                 } else {
                     install(unfiltered);
-                    if (kept_failure && counting)
+                    if (kept_failure && heard_before && counting)
                         counting->silence(before);
                 }
             } catch (const SupersededRequest&) {
@@ -1532,15 +1538,15 @@ struct HostProcessor::Impl {
     // heard is already silent, as a filter published then is installed
     // directly.
     void mute(std::uint64_t through) noexcept {
-        // A filter published after `through` is already playing: nothing to
-        // mute, except the one it is still fading out, if that was published
-        // up to `through` (silence(through) after the audio thread adopted
-        // the later publication).
-        if (current && current->number > through) {
-            if (previous && previous->number <= through)
-                previous_muted = true;
+        // The filter being faded out mutes if it was published up to
+        // `through`, also when silence(through) arrives after the audio
+        // thread adopted a later publication.
+        if (previous && previous->number <= through)
+            previous_muted = true;
+        // A filter published after `through` is already playing: nothing
+        // more to mute.
+        if (current && current->number > through)
             return;
-        }
         muted = true;
         muted_through = std::max(muted_through, through);
         if (!started)

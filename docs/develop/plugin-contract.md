@@ -225,10 +225,15 @@ before they set the sample rate and channel layout (VST3 `setState` before
   plays as any kept filter does: silence, with Mix's dry share and
   bypass's input where the host's and the filter's counts are both equal
   ([states](#states-and-transitions)), where a refused first load played
-  silence with no dry signal. What played before it (an empty instance's
-  input, say) mutes over 1.33 ms, as for a failed first load, not after
-  the new playback's warm-up (`HostProcessor::silence(through)`; jrp's
-  review of #258 measured 90.6 ms at Latency 4096 before). A chosen IR
+  silence with no dry signal. What played before it, if it could be heard
+  (a filter that suited the host, or an empty instance's input), mutes
+  over 1.33 ms, as for a failed first load, not after the new playback's
+  warm-up (`HostProcessor::silence(through)`; jrp's review of #258
+  measured 90.6 ms at Latency 4096 before), and so does a filter it was
+  still fading out. A filter kept before, or a failure, is not muted: it
+  plays silence with at most the dry share and bypass the new one carries
+  on, so a host restoring the same preset again (GarageBand) leaves them
+  without a gap. A chosen IR
   file or `.cfg` is kept the same way: `read_chosen_file()`'s
   `keep_unsuited` reads a single filter that does not suit as it is,
   rather than refusing it; a configuration list with no entry for the
@@ -245,7 +250,8 @@ before they set the sample rate and channel layout (VST3 `setState` before
   (`refuse_mismatch`): its configuration never changes. `native.host`
   `kept_unless_one_plays` (jrp's two tests: a waiting filter starts when
   the settings fit, and a refused replacement leaves the working filter
-  selected across a restart; and the mute), `native.host_settling`,
+  selected across a restart; the mute, and none between kept filters),
+  `native.host_settling`,
   `vst3.adapter` `kept_until_channels_fit` and
   `chosen_file_kept_until_it_fits`, `au.adapter` `chosen_file_kept` and
   `au.editor` `files` (a mono file chosen on an empty stereo unit).
