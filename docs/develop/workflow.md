@@ -192,9 +192,10 @@ checklist says so:
   [CONTRIBUTING](../../CONTRIBUTING.md#lint-checks).
 - **Documentation:** the guide that owns the behaviour is updated
   ([page ownership](documentation.md#one-home-for-each-topic)); a new page is in
-  the [index](../README.md); user-visible changes and every finished TODO
-  item, contributor-only ones included, are in the
-  [CHANGELOG](../../CHANGELOG.md) under its ID. Affected product claims and
+  the [index](../README.md); user-visible changes, under Added, Changed or
+  Fixed, and every finished TODO item, a contributor-only one under
+  **For contributors**, are in the [CHANGELOG](../../CHANGELOG.md) under its
+  ID. Affected product claims and
   their summaries follow the [claims rule](documentation.md#current-claims-and-dated-evidence).
 - **TODO:** the item is ticked with its evidence, or says what remains,
   what would justify it and when it is done. A plan that is now fully implemented, or superseded,
@@ -318,16 +319,14 @@ approve or merge; jrp does that.
 ## Recording progress in TODO
 
 Each item in [TODO](../../TODO.md) has a stable ID. Do not reuse or renumber IDs;
-add new ones after the highest in their group. An open item says what
-remains, what would justify doing it and what counts as finished
-(**Remains**, **Worth doing when**, **Done when**), with what is already
-built in a sentence that names its pull requests. When a pull request
-advances an item, rewrite those parts in place rather than adding a
-narrative of the work: the pull request, its records and the CHANGELOG
-keep the evidence (jrp, 12 November 2026, DOC-14). The longer
-`Progress (date, PR #N): …` lines of the items DOC-14 rewrote were moved
-to [`docs/archive/todo/`](../archive/todo/README.md); the few left in other
-items go the same way when those items next change.
+add new ones after the highest in their group. An open item is a line or
+two: what remains (**Remains**, when part is built), what counts as
+finished (**Done when**) and, when it is not to be done now, what would
+justify it (**Worth doing when**). When a pull request advances an item,
+rewrite those words in place rather than adding a narrative of the work:
+the pull request, the plan the item links and the CHANGELOG keep the
+evidence (jrp, 12 November 2026, DOC-14, and 20 November 2026, DOC-19). The items' earlier, longer text is in
+[`docs/archive/todo/`](../archive/todo/README.md).
 
 The item is the one home for its open work. The
 [status page](../project/status.md) gives only each feature's level and
@@ -347,7 +346,7 @@ replace the item with one ticked line in TODO's [done](../../TODO.md#done) list:
 its ID and title, the date, the pull request if there was one, and a link to the page that now
 describes it. In the same pull request, add an entry naming the ID under
 `[Unreleased]` in the [CHANGELOG](../../CHANGELOG.md), even for work only
-contributors see. TODO keeps open work only; the one-line entry keeps the ID
+contributors see, which goes under **For contributors**. TODO keeps open work only; the one-line entry keeps the ID
 defined, and the [repository checks](#automated-checks) reject a TODO ID that
 is used but never defined. When the done list grows long, a documentation
 change moves its lines unchanged, apart from relative links, into a new dated
