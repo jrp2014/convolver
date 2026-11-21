@@ -37,6 +37,18 @@ first published preview, keep their original grouping.
 
 ### Changed
 
+- Library and tools (PLUG-39 step 5b): exceptions keep their message's
+  parts (problem, cause, fix, note) typed beside their text, and every catch
+  block reads the parts rather than parsing the "Cause: ", "Fix: " and
+  "Note: " lines back. The exception types and their `what()` text are
+  unchanged, so nothing a user reads changes. `HostFilter::fail_activation()`
+  gains an overload taking the exception, which keeps only its problem as
+  the reason, and the string form is documented to take the reason as a
+  phrase. One LV2 log line differs, and only when memory runs out twice:
+  when recording an activation failure itself runs out of memory and an
+  earlier load failure had been recorded without its message, the log now
+  says that memory ran out before Convolver could record why, where it
+  logged nothing.
 - Plug-ins (PLUG-39 step 5a): the window's report travels as one typed
   value. `encode_report()` and `decode_report()` in
   `portable/host_report.hpp` encode it once for the VST3 message between the
@@ -222,6 +234,11 @@ first published preview, keep their original grouping.
   passes, before dropping them. `tests/upgrade/harness_tests.py` (in
   pre-commit) feeds it a NaN, an infinity and sound there. `capture_au.py`
   no longer uses `str.removesuffix`, which needs Python 3.9.
+- Tests (HOST-11): `scripts/reaper_check.py` accepts a Status reading only
+  when it is exactly the stereo example's Active text, `Filter loaded: 48000
+  Hz, 2 in, 2 out.`. From jrp's review of 21 November 2026: the waiting text
+  ("; waiting for audio settings from the host.") and the Mix 0% text start
+  the same way, and passed checks 3 and 7 before.
 - Tests (HOST-11): `scripts/reaper_check.py` repeats the project's first
   seconds while REAPER plays, so that Status is read with the transport
   running, and counts that reading only when REAPER reports it running; in jrp's first run, on 21 November 2026, REAPER had

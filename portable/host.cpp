@@ -141,8 +141,7 @@ std::string hex(std::uint32_t n) {
 } // namespace
 
 Advice preparation_message(const std::string& what) {
-    return {"the filter could not be prepared" +
-                (what.empty() ? std::string() : ": " + detail::advice_problem(what)),
+    return {"the filter could not be prepared" + (what.empty() ? std::string() : ": " + what),
             "Memory may have run out, or the filter is too long for this computer.",
             "Close other projects or programs, then load the filter again; a shorter filter needs "
             "less memory. If it keeps failing, copy the diagnostics and report it.",
@@ -159,7 +158,7 @@ const Advice& failure_message(const HostFailure& f) {
 }
 
 Advice state_read_message(const std::exception& e) {
-    auto a = detail::parse_advice(e.what());
+    auto a = detail::advice_of(e);
     a.problem = "the saved project or preset could not be read: " + a.problem;
     if (a.fix.empty()) {
         a.cause = "The project or preset is damaged, or was not saved by Convolver.";
@@ -522,7 +521,7 @@ HostDrySignal unplayed_dry(const Configuration* kept, bool failed,
 void HostFilter::refuse(HostFailureKind kind, Advice why, const HostRequest& request,
                         const Configuration* carried) {
     record(kind, std::move(why), request, carried);
-    throw Refused(advice_text(load_failure_->message));
+    throw detail::AdvisedError<Refused>(load_failure_->message);
 }
 
 HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& host,
@@ -686,8 +685,8 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
             } catch (const SupersededRequest&) {
                 throw; // Abandoned: nothing recorded or changed.
             } catch (const std::exception& e) {
-                refuse(HostFailureKind::preparation, preparation_message(e.what()), request,
-                       carried);
+                refuse(HostFailureKind::preparation,
+                       preparation_message(detail::advice_of(e).problem), request, carried);
             }
         }
     } catch (const Refused&) {
@@ -803,6 +802,11 @@ bool HostFilter::estimate(bool on, const std::function<void(const FilterGains&)>
     return true;
 }
 
+void HostFilter::fail_activation(const std::exception* error) {
+    fail_activation(error ? detail::advice_of(*error).problem
+                          : std::string("the processor could not be built."));
+}
+
 void HostFilter::fail_activation(std::string why) {
     // First, before anything that may throw, as for any new start: nothing
     // counts on from the processor that is gone.
@@ -820,7 +824,7 @@ void HostFilter::fail_activation(std::string why) {
     }
     f.silent = true;
     f.message = {"the filter could not be started when the host started the plug-in" +
-                     (why.empty() ? std::string() : ": " + detail::advice_problem(why)),
+                     (why.empty() ? std::string() : ": " + why),
                  why.empty() ? "Memory may have run out."
                              : "Usually memory has run out; the words after the colon are the "
                                "reason given.",

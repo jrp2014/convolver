@@ -2,6 +2,7 @@
 // The Audio Unit's saved state and filter loading: preset checks, the saved
 // settings, SaveState and RestoreState, a file chosen in the window, and
 // installing a new filter or recording its refusal (see effect.cpp).
+#include "advice.hpp"
 #include "chosen_file.hpp"
 #include "core_foundation.hpp"
 #include "effect.hpp"
@@ -112,7 +113,7 @@ CFStringRef state_key() {
 
 // The checks AUBase::RestoreState makes, before anything changes: Apple's
 // preset version and this component's subtype and manufacturer.
-std::string foreign(CFDictionaryRef dict, const AudioComponentDescription& desc) {
+Advice foreign(CFDictionaryRef dict, const AudioComponentDescription& desc) {
     const auto number = [&](CFStringRef key, SInt32& out) {
         const auto value = CFDictionaryGetValue(dict, key);
         return value && CFGetTypeID(value) == CFNumberGetTypeID() &&
@@ -120,25 +121,25 @@ std::string foreign(CFDictionaryRef dict, const AudioComponentDescription& desc)
     };
     SInt32 version = -1, subtype = 0, manufacturer = 0;
     if (CFDictionaryContainsKey(dict, CFSTR(kAUPresetPartKey)))
-        return detail::advice_text({"the preset is for one part of a multi-part instrument, "
-                                    "not a whole effect",
-                                    {},
-                                    "Make a Convolver preset with convolver-preset.",
-                                    {}});
+        return {"the preset is for one part of a multi-part instrument, "
+                "not a whole effect",
+                {},
+                "Make a Convolver preset with convolver-preset.",
+                {}};
     if (!number(CFSTR(kAUPresetVersionKey), version) || version != 0)
-        return detail::advice_text({"the preset is not an Audio Unit preset this plug-in can "
-                                    "read (its version entry is missing or not 0)",
-                                    {},
-                                    "Make a Convolver preset with convolver-preset.",
-                                    {}});
+        return {"the preset is not an Audio Unit preset this plug-in can "
+                "read (its version entry is missing or not 0)",
+                {},
+                "Make a Convolver preset with convolver-preset.",
+                {}};
     if (!number(CFSTR(kAUPresetSubtypeKey), subtype) ||
         !number(CFSTR(kAUPresetManufacturerKey), manufacturer) ||
         static_cast<UInt32>(subtype) != desc.componentSubType ||
         static_cast<UInt32>(manufacturer) != desc.componentManufacturer)
-        return detail::advice_text({"the preset belongs to another plug-in",
-                                    {},
-                                    "Make a Convolver preset with convolver-preset.",
-                                    {}});
+        return {"the preset belongs to another plug-in",
+                {},
+                "Make a Convolver preset with convolver-preset.",
+                {}};
     return {};
 }
 } // namespace
@@ -484,14 +485,14 @@ bool Effect::read_state(CFPropertyListRef plist, HostState& next,
     const auto dict = static_cast<CFDictionaryRef>(plist);
     try {
         if (auto why = foreign(dict, GetComponentDescription()); !why.empty())
-            throw std::invalid_argument(why);
+            throw detail::AdvisedError<std::invalid_argument>(std::move(why));
         const auto value = CFDictionaryGetValue(dict, state_key());
         if (!value || CFGetTypeID(value) != CFDataGetTypeID())
-            throw std::invalid_argument(detail::advice_text(
+            throw detail::AdvisedError<std::invalid_argument>(
                 {"the preset holds no Convolver filter (it has no convolver-state entry)",
                  {},
                  "Make the preset with convolver-preset, or save it from Convolver in the host.",
-                 {}}));
+                 {}});
         const auto data = static_cast<CFDataRef>(value);
         const auto size = static_cast<std::size_t>(CFDataGetLength(data));
         if (size > max_host_state_bytes)

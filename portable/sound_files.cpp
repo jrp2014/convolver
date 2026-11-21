@@ -184,12 +184,12 @@ std::optional<WaveSizes> validate_wave(const std::filesystem::path& path) {
     } catch (const std::runtime_error& e) {
         // One place turns the path into text, whichever advice follows.
         const auto* unsized = dynamic_cast<const UnsizedRefusal*>(&e);
-        throw std::runtime_error(
-            advice_text({"cannot read sound file " + detail::utf8_string(path) + ": " + e.what(),
-                         unsized ? unsized->cause
-                                 : "The file is damaged or incomplete, or is not a sound file.",
-                         unsized ? unsized->fix : "Export it again from the program that made it.",
-                         {}}));
+        throw convolver::detail::AdvisedError<std::runtime_error>(
+            {"cannot read sound file " + detail::utf8_string(path) + ": " + e.what(),
+             unsized ? unsized->cause
+                     : "The file is damaged or incomplete, or is not a sound file.",
+             unsized ? unsized->fix : "Export it again from the program that made it.",
+             {}});
     }
 }
 std::string sample_position(std::uint64_t frame, std::size_t channel, int sample_rate) {
@@ -199,9 +199,9 @@ std::string sample_position(std::uint64_t frame, std::size_t channel, int sample
     return std::string("at ") + seconds + " s (frame " + std::to_string(frame) + "), channel " +
            std::to_string(channel);
 }
-std::string invalid_sample_message(const std::filesystem::path& path, std::uint64_t frame,
-                                   std::size_t channel, int sample_rate,
-                                   std::optional<RawEncoding> raw) {
+Advice invalid_sample_message(const std::filesystem::path& path, std::uint64_t frame,
+                              std::size_t channel, int sample_rate,
+                              std::optional<RawEncoding> raw) {
     const bool stream = path == "-";
     Advice a{std::string(stream ? "cannot read audio from standard input"
                                 : "cannot read sound file " + detail::utf8_string(path)) +
@@ -221,7 +221,7 @@ std::string invalid_sample_message(const std::filesystem::path& path, std::uint6
                   "program that made it wrote invalid samples.";
         a.fix = "Export it again from that program.";
     }
-    return advice_text(a);
+    return a;
 }
 std::size_t raw_sample_bytes(SampleType sample) {
     switch (sample) {

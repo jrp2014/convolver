@@ -257,7 +257,7 @@ class ToolboxFile final : public SoundFile {
             throw std::runtime_error("audio read failed: " + explain(status));
         for (std::size_t i = 0; i < std::size_t{frames} * channels; ++i)
             if (!std::isfinite(data[i]))
-                throw std::runtime_error(invalid_sample_message(
+                throw detail::AdvisedError<std::runtime_error>(invalid_sample_message(
                     path_, position_ + i / channels, i % channels + 1, info_.sample_rate));
         position_ += frames;
         return frames;
@@ -318,7 +318,7 @@ class RawFile final : public SoundFile {
             throw std::runtime_error(opening + ec.message());
         frame_bytes_ = width_ * spec.channels;
         if (bytes % frame_bytes_)
-            throw std::runtime_error(detail::raw_incomplete_frame);
+            throw detail::AdvisedError<std::runtime_error>(detail::raw_incomplete_frame());
         frames_ = static_cast<std::size_t>(bytes / frame_bytes_);
     }
     AudioInfo info() const noexcept override {
@@ -339,11 +339,11 @@ class RawFile final : public SoundFile {
         if (file_.bad())
             throw std::runtime_error("RAW audio read failed");
         if (got % frame_bytes_)
-            throw std::runtime_error(detail::raw_incomplete_frame);
+            throw detail::AdvisedError<std::runtime_error>(detail::raw_incomplete_frame());
         for (std::size_t i = 0; i < got / width_; ++i) {
             data[i] = decode_raw(bytes_.data() + i * width_, encoding_);
             if (!std::isfinite(data[i]))
-                throw std::runtime_error(
+                throw detail::AdvisedError<std::runtime_error>(
                     invalid_sample_message(path_, position_ + i / info_.channels,
                                            i % info_.channels + 1, info_.sample_rate, encoding_));
         }

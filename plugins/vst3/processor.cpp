@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "processor.hpp"
+#include "advice.hpp"
 #include "bytes.hpp"
 #include "chosen_file.hpp"
 #include "convolver_sdk.hpp"
@@ -301,18 +302,19 @@ tresult Processor::activate(TBool state) {
         active_ = state != 0;
         return AudioEffect::setActive(state);
     } catch (const std::exception& e) {
-        record_activation_failure(e.what());
+        record_activation_failure(&e);
         return kResultFalse;
     } catch (...) {
-        record_activation_failure("the processor could not be built.");
+        record_activation_failure(nullptr);
         return kResultFalse;
     }
 }
-void Processor::record_activation_failure(const char* why) noexcept {
+void Processor::record_activation_failure(const std::exception* error) noexcept {
     try {
-        filter_.fail_activation(why);
+        filter_.fail_activation(error);
         hold_fault_signal();
-        log(filter_.error());
+        if (const auto& f = filter_.failure())
+            log(detail::advice_line(failure_message(*f)));
     } catch (...) { // Out of memory for the message: nothing more to keep.
     }
 }
@@ -585,7 +587,7 @@ void Processor::choose_latency(std::size_t frames) noexcept {
         changed = true;
     } catch (const std::exception& e) {
         try {
-            why = e.what();
+            why = detail::advice_line(detail::advice_of(e));
         } catch (...) {
         }
     } catch (...) {
@@ -622,7 +624,7 @@ void Processor::choose_gain_mode(GainMode mode) noexcept {
         });
     } catch (const std::exception& e) {
         try {
-            why = e.what();
+            why = detail::advice_of(e).problem;
         } catch (...) {
         }
     } catch (...) {
