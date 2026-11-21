@@ -1617,6 +1617,98 @@ void same_filter_kept() {
     faulty.clear_faults();
     require(faulty.keep(loud_playing), "a processor cleared of its faults not kept");
 }
+// PLUG-42 (jrp, 21 November 2026): with a host whose configuration is
+// settled now but may change at a later start (HostLoadCheck::
+// keep_unless_one_plays: VST3 and the Audio Unit while the host plays), a
+// filter that does not suit it is refused only while a suiting filter
+// plays. jrp's two tests: a waiting filter starts when the settings fit
+// (Ardour 8.4 restarting the plug-in with new outputs a little after a
+// preset loaded), and a refused replacement leaves the working filter
+// selected across a restart.
+void kept_unless_one_plays() {
+    const HostLayout stereo{48000, 2, 2}, six{48000, 2, 6};
+    const Configuration two{48000, 2, 2, 0, {}, {}, {{{.5f}, {{0, 1}}, {{0, 1}}}}};
+    const Configuration crossover{48000, 2, 6, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
+    const auto refused = [](auto&& load) {
+        try {
+            load();
+        } catch (const std::invalid_argument&) {
+            return true;
+        }
+        return false;
+    };
+    const auto check = HostLoadCheck::keep_unless_one_plays;
+    // 1. Nothing plays (an empty instance): the crossover is kept, silent
+    // with the reason, saved as the filter, and plays at the next start
+    // with the outputs it was made for.
+    {
+        HostFilter f(8);
+        static_cast<void>(test::started(f, stereo));
+        const auto change = f.load(HostState{crossover}, stereo, {}, {}, nullptr, check);
+        require(change.kept == HostChange::Kept::nothing_plays && !f.rejection(),
+                "a filter refused with nothing playing");
+        require(f.filter() && f.filter()->output_channels == 6 && f.failure() &&
+                    f.failure()->silent && f.failure()->kind == HostFailureKind::channels,
+                "the kept filter is not silent with its reason");
+        require(!f.failed() && saved_of(f).configuration &&
+                    saved_of(f).configuration->output_channels == 6,
+                "the kept filter not saved as the filter");
+        require(!f.awaiting(), "a settled host's check counted as awaiting validation");
+        const auto plays = test::started(f, six);
+        require(!f.failure() && plays.filter && plays.filter->output_channels == 6,
+                "the kept filter does not play at a start that suits it");
+    }
+    // A filter that does not suit the host after a restart plays nothing
+    // either, so the latest choice replaces it.
+    {
+        HostFilter f(8);
+        f.load(HostState{two}, stereo);
+        static_cast<void>(test::started(f, six));
+        require(f.failure() && f.failure()->silent, "a filter that does not suit plays");
+        auto quieter = two;
+        quieter.paths[0].impulse[0] = .25f;
+        require(!refused([&] { f.load(HostState{quieter}, six, {}, {}, nullptr, check); }) &&
+                    f.filter() && f.failure() && f.failure()->silent,
+                "a choice refused while the earlier filter played silence");
+        require(f.filter()->paths[0].impulse[0] == .25f, "the latest choice not kept");
+        static_cast<void>(test::started(f, stereo));
+        require(!f.failure(), "the latest choice does not play when the settings fit");
+    }
+    // 2. A suiting filter plays: the crossover is refused, and the playing
+    // filter stays selected across a restart, also at the refused filter's
+    // outputs, and is what is saved.
+    {
+        HostFilter f(8);
+        f.load(HostState{two}, stereo);
+        static_cast<void>(test::started(f, stereo));
+        require(refused([&] { f.load(HostState{crossover}, stereo, {}, {}, nullptr, check); }),
+                "a replacement that does not suit accepted while a filter plays");
+        require(f.rejection() && !f.rejection()->silent, "the refusal not recorded");
+        require(text_of(f.rejection()->message)
+                        .find("The filter that is playing stays selected when the host restarts "
+                              "the plug-in, even with settings that suit this one") !=
+                    std::string::npos,
+                "the refusal does not say the playing filter stays selected");
+        const auto again = test::started(f, stereo);
+        require(f.filter() && f.filter()->output_channels == 2 && again.filter &&
+                    again.filter->output_channels == 2 && f.failure() && !f.failure()->silent,
+                "a restart with the same settings switched filters");
+        static_cast<void>(test::started(f, six));
+        require(f.filter() && f.filter()->output_channels == 2,
+                "a restart with the refused filter's outputs switched to it");
+        require(saved_of(f).configuration && saved_of(f).configuration->output_channels == 2,
+                "the refused filter saved");
+    }
+    // LV2 (refuse_mismatch): its layout never changes, so a filter that does
+    // not suit is refused even with nothing playing.
+    {
+        HostFilter f(8);
+        static_cast<void>(test::started(f, stereo));
+        require(refused([&] { f.load(HostState{crossover}, stereo); }) && !f.filter() &&
+                    f.failure() && f.failure()->silent,
+                "refuse_mismatch kept a filter that does not suit");
+    }
+}
 // PLUG-39 step 1b: HostFilter::load() decides what an accepted request
 // changes besides the filter (HostChange), from the request's kind and the
 // state, so that no adapter decides it again (the scope table in
@@ -2557,6 +2649,7 @@ int main() {
             {"shared_filter", shared_filter},
             {"processing_faults", processing_faults},
             {"same_filter_kept", same_filter_kept},
+            {"kept_unless_one_plays", kept_unless_one_plays},
             {"request_changes", request_changes},
             {"costly_moments_against_oracle", costly_moments_against_oracle},
         },

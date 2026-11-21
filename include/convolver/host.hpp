@@ -225,9 +225,21 @@ class HostProcessor;
 // (the shared adapter contract, "state that arrives before the host is
 // configured"). The adapter decides which applies; HostFilter applies it.
 enum class HostLoadCheck {
-    // The host's configuration is settled: the load is refused, and what was
-    // accepted before stays (a failed first load if nothing was).
+    // The host's configuration is settled and cannot change (LV2: a layout is
+    // its own plug-in): the load is refused, and what was accepted before
+    // stays (a failed first load if nothing was).
     refuse_mismatch,
+    // PLUG-42 (jrp, 21 November 2026): the host's configuration is settled
+    // now, but the host may start the plug-in with another later (VST3, the
+    // Audio Unit). While an accepted filter suits it and plays, the load is
+    // refused, so that one plays on. Otherwise a refusal would protect
+    // nothing: the filter is kept, playing silence with the reason, until a
+    // start suits it, and is saved as the filter rather than as a failed
+    // load. Ardour 8.4 restarts the plug-in with the outputs set in its Pin
+    // Connections a little after they are set; a preset loaded in between
+    // was refused, never tried at the outputs that suited it, and saved as
+    // a failure (HOST-10).
+    keep_unless_one_plays,
     // The host may still change its configuration (it is restoring a project):
     // the filter is accepted all the same and kept, playing silence with the
     // reason as failure() until an activation suits it, as an activation keeps
@@ -401,6 +413,16 @@ struct HostChange {
     // report until one is built; 0 otherwise, when the processor knows it,
     // and for no filter.
     std::size_t inactive_tail = 0;
+    // Why an accepted filter that does not suit the host was kept instead of
+    // refused, for the adapter's log line; `none` when it suits, or when the
+    // host's configuration is not known.
+    enum class Kept {
+        none,
+        // HostLoadCheck::keep_until_suited: the host may still change it.
+        unsettled,
+        // HostLoadCheck::keep_unless_one_plays with no suiting filter playing.
+        nothing_plays,
+    } kept = Kept::none;
 };
 
 // ROBUST-8: what HostFilter::activation() found for the host, which

@@ -149,7 +149,10 @@ void cases() {
          {"The saved filter is for 48000 Hz, and the host runs at 44100 Hz.",
           "Cause: Convolver never resamples",
           "Fix: Load a filter made for 44100 Hz, or set the host's project or audio device to "
-          "48000 Hz. The host may play at a different rate from the one it exports at."},
+          "48000 Hz. The host may play at a different rate from the one it exports at.",
+          // PLUG-42: it plays at the next start that suits it.
+          "Convolver plays silence. The filter is kept and waits for audio settings that suit "
+          "it: it plays when the host next starts the plug-in with them."},
          {"stereo track"}},
         // jrp's review of 0.5.5: the report says what a rejected first load at
         // Mix 50% plays. PLUG-23 (jrp, 7 November 2026): with no filter kept
@@ -162,7 +165,7 @@ void cases() {
          },
          HostStatus::load_failed,
          {"The saved state could not be read. Convolver plays silence."},
-         {"load a Convolver preset", "only the dry signal"}},
+         {"load a Convolver preset", "only the dry signal", "The filter is kept"}},
         // A kept filter with equal counts that does not suit the host still
         // passes the dry signal at Mix 50%.
         {"wrong rate, Mix 50%",

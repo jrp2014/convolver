@@ -266,6 +266,7 @@ void Effect::reject(HostFailureKind kind, const Advice& why, const HostRequest& 
 bool Effect::install(HostState next, const HostRequest& request, const SavedSettings* saved,
                      bool settings_unreadable) {
     bool accepted = false, problem = true;
+    auto kept = HostChange::Kept::none;
     std::string message, faults;
     {
         const Locked lock(*this);
@@ -298,6 +299,7 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
             // Nothing from here on can throw: the request is accepted.
             tail_.store(host() ? host()->tail_frames() : change.inactive_tail);
             accepted = true;
+            kept = change.kept;
             if ((applied = change.settings)) {
                 store(*applied);
                 // The restored mode is in place, with its estimate: the
@@ -315,6 +317,11 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
             } else {
                 problem = filter_.failure().has_value() || !filter_.notice().empty();
                 message = loaded_line(filter_, known);
+                // PLUG-42: why it is kept, and what to change.
+                if (const auto& f = filter_.failure();
+                    kept == HostChange::Kept::nothing_plays && f && f->silent)
+                    message += " It does not suit the host's present configuration: " +
+                               detail::advice_line(f->message) + kept_rather_than_refused_sentence;
                 // Hosts such as GarageBand restore a project after starting the
                 // unit, so its "Started at" line shows the settings before this.
                 if (applied) {
@@ -365,7 +372,7 @@ OSStatus Effect::load_file(const std::string& path) {
     bool settled = false;
     {
         const Locked lock(*this);
-        settled = settling_.check(request.kind) == HostLoadCheck::refuse_mismatch;
+        settled = settling_.check(request.kind) != HostLoadCheck::keep_until_suited;
         host = known_layout();
     }
     FilterFileFailure why;

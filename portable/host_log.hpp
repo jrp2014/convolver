@@ -56,6 +56,13 @@ std::string loaded_line(const HostFilter&, bool host_known);
 // The same with the host's configuration where known, which also names the
 // host's inputs the filter ignores (PLUG-23).
 std::string loaded_line(const HostFilter&, const std::optional<HostLayout>& host);
+// PLUG-42: added to loaded_line() when HostFilter::load() kept a filter that
+// does not suit a settled host because no other filter was playing
+// (HostChange::Kept::nothing_plays).
+inline constexpr const char* kept_rather_than_refused_sentence =
+    " No other filter was playing, so it was not refused: it waits for audio settings that suit "
+    "it, and plays when the host next starts the plug-in at the rate and with the channels it "
+    "was made for.";
 // After a rejected load: what plays instead and HostFilter::rejection()'s
 // message, numbered as loaded_line() numbers accepted ones ("Request 3: ");
 // empty if there is none. `started` says whether the host has started the

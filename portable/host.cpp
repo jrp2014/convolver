@@ -553,7 +553,14 @@ void HostFilter::refuse(HostFailureKind kind, Advice why, const HostRequest& req
 HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& host,
                             const std::function<void(const HostPlayback&)>& install,
                             HostRequest request, HostProcessor* counting, HostLoadCheck check) {
-    const bool keep_mismatch = check == HostLoadCheck::keep_until_suited;
+    // PLUG-42: a filter that does not suit a host that may start the plug-in
+    // with another configuration later is refused only where that keeps
+    // something playing: an accepted filter that suits the host (no failure
+    // found at activation). refuse_mismatch (LV2, whose layout never
+    // changes) refuses always.
+    const bool one_plays = filter_ && !failed_ && !activation_failure_;
+    const bool keep_mismatch = check == HostLoadCheck::keep_until_suited ||
+                               (check == HostLoadCheck::keep_unless_one_plays && !one_plays);
     request = numbered(std::move(request));
     auto& next = state.configuration;
     // PLUG-39: what the request changes besides the filter, decided here once
@@ -606,10 +613,20 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
             if (auto why = host_state_size_error(state); !why.empty())
                 refuse(HostFailureKind::too_large, std::move(why), request, carried);
         if (host && next) {
-            if (auto m =
-                    mismatch(*next, *host, keep_mismatch ? "the saved filter" : "the filter")) {
-                if (!keep_mismatch)
+            const bool unsettled = check == HostLoadCheck::keep_until_suited;
+            if (auto m = mismatch(*next, *host, unsettled ? "the saved filter" : "the filter")) {
+                if (!keep_mismatch) {
+                    // PLUG-42 (jrp, 21 November 2026): a refusal must be one
+                    // the user can trust, so the refused filter is not held
+                    // to replace the playing one at a later start.
+                    if (check == HostLoadCheck::keep_unless_one_plays)
+                        m->why.note += std::string(m->why.note.empty() ? "" : " ") +
+                                       "The filter that is playing stays selected when the "
+                                       "host restarts the plug-in, even with settings that suit "
+                                       "this one: choose this one again after changing them.";
                     refuse(m->kind, std::move(m->why), request, carried);
+                }
+                change.kept = unsettled ? HostChange::Kept::unsettled : HostChange::Kept::nothing_plays;
                 // Kept, as activation() keeps a filter that does not suit.
                 HostFailure f;
                 f.kind = m->kind;
@@ -741,7 +758,8 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
     estimating_ = estimating;
     identity_ = identity;
     failed_ = state.failed;
-    awaiting_ = request.kind == HostRequestKind::chosen_file && keep_mismatch;
+    awaiting_ = request.kind == HostRequestKind::chosen_file &&
+                check == HostLoadCheck::keep_until_suited;
     accepted_ = std::move(request);
     if (offered)
         offered_name_ = std::move(offered);
