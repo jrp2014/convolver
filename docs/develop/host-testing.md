@@ -275,15 +275,18 @@ Do this once. Run the commands in the extracted preview package folder.
 
    The output must end with `AU VALIDATION SUCCEEDED`. Then make the
    GarageBand presets, mono and stereo, from the package's VST3 examples, so they appear in the
-   unit's preset menu (the tool refuses to overwrite, so delete old copies
-   before running it again):
+   unit's preset menu. The loop deletes each old copy first: the tool
+   refuses to overwrite, and a preset left from an earlier preview keeps
+   its name in the menu but may hold a different filter (before 0.18 the
+   echo was a single copy 5 ms later):
 
    ```sh
    mkdir -p ~/Library/Audio/Presets/Convolver/Convolver
    for kind in identity echo repeat; do
      for layout in mono stereo; do
-       ./bin/convolver-preset "presets/$kind-44100-$layout/$kind-44100-$layout.vstpreset" \
-         ~/Library/Audio/Presets/Convolver/Convolver/$kind-44100-$layout.aupreset
+       out=~/Library/Audio/Presets/Convolver/Convolver/$kind-44100-$layout.aupreset
+       rm -f "$out"
+       ./bin/convolver-preset "presets/$kind-44100-$layout/$kind-44100-$layout.vstpreset" "$out"
      done
    done
    ```
@@ -394,7 +397,8 @@ Do this once. Run the commands in the extracted preview package folder.
     playing, and record what the window's Latency row and the log say,
     what REAPER shows as the plug-in's latency (its delay compensation),
     and when the new latency comes into use: since VST3-16 at once (the log
-    says `Latency changed from 256 to 1024 frames`), with REAPER's delay
+    says `Latency changed from 0 to 1024 frames`, since the default is
+    0), with REAPER's delay
     compensation following. Open the
     disclosure triangle: REAPER's FX window grows to fit.
     Click **Copy Diagnostics** and paste into the report. Save, quit and
@@ -578,10 +582,14 @@ preparation and steps 2, 3 and 9 below include what it found.
     check a configuration list: in a new project, choose a list (a text
     file in the package folder naming `presets/echo-44100-stereo/filter.cfg`
     and then `examples/first-use/stereo/filter.cfg`) before playing; it must
-    be refused with "Play audio once…". With the window still open, play a
-    second and stop: the window must show the list loaded (Active, 48000
-    Hz) without choosing it again (PLUG-40). Export and compare as above:
-    the list's 48000 Hz entry must play.
+    be refused with "Play audio once…". With the window still open, turn
+    on looping and play for at least two seconds, then stop. The example
+    lasts 85 ms and the window checks the host's settings every half
+    second, so a single play can end before the window sees them and fail
+    the check falsely. The window must show the list loaded
+    (Active, 48000 Hz) without choosing it again (PLUG-40). Leave the list
+    selected, then export and compare as above: the list's 48000 Hz entry
+    must play.
 
 ### GarageBand (Audio Unit)
 
@@ -617,7 +625,11 @@ preparation and steps 2, 3 and 9 below include what it found.
    [preparation](#prepare-the-mac), or the Console application, searching
    for "Convolver").
 9. The [settings](../use/plugins.md#settings). Choose `repeat-44100-stereo`,
-   where the changes are easiest to hear, and play. Record where the window
+   where the changes are easiest to hear, and play. Latency starts at 0
+   frames, the default; choose 256 frames while playing and check that it
+   is in use before going on: the window's Latency detail reads 256 frames
+   without "not in use yet", and the log has `Latency changed from 0 to
+   256 frames`. Record where the window
    shows Gain and Mix and how it shows their values. Set Gain to −12 dB: the
    level drops smoothly, without a click. Set Mix to 0%: you hear the dry
    track, without the repeat; 50% mixes the two. Save, quit and reopen the
