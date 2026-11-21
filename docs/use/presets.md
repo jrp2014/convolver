@@ -109,7 +109,7 @@ The filter is copied byte for byte. The preset must be one of Convolver's: a
 preset for another plug-in is refused. Presets saved by a host (which add the
 host's own data) are accepted. The list options do not apply, since the preset
 already holds one filter. A preset a host saved also keeps the VST3 plug-in's
-Gain, Mix and Latency: a `.vstpreset` made from it applies them, while
+Gain, Gain mode, Mix and Latency: a `.vstpreset` made from it applies them, while
 an `.aupreset` or LV2 preset made from it carries them but its plug-in
 ignores them there.
 

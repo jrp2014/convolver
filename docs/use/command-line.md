@@ -70,7 +70,7 @@ nearest-rate substitution.
 
 `--block-size` is the engine's latency in frames, from 0 (the default, as the
 plug-ins) to 1048576. It is not the historical partition count, and since
-PERF-2 it does not set the transform size: the engine sums a filter's first
+0.13.0 it does not set the transform size: the engine sums a filter's first
 taps directly and divides the rest into blocks of 64 to 8192 frames whatever
 the latency, so any value works with all three backends. A larger latency can
 use somewhat less processor time; above 16384 frames it only adds delay. The
@@ -662,8 +662,8 @@ Saving wisdom avoids repeating the measured search; it does not make a
 given measured plan execute faster than that same plan without saving it.
 Compare the gain with the one-off tuning time and preparation cost in the
 [backend measurements](../develop/fft-measurements.md#perf-2-backend-and-wisdom-comparison).
-For example, the 8 November PERF-2 candidate took 1.72 seconds to tune on an
-M5 Max; saved patient wisdom reduced processing time by a median 3.7% over
+For example, in one measurement on an M5 Max, tuning took 1.72 seconds;
+saved patient wisdom reduced processing time by a median 3.7% over
 FFTW estimation across the tested cases, with little or no gain in some.
 Neither measured planning nor saved wisdom guarantees a speedup for every
 workload, so estimation remains a reasonable starting point.
