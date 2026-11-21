@@ -1225,6 +1225,13 @@ move to the archive.
   and LV2. Its targets now build with the same ones, the SDK as system
   headers, and the warnings they showed are fixed
   ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
+- [x] **DOC-18 — User guides that match the plug-ins.** 20 November
+  2026, PR #234, from an outside audit's findings in `docs/use/`: the
+  first-sound guide's **Choose…** reads Convolver presets, the concepts
+  page's engine and settings are current, the Windows window is named
+  wherever the macOS one is, the package list has the LV2 plug-in, and no
+  TODO IDs remain in the user guides
+  ([documentation](docs/develop/documentation.md#writing-rules)).
 - [x] **HOST-7 — Run the Ardour test with Ardour 9.**
   20 November 2026, PR #229, from CI-43: Ardour 9's Lua tool crashed in
   `Session:new_audio_track`, which takes an empty `ARDOUR.RouteGroup()`
