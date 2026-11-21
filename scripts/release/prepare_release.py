@@ -77,8 +77,8 @@ CHANGES = (
         "the host's log says so."
     ),
     (
-        "In Audacity, Convolver's Choose… and Recent have been checked beside Audacity's own preset menu, on a "
-        'candidate build before this version (0.16.14, Audacity 4.0.2 on macOS, 21 November 2026): a filter chosen '
+        "In Audacity, Convolver's Choose… and Recent have been checked, on a candidate build before this version "
+        '(0.16.14, Audacity 4.0.2 on macOS, 21 November 2026): a filter chosen '
         'before playing reached the export, and the next export after saving, quitting and reopening; a list chosen '
         'after one playback took its 48 kHz entry. All four exports matched the reference within -137 dB. Later '
         'changes to choosing a file, listed here, have not yet been checked in Audacity.'
@@ -87,7 +87,8 @@ CHANGES = (
         "Once the host stops the plug-in, the tail it reports, and the Ring-out row in the window's details, are "
         "the current filter's own. While audio plays it stays the longest tail used since the start, so a host "
         'keeps rendering a tail that is still ringing; before, after a stop it stayed at the longest one the last '
-        'start had played.'
+        'start had played. Not yet right in one case: a stopped Audio Unit holding a filter for another sample rate '
+        "converts its tail at the host's last rate, so a 1 s tail at 48 kHz reads 0.5 s after a 96 kHz start."
     ),
     (
         'In LV2, choosing again the file of the filter already playing keeps it playing, with its tail ringing on, '
@@ -284,8 +285,9 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'Other hosts are untested.\n'
             "- In Audacity, a filter chosen with Convolver's Choose…, even before playing, is kept for exports and "
             'saved projects, and one chosen from Recent for exports (checked in Audacity 4.0.2 on macOS on 21 '
-            "November 2026 with the 0.16.14 candidate, as is Audacity's own preset menu; not yet repeated on this "
-            'version). Reload and reloading when the file changes are checked only by automated tests.\n'
+            "November 2026 with the 0.16.14 candidate, not yet repeated on this version; Audacity's own preset menu "
+            'was checked with an earlier preview). Reload and reloading when the file changes are checked only by '
+            'automated tests.\n'
             '- In Ardour, the VST3 plug-in on a Flexible-I/O track gets 2 inputs and 2 outputs whatever the track '
             'has, so a mono filter plays silence until its outputs are set by hand in Pin Connections (steps not yet '
             "confirmed in Ardour's window), and a crossover cannot play; nor can a crossover on a Strict-I/O track, "
