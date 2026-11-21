@@ -152,6 +152,13 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
+- Tests (HOST-11, first version): `scripts/reaper_check.py` runs part of
+  the REAPER host check from one command on a Mac. REAPER renders the
+  stereo example through its `.vstpreset`, saves, quits, reopens the
+  project in a new process and renders again; both renders are compared
+  with `convolver --compare`, and one `result.md` holds what a host report
+  needs. It needs REAPER, so no workflow runs it; its tests run in
+  pre-commit against a stand-in REAPER.
 - Tests (HOST-9): the headless Ardour test plays the VST3 plug-in too, in
   the VST3 workflow, on Ardour's own VST3 host, and saves sessions at a
   larger Latency (LV2 at 256 and 1024, VST3 at 1024): Ardour must be told

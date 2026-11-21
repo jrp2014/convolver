@@ -53,8 +53,9 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 
 ### In progress
 
-PLUG-39's step 4a with PLUG-30 (PR #236). Check the open pull requests for an
-ID before starting anything.
+PLUG-39's step 4a with PLUG-30 (PR #236); HOST-11's first version (PR #245),
+which waits for a run on jrp's Mac. Check the open pull requests for an ID
+before starting anything.
 
 ### Ready
 
