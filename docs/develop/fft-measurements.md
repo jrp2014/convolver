@@ -1418,8 +1418,8 @@ in ms; decoding the file or saved state comes on top:
 What the runs show:
 
 - **Every workload that fits the saved-state limit keeps up with room to
-  spare, except the full 7.1 matrix at 96 kHz,** by the criteria proposed
-  with PERF-3 for the supported workloads: mean at most 25% of one core and
+  spare, except the full 7.1 matrix at 96 kHz,** by jrp's criteria for
+  supported workloads ([decisions](../project/decisions.md#releases)): mean at most 25% of one core and
   99th-percentile callback at most half its period on every machine
   measured, at both latencies and both callback sizes. Every other
   workload used at most 20% of a core (the 60 s stereo reverb at 96 kHz on
