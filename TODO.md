@@ -490,7 +490,7 @@ Items finished since then are listed here, one line each, until the next
 move to the archive.
 
 - [x] **PLUG-24 — `HostProcessor` in its own source file.** 21 November
-  2026, PR #NNN ([architecture](docs/develop/architecture.md#components-and-source-of-truth)).
+  2026, PR #260 ([architecture](docs/develop/architecture.md#components-and-source-of-truth)).
 - [x] **PLUG-39 — One consolidation of the load and restore path.** 21
   November 2026, PRs #200, #205, #213, #217, #219, #224, #226, #230 to
   #232, #236, #246, #250 and #256 ([plan](docs/archive/plans/2026-11-13-load-restore-consolidation.md),
