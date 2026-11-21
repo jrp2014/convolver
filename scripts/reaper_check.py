@@ -219,16 +219,33 @@ local function tick()
   reaper.defer(tick)
 end
 
+-- REAPER stops at the end of a project, and the example lasts 85 ms, so
+-- Status would be read after the transport stopped (jrp's first run, 21
+-- November 2026). Repeat over the first seconds keeps it running until the
+-- reading; the project's own loop and repeat come back afterwards.
 local function play_briefly(track, fx)
+  local loop_start, loop_end, repeat_before
   step(function()
+    loop_start, loop_end = reaper.GetSet_LoopTimeRange2(project, false, true, 0, 0, false)
+    repeat_before = reaper.GetSetRepeatEx(project, -1)
+    reaper.GetSet_LoopTimeRange2(project, true, true, 0, CONFIG.play_seconds + 1, false)
+    reaper.GetSetRepeatEx(project, 1)
+    reaper.SetEditCurPos(0, false, false)
     reaper.OnPlayButton()
+    return function() return (reaper.GetPlayState() & 1) == 1 end, 10
+  end)
+  step(function()
+    record("play_started", (reaper.GetPlayState() & 1) == 1 and "yes" or "no")
     return CONFIG.play_seconds
   end)
   step(function()
     record("play_state", reaper.GetPlayState())
+    record("play_position", string.format("%.3f", reaper.GetPlayPosition()))
     record("device_rate_playing", device_info("SRATE"))
     record("status_playing", status(track(), fx()))
     reaper.OnStopButton()
+    reaper.GetSet_LoopTimeRange2(project, true, true, loop_start, loop_end, false)
+    reaper.GetSetRepeatEx(project, repeat_before)
     return 0.5
   end)
 end
@@ -257,6 +274,9 @@ step(function()
   end
   reaper.SetMediaTrackInfo_Value(master, "D_VOL", 1)
   reaper.SetMediaTrackInfo_Value(master, "D_PAN", 0)
+  -- A gain of 1 at the centre, whatever the default pan law in REAPER's
+  -- preferences (-1 would follow them).
+  reaper.SetMediaTrackInfo_Value(master, "D_PANLAW", 1)
   reaper.SetMediaTrackInfo_Value(master, "I_NCHAN", 2)
   reaper.GetSetProjectInfo(project, "PROJECT_SRATE", CONFIG.rate, true)
   reaper.GetSetProjectInfo(project, "PROJECT_SRATE_USE", 1, true)
@@ -272,6 +292,7 @@ step(function()
   if not item then error("REAPER made a track but put no item on it", 0) end
   reaper.SetMediaTrackInfo_Value(track, "D_VOL", 1)
   reaper.SetMediaTrackInfo_Value(track, "D_PAN", 0)
+  reaper.SetMediaTrackInfo_Value(track, "D_PANLAW", 1)
   reaper.SetMediaTrackInfo_Value(track, "I_NCHAN", 2)
   reaper.SetMediaItemInfo_Value(item, "D_POSITION", 0)
   reaper.SetMediaItemInfo_Value(item, "D_VOL", 1)
@@ -551,6 +572,29 @@ def rate_hint(results):
     return ''
 
 
+def playing(results):
+    """Whether REAPER's transport was running when Status was read while
+    playing (GetPlayState: 1 playing, 2 paused, 4 recording)."""
+    try:
+        return int(float(results.get('play_state', ''))) & 1 == 1
+    except ValueError:
+        return False
+
+
+def loaded_while_playing(results):
+    return playing(results) and results.get('status_playing', '').startswith(LOADED)
+
+
+def playing_text(results):
+    if 'play_state' not in results:
+        return 'while playing: (not read)'
+    when = 'transport running' if playing(results) else 'transport stopped, so this is not a reading during playback'
+    return (
+        f'while playing: {results.get("status_playing", "(none)")} '
+        f'(play state {results["play_state"]}, {when}, at {results.get("play_position", "?")} s)'
+    )
+
+
 def same_file(recorded, project):
     """Whether the path REAPER reports is the project saved in the first
     stage (allowing for symbolic links such as /var and /private/var)."""
@@ -580,14 +624,12 @@ def evaluate(first, reopen, first_compare, reopen_compare, project):
         (
             'The .vstpreset loads the stereo example',
             one.get('preset_applied') == 'true'
-            and (
-                one.get('status_after_preset', '').startswith(LOADED)
-                or one.get('status_playing', '').startswith(LOADED)
-            ),
+            and one.get('status_after_preset', '').startswith(LOADED)
+            and loaded_while_playing(one),
             (
                 f'TrackFX_SetPreset returned {one.get("preset_applied") or "nothing"}; '
                 f'Status after the preset: {one.get("status_after_preset", "(none)")}; '
-                f'while playing: {one.get("status_playing", "(none)")}{rate_hint(one)}'
+                f'{playing_text(one)}{rate_hint(one)}'
             ),
         ),
         ('The render matches expected.wav', first_compare['match'], last_line(first_compare['output'])),
@@ -611,11 +653,8 @@ def evaluate(first, reopen, first_compare, reopen_compare, project):
         ),
         (
             'The reopened project restores the filter',
-            two.get('status_reopened', '').startswith(LOADED) or two.get('status_playing', '').startswith(LOADED),
-            (
-                f'Status on reopening: {two.get("status_reopened", "(none)")}; '
-                f'while playing: {two.get("status_playing", "(none)")}{rate_hint(two)}'
-            ),
+            two.get('status_reopened', '').startswith(LOADED) and loaded_while_playing(two),
+            (f'Status on reopening: {two.get("status_reopened", "(none)")}; {playing_text(two)}{rate_hint(two)}'),
         ),
         ('The reopened render matches expected.wav', reopen_compare['match'], last_line(reopen_compare['output'])),
     ]
@@ -693,7 +732,9 @@ def report(context):
             f'(VST3) and loaded `{PRESET}` with TrackFX_SetPreset.'
         ),
         (
-            f'2. REAPER played for {context["play_seconds"]} s, then rendered the master to '
+            f'2. REAPER played for {context["play_seconds"]} s, repeating the first '
+            f'{context["play_seconds"] + 1} s so that Status is read while the transport runs, then '
+            'rendered the master to '
             f'`{FIRST_RENDER}.wav` (WAV, {RATE} Hz, stereo, 1 s tail, no normalising or dither).'
         ),
         f'3. It saved the project as `{context["project"].name}` and quit ({quit_text(first)}).',

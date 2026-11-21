@@ -435,12 +435,16 @@ python3 /path/to/convolver/scripts/reaper_check.py
 It starts REAPER twice. The first time, a new project at 48000 Hz gets the
 stereo example's `input.wav` on a track, with Convolver's VST3 loaded from
 `examples/first-use/stereo/first-use-stereo.vstpreset`; REAPER plays for a
-moment, renders, saves the project and quits. The second time, REAPER
+moment, repeating the project's first seconds so that Status is read while
+the transport runs, then renders, saves the project and quits. The second time, REAPER
 reopens that project in a new process, plays, renders again and quits.
 `bin/convolver --compare` checks both renders against the example's
 `expected.wav`. REAPER must accept the preset (`TrackFX_SetPreset`
 succeeds), the second REAPER must report the project the first one saved,
-and each Status must read `Filter loaded: 48000 Hz, 2 in, 2 out.` Everything goes into a new `reaper-check-DATE-TIME` folder in the
+and each Status must read `Filter loaded: 48000 Hz, 2 in, 2 out.`, after
+loading or reopening and again while REAPER reports its transport running.
+Track and master pan laws are set to 0 dB, whatever REAPER's preferences
+say. Everything goes into a new `reaper-check-DATE-TIME` folder in the
 package folder; its `result.md` lists the eight checks with their evidence,
 what [every report](#every-report) needs (the package's SHA-256 when its ZIP
 sits beside the folder, or from `--zip`) and the Convolver log lines written
@@ -455,7 +459,11 @@ and Status only), 6 and 7 of [REAPER](#reaper-vst3), in the guide's
 [render and reopen](../use/check-a-stereo-filter.md#4-render-the-example-in-the-host)
 form. Listening, bypass, the refused presets, the wrong host rate, the
 window, Latency and the crossover stay manual until the script grows to
-cover them, one addition per run. Without REAPER, `tests/reaper_check_tests.py`
+cover them, one addition per run. jrp's first run, on 21 November 2026
+with the 0.16.14 candidate, passed all eight checks
+([record](../archive/reviews/2026-11-21-host11-reaper.md)); it read Status
+"while playing" after the transport had stopped, which the repeat now
+prevents. Without REAPER, `tests/reaper_check_tests.py`
 checks the script in pre-commit against a stand-in REAPER.
 
 ### Audacity (VST3)
