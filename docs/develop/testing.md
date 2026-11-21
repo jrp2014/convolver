@@ -1272,7 +1272,10 @@ each case:
    (`HOME` is a temporary folder). For VST3, Ardour's
    `ardour-vst3-scanner` first indexes the bundle in `~/.vst3`, as Ardour's
    window does when it finds a new one; the headless tools list only
-   indexed plug-ins. `ardour9-new_session` makes a session whose master bus
+   indexed plug-ins, and only while the module is older than the index in
+   whole seconds, so the test dates its copy of the bundle a minute back
+   (a bundle built in the same second as the scan was listed as nothing,
+   intermittently, in CI). `ardour9-new_session` makes a session whose master bus
    has one channel per plug-in output.
 2. [`ardour_session.lua`](../../tests/plugins/ardour_session.lua), run by
    `ardour9-lua` on Ardour's Dummy backend, adds a track with the plug-in,

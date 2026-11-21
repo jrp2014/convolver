@@ -48,6 +48,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 import xml.etree.ElementTree as ET
 
 sys.dont_write_bytecode = True
@@ -110,8 +111,10 @@ def explain_vst3_discovery(directory):
     for folder in (directory / 'cache', directory / 'config'):
         for path in sorted(folder.rglob('*')):
             if path.is_file() and (path.suffix == '.v3i' or path.name == 'scan_log'):
-                print(f'--- {path.relative_to(directory)}')
+                print(f'--- {path.relative_to(directory)} (mtime {path.stat().st_mtime:.3f})')
                 print(path.read_text(encoding='utf-8', errors='replace')[:4000])
+    for module in sorted((directory / 'home' / '.vst3').rglob('*.so')):
+        print(f'--- {module.relative_to(directory)} (mtime {module.stat().st_mtime:.3f})')
 
 
 def plugin_uri(inputs, outputs):
@@ -387,6 +390,14 @@ def main():
         else:
             installed = directory / 'home' / '.vst3' / bundle.name
             shutil.copytree(bundle, installed)
+            # Ardour trusts a scanner's cache only when the module's mtime is
+            # older than the cache file's, in whole seconds
+            # (vst3_valid_cache_file in Ardour's libs/ardour/vst3_scan.cc). A
+            # bundle built within the same second as the scan is treated as
+            # changed, so Ardour lists nothing: date the copy a minute before the scan.
+            past = time.time() - 60
+            for path in [installed, *installed.rglob('*')]:
+                os.utime(path, (past, past), follow_symlinks=False)
             # Ardour looks for VST3 bundles on VST3_PATH and in ~/.vst3, and
             # lists only those its scanner has indexed; the GUI runs it when
             # it finds a new bundle, the headless tools do not.
