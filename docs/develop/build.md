@@ -594,7 +594,8 @@ with a newer compiler, within the stated tolerance
 compiler's warnings in Convolver's own sources are fixed; where the compiler
 is wrong or its advice does not apply, the warning is silenced at that line
 with the reason, as for a clang-tidy false positive. The core, each
-plug-in and the plug-ins' tests build with `-Wall -Wextra -Wpedantic` (GCC
+plug-in, the programs built from plug-in sources and the plug-ins' tests
+build with `-Wall -Wextra -Wpedantic` (GCC
 and Clang) or `/W4 /permissive- /utf-8` (MSVC); the plug-in SDKs' headers
 are included as system headers. Warnings in the SDKs and libsndfile are theirs.
 
