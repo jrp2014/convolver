@@ -256,9 +256,9 @@ upstream, or state support in FFmpeg's `lv2` filter
   either way. **Done when** he has decided and, if he wants it, such names
   load with a test.
 - [ ] **COMPAT-1 — Files from released builds.** Five previews' files are
-  kept and checked ([upgrade tests](tests/upgrade/README.md)). **Remains:**
-  a REAPER project saved with 0.14.0 and Audio Unit state from a release.
-  **Done when** both are kept and checked.
+  kept and checked, and 0.14.0's LV2 and Audio Unit state
+  ([upgrade tests](tests/upgrade/README.md)). **Remains:**
+  a REAPER project saved with 0.14.0. **Done when** it is kept and checked.
 - [ ] **IO-1 — Large files.** **Done when** each container's 4 GiB boundary
   and pipes beyond it have a test; only for a defect or a user need.
 - [ ] **IO-2 — The rate-mismatch workflow, and offline IR resampling.** A

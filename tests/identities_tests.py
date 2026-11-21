@@ -143,6 +143,9 @@ COPIES_ALLOWED = (
     'packaging/windows/installer.nsi',
 )
 RECORDS = ('historical/', 'docs/', 'TODO.md')
+# Files a published release wrote, kept byte for byte (COMPAT-1): LV2 state
+# names the plug-in by its URI, as every saved session does.
+RELEASE_FILES = re.compile(r'tests/upgrade/\d+\.\d+\.\d+/')
 
 
 def lookup(registry, path):
@@ -365,7 +368,7 @@ def check_copies(root, registry, errors):
     # Every text file: sources in any language, Turtle, plists, workflows.
     # AU codes such as Conv are too common to search for; review catches those.
     for name in tracked_files(root):
-        if name in COPIES_ALLOWED or name.startswith(RECORDS):
+        if name in COPIES_ALLOWED or name.startswith(RECORDS) or RELEASE_FILES.match(name):
             continue
         data = (root / name).read_bytes()
         if b'\0' in data[:8192]:

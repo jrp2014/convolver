@@ -1224,6 +1224,17 @@ a Mac with the component installed and Xcode's command-line tools:
 python3 tests/au/avaudioengine_tests.py build-au/convolver-preset
 ```
 
+The next step restores, with the same renderer, the `ClassInfo` each
+published preview's Audio Unit saved (COMPAT-1,
+[files kept from releases](../../tests/upgrade/README.md)):
+`run_upgrade.py --au-render` gives each kept state to the renderer as its
+preset, in blocks of the size `au.json` records, and requires the latency
+the release reported, silence before it and the expected audio within
+`upgrade.cli`'s bound after it. The renderer's `--parameter ID=VALUE` and
+`--save PATH`, with `--round-trip`, are what
+[`capture_au.py`](../../tests/upgrade/capture_au.py) used to make those
+states from the release's own unit.
+
 ### LV2 tests
 
 `ctest -L lv2` runs:
@@ -1275,6 +1286,11 @@ python3 tests/au/avaudioengine_tests.py build-au/convolver-preset
   failure record after every step, and the exact output at every reset and at
   the end; the transitions during audio (crossfades, a rejection while
   playing) are the harness's cases.
+- `lv2.upgrade`: each LV2 state kept from a published release (COMPAT-1)
+  restored through lilv, ports included, as a host reopens a session, in the
+  bundle loaded from its folder ([`lv2_render.cpp`](../../tests/upgrade/lv2_render.cpp));
+  the latency port must report what the release reported, and the render
+  must match the release's own by the rule `upgrade.cli` uses.
 - `lv2.exports` and `lv2.fft_symbols`: the library exports only
   `lv2_descriptor` and does not use a shared FFTW.
 
@@ -1795,10 +1811,11 @@ except:
   `<!-- first-use-example -->` changes (`examples.first_use` runs those
   commands; CI-35). Other edits to those three pages count as the
   documentation or packaged page each otherwise is;
-- Markdown under `tests/upgrade/`, which `upgrade.cli` and `vst3.upgrade`
-  read: the version folders hash their files, Markdown included (COMPAT-1).
-  It counts with the rest of that folder, which runs the native and VST3
-  workflows ([below](#pull-requests-for-one-plug-in-format));
+- Markdown under `tests/upgrade/`, which `upgrade.cli`, `vst3.upgrade`,
+  `lv2.upgrade` and the Audio Unit state check read: the version folders
+  hash their files, Markdown included (COMPAT-1). It counts with the rest of
+  that folder, which runs the native, VST3, LV2 and Audio Unit workflows
+  ([below](#pull-requests-for-one-plug-in-format));
 - pages copied into the preview packages, which also run the
   [candidate workflow](#plug-in-candidate-checks): everything under `docs/use/`,
   `examples/plugin-presets/README.md` and the Ooura `README.md`. A page in
@@ -1838,7 +1855,7 @@ of their own.
 | `plugins/lv2/`, `tests/lv2/` | LV2 |
 | `plugins/editor/mac/` (the macOS window, CI-26) | VST3, Audio Unit and the candidates: only those builds compile it, and their `editor_tests.mm` test it |
 | `scripts/release/`, `tests/release/`, `packaging/`, apart from the files other workflows use (CI-34) | the [candidates](#plug-in-candidate-checks) |
-| `tests/upgrade/`, the [files kept from releases](../../tests/upgrade/README.md) and their checks (CI-42) | native and VST3, whose `upgrade.cli` and `vst3.upgrade` read them |
+| `tests/upgrade/`, the [files kept from releases](../../tests/upgrade/README.md) and their checks (CI-42) | native, VST3, LV2 and Audio Unit, whose `upgrade.cli`, `vst3.upgrade`, `lv2.upgrade` and Audio Unit state check read them |
 | `tests/plugins/ardour_*`, the [headless Ardour test](#ardour-headless) (HOST-9) | VST3 and LV2, the only workflows that run it (`ARDOUR_WORKFLOWS`); the fixtures it imports count as shared |
 | `scripts/reaper_check.py` and its tests, the [REAPER check](host-testing.md#reaper-from-one-command) jrp runs by hand (HOST-11) | none: Lint's pre-commit runs `tests/reaper_check_tests.py` (`MANUAL`) |
 | `.github/workflows/NAME.yml` | that workflow |
@@ -1865,15 +1882,15 @@ release file, so a new use outside the candidates fails pre-commit; add that
 file to `RELEASE_SHARED` in `ci_scope.py`.
 
 The files kept from releases are read only by `upgrade.cli`, registered
-wherever the CLI is built, and `vst3.upgrade`, registered by the VST3
-build; no LV2 job runs either. The Audio Unit job's suite includes
-`upgrade.cli` as well. A pull request that changes only these files leaves
-that run to `main` (CI-42); since CI-43 the VST3 macOS job's suite runs it
-with the same compiler (the newest Xcode on `macos-26`, which `macos-latest`
-also is today), and the other macOS runs check the same bound. `tests/ci_scope_tests.py` lists, each with its
-reason, the only files outside `tests/upgrade/` that may name them, and
-checks that those two are the only CTest entries that run the checker; when
-another build starts reading them, add its workflow to `UPGRADE_WORKFLOWS`
+wherever the CLI is built, `vst3.upgrade`, registered by the VST3 build,
+`lv2.upgrade`, registered by the LV2 build with tests, which the LV2
+workflow's sanitizer job runs, and the Audio Unit workflow's Release job,
+whose suite includes `upgrade.cli` and whose
+[AVAudioEngine step](#avaudioengine-render) restores the Audio Unit state.
+`tests/ci_scope_tests.py` lists, each with its reason, the only files
+outside `tests/upgrade/` that may name them, and checks that those three
+are the only CTest entries that run the checker; when another build starts
+reading them, add its workflow to `UPGRADE_WORKFLOWS`
 in `ci_scope.py`.
 
 ### When pull requests build the candidates
