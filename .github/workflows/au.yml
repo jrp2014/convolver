@@ -104,7 +104,11 @@ jobs:
       - uses: ./.github/actions/newest-compiler
         with:
           compiler: xcode
+      # The sanitizer builds below run after a Release failure, but not when
+      # this setup failed (CI-51): it is reached only after the SDK fetch and
+      # the compiler step succeeded.
       - name: Tools and libraries
+        id: setup
         run: |
           sw_vers
           xcodebuild -version
@@ -256,7 +260,7 @@ jobs:
           killall -9 AudioComponentRegistrar 2>/dev/null || true
       - name: FFTW for the fallback build
         id: asan-tools
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: brew install fftw
       - name: Configure the ASan and UBSan build (Debug, fallbacks)
         id: asan-configure
@@ -284,7 +288,7 @@ jobs:
       # ASan, so it is a build of its own, of that one test.
       - name: Configure the ThreadSanitizer build (Debug)
         id: tsan-configure
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: >-
           cmake -S . -B build-au-tsan -DCMAKE_BUILD_TYPE=Debug
           -DCONVOLVER_BUILD_AU=ON "-DCONVOLVER_AU_SDK=$RUNNER_TEMP/sources/AudioUnitSDK"

@@ -267,7 +267,7 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
-- CI (CI-51, measured on its pull request): the Audio Unit workflow's two
+- CI (CI-51): the Audio Unit workflow's two
   sanitizer jobs, the AU tests with ASan and UBSan and the fallbacks, and
   `au.adapter` under ThreadSanitizer, run as steps of its `au` job after the
   Release build and tests, each in its own build folder and even when an

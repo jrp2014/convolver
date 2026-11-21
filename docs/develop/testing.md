@@ -785,7 +785,7 @@ length they made 73,065 sequences per layout, and Windows CI's
 before step 0: 10.8 seconds for both layouts in a Release build on the
 cloud machine, against 10 seconds. The Intel macOS candidate's Release run
 took 124 to 221 seconds in ten passing runs on 20 and 21 November 2026 and
-passed its 300-second limit on a slow runner, so `vst3.lifecycle` has the
+exceeded its 300-second limit on a slow runner, so `vst3.lifecycle` has the
 600 seconds `au.lifecycle` and `lv2.lifecycle` have (CI-50).
 
 ## Load timing (PERF-9)
@@ -2132,7 +2132,7 @@ format's whole test label, with the CLI for the `examples.first_use` fixture:
 | `convolver_au_suite` | Audio Unit with sanitizers | `ctest -L au` |
 | `convolver_lv2_tests` | LV2 with ASan and UBSan, and the upstream lilv check | `examples.first_use` and `lv2.*` |
 
-The LV2, Audio Unit and VST3 ThreadSanitizer jobs, the lv2lint bundle and the fuzz
+The LV2 and VST3 ThreadSanitizer jobs, the Audio Unit job's ThreadSanitizer build, the lv2lint bundle and the fuzz
 workflow name their few targets directly in the workflow; the other jobs build everything.
 A test whose program the target does not build fails (CTest reports "Could
 not find executable", a Python-driven test its own error), so a new plug-in

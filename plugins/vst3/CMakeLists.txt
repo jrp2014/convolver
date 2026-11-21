@@ -343,7 +343,7 @@ if(CONVOLVER_BUILD_IO)
             add_test(NAME vst3.lifecycle COMMAND convolver_vst3_lifecycle ${CONVOLVER_LIFECYCLE_LENGTH})
             # COST: about 100 s on Windows CI, so ctest --parallel starts it first (CI-9).
             # TIMEOUT as au.lifecycle and lv2.lifecycle have: the Intel macOS candidate
-            # took 124 to 221 s in ten passing runs and passed 300 on a slow runner (CI-50).
+            # took 124 to 221 s in ten passing runs and exceeded 300 on a slow runner (CI-50).
             set_tests_properties(vst3.lifecycle PROPERTIES LABELS "vst3;real-libraries;plug7" TIMEOUT 600
                 COST 100)
             # The loading-responsiveness timings (TODO.md).
