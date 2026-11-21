@@ -16,6 +16,7 @@
 #include "au/au_host.hpp"
 #import "diagnostic_view.h"
 #include "filter_file.hpp"
+#include "host_log.hpp"
 #include "host_report.hpp"
 #include <algorithm>
 #include <atomic>
@@ -306,15 +307,16 @@ void properties(const au_test::LogSince& log) {
             "diagnostics:\n" + text(copied));
     // GarageBand restored the same preset five times in a second on a mono
     // track: the identical failure is logged once, not once per request.
-    // A refused load while the saved filter is kept: "Not loaded; the
-    // previous filter is kept (it does not play): …".
-    const char* refused = "Not loaded; the previous filter is kept";
-    const auto before_repeats = count(log.text(), refused);
+    // PLUG-42: no filter that suits the track plays, so each restore keeps
+    // the stereo filter rather than being refused: "Request N: Loaded … No
+    // other filter was playing, so it was not refused: …".
+    const char* kept = convolver::kept_rather_than_refused_sentence;
+    const auto before_repeats = count(log.text(), kept);
     for (int i = 0; i < 4; ++i)
         static_cast<void>(unit.load(state_of(identity(44100, 2))));
     // Exactly one: the first repeat follows the start line, whose text
-    // differs, and the rest repeat it.
-    require(count(log.text(), refused) == before_repeats + 1,
+    // differs, and the rest repeat it but for the request's number.
+    require(count(log.text(), kept) == before_repeats + 1,
             "repeated identical failures logged:\n" + log.text());
     AudioUnitRemovePropertyListenerWithUserData(unit.get(), au::report_property, report_changed,
                                                 nullptr);
@@ -735,8 +737,9 @@ void window() {
 // convolver-preset uses, so the saved state is the one that step gives for
 // the same rate and channels; a file that does not suit the unit is refused
 // with its name and the reason, the previous filter still playing, and an
-// empty unit stays silent. A dialog that answers after its window closed, or
-// after a newer one opened, loads nothing.
+// empty unit keeps it, silent, until the host's channels suit it (PLUG-42).
+// A dialog that answers after its window closed, or after a newer one
+// opened, loads nothing.
 void files() {
     TemporaryFolder folder;
     const auto stereo = folder / "stereo.wav", mono = folder / "mono.wav";
@@ -876,17 +879,31 @@ void files() {
     [view removeFromSuperview];
     unit.uninitialize();
 
-    // On an empty unit a file refused while the host renders leaves it
-    // silent, as a first preset that does not fit does (docs/use/plugins.md).
+    // PLUG-42: on an empty unit a file that does not suit the host's
+    // channels is kept while the host renders, silent with its reason, and
+    // saved as the filter, as a first preset that does not fit is
+    // (docs/use/plugins.md); once a suiting filter plays, it is refused.
     Unit empty;
     check(empty.configure(44100, 2, 2, 512), "stereo formats");
     check(empty.initialize(), "stereo initialization");
     render_block(empty, 2, 2);
-    require(choose(empty, mono.string()) != noErr, "a mono file accepted by an empty unit");
+    check(choose(empty, mono.string()), "a mono file chosen on an empty unit");
     const auto first = empty.failure();
-    require(first.present && first.silent && contains(report(empty).explanation, mono.c_str()),
-            "a refused first file must leave the unit silent and say why: " +
+    const auto first_saved = empty.saved();
+    require(first.present && first.silent &&
+                first.kind == static_cast<UInt32>(HostFailureKind::channels) &&
+                contains(report(empty).explanation, "The filter is kept and waits"),
+            "a kept first file must leave the unit silent and say why: " +
                 text(report(empty).explanation));
+    require(first_saved.configuration && first_saved.configuration->input_channels == 1 &&
+                !first_saved.failed,
+            "the kept mono file not saved as the filter");
+    check(choose(empty, stereo.string()), "the stereo file after the kept mono one");
+    render_block(empty, 2, 2);
+    require(choose(empty, mono.string()) != noErr,
+            "a mono file accepted while a suiting filter played");
+    require(empty.saved().configuration && empty.saved().configuration->input_channels == 2,
+            "the refused mono file replaced the playing filter");
     empty.uninitialize();
 
     // PLUG-33: a chosen file follows the rule a preset follows (PLUG-23):

@@ -86,7 +86,6 @@ anything.
 | Item | What remains | The decision |
 | --- | --- | --- |
 | **REL-1**, **PLUG-20** | Signing and notarization, verified minimum versions and the final licence review; the VST logo in the window (optional) | jrp's signing choices in the [signing plan](docs/project/plans/2026-11-09-macos-signing.md), then his setup |
-| **PLUG-42** | Whether a filter refused only for its channels is tried again when the host restarts the plug-in with channels that fit (found in Ardour 8.4 by HOST-10) | jrp: retry at the next start that fits, or keep the refusal final |
 | **IO-2**, **EDGE-1** and the other **EDGE** items | First the limitations users cite (IO-2, EDGE-11's other candidates, EDGE-10, EDGE-3, EDGE-13); then EDGE-12, EDGE-9, EDGE-2, EDGE-4 and EDGE-5; then EDGE-6 to EDGE-8; EDGE-14 and EDGE-15 | Each starts with the owner's decision its row in the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) names, and the plan's gate. Feedback that asks for one moves it up |
 
 ### Parked
@@ -192,17 +191,17 @@ done once for all three formats:
   a placeholder-rate match and restored state are still judged against
   it); parked. **Done when** jrp has decided and, if
   he wants it, the marking is shown and its message tests cover it.
-- [ ] **PLUG-42 — Try a refused filter again when the channels change.**
-  Found by HOST-10 on Ardour 8.4. Setting a VST3's outputs by hand restarts
-  the plug-in a little later, and a filter chosen while it still runs with
-  the old outputs is refused ("Not loaded"). It is not tried again when the
-  host restarts the plug-in with channels that fit, so the project saves
-  the refusal. The [Ardour guide](docs/use/plugins.md#ardour) says to choose the
-  filter again ([evidence](docs/develop/testing.md#ardour-headless)). **Needs** jrp's
-  decision: keep a filter refused only for its channels, and try it again
-  at the next start whose channels fit, or keep the refusal final. **Done
-  when** he has decided and, if he wants the retry, adapter tests cover it
-  in each format that refuses a chosen file.
+- [ ] **PLUG-43 — Hold a refused filter beside the one that plays.** Since
+  PLUG-42, VST3 and the Audio Unit refuse a filter that does not suit the
+  host only while a filter that suits it plays, and the refusal is final: a
+  later start with settings that suit the refused filter keeps the playing
+  one (jrp, 21 November 2026: a user who sees the refusal must be able to
+  trust that restarting playback will not switch filters). Holding the
+  refused filter beside the playing one, to replace it at such a start,
+  keeps two filters in memory and adds a state every later change must
+  remember. **Needs** a user asking for it; jrp then decides. **Done when**
+  he has decided and, if he wants it, the contract and adapter tests cover
+  it.
 - [ ] **PLUG-29 — Keep the Recent list out of the log folder.** Save it in
   each platform's application-support folder, reading the old file once.
   **Done when** the tests cover both paths and the guide names the folder.
@@ -493,6 +492,12 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **PLUG-42 — Keep a filter refused only for the host's channels or
+  rate.** 21 November 2026, PR #258, jrp's decision of the same day (found
+  in Ardour 8.4 by HOST-10): VST3 and the Audio Unit refuse a filter that
+  does not suit the host only while one that suits it plays; otherwise
+  they keep it, save it as the filter and play it at the next start that
+  suits it ([contract](docs/develop/plugin-contract.md#loading-and-failure)).
 - [x] **PLUG-39 — One consolidation of the load and restore path.** 21
   November 2026, PRs #200, #205, #213, #217, #219, #224, #226, #230 to
   #232, #236, #246, #250 and #256 ([plan](docs/archive/plans/2026-11-13-load-restore-consolidation.md),

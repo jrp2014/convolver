@@ -61,7 +61,7 @@ behaviour:
 | --- | --- | --- | --- |
 | **Empty instance:** no filter was ever loaded | Equal input and output counts: identity (input *c* to output *c*). Unequal counts: silence, because an unfiltered 2→6 crossover would send full-range audio to whatever is on outputs 1 and 2 | "No filter" status where the format has one | As specified |
 | **Failed initial load:** the first filter (a session restore or the first preset) cannot be used: missing file without an embedded copy, wrong rate or channel counts, corrupt state | Silence, never a silent fallback to identity: a room correction or crossover that quietly plays unfiltered audio is worse than an obvious failure | Error returned to the host where the format allows it, status "load failed", and the explanatory message in the host's log | Silence; `setState` returns `kResultFalse`. A mismatch found at activation plays silence; until DIAG-1 it did so with no message (accepted until VST3-3). Since DIAG-1 the Status parameter says why and the Convolver log explains (see [status and log](#status-and-log)) |
-| **Failed replacement:** a working filter is running and a new one is rejected | The working filter keeps running, unchanged | Error returned to the host, status "load failed", message in the log; saved state still describes the working filter | As specified, active or inactive once the plug-in has been activated at the current rate and buses and has played audio with them; `setState` returns `kResultFalse`. A file chosen in the window is refused only while the host plays (PLUG-27, [below](#loading-and-failure)). Before that, restored state that does not suit is kept, silent (see the VST3 note under [state that arrives before the host is configured](#loading-and-failure)) |
+| **Failed replacement:** a working filter is running and a new one is rejected | The working filter keeps running, unchanged | Error returned to the host, status "load failed", message in the log; saved state still describes the working filter | As specified, active or inactive once the plug-in has been activated at the current rate and buses and has played audio with them; `setState` returns `kResultFalse`. A file chosen in the window is refused only while the host plays (PLUG-27, [below](#loading-and-failure)). Before that, restored state that does not suit is kept, silent (see the VST3 note under [state that arrives before the host is configured](#loading-and-failure)). In VST3 and the Audio Unit only a working filter is protected this way: with none playing, a filter that does not suit is kept instead of refused (PLUG-42, [below](#loading-and-failure)) |
 
 The control side of these rules is shared code in the host layer, so every
 adapter gets the same decisions and messages: `HostFilter` (which filter a load
@@ -208,6 +208,47 @@ before they set the sample rate and channel layout (VST3 `setState` before
   chosen files, the VST3 rule of 13 November that checked one once the
   plug-in had started, and the Audio Unit rule that checked every request
   once the formats were known).
+- **Refused only to protect a working filter** (PLUG-42, jrp, 21 November
+  2026), in VST3 and the Audio Unit: where the rules above refuse a
+  request for not suiting the host (`HostSettling::check()` answers
+  `keep_unless_one_plays`), it is refused only while an accepted filter
+  that suits the host plays (`HostFilter::plays_suiting()`: no failure
+  found at its activation; also while bypassed or stopped). The refusal's
+  note then says "The filter Convolver has now stays selected when the
+  host restarts the plug-in, even with settings that suit this one", and
+  it does: the refused filter is not held for a later start. With nothing
+  suiting playing (an empty instance, a failed load, or a kept filter that
+  does not suit the host either), a refusal would protect nothing, so the
+  request is kept as `keep_until_suited` keeps one: Kept, unsuited
+  (`HostFilter::kept_unsuited()`), saved as the filter rather than as a
+  failed load, and played at the next start that suits it. Meanwhile it
+  plays as any kept filter does: silence, with Mix's dry share and
+  bypass's input where the host's and the filter's counts are both equal
+  ([states](#states-and-transitions)), where a refused first load played
+  silence with no dry signal. What played before it (an empty instance's
+  input, say) mutes over 1.33 ms, as for a failed first load, not after
+  the new playback's warm-up (`HostProcessor::silence(through)`; jrp's
+  review of #258 measured 90.6 ms at Latency 4096 before). A chosen IR
+  file or `.cfg` is kept the same way: `read_chosen_file()`'s
+  `keep_unsuited` reads a single filter that does not suit as it is,
+  rather than refusing it; a configuration list with no entry for the
+  host's configuration is still refused, having no entry to keep. The
+  log adds "No other filter was playing, so it was not refused: it waits
+  for audio settings that suit it, ..." and the window's report "The
+  filter is kept and waits for audio settings that suit it". The latest
+  request is the one kept. Found by HOST-10: Ardour 8.4 restarts the
+  plug-in with the outputs set in its Pin Connections a little after they
+  are set, and a preset loaded in between was refused, never tried at the
+  outputs that suited it, and saved as a failure. Holding a refused filter
+  beside a playing one, to replace it at a start that suits it, was left
+  until a user asks for it (TODO PLUG-43). LV2 refuses as before
+  (`refuse_mismatch`): its configuration never changes. `native.host`
+  `kept_unless_one_plays` (jrp's two tests: a waiting filter starts when
+  the settings fit, and a refused replacement leaves the working filter
+  selected across a restart; and the mute), `native.host_settling`,
+  `vst3.adapter` `kept_until_channels_fit` and
+  `chosen_file_kept_until_it_fits`, `au.adapter` `chosen_file_kept` and
+  `au.editor` `files` (a mono file chosen on an empty stereo unit).
 - VST3 counts its configuration as known once the plug-in has been activated
   with it and has played audio with it (a `process` call with samples, in
   that activation or an earlier one since the rate or buses last changed),
@@ -276,12 +317,12 @@ host layer's own tests.
 | State or preset that suits the host, or arrives while its configuration is not known | Active | Active (replaced, or kept playing when the same filter and settings arrive) | Active | Active | Lifecycle `state-A`, `state-B`; harness `initial`, `restore-after-activation`, `restore-before-setup`, `live-replacement`, `same-filter-restore`; `native.host` `same_filter_kept`, `request_changes` |
 | State that does not suit, while the configuration is not known | Waiting, then Kept at activation | The same | The same | The same | Lifecycle `state-other-rate` before `setup`; harness `restore-before-setup-mismatch` |
 | State that does not suit, VST3, started but not yet played with this configuration | Kept | Kept | Kept | Kept | `vst3.adapter` `restored_while_host_settles`; `native.host` `status_lines` ("kept, unsuited"); lifecycle `state-other-rate` (VST3) |
-| State that does not suit, configuration known | Failed | Active, previous filter kept: Status "previous filter kept" | Kept: Status still gives why the kept filter is silent; the log gives the refusal | Failed, with the new reason | Lifecycle `state-other-rate`; harness `failed-replacement`, `failed-replacement-inactive`, `failed-initial-load`; `vst3.adapter` `failed_first_loads`, `failure_records`; `au.adapter` `rejected_presets`; `lv2.adapter` `refused_first_loads`; `native.host` `failure_reasons` |
+| State that does not suit, configuration known | Failed (VST3 and the Audio Unit: Kept, PLUG-42) | Active, previous filter kept: Status "previous filter kept" | Kept: Status still gives why the kept filter is silent; the log gives the refusal (VST3 and the Audio Unit: Kept with the new filter, PLUG-42) | Failed, with the new reason (VST3 and the Audio Unit: Kept, PLUG-42) | Lifecycle `state-other-rate`; `native.host` `kept_unless_one_plays`; harness `failed-replacement`, `failed-replacement-inactive`, `failed-initial-load`; `vst3.adapter` `failed_first_loads`, `failure_records`; `au.adapter` `rejected_presets`; `lv2.adapter` `refused_first_loads`; `native.host` `failure_reasons` |
 | Malformed or newer state (checked at once, in every format) | Failed | Active, previous filter kept | Kept | Failed | Lifecycle `state-malformed`; `vst3.adapter` `failed_first_loads`; `native.host` `failure_reasons` |
 | Empty state; LV2's empty state map | Empty | Empty | Empty | Empty | Lifecycle `state-empty`, `empty-map`; `lv2.adapter` `empty_state_resets` |
 | Saved failed state | Failed | Failed: silence replaces the filter | Failed | Failed | Lifecycle `state-failed`; `native.host` `processing_faults` (the saved failure holds the fault signal) |
 | Chosen filter file accepted (VST3 and the Audio Unit while the host is not playing: checked when it starts; PLUG-27) | Active | Active | Active | Active | Lifecycle `file-A` then `work` (LV2); `vst3.adapter` `chosen_preset`, `chosen_preset_before_activation`, `chosen_before_host_plays`, `chosen_file_on_wider_bus`; `au.adapter` `chosen_preset`; `lv2.adapter` `worker_loads`, `rechosen_files` |
-| Chosen filter file refused (missing, unreadable, a list before the host has started, or not suiting a host that is playing) | Failed | Active, previous filter kept | Kept | Failed, with the new reason | Lifecycle `file-missing`, `file-refused`; `lv2.adapter` `refused_first_loads`; `vst3.adapter` `report_and_files`, `chosen_preset` |
+| Chosen filter file refused (missing, unreadable, a list before the host has started, or not suiting a host that is playing, in VST3 and the Audio Unit only while a suiting filter plays: PLUG-42) | Failed | Active, previous filter kept | Kept | Failed, with the new reason | Lifecycle `file-missing`, `file-refused`; `lv2.adapter` `refused_first_loads`; `vst3.adapter` `report_and_files`, `chosen_preset` |
 | Activation after a rate or bus change | Empty: identity or silence by the new counts | Active if the filter suits, otherwise Kept | Active if the filter now suits, otherwise Kept | Failed | Lifecycle `rate`, `layout`, `start`; harness `restore-before-setup-mismatch`; `native.host` `status_lines` ("kept, then suited"), `processing_faults` |
 | Reopening the project (the saved state restored into a new instance) | Empty | Active | Waiting, then Kept at activation (LV2: Kept at once) | Failed | Lifecycle `reopen` |
 | Bypass | Unchanged. The untouched input where the host's counts are equal, else silence | Unchanged. The input where the filter's counts are equal, else silence | Unchanged. The input where the host's and the filter's counts are both equal, else silence | Unchanged. Silence | Lifecycle `bypass`; harness `bypass`; `native.host` `unequal_bypass`, `status_lines`; `native.host_report` `cases` |

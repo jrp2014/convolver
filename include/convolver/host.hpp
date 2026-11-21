@@ -225,9 +225,21 @@ class HostProcessor;
 // (the shared adapter contract, "state that arrives before the host is
 // configured"). The adapter decides which applies; HostFilter applies it.
 enum class HostLoadCheck {
-    // The host's configuration is settled: the load is refused, and what was
-    // accepted before stays (a failed first load if nothing was).
+    // The host's configuration is settled and cannot change (LV2: a layout is
+    // its own plug-in): the load is refused, and what was accepted before
+    // stays (a failed first load if nothing was).
     refuse_mismatch,
+    // PLUG-42 (jrp, 21 November 2026): the host's configuration is settled
+    // now, but the host may start the plug-in with another later (VST3, the
+    // Audio Unit). While an accepted filter suits it and plays, the load is
+    // refused, so that one plays on. Otherwise a refusal would protect
+    // nothing: the filter is kept, playing silence with the reason, until a
+    // start suits it, and is saved as the filter rather than as a failed
+    // load. Ardour 8.4 restarts the plug-in with the outputs set in its Pin
+    // Connections a little after they are set; a preset loaded in between
+    // was refused, never tried at the outputs that suited it, and saved as
+    // a failure (HOST-10).
+    keep_unless_one_plays,
     // The host may still change its configuration (it is restoring a project):
     // the filter is accepted all the same and kept, playing silence with the
     // reason as failure() until an activation suits it, as an activation keeps
@@ -481,6 +493,23 @@ class HostFilter {
     // True after a failed initial load: nothing accepted, and a load failed.
     bool failed() const noexcept {
         return failed_;
+    }
+    // PLUG-42: an accepted filter plays that suits the host as last checked
+    // (no failure found at activation keeps it silent). Only then does
+    // HostLoadCheck::keep_unless_one_plays refuse a filter that does not
+    // suit; adapters ask it to read a chosen file the same way
+    // (read_chosen_file()'s `keep_unsuited`).
+    bool plays_suiting() const noexcept {
+        return filter_ && !failed_ && !activation_failure_;
+    }
+    // The contract's Kept, unsuited state: an accepted filter that does not
+    // suit the host's rate or channels, so it plays silence (with any dry
+    // share) until a start suits it. After an accepted load(), the filter it
+    // kept for that reason (PLUG-42: why depends on the check the adapter
+    // passed).
+    bool kept_unsuited() const noexcept {
+        return filter_ && activation_failure_ &&
+               activation_failure_->kind != HostFailureKind::activation;
     }
     // DIAG-1: whether host_status() shows a load failure, which comes before
     // Fault. Adapters pass it to HostProcessor::hold_fault_signal() after
@@ -899,6 +928,13 @@ class HostProcessor {
     // silence over 1.33 ms (64 frames at 48 kHz). A call already running when this one is made
     // may still play a filter it adopted.
     void silence() noexcept;
+    // The same for publications up to `through`, a count publications()
+    // returned before a later publication (PLUG-42: HostFilter::load()
+    // keeping a filter that does not suit the host reads the count, publishes
+    // its silent playback, then calls this): what played before mutes over
+    // 1.33 ms, also when the audio thread has already begun fading it out
+    // for the later publication, which takes over as any replacement does.
+    void silence(std::uint64_t through) noexcept;
     // Audio thread: how many filters replace() and publish() have handed
     // over so far.
     std::uint64_t publications() const noexcept;

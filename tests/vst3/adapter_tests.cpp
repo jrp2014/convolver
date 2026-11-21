@@ -941,6 +941,9 @@ void restart_mid_transition() {
 }
 // A failed first load plays silence, never the unfiltered input: a wrong-rate
 // preset sent to an active empty instance, and malformed state before activation.
+// PLUG-42 (jrp, 21 November 2026): with nothing playing, the wrong-rate preset
+// is kept rather than refused, silent, and saved as the filter, so the saved
+// project still plays silence at 48 kHz.
 void failed_first_loads() {
     for (const bool while_active : {true, false}) {
         HostApplication context;
@@ -982,7 +985,8 @@ void failed_first_loads() {
             MemoryStream state;
             require(write_state(&state, wrong), "encode wrong-rate state");
             state.seek(0, IBStream::kIBSeekSet, nullptr);
-            require(p.setState(&state) != kResultOk, "wrong-rate first load accepted while active");
+            require(p.setState(&state) == kResultOk,
+                    "a wrong-rate first load refused while nothing played");
         } else {
             MemoryStream damaged;
             const std::array<unsigned char, 16> junk{16, 0, 0, 0, 1, 2,  3,  4,
@@ -1003,8 +1007,12 @@ void failed_first_loads() {
         require(p.getState(&saved) == kResultOk, "state after a failed first load");
         saved.seek(0, IBStream::kIBSeekSet, nullptr);
         const auto kept = read_state(&saved);
-        require(!kept.configuration && kept.failed,
-                "a failed first load must be saved as failed, without the filter");
+        if (while_active)
+            require(kept.configuration && kept.configuration->sample_rate == 44100 && !kept.failed,
+                    "a wrong-rate first load kept with nothing playing not saved as the filter");
+        else
+            require(!kept.configuration && kept.failed,
+                    "a failed first load must be saved as failed, without the filter");
         p.setProcessing(false);
         p.setActive(false);
         p.terminate();
@@ -1056,18 +1064,22 @@ void failure_records() {
         convolver::Configuration{48000, 2, 2, 0, {}, {}, {{{.5f}, {{0, 1}}, {{1, 1}}}}};
     auto wrong = good;
     wrong.configuration->sample_rate = 44100;
-    require(p.setState(stream(wrong).get()) == kResultFalse, "wrong-rate state accepted");
+    // PLUG-42: with nothing playing, the wrong-rate state is kept, silent,
+    // with the reason, rather than refused.
+    require(p.setState(stream(wrong).get()) == kResultOk, "wrong-rate state refused");
     auto f = p.failure();
     require(f && f->kind == HostFailureKind::sample_rate && f->request.number == 1 && f->silent &&
                 f->sample_rate == 44100 && f->message.problem.find("44100 Hz") != std::string::npos,
             "wrong-rate first load not recorded");
+    require(p.setState(stream(good).get()) == kResultOk && !p.failure(),
+            "a good state did not replace the kept one");
     MemoryStream damaged;
     const std::array<unsigned char, 16> junk{12, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
     damaged.write(const_cast<unsigned char*>(junk.data()), 16, nullptr);
     damaged.seek(0, IBStream::kIBSeekSet, nullptr);
     require(p.setState(&damaged) == kResultFalse, "damaged state accepted");
     f = p.failure();
-    require(f && f->kind == HostFailureKind::state_unreadable && f->request.number == 2,
+    require(f && f->kind == HostFailureKind::state_unreadable && f->request.number == 3,
             "damaged state not recorded");
     MemoryStream newer;
     const std::array<unsigned char, 16> v5{12, 0, 0, 0, 0x43, 0x4e, 0x56, 0x53,
@@ -1076,7 +1088,7 @@ void failure_records() {
     newer.seek(0, IBStream::kIBSeekSet, nullptr);
     require(p.setState(&newer) == kResultFalse, "newer state accepted");
     f = p.failure();
-    require(f && f->kind == HostFailureKind::state_newer && f->request.number == 3 &&
+    require(f && f->kind == HostFailureKind::state_newer && f->request.number == 4 &&
                 f->message.problem.find("newer version of Convolver") != std::string::npos,
             "newer state not recorded");
     require(p.setState(stream(good).get()) == kResultOk && !p.failure(),
@@ -1086,16 +1098,16 @@ void failure_records() {
     crossover.configuration->output_channels = 6;
     require(p.setState(stream(crossover).get()) == kResultFalse, "2->6 state accepted on 2x2");
     f = p.failure();
-    require(f && f->kind == HostFailureKind::channels && f->request.number == 5 && !f->silent,
+    require(f && f->kind == HostFailureKind::channels && f->request.number == 6 && !f->silent,
             "failed replacement not recorded");
     // Reactivating at another rate: the kept filter does not suit, so silence,
-    // with the reason belonging to the request that supplied it (4).
+    // with the reason belonging to the request that supplied it (5).
     require(p.setActive(false) == kResultOk, "failure-record deactivate");
     setup.sampleRate = 44100;
     require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
             "activate at 44.1 kHz");
     f = p.failure();
-    require(f && f->kind == HostFailureKind::sample_rate && f->request.number == 4 && f->silent &&
+    require(f && f->kind == HostFailureKind::sample_rate && f->request.number == 5 && f->silent &&
                 f->message.problem.find("the saved filter is for 48000 Hz") == 0,
             "mismatch at activation not recorded");
     require(p.setActive(false) == kResultOk, "failure-record deactivate again");
@@ -1103,7 +1115,7 @@ void failure_records() {
     require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
             "activate at 48 kHz again");
     f = p.failure();
-    require(f && f->request.number == 5, "activation failure kept, or request 5's failure lost");
+    require(f && f->request.number == 6, "activation failure kept, or request 6's failure lost");
     p.setActive(false);
     p.terminate();
 }
@@ -1211,13 +1223,14 @@ void fractional_rates() {
     kept.seek(0, IBStream::kIBSeekSet, nullptr);
     require(read_state(&kept).configuration->sample_rate == 48000,
             "the filter was not kept at a fractional rate");
-    // A replacement at the fractional rate is refused, the filter kept.
+    // A replacement at the fractional rate: no filter plays there, so it is
+    // kept rather than refused (PLUG-42), silent with the reason.
     MemoryStream again;
     write_state(&again, saved);
     again.seek(0, IBStream::kIBSeekSet, nullptr);
-    require(p.setState(&again) == kResultFalse && p.failure() &&
+    require(p.setState(&again) == kResultOk && p.failure() && p.failure()->silent &&
                 p.failure()->message.problem.find("runs at 47952.04795 Hz") != std::string::npos,
-            "a replacement accepted at a fractional rate");
+            "a replacement at a fractional rate not kept silent with the reason");
     p.setProcessing(false);
     require(p.setActive(false) == kResultOk, "fractional deactivate");
     // Proposed at the whole part after running at the fractional rate: the
@@ -1257,6 +1270,116 @@ void fractional_rates() {
             "a nearby rate treated as the filter's");
     p.setActive(false);
     p.terminate();
+}
+// PLUG-42 (jrp, 21 November 2026), jrp's two tests through VST3. Ardour 8.4
+// restarts the plug-in with the outputs set in Pin Connections a little after
+// they are set, and a preset loaded in between met the old stereo buses while
+// the host played. With nothing playing it is kept, saved as the filter, and
+// plays once the host restarts the plug-in with buses that suit it. With a
+// filter playing, a preset that does not suit is refused, the refusal says the
+// playing filter stays selected, and a restart with the refused preset's
+// buses does not switch to it.
+void kept_until_channels_fit() {
+    const convolver::test_log::LogSince log(process_log);
+    const auto contains = [](const std::string& text, const char* part) {
+        return text.find(part) != std::string::npos;
+    };
+    const auto state_of = [](const convolver::Configuration& c) {
+        convolver::HostState s;
+        s.configuration = c;
+        auto stream = std::make_unique<MemoryStream>();
+        require(write_state(stream.get(), s), "encode state");
+        stream->seek(0, IBStream::kIBSeekSet, nullptr);
+        return stream;
+    };
+    const auto saved_outputs = [](Processor& p) {
+        MemoryStream saved;
+        require(p.getState(&saved) == kResultOk, "save");
+        saved.seek(0, IBStream::kIBSeekSet, nullptr);
+        const auto state = read_state(&saved);
+        return state.configuration && !state.failed ? state.configuration->output_channels : 0;
+    };
+    // One block of ones in, the outputs' last samples out.
+    const auto play_ones = [](Processor& p, int channels) {
+        std::vector<std::vector<float>> in(channels, std::vector<float>(512, 1.f)),
+            out(channels, std::vector<float>(512));
+        std::vector<float*> ins, outs;
+        for (auto& c : in)
+            ins.push_back(c.data());
+        for (auto& c : out)
+            outs.push_back(c.data());
+        AudioBusBuffers input{}, output{};
+        input.numChannels = output.numChannels = channels;
+        input.channelBuffers32 = ins.data();
+        output.channelBuffers32 = outs.data();
+        ProcessData d{};
+        d.symbolicSampleSize = kSample32;
+        d.numInputs = d.numOutputs = 1;
+        d.inputs = &input;
+        d.outputs = &output;
+        d.numSamples = 512;
+        for (int k = 0; k < 3; ++k) // Past the latency and any transition.
+            require(p.process(d) == kResultOk, "process");
+        return out[0][511];
+    };
+    const convolver::Configuration mono{48000, 1, 1, 0, {}, {}, {{{.5f}, {{0, 1}}, {{0, 1}}}}};
+    const convolver::Configuration stereo_filter{
+        48000, 2, 2, 0, {}, {}, {{{.25f}, {{0, 1}}, {{0, 1}}}, {{.25f}, {{1, 1}}, {{1, 1}}}}};
+    SpeakerArrangement stereo = SpeakerArr::kStereo, one = SpeakerArr::kMono;
+    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+    const auto restart_with = [&](Processor& p, SpeakerArrangement& buses) {
+        p.setProcessing(false);
+        p.setActive(false);
+        require(p.setBusArrangements(&buses, 1, &buses, 1) == kResultOk, "new buses");
+        require(p.setActive(true) == kResultOk, "restart");
+        p.setProcessing(true);
+    };
+    for (const bool working : {false, true}) {
+        HostApplication context;
+        Processor p;
+        require(p.initialize(&context) == kResultOk, "initialize");
+        require(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "stereo buses");
+        p.activateBus(kAudio, kInput, 0, true);
+        p.activateBus(kAudio, kOutput, 0, true);
+        require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk, "start");
+        p.setProcessing(true);
+        if (working)
+            require(p.setState(state_of(stereo_filter).get()) == kResultOk, "the working filter");
+        play_block(p, 2, 2, 512); // The host plays with stereo buses.
+        if (!working) {
+            // 1. Nothing plays: the mono preset waits, saved as the filter.
+            require(p.setState(state_of(mono).get()) == kResultOk,
+                    "a mono preset refused with nothing playing");
+            require(contains(p.status().text, "Silent: the filter has 1 in, 1 out"),
+                    ("kept mono preset: " + p.status().text).c_str());
+            require(contains(log.text(), "No other filter was playing, so it was not refused: it "
+                                         "waits for audio settings that suit it"),
+                    "the log does not say the kept preset waits");
+            require(saved_outputs(p) == 1, "the kept preset not saved as the filter");
+            restart_with(p, one);
+            require(std::abs(play_ones(p, 1) - .5f) < 1e-5,
+                    "the kept preset does not play once the buses suit it");
+            require(contains(p.status().text, "Filter loaded"),
+                    ("mono buses: " + p.status().text).c_str());
+        } else {
+            // 2. A filter plays: the mono preset is refused and stays so.
+            require(p.setState(state_of(mono).get()) != kResultOk,
+                    "a mono preset accepted while a stereo filter played");
+            require(contains(log.text(), "The filter Convolver has now stays selected when the "
+                                         "host restarts the plug-in, even with settings that "
+                                         "suit this one"),
+                    "the refusal does not say the playing filter stays selected");
+            restart_with(p, stereo);
+            require(std::abs(play_ones(p, 2) - .25f) < 1e-5 && saved_outputs(p) == 2,
+                    "a restart with the same buses switched filters");
+            restart_with(p, one);
+            require(play_ones(p, 1) == 0 && saved_outputs(p) == 2,
+                    "a restart with the refused preset's buses switched to it");
+        }
+        p.setProcessing(false);
+        p.setActive(false);
+        p.terminate();
+    }
 }
 // PLUG-39 step 4: with bypass on, the log lines say what bypass plays, not
 // the filter: the start line, a refused replacement, and restored state
@@ -1418,16 +1541,19 @@ void status_and_log() {
     auto wrong = good;
     wrong.configuration->sample_rate = 44100;
     // A wrong-rate preset as the first load: silence, said in the window and
-    // explained in the log.
-    require(p.setState(stream(wrong).get()) == kResultFalse, "status wrong rate accepted");
+    // explained in the log. With nothing playing it is kept rather than
+    // refused (PLUG-42), and the log says it waits for settings that suit it.
+    require(p.setState(stream(wrong).get()) == kResultOk, "status wrong rate refused");
     require(shown() == "Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details "
                        "in the Convolver log." &&
                 status() == convolver::HostStatus::load_failed,
-            "failed first load not shown");
-    require(contains(log_text(), "Not loaded, so Convolver plays silence: the filter is for "
+            "kept first load not shown");
+    require(contains(log_text(), "It does not suit the host's present configuration, so it is "
+                                 "kept until it does. Convolver plays silence. The filter is for "
                                  "44100 Hz, and the host runs at 48000 Hz. Cause: Convolver "
-                                 "never resamples"),
-            "failed first load not logged");
+                                 "never resamples") &&
+                contains(log_text(), convolver::kept_rather_than_refused_sentence),
+            ("kept first load not logged: " + log_text()).c_str());
     require(p.setState(stream(good).get()) == kResultOk &&
                 shown() == "Filter loaded: 48000 Hz, 2 in, 2 out." &&
                 status() == convolver::HostStatus::active &&
@@ -2715,6 +2841,86 @@ void write_wav(const std::filesystem::path& path, int rate, int channels, int fr
             put(f == 0 ? 16384 : 0, 2);
     if (!out)
         throw std::runtime_error("could not write " + path.string());
+}
+// PLUG-42, jrp's review of #258: an IR file or .cfg chosen in the window
+// while the host plays, with no filter that suits it playing, is kept as a
+// preset is (it was refused and the project saved a failed load), and plays
+// once the host starts the plug-in with buses that suit it; one chosen while
+// a suiting filter plays is still refused. A list with no entry for the
+// host's configuration is still refused: it has no entry to keep.
+void chosen_file_kept_until_it_fits() {
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk && p.connect(&c) == kResultOk &&
+                c.connect(&p) == kResultOk,
+            "chosen kept: initialize");
+    SpeakerArrangement stereo = SpeakerArr::kStereo, surround = SpeakerArr::k51;
+    require(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "chosen kept: buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "chosen kept: activate");
+    p.setProcessing(true);
+    play_block(p, 2, 2, 64); // The host plays: its configuration is settled.
+    const auto folder = private_temp("convolver-vst3-chosen-kept");
+    std::filesystem::create_directories(folder);
+    write_wav(folder / "slow.wav", 44100, 2, 8);
+    write_wav(folder / "band.wav", 48000, 1, 8);
+    std::ofstream(folder / "crossover.cfg")
+        << "48000 2 6 0\n0 0\n0 0 0 0 0 0\nband.wav\n0\n0\n0\nband.wav\n0\n1\n5\n";
+    std::ofstream(folder / "slow.txt") << "slow.wav\n";
+    const auto saved = [&] {
+        MemoryStream state;
+        require(p.getState(&state) == kResultOk, "chosen kept: save");
+        state.seek(0, IBStream::kIBSeekSet, nullptr);
+        return read_state(&state);
+    };
+    // A list with no 48 kHz entry: refused, as before.
+    require(!c.load_file((folder / "slow.txt").string()), "a list with no fitting entry kept");
+    // The WAV for another rate: kept, silent with the reason, saved.
+    require(c.load_file((folder / "slow.wav").string()),
+            "a 44.1 kHz WAV chosen with nothing playing refused");
+    require(p.status().text.find("Silent: the filter is for 44100 Hz") == 0,
+            ("the kept WAV: " + p.status().text).c_str());
+    auto state = saved();
+    require(state.configuration && state.configuration->sample_rate == 44100 && !state.failed,
+            "the kept WAV not saved as the filter");
+    // The crossover .cfg on stereo buses: the WAV plays nothing, so it is
+    // kept too, the latest choice.
+    require(c.load_file((folder / "crossover.cfg").string()),
+            "a crossover chosen on stereo buses with nothing playing refused");
+    state = saved();
+    require(state.configuration && state.configuration->output_channels == 6 && !state.failed,
+            "the kept crossover not saved as the filter");
+    // The host restarts the plug-in with six channels: it plays.
+    p.setProcessing(false);
+    p.setActive(false);
+    require(p.setBusArrangements(&surround, 1, &surround, 1) == kResultOk &&
+                p.setActive(true) == kResultOk,
+            "chosen kept: 5.1 restart");
+    p.setProcessing(true);
+    play_block(p, 6, 6, 64);
+    require(!p.failure() && p.status().text ==
+                                "Filter loaded: 48000 Hz, 2 in, 6 out; plug-in inputs 3-6 "
+                                "ignored.",
+            ("the kept crossover on six channels: " + p.status().text).c_str());
+    // Now a suiting filter plays: the WAV is refused, and the crossover stays.
+    require(!c.load_file((folder / "slow.wav").string()),
+            "a 44.1 kHz WAV accepted while the crossover played");
+    state = saved();
+    require(state.configuration && state.configuration->output_channels == 6,
+            "the refused WAV replaced the playing crossover");
+    p.setProcessing(false);
+    p.setActive(false);
+    p.disconnect(&c);
+    c.disconnect(&p);
+    p.terminate();
+    c.terminate();
+    std::filesystem::remove_all(folder);
 }
 // VST3-3: the processor sends the window's report with the status, the
 // controller keeps it, and a filter file chosen in the window loads through
@@ -4211,6 +4417,8 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"speaker_arrangements", speaker_arrangements},
         {"placeholder_setup", placeholder_setup},
         {"restart_mid_transition", restart_mid_transition},
+        {"kept_until_channels_fit", kept_until_channels_fit},
+        {"chosen_file_kept_until_it_fits", chosen_file_kept_until_it_fits},
         {"failed_first_loads", failed_first_loads},
         {"failure_records", failure_records},
         {"status_and_log", status_and_log},

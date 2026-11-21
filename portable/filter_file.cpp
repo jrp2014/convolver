@@ -93,10 +93,11 @@ HostState filter_file_state(const std::filesystem::path& path,
     return state;
 }
 
-std::optional<HostState>
-read_filter_file(const std::string& path, const std::optional<HostLayout>& known,
-                 const detail::SoundFiles& reader, FilterFileFailure& failure,
-                 std::vector<std::string>* files, std::string* wider_entry, bool settled) {
+namespace {
+std::optional<HostState> read_for(const std::string& path, const std::optional<HostLayout>& known,
+                                  const detail::SoundFiles& reader, FilterFileFailure& failure,
+                                  std::vector<std::string>* files, std::string* wider_entry,
+                                  bool settled) {
     failure.kind = HostFailureKind::filter_file;
     failure.carried.reset();
     if (files)
@@ -240,5 +241,21 @@ read_filter_file(const std::string& path, const std::optional<HostLayout>& known
         failure.message = refusal(path, e);
     }
     return std::nullopt;
+}
+} // namespace
+
+std::optional<HostState> read_filter_file(const std::string& path,
+                                          const std::optional<HostLayout>& known,
+                                          const detail::SoundFiles& reader,
+                                          FilterFileFailure& failure,
+                                          std::vector<std::string>* files, std::string* wider_entry,
+                                          bool settled, bool keep_unsuited) {
+    auto state = read_for(path, known, reader, failure, files, wider_entry, settled);
+    // PLUG-42: a single filter refused only for the host's rate or channels
+    // (`carried` holds its own) is read as it is, for HostFilter::load() to
+    // keep until a start suits it.
+    if (state || !keep_unsuited || !settled || !failure.carried)
+        return state;
+    return read_for(path, known, reader, failure, files, wider_entry, false);
 }
 } // namespace convolver
