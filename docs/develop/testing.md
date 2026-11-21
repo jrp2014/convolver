@@ -1954,6 +1954,8 @@ of their own.
 | `tests/upgrade/`, the [files kept from releases](../../tests/upgrade/README.md) and their checks (CI-42) | native, VST3, LV2 and Audio Unit, whose `upgrade.cli`, `vst3.upgrade`, `lv2.upgrade` and Audio Unit state check read them |
 | `tests/plugins/ardour_*`, the [headless Ardour test](#ardour-headless) (HOST-9) | VST3 and LV2, the only workflows that run it (`ARDOUR_WORKFLOWS`); the fixtures it imports count as shared |
 | `scripts/reaper_check.py` and its tests, the [REAPER check](host-testing.md#reaper-from-one-command) jrp runs by hand (HOST-11) | none: Lint's pre-commit runs `tests/reaper_check_tests.py` (`MANUAL`) |
+| `scripts/check_repository.py`, `scripts/check_doc_links.py`, `scripts/fold_changes.py` and their tests, the record checks and the [change fragment](workflow.md#change-fragments) folder (DOC-20) | none: only Lint's pre-commit runs them (`RECORD_CHECKS`) |
+| `scripts/version_source.py` and `tests/versioning_tests.py`, the [version helper](versioning.md) (DOC-20) | native, whose CTest entry `versioning` runs the tests (`VERSIONING`); pre-commit and the version workflow on `main` run them too |
 | `.github/workflows/NAME.yml` | that workflow |
 
 The shared parts are not a format's files: the PLUG-2 harness in

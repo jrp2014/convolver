@@ -71,6 +71,14 @@ class Classification(unittest.TestCase):
             # The REAPER script jrp runs by hand, and its tests (HOST-11).
             'scripts/reaper_check.py': 'manual',
             'tests/reaper_check_tests.py': 'manual',
+            # The record checks and the fragment folder, and the version
+            # helper (DOC-20).
+            'scripts/check_repository.py': 'records',
+            'scripts/fold_changes.py': 'records',
+            'tests/documentation_links_tests.py': 'records',
+            'scripts/version_source.py': 'versioning',
+            'tests/versioning_tests.py': 'versioning',
+            'changes/DOC-20.md': 'documentation',
             'portable/third_party/ooura/README.md': 'packaged',
             'portable/engine.cpp': 'code',
             'COPYING': 'code',
@@ -691,6 +699,38 @@ class UpgradeIsolation(unittest.TestCase):
         found = {path for path, contents in tracked() if path not in own and pattern.search(contents)}
         # Only lint's pre-commit runs their tests.
         self.assertEqual(found, {'.pre-commit-config.yaml'})
+
+    def test_record_checks_build_nothing_and_versioning_runs_native(self):
+        # DOC-20: #257 changed only these and still ran every plug-in workflow.
+        self.assertEqual(ci_scope.needed([*ci_scope.RECORD_CHECKS, 'changes/DOC-20.md', 'AGENTS.md']), set())
+        self.assertEqual(ci_scope.needed([*ci_scope.VERSIONING, *ci_scope.RECORD_CHECKS]), {'regression'})
+        self.assertEqual(
+            ci_scope.needed(['scripts/version_source.py', '.github/workflows/version.yml']), {'regression'}
+        )
+        # Code beside them still runs every plug-in workflow.
+        self.assertIn('vst3', ci_scope.needed(['scripts/fold_changes.py', 'portable/engine.cpp']))
+
+    def test_only_pre_commit_runs_the_record_checks(self):
+        pattern = re.compile(
+            r'\b(?:check_repository|check_doc_links|fold_changes|repository_checks_tests|documentation_links_tests)\b'
+        )
+        own = (*ci_scope.RECORD_CHECKS, 'scripts/ci_scope.py', 'tests/ci_scope_tests.py')
+        found = {
+            path
+            for path, contents in tracked()
+            if path not in own and not path.endswith('.md') and pattern.search(contents)
+        }
+        self.assertEqual(found, {'.pre-commit-config.yaml'})
+
+    def test_only_ctest_pre_commit_and_the_version_workflow_run_the_version_helper(self):
+        pattern = re.compile(r'\b(?:version_source|versioning_tests)\b')
+        own = (*ci_scope.VERSIONING, 'scripts/ci_scope.py', 'tests/ci_scope_tests.py')
+        found = {
+            path
+            for path, contents in tracked()
+            if path not in own and not path.endswith('.md') and pattern.search(contents)
+        }
+        self.assertEqual(found, {'CMakeLists.txt', '.pre-commit-config.yaml', '.github/workflows/version.yml'})
 
     def test_only_listed_files_name_the_upgrade_files(self):
         # A relative path such as parents[1] / 'upgrade/x' counts too.

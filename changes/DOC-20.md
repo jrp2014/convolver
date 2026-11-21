@@ -23,7 +23,11 @@
   [clearing processed records](docs/develop/workflow.md#clearing-processed-records),
   [source versioning](docs/develop/versioning.md#minor-and-major-versions)).
   Pre-commit now also runs the versioning tests when the version helper
-  or its tests change, as CTest's `versioning` test already did.
+  or its tests change, as CTest's `versioning` test already did. A pull
+  request that changes only the record checks, the fragment folder or their
+  tests now runs Lint alone, and one that changes the version helper adds
+  only the native workflow, instead of every plug-in workflow
+  ([CI triggers](docs/develop/testing.md#ci-triggers)).
 
 ## Done
 
