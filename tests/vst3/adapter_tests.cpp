@@ -26,6 +26,7 @@
 #include <iostream>
 #include <iterator>
 #include <limits>
+#include <map>
 #include <memory>
 #include <optional>
 #include <random>
@@ -3182,6 +3183,18 @@ void chosen_before_host_plays() {
     // jrp (20 November 2026): that start is too little evidence to say the
     // filter is wrong, so Status still says it is waiting.
     status_is(waiting, "after Audacity's flush at 44.1 kHz");
+    // The window's report says the same, not Load failed against 44.1 kHz.
+    {
+        std::map<std::string, std::string> fields;
+        for (const auto& [key, value] : c.report())
+            fields[key] = value;
+        require(fields["status name"] == "Waiting" && fields["summary"] == waiting &&
+                    fields["plays"].find(waiting) == 0 &&
+                    fields["explanation"].find("44100") == std::string::npos,
+                ("after Audacity's flush, the window's report: " + fields["status name"] + ": " +
+                 fields["explanation"])
+                    .c_str());
+    }
     // Stopped: another file chosen is kept too.
     require(c.load_file((folder / "hall.wav").string()), "a second file chosen while stopped");
     state = saved_filter(p);
