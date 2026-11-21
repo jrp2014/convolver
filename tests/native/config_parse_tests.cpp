@@ -44,7 +44,7 @@ int main() {
             // PLUG-39 step 5b: an exception keeps the parts as they were,
             // under its standard type and with the same text.
             try {
-                throw_advice<std::invalid_argument>(advice);
+                throw AdvisedError<std::invalid_argument>(advice);
             } catch (const std::invalid_argument& e) {
                 require(e.what() == text && advice_of(e) == advice, "advised exception");
             }

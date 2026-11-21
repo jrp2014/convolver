@@ -311,8 +311,7 @@ tresult Processor::activate(TBool state) {
 }
 void Processor::record_activation_failure(const std::exception* error) noexcept {
     try {
-        filter_.fail_activation(error ? detail::advice_of(*error).problem
-                                      : "the processor could not be built.");
+        filter_.fail_activation(error);
         hold_fault_signal();
         if (const auto& f = filter_.failure())
             log(detail::advice_line(failure_message(*f)));

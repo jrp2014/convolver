@@ -311,7 +311,9 @@ is shown is in [status and log](#status-and-log) (DIAG-1):
   `detail::AdvisedError`, read with `detail::advice_of()` in
   [`portable/advice.hpp`](../../portable/advice.hpp)), with `what()` the
   same parts as text, one labelled line per part; nothing parses that text
-  back.
+  back. An adapter hands a failed start's exception to
+  `HostFilter::fail_activation()`, which keeps its problem as the reason, so
+  its cause and fix never appear inside the record's own.
 
 The reason lives on the control side (in `HostFilter` or beside it) and never
 on the audio thread: the audio callback only plays what it was given. Every

@@ -802,6 +802,11 @@ bool HostFilter::estimate(bool on, const std::function<void(const FilterGains&)>
     return true;
 }
 
+void HostFilter::fail_activation(const std::exception* error) {
+    fail_activation(error ? detail::advice_of(*error).problem
+                          : std::string("the processor could not be built."));
+}
+
 void HostFilter::fail_activation(std::string why) {
     // First, before anything that may throw, as for any new start: nothing
     // counts on from the processor that is gone.

@@ -342,7 +342,8 @@ own number (`VST3 #1`, `VST3 #2`), and the one playing logs `Started at` with
 the rate the host plays at.
 
 **What Status leaves out.** Status names one state in a short line, so some
-things only the window's report and the Convolver log say: a Latency you
+things only the window's report and the Convolver log say (in LV2, the
+host's log): a Latency you
 chose that is not in use yet, or could not be applied; the Gain mode's
 Estimate still being found, or why it could not be. In the VST3 and the
 Audio Unit nothing says that a filter is still loading: the earlier status

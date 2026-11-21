@@ -280,8 +280,7 @@ OSStatus Effect::Initialize() {
 
 std::string Effect::activation_failed(const std::exception* error) noexcept {
     try {
-        filter_.fail_activation(error ? detail::advice_of(*error).problem
-                                      : "the processor could not be built.");
+        filter_.fail_activation(error);
         const auto& f = filter_.failure();
         return f ? detail::advice_line(failure_message(*f)) : std::string();
     } catch (...) { // Out of memory for the message: nothing more to keep.

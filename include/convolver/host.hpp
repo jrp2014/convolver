@@ -610,9 +610,14 @@ class HostFilter {
     // The adapter could not build a processor for what activation() returned
     // when the host started it, so it plays silence; recorded until the next
     // activate(). The fault count starts again, as for a new processor.
-    // `why` is the reason as a phrase (an exception's problem, without its
-    // cause or fix), shown after "could not be started ...: ".
+    // `why` is the reason as a phrase, shown after "could not be started
+    // ...: ".
     void fail_activation(std::string why);
+    // The same for the exception building the processor threw: its reason is
+    // the problem of the advice it carries, without its cause or fix, so no
+    // adapter picks that part; null, for one that is not a std::exception, a
+    // reason that says the processor could not be built.
+    void fail_activation(const std::exception* error);
     // DIAG-1: processing faults since the filter that plays was accepted or
     // the instance last started (activate()), whichever is later. host_status()
     // shows them as HostStatus::fault after any load failure.

@@ -165,17 +165,11 @@ Foundation items are parked by owner decision instead.
   the window shows numbers in the system locale from one formatting path,
   Status and the log stay plain, and a test covers other separators; best
   after PLUG-39's typed reporting.
-- [ ] **DIAG-10 — Status says what the window says.** From jrp's
-  state-visibility survey (21 November 2026), for full diagnostics while in
-  alpha: Status (`host_status()`) leaves out a Latency chosen but not in use
-  yet, the Gain mode's Estimate being found or failing, and a filter still
-  preparing (VST3 and the Audio Unit have no Loading state); LV2's `status`
-  port reads Bypassed as Active and carries no reason text.
-  [What Status leaves out](docs/use/plugins.md#status-and-the-convolver-log)
-  documents this today. In PLUG-39's typed reporting. **Done when** Status
-  names these states within its 127-character line, each format's tests
-  cover them, and the LV2 port's values are decided with jrp (a new value is
-  a port-range change).
+- [ ] **DIAG-10 — Status says what the window says.** Status also names a
+  Latency not in use yet, the Estimate being found or failing, and a filter
+  still loading ([what Status leaves out](docs/use/plugins.md#status-and-the-convolver-log));
+  in PLUG-39's typed reporting. **Done when** each format's tests cover
+  them and jrp has decided LV2's `status` port values.
 
 ## Plug-ins: VST3, LV2 and AU
 

@@ -67,9 +67,6 @@ template <class Error> class AdvisedError final : public Error, public Advised {
   public:
     explicit AdvisedError(Advice a) : Error(advice_text(a)), Advised(std::move(a)) {}
 };
-template <class Error = std::runtime_error> [[noreturn]] void throw_advice(Advice a) {
-    throw AdvisedError<Error>(std::move(a));
-}
 // The parts of a caught exception: as thrown when it was advised, otherwise
 // its text as the problem.
 inline Advice advice_of(const std::exception& e) {

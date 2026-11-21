@@ -34,11 +34,13 @@ first published preview, keep their original grouping.
   block reads the parts rather than parsing the "Cause: ", "Fix: " and
   "Note: " lines back. The exception types and their `what()` text are
   unchanged, so nothing a user reads changes. `HostFilter::fail_activation()`
-  is documented to take the reason as a phrase (the exception's problem),
-  which is what the adapters now pass. One log line differs, and only when
-  memory runs out twice: an activation failure whose message could not be
-  recorded now logs the same "memory ran out" message the window shows,
-  where it logged nothing.
+  gains an overload taking the exception, which keeps only its problem as
+  the reason, and the string form is documented to take the reason as a
+  phrase. One LV2 log line differs, and only when memory runs out twice:
+  when recording an activation failure itself runs out of memory and an
+  earlier load failure had been recorded without its message, the log now
+  says that memory ran out before Convolver could record why, where it
+  logged nothing.
 - Plug-ins (PLUG-39 step 5a): the window's report travels as one typed
   value. `encode_report()` and `decode_report()` in
   `portable/host_report.hpp` encode it once for the VST3 message between the
