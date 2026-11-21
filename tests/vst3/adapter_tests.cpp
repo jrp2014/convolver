@@ -104,11 +104,11 @@ class Handler final : public IComponentHandler, public IComponentHandler2 {
     tresult PLUGIN_API finishGroupEdit() override {
         return kNotImplemented;
     }
-    tresult PLUGIN_API queryInterface(const TUID iid, void** obj) override {
-        QUERY_INTERFACE(iid, obj, FUnknown::iid, IComponentHandler)
-        QUERY_INTERFACE(iid, obj, IComponentHandler::iid, IComponentHandler)
+    tresult PLUGIN_API queryInterface(const TUID _iid, void** obj) override {
+        QUERY_INTERFACE(_iid, obj, FUnknown::iid, IComponentHandler)
+        QUERY_INTERFACE(_iid, obj, IComponentHandler::iid, IComponentHandler)
         if (offers_dirty) {
-            QUERY_INTERFACE(iid, obj, IComponentHandler2::iid, IComponentHandler2)
+            QUERY_INTERFACE(_iid, obj, IComponentHandler2::iid, IComponentHandler2)
         }
         *obj = nullptr;
         return kNoInterface;
@@ -479,9 +479,9 @@ class ProjectStream final : public MemoryStream, public IStreamAttributes {
     IAttributeList* PLUGIN_API getAttributes() override {
         return attributes_;
     }
-    tresult PLUGIN_API queryInterface(const TUID iid, void** obj) override {
-        QUERY_INTERFACE(iid, obj, IStreamAttributes::iid, IStreamAttributes)
-        return MemoryStream::queryInterface(iid, obj);
+    tresult PLUGIN_API queryInterface(const TUID _iid, void** obj) override {
+        QUERY_INTERFACE(_iid, obj, IStreamAttributes::iid, IStreamAttributes)
+        return MemoryStream::queryInterface(_iid, obj);
     }
     uint32 PLUGIN_API addRef() override {
         return MemoryStream::addRef();
@@ -1707,8 +1707,7 @@ void output_silence_flags() {
     require(call(music) == (L >= frames ? 3 : 0),
             "the latency is silence, so it is flagged; audio is not");
     while (frame < stop + tail - frames)
-        require(call(music) == 0 || frame < latency_samples,
-                "audio or the filter's tail was flagged silent");
+        require(call(music) == 0 || frame < L, "audio or the filter's tail was flagged silent");
     // The call holding the tail's last sample. Float rounding in the last
     // blocks computed from the audio can leave values near 1e-8 for up to two
     // partitions after it; from then on the output is exactly zero.
@@ -3484,9 +3483,9 @@ class Proxy final : public IConnectionPoint {
         }
         return n;
     }
-    tresult PLUGIN_API queryInterface(const TUID iid, void** obj) override {
-        QUERY_INTERFACE(iid, obj, FUnknown::iid, IConnectionPoint)
-        QUERY_INTERFACE(iid, obj, IConnectionPoint::iid, IConnectionPoint)
+    tresult PLUGIN_API queryInterface(const TUID _iid, void** obj) override {
+        QUERY_INTERFACE(_iid, obj, FUnknown::iid, IConnectionPoint)
+        QUERY_INTERFACE(_iid, obj, IConnectionPoint::iid, IConnectionPoint)
         *obj = nullptr;
         return kNoInterface;
     }
