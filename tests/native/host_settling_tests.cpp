@@ -28,8 +28,8 @@ bool known_as(const HostSettling& s, const HostLayout& now) {
 }
 
 // VST3: a start binds the rate and buses while they stay the same; restored
-// state is refused only once audio has played with them; a chosen file is
-// refused at once; a project the host is opening never is.
+// state is refused only once audio has played with them; a project the host
+// is opening never is. (A chosen file: chosen_file() below.)
 void activation_binding() {
     HostSettling s(HostBinding::activation);
     require(!s.known(stereo) && !s.last_start(), "known before any start");
@@ -40,8 +40,6 @@ void activation_binding() {
     // stopped, given the track's six channels, started again.
     s.started(stereo);
     require(known_as(s, stereo), "not known while started");
-    require(s.check(HostRequestKind::chosen_file) == HostLoadCheck::refuse_mismatch,
-            "a chosen file is not refused once started");
     require(s.check(HostRequestKind::restore) == HostLoadCheck::keep_until_suited,
             "restored state refused before audio played");
     require(s.check(HostRequestKind::session) == HostLoadCheck::keep_until_suited,
@@ -69,7 +67,7 @@ void activation_binding() {
 }
 
 // Audio Unit: an initialization binds the formats only once audio has
-// rendered with it, and then every request is checked against them.
+// rendered with it, and then restored state is checked against them.
 void rendering_binding() {
     HostSettling s(HostBinding::rendering);
     require(!s.known(probe), "known before any initialization");
@@ -84,16 +82,52 @@ void rendering_binding() {
     s.stopped();
     require(known_as(s, stereo), "rendered formats not known after uninitializing");
     require(!s.known(probe), "known at other formats");
-    for (const auto kind :
-         {HostRequestKind::chosen_file, HostRequestKind::restore, HostRequestKind::session})
+    for (const auto kind : {HostRequestKind::restore, HostRequestKind::session})
         require(s.check(kind) == HostLoadCheck::refuse_mismatch,
-                "a request is not checked against bound formats");
+                "restored state is not checked against bound formats");
     // A later unrendered initialization at other formats leaves the bound
     // ones: the next restore at 48 kHz is still checked.
     s.started(probe);
     s.stopped();
     require(known_as(s, stereo) && !s.known(probe), "an unrendered start replaced the binding");
     require(s.last_start() && same_configuration(*s.last_start(), probe), "last start");
+}
+
+// PLUG-27, both formats: a chosen file is refused for not suiting the host
+// only while the host plays audio through the plug-in (started, and audio
+// has played with that configuration); otherwise it is kept and checked at
+// the next start. Audacity 4.0.2's order for its window's copy: set up at
+// 44.1 kHz, started for a moment with one block of silence to pass on an
+// edit, stopped, while the project plays at 48 kHz in other copies.
+void chosen_file() {
+    for (const auto binding : {HostBinding::activation, HostBinding::rendering}) {
+        const auto name = binding == HostBinding::activation ? std::string("VST3: ")
+                                                             : std::string("Audio Unit: ");
+        HostSettling s(binding);
+        const auto chosen = [&] { return s.check(HostRequestKind::chosen_file); };
+        require(chosen() == HostLoadCheck::keep_until_suited, name + "refused before any start");
+        s.started(probe);
+        require(chosen() == HostLoadCheck::keep_until_suited,
+                name + "refused while started before any audio");
+        s.played();
+        require(s.playing(), name + "audio processed while started is not the host playing");
+        require(chosen() == HostLoadCheck::refuse_mismatch,
+                name + "kept while the host plays audio");
+        s.stopped();
+        require(chosen() == HostLoadCheck::keep_until_suited && !s.playing(),
+                name + "refused while stopped");
+        // A host that keeps the plug-in started and plays (REAPER). A new
+        // start has processed nothing yet, even where VST3 remembers that
+        // audio played with that configuration before.
+        s.started(stereo);
+        require(!s.playing(), name + "playing at a start before any audio");
+        s.played();
+        require(chosen() == HostLoadCheck::refuse_mismatch,
+                name + "kept while the host plays audio again");
+        s.stopped();
+        s.started(stereo);
+        require(!s.playing(), name + "a restart with the same configuration counted as playing");
+    }
 }
 
 // Calls a host makes out of order bind nothing they should not: a stop
@@ -124,6 +158,7 @@ int main() {
     if (test::run_cases({
             {"activation_binding", activation_binding},
             {"rendering_binding", rendering_binding},
+            {"chosen_file", chosen_file},
             {"out_of_order", out_of_order},
         }))
         return 1;

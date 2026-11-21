@@ -383,6 +383,8 @@ HostStatusLine Processor::status_locked() const {
 }
 HostStatusLine Processor::status() {
     const Locked lock(*this);
+    if (settling_.playing()) // PLUG-27: the host plays the filter.
+        filter_.confirm();
     return status_locked();
 }
 HostReport Processor::report_locked() const {
@@ -409,6 +411,8 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
         std::string fields, text;
         {
             const Locked lock(*this);
+            if (settling_.playing()) // PLUG-27: the host plays the filter.
+                filter_.confirm();
             line = status_locked();
             const auto report = report_locked();
             fields = encode_report(report_fields(report));
@@ -720,8 +724,9 @@ tresult Processor::load_state(IBStream* stream) {
     }
 }
 HostLoadCheck Processor::load_check(HostRequestKind kind) const noexcept {
-    // A file chosen in the window is checked against the host's configuration
-    // once the host has started the plug-in with it (known_layout()).
+    // A file chosen in the window is refused for not suiting the host only
+    // while the host plays audio through the plug-in (PLUG-27); otherwise it
+    // is kept and checked at the next activation, as a preset is.
     // Restored state is refused for not suiting the host only once the host
     // has also played audio with it, and never when the host says it is
     // restoring a project: hosts start the plug-in on placeholder buses
@@ -792,6 +797,10 @@ std::optional<HostSettings> Processor::install(HostState next, const HostRequest
             line += request.kind == HostRequestKind::session
                         ? " The host said it is restoring a project, so its channels and rate "
                           "may still change."
+                    : request.kind == HostRequestKind::chosen_file
+                        ? " Nothing is playing through the plug-in, so the host's channels "
+                          "and rate may still change; the filter is checked again when the "
+                          "host starts the plug-in."
                         : " The host has not played audio since it started the plug-in, so "
                           "its channels and rate may still change.";
         log(line, f.has_value() || !filter_.notice().empty());
@@ -835,10 +844,15 @@ bool Processor::load_file(std::string_view chosen, std::optional<HostSettings>& 
 bool Processor::install_chosen(const std::string& path, std::optional<HostSettings>& settings) {
     HostRequest request{HostFilterSource::file, path, 0};
     request.kind = HostRequestKind::chosen_file;
-    // Before the host has started the plug-in, a list chooses its entry
-    // for the rate and channels the host has proposed so far, and the
-    // filter is checked again at activation, as for restored state.
-    const auto host = known_layout().value_or(layout());
+    // PLUG-27: a file that does not suit the host is refused only while the
+    // host plays audio through the plug-in. Otherwise its rate and channels
+    // may be a placeholder (Audacity sets its window's copy up at 44.1 kHz
+    // whatever the project's rate), so a single filter is read as it is and
+    // kept, checked when the host starts the plug-in; a list chooses its
+    // entry for the configuration the host last started with, or waits for
+    // one (read_filter_file()).
+    const bool settled = load_check(request.kind) == HostLoadCheck::refuse_mismatch;
+    const auto host = known_layout();
     const auto* reader = files_;
     if (!reader) {
         filter_.reject(HostFailureKind::filter_file,
@@ -854,7 +868,8 @@ bool Processor::install_chosen(const std::string& path, std::optional<HostSettin
     FilterFileFailure why;
     // The files it was read from, so the window can reload it (VST3-11).
     // PLUG-26: a Convolver .vstpreset too.
-    auto next = read_chosen_file(path, host, *reader, why, &request.files, &request.wider_entry);
+    auto next =
+        read_chosen_file(path, host, *reader, why, &request.files, &request.wider_entry, settled);
     if (!next) {
         filter_.reject(why.kind, why.message, request, why.filter());
         return false;

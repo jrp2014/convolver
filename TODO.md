@@ -53,8 +53,7 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 
 ### In progress
 
-PLUG-39's step 4a with PLUG-30 (PR #236); PLUG-27, which jrp brought
-forward on 20 November 2026 (PR #233). Check the open pull requests for an
+PLUG-39's step 4a with PLUG-30 (PR #236). Check the open pull requests for an
 ID before starting anything.
 
 ### Ready
@@ -172,12 +171,10 @@ done once for all three formats:
   and its tests cover it ([trademarks](packaging/trademarks/README.md)).
 - [ ] **PLUG-25 — Say which rate the host plays at.** The rate refusal's
   advice is done (PR #210). **Remains:** whether the window marks a host
-  rate as not yet confirmed; parked. **Done when** jrp has decided and, if
+  rate as not yet confirmed (since PLUG-27 a chosen file waits instead;
+  a placeholder-rate match and restored state are still judged against
+  it); parked. **Done when** jrp has decided and, if
   he wants it, the marking is shown and its message tests cover it.
-- [ ] **PLUG-27 — Read a chosen filter before the host's audio settings
-  are known.** Check a chosen IR or `.cfg` when audio starts, as a preset
-  is, in VST3 and the Audio Unit. **Done when** tests cover choosing before
-  activation, refusal while playing, a changed rate and list selection.
 - [ ] **PLUG-29 — Keep the Recent list out of the log folder.** Save it in
   each platform's application-support folder, reading the old file once.
   **Done when** the tests cover both paths and the guide names the folder.
@@ -283,8 +280,11 @@ relevant to a convolver unless the product changes.
   Audacity, keyboard isolation and VoiceOver (checks 1 and 4). **Done
   when** they pass or jrp narrows them.
 - [ ] **VST3-17 — Audacity keeps a filter chosen in the window.** Fixed in
-  0.13.12 (PR #177) and checked only by `vst3.adapter`. **Remains:** jrp's
-  Audacity check (check 10) with whether undo brings back the previous
+  0.13.12 (PR #177) and checked only by `vst3.adapter`; jrp's run of
+  0.14.0 never reached it, as **Choose…** was refused first (PLUG-27,
+  [record](docs/archive/reviews/2026-11-20-vst3-17-audacity.md)).
+  **Remains:** jrp's Audacity check (check 10) on a build with PLUG-27's
+  fix, with a list chosen again after one playback, with whether undo brings back the previous
   filter, a REAPER check that a chosen file adds no undo entry, and the
   drafted upstream issue for jrp to post. **Done when** the Audacity check
   passes and the guides drop "not yet checked in Audacity".
@@ -491,5 +491,9 @@ move to the archive.
   ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
 - [x] **DOC-19 — Shorter project records.** 21 November 2026, PRs #238 to
   #241 ([recording progress](docs/develop/workflow.md#recording-progress-in-todo)).
+- [x] **PLUG-27 — Read a chosen filter before the host's audio settings
+  are known.** 21 November 2026, PR #233: a chosen file waits ("Filter
+  selected. Waiting for the host's audio settings.") until the host plays
+  ([plug-ins](docs/use/plugins.md#loading-a-filter)).
 - [x] **AU-18 — Render the Audio Unit in the hosts' orders of events.** 21
   November 2026, PR #242 ([AVAudioEngine render](docs/develop/testing.md#avaudioengine-render)).

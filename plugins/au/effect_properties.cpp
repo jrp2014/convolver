@@ -195,6 +195,8 @@ void Effect::update_status() noexcept {
             report_cache_.reset();
         }
         status_log_written_ = host_log_written();
+        if (settling_.playing()) // PLUG-27: the host renders the filter.
+            filter_.confirm();
         // Gain and Mix change what plays without a filter (PLUG-10).
         const bool bypassed = bypass_.load();
         status_ = host_status(filter_, known_layout(), status_log_written_, settings(), bypassed,
@@ -239,7 +241,14 @@ void Effect::notify_status() noexcept {
     tell_listeners(notice_report);
 }
 
-HostReport Effect::report_locked(std::string& faults) {
+bool Effect::confirm_rendered() noexcept {
+    if (!settling_.playing() || !filter_.awaiting())
+        return false;
+    update_status(); // Confirms it.
+    return true;
+}
+
+HostReport Effect::report_locked(std::string& faults, bool& confirmed) {
     // As for the Status text: faults Render signalled are explained here,
     // and Gain or Mix may have changed on another thread. Only an update
     // that has observed new faults rewrites the Status value, which Render
@@ -255,9 +264,10 @@ HostReport Effect::report_locked(std::string& faults) {
         faults = observe_faults();
         report_faults_at_ = now;
     }
-    if (faults.empty())
+    confirmed = confirm_rendered();
+    if (faults.empty() && !confirmed)
         refresh_status_text();
-    else
+    else if (!confirmed)
         update_status();
     HostReportFacts facts;
     facts.format = tag_;
@@ -279,6 +289,7 @@ HostReport Effect::report_locked(std::string& faults) {
 
 HostReport Effect::report() {
     std::string faults;
+    bool confirmed = false;
     HostReport r;
     {
         // A load or the Latency work holds the lock while it prepares a
@@ -296,7 +307,7 @@ HostReport Effect::report() {
             lock.lock(); // No current copy: wait.
         }
         playing_.reclaim(); // As every control call does (Locked).
-        r = report_locked(faults);
+        r = report_locked(faults, confirmed);
         // Stored under control_, so a slower reader cannot replace a newer copy.
         try {
             std::lock_guard cached(report_cache_lock_);
@@ -304,16 +315,17 @@ HostReport Effect::report() {
         } catch (...) { // Out of memory: the older copy stays.
         }
     }
-    if (!faults.empty()) { // As when a host reads the Status text.
+    if (!faults.empty()) // As when a host reads the Status text.
         log_faults(faults);
+    if (!faults.empty() || confirmed)
         notify_status();
-    }
     return r;
 }
 
 HostStatusLine Effect::status() {
     const Locked lock(*this);
-    refresh_status_text(); // With the Gain and Mix set now, as hosts read it.
+    if (!confirm_rendered())
+        refresh_status_text(); // With the Gain and Mix set now, as hosts read it.
     return status_;
 }
 
@@ -595,14 +607,16 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         if (request->inParamID != status_parameter)
             return kAudioUnitErr_InvalidParameter;
         std::string text, faults;
+        bool confirmed = false;
         try {
             const Locked lock(*this);
             // A host showing Fault, which Render wrote, asks for its text:
             // the faults are explained here, on the host's control thread.
             faults = observe_faults();
-            if (!faults.empty())
+            confirmed = confirm_rendered(); // PLUG-27: read while it renders.
+            if (!faults.empty() && !confirmed)
                 update_status();
-            else // Gain or Mix may have changed, on any thread (PLUG-10).
+            else if (!confirmed) // Gain or Mix may have changed, on any thread (PLUG-10).
                 refresh_status_text();
             const auto current = static_cast<AudioUnitParameterValue>(status_.status);
             const auto value = request->inValue ? *request->inValue : current;
@@ -614,10 +628,10 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         } catch (...) {
             return kAudioUnitErr_InvalidPropertyValue;
         }
-        if (!faults.empty()) {
+        if (!faults.empty())
             log_faults(faults);
+        if (!faults.empty() || confirmed)
             notify_status();
-        }
         if (text.empty())
             return kAudioUnitErr_InvalidPropertyValue;
         request->outString =

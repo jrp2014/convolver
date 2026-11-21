@@ -278,7 +278,12 @@ class Effect final : public ausdk::AUBase {
     // explanation of faults counted since the last look, to log. The window
     // reads it twice a second, so while faults go on it takes them in at most
     // every report_fault_interval, once Render's Fault is explained.
-    HostReport report_locked(std::string& faults);
+    HostReport report_locked(std::string& faults, bool& confirmed);
+    // PLUG-27: when the host renders a chosen filter that awaits validation,
+    // its check stands (HostFilter::confirm()) and the status is updated.
+    // Under the control lock; says whether it confirmed, so the caller can
+    // tell the host the Status changed.
+    bool confirm_rendered() noexcept;
     static constexpr std::chrono::seconds report_fault_interval{10};
     // AU-7: stores a Gain, Mix, Latency or Gain mode value clamped to its
     // range; other IDs are ignored.
