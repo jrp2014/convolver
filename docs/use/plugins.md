@@ -359,9 +359,10 @@ frames not in use yet.` when the Latency you chose has not been applied (the
 log says why, if it could not be), `No estimate: No clipping's gain plays.`
 or `Too loud to estimate: No clipping's gain plays.` when the Gain mode is
 Estimate and the filter has no estimate, and `Silent: no gain figure for
-this filter.` when the filter has no figure for the Gain mode at all. A
-load failure or a fault comes first, and the window's report gives the
-details. LV2's `status` port keeps its five values (see
+this filter.` when the filter has no figure for the Gain mode at all (`No
+gain figure for this filter: only the dry signal plays.` when Mix lets the
+dry signal through). A load failure or a fault comes first, and the
+window's report gives the details. LV2's `status` port keeps its five values (see
 [LV2 ports](#lv2-ports)): Bypassed reads as Active, and while a new Latency
 is applied or the estimate is found the filter plays on and the port stays
 at Active; the host's log says what is happening.

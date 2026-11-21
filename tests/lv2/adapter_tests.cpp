@@ -2248,6 +2248,20 @@ void pending_settings_stay_active(host::World& world, const fs::path& work) {
     check(p->status == as_float(lv2::Status::running) &&
               p->log.contains(LV2_LOG__Note, "Gain mode set to Estimate"),
           "pending: Active once Estimate plays its figure");
+
+    // Chosen while inactive (as a reopened session restores the port): the
+    // activation finds the estimate before anything plays, so the log does
+    // not say No clipping's gain plays meanwhile.
+    auto q = worker_instance(world, host::Worker::threaded);
+    q->activate();
+    q->set_filter(files.original.string());
+    settle(*q);
+    q->deactivate();
+    q->gain_mode = 1;
+    q->activate();
+    check(close_to(play_constant(*q, 4096).back(), 1) &&
+              !q->log.contains(LV2_LOG__Note, "Finding the filter's estimate"),
+          "pending: an activation in Estimate does not say the estimate is being found");
 }
 
 int main(int argc, char** argv) {

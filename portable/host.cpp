@@ -1198,18 +1198,26 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
                     (!host             ? "; waiting for audio settings from the host."
                      : ignored.empty() ? "."
                                        : "; plug-in " + ignored + " ignored.");
-        if (host && !filter.notice().empty())
-            line.text += log_written ? " Speaker labels differ; see the Convolver log."
-                                     : " Speaker labels differ.";
-        if (dry_known && clamp_mix(settings.mix) == 0)
-            line.text += " Mix 0%: only the dry signal plays.";
-        // DIAG-10: what the window's Gain mode note says, in short.
-        if (!applied_gain_db(settings, filter.gains()))
-            line.text += " Silent: no gain figure for this filter.";
-        else if (settings.gain_mode == GainMode::estimate && !filter.gains().estimate_db)
+        const bool mix_dry_only = dry_known && clamp_mix(settings.mix) == 0;
+        // DIAG-10: what the window's Gain mode note says, in short, before
+        // the notes below, so the 127-character limit cuts those first.
+        // Without a figure the filter is silent, but Mix's dry share still
+        // plays where there is one (PLUG-36's rule for "Silent: ").
+        if (!applied_gain_db(settings, filter.gains())) {
+            if (!mix_dry_only)
+                line.text += dry_known && clamp_mix(settings.mix) < 1
+                                 ? " No gain figure for this filter: only the dry signal plays."
+                                 : " Silent: no gain figure for this filter.";
+        } else if (settings.gain_mode == GainMode::estimate && !filter.gains().estimate_db) {
             line.text += filter.gains().estimate_failed
                              ? " Too loud to estimate: No clipping's gain plays."
                              : " No estimate: No clipping's gain plays.";
+        }
+        if (host && !filter.notice().empty())
+            line.text += log_written ? " Speaker labels differ; see the Convolver log."
+                                     : " Speaker labels differ.";
+        if (mix_dry_only)
+            line.text += " Mix 0%: only the dry signal plays.";
         break;
     }
     case HostStatus::no_filter: {

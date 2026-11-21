@@ -1079,9 +1079,9 @@ void status_names_settings() {
             "Set mode says nothing about the estimate");
 
     // "Too loud to estimate" (estimate_failed with a bound) has no portable
-    // test filter: whether the noise overflows before the bound does depends
-    // on the FFT library's intermediate values (a Release candidate build
-    // found the estimate for a 3e38 tap that a Debug build could not).
+    // test filter: whether a filter's noise overflows before its bound does
+    // depends on the build and the FFT library (a 3e38 tap failed its
+    // estimate in one Linux build and not in others), so it is untested.
     // No figure at all: silence, whichever mode needs one.
     Configuration huge{48000, 1, 1, 0, {}, {}, {}};
     for (int i = 0; i < 2; ++i)
@@ -1093,6 +1093,18 @@ void status_names_settings() {
     line = host_status(no_figure, layout, true, no_clipping);
     require(contains(line.text, " Silent: no gain figure for this filter."),
             "no figure: " + line.text);
+    // Mix's dry share still plays: not "Silent", and at Mix 0% only Mix's
+    // own note.
+    no_clipping.mix = .5;
+    line = host_status(no_figure, layout, true, no_clipping);
+    require(contains(line.text, " No gain figure for this filter: only the dry signal plays.") &&
+                !contains(line.text, "Silent"),
+            "no figure, Mix 50%: " + line.text);
+    no_clipping.mix = 0;
+    line = host_status(no_figure, layout, true, no_clipping);
+    require(contains(line.text, " Mix 0%: only the dry signal plays.") &&
+                !contains(line.text, "gain figure") && !contains(line.text, "Silent"),
+            "no figure, Mix 0%: " + line.text);
 }
 } // namespace
 

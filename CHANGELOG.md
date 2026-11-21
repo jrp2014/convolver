@@ -42,7 +42,8 @@ first published preview, keep their original grouping.
   frames not in use yet.`), Estimate without an estimate for the filter
   (`No estimate: No clipping's gain plays.`, or `Too loud to estimate: …`)
   and a filter with no gain figure (`Silent: no gain figure for this
-  filter.`), as the window's report does. LV2's `status` port keeps its
+  filter.`, or `… only the dry signal plays.` where Mix lets it through),
+  as the window's report does. LV2's `status` port keeps its
   five values (jrp, 21 November 2026): while a new Latency is applied or
   Estimate's figure is found the filter plays on and the port stays at
   Active, and the host's log now says so before saying what happened.

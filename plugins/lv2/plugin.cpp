@@ -536,8 +536,11 @@ void apply_gain_mode(Instance& p) noexcept {
         return;
     // DIAG-10 (jrp, 21 November 2026): the status port stays at Active while
     // the estimate is found, as the filter plays on; the log says what is
-    // happening, as the other formats' Status text does.
-    if (estimate && p.filter.filter() && !p.filter.gains().estimate_db) {
+    // happening, as the other formats' Status text does. Only while a
+    // processor plays (not in activate(), which finds it before building
+    // one) and when there is an estimate to look for.
+    if (estimate && p.host && p.filter.filter() && !p.filter.gains().estimate_db &&
+        !p.filter.gains().estimate_failed) {
         try { // Best effort: out of memory for the line changes nothing else.
             p.log_note("Finding the filter's estimate for Estimate; the filter plays at No "
                        "clipping's gain until it is found.");

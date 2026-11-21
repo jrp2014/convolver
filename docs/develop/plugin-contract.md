@@ -422,8 +422,14 @@ format.
   fault, which say more), and, with a filter, Estimate chosen without an
   estimate ("No estimate: No clipping's gain plays." or "Too loud to
   estimate: …") or no gain figure at all ("Silent: no gain figure for this
-  filter."); the 127-character limit cuts what does not fit
-  (`native.host_settings` `status_names_settings`). The Status value does
+  filter.", or "No gain figure for this filter: only the dry signal
+  plays." where Mix's dry share plays, and nothing beyond Mix's own note at
+  Mix 0%); the gain notes come before the speaker-label and Mix 0% notes,
+  and the 127-character limit cuts what does not fit
+  (`native.host_settings` `status_names_settings`; "Too loud to estimate"
+  is untested, as no filter fails its estimate while keeping its bound in
+  every build). VST3's `Processor::status()` passes the same latency as its
+  report. The Status value does
   not change for these. The Audio Unit
   recomputes the line each time a host reads it, as Gain and Mix may have
   changed. The parameter is not automatable and is not part of the host
