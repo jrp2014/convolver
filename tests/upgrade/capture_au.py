@@ -112,7 +112,9 @@ def main():
     by_name = {c['name']: c for c in record['cases']}
     cases = []
     for lv2_case in lv2_record['cases']:
-        base = by_name[lv2_case['name'].removesuffix('-settings')]
+        name = lv2_case['name']
+        # Not str.removesuffix, which needs Python 3.9; the minimum is 3.8.
+        base = by_name[name[: -len('-settings')] if name.endswith('-settings') else name]
         cases.append((base, lv2_case['name'], lv2_case['settings'], lv2_case['expected']))
 
     found = []

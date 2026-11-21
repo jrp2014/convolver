@@ -217,6 +217,11 @@ first published preview, keep their original grouping.
   the render within the bound; `capture_au.py` captures later releases,
   and the AVAudioEngine renderer gains `--parameter` and `--save` for it.
   Changes to `tests/upgrade/` now run the LV2 and Audio Unit workflows too.
+  The Audio Unit check requires every sample before the reported latency
+  to be finite; it had checked only their largest value, which a NaN
+  passes, before dropping them. `tests/upgrade/harness_tests.py` (in
+  pre-commit) feeds it a NaN, an infinity and sound there. `capture_au.py`
+  no longer uses `str.removesuffix`, which needs Python 3.9.
 - Tests (HOST-11): `scripts/reaper_check.py` repeats the project's first
   seconds while REAPER plays, so that Status is read with the transport
   running, and counts that reading only when REAPER reports it running; in jrp's first run, on 21 November 2026, REAPER had
