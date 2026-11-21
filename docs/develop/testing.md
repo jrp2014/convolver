@@ -1329,7 +1329,13 @@ new track by default (the `strict-io` preference) and which keeps the
 track's channel count through its plug-ins. On a Strict-I/O track, both
 formats play mono and stereo as they are: for the VST3, Ardour connects
 only the track's channels and asks the plug-in for that layout through
-`enable_io`, which does not mask it. A crossover cannot play on one in
+`enable_io`, which does not mask it. The Strict-I/O cases played on
+Ardour 8.4 locally and on 9.0 in the Ardour jobs at `3627960` on
+21 November 2026: the VST3's stereo within 2.6e-8 and mono within 2.05e-8
+of the oracle ([run 44928692792](https://github.com/jrp2014/convolver/actions/runs/44928692792)),
+the LV2's stereo within 2.9e-8 and mono within 2.06e-8
+([run 44928692781](https://github.com/jrp2014/convolver/actions/runs/44928692781)).
+A crossover cannot play on one in
 either format, since the insert keeps 2 outputs (tried on Ardour 8.4: both
 exports differed from the oracle by about the output peak), so the
 crossover cases run on Flexible-I/O tracks. On a Flexible-I/O track, with
