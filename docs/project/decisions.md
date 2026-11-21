@@ -494,7 +494,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
   the preset tool; LV2 and AU join later previews once their own journeys are
   demonstrated (AU moved into the first preview on 25 October 2026; narrowed
   to macOS on 6 November 2026, below). See
-  [Status](status.md#user-journeys-for-the-first-preview).
+  [first-preview record](../archive/releases/2026-11-08-first-preview-gates.md#user-journeys-for-the-first-preview).
 - **24 October 2026.** CI runs each kind of test only where a configuration
   can change its result; plug-in jobs skip what an identical native or Audio
   Unit job runs, and the release candidates no longer run the CMake package
@@ -744,7 +744,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
   November 2026, under [releases](#releases)); crashes, lost state, wrong
   audio, ordinary compatibility failures and demonstrated dropouts are still
   fixed at once (jrp's review of 0.10.8, and his "yes" to the macOS-first
-  preview). See [Status](status.md#what-still-blocks-the-first-preview),
+  preview). See [first-preview record](../archive/releases/2026-11-08-first-preview-gates.md#what-still-blocks-the-first-preview),
   [TODO](../../TODO.md#execution-priorities).
 - **6 November 2026.** A filter plays on an input bus wider than its inputs:
   it reads the first inputs and ignores the rest, while its outputs must still
@@ -778,14 +778,14 @@ Contents: [direction](#direction) · [releases](#releases) ·
   qualification of the loading gate on a named machine (REL-6) stay
   first-preview gates, although further hardening waits for the first
   walkthrough (jrp: "yes"). See
-  [Status](status.md#what-still-blocks-the-first-preview), [responsiveness
+  [first-preview record](../archive/releases/2026-11-08-first-preview-gates.md#what-still-blocks-the-first-preview), [responsiveness
   qualification](../develop/releasing.md#responsiveness-qualification).
 - **8 November 2026.** The host smoke tests stay first-preview gates,
   GarageBand's (AU-4) and HOST-1's remaining Audacity steps included, and
   every step, including those that passed on earlier candidates, is run again
   on the preview candidate, so the earlier results hold for the current window
   and code (jrp: "yes, make sure that the older tests still pass!", answering
-  DOC-11). See [Status](status.md#what-still-blocks-the-first-preview),
+  DOC-11). See [first-preview record](../archive/releases/2026-11-08-first-preview-gates.md#what-still-blocks-the-first-preview),
   [TODO](../../TODO.md) (HOST-1, AU-4).
 - **8 November 2026.** An exception to the row above for PLUG-31 ([PR
   #148](https://github.com/jrp2014/convolver/pull/148)): the REAPER part C and
@@ -796,7 +796,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
   whether to re-run them). See
   [REAPER](../archive/reviews/2026-11-08-host1-reaper-window.md) and
   [GarageBand](../archive/reviews/2026-11-08-au4-garageband.md) records,
-  [status](status.md#what-still-blocks-the-first-preview).
+  [first-preview record](../archive/releases/2026-11-08-first-preview-gates.md#what-still-blocks-the-first-preview).
 - **8 November 2026.** For REAPER, the PLUG-31 retest in the row above is
   done: loading packaged presets, and save and reopen, passed with the
   candidate from `f11a3dd` (the merge of PR #148) and stand for the final
@@ -804,7 +804,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
   there needs only listening and the Status display. GarageBand's preset and
   reopen retest is unchanged (jrp chose "Yes, they count" on a decision card).
   See [PLUG-31 REAPER record](../archive/reviews/2026-11-08-plug31-reaper.md),
-  [status](status.md#what-still-blocks-the-first-preview).
+  [first-preview record](../archive/releases/2026-11-08-first-preview-gates.md#what-still-blocks-the-first-preview).
 - **6 November 2026.** The plug-in window names the filter. The name, with its
   extension, comes first, with the status beside it and, under it, the
   filter's own sample rate, channels, length and speakers as labelled columns,
