@@ -120,6 +120,19 @@ repos:
         language: python
         pass_filenames: false
         files: ^tests/plugins/ardour_(tests|harness_tests)\.py$
+      - id: upgrade-harness-tests
+        name: Upgrade check's Audio Unit comparison without macOS (COMPAT-1)
+        entry: python tests/upgrade/harness_tests.py
+        language: python
+        pass_filenames: false
+        files: |
+          (?x)^(
+            tests/upgrade/run_upgrade\.py|
+            tests/upgrade/harness_tests\.py|
+            tests/upgrade/0\.14\.0/au\.json|
+            tests/plugins/fixtures\.py|
+            plugins/identities\.json
+          )$
       - id: reaper-check-tests
         name: REAPER check script without REAPER (HOST-11)
         entry: python tests/reaper_check_tests.py

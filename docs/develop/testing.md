@@ -1235,8 +1235,11 @@ published preview's Audio Unit saved (COMPAT-1,
 [files kept from releases](../../tests/upgrade/README.md)):
 `run_upgrade.py --au-render` gives each kept state to the renderer as its
 preset, in blocks of the size `au.json` records, and requires the latency
-the release reported, silence before it and the expected audio within
-`upgrade.cli`'s bound after it. The renderer's `--parameter ID=VALUE` and
+the release reported, silence before it (every sample finite and within
+the bound) and the expected audio within `upgrade.cli`'s bound after it.
+[`harness_tests.py`](../../tests/upgrade/harness_tests.py) (in pre-commit)
+checks, without macOS, that a NaN, an infinity or sound before the latency
+fails that comparison. The renderer's `--parameter ID=VALUE` and
 `--save PATH`, with `--round-trip`, are what
 [`capture_au.py`](../../tests/upgrade/capture_au.py) used to make those
 states from the release's own unit.
