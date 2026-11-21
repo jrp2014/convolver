@@ -24,8 +24,8 @@ keep using those guides' supplied first-use inputs and expected outputs.
 
 With the identity preset, the sound should stay unchanged. With
 `repeat-48000-stereo`, each click should have a quieter repeat 250 ms later,
-on the same side. With `echo-48000-stereo`, the 5 ms delay changes the tone
-and click colour rather than making a clearly separate repeat. Use the
+on the same side. With `echo-48000-stereo`, each click comes back three
+times, 0.3 s apart, each quieter than the last. Use the
 sustained section to hear Gain, Mix and bypass changes; loop that section
 if you need more time. The silence at either end makes looping the whole
 file clean, but a settings change during silence cannot be judged by ear.
