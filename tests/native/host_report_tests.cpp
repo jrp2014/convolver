@@ -1005,6 +1005,17 @@ void unsettled_list() {
                 s.text.size() < max_status_text && contains(r.fix, "Play audio once") &&
                 !contains(r.fix, "now known"),
             "before the settings are known: " + s.text + " | " + r.fix);
+    // A configuration the host has not been seen playing with (Audacity's
+    // brief 44.1 kHz start) is not taken as its settings (the independent
+    // review): still play first.
+    s = host_status(f, known, true, {});
+    r = host_report(f, facts(known));
+    require(contains(s.text, "play audio once") && contains(r.fix, "Play audio once") &&
+                !contains(r.fix, "now known"),
+            "a configuration not seen playing: " + s.text + " | " + r.fix);
+    f.confirm(known); // Seen playing with it.
+    require(!f.played_with(HostLayout{44100, 2, 2}) && f.played_with(known),
+            "played_with() for another configuration");
     s = host_status(f, known, true, {});
     r = host_report(f, facts(known));
     require(contains(s.text, "now known: 48000 Hz, 2 in, 2 out; choose the list again.") &&

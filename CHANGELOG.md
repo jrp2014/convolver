@@ -41,11 +41,13 @@ first published preview, keep their original grouping.
   configuration list chosen in Convolver's window before the host has
   played is no longer something to choose again. With the window open, it
   loads by itself, as if chosen, when the host plays, and the project is
-  marked changed. If the window was closed meanwhile, Status and the window
-  say "The host's settings are now known (48000 Hz, 2 in, 2 out): choose the
-  configuration list again." (Status in short) instead of still saying the
-  settings are unknown. The window no longer suggests dropping a file beside
-  a refusal whose advice says to play first. VST3 and the Audio Unit; the
+  marked changed (it is not added to Recent). Checked by automated tests,
+  not yet in a host. Once Convolver has seen the host play, Status and the
+  window say "The host's settings are now known (48000 Hz, 2 in, 2 out):
+  choose the configuration list again." (Status in short) instead of still
+  saying the settings are unknown; a brief start without playing, such as
+  Audacity's after a parameter edit, does not count. The window no longer
+  suggests dropping a file beside any refusal. VST3 and the Audio Unit; the
   Audio Unit's part is checked only on macOS CI
   ([when a chosen file is checked](docs/use/plugins.md#loading-a-filter)).
 - Documentation (VST3-17): in Audacity, Convolver's **Choose…** and

@@ -363,7 +363,7 @@ HostStatusLine Processor::status_locked() const {
 HostStatusLine Processor::status() {
     const Locked lock(*this);
     if (settling_.playing()) // PLUG-27: the host plays the filter.
-        filter_.confirm();
+        filter_.confirm(known_layout());
     return status_locked();
 }
 HostReport Processor::report_locked() const {
@@ -391,7 +391,7 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
         {
             const Locked lock(*this);
             if (settling_.playing()) // PLUG-27: the host plays the filter.
-                filter_.confirm();
+                filter_.confirm(known_layout());
             // PLUG-39 step 5: the report holds the Status line too.
             report = encode_report(report_locked());
         }

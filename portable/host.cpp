@@ -1058,9 +1058,11 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
     case HostFailureKind::too_large:
         return "the filter is too large to save with the project.";
     case HostFailureKind::settings_unknown:
-        // PLUG-40: what to do now; short enough for the longest prefix and
-        // the log's pointer (max_status_text). The window's Fix says it in
-        // full (settings_now_known()).
+        // PLUG-40: what to do now, given a configuration the host was seen
+        // playing with (HostFilter::played_with()). With the longest prefix
+        // and the log's pointer it fits max_status_text except with a
+        // fractional rate and ten or more channels, where the pointer is cut.
+        // The window's Fix says it in full (settings_now_known()).
         if (host)
             return "now known: " + host_rate_text(*host) + ", " +
                    ports(host->inputs, host->outputs) + "; choose the list again.";
@@ -1165,7 +1167,9 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
             // A filter the adapter could not start has no processor, so nothing
             // plays, not even Mix's dry share (the independent review).
             if (f->silent && f->kind != HostFailureKind::activation && bypass_dry) {
-                auto reason = short_reason(*f, host);
+                auto reason = f->kind == HostFailureKind::settings_unknown
+                                  ? short_reason(*f, filter.played_with(host))
+                                  : short_reason(*f, host);
                 if (!reason.empty())
                     reason[0] =
                         static_cast<char>(std::toupper(static_cast<unsigned char>(reason[0])));
@@ -1176,7 +1180,10 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
                 line.text = (!f->silent ? "Load failed, previous filter kept: "
                              : f->kind == HostFailureKind::activation ? std::string("Silent: ")
                                                                       : silent_words()) +
-                            short_reason(*f, host) + details;
+                            (f->kind == HostFailureKind::settings_unknown
+                                 ? short_reason(*f, filter.played_with(host))
+                                 : short_reason(*f, host)) +
+                            details;
             }
         }
         break;

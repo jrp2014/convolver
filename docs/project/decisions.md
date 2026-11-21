@@ -1013,7 +1013,11 @@ Contents: [direction](#direction) · [releases](#releases) ·
   report while the host plays audio through the plug-in, on the window's
   thread, so the project is marked changed as for a chosen file; never from
   the audio thread or a start, and once per refusal. The drop hint is not
-  offered after a refusal. See [Contract: loading and
+  offered after a refusal. The independent review then found that the
+  "now known" wording, taken from any configuration the host had started
+  with, would after Audacity's 44.1 kHz flush send the user to load the
+  wrong entry, so it is shown only for a configuration the host has been
+  seen playing with. See [Contract: loading and
   failure](../develop/plugin-contract.md#loading-and-failure),
   [plug-ins](../use/plugins.md#loading-a-filter).
 

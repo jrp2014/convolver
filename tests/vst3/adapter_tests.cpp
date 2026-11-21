@@ -3202,18 +3202,39 @@ void list_read_again() {
     require(p.setActive(true) == kResultOk, "list read again: the flush starts");
     play_block(p, 1, 1, 64);
     require(p.setActive(false) == kResultOk, "list read again: the flush stops");
+    // The flush's 44.1 kHz is not taken as the host's settings (the
+    // independent review): the Fix still says to play first, and nothing is
+    // read again.
     auto r = c.report();
-    require(r &&
-                r->fix == "The host's settings are now known (44100 Hz, 1 in, 1 out): choose the "
-                          "configuration list again." &&
-                p.failure() && handler.edits.size() == edits,
+    require(r && r->fix.find("Play audio once") != std::string::npos &&
+                r->fix.find("now known") == std::string::npos && p.failure() &&
+                handler.edits.size() == edits,
             ("list read again: after the flush, the window's Fix: " +
              (r ? r->fix : std::string("none")))
                 .c_str());
-    // The host plays at 48 kHz and the window reads its report.
+    require(p.status().text.find("play audio once") != std::string::npos,
+            ("list read again: after the flush, Status: " + p.status().text).c_str());
+    // The host plays at 48 kHz and something other than the window reads
+    // the Status while it plays, then it stops: the settings are known now,
+    // and the window says so, but reads nothing again while stopped.
     ProcessSetup project{kRealtime, kSample32, 512, 48000};
     require(p.setupProcessing(project) == kResultOk && p.setActive(true) == kResultOk,
             "list read again: the host starts at 48 kHz");
+    play_block(p, 1, 1, 64);
+    (void)p.status();
+    require(p.setActive(false) == kResultOk, "list read again: the host stops");
+    r = c.report();
+    require(r &&
+                r->fix == "The host's settings are now known (48000 Hz, 1 in, 1 out): choose the "
+                          "configuration list again." &&
+                p.failure() && handler.edits.size() == edits,
+            ("list read again: after playing at 48 kHz, the window's Fix: " +
+             (r ? r->fix : std::string("none")))
+                .c_str());
+    require(p.status().text.find("now known: 48000 Hz, 1 in, 1 out") != std::string::npos,
+            ("list read again: after playing at 48 kHz, Status: " + p.status().text).c_str());
+    // It plays again and the window reads its report: the list is read again.
+    require(p.setActive(true) == kResultOk, "list read again: the host starts again");
     play_block(p, 1, 1, 64);
     r = c.report();
     require(!p.failure() && r && r->status_name == "Active",

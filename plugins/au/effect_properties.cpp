@@ -192,7 +192,7 @@ void Effect::update_status() noexcept {
         // then published, so a reader never mixes two generations. Copying
         // the HostFilter shares the accepted filter rather than copying it.
         if (settling_.playing()) // PLUG-27: the host renders the filter.
-            filter_.confirm();
+            filter_.confirm(known_layout());
         auto next = std::make_shared<const Diagnostics>(Diagnostics{
             filter_, known_layout(), host_log_written(),
             host() ? static_cast<std::size_t>(GetMaxFramesPerSlice()) : 0, host() != nullptr});

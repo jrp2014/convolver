@@ -164,9 +164,13 @@ before they set the sample rate and channel layout (VST3 `setState` before
   answers with `"retried"` so the controller marks the project changed as for
   a chosen file (setDirty, or VST3-17's Latency edit), and the Audio Unit in
   its `report()`, through `load_file()`. Audacity's flush plays no audio a
-  window could see, so it never triggers this. Until then, once a
-  configuration is known, Status and the window say so with it,
-  from the same known layout: the window's Fix "The host's settings are now
+  window could see, so it never triggers this. Until then, once a control
+  call has seen the host playing with the configuration it still has
+  (`HostFilter::confirm()` with it, `HostFilter::played_with()`; not a
+  configuration a brief start only passed, such as Audacity's flush at
+  44.1 kHz, which following the advice would load the wrong entry for; the
+  independent review), Status and the window say so with it,
+  from the same layout: the window's Fix "The host's settings are now
   known (48000 Hz, 2 in, 2 out): choose the configuration list again."
   (`settings_now_known()`, `shown_failure_message()`), Status "now known:
   48000 Hz, 2 in, 2 out; choose the list again.". The window offers its drop

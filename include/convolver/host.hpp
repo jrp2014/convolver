@@ -512,8 +512,23 @@ class HostFilter {
         return awaiting() && activation_failure_.has_value() &&
                activation_failure_->kind != HostFailureKind::activation;
     }
-    void confirm() noexcept {
+    // `host`: the configuration the host plays with now, which the adapter
+    // passes whenever it sees the host playing (HostSettling::playing()) on a
+    // control call. PLUG-40, from the independent review: only such a
+    // configuration counts as the host's settings for a refused list
+    // (played_with()), not one a brief start passed, such as Audacity
+    // 4.0.2's FlushParameters at its placeholder 44.1 kHz.
+    void confirm(const std::optional<HostLayout>& host = std::nullopt) noexcept {
         awaiting_ = false;
+        if (host)
+            heard_ = host;
+    }
+    // `host` if a control call saw the host playing with that configuration
+    // (confirm()); nullopt otherwise.
+    std::optional<HostLayout> played_with(const std::optional<HostLayout>& host) const noexcept {
+        if (host && heard_ && same_configuration(*heard_, *host))
+            return host;
+        return std::nullopt;
     }
     // failure() as the status and the window show it: without the failure a
     // filter that is waiting() found at a start.
@@ -665,8 +680,9 @@ class HostFilter {
     std::optional<OfferedName> offered_name_;
     std::uint64_t requests_ = 0;
     bool failed_ = false;
-    bool awaiting_ = false;          // awaiting()
-    std::uint64_t list_retaken_ = 0; // take_unsettled_list()'s last request
+    bool awaiting_ = false;           // awaiting()
+    std::uint64_t list_retaken_ = 0;  // take_unsettled_list()'s last request
+    std::optional<HostLayout> heard_; // confirm()'s configuration
     std::optional<HostFailure> load_failure_, activation_failure_;
     Advice notice_;
     // faults(); the processor's totals at the last clear (the audio side's

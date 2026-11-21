@@ -91,7 +91,7 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
     // (host_status_value()).
     const auto status = host_status_value(filter, host.has_value(), facts.bypassed);
     if (status == HostStatus::load_failed && failure) {
-        auto a = shown_failure_message(*failure, host);
+        auto a = shown_failure_message(*failure, filter.played_with(host));
         a.problem = short_problem(std::move(a.problem), *failure);
         take(a);
         m.plays = failure_consequence(*failure, layout, facts.settings,

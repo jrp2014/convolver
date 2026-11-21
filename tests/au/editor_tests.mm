@@ -945,11 +945,25 @@ void list_read_again() {
     check(unit.configure(48000, 2, 2, 512), "48 kHz formats for the list");
     check(unit.initialize(), "48 kHz initialization for the list");
     render_block(unit, 2, 2);
+    for (const auto id : {kAudioUnitProperty_ClassInfo, kAudioUnitProperty_PresentPreset})
+        check(AudioUnitAddPropertyListener(unit.get(), id, state_changed, nullptr),
+              "state listener for the list");
+    class_info_changes = 0;
+    preset_changes = 0;
     r = report(unit);
     const auto saved = unit.saved();
     require(r.status_name == "Active" && saved.configuration && !saved.failed &&
                 saved.configuration->sample_rate == 48000,
             "the list was not read again while rendering: " + r.status_name + ": " + r.explanation);
+    // The project is marked changed, as for a chosen file.
+    require(class_info_changes > 0 && preset_changes > 0,
+            "the list read again sent no ClassInfo or PresentPreset notification");
+    // Read once: a later read loads nothing.
+    const int changes = class_info_changes;
+    (void)report(unit);
+    require(class_info_changes == changes, "the list was read again twice");
+    for (const auto id : {kAudioUnitProperty_ClassInfo, kAudioUnitProperty_PresentPreset})
+        AudioUnitRemovePropertyListenerWithUserData(unit.get(), id, state_changed, nullptr);
     unit.uninitialize();
 }
 
