@@ -59,10 +59,10 @@ Contents: [formats](#formats) · [channels](#channels) ·
 | Channel counts | Any pairing of 1 to 8 in and out | Any pairing of 1 to 8 in and out | [Fixed layouts](#lv2-channel-layouts) |
 | Preset file | `.vstpreset` | `.aupreset` | A `NAME.preset.lv2` folder |
 | Libraries it needs on macOS | None beyond macOS: Accelerate for the FFT, AudioToolbox to read the files chosen in its window | None beyond macOS: Accelerate for the FFT, AudioToolbox to read the files chosen in its window | Not on macOS |
-| Choose a `.cfg` or IR file directly | [On macOS](#convolvers-window), in its window | [Yes](#convolvers-window), in its window | [Yes](#lv2-filter-files) |
+| Choose a `.cfg` or IR file directly | [On macOS and Windows](#convolvers-window), in its window | [Yes](#convolvers-window), in its window | [Yes](#lv2-filter-files) |
 | Where a failure is explained | The Status parameter and the [Convolver log](#status-and-the-convolver-log) | The Status parameter and the [Convolver log](#status-and-the-convolver-log), also in the macOS system log | The `status` output and the host's log |
 | Tail reported to the host | Yes | Yes, in seconds | No |
-| [Settings](#settings): gain, mix, latency | Yes | Yes | Yes, as control ports ([LV2 ports](#lv2-ports)) |
+| [Settings](#settings): gain, gain mode, mix, latency | Yes | Yes | Yes, as control ports ([LV2 ports](#lv2-ports)) |
 | Licence | GPL-2.0-or-later | [GPL-3.0-or-later](#audio-unit-licence) | GPL-2.0-or-later |
 
 ## Channels
@@ -236,8 +236,8 @@ How each format reports a refusal:
 ## Status and the Convolver log
 
 The VST3 and the Audio Unit say what they are doing in two places, the Status
-parameter and the Convolver log; on macOS both also show them in
-[Convolver's window](#convolvers-window).
+parameter and the Convolver log; on macOS, and the VST3 plug-in on Windows,
+also in [Convolver's window](#convolvers-window).
 
 **The Status parameter** is a read-only parameter that hosts can list with the
 plug-in's controls, for example in their generic plug-in window or parameter
@@ -573,7 +573,7 @@ window updates twice a second while it is on screen. While the host restores
 a project or preset on another thread, it shows what plays until the
 filter is ready.
 
-**In VST3** (VST3-11 on macOS, VST3-12 on Windows) the window behaves as
+**In VST3**, on macOS and Windows, the window behaves as
 above, except:
 
 - The title line names the instance as the log does (`VST3 #2`).
@@ -597,9 +597,9 @@ above, except:
 - The window grows when the file, software and log lines are shown, and
   asks the host to make its window fit; the user cannot resize it.
 - The software line names macOS AudioToolbox as the reader of filter files,
-  as in the Audio Unit. Not yet tried in REAPER or Audacity (HOST-1).
+  as in the Audio Unit. Not yet tried in REAPER or Audacity.
 
-**On Windows** (VST3-12, new since 0.13.2) the VST3 window is built from
+**On Windows** (new since 0.13.2) the VST3 window is built from
 Windows' own controls, with the same parts in the same order, and behaves
 as the VST3 window above, except:
 
