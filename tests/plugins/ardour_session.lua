@@ -22,9 +22,13 @@
 --   CONVOLVER_TAIL    frames to add after the recording
 --   CONVOLVER_LEAD    frames of silence before it
 --   CONVOLVER_ARDOUR_MAJOR  Ardour's major version (8 or 9)
---   CONVOLVER_PINS    optional; 1 sets the plug-in's inputs and outputs to
---                     the track's by hand, as Ardour's pin configuration
---                     window's manual setting does
+--   CONVOLVER_PINS    optional, sets the plug-in's channels by hand, as the
+--                     Pin Connections window's Manual Config does:
+--                     "outputs" sets its outputs to the track's and leaves
+--                     its inputs as Ardour has them (as in Ardour 8's window,
+--                     which has no input-pin setting for a VST3); "all"
+--                     sets its inputs to the track's too (Ardour 9's window
+--                     has an Audio Input Pins setting)
 -- Each step that fails stops the script with an error, which the test reports.
 
 -- Unbuffered, so that if Ardour crashes the log shows the last step begun.
@@ -107,23 +111,30 @@ if processor:isnil() then
 	error("Ardour cannot find the " .. format .. " plug-in " .. identifier .. " among the " .. listed .. " it lists")
 end
 assert(track:add_processor_by_index(processor, 0, nil, true) == 0, "cannot add the plug-in to the track")
-if os.getenv("CONVOLVER_PINS") == "1" then
-	step("set the plug-in's inputs and outputs by hand")
+local pins = os.getenv("CONVOLVER_PINS") or ""
+if pins ~= "" then
+	assert(pins == "outputs" or pins == "all", "CONVOLVER_PINS is neither outputs nor all")
+	local sinks = inputs
+	if pins == "outputs" then
+		sinks = processor:to_insert():natural_input_streams():n_audio()
+	end
+	step("set the plug-in's channels by hand: " .. sinks .. " input pins, " .. outputs .. " outputs")
 	local audio = ARDOUR.DataType("audio")
-	assert(track:customize_plugin_insert(processor, 1, ARDOUR.ChanCount(audio, outputs), ARDOUR.ChanCount(audio, inputs)),
-		"Ardour refused " .. inputs .. " in, " .. outputs .. " out for the plug-in")
+	assert(track:customize_plugin_insert(processor, 1, ARDOUR.ChanCount(audio, outputs), ARDOUR.ChanCount(audio, sinks)),
+		"Ardour refused " .. sinks .. " input pins, " .. outputs .. " outputs for the plug-in")
 end
 local plugin = processor:to_insert():plugin(0)
 local preset = plugin:preset_by_label(label)
 assert(preset, "Ardour does not list the preset " .. label)
 assert(plugin:load_preset(preset), "Ardour cannot load the preset " .. label)
 print("Loaded preset " .. label .. " into " .. plugin:name())
--- HOST-10: the channels the plug-in itself runs with (its natural streams),
--- which the test checks against the filter's, and the insert's on the track
--- side; and what Ardour calls each input parameter, since its generic
+-- HOST-10: Ardour's natural streams for the plug-in (its count of the
+-- plug-in's pins, which can differ from the channels the plug-in was given:
+-- the Convolver log says those) and the insert's on the track side, for
+-- the record; and what Ardour calls each input parameter, since its generic
 -- controls leave out every one it names "hidden".
 local insert = processor:to_insert()
-print("Plug-in channels: " .. insert:natural_input_streams():n_audio() .. " in, " ..
+print("Natural streams: " .. insert:natural_input_streams():n_audio() .. " in, " ..
 	insert:natural_output_streams():n_audio() .. " out")
 print("Insert channels: " .. insert:input_streams():n_audio() .. " in, " ..
 	insert:output_streams():n_audio() .. " out")

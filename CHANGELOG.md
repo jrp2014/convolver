@@ -34,11 +34,13 @@ first published preview, keep their original grouping.
   plug-in gets 2 inputs and 2 outputs, so a mono or crossover filter plays
   silence there (Ardour 9.0 asks for a mono track's channel, but the
   request arrives as a layout with no channels, which Convolver refuses).
-  A mono filter on a mono track plays once its channels are set by hand in
-  Ardour's Pin Connections window; a crossover cannot be set up that way.
-  Ardour also leaves Gain mode and Latency out of its controls for the VST3
-  plug-in. On Linux, the LV2 plug-in's layouts and four settings work in
-  Ardour as elsewhere. The LV2 ports table now lists `gain_mode`.
+  The guide gives the Pin Connections steps that should let a mono filter
+  play on a mono track (the same settings, made from a script, played it in
+  Ardour 8.4 and 9.0); a crossover cannot be set up that way. Ardour also
+  leaves Gain mode and Latency out of its controls for the VST3 plug-in. On
+  Linux, Ardour plays the LV2 plug-in's mono, stereo and 2→6 layouts and
+  names all four of its settings. The LV2 ports table now lists
+  `gain_mode`.
 - Plug-ins (PLUG-39 step 5a): the window's report travels as one typed
   value. `encode_report()` and `decode_report()` in
   `portable/host_report.hpp` encode it once for the VST3 message between the
@@ -193,10 +195,12 @@ first published preview, keep their original grouping.
 ### For contributors
 
 - Tests (HOST-10): the headless Ardour test plays the mono example in the
-  VST3 plug-in with its inputs and outputs set by hand, as Ardour's pin
-  configuration window does; prints the channels the plug-in and the
-  insert run with and the name Ardour gives each input parameter; and
-  prints the Convolver log when an export does not match the oracle.
+  VST3 plug-in with its channels set by hand, as the Pin Connections
+  window's Manual Config does: outputs only (all Ardour 8's window can set
+  for a VST3) and outputs and input pins (Ardour 9's). It prints Ardour's
+  natural streams, the insert's channels and the name Ardour gives each
+  input parameter, and prints the Convolver log when an export does not
+  match the oracle.
 - Tests (COMPAT-1, in progress): LV2 state saved by the published 0.14.0's
   own LV2 plug-in is kept in `tests/upgrade/0.14.0/lv2-state/`: for each of
   the 21 cases, a session lilv saved after the plug-in chose the case's

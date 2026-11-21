@@ -1321,7 +1321,7 @@ at a Latency:
 | Format | Cases |
 | --- | --- |
 | LV2 | Mono (1 in, 1 out), the stereo cross-feed (2 in, 2 out) and the crossover (2 in, 6 out) at Latency 0; the stereo cross-feed at 1024 and the crossover at 256 |
-| VST3 | The stereo cross-feed at Latency 0 and 1024; mono at Latency 0 with the plug-in's inputs and outputs set by hand |
+| VST3 | The stereo cross-feed at Latency 0 and 1024; mono at Latency 0 with the plug-in's channels set by hand, outputs only and outputs with input pins |
 
 With its automatic pin configuration, Ardour runs Convolver's VST3 with 2 in
 and 2 out (HOST-10): on a mono track it feeds the one input to both, so a
@@ -1335,20 +1335,25 @@ no channels, which Convolver refuses, and a wider one as stereo. The Ardour
 job showed the mono case so at `4a7d4f0` on 21 November 2026
 ([run 44910071468](https://github.com/jrp2014/convolver/actions/runs/44910071468)):
 "it has 0 input and 0 output channels" in the Convolver log, then 2 in, 2 out
-and silence. Set by hand to the track's 1 in and 1 out, as the pin
-configuration window's manual setting does (`Route::customize_plugin_insert`,
-which the script calls for the mono VST3 case), Ardour gives the plug-in a
-mono output (on Ardour 8.4, locally: 2 in, 1 out, the second input
-ignored, by the Convolver log) and the mono example plays, within 2.4e-8 of
-the oracle on Ardour 8.4 and 2.2e-8 on Ardour 9.0 in the Ardour job at
-`df9dcf7` ([run 44912433237](https://github.com/jrp2014/convolver/actions/runs/44912433237)),
-where the natural streams still read 2 in, 2 out and the insert 1 in, 1 out. The
-crossover set by hand (2 in, 6 out) still got 2 outputs on Ardour 8.4 and
-played silence, so the VST3 crossover is not run. The script prints the
-channels the plug-in runs with (Ardour's natural streams) and the insert's
-on the track side; the export, checked against the oracle, is what the test
-asserts, and when it fails the test prints the Convolver log, which says
-what the plug-in was given. Ardour, 8.4 and 9.0 alike, names every VST3
+and silence. Set by hand, as the Pin Connections window's Manual Config
+does (`Route::customize_plugin_insert`, which the script calls for the two
+mono VST3 cases), Ardour gives the plug-in a mono output and the mono
+example plays. Ardour 8's window can set only the outputs for a VST3 (its
+"Audio Input Pins" setting is for plug-ins whose inputs can change, which
+9.0 extends to VST3), so one case sets the outputs to 1 and leaves the
+input pins as Ardour has them (2), and the other sets the input pins to 1
+as well. On Ardour 8.4, locally, both played within 2.4e-8 of the oracle,
+the Convolver log saying 2 in, 1 out with the second input ignored. With
+both set, the mono example played on Ardour 9.0 within 2.2e-8 in the
+Ardour job at `df9dcf7`
+([run 44912433237](https://github.com/jrp2014/convolver/actions/runs/44912433237)).
+The crossover set by hand (2 in, 6 out) still got 2 outputs on Ardour 8.4
+and played silence, so the VST3 crossover is not run. The script prints
+Ardour's natural streams, its count of the plug-in's pins (2 in, 2 out in
+every VST3 case, even when the plug-in runs 2 in, 1 out), and the insert's
+channels on the track side, for the record; the export, checked against
+the oracle, is what the test asserts, and when it fails the test prints the
+Convolver log, which says what the plug-in was given. Ardour, 8.4 and 9.0 alike, names every VST3
 parameter that cannot be automated (Gain mode and Latency) "hidden" and
 leaves it out of its generic controls, while its LV2 host lists all four
 settings by name; the script prints each input parameter's name, and finds

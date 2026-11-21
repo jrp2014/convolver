@@ -866,7 +866,7 @@ from Ardour's controls.
   plug-in runs with 2 inputs and 2 outputs whatever the track has; on a
   mono track Ardour feeds the track's channel to both inputs. A filter with
   other outputs, such as a mono filter (1 in, 1 out) or a 2→6 crossover,
-  then plays silence and Convolver's Status says why. (Ardour 9 does ask
+  then plays silence and the Convolver log says why. (Ardour 9 does ask
   for a mono track's channel, but the request reaches Convolver as a layout
   with no channels, which it refuses; seen with 9.0, and the code that does
   it is the same in 9.10. The
@@ -874,18 +874,20 @@ from Ardour's controls.
   channel layout: it has 0 input and 0 output channels`.)
 - **A mono filter on a mono track** plays once you set the channels by
   hand: in the mixer strip, right-click Convolver, choose **Pin
-  Connections…**, click **Manual Config**, and set **Audio Out** to 1 and
-  the audio input pins to 1 with the − buttons. (Tried in Ardour 8.4 and
-  9.0 through the same setting from a script, not yet in the window.) A
-  crossover cannot be set
-  up this way: Convolver still gets only 2 outputs. With the VST3 plug-in in
+  Connections…**, click **Manual Config**, and set **Audio Out** to 1 with
+  its − button. Ardour 9's window also has **Audio Input Pins**; the
+  filter plays whether you leave them or set them to 1, and Convolver uses
+  the first input. (Tried in Ardour 8.4 and 9.0 through the same settings
+  from a script, not yet in the window.) A crossover cannot be set up this
+  way: Convolver still gets only 2 outputs. With the VST3 plug-in in
   Ardour, use filters with 2 outputs (and 1 or 2 inputs), or a mono filter
   set up as above.
 - **Settings.** Ardour leaves Gain mode and Latency out of its own controls
   for the VST3 plug-in, because they cannot be automated; Gain and Mix are
   there. On macOS and Windows, Convolver's window has all four (not yet
   tried in Ardour). On Linux the VST3 plug-in has no window, so in Ardour
-  those two stay as they are.
+  those two cannot be changed: they keep what the plug-in's saved state or
+  preset gives them, or their defaults.
 - **Which to use.** On Linux, use the LV2 plug-in for a crossover or to
   reach every setting: add the
   [layout](#lv2-channel-layouts) that matches the track, such as 1→1 for
