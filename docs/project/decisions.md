@@ -453,7 +453,9 @@ Contents: [direction](#direction) · [releases](#releases) ·
   behaviour row of 8 November that runs every host step again on the preview
   candidate, and to the acceptance plan's rule against counting an earlier
   result for the final package. The REAPER guide steps that DOC-10 rewrites
-  (steps 10 and 12) still run on the final candidate. See [Status: checks
+  (steps 10 and 12) still run on the final candidate. From 0.13 on, results on
+  earlier builds are records of those builds, not passes (see the 19 November
+  2026 baseline). See [Status: checks
   left](status.md#checks-left-before-publication), [what blocks a
   preview](../develop/releasing.md#what-blocks-a-preview).
 - **8 November 2026.** Use a bounded preview qualification plan: clear
@@ -505,6 +507,11 @@ Contents: [direction](#direction) · [releases](#releases) ·
 - **24 October 2026.** The old SourceForge website stays as it is for now,
   without a banner pointing here; the SourceForge project summary points to
   GitHub. See [TODO](../../TODO.md) REL-4.
+- **24 October 2026.** Start the 0.5 series before end-to-end testing, so the
+  first preview is cut from a 0.5.x tag (replaced on 25 October 2026 by the
+  0.6 series, below). See
+  [Status](status.md#next-milestone-an-independent-user-runs-a-preview),
+  [versioning](../develop/versioning.md#minor-and-major-versions).
 - **25 October 2026.** Start the 0.6 series rather than restore 0.5.x API
   compatibility, and keep no bridges to older library interfaces until the API
   is more stable; the project must stay internally consistent. The first
@@ -525,6 +532,12 @@ Contents: [direction](#direction) · [releases](#releases) ·
   ("agreed"). See [Which libraries each build
   uses](../develop/build.md#which-libraries-each-build-uses), [FFT
   guide](../develop/fft-backends.md#accelerate-by-default-on-macos).
+- **31 October 2026.** Start the 0.7 series as a milestone, once the Audio
+  Unit's window (AU-6) and the pre-preview fixes (PLUG-12, ROBUST-3) are
+  merged, so the first preview is cut from a 0.7.x tag (replaced on 1 November
+  2026 by the 0.8 series, below). See
+  [Status](status.md#next-milestone-an-independent-user-runs-a-preview),
+  [versioning](../develop/versioning.md#minor-and-major-versions).
 - **1 November 2026.** Version 0.8.0 for PLUG-10's library change
   (`HostProcessor` takes its block size from the settings), following the rule
   that an incompatible API change before 1.0 needs a minor step; the first
@@ -1288,7 +1301,8 @@ were recorded in the repository; this log is their first written record.
   of it, with the evidence in pull requests, records and the CHANGELOG
   (DOC-14, jrp: "let each open item state what remains, what would justify
   doing it, and what counts as finished. No information needs to be
-  discarded"). See [Recording
+  discarded"). Its form was replaced on 20 November 2026, below; the rule
+  against progress narratives stands. See [Recording
   progress](../develop/workflow.md#recording-progress-in-todo).
 - **20 November 2026.** The project records are slimmed, from an outside
   audit: each open TODO item is a line or two, with its earlier text and the
