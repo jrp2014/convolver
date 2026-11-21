@@ -494,12 +494,12 @@ Items finished since then are listed here, one line each, until the next
 move to the archive.
 
 - [x] **CI-51 — One Audio Unit job instead of three.** 21 November 2026,
-  PR #TBD ([CI triggers](docs/develop/testing.md#ci-triggers)).
+  PR #259 ([CI triggers](docs/develop/testing.md#ci-triggers)).
 - [x] **CI-50 — The VST3 lifecycle test's time limit matches the other
-  formats'.** 21 November 2026, PR #TBD
+  formats'.** 21 November 2026, PR #259
   ([lifecycle sequences](docs/develop/testing.md#lifecycle-sequences-plug-7)).
 - [x] **CI-49 — Advisory upstream lilv off pull requests; Monday runs
-  staggered.** 21 November 2026, PR #TBD
+  staggered.** 21 November 2026, PR #259
   ([pre-releases](docs/develop/build.md#pre-releases-and-newer-upstream-versions)).
 - [x] **PLUG-39 — One consolidation of the load and restore path.** 21
   November 2026, PRs #200, #205, #213, #217, #219, #224, #226, #230 to
