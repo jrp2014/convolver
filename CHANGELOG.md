@@ -202,6 +202,14 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
+- CI (CI-51, measured on its pull request): the Audio Unit workflow's two
+  sanitizer jobs, the AU tests with ASan and UBSan and the fallbacks, and
+  `au.adapter` under ThreadSanitizer, run as steps of its `au` job after the
+  Release build and tests, each in its own build folder and even when an
+  earlier part failed. A pull request that changes the core takes three of
+  the account's five macOS runners instead of five, or five instead of seven
+  with the candidates, and every test still runs
+  ([CI triggers](docs/develop/testing.md#ci-triggers)).
 - Tests (CI-50): `vst3.lifecycle` has a 600-second CTest limit, as
   `au.lifecycle` and `lv2.lifecycle` have, instead of 300. The Intel macOS
   candidate took 124 to 221 seconds in ten passing runs on 20 and 21

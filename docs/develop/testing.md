@@ -1170,8 +1170,9 @@ The tests register the unit inside the test process with
 `AudioComponentRegister`, so they need no installation. The
 [Audio Unit workflow](../../.github/workflows/au.yml) runs them on macOS, then
 installs the component for the runner's user and runs `auval -strict` and
-[pluginval](#pluginval). Its `au-sanitizers` job runs two Debug builds side
-by side: the AU tests again with ASan and UBSan, built with the fallbacks
+[pluginval](#pluginval). The same job then runs two Debug builds, each in a
+folder of its own and even when a Release step failed (CI-51; they were two
+more macOS jobs): the AU tests again with ASan and UBSan, built with the fallbacks
 (`CONVOLVER_AU_FILE_READER=LIBSNDFILE`, `CONVOLVER_FFT_BACKEND=FFTW`) so that
 they keep working, and `au.adapter` alone under ThreadSanitizer (AU-3), built
 with the defaults the packages use. There it switches bypass from another
@@ -1794,7 +1795,10 @@ jobs at once across the account's repositories, and only 5 on macOS, and one
 commit starts 28 jobs, 6 of them on macOS (27 October 2026). So more macOS
 jobs do not shorten the wait, and the native macOS job's FFT backends stay in
 one job: splitting them (CI-11, not done) would only make the candidates queue
-longer.
+longer. For the same reason the Audio Unit workflow runs its Release, ASan and
+UBSan, and ThreadSanitizer builds in one job (CI-51), so a pull request that
+changes the core takes three macOS runners, or five with the candidates,
+instead of five or seven.
 When the same commit also ran for the branch push, and older
 commits kept running, jobs on 22 October 2026 waited a median of 10 minutes for
 a macOS runner (up to an hour) while taking about 3 minutes to run.

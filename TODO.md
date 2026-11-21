@@ -500,6 +500,8 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **CI-51 — One Audio Unit job instead of three.** 21 November 2026,
+  PR #TBD ([CI triggers](docs/develop/testing.md#ci-triggers)).
 - [x] **CI-50 — The VST3 lifecycle test's time limit matches the other
   formats'.** 21 November 2026, PR #TBD
   ([lifecycle sequences](docs/develop/testing.md#lifecycle-sequences-plug-7)).
