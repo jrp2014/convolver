@@ -1934,7 +1934,10 @@ the lists in `ci_scope.py`. `tests/ci_scope_tests.py` (in pre-commit) checks the
 lists against the test and packaging sources and checks that every workflow
 run for pull requests, other than Lint, either starts with the `scope` job or
 filters its own paths, and that no job in them overrides a skip with
-`always()` or `cancelled()`.
+`always()` or `cancelled()`. A job that needs `scope` runs on exactly its
+gate; only the advisory jobs the test lists, now the upstream lilv check,
+also leave out pull requests, so a required job cannot skip them unnoticed
+(CI-49).
 
 No status check is required on `main` at present. If one is made required,
 require a job that always reports: a skipped matrix job shows under its

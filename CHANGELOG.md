@@ -285,8 +285,8 @@ first published preview, keep their original grouping.
   like the advisory pluginval pre-release (CI-38) it still runs on pushes to
   `main`, the weekly and manual runs
   ([pre-releases](docs/develop/build.md#pre-releases-and-newer-upstream-versions));
-  `tests/ci_scope_tests.py` accepts that one extra condition beside a job's
-  scope gate. The Monday runs with macOS jobs now start half an hour apart
+  `tests/ci_scope_tests.py` accepts that extra condition only for the
+  advisory jobs it lists, and requires it of them. The Monday runs with macOS jobs now start half an hour apart
   (candidates 06:23, Audio Unit 06:53, VST3 07:23 UTC) instead of together,
   so they no longer queue for the same five macOS runners. The analysis's other
   proposals were not taken: the Accelerate and Ooura builds keep the

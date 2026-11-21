@@ -23,10 +23,13 @@ UNGATED = {'lint.yml'}  # Runs for every change, documentation included.
 # commands at the real one.
 CLEAN = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
 OVERRIDE = re.compile(r'^    if:.*(always|cancelled)\(\)', re.MULTILINE)
-# An advisory job may also leave out pull requests (CI-49), which only narrows the gate.
-GATE = re.compile(
-    r"^    if: needs\.scope\.outputs\.(build|package) == 'true'"
-    r"(?: && github\.event_name != 'pull_request')?$",
+GATE = re.compile(r"^    if: needs\.scope\.outputs\.(build|package) == 'true'$", re.MULTILINE)
+# Advisory jobs, which only warn, also leave out pull requests (CI-49). Only
+# the jobs listed here may: a required job that skipped pull requests would
+# still pass every other check here.
+ADVISORY = {('lv2.yml', 'upstream-lilv')}
+ADVISORY_GATE = re.compile(
+    r"^    if: needs\.scope\.outputs\.build == 'true' && github\.event_name != 'pull_request'$",
     re.MULTILINE,
 )
 
@@ -501,7 +504,8 @@ class Workflows(unittest.TestCase):
                     needs = re.search(r'^    needs: (\S+)$', body, re.MULTILINE)
                     self.assertIsNotNone(needs, f'{name} must need scope or another job')
                     if needs.group(1) == 'scope':
-                        self.assertRegex(body, GATE, name)
+                        gate = ADVISORY_GATE if (workflow.name, name) in ADVISORY else GATE
+                        self.assertRegex(body, gate, name)
                     # A job that runs despite a skipped dependency would undo the gate.
                     self.assertNotRegex(body, OVERRIDE, name)
 
