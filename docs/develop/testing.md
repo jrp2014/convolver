@@ -1333,9 +1333,14 @@ A track the script adds is Flexible-I/O unless the case asks for
 Strict-I/O (`Route::set_strict_io`), which is what Ardour's window gives a
 new track by default (the `strict-io` preference) and which keeps the
 track's channel count through its plug-ins. On a Strict-I/O track, both
-formats play mono and stereo as they are: for the VST3, Ardour connects
-only the track's channels and asks the plug-in for that layout through
-`enable_io`, which does not mask it. The Strict-I/O cases played on
+formats play mono and stereo as they are: for the VST3, Ardour gives the
+plug-in as many outputs as the track has channels (`enable_io`, which does
+not mask the request). On a mono track the Convolver log said 1 in, 1 out
+on Ardour 8.4; on 9.0 it first said "Refused the host's channel layout:
+it has 0 input and 0 output channels" (the masked request described
+below), then 2 in, 1 out, the second input ignored
+([run 44931897154](https://github.com/jrp2014/convolver/actions/runs/44931897154)
+at `28dec71`, which prints those lines for every case). The Strict-I/O cases played on
 Ardour 8.4 locally and on 9.0 in the Ardour jobs at `3627960` on
 21 November 2026: the VST3's stereo within 2.6e-8 and mono within 2.05e-8
 of the oracle ([run 44928692792](https://github.com/jrp2014/convolver/actions/runs/44928692792)),
@@ -1374,7 +1379,8 @@ input pins alone. On Ardour 9.0 both played, within 2.1e-8 (outputs only)
 and 1.9e-8 (input pins as well) in the Ardour job at `75b615b`
 ([run 44915756335](https://github.com/jrp2014/convolver/actions/runs/44915756335))
 and within 2.14e-8 and 2.05e-8 at `3627960`
-([run 44928692792](https://github.com/jrp2014/convolver/actions/runs/44928692792)).
+([run 44928692792](https://github.com/jrp2014/convolver/actions/runs/44928692792));
+there the log said 1 in, 1 out in both, after the refused request.
 The crossover set by hand (2 in, 6 out) still got 2 outputs on Ardour 8.4
 and played silence, so the VST3 crossover is not run; for Ardour 9 that
 it gets 2 outputs too comes from reading `request_bus_layout`, not from a
