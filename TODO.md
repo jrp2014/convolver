@@ -67,7 +67,6 @@ ID before starting anything.
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **PERF-3** | One measurement exercise: resource budgets and supported workloads | Changes no shipped code; decides whether FFT-2, VST3-5, PLUG-11 and PERF-2's tuning are worth doing |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
-| **HOST-11** | Step 3 of the [host-test automation plan](docs/project/plans/2026-11-21-host-test-automation.md#steps), after AU-18 | jrp asked for the plan on 20 November 2026; HOST-11 needs jrp to run it on his Mac |
 
 ### Depends on
 
@@ -79,6 +78,7 @@ ID before starting anything.
 | **VST3-12**, **HOST-4** | The Windows window in hosts and a screen reader; Equalizer APO on a real device | A Windows tester or device |
 | **LV2-4** | Desktop LV2 hosts and PipeWire on a real sound card | A Linux tester |
 | **HOST-8** | Ardour 9.0's abort as `new_session` exits | A fixed Ardour on `ubuntu-latest` |
+| **HOST-11** | Step 3 of the [host-test automation plan](docs/project/plans/2026-11-21-host-test-automation.md#steps): one command for the REAPER checks | AU-18 (PR #242), then a run on jrp's Mac |
 | **CFG-1**, then **CFG-2** | Other `.cfg` readers, then importing and exporting their formats | Access to Roon, JRiver or Audiolense workflows |
 | **FFT-2**, **VST3-5**, **PLUG-11** | Optimisation | PERF-3 showing a need |
 | **VST3-13**, **VST3-2**, **VST3-6**, **HOST-2**, **LV2-3**, **LV2-6**, **DIAG-9** | The Linux window, switching filters from the host, replacing the old VST2 plug-in, CLAP, named LV2 layouts, an LV2 window, numbers in the user's locale | A stated user need |
@@ -157,9 +157,9 @@ Foundation items are parked by owner decision instead.
   [plug-in guide](docs/use/plugins.md) says what Ardour users need.
 - [ ] **AU-18 — Render the Audio Unit in the hosts' orders of events.**
   Step 2 of the [host-test automation plan](docs/project/plans/2026-11-21-host-test-automation.md#steps)
-  (PR #242). **Done when** GarageBand's order at 44.1 kHz, Latency chosen
-  while running and a `ClassInfo` round trip each match the oracle in the
-  Audio Unit workflow.
+  (PR #242, which replaces this entry with its done line). **Done when**
+  GarageBand's order at 44.1 kHz, Latency chosen while running and a
+  `ClassInfo` round trip each match the oracle in the Audio Unit workflow.
 - [ ] **HOST-11 — One command for the REAPER checks.** Step 3 of the
   [plan](docs/project/plans/2026-11-21-host-test-automation.md#steps): a
   ReaScript-driven script for jrp's Mac (presets, renders compared with

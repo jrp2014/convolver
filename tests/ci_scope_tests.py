@@ -64,6 +64,10 @@ class Classification(unittest.TestCase):
             'tests/upgrade/README.md': 'upgrade',
             'tests/upgrade/run_upgrade.py': 'upgrade',
             'tests/upgrade/vst3_render.cpp': 'upgrade',
+            # The headless Ardour test (HOST-9); the fixtures it imports are
+            # code (below).
+            'tests/plugins/ardour_tests.py': 'ardour',
+            'tests/plugins/ardour_session.lua': 'ardour',
             'portable/third_party/ooura/README.md': 'packaged',
             'portable/engine.cpp': 'code',
             'COPYING': 'code',
@@ -213,6 +217,12 @@ class Classification(unittest.TestCase):
         self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'plugins/lv2/plugin.cpp']), upgrade | {'lv2'})
         self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'portable/engine.cpp']), builds)
         self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'cmake/X.cmake']), everything)
+        # The headless Ardour test runs only where it runs: the VST3 and LV2
+        # workflows (HOST-9).
+        ardour = {'vst3', 'lv2'}
+        self.assertEqual(runs(['tests/plugins/ardour_tests.py', 'tests/plugins/ardour_reopen.lua']), ardour)
+        self.assertEqual(runs(['tests/plugins/ardour_session.lua', 'plugins/au/effect.hpp']), ardour | {'au'})
+        self.assertEqual(runs(['tests/plugins/ardour_tests.py', 'tests/plugins/harness.hpp']), others)
         self.assertEqual(ci_scope.decide(['plugins/au/effect.hpp'], 'release'), {'build': False, 'package': False})
         self.assertEqual(ci_scope.decide(['plugins/lv2/plugin.cpp'], 'release'), {'build': False, 'package': False})
         self.assertEqual(ci_scope.decide(['cmake/X.cmake'], 'release'), {'build': True, 'package': True})
@@ -658,6 +668,13 @@ class UpgradeIsolation(unittest.TestCase):
     """A pull request that changes only the files kept from releases runs
     the native and VST3 workflows, so only the tests those workflows run may
     read them (CI-42)."""
+
+    def test_only_the_vst3_and_lv2_workflows_run_the_ardour_test(self):
+        pattern = re.compile(r'\bardour_(?:tests|session|reopen|harness_tests)\b')
+        own = (*ci_scope.ARDOUR, 'scripts/ci_scope.py', 'tests/ci_scope_tests.py')
+        found = {path for path, contents in tracked() if not path.startswith(own) and pattern.search(contents)}
+        # Lint runs the harness tests through pre-commit for every pull request.
+        self.assertEqual(found, {'.github/workflows/vst3.yml', '.github/workflows/lv2.yml', '.pre-commit-config.yaml'})
 
     def test_only_listed_files_name_the_upgrade_files(self):
         # A relative path such as parents[1] / 'upgrade/x' counts too.

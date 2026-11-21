@@ -1288,7 +1288,8 @@ each case:
    export (0.3 % low after 1000 frames), and saves the session.
 3. [`ardour_reopen.lua`](../../tests/plugins/ardour_reopen.lua), a second
    `ardour9-lua` process, reopens the session: the restored plug-in must
-   report the Latency the session was saved with.
+   report the Latency the session was saved with. At Latency 0, the
+   default, this shows nothing; the 256 and 1024 cases test the restore.
 4. `ardour9-export`, a third process, restores the session, plug-in state
    and Latency included, and exports it offline with Ardour's latency
    compensation.
@@ -1789,6 +1790,7 @@ of their own.
 | `plugins/editor/mac/` (the macOS window, CI-26) | VST3, Audio Unit and the candidates: only those builds compile it, and their `editor_tests.mm` test it |
 | `scripts/release/`, `tests/release/`, `packaging/`, apart from the files other workflows use (CI-34) | the [candidates](#plug-in-candidate-checks) |
 | `tests/upgrade/`, the [files kept from releases](../../tests/upgrade/README.md) and their checks (CI-42) | native and VST3, whose `upgrade.cli` and `vst3.upgrade` read them |
+| `tests/plugins/ardour_*`, the [headless Ardour test](#ardour-headless) (HOST-9) | VST3 and LV2, the only workflows that run it (`ARDOUR_WORKFLOWS`); the fixtures it imports count as shared |
 | `.github/workflows/NAME.yml` | that workflow |
 
 The shared parts are not a format's files: the PLUG-2 harness in

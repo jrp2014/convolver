@@ -127,6 +127,16 @@ FORMAT_WORKFLOWS = {
 # macos-latest also is today), and every macOS run checks the same bound.
 UPGRADE = ('tests/upgrade/',)
 UPGRADE_WORKFLOWS = {'regression', 'vst3'}
+# The headless Ardour test (HOST-9), which only the VST3 and LV2 workflows
+# run. It sits in the shared tests/plugins/ because both use it, but it is
+# no other build's code; the fixtures it imports count as code as usual.
+ARDOUR = (
+    'tests/plugins/ardour_harness_tests.py',
+    'tests/plugins/ardour_reopen.lua',
+    'tests/plugins/ardour_session.lua',
+    'tests/plugins/ardour_tests.py',
+)
+ARDOUR_WORKFLOWS = {'vst3', 'lv2'}
 # Files only the candidate workflow uses (CI-34), apart from RELEASE_SHARED.
 RELEASE = ('scripts/release/', 'tests/release/', 'packaging/')
 # Release files that other workflows use too: they count as code.
@@ -231,9 +241,11 @@ def matches(path, entries):
 
 def classify(path):
     """Return 'documentation', 'packaged', 'format:NAME', 'release',
-    'upgrade', 'workflow:NAME' or 'code' for a repository path."""
+    'upgrade', 'ardour', 'workflow:NAME' or 'code' for a repository path."""
     if matches(path, UPGRADE):
         return 'upgrade'
+    if matches(path, ARDOUR):
+        return 'ardour'
     if matches(path, TESTED):
         return 'code'
     if matches(path, PACKAGED):
@@ -345,6 +357,8 @@ def needed(paths):
                 workflows |= FORMAT_WORKFLOWS[kind.split(':', 1)[1]]
             elif kind == 'upgrade':
                 workflows |= UPGRADE_WORKFLOWS
+            elif kind == 'ardour':
+                workflows |= ARDOUR_WORKFLOWS
             elif kind.startswith('workflow:'):
                 workflows.add(kind.split(':', 1)[1])
     workflows.discard('release')
