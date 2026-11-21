@@ -16,5 +16,5 @@
 ## Done
 
 - [x] **DOC-22 — Host-testing steps that match the 0.18 defaults.**
-  21 November 2026, PR #PR
+  21 November 2026, PR #268
   ([host testing](../docs/develop/host-testing.md#prepare-the-mac)).
