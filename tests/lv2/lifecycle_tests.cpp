@@ -310,7 +310,8 @@ int load_timing(host::World& world, const fs::path& work, int argc, char** argv)
     // audio for restore(), and the worker has its own thread.
     const std::vector<timing::Entry> entries{{"restore",
                                               [&](const timing::Filter& f, timing::Audio&) {
-                                                  return timing::Outcome{driver.restore(f.state)};
+                                                  return timing::Outcome{driver.restore(f.state),
+                                                                         std::nullopt};
                                               },
                                               true, false},
                                              {"worker",

@@ -165,6 +165,10 @@ first published preview, keep their original grouping.
   the engine runs, which the host's property listener must hear of; and a
   project's round trip into a second unit through `ClassInfo`. Each must
   report the expected latency and match the oracle within 1e-5.
+- Builds (CI-47): the Audio Unit component's own sources (its factory and
+  the window it shares with the VST3 plug-in) and the Audio Unit and LV2
+  tests build with `-Wall -Wextra -Wpedantic`, as everything else now does;
+  what they found is fixed in the code. No output changes.
 - Builds (CI-46, from an outside audit of 20 November 2026): the VST3
   plug-in and the programs that compile its sources build with the warnings
   the core, the Audio Unit and the LV2 plug-in already had
