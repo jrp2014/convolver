@@ -209,14 +209,14 @@ class Classification(unittest.TestCase):
         self.assertEqual(runs(['scripts/release/resolve.py']), unfuzzed)
         self.assertEqual(runs(['packaging/release-policy.json']), unfuzzed)
         self.assertEqual(runs(['scripts/release/candidate.py', 'plugins/au/effect.hpp']), {'au', 'release'})
-        # The files kept from releases run the native, VST3 and LV2
-        # workflows, whose upgrade.cli, vst3.upgrade and lv2.upgrade read
-        # them, and not the Audio Unit one (CI-42, COMPAT-1).
-        upgrade = {'regression', 'vst3', 'lv2'}
+        # The files kept from releases run the native, VST3, LV2 and Audio
+        # Unit workflows, whose upgrade.cli, vst3.upgrade, lv2.upgrade and
+        # Audio Unit state check read them (CI-42, COMPAT-1).
+        upgrade = {'regression', 'vst3', 'lv2', 'au'}
         self.assertEqual(runs(['tests/upgrade/0.13.2/expected/echo-44100-mono.wav']), upgrade)
         self.assertEqual(runs(['tests/upgrade/0.14.0/manifest.json', 'tests/upgrade/README.md', 'TODO.md']), upgrade)
         self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'tests/upgrade/vst3_render.cpp']), upgrade)
-        self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'plugins/au/effect.hpp']), upgrade | {'au'})
+        self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'plugins/au/effect.hpp']), upgrade)
         self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'plugins/lv2/plugin.cpp']), upgrade)
         self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'portable/engine.cpp']), builds)
         self.assertEqual(runs(['tests/upgrade/run_upgrade.py', 'cmake/X.cmake']), everything)
@@ -665,6 +665,7 @@ UPGRADE_REFERENCES = {
     'CMakeLists.txt': 'registers upgrade.cli wherever the CLI is built',
     'plugins/vst3/CMakeLists.txt': 'registers vst3.upgrade and builds convolver_vst3_render',
     'plugins/lv2/CMakeLists.txt': 'registers lv2.upgrade and builds convolver_lv2_render',
+    '.github/workflows/au.yml': 'restores the Audio Unit state with run_upgrade.py --au-render',
     '.gitattributes': 'keeps the version folders byte for byte; builds nothing',
     '.markdownlint-cli2.yaml': 'Lint leaves the version folders alone',
     '.pre-commit-config.yaml': 'Lint leaves the version folders alone',
@@ -674,7 +675,7 @@ UPGRADE_REFERENCES = {
 
 class UpgradeIsolation(unittest.TestCase):
     """A pull request that changes only the files kept from releases runs
-    the native, VST3 and LV2 workflows, so only the tests those workflows
+    the native, VST3, LV2 and Audio Unit workflows, so only the tests those workflows
     run may read them (CI-42)."""
 
     def test_only_the_vst3_and_lv2_workflows_run_the_ardour_test(self):
@@ -694,7 +695,7 @@ class UpgradeIsolation(unittest.TestCase):
     def test_only_listed_files_name_the_upgrade_files(self):
         # A relative path such as parents[1] / 'upgrade/x' counts too.
         pattern = re.compile(
-            r'tests/upgrade\b|(?<![\w./-])upgrade/|\brun_upgrade\b|\b(?:vst3|lv2)_render\.cpp\b|\bcapture(?:_lv2)?\.py\b'
+            r'tests/upgrade\b|(?<![\w./-])upgrade/|\brun_upgrade\b|\b(?:vst3|lv2)_render\.cpp\b|\bcapture(?:_lv2|_au)?\.py\b'
         )
         own = (*ci_scope.UPGRADE, 'scripts/ci_scope.py', 'tests/ci_scope_tests.py')
         found = {path for path, contents in tracked() if not path.startswith(own) and pattern.search(contents)}
@@ -724,6 +725,7 @@ class UpgradeIsolation(unittest.TestCase):
         self.assertIn('vst3', ci_scope.UPGRADE_WORKFLOWS)
         self.assertIn('regression', ci_scope.UPGRADE_WORKFLOWS)
         self.assertIn('lv2', ci_scope.UPGRADE_WORKFLOWS)
+        self.assertIn('au', ci_scope.UPGRADE_WORKFLOWS)
 
 
 class Command(unittest.TestCase):

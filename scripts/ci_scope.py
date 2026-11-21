@@ -127,13 +127,13 @@ FORMAT_WORKFLOWS = {
 # plugins/lv2/CMakeLists.txt registers with convolver_lv2_render
 # (tests/upgrade/lv2_render.cpp). The native workflow runs upgrade.cli in
 # every job, the VST3 workflow runs it and vst3.upgrade, and the LV2
-# workflow's sanitizer job runs lv2.upgrade. The Audio Unit job's suite
-# includes upgrade.cli too; a change to these files
-# alone leaves that run to main (CI-42). Since CI-43 the VST3 macOS job's
+# workflow's sanitizer job runs lv2.upgrade. The Audio Unit workflow's
+# Release job runs upgrade.cli in its suite and restores the Audio Unit state
+# (run_upgrade.py --au-render) through AVAudioEngine (CI-42). Since CI-43 the VST3 macOS job's
 # suite runs it with the same compiler (the newest Xcode on macos-26, which
 # macos-latest also is today), and every macOS run checks the same bound.
 UPGRADE = ('tests/upgrade/',)
-UPGRADE_WORKFLOWS = {'regression', 'vst3', 'lv2'}
+UPGRADE_WORKFLOWS = {'regression', 'vst3', 'lv2', 'au'}
 # The headless Ardour test (HOST-9), which only the VST3 and LV2 workflows
 # run. It sits in the shared tests/plugins/ because both use it, but it is
 # no other build's code; the fixtures it imports count as code as usual.

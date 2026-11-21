@@ -242,6 +242,56 @@ jobs:
         if: success() && github.run_attempt != '1'
         uses: ./.github/actions/note-retry
 
+  # TEMPORARY (COMPAT-1): captures 0.14.0's Audio Unit state with the
+  # published package and prints it to the log; removed before review.
+  au-capture:
+    needs: scope
+    if: needs.scope.outputs.build == 'true'
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install the published 0.14.0 Audio Unit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/rel"
+          gh release download v0.14.0 -R "$GITHUB_REPOSITORY" -p 'Convolver-0.14.0-preview-macos-arm64.zip' \
+            -D "$RUNNER_TEMP/rel"
+          ditto -x -k "$RUNNER_TEMP/rel/Convolver-0.14.0-preview-macos-arm64.zip" "$RUNNER_TEMP/rel/mac"
+          components="$HOME/Library/Audio/Plug-Ins/Components"
+          mkdir -p "$components"
+          ditto "$RUNNER_TEMP/rel/mac/Components/Convolver.component" "$components/Convolver.component"
+          killall -9 AudioComponentRegistrar 2>/dev/null || true
+          auval -v aufx Conv CONV | tail -5
+          sw_vers; uname -m
+      - name: Capture
+        run: |
+          xcrun swiftc -O -o "$RUNNER_TEMP/avaudioengine_render" tests/au/avaudioengine_render.swift
+          cp -R tests/upgrade/0.14.0 "$RUNNER_TEMP/cap"
+          python3 tests/upgrade/capture_au.py --package "$RUNNER_TEMP/rel/mac" \
+            --renderer "$RUNNER_TEMP/avaudioengine_render" --version 0.14.0 \
+            --zip "$RUNNER_TEMP/rel/Convolver-0.14.0-preview-macos-arm64.zip" --out "$RUNNER_TEMP/cap"
+      - name: Print
+        run: |
+          python3 - "$RUNNER_TEMP/cap" <<'PY'
+          import base64, hashlib, json, plistlib, sys
+          from pathlib import Path
+          out = Path(sys.argv[1])
+          def small(v):
+              if isinstance(v, bytes):
+                  if len(v) > 512:
+                      return {'sha256': hashlib.sha256(v).hexdigest(), 'size': len(v)}
+                  return {'base64': base64.b64encode(v).decode()}
+              return v
+          states = {}
+          for p in sorted((out / 'au-state').glob('*.plist')):
+              states[p.name] = {k: small(v) for k, v in plistlib.loads(p.read_bytes()).items()}
+          print('BEGIN-AU-CAPTURE')
+          print(json.dumps({'au.json': json.loads((out / 'au.json').read_text()), 'states': states}))
+          print('END-AU-CAPTURE')
+          PY
+
   # Two Debug builds of the AU tests, side by side. auval cannot load an
   # instrumented bundle, so only the in-process tests run here, and the
   # core's own sanitizer runs are in the native workflow.
