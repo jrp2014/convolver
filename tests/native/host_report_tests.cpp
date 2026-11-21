@@ -8,6 +8,7 @@
 #include "host_activation.hpp"
 #include "host_log.hpp"
 #include "host_report.hpp"
+#include "window_model.hpp"
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -978,6 +979,60 @@ void awaiting_validation() {
             "restored state waits as a chosen file does");
 }
 
+// PLUG-40 (jrp, 21 November 2026): a list refused before the host's
+// settings were known. Before they are, Status and the window say to play
+// once; once they are, both say so with the same rate and channels, and the
+// window offers no drop hint. The list is given to read again once for that
+// refusal (HostFilter::take_unsettled_list()), and only for that kind.
+void unsettled_list() {
+    const HostLayout known{48000, 2, 2};
+    const std::string now_known =
+        "The host's settings are now known (48000 Hz, 2 in, 2 out): choose the configuration "
+        "list again.";
+    HostFilter f(8);
+    HostRequest list{HostFilterSource::file, "/filters/rates.txt", 0};
+    list.kind = HostRequestKind::chosen_file;
+    f.reject(HostFailureKind::settings_unknown,
+             {"/filters/rates.txt: no entry selected",
+              "Not known yet.",
+              "Play audio once so Convolver can check the host's sample rate and channel counts, "
+              "then choose the configuration list again.",
+              {}},
+             list);
+    auto s = host_status(f, std::nullopt, true, {});
+    auto r = host_report(f, facts(std::nullopt));
+    require(s.status == HostStatus::load_failed && contains(s.text, "play audio once") &&
+                s.text.size() < max_status_text && contains(r.fix, "Play audio once") &&
+                !contains(r.fix, "now known"),
+            "before the settings are known: " + s.text + " | " + r.fix);
+    // A configuration the host has not been seen playing with (Audacity's
+    // brief 44.1 kHz start) is not taken as its settings (the independent
+    // review): still play first.
+    s = host_status(f, known, true, {});
+    r = host_report(f, facts(known));
+    require(contains(s.text, "play audio once") && contains(r.fix, "Play audio once") &&
+                !contains(r.fix, "now known"),
+            "a configuration not seen playing: " + s.text + " | " + r.fix);
+    f.confirm(known); // Seen playing with it.
+    require(!f.played_with(HostLayout{44100, 2, 2}) && f.played_with(known),
+            "played_with() for another configuration");
+    s = host_status(f, known, true, {});
+    r = host_report(f, facts(known));
+    require(contains(s.text, "now known: 48000 Hz, 2 in, 2 out; choose the list again.") &&
+                r.fix == now_known && !contains(r.cause, "not known yet") &&
+                !contains(r.explanation, "Play audio once"),
+            "once they are known: " + s.text + " | " + r.explanation);
+    require(r.filter_note == "rates.txt was refused." &&
+                view::window_content(&r, true).filter_note == "rates.txt was refused.",
+            "a drop hint beside the refusal: " + view::window_content(&r, true).filter_note);
+    require(f.take_unsettled_list() == "/filters/rates.txt" && f.take_unsettled_list().empty(),
+            "the refused list is not given once to read again");
+    // Another kind of refusal is not read again.
+    HostFilter other(8);
+    other.reject(HostFailureKind::sample_rate, {"why"}, list);
+    require(other.take_unsettled_list().empty(), "a rate refusal is given to read again");
+}
+
 // PLUG-39 step 5: the report's one encoding for a format's transport (the
 // VST3 message, the Audio Unit property): every field read back as written,
 // text with tabs, line breaks and zero bytes kept, and anything not read
@@ -1026,6 +1081,7 @@ void encoding() {
 int main() {
     if (convolver::test::run_cases({
             {"awaiting_validation", awaiting_validation},
+            {"unsettled_list", unsettled_list},
             {"cases", cases},
             {"actions", actions},
             {"log_agrees", log_agrees},

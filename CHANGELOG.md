@@ -37,6 +37,58 @@ first published preview, keep their original grouping.
 
 ### Changed
 
+- Plug-ins (PLUG-39 step 6, which finishes PLUG-39): the latency and tail
+  the host reads are written in one place in each of VST3 and the Audio
+  Unit, from the newest processor or, with none, from the accepted filter
+  (`HostFilter::filter_tail()`, which replaces `HostChange::inactive_tail`).
+  One reading changes, while no audio runs: once the host has stopped the
+  plug-in, the tail the host reads and the window's Ring-out row are the
+  accepted filter's, where they stayed at the longest filter the last
+  processor had played (or at 0 for a filter that did not suit the host).
+  `vst3.adapter`'s `edge_cases` and `au.adapter`'s `timing_in_seconds`
+  check it. Audio, saved state and every other message are unchanged.
+- Library (PLUG-39 step 6), in 0.18.0: `HostChange::inactive_tail` is
+  removed; `HostFilter::filter_tail()` gives the accepted filter's tail
+  instead, found when the filter is accepted. An incompatible API change,
+  so a minor version step. The
+  [plan](docs/archive/plans/2026-11-13-load-restore-consolidation.md) is
+  archived with its recount.
+- Documentation (HOST-10): the plug-in guide has an Ardour section, by the
+  track's Pin Mode (tried with Ardour 8.4 and 9.0). On a Strict-I/O track,
+  Ardour's default, a mono or stereo filter plays in the VST3 and the LV2
+  plug-in, but a crossover cannot (the track keeps its channel count). On a
+  Flexible-I/O track, the LV2 plug-in plays its mono, stereo and 2→6
+  layouts, while the VST3 plug-in gets 2 inputs and 2 outputs whatever the
+  track has, so a mono or crossover filter plays silence; the guide gives
+  Pin Connections steps that should let a mono filter play there (the same
+  settings, made from a script, played it; set the channels before choosing
+  the filter, or choose it again after), and a crossover cannot be set up
+  that way. Ardour also leaves Gain mode and Latency out of its controls
+  for the VST3 plug-in, and names all four of the LV2 plug-in's settings.
+  The LV2 ports table now lists `gain_mode`.
+- Plug-ins (PLUG-40, from jrp's Audacity pass of 21 November 2026): a
+  configuration list chosen in Convolver's window before the host has
+  played is no longer something to choose again. With the window open, it
+  loads by itself, as if chosen, when the host plays, and the project is
+  marked changed (it is not added to Recent). Checked by automated tests,
+  not yet in a host. Once Convolver has seen the host play, Status and the
+  window say "The host's settings are now known (48000 Hz, 2 in, 2 out):
+  choose the configuration list again." (Status in short) instead of still
+  saying the settings are unknown; a brief start without playing, such as
+  Audacity's after a parameter edit, does not count. The window no longer
+  suggests dropping a file beside any refusal. VST3 and the Audio Unit; the
+  Audio Unit's part is checked only on macOS CI
+  ([when a chosen file is checked](docs/use/plugins.md#loading-a-filter)).
+- Documentation (VST3-17): in Audacity, Convolver's **Choose…** and
+  **Recent** are now checked routes alongside Audacity's preset menu. jrp
+  checked the 0.16.14 candidate in Audacity 4.0.2 on macOS on 21 November
+  2026: a filter chosen before playing was in the export with the window
+  open and, after saving, quitting and reopening, in the next export; a
+  configuration list chosen after one playback took its 48 kHz entry
+  ([record](docs/archive/reviews/2026-11-21-vst3-17-audacity-pass.md)).
+  The guides, status and the release notes' text say so; **Reload**,
+  reloading when the file changes and a `.vstpreset` chosen in the window
+  remain checked only by automated tests.
 - Library and tools (PLUG-39 step 5b): exceptions keep their message's
   parts (problem, cause, fix, note) typed beside their text, and every catch
   block reads the parts rather than parsing the "Cause: ", "Fix: " and
@@ -155,6 +207,14 @@ first published preview, keep their original grouping.
 
 ### Fixed
 
+- Plug-ins (PLUG-41, from jrp's review of 21 November 2026): a filter file
+  chosen in Convolver's window waits for audio in the current start in both
+  formats. The VST3 plug-in refused a file chosen just after the host
+  stopped and started again with the same settings, before any audio of
+  that start, from audio played in the earlier start. The Audio Unit
+  counted a render of zero frames as the host playing, so after one it
+  refused a chosen file that should wait, and refused restoring a 48 kHz
+  project after a 44.1 kHz probe (error -10851). No change to the sound.
 - Plug-ins (PLUG-27): a filter file chosen in Convolver's window before the
   host plays is kept and saved with the project, and checked when the host
   plays audio through the plug-in; until then Status says "Filter selected.
@@ -170,8 +230,13 @@ first published preview, keep their original grouping.
   no entry for the rate the host last ran at is refused naming it, with
   the same step added to the advice while the host is not playing. While the
   host plays, a file that does not suit it is still refused and the working
-  filter keeps playing. VST3 and the Audio Unit; not yet checked in
-  Audacity ([when a chosen file is checked](docs/use/plugins.md#loading-a-filter)).
+  filter keeps playing. VST3 and the Audio Unit
+  ([when a chosen file is checked](docs/use/plugins.md#loading-a-filter));
+  checked in Audacity 4.0.2 on macOS with the 0.16.14 candidate (jrp, 21
+  November 2026, [record](docs/archive/reviews/2026-11-21-vst3-17-audacity-pass.md)):
+  Status said it was waiting, both exports had the filter, and a list
+  chosen after one playback took its 48 kHz entry. The Audio Unit's part
+  is checked only by automated tests.
 - Documentation (DOC-18, from an outside audit of 20 November 2026): the
   user guides no longer contradict the plug-ins. **Choose…** opens a
   Convolver `.vstpreset` (the first-sound guide said it read no presets);
@@ -221,15 +286,28 @@ first published preview, keep their original grouping.
   `main`, the weekly and manual runs
   ([pre-releases](docs/develop/build.md#pre-releases-and-newer-upstream-versions));
   `tests/ci_scope_tests.py` accepts that one extra condition beside a job's
-  scope gate. The Monday runs with macOS jobs now start half an hour apart (candidates
-  06:23, Audio Unit 06:53, VST3 07:23 UTC) instead of together, so they no
-  longer queue for the same five macOS runners. The analysis's other
+  scope gate. The Monday runs with macOS jobs now start half an hour apart
+  (candidates 06:23, Audio Unit 06:53, VST3 07:23 UTC) instead of together,
+  so they no longer queue for the same five macOS runners. The analysis's other
   proposals were not taken: the Accelerate and Ooura builds keep the
   package consumer tests, because the installed package's configuration
   differs for each FFT backend and those builds are the only check of the
   Accelerate and Ooura packages; the Ardour and LV2 tools jobs stay without
   a compiler cache (builds of 17 to 35 s, never the last job, and the
   repository's cache space is shared).
+- Tests (HOST-10): the headless Ardour test plays the mono and stereo
+  examples on Strict-I/O tracks too, as Ardour's window adds by default
+  (`CONVOLVER_STRICT_IO`), and the mono example in the VST3 plug-in on a
+  Flexible-I/O track with its channels set by hand, as the Pin Connections
+  window's Manual Config does: outputs only (all Ardour 8's window can set
+  for a VST3) and outputs and input pins (Ardour 9's). It prints the
+  track's Pin Mode, Ardour's
+  natural streams, the insert's channels and the name Ardour gives each
+  input parameter, the layout lines the Convolver log gained in each case,
+  and the whole log when an export does not match the oracle. After
+  setting the channels it waits until the log says the plug-in started
+  with them: Ardour 8.4 restarts the plug-in a little later, and a preset
+  loaded before that was refused and saved as a failure (PLUG-42).
 - Benchmarks (PERF-3): `tests/native/benchmarks/workloads.py` measures
   callback times, peak memory and preparation for long and multichannel
   filters through `HostProcessor`, and the manual Workload measurements
@@ -257,6 +335,11 @@ first published preview, keep their original grouping.
   the render within the bound; `capture_au.py` captures later releases,
   and the AVAudioEngine renderer gains `--parameter` and `--save` for it.
   Changes to `tests/upgrade/` now run the LV2 and Audio Unit workflows too.
+  The Audio Unit check requires every sample before the reported latency
+  to be finite; it had checked only their largest value, which a NaN
+  passes, before dropping them. `tests/upgrade/harness_tests.py` (in
+  pre-commit) feeds it a NaN, an infinity and sound there. `capture_au.py`
+  no longer uses `str.removesuffix`, which needs Python 3.9.
 - Tests (HOST-11): `scripts/reaper_check.py` accepts a Status reading only
   when it is exactly the stereo example's Active text, `Filter loaded: 48000
   Hz, 2 in, 2 out.`. From jrp's review of 21 November 2026: the waiting text

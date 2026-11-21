@@ -355,7 +355,20 @@ void timing_in_seconds() {
     check(unit.initialize(), "initialization");
     require(unit.seconds(kAudioUnitProperty_TailTime) == static_cast<double>(tail) / 48000,
             "tail after initialization is not the filter's tail in seconds");
+    // PLUG-39 step 6: a shorter filter keeps the longer tail while
+    // initialized; uninitialized, nothing rings on, so the tail is the
+    // accepted filter's.
+    auto shorter = filter;
+    for (auto& path : shorter.paths)
+        path.impulse.resize(10);
+    const auto short_tail = configuration_tail_frames(shorter);
+    require(short_tail < tail, "the shorter filter's tail is not shorter");
+    check(unit.load(state_of(shorter)), "load a shorter filter while initialized");
+    require(unit.seconds(kAudioUnitProperty_TailTime) == static_cast<double>(tail) / 48000,
+            "a shorter filter shortened the tail while initialized");
     unit.uninitialize();
+    require(unit.seconds(kAudioUnitProperty_TailTime) == static_cast<double>(short_tail) / 48000,
+            "the tail uninitialized is not the accepted filter's");
     seen.clear();
     // A new rate changes both values in seconds, and the host is told.
     check(unit.configure(96000, 2, 6, 512), "formats at 96 kHz");
@@ -704,6 +717,16 @@ void layout_probe_before_restore() {
             "a 44.1 kHz filter accepted after rendering at 48 kHz");
     require(encode_host_state(unit.saved()) == encode_host_state(state_of(filter)),
             "a rejected restore replaced the filter");
+
+    // jrp's review (21 November 2026): a render of zero frames is not audio
+    // rendered, so after such a probe the 48 kHz project still restores.
+    Unit probed;
+    check(probed.configure(44100, 2, 6, 512), "zero-frame probe formats");
+    check(probed.initialize(), "zero-frame probe initialization");
+    Buffers none(2, 6, 512);
+    check(render(probed, none, 0, false, silent), "a zero-frame render");
+    probed.uninitialize();
+    check(probed.load(state_of(filter)), "restoring a 48 kHz project after a zero-frame render");
 }
 
 // PLUG-8: a processor that cannot be built at initialization is recorded as an

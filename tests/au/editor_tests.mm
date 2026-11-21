@@ -918,6 +918,74 @@ void files() {
     wide.uninitialize();
 }
 
+// PLUG-40 (jrp, 21 November 2026), as in VST3: a list refused before the
+// unit rendered is read again by itself, as if chosen, once the window reads
+// its report while the host renders; until then the report says what to do.
+void list_read_again() {
+    TemporaryFolder folder;
+    write_wav(folder / "room.wav", 48000, 2, 8);
+    write_wav(folder / "slow.wav", 44100, 2, 8);
+    std::ofstream(folder / "slow.cfg") << "44100 2 2 0\n0 0\n0 0\nslow.wav\n0\n0\n0\n"
+                                       << "slow.wav\n1\n1\n1\n";
+    std::ofstream(folder / "room.cfg") << "48000 2 2 0\n0 0\n0 0\nroom.wav\n0\n0\n0\n"
+                                       << "room.wav\n1\n1\n1\n";
+    std::ofstream(folder / "rates.txt") << "slow.cfg\nroom.cfg\n";
+    Unit unit;
+    // Initialized at 44.1 kHz and uninitialized with nothing rendered (a
+    // JUCE host's probe): the formats are not known. (While initialized,
+    // the list would take the entry for that initialization's formats.)
+    check(unit.configure(44100, 2, 2, 512), "44.1 kHz formats for the list");
+    check(unit.initialize(), "44.1 kHz initialization for the list");
+    unit.uninitialize();
+    require(choose(unit, (folder / "rates.txt").string()) != noErr,
+            "a list chosen before rendering");
+    auto r = report(unit);
+    require(r.fix.find("Play audio once") != std::string::npos,
+            "before rendering, the list's Fix: " + r.fix);
+    // The host renders at 48 kHz and reads Status with the window closed,
+    // then stops: the report says the settings are known now, and nothing
+    // is read again while stopped.
+    check(unit.configure(48000, 2, 2, 512), "48 kHz formats for the list");
+    check(unit.initialize(), "48 kHz initialization for the list");
+    render_block(unit, 2, 2);
+    {
+        AudioUnitParameterStringFromValue request{au::status_parameter, nullptr, nullptr};
+        UInt32 bytes = sizeof request;
+        check(AudioUnitGetProperty(unit.get(), kAudioUnitProperty_ParameterStringFromValue,
+                                   kAudioUnitScope_Global, 0, &request, &bytes),
+              "the host's Status read");
+        if (request.outString)
+            CFRelease(request.outString);
+    }
+    unit.uninitialize();
+    r = report(unit);
+    require(r.fix == "The host's settings are now known (48000 Hz, 2 in, 2 out): choose the "
+                     "configuration list again.",
+            "after a Status read while rendering, the list's Fix: " + r.fix);
+    check(unit.initialize(), "48 kHz initialization again for the list");
+    render_block(unit, 2, 2);
+    for (const auto id : {kAudioUnitProperty_ClassInfo, kAudioUnitProperty_PresentPreset})
+        check(AudioUnitAddPropertyListener(unit.get(), id, state_changed, nullptr),
+              "state listener for the list");
+    class_info_changes = 0;
+    preset_changes = 0;
+    r = report(unit);
+    const auto saved = unit.saved();
+    require(r.status_name == "Active" && saved.configuration && !saved.failed &&
+                saved.configuration->sample_rate == 48000,
+            "the list was not read again while rendering: " + r.status_name + ": " + r.explanation);
+    // The project is marked changed, as for a chosen file.
+    require(class_info_changes > 0 && preset_changes > 0,
+            "the list read again sent no ClassInfo or PresentPreset notification");
+    // Read once: a later read loads nothing.
+    const int changes = class_info_changes;
+    (void)report(unit);
+    require(class_info_changes == changes, "the list was read again twice");
+    for (const auto id : {kAudioUnitProperty_ClassInfo, kAudioUnitProperty_PresentPreset})
+        AudioUnitRemovePropertyListenerWithUserData(unit.get(), id, state_changed, nullptr);
+    unit.uninitialize();
+}
+
 // PLUG-27, as vst3.adapter chosen_before_host_plays: a single filter chosen
 // before the host renders is kept and saved, and checked when the host
 // initializes the unit; a list waits for formats the host has rendered
@@ -1010,6 +1078,24 @@ void chosen_before_rendering() {
     require(f.present && !f.silent && rate_of(unit) == 48000,
             "a refused file replaced the playing filter: " + std::string(f.problem));
     unit.uninitialize();
+
+    // jrp's review (21 November 2026): a render of zero frames is not the
+    // host playing, so a 44.1 kHz file chosen after one is kept and waits.
+    Unit fresh;
+    check(fresh.configure(48000, 2, 2, 512), "48 kHz formats for a zero-frame render");
+    check(fresh.initialize(), "48 kHz initialization for a zero-frame render");
+    std::vector<float> in(512), out(512), in2(512), out2(512);
+    const std::array<const float*, 2> ins{in.data(), in2.data()};
+    const std::array<float*, 2> outs{out.data(), out2.data()};
+    bool zero_silent = false;
+    check(fresh.render(ins, outs, 0, false, zero_silent), "a zero-frame render");
+    check(choose(fresh, (folder / "slow.wav").string()),
+          "a 44.1 kHz file chosen after a zero-frame render");
+    r = report(fresh);
+    require(r.status_name == "Waiting" && rate_of(fresh) == 44100,
+            "chosen after a zero-frame render: " + text(r.status_name) + ": " +
+                text(r.status.text));
+    fresh.uninitialize();
 }
 
 // TODO AU-6: a report read while a load holds the unit's control lock on
@@ -1137,6 +1223,7 @@ int main() {
             window();
             files();
             chosen_before_rendering();
+            list_read_again();
             responsive();
             faults(log);
         } catch (const std::exception& e) {

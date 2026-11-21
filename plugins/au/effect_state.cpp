@@ -225,21 +225,23 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
 // An empty instance that fails its first load plays silence, not identity,
 // without allocating: memory may have run out (ROBUST-3), maybe before the
 // failure could be recorded (ROBUST-7).
-void Effect::silence_failed_first_load() noexcept {
+bool Effect::silence_failed_first_load() noexcept {
     filter_.fail_request(host());
-    if (!host() && filter_.failed())
-        tail_.store(0);
+    return publish_timing();
 }
 
 // ROBUST-7: a request that failed before its failure could be recorded
 // (memory ran out building the message) still fails a first load.
 void Effect::fail_unrecorded() noexcept {
     try {
+        bool latency = false;
         {
             const Locked lock(*this);
-            silence_failed_first_load();
+            latency = silence_failed_first_load();
             update_status();
         }
+        if (latency)
+            tell_listeners(notice_latency);
         notify_status();
     } catch (...) { // The lock could not be taken.
     }
@@ -248,13 +250,16 @@ void Effect::fail_unrecorded() noexcept {
 void Effect::reject(HostFailureKind kind, const Advice& why, const HostRequest& request,
                     const Configuration* carried) {
     std::string faults;
+    bool latency = false;
     {
         const Locked lock(*this);
         faults = observe_faults(); // Explained under the filter that played.
         filter_.reject(kind, why, request, carried);
-        silence_failed_first_load();
+        latency = silence_failed_first_load();
         update_status();
     }
+    if (latency)
+        tell_listeners(notice_latency);
     log_faults(faults);
     log(rejection_line());
     notify_status();
@@ -265,7 +270,7 @@ void Effect::reject(HostFailureKind kind, const Advice& why, const HostRequest& 
 // `saved`: the settings from a restored state, applied if it is accepted.
 bool Effect::install(HostState next, const HostRequest& request, const SavedSettings* saved,
                      bool settings_unreadable) {
-    bool accepted = false, problem = true;
+    bool accepted = false, problem = true, latency = false;
     std::string message, faults;
     {
         const Locked lock(*this);
@@ -296,7 +301,7 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                 },
                 request, host(), settling_.check(request.kind));
             // Nothing from here on can throw: the request is accepted.
-            tail_.store(host() ? host()->tail_frames() : change.inactive_tail);
+            latency = publish_timing();
             accepted = true;
             if ((applied = change.settings)) {
                 store(*applied);
@@ -305,7 +310,7 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                 applied_gain_mode_ = applied->gain_mode;
             }
         } catch (...) {
-            silence_failed_first_load();
+            latency = silence_failed_first_load();
         }
         try {
             // Why this request failed, or what was loaded (with the saved
@@ -334,7 +339,7 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
     }
     // Listeners may call back into the unit, so notify outside the lock; on
     // the main thread, as a restore may run on another (AU-17).
-    tell_listeners(notice_tail);
+    tell_listeners(latency ? notice_tail | notice_latency : notice_tail);
     log_faults(faults);
     log(message, problem); // A restored failed load says why it plays silence.
     if (accepted && settings_unreadable)

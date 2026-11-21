@@ -186,6 +186,11 @@ uint32 PLUGIN_API Processor::getTailSamples() {
     const auto latency = getLatencySamples();
     return tail >= kInfiniteTail - latency ? kInfiniteTail - 1 : tail + latency;
 }
+void Processor::publish_timing() noexcept {
+    const auto* const p = host();
+    tail_.store(static_cast<uint32>(p ? p->tail_frames() : filter_.filter_tail()));
+    active_latency_.store(p ? p->latency_frames() : inactive);
+}
 HostSettings Processor::settings() const noexcept {
     return {gain_db_.load(), mix_.load(), latency_.load(), gain_mode_.load()};
 }
@@ -272,13 +277,12 @@ tresult Processor::activate(TBool state) {
             auto activation = filter_.activation(now);
             auto next = std::make_unique<HostProcessor>(
                 activation.playback, processSetup.maxSamplesPerBlock, chosen, now.inputs);
-            tail_.store(static_cast<uint32>(next->tail_frames()));
             next->set_bypass(bypassed);
             next->reset();
             // Not playing: the host does not process while it activates.
             playing_.offer(std::move(next));
             filter_.activate(std::move(activation));
-            active_latency_.store(host()->latency_frames());
+            publish_timing();
             hold_fault_signal();
             // Audio played with these rate and buses before still counts:
             // only a new configuration needs the host to play again.
@@ -296,7 +300,7 @@ tresult Processor::activate(TBool state) {
         } else {
             // No audio runs while inactive: every processor is freed.
             playing_.clear();
-            active_latency_.store(inactive);
+            publish_timing();
             settling_.stopped();
         }
         active_ = state != 0;
@@ -363,7 +367,7 @@ HostStatusLine Processor::status_locked() const {
 HostStatusLine Processor::status() {
     const Locked lock(*this);
     if (settling_.playing()) // PLUG-27: the host plays the filter.
-        filter_.confirm();
+        filter_.confirm(known_layout());
     return status_locked();
 }
 HostReport Processor::report_locked() const {
@@ -391,7 +395,7 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
         {
             const Locked lock(*this);
             if (settling_.playing()) // PLUG-27: the host plays the filter.
-                filter_.confirm();
+                filter_.confirm(known_layout());
             // PLUG-39 step 5: the report holds the Status line too.
             report = encode_report(report_locked());
         }
@@ -406,8 +410,11 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
             return;
         attributes->setBinary("report", report.data(), static_cast<uint32>(report.size()));
         attributes->setBinary("format", tag_.data(), static_cast<uint32>(tag_.size()));
-        if (answer.load_request) {
-            attributes->setInt("load request", answer.load_request);
+        if (answer.load_request || answer.retried) {
+            if (answer.load_request)
+                attributes->setInt("load request", answer.load_request);
+            if (answer.retried)
+                attributes->setInt("retried", 1);
             attributes->setInt("accepted", answer.accepted ? 1 : 0);
             if (answer.accepted && answer.settings) {
                 attributes->setFloat("gain", answer.settings->gain_db);
@@ -478,6 +485,7 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
     }
     if (id == report_message) {
         bool faulted = false;
+        std::string list;
         {
             const Locked lock(*this);
             const auto now = std::chrono::steady_clock::now();
@@ -485,9 +493,25 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
                 faulted = observe_faults();
                 report_faults_at_ = now;
             }
+            // PLUG-40: a list refused before the host's settings were known
+            // is read again once the window sees the host playing audio, as
+            // if chosen again; the window's read comes on the UI thread, as a
+            // chosen file does.
+            if (settling_.playing())
+                try {
+                    list = filter_.take_unsettled_list();
+                } catch (...) { // Out of memory: the refusal's advice stays.
+                }
         }
         if (faulted)
             write_log();
+        if (!list.empty()) {
+            std::optional<HostSettings> settings;
+            const bool accepted = load_file(list, settings);
+            write_log();
+            send_status({.retried = true, .accepted = accepted, .settings = settings});
+            return kResultOk;
+        }
         send_status();
         return kResultOk;
     }
@@ -579,11 +603,10 @@ void Processor::choose_latency(std::size_t frames) noexcept {
         // Before it plays, so its first block cannot show Fault over a load
         // failure that is showing.
         next->hold_fault_signal(filter_.failure_shown());
-        tail_.store(static_cast<uint32>(next->tail_frames()));
-        active_latency_.store(next->latency_frames());
         // process() plays it from its next block; the one it replaces is
         // freed by a later control call once process() has let it go.
         playing_.offer(std::move(next));
+        publish_timing();
         changed = true;
     } catch (const std::exception& e) {
         try {
@@ -728,8 +751,7 @@ std::optional<HostSettings> Processor::install(HostState next, const HostRequest
         request, host(), check);
     // Nothing from here on can throw: the request is accepted.
     hold_fault_signal();
-    tail_.store(host() ? static_cast<uint32>(host()->tail_frames())
-                       : static_cast<uint32>(change.inactive_tail));
+    publish_timing();
     if (change.bypass) {
         bypass_.store(*change.bypass);
         shown_bypass_.store(*change.bypass);
@@ -787,8 +809,7 @@ void Processor::refused() noexcept {
     // without allocating: memory may have run out (ROBUST-3), maybe before
     // the failure could be recorded (ROBUST-7).
     filter_.fail_request(host());
-    if (!host() && filter_.failed())
-        tail_.store(0);
+    publish_timing();
     hold_fault_signal();
     try {
         log(rejected_line(filter_, host() != nullptr, bypass_.load()));

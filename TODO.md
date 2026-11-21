@@ -53,16 +53,15 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 
 ### In progress
 
-PLUG-39's step 5, after step 4a (PR #236); HOST-11's exact Status
-check (PR #255), before jrp's second run. Check the open pull requests for
-an ID before starting anything.
+PLUG-24, then DIAG-10; HOST-11 waits for jrp's second run of the REAPER
+check (PR #255). Check the open pull requests for an ID before starting
+anything.
 
 ### Ready
 
 | Item | What to do | Note |
 | --- | --- | --- |
-| **PLUG-39** | Step 6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps); steps 0 to 5 and ROBUST-8 are merged | Each step is its own reviewed pull request (jrp, 13 and 19 November 2026) |
-| **PLUG-24** | `HostProcessor` in its own source file | In PLUG-39's sequence, as its own pull request, never with a DSP change (jrp, 19 November 2026) |
+| **PLUG-24** | `HostProcessor` in its own source file | After PLUG-39, as its own pull request, never with a DSP change (jrp, 19 November 2026) |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 
@@ -71,7 +70,7 @@ an ID before starting anything.
 | Item | What remains | Waits for |
 | --- | --- | --- |
 | **REL-3** | The independent walkthrough of the published 0.14.0 files | A tester, whom jrp chooses |
-| **HOST-1**, **VST3-11**, **AU-4**, **AU-6**, **VST3-17**, **PERF-2**, **COMPAT-1** | [Checks left](docs/project/status.md#checks-left-before-publication) 1 to 5 and 8 to 10; COMPAT-1's REAPER project saved with 0.14.0 | jrp's Mac session on 0.14.0 |
+| **HOST-1**, **VST3-11**, **AU-4**, **AU-6**, **PERF-2**, **COMPAT-1** | [Checks left](docs/project/status.md#checks-left-before-publication) 1 to 5, 8 and 9; COMPAT-1's REAPER project saved with 0.14.0 | jrp's Mac session on 0.14.0 |
 | **PERF-2**, after its session | The CPU indication beside the Latency menu, and block sizes tuned on Apple silicon (first a largest block above 8,192 frames for filters over 30 s) | Check 9 and the [workload measurements](docs/develop/fft-measurements.md#supported-workloads) run on jrp's Mac |
 | **VST3-12**, **HOST-4** | The Windows window in hosts and a screen reader; Equalizer APO on a real device | A Windows tester or device |
 | **LV2-4** | Desktop LV2 hosts and PipeWire on a real sound card | A Linux tester |
@@ -87,6 +86,7 @@ an ID before starting anything.
 | Item | What remains | The decision |
 | --- | --- | --- |
 | **REL-1**, **PLUG-20** | Signing and notarization, verified minimum versions and the final licence review; the VST logo in the window (optional) | jrp's signing choices in the [signing plan](docs/project/plans/2026-11-09-macos-signing.md), then his setup |
+| **PLUG-42** | Whether a filter refused only for its channels is tried again when the host restarts the plug-in with channels that fit (found in Ardour 8.4 by HOST-10) | jrp: retry at the next start that fits, or keep the refusal final |
 | **IO-2**, **EDGE-1** and the other **EDGE** items | First the limitations users cite (IO-2, EDGE-11's other candidates, EDGE-10, EDGE-3, EDGE-13); then EDGE-12, EDGE-9, EDGE-2, EDGE-4 and EDGE-5; then EDGE-6 to EDGE-8; EDGE-14 and EDGE-15 | Each starts with the owner's decision its row in the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) names, and the plan's gate. Feedback that asks for one moves it up |
 
 ### Parked
@@ -127,8 +127,9 @@ Foundation items are parked by owner decision instead.
   at each preview, and for 0.13.12, which added LV2, the community posts and
   the LV2 list proposal those steps name. Recurs with each preview.
 - [ ] **HOST-1 — Named host matrix.** REAPER and Audacity on jrp's Mac
-  ([checks left](docs/project/status.md#checks-left-before-publication) 1 to 4
-  and 10) on the published 0.14.0 files, then Windows hosts. **Done when**
+  ([checks left](docs/project/status.md#checks-left-before-publication) 1 to
+  4) on the published 0.14.0 files, with REAPER step 11's check that a file
+  chosen in the window adds no undo entry (from VST3-17), then Windows hosts. **Done when**
   each check passes or jrp narrows it, recorded as
   [every report](docs/develop/host-testing.md#every-report) asks.
 - [ ] **HOST-2 — Additional formats.** CLAP, only on request: every CLAP
@@ -148,11 +149,6 @@ Foundation items are parked by owner decision instead.
   `known_new_session_abort()` in `tests/plugins/ardour_tests.py` accepts it on
   9.0 only; jrp may report it upstream. **Done when** the Ardour on
   `ubuntu-latest` no longer aborts and the test stops accepting it.
-- [ ] **HOST-10 — Ardour's VST3 channels and settings.** From HOST-9:
-  Ardour 8.4 ran the VST3 only at its default 2 in, 2 out and named Latency
-  and Gain mode "hidden" ([unresolved host finding](docs/develop/host-testing.md#unresolved-host-findings)).
-  **Done when** it is known whether Ardour 9 does the same and the
-  [plug-in guide](docs/use/plugins.md) says what Ardour users need.
 - [ ] **HOST-11 — One command for the REAPER checks.** Step 3 of the
   [plan](docs/project/plans/2026-11-21-host-test-automation.md#steps): a
   ReaScript-driven script for jrp's Mac (presets, renders compared with
@@ -163,12 +159,12 @@ Foundation items are parked by owner decision instead.
 - [ ] **DIAG-9 — Numbers in the user's locale.** Low priority. **Done when**
   the window shows numbers in the system locale from one formatting path,
   Status and the log stay plain, and a test covers other separators; best
-  after PLUG-39's typed reporting.
+  after DIAG-10.
 - [ ] **DIAG-10 — Status says what the window says.** Status also names a
   Latency not in use yet, the Estimate being found or failing, and a filter
-  still loading ([what Status leaves out](docs/use/plugins.md#status-and-the-convolver-log));
-  in PLUG-39's typed reporting. **Done when** each format's tests cover
-  them and jrp has decided LV2's `status` port values.
+  still loading ([what Status leaves out](docs/use/plugins.md#status-and-the-convolver-log)),
+  from the typed report. **Done when** each format's tests cover them and
+  jrp has decided LV2's `status` port values.
 
 ## Plug-ins: VST3, LV2 and AU
 
@@ -196,17 +192,23 @@ done once for all three formats:
   a placeholder-rate match and restored state are still judged against
   it); parked. **Done when** jrp has decided and, if
   he wants it, the marking is shown and its message tests cover it.
+- [ ] **PLUG-42 — Try a refused filter again when the channels change.**
+  Found by HOST-10 on Ardour 8.4. Setting a VST3's outputs by hand restarts
+  the plug-in a little later, and a filter chosen while it still runs with
+  the old outputs is refused ("Not loaded"). It is not tried again when the
+  host restarts the plug-in with channels that fit, so the project saves
+  the refusal. The [Ardour guide](docs/use/plugins.md#ardour) says to choose the
+  filter again ([evidence](docs/develop/testing.md#ardour-headless)). **Needs** jrp's
+  decision: keep a filter refused only for its channels, and try it again
+  at the next start whose channels fit, or keep the refusal final. **Done
+  when** he has decided and, if he wants the retry, adapter tests cover it
+  in each format that refuses a chosen file.
 - [ ] **PLUG-29 — Keep the Recent list out of the log folder.** Save it in
   each platform's application-support folder, reading the old file once.
   **Done when** the tests cover both paths and the guide names the folder.
-- [ ] **PLUG-39 — One consolidation of the load and restore path.** Step
-  6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md).
-  **Done when** the plan's
-  [success criterion](docs/project/plans/2026-11-13-load-restore-consolidation.md#success-criterion)
-  is met.
 - [ ] **PLUG-24 — `HostProcessor` in its own source file.** Move its audio
   code out of `host.cpp`, with public APIs, saved state, messages and
-  results unchanged, as its own pull request in PLUG-39's sequence.
+  results unchanged, as its own pull request after PLUG-39.
 
 LV2 (Linux first; also PipeWire system audio):
 
@@ -299,15 +301,6 @@ relevant to a convolver unless the product changes.
 - [ ] **VST3-11 — Editor window on macOS.** The window's steps in REAPER and
   Audacity, keyboard isolation and VoiceOver (checks 1 and 4). **Done
   when** they pass or jrp narrows them.
-- [ ] **VST3-17 — Audacity keeps a filter chosen in the window.** Fixed in
-  0.13.12 (PR #177) and checked only by `vst3.adapter`; jrp's run of
-  0.14.0 never reached it, as **Choose…** was refused first (PLUG-27,
-  [record](docs/archive/reviews/2026-11-20-vst3-17-audacity.md)).
-  **Remains:** jrp's Audacity check (check 10) on a build with PLUG-27's
-  fix, with a list chosen again after one playback, with whether undo brings back the previous
-  filter, a REAPER check that a chosen file adds no undo entry, and the
-  drafted upstream issue for jrp to post. **Done when** the Audacity check
-  passes and the guides drop "not yet checked in Audacity".
 - [ ] **VST3-12 — Editor window on Windows.** **Done when** a tester has
   used it in REAPER, another Windows host and a screen reader, and the
   release notes drop the limitation.
@@ -508,6 +501,16 @@ move to the archive.
 - [x] **CI-49 — Advisory upstream lilv off pull requests; Monday runs
   staggered.** 21 November 2026, PR #TBD
   ([pre-releases](docs/develop/build.md#pre-releases-and-newer-upstream-versions)).
+- [x] **PLUG-39 — One consolidation of the load and restore path.** 21
+  November 2026, PRs #200, #205, #213, #217, #219, #224, #226, #230 to
+  #232, #236, #246, #250 and #256 ([plan](docs/archive/plans/2026-11-13-load-restore-consolidation.md),
+  [adapter contract](docs/develop/plugin-contract.md#replacement-and-threads)).
+- [x] **HOST-10 — Ardour's VST3 channels and settings.** 21 November 2026,
+  PR #247: on Ardour's default Strict-I/O tracks mono and stereo play; a
+  crossover needs the LV2 on a Flexible-I/O track, where the VST3 gets 2
+  in, 2 out (a mono filter plays once its outputs are set by hand); the
+  VST3's Gain mode and Latency are hidden
+  ([plug-ins](docs/use/plugins.md#ardour)).
 - [x] **PERF-3 — One measurement exercise: budgets, supported workloads and
   published evidence.** 21 November 2026, PR #248
   ([supported workloads](docs/develop/fft-measurements.md#supported-workloads),
@@ -526,7 +529,8 @@ move to the archive.
 - [x] **PLUG-27 — Read a chosen filter before the host's audio settings
   are known.** 21 November 2026, PR #233: a chosen file waits ("Filter
   selected. Waiting for the host's audio settings.") until the host plays
-  ([plug-ins](docs/use/plugins.md#loading-a-filter)).
+  ([plug-ins](docs/use/plugins.md#loading-a-filter)); checked in Audacity
+  on 0.16.14 ([record](docs/archive/reviews/2026-11-21-vst3-17-audacity-pass.md)).
 - [x] **HOST-9 — Play the VST3 and a saved Latency in the Ardour test.** 21
   November 2026, PR #237 ([Ardour, headless](docs/develop/testing.md#ardour-headless)).
 - [x] **AU-18 — Render the Audio Unit in the hosts' orders of events.** 21
@@ -534,3 +538,18 @@ move to the archive.
 - [x] **PLUG-30 — One rule for state a busy lock makes a call skip.**
   21 November 2026, PR #236, with PLUG-39 step 4a
   ([calls that do not wait for the control lock](docs/develop/plugin-contract.md#calls-that-do-not-wait-for-the-control-lock)).
+- [x] **VST3-17 — Audacity keeps a filter chosen in the window.** 21
+  November 2026, PRs #177, #233 and #252: jrp's Audacity pass on 0.16.14
+  ([in Audacity](docs/use/first-sound-in-a-host.md#in-audacity),
+  [record](docs/archive/reviews/2026-11-21-vst3-17-audacity-pass.md));
+  the drafted upstream issue stays in the project files for jrp.
+- [x] **PLUG-40 — Keep a refused list's advice current.** 21 November
+  2026, PR #252: a list refused before the host's settings were known is
+  read again by itself once the window sees the host playing, and says the
+  settings are known meanwhile
+  ([plug-ins](docs/use/plugins.md#loading-a-filter)).
+- [x] **PLUG-41 — A chosen file waits for audio in this start.** 21
+  November 2026, PR #252, from jrp's review of the same day: VST3 no longer
+  refuses a file chosen after a restart from the earlier start's audio, and
+  an Audio Unit render of zero frames no longer counts as playing
+  ([contract](docs/develop/plugin-contract.md#loading-and-failure)).

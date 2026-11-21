@@ -70,8 +70,9 @@ void content_tests() {
     require(c.boxed() && c.message_shown(), "a problem is boxed");
     require(c.action == WindowAction::choose_filter, "Choose is the fix's action");
     require(c.filter_name == "room.cfg", "filter name");
-    require(c.filter_note == "room-48k.wav was refused. Or drop a file on this window.",
-            "filter note with the drop hint: " + c.filter_note);
+    // PLUG-40: after a refusal the Fix says what to do; no drop hint.
+    require(c.filter_note == "room-48k.wav was refused.",
+            "filter note after a refusal: " + c.filter_note);
     require(c.facts_shown && c.filter_rate == "44100 Hz" && c.filter_channels == "2 in → 2 out" &&
                 c.filter_length == "1.37 s" && c.filter_taps == "65536 taps" &&
                 c.filter_speakers.empty(),

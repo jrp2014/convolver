@@ -252,6 +252,9 @@ enum class HostFailureKind {
     activation,       // The processor could not be built when the host activated.
     saved_failure,    // The restored state records an earlier failed load.
     too_large,        // The filter is too large to save in the plug-in's state (PLUG-12).
+    // PLUG-27, PLUG-40: a configuration list chosen before the host's rate
+    // and channels were known, so no entry could be chosen.
+    settings_unknown,
 };
 // Where a filter came from. Plug-ins cannot tell a preset from a saved
 // session: both arrive as state.
@@ -393,11 +396,6 @@ struct HostChange {
     // The state's bypass, for restored state; none for a chosen file. Only
     // VST3 applies it: the Audio Unit and LV2 leave bypass to the host.
     std::optional<bool> bypass;
-    // The accepted filter's tail in frames (configuration_tail_frames()) when
-    // no processor plays (load()'s `counting` was null), for the adapter to
-    // report until one is built; 0 otherwise, when the processor knows it,
-    // and for no filter.
-    std::size_t inactive_tail = 0;
 };
 
 // ROBUST-8: what HostFilter::activation() found for the host, which
@@ -431,6 +429,13 @@ class HostFilter {
     // worst_case_peak() of filter(), found when it was accepted; 0 without one.
     double filter_peak() const noexcept {
         return peak_;
+    }
+    // configuration_tail_frames() of filter(), found when it was accepted; 0
+    // without one. The tail an adapter reports while no processor plays; a
+    // processor reports its own (HostProcessor::tail_frames()), which also
+    // covers a filter it is still fading out (PLUG-39 step 6).
+    std::size_t filter_tail() const noexcept {
+        return tail_;
     }
     // PLUG-10: filter_gains() of filter(), found when it was accepted (the
     // estimate once found while estimating()); 0 dB for both without one.
@@ -509,8 +514,23 @@ class HostFilter {
         return awaiting() && activation_failure_.has_value() &&
                activation_failure_->kind != HostFailureKind::activation;
     }
-    void confirm() noexcept {
+    // `host`: the configuration the host plays with now, which the adapter
+    // passes whenever it sees the host playing (HostSettling::playing()) on a
+    // control call. PLUG-40, from the independent review: only such a
+    // configuration counts as the host's settings for a refused list
+    // (played_with()), not one a brief start passed, such as Audacity
+    // 4.0.2's FlushParameters at its placeholder 44.1 kHz.
+    void confirm(const std::optional<HostLayout>& host = std::nullopt) noexcept {
         awaiting_ = false;
+        if (host)
+            heard_ = host;
+    }
+    // `host` if a control call saw the host playing with that configuration
+    // (confirm()); nullopt otherwise.
+    std::optional<HostLayout> played_with(const std::optional<HostLayout>& host) const noexcept {
+        if (host && heard_ && same_configuration(*heard_, *host))
+            return host;
+        return std::nullopt;
     }
     // failure() as the status and the window show it: without the failure a
     // filter that is waiting() found at a start.
@@ -527,6 +547,15 @@ class HostFilter {
     const std::optional<HostFailure>& rejection() const noexcept {
         return load_failure_;
     }
+    // PLUG-40 (jrp, 21 November 2026: "don't make the user choose again
+    // unnecessarily"): the configuration list the newest request refused
+    // because the host's settings were not known
+    // (HostFailureKind::settings_unknown), which an adapter reads again, as
+    // if chosen, when its window reads the report while the host plays audio
+    // through the plug-in (HostSettling::playing()), on that thread. Given
+    // once for each refused request, so a read again that fails no other way
+    // (out of memory) is not repeated at every read; empty otherwise.
+    std::string take_unsettled_list();
     // The request that supplied the accepted filter (or the saved failure);
     // number 0 before any was accepted.
     const HostRequest& accepted() const noexcept {
@@ -544,8 +573,8 @@ class HostFilter {
     }
     // Load decoded state: a filter, none to return to an empty instance, or a
     // saved failed load (plays silence). Returns what else the accepted
-    // request requires (HostChange: the settings and bypass to apply, the
-    // tail while no processor plays), decided from `request.kind` and the
+    // request requires (HostChange: the settings and bypass to apply),
+    // decided from `request.kind` and the
     // state; the install callback receives what to play, which for a
     // request holding the filter already playing says so
     // (HostPlayback::playing), and passes it to HostProcessor::play(). A
@@ -641,6 +670,7 @@ class HostFilter {
     std::size_t max_channels_;
     std::shared_ptr<const Configuration> filter_;
     double peak_ = 0;            // filter_peak()
+    std::size_t tail_ = 0;       // filter_tail()
     FilterGains gains_;          // gains()
     bool estimating_ = false;    // estimating()
     std::uint64_t identity_ = 0; // filter_identity()
@@ -653,7 +683,9 @@ class HostFilter {
     std::optional<OfferedName> offered_name_;
     std::uint64_t requests_ = 0;
     bool failed_ = false;
-    bool awaiting_ = false; // awaiting()
+    bool awaiting_ = false;           // awaiting()
+    std::uint64_t list_retaken_ = 0;  // take_unsettled_list()'s last request
+    std::optional<HostLayout> heard_; // confirm()'s configuration
     std::optional<HostFailure> load_failure_, activation_failure_;
     Advice notice_;
     // faults(); the processor's totals at the last clear (the audio side's

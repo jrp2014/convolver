@@ -157,6 +157,21 @@ const Advice& failure_message(const HostFailure& f) {
     return f.message.empty() ? unrecorded : f.message;
 }
 
+std::string settings_now_known(const HostLayout& host) {
+    return "The host's settings are now known (" + host_rate_text(host) + ", " +
+           ports(host.inputs, host.outputs) + "): choose the configuration list again.";
+}
+
+Advice shown_failure_message(const HostFailure& f, const std::optional<HostLayout>& host) {
+    auto a = failure_message(f);
+    if (f.kind == HostFailureKind::settings_unknown && host) {
+        a.cause = "A configuration list's entry is chosen for the host's sample rate and "
+                  "channel counts, which were not known when it was chosen.";
+        a.fix = settings_now_known(*host);
+    }
+    return a;
+}
+
 Advice state_read_message(const std::exception& e) {
     auto a = detail::advice_of(e);
     a.problem = "the saved project or preset could not be read: " + a.problem;
@@ -434,6 +449,17 @@ void HostFilter::offer_name(std::string name, std::uint64_t identity) {
         accepted_.name = std::move(shown);
 }
 
+std::string HostFilter::take_unsettled_list() {
+    const auto& r = load_failure_;
+    if (!r || r->kind != HostFailureKind::settings_unknown ||
+        r->request.source != HostFilterSource::file || r->request.path.empty() ||
+        r->request.number == list_retaken_)
+        return {};
+    auto path = r->request.path;
+    list_retaken_ = r->request.number;
+    return path;
+}
+
 HostRequest HostFilter::numbered(HostRequest request) {
     request.number = request.number ? request.number : requests_ + 1;
     requests_ = std::max(requests_, request.number);
@@ -549,6 +575,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
     Advice notice;
     std::optional<HostFailure> saved_failure, kept_failure;
     double peak = 0;
+    std::size_t tail = 0;
     std::uint64_t identity = 0;
     FilterGains gains;
     std::optional<OfferedName> offered;
@@ -636,16 +663,15 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
         // the preparation, so a report never has to compute it.
         if (same) {
             peak = peak_;
+            tail = tail_;
             gains = gains_;
             if (estimating && !gains.estimate_db && !gains.estimate_failed)
                 find_estimate(gains, *accepted);
         } else if (accepted) {
             peak = worst_case_peak(*accepted);
+            tail = configuration_tail_frames(*accepted);
             gains = gains_for(*accepted, peak, estimating);
         }
-        // Until a processor is built, the adapter reports the filter's tail.
-        if (accepted && !counting)
-            change.inactive_tail = configuration_tail_frames(*accepted);
         if (state.failed) {
             HostFailure f;
             f.kind = HostFailureKind::saved_failure;
@@ -711,6 +737,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
                   std::is_nothrow_move_assignable_v<Advice>);
     filter_ = std::move(accepted);
     peak_ = peak;
+    tail_ = tail;
     gains_ = gains;
     estimating_ = estimating;
     identity_ = identity;
@@ -1031,6 +1058,16 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
         return "a load had failed when this was saved.";
     case HostFailureKind::too_large:
         return "the filter is too large to save with the project.";
+    case HostFailureKind::settings_unknown:
+        // PLUG-40: what to do now, given a configuration the host was seen
+        // playing with (HostFilter::played_with()). With the longest prefix
+        // and the log's pointer it fits max_status_text except with a
+        // fractional rate and ten or more channels, where the pointer is cut.
+        // The window's Fix says it in full (settings_now_known()).
+        if (host)
+            return "now known: " + host_rate_text(*host) + ", " +
+                   ports(host->inputs, host->outputs) + "; choose the list again.";
+        return "no list entry yet; play audio once, then choose it again.";
     }
     return "the filter could not be loaded.";
 }
@@ -1131,7 +1168,9 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
             // A filter the adapter could not start has no processor, so nothing
             // plays, not even Mix's dry share (the independent review).
             if (f->silent && f->kind != HostFailureKind::activation && bypass_dry) {
-                auto reason = short_reason(*f, host);
+                auto reason = f->kind == HostFailureKind::settings_unknown
+                                  ? short_reason(*f, filter.played_with(host))
+                                  : short_reason(*f, host);
                 if (!reason.empty())
                     reason[0] =
                         static_cast<char>(std::toupper(static_cast<unsigned char>(reason[0])));
@@ -1142,7 +1181,10 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
                 line.text = (!f->silent ? "Load failed, previous filter kept: "
                              : f->kind == HostFailureKind::activation ? std::string("Silent: ")
                                                                       : silent_words()) +
-                            short_reason(*f, host) + details;
+                            (f->kind == HostFailureKind::settings_unknown
+                                 ? short_reason(*f, filter.played_with(host))
+                                 : short_reason(*f, host)) +
+                            details;
             }
         }
         break;

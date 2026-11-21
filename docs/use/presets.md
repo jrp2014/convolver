@@ -125,12 +125,9 @@ ignores them there.
   [preset folders](#preset-folders) (this needs an administrator) and
   restart Audacity. They appear in the effect's preset menu under their
   file names, so give each preset its own name,
-  such as `room-48000.vstpreset`. This preset menu is the route checked in
-  Audacity. Up to 0.13.2 a filter loaded from Convolver's window (Choose…,
-  Recent, Reload, or reloading when the file changes) played while you
-  listened, but Audacity 4.0.2 did not keep it for exports or saved
-  projects; later versions should keep it, checked so far only by
-  automated tests ([in Audacity](first-sound-in-a-host.md#in-audacity)). Audacity always runs Convolver with two channels, even on a
+  such as `room-48000.vstpreset`. This preset menu is checked in Audacity,
+  as are Choose… and Recent in Convolver's window, which need no copying
+  ([in Audacity](first-sound-in-a-host.md#in-audacity)). Audacity always runs Convolver with two channels, even on a
   mono track, so use a stereo (2-in, 2-out) filter, and set its playback
   rate to the filter's
   ([the rate a host plays at](plugins.md#status-and-the-convolver-log)).
@@ -140,7 +137,8 @@ ignores them there.
   ([a preset in the window](plugins.md#a-preset-in-the-window)). Its Gain,
   Mix and Latency load with the filter, as from the host's preset menu.
   In Audacity 4 this avoids the preset folder, but it is not yet checked
-  in Audacity, and the window route's caveat above applies.
+  in Audacity, so export a few seconds and compare as
+  [in Audacity](first-sound-in-a-host.md#in-audacity) says.
 - **AU:** load the `.aupreset` from the host's preset menu. Logic and
   GarageBand list the user presets in their [preset folder](#preset-folders).
 - **LV2:** copy the whole `room.preset.lv2` folder into a
