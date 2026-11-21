@@ -26,6 +26,9 @@ changed file is one of these kinds:
   releases (Markdown included, as the version folders hash it) and the
   programs that check them. Only upgrade.cli and vst3.upgrade read them, so
   they need the native and VST3 workflows, not the Audio Unit or LV2 ones.
+- manual host scripts (HOST-11): scripts that jrp runs by hand on his Mac,
+  and their tests. No workflow builds or runs them; lint's pre-commit runs
+  their tests, so they need no other workflow.
 - one workflow file: that workflow alone.
 - everything else, including documentation that a build test reads or runs.
   Every workflow but the candidates and the fuzz targets runs.
@@ -137,6 +140,9 @@ ARDOUR = (
     'tests/plugins/ardour_tests.py',
 )
 ARDOUR_WORKFLOWS = {'vst3', 'lv2'}
+# Host scripts jrp runs by hand (HOST-11), and their tests, which pre-commit
+# runs. No workflow builds or runs them.
+MANUAL = ('scripts/reaper_check.py', 'tests/reaper_check_tests.py')
 # Files only the candidate workflow uses (CI-34), apart from RELEASE_SHARED.
 RELEASE = ('scripts/release/', 'tests/release/', 'packaging/')
 # Release files that other workflows use too: they count as code.
@@ -241,11 +247,14 @@ def matches(path, entries):
 
 def classify(path):
     """Return 'documentation', 'packaged', 'format:NAME', 'release',
-    'upgrade', 'ardour', 'workflow:NAME' or 'code' for a repository path."""
+    'upgrade', 'ardour', 'manual', 'workflow:NAME' or 'code' for a
+    repository path."""
     if matches(path, UPGRADE):
         return 'upgrade'
     if matches(path, ARDOUR):
         return 'ardour'
+    if path in MANUAL:
+        return 'manual'
     if matches(path, TESTED):
         return 'code'
     if matches(path, PACKAGED):
