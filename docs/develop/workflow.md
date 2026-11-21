@@ -192,10 +192,10 @@ checklist says so:
   [CONTRIBUTING](../../CONTRIBUTING.md#lint-checks).
 - **Documentation:** the guide that owns the behaviour is updated
   ([page ownership](documentation.md#one-home-for-each-topic)); a new page is in
-  the [index](../README.md); user-visible changes and every finished TODO
-  item, contributor-only ones included, are in the
-  [CHANGELOG](../../CHANGELOG.md) under its ID, contributor-only ones under
-  **For contributors**. Affected product claims and
+  the [index](../README.md); user-visible changes, under Added, Changed or
+  Fixed, and every finished TODO item, a contributor-only one under
+  **For contributors**, are in the [CHANGELOG](../../CHANGELOG.md) under its
+  ID. Affected product claims and
   their summaries follow the [claims rule](documentation.md#current-claims-and-dated-evidence).
 - **TODO:** the item is ticked with its evidence, or says what remains,
   what would justify it and when it is done. A plan that is now fully implemented, or superseded,

@@ -5,15 +5,16 @@ Changes to the portable C++ core, CLI and plug-ins. The portable package is
 versioned separately from the historical Windows releases (1.x to 4.4), whose
 release notes are archived in [docs/historical](docs/historical).
 
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-Until 1.0 the C++ API may change between minor versions.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+with one extra group, **For contributors**. Until 1.0 the C++ API may change
+between minor versions.
 
 Each release lists first, under **Added**, **Changed** and **Fixed**, what
 users of the command-line tools and plug-ins and of the C++ library can see.
 Work only contributors see (tests, CI, builds, contributor documentation and
-records) follows under **For contributors**; every finished TODO item keeps
-its entry there until formal releases. Releases before 0.12.12, the first
-published preview, keep their original grouping.
+records) follows under **For contributors**, where contributor-only TODO
+items keep their entries until formal releases. Releases before 0.12.12, the
+first published preview, keep their original grouping.
 
 ## [Unreleased]
 
@@ -51,6 +52,18 @@ published preview, keep their original grouping.
   fail. Build the processor from `activation().playback`, then call
   `activate()` once nothing can stop that processor from playing.
 
+- Builds (CI-43): the Mac preview packages are built with the newest Xcode
+  on GitHub's macOS 26 images (Xcode 26.6 today, was 16.4 on macOS 15), still
+  for macOS 14 and later, and the Linux packages with GCC 12 (was 11), still
+  on Ubuntu 22.04 for glibc 2.35. CI tests with the newest GCC and Xcode the
+  images have, the newest LLVM release branch (Clang 23 today, was 21) and the newest
+  stable Python (3.15, was 3.12); the Audio Unit job runs on macOS 26, and the
+  LV2 tests run on the newest Ubuntu image with its lilv (the Ardour test
+  stays on Ubuntu 24.04 until it works with Ardour 9).
+  Output may differ within the tested tolerance. Contributor guidance now
+  says to keep every external dependency, compilers and CI machines
+  included, on its newest formal release
+  ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
 - Plug-ins (PLUG-39 step 4): with bypass on, the window's report and the
   Convolver log say what bypass plays instead of saying that the filter
   plays: a fault reads "Bypass is on: the input plays unfiltered." instead
@@ -128,18 +141,6 @@ published preview, keep their original grouping.
   example matches the oracle (worst error 3.42e-8).
 - Builds (CI-45): Convolver's own sources build without the warnings GCC 12
   to 15, Xcode 26.6 and Visual Studio 2022 gave in CI. No output changes.
-- Builds (CI-43): the Mac preview packages are built with the newest Xcode
-  on GitHub's macOS 26 images (Xcode 26.6 today, was 16.4 on macOS 15), still
-  for macOS 14 and later, and the Linux packages with GCC 12 (was 11), still
-  on Ubuntu 22.04 for glibc 2.35. CI tests with the newest GCC and Xcode the
-  images have, the newest LLVM release branch (Clang 23 today, was 21) and the newest
-  stable Python (3.15, was 3.12); the Audio Unit job runs on macOS 26, and the
-  LV2 tests run on the newest Ubuntu image with its lilv (the Ardour test
-  stays on Ubuntu 24.04 until it works with Ardour 9).
-  Output may differ within the tested tolerance. Contributor guidance now
-  says to keep every external dependency, compilers and CI machines
-  included, on its newest formal release
-  ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
 - Releases (CI-44): the Linux candidate's check refuses libstdc++ symbol
   versions newer than GCC 12's (GLIBCXX_3.4.30, CXXABI_1.3.13), as it
   already refused glibc ones newer than 2.35: a newer GCC on the build
@@ -612,6 +613,13 @@ checked in Audacity ([release](https://github.com/jrp2014/convolver/releases/tag
 
 ### Changed
 
+- Source (PLUG-34): what Convolver's window does, apart from drawing it,
+  moved from the macOS window's Objective-C into shared C++
+  (`portable/window_model.hpp`), so the coming Windows window behaves the
+  same; `native.window_model` tests it on every system. The macOS window
+  looks and behaves as before, except in typed values nobody would type:
+  `0x10` now reads as 0 rather than 16, and `5e` is refused rather than
+  read as 5.
 - Command line and plug-ins (DIAG-6, from the whole-project review of 9
   November 2026): a sound file refused as a filter is reported with the
   reader's reason, for example "truncated or invalid RIFF/WAVE size" or
@@ -692,13 +700,6 @@ checked in Audacity ([release](https://github.com/jrp2014/convolver/releases/tag
   run, with no reports. From the whole-project review of 9 November 2026.
   No change to the plug-in
   ([VST3 tests](docs/develop/testing.md#vst3-tests)).
-- Source (PLUG-34): what Convolver's window does, apart from drawing it,
-  moved from the macOS window's Objective-C into shared C++
-  (`portable/window_model.hpp`), so the coming Windows window behaves the
-  same; `native.window_model` tests it on every system. The macOS window
-  looks and behaves as before, except in typed values nobody would type:
-  `0x10` now reads as 0 rather than 16, and `5e` is refused rather than
-  read as 5.
 - Source (TIDY-1, from the whole-project review of 9 November 2026): small
   helpers that existed in two or three copies now have one: the SplitMix64
   generator and the little-endian readers and writers in `bytes.hpp`, and
@@ -802,6 +803,16 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
 
 ### Added
 
+- Host checks (HOST-1, AU-4): jrp's 8 November 2026 checks of the v0.12.8
+  candidate are recorded
+  ([record](docs/archive/reviews/2026-11-08-v0128-host-checks.md)). In
+  REAPER a render, save and reopen, a refused preset and a change of host
+  rate passed against the CLI; in GarageBand a packaged preset with save
+  and reopen, Recent and Reload passed. In Audacity 4 a filter chosen with
+  Choose… was missing from the export, because Audacity stores a plug-in's
+  state only after a parameter edit (VST3-17, open).
+  For the first preview, Audacity is supported through its own preset
+  menu only, and the release notes say so.
 - User guides (REL-2): [check a crossover in a host](docs/use/check-a-crossover-in-a-host.md),
   the 2→6 crossover journey in REAPER with the VST3 plug-in or the Audio
   Unit, and [check file rendering with the command line](docs/use/check-files-with-the-command-line.md),
@@ -997,6 +1008,22 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   host's audio settings are known), PLUG-28 (packaged presets named after
   their filter) and PLUG-29 (the Recent list out of the log folder), and
   PLUG-25 records jrp's agreed wording for a rate refusal.
+- Host checks (HOST-1): jrp's Audacity 4.0.2 session with the VST3
+  plug-in (7 November 2026, candidate 0.10.13) is
+  [recorded](docs/archive/reviews/2026-11-07-host1-audacity.md): the seven
+  48 kHz stereo exports with a filter or bypass matched the CLI with
+  `convolver --compare`, including after a refused preset and after
+  restarting Audacity, and the export with no filter matched the original
+  file. The guides now say
+  what it found: Audacity plays real-time effects at its Default sample
+  rate, which can differ from the rate an export uses, so set it, and the
+  project's rate, to the filter's rate; Convolver's window shows with *Preset options ›
+  Use vendor UI*; and, as Audacity's preset menu does not import
+  `.vstpreset`, a filter can be chosen with **Choose…** in the window on
+  macOS. [Your first sound in a host](docs/use/first-sound-in-a-host.md) no
+  longer says the plug-in has no window or that preview packages lack the
+  Audio Unit. PLUG-25 records the clearer playback-rate wording still to
+  decide. No code or sound changes.
 - Wording (DOC-9, from jrp's review of 7 November 2026): one set of words for
   filters, IR files, configurations, presets and projects, listed in
   [words Convolver uses](docs/use/concepts.md#words-convolver-uses) and used
@@ -1224,16 +1251,17 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   `details` with `headline`, `filter_name`, `filter_note`, `audio`
   (`HostFact`), `settings`, `reference`, `sample_rate` and
   `latency_waits` (pre-1.0 internal API).
-- Plug-in contract (PLUG-16): a replacement filter plays for one Latency
-  block, not always 256 samples, before its 256-sample crossfade, as it has
-  since the Latency setting arrived; the page now says so. In
-  `HostProcessor` the 64-frame ramps and the crossfade are named constants;
-  the sound is unchanged.
 - Plug-ins (PLUG-17): the Gain, Mix, bypass and mute ramps last 1.33 ms and
   a replacement filter's crossfade 5.33 ms at every sample rate, rather
   than 64 and 256 frames. At 48 kHz the sound is unchanged (the oracle tests
   pass as before); at 44.1 kHz the ramps are 59 and 235 frames, and at
   96 kHz 128 and 512, so fades no longer get shorter as the rate rises.
+- Command line (IO-9): `convolver-equalizer-apo` formats gains with
+  `std::to_chars` instead of a search with `snprintf` and `strtof`. Every
+  gain reads back as the same number; the text is the same for every float
+  but ±2^-96 (about −578 dB), which now takes one digit fewer. Building it now needs macOS 13.3 or later (the
+  default target is 14.0); the build guide says what building for an older
+  macOS would need.
 
 ### Fixed
 
@@ -1388,16 +1416,6 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   status page now lists, once, the checks left before the first preview
   is published, keeping the host results jrp accepted
   ([checks left](docs/project/status.md#checks-left-before-publication)).
-- Host checks (HOST-1, AU-4): jrp's 8 November 2026 checks of the v0.12.8
-  candidate are recorded
-  ([record](docs/archive/reviews/2026-11-08-v0128-host-checks.md)). In
-  REAPER a render, save and reopen, a refused preset and a change of host
-  rate passed against the CLI; in GarageBand a packaged preset with save
-  and reopen, Recent and Reload passed. In Audacity 4 a filter chosen with
-  Choose… was missing from the export, because Audacity stores a plug-in's
-  state only after a parameter edit (VST3-17, open).
-  For the first preview, Audacity is supported through its own preset
-  menu only, and the release notes say so.
 - Releases (REL-8): a "Draft preview release" workflow turns a passed
   candidate run on a `vX.Y.Z` tag into a draft GitHub pre-release. It refuses
   a run that was not started by hand on the tag or did not pass, or whose
@@ -1520,22 +1538,6 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   execution priorities now list VST3-16 as an open fix and PLUG-28 before
   the first preview. The dated records are unchanged. No code or sound
   changes.
-- Host checks (HOST-1): jrp's Audacity 4.0.2 session with the VST3
-  plug-in (7 November 2026, candidate 0.10.13) is
-  [recorded](docs/archive/reviews/2026-11-07-host1-audacity.md): the seven
-  48 kHz stereo exports with a filter or bypass matched the CLI with
-  `convolver --compare`, including after a refused preset and after
-  restarting Audacity, and the export with no filter matched the original
-  file. The guides now say
-  what it found: Audacity plays real-time effects at its Default sample
-  rate, which can differ from the rate an export uses, so set it, and the
-  project's rate, to the filter's rate; Convolver's window shows with *Preset options ›
-  Use vendor UI*; and, as Audacity's preset menu does not import
-  `.vstpreset`, a filter can be chosen with **Choose…** in the window on
-  macOS. [Your first sound in a host](docs/use/first-sound-in-a-host.md) no
-  longer says the plug-in has no window or that preview packages lack the
-  Audio Unit. PLUG-25 records the clearer playback-rate wording still to
-  decide. No code or sound changes.
 - Development (DOC-8, from jrp's review of the agent guidance at `f6895f3`):
   the [workflow guide](docs/develop/workflow.md#verification-for-each-kind-of-change)
   says what each kind of change must run before a push (a prose-only change
@@ -1703,6 +1705,11 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   scripts) is removed; its timing program is now `convolver_kernel_benchmark`.
   It was off by default and its 24 October results kept the existing
   kernels; no build that ships changes.
+- Plug-in contract (PLUG-16): a replacement filter plays for one Latency
+  block, not always 256 samples, before its 256-sample crossfade, as it has
+  since the Latency setting arrived; the page now says so. In
+  `HostProcessor` the 64-frame ramps and the crossfade are named constants;
+  the sound is unchanged.
 - Continuous integration (CI-7): the VST3 and Audio Unit workflows resolve
   the newest SDK release once per run, in a first `sdk` job that uploads a
   lock file, and every build job of the run builds exactly that release
@@ -1728,13 +1735,6 @@ last host checks ([release](https://github.com/jrp2014/convolver/releases/tag/v0
   check), `.github/workflows/watchdog.yml` and `scripts/ci_watchdog_probe.py`
   are removed, the Linux CI jobs no longer install gdb, and CI-24 and CI-25
   close without a cause; their evidence is archived.
-- Command line (IO-9): `convolver-equalizer-apo` formats gains with
-  `std::to_chars` instead of a search with `snprintf` and `strtof`. Every
-  gain reads back as the same number; the text is the same for every float
-  but ±2^-96 (about −578 dB), which now takes one digit fewer. Building it now needs macOS 13.3 or later (the
-  default target is 14.0); the build guide says what building for an older
-  macOS would need.
-
 - Tests (CI-33): `native.cli`'s no-clip case compared each pair of renders
   byte for byte, so its float case failed when the two files' `PEAK` chunks,
   in which libsndfile records the second a float WAV file was written,
