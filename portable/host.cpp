@@ -671,7 +671,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
         }
         if (next && request.source == HostFilterSource::file)
             offered = OfferedName{shown_name(request), identity};
-        // For the window's Loudest peak; on the control side with the rest of
+        // For the window's Worst-case peak; on the control side with the rest of
         // the preparation, so a report never has to compute it.
         if (same) {
             peak = peak_;
@@ -1091,6 +1091,27 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
 }
 } // namespace
 
+namespace {
+// PLUG-44: what a filter that waits for settings that suit it waits for,
+// completing "Silent, waiting for ": "44100 Hz: the host runs at 48000 Hz.".
+std::string waited_for(const HostFailure& f, const std::optional<HostLayout>& host) {
+    if (f.kind == HostFailureKind::sample_rate)
+        return (f.sample_rate > 0 ? std::to_string(f.sample_rate) + " Hz"
+                                  : std::string("another sample rate")) +
+               (host ? ": the host runs at " + host_rate_text(*host) + "." : ".");
+    return (f.inputs || f.outputs ? ports(f.inputs, f.outputs) : std::string("other channels")) +
+           (host ? ": the host has " + ports(host->inputs, host->outputs) + "." : ".");
+}
+// PLUG-44: the gain Estimate or No clipping plays, for hosts that show only
+// the Gain setting ("Estimate plays -7.3 dB."), ASCII as the line is.
+std::string played_gain_words(GainMode mode, double db) {
+    char text[64] = {};
+    std::snprintf(text, sizeof text, " %s plays %.1f dB.", gain_mode_name(mode),
+                  std::abs(db) < .05 ? 0.0 : db);
+    return text;
+}
+} // namespace
+
 HostDrySignal dry_signal_rule(const HostFilter& filter, const HostLayout& host) noexcept {
     const auto& f = filter.failure();
     const auto& c = filter.filter();
@@ -1130,7 +1151,7 @@ const char* no_dry_reason(HostDrySignal rule) noexcept {
 HostStatus host_status_value(const HostFilter& filter, bool host_known, bool bypassed) noexcept {
     host_known = host_known && !filter.waiting(); // PLUG-27: awaiting validation.
     if (filter.shown_failure())
-        return HostStatus::load_failed;
+        return filter.waits_for_settings() ? HostStatus::unchecked : HostStatus::load_failed;
     if (filter.faults().any() && !filter.failed())
         return HostStatus::fault;
     if (bypassed && filter.filter())
@@ -1226,6 +1247,18 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
             line.text = "Filter selected. Waiting for the host's audio settings.";
             break;
         }
+        if (filter.waits_for_settings() && f) {
+            // PLUG-44 (jrp, 21 November 2026): what plays first, as for a
+            // load failure, then what the kept filter waits for.
+            line.text =
+                (bypass_dry ? std::string("Bypass is on: only the dry signal plays. Waiting for ")
+                 : !host    ? std::string("Filter kept, waiting for ")
+                 : dry_known && !unfiltered_sound(settings, false).silent
+                     ? std::string("Only the dry signal plays, waiting for ")
+                     : std::string("Silent, waiting for ")) +
+                waited_for(*f, host) + details;
+            break;
+        }
         const auto ignored = host ? ignored_inputs(*c, *host, "-") : std::string();
         line.text = "Filter loaded: " + std::to_string(c->sample_rate) + " Hz, " +
                     ports(c->input_channels, c->output_channels) +
@@ -1246,6 +1279,11 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
             line.text += filter.gains().estimate_failed
                              ? " Too loud to estimate: No clipping's gain plays."
                              : " No estimate: No clipping's gain plays.";
+        } else if (settings.gain_mode != GainMode::set && !mix_dry_only) {
+            // PLUG-44: the figure the Gain mode plays, which hosts without
+            // Convolver's window cannot show beside the Gain setting.
+            line.text +=
+                played_gain_words(settings.gain_mode, *applied_gain_db(settings, filter.gains()));
         }
         if (host && !filter.notice().empty())
             line.text += log_written ? " Speaker labels differ; see the Convolver log."
@@ -1273,7 +1311,8 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
     // DIAG-10: a Latency chosen but not in use yet, after anything that needs
     // attention (a failure or a fault says more than this).
     if (latency_in_use && *latency_in_use != settings.latency &&
-        line.status != HostStatus::load_failed && line.status != HostStatus::fault)
+        line.status != HostStatus::load_failed && line.status != HostStatus::fault &&
+        !filter.waits_for_settings())
         line.text += " Latency " + std::to_string(settings.latency) + " frames not in use yet.";
     if (line.text.size() > max_status_text)
         line.text.resize(max_status_text);

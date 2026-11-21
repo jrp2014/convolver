@@ -222,14 +222,15 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSStackView* stack_;                  // Everything, top to bottom.
     NSScrollView* scroll_;
     NSLayoutConstraint* scrollHeight_;
-    NSStackView* audio_;        // The Audio facts' rows, rebuilt when they change.
-    NSBox* message_;            // The message, in a box when it is a problem; hidden when empty.
-    NSStackView* messageStack_; // Its text, button and note.
-    NSStackView* factsRow_;     // The facts under the name, hidden while they are not known.
-    NSStackView* noteRow_;      // "Note:" and the note, hidden without one.
-    NSStackView* mixRow_;       // Mix's row, whose label dims when Mix has no effect.
-    NSStackView* mixNoteRow_;   // The mix note's row, hidden while Mix applies.
-    NSUInteger mix_;            // Mix's index among the settings (NSNotFound: none).
+    NSStackView* audio_;         // The Audio facts' rows, rebuilt when they change.
+    NSBox* message_;             // The message, in a box when it is a problem; hidden when empty.
+    NSStackView* messageStack_;  // Its text, button and note.
+    NSStackView* factsRow_;      // The facts under the name, hidden while they are not known.
+    NSStackView* filterNoteRow_; // A refused file's note under the name, hidden without one.
+    NSStackView* noteRow_;       // "Note:" and the note, hidden without one.
+    NSStackView* mixRow_;        // Mix's row, whose label dims when Mix has no effect.
+    NSStackView* mixNoteRow_;    // The mix note's row, hidden while Mix applies.
+    NSUInteger mix_;             // Mix's index among the settings (NSNotFound: none).
     NSTimer* timer_;
     std::optional<WindowContent> shown_; // What was last shown, so a refresh keeps a selection.
     NSString* logPath_;
@@ -365,14 +366,16 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     fixed_width(factsRow_, inner);
     _glanceValues = values;
     [self add:factsRow_ after:6];
-    // Under the name, a refused file and the drop hint, in the small font.
+    // Under the name, a refused file's note in the small font (PLUG-44: no
+    // drop hint; the Fix and Choose…'s tooltip name dropping a file).
     _filterNoteField = wrapping(small_font(), [NSColor secondaryLabelColor], inner - icon - 6);
     NSView* note_indent = [[NSView alloc] init];
     fixed_width(note_indent, icon);
     [note_indent.heightAnchor constraintEqualToConstant:1].active = YES;
-    [self add:stack(@[ note_indent, _filterNoteField ], NSUserInterfaceLayoutOrientationHorizontal,
-                    6)
-        after:10];
+    filterNoteRow_ =
+        stack(@[ note_indent, _filterNoteField ], NSUserInterfaceLayoutOrientationHorizontal, 6);
+    filterNoteRow_.hidden = YES;
+    [self add:filterNoteRow_ after:10];
 
     // DIAG-2's message, shown only when there is something to say: the
     // problem, what plays, its cause and fix, the button that carries out
@@ -756,6 +759,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _filterNameField.stringValue = ns(c.filter_name);
     _filterNameField.toolTip = c.filter_name.empty() ? nil : ns(c.filter_name);
     _filterNoteField.stringValue = ns(c.filter_note);
+    filterNoteRow_.hidden = c.filter_note.empty();
     [self showAudio:c.audio];
     [self showGlance:c];
     _referenceField.attributedStringValue = reference_text(c.reference);

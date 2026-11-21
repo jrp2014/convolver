@@ -9,6 +9,7 @@
 #include "host_log.hpp"
 #include "host_report.hpp"
 #include "window_model.hpp"
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -82,9 +83,10 @@ void cases() {
              return host_report(f, facts(std::nullopt));
          },
          HostStatus::no_filter,
-         {"No filter is loaded.", "has not sent its audio settings",
-          "Fix: Load a Convolver preset"},
-         {"Silent"}},
+         // PLUG-44: the heading's "None" and the status say there is no
+         // filter, so the message does not repeat it.
+         {"The host has not sent its audio settings yet.", "Fix: Load a Convolver preset"},
+         {"Silent", "No filter is loaded."}},
         // The Audio Unit's window has Choose Filter.
         {"empty, the window chooses files",
          [&] {
@@ -119,7 +121,7 @@ void cases() {
              static_cast<void>(test::started(f, mono));
              return host_report(f, facts(mono));
          },
-         HostStatus::load_failed,
+         HostStatus::unchecked,
          {"The saved filter has 2 inputs and 2 outputs, and the host gives the plug-in 1 input "
           "and 1 output. Convolver plays silence.",
           "Fix: Give the plug-in 2 inputs and 2 outputs",
@@ -135,7 +137,7 @@ void cases() {
              static_cast<void>(test::started(f, mono));
              return host_report(f, facts(mono));
          },
-         HostStatus::load_failed,
+         HostStatus::unchecked,
          {"Give the plug-in 6 inputs and 6 outputs"},
          {"stereo track"}},
         {"wrong rate",
@@ -145,7 +147,7 @@ void cases() {
              static_cast<void>(test::started(f, {44100, 2, 2}));
              return host_report(f, facts(HostLayout{44100, 2, 2}));
          },
-         HostStatus::load_failed,
+         HostStatus::unchecked,
          {"The saved filter is for 48000 Hz, and the host runs at 44100 Hz.",
           "Cause: Convolver never resamples",
           "Fix: Load a filter made for 44100 Hz, or set the host's project or audio device to "
@@ -175,7 +177,7 @@ void cases() {
              static_cast<void>(test::started(f, {44100, 2, 2}));
              return host_report(f, facts(HostLayout{44100, 2, 2}, {0, .5}));
          },
-         HostStatus::load_failed,
+         HostStatus::unchecked,
          {"With Mix at 50% wet, only the dry signal plays: the input at -6.0 dB."},
          {"no dry signal"}},
         {"refused replacement",
@@ -259,7 +261,7 @@ void cases() {
              bypassed.bypassed = true;
              return host_report(f, bypassed);
          },
-         HostStatus::load_failed,
+         HostStatus::unchecked,
          {"Bypass is on: only the dry signal plays."},
          {"plays silence", "Mix at"}},
         // Bypass with no dry signal plays silence, and the report says so:
@@ -275,7 +277,7 @@ void cases() {
              bypassed.bypassed = true;
              return host_report(f, bypassed);
          },
-         HostStatus::load_failed,
+         HostStatus::unchecked,
          {"Convolver plays silence."},
          {"Bypass is on", "dry signal plays"}},
         // A failed load with no filter kept stays silent, bypassed too
@@ -460,8 +462,10 @@ void cases() {
     // jrp, 7 November 2026: short labelled values ("Host sample rate"), not
     // prose; the filter's own values are under its name, so the Audio
     // section neither repeats its rate and speakers nor lists its length.
-    check(fact(r, "Host sample rate"), "44100 Hz", "");
-    check(fact(r, "Host channels"), "2 in, 2 out", "");
+    // PLUG-44: a host that matches the filter is one line saying so.
+    check(fact(r, "Host"), "44100 Hz, 2 in → 2 out", "✓ suits the filter");
+    require(!has_fact(r, "Host sample rate") && !has_fact(r, "Host channels"),
+            "the host's values repeat the filter's");
     check(fact(r, "Routing"), "In 1 → Out 1, In 2 → Out 2", "");
     require(!has_fact(r, "Filter length"), "the filter's length repeated as a fact");
     // PLUG-22: the Latency setting shows the time it adds, so the Audio
@@ -471,7 +475,7 @@ void cases() {
     // The identity paths have peak 1.75 (1 + .5 + .25): +4.9 dB. Gain
     // scales only the filtered path, which Mix then adds to the dry input:
     // at Gain -6 dB and Mix 25%, .25 * .501 * 1.75 + .75 = .97.
-    check(fact(r, "Loudest peak"), "+4.9 dB", "(cannot clip at this Gain and Mix)");
+    check(fact(r, "Worst-case peak"), "+4.9 dB", "(cannot clip at this Gain and Mix)");
     check(fact(r, "Host block size"), "up to 512 frames", "(11.6 ms)");
     // jrp, 7 November 2026: the filter's own facts, under its name in the
     // window; the Audio section gives the host's.
@@ -487,13 +491,13 @@ void cases() {
         HostFilter waiting(8);
         waiting.load(HostState{labelled}, std::nullopt);
         const auto w = host_report(waiting, facts(std::nullopt));
-        require(
-            w.filter_rate == "48000 Hz" && w.filter_channels == "2 in → 2 out" &&
-                w.filter_speakers == "Front left, front right" &&
-                contains(fact(w, "Host sample rate").value,
-                         "not known until the host sends its audio settings") &&
-                fact(w, "Host sample rate").note.empty() && fact(w, "Host channels").note.empty(),
-            "filter facts before the host starts: " + w.filter_rate + " | " + w.filter_speakers);
+        require(w.filter_rate == "48000 Hz" && w.filter_channels == "2 in → 2 out" &&
+                    w.filter_speakers == "Front left, front right" &&
+                    // PLUG-44: one line for the host.
+                    fact(w, "Host").value == "not known yet" && fact(w, "Host").note.empty() &&
+                    !has_fact(w, "Host sample rate") && !has_fact(w, "Host channels"),
+                "filter facts before the host starts: " + w.filter_rate + " | " +
+                    w.filter_speakers);
         // PLUG-22: the identity a saved name is matched against: 16 hex
         // digits, the same for the same filter, different for another.
         require(r.filter_identity.size() == 16 &&
@@ -554,21 +558,20 @@ void cases() {
                     from_file == "room.wav" && none.filter_saved_name.empty(),
                 "filter saved name: " + from_preset + " | " + from_file);
     }
-    require(r.audio.front().label == "Host sample rate" &&
-                r.audio.back().label == "Host block size",
+    require(r.audio.front().label == "Host" && r.audio.back().label == "Host block size",
             "Audio order");
     const auto loud = host_report(f, facts(stereo));
-    require(fact(loud, "Loudest peak").note == "(Gain −4.9 dB or lower rules out clipping)",
-            "loudest peak at 0 dB: " + fact(loud, "Loudest peak").note);
+    require(fact(loud, "Worst-case peak").note == "(Gain −4.9 dB or lower rules out clipping)",
+            "loudest peak at 0 dB: " + fact(loud, "Worst-case peak").note);
     // The Gain that rules out clipping does not depend on Mix (above 0):
     // at Mix 50% and Gain -3 dB, .5 * .708 * 1.75 + .5 = 1.12 can clip, and
     // at Mix 25% it still takes -4.9 dB. At Mix 0 nothing can clip.
     for (const HostSettings s : {HostSettings{-3, .5}, HostSettings{0, .25}})
-        require(fact(host_report(f, facts(stereo, s)), "Loudest peak").note ==
+        require(fact(host_report(f, facts(stereo, s)), "Worst-case peak").note ==
                     "(Gain −4.9 dB or lower rules out clipping)",
                 "loudest peak at gain " + std::to_string(s.gain_db) + ", mix " +
                     std::to_string(s.mix));
-    require(fact(host_report(f, facts(stereo, {24, 0})), "Loudest peak").note ==
+    require(fact(host_report(f, facts(stereo, {24, 0})), "Worst-case peak").note ==
                 "(cannot clip at this Gain and Mix)",
             "loudest peak at mix 0");
     // PLUG-10: the note follows the gain that plays, not the Gain setting:
@@ -576,12 +579,12 @@ void cases() {
     // Estimate plays the filter's own figure (its bound here: f has no
     // estimate), so the note names the mode.
     HostSettings moded{-30, 1, 0, GainMode::no_clipping};
-    require(fact(host_report(f, facts(stereo, moded)), "Loudest peak").note ==
+    require(fact(host_report(f, facts(stereo, moded)), "Worst-case peak").note ==
                 "(cannot clip in this Gain mode and Mix)",
             "loudest peak in No clipping: " +
-                fact(host_report(f, facts(stereo, moded)), "Loudest peak").note);
+                fact(host_report(f, facts(stereo, moded)), "Worst-case peak").note);
     moded.gain_mode = GainMode::set;
-    require(fact(host_report(f, facts(stereo, moded)), "Loudest peak").note ==
+    require(fact(host_report(f, facts(stereo, moded)), "Worst-case peak").note ==
                 "(cannot clip at this Gain and Mix)",
             "loudest peak at -30 dB in Set");
     HostFilter estimated(8);
@@ -589,11 +592,46 @@ void cases() {
     with_estimate.settings = HostSettings{0, 1, 0, GainMode::estimate};
     estimated.load(with_estimate, stereo, [](const HostPlayback&) {});
     moded.gain_mode = GainMode::estimate;
-    const auto estimate_note = fact(host_report(estimated, facts(stereo, moded)), "Loudest peak");
+    const auto estimate_note =
+        fact(host_report(estimated, facts(stereo, moded)), "Worst-case peak");
     require(estimated.gains().estimate_db &&
                 *estimated.gains().estimate_db > *estimated.gains().no_clipping_db &&
                 estimate_note.note == "(Gain mode No clipping rules out clipping)",
             "loudest peak in Estimate: " + estimate_note.note);
+    // PLUG-44: hosts without Convolver's window show only the Gain setting,
+    // so Status names the figure the Gain mode plays; Set adds nothing.
+    {
+        const auto line = [&](GainMode mode) {
+            HostSettings s{-30, 1, 0, mode};
+            return host_status(estimated, stereo, true, s).text;
+        };
+        char expected[64];
+        std::snprintf(expected, sizeof expected, " Estimate plays %.1f dB.",
+                      *estimated.gains().estimate_db);
+        require(contains(line(GainMode::estimate), expected) &&
+                    contains(line(GainMode::no_clipping), " No clipping plays ") &&
+                    !contains(line(GainMode::set), " plays ") &&
+                    !contains(line(GainMode::estimate), "−"),
+                "the gain the mode plays in Status: " + line(GainMode::estimate) + " | " +
+                    line(GainMode::no_clipping));
+    }
+    // PLUG-44: Ring-out shows only when it says more than the filter's
+    // Length (3 taps and a 3-frame tail both read 0.1 ms here); the title
+    // gives the release version, without the build's suffix.
+    {
+        auto same = facts(stereo);
+        same.tail_frames = 3;
+        const auto rs = host_report(f, same);
+        require(!has_fact(rs, "Ring-out") && rs.filter_length == "0.1 ms",
+                "Ring-out repeats the filter's length");
+        require(!contains(r.title, "+") && contains(reference(r, "Software"), "Convolver"),
+                "title: " + r.title);
+    }
+    // PLUG-44: the Latency values hosts' own controls show.
+    require(latency_value_text(0, 48000) == "0 frames (none)" &&
+                latency_value_text(256, 48000) == "256 frames (5.3 ms)" &&
+                latency_value_text(1024, 0) == "1024 frames",
+            "Latency value text: " + latency_value_text(256, 48000));
     require(r.filter_name == "Restored filter" && r.filter_note.empty(),
             "filter row: " + r.filter_name + " / " + r.filter_note);
     require(reference(r, "Filter file") == "a saved project or preset, request 1",
@@ -602,7 +640,7 @@ void cases() {
     require(!contains(reference(r, "Software"), "Session:"), "software line");
     require(
         contains(report_text(r), "Settings: " + r.settings + "\n") &&
-            contains(report_text(r), "Host sample rate: 44100 Hz\n") &&
+            contains(report_text(r), "Host: 44100 Hz, 2 in → 2 out ✓ suits the filter\n") &&
             contains(report_text(r), "Filter values: 44100 Hz, 2 in → 2 out, 0.1 ms (3 taps)\n") &&
             contains(report_text(r), "Filter file: a saved project or preset, request 1\n"),
         "report text:\n" + report_text(r));
@@ -615,16 +653,16 @@ void cases() {
 
     // Before the host starts: what is known.
     const auto unstarted = host_report(HostFilter(8), facts(std::nullopt));
-    require(contains(fact(unstarted, "Host sample rate").value,
-                     "not known until the host sends its audio settings") &&
-                fact(unstarted, "Routing").value == "none" &&
-                !has_fact(unstarted, "Loudest peak") && !has_fact(unstarted, "Host block size") &&
+    // PLUG-44: no Routing without a filter, and the heading's "None" is not
+    // said again in the message.
+    require(fact(unstarted, "Host").value == "not known yet" && !has_fact(unstarted, "Routing") &&
+                !has_fact(unstarted, "Worst-case peak") &&
+                !has_fact(unstarted, "Host block size") &&
                 !contains(report_text(unstarted), "Filter values:"),
             "facts before start");
     require(unstarted.filter_name == "None" && unstarted.problem.empty() &&
-                unstarted.plays ==
-                    "No filter is loaded. The host has not sent its audio settings yet.",
-            "empty filter row");
+                unstarted.plays == "The host has not sent its audio settings yet.",
+            "empty filter row: " + unstarted.plays);
 
     // A refused file while the previous filter plays: the problem shows in
     // the fact, naming the refused file, and the file in the row.
@@ -640,7 +678,8 @@ void cases() {
     require(fact(rr, "Host sample rate").problem &&
                 fact(rr, "Host sample rate").note == "the refused file is for 48000 Hz",
             "refused rate: " + fact(rr, "Host sample rate").note);
-    require(rr.filter_note == "room-48k.cfg was refused." &&
+    // PLUG-44: the heading names the filter that still plays.
+    require(rr.filter_note == "Still playing. room-48k.cfg was refused." &&
                 reference(rr, "Refused file") == "/filters/room-48k.cfg, request 2",
             "refused file: " + rr.filter_note);
     require(
@@ -685,20 +724,18 @@ void cases() {
     static_cast<void>(test::started(idle, {44100, 1, 1}));
     const auto ri = host_report(idle, facts(HostLayout{44100, 1, 1}));
     require(fact(ri, "Host channels").problem &&
-                fact(ri, "Host channels").note == "the filter has 2 in, 2 out" &&
+                fact(ri, "Host channels").note == "the filter has 2 in → 2 out" &&
                 fact(ri, "Routing").note == "(not playing)" && ri.filter_note.empty(),
             "mono track facts: " + report_text(ri));
 
     // PLUG-10: a Latency chosen but not yet in use (not applied yet, or it
-    // could not be), and the window says so.
-    require(!contains(r.explanation, "is chosen"), "a latency in use reads as waiting");
+    // could not be). PLUG-44: the window's Latency row says so
+    // (latency_waits), not the message again.
     auto waiting_facts = facts(stereo, {0, 1, 1024});
     waiting_facts.latency_frames = 256;
     const auto waiting = host_report(f, waiting_facts);
-    require(waiting.note.starts_with("Latency 1024 frames is chosen but not in use yet, so "
-                                     "the plug-in keeps 256 frames for now.") &&
-                contains(waiting.explanation, "\nNote: Latency 1024 frames"),
-            "waiting latency explanation: " + waiting.explanation);
+    require(!contains(waiting.explanation, "Latency") && waiting.note.empty(),
+            "waiting latency said again in the message: " + waiting.explanation);
     // DIAG-10: the Status line says so too, in short.
     require(contains(waiting.status.text, " Latency 1024 frames not in use yet.") &&
                 !contains(r.status.text, "Latency"),
@@ -877,7 +914,7 @@ void wider_inputs() {
     require(r.status.status == HostStatus::active && r.problem.empty(),
             "a crossover on a wider bus is reported as a problem: " + r.explanation);
     const auto channels = fact(r, "Host channels");
-    require(channels.value == "6 in, 6 out" && channels.note == "(inputs 3–6 ignored)" &&
+    require(channels.value == "6 in → 6 out" && channels.note == "(inputs 3–6 ignored)" &&
                 !channels.problem,
             "Channels: " + channels.value + " " + channels.note);
     require(r.mix_note == "The filter's inputs and outputs differ, so there is no dry signal: Mix "
@@ -890,9 +927,11 @@ void wider_inputs() {
     HostFilter stereo(8);
     stereo.load(HostState{filter(48000, 2)}, HostLayout{48000, 2, 2});
     const auto rs = host_report(stereo, facts(HostLayout{48000, 2, 2}));
-    require(rs.mix_note.empty() &&
-                fact(rs, "Host channels").note.find("ignored") == std::string::npos,
-            "a stereo filter has a mix note or ignored inputs");
+    // PLUG-44: a host that matches the filter is one line.
+    require(rs.mix_note.empty() && !has_fact(rs, "Host channels") &&
+                fact(rs, "Host").value == "48000 Hz, 2 in → 2 out" &&
+                fact(rs, "Host").note == "✓ suits the filter",
+            "a stereo filter has a mix note, or its host's values are repeated");
     // Without a filter and with unequal counts, the host's counts decide.
     HostFilter none(8);
     require(contains(host_report(none, facts(HostLayout{48000, 2, 6})).mix_note,
@@ -938,7 +977,8 @@ void wider_inputs() {
 // playing is kept; a start at another rate (Audacity's placeholder 44.1 kHz)
 // is too little evidence to say it is wrong, so Status and the window say it
 // is selected and waiting, until the adapter reports that the host played it
-// (confirm()); then Silent with both rates. The log keeps the start's facts.
+// (confirm()); then Silent, waiting, with both rates (PLUG-44: still the
+// Waiting status, as the filter stays kept). The log keeps the start's facts.
 void awaiting_validation() {
     const HostLayout placeholder{44100, 2, 2};
     const std::string waiting = "Filter selected. Waiting for the host's audio settings.";
@@ -962,7 +1002,8 @@ void awaiting_validation() {
                 started_line(f, placeholder, 512, nullptr, false));
     f.confirm();
     s = host_status(f, placeholder, true, {});
-    require(!f.waiting() && s.status == HostStatus::load_failed && contains(s.text, "48000 Hz") &&
+    require(!f.waiting() && s.status == HostStatus::unchecked &&
+                s.text.rfind("Silent, waiting for 48000 Hz", 0) == 0 &&
                 contains(s.text, "44100 Hz"),
             "after the host played it: " + s.text);
     // A start that could not be done at all is shown, not waited out (the
@@ -982,8 +1023,23 @@ void awaiting_validation() {
                   HostLoadCheck::keep_until_suited);
     static_cast<void>(test::started(restored, placeholder));
     require(!restored.awaiting() &&
-                host_status(restored, placeholder, true, {}).status == HostStatus::load_failed,
+                host_status(restored, placeholder, true, {})
+                        .text.rfind("Silent, waiting for 48000 Hz: the host runs at 44100 Hz", 0) ==
+                    0,
             "restored state waits as a chosen file does");
+    // A file refused while the kept filter waits (here, unreadable) is named
+    // under the heading and in the file lines, not only in the log; the
+    // status line keeps the kept filter's reason (jrp, 21 November 2026,
+    // PLUG-44).
+    restored.reject(HostFailureKind::filter_file, {"The file could not be read."},
+                    HostRequest{HostFilterSource::file, "/filters/broken.wav"});
+    r = host_report(restored, facts(placeholder));
+    s = host_status(restored, placeholder, true, {});
+    require(r.filter_note == "broken.wav was refused." &&
+                reference(r, "Refused file") == "/filters/broken.wav, request 2" &&
+                s.status == HostStatus::load_failed &&
+                contains(s.text, "the filter is for 48000 Hz, the host runs at 44100 Hz"),
+            "a file refused while a kept filter waits: " + r.filter_note + " | " + s.text);
 }
 
 // PLUG-40 (jrp, 21 November 2026): a list refused before the host's

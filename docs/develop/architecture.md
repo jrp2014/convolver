@@ -58,7 +58,7 @@ does, apart from drawing it (PLUG-34), is shared C++ that every system's
 window uses, in [`window_model.hpp`](../../portable/window_model.hpp), part
 of `Convolver::host`: what to show for a report (the status's tone and
 symbol, the message, the filter's facts, the Audio and reference lines, the
-drop hint and the fix's button), the Latency note, typed values, Choose…
+fix's button), the Latency note, typed values, Choose…
 requests, the Recent menu's entries, and following the playing filter's
 files for Reload When the File Changes (AU-11). It knows no plug-in
 format: each format hands it blocks that read the report, the diagnostics

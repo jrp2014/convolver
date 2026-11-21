@@ -1010,7 +1010,7 @@ void wider_inputs() {
                 dry_signal_rule(kept, slower) == HostDrySignal::filter_counts &&
                 !silent_crossover.dry && silent_crossover.filter->output_channels == 6,
             "a kept crossover that does not suit the host has a dry signal");
-    require(host_status(kept, slower, true, {0, .5}).text.rfind("Silent: ", 0) == 0,
+    require(host_status(kept, slower, true, {0, .5}).text.rfind("Silent, waiting for ", 0) == 0,
             "status: " + host_status(kept, slower, true, {0, .5}).text);
     require(failure_consequence(*kept.failure(), &slower, {0, .5}, dry_signal(kept, slower),
                                 false) == "Convolver plays silence.",
@@ -2434,9 +2434,11 @@ void status_lines() {
     check(host_status(f, std::nullopt), Status::unchecked,
           "Filter loaded: 44100 Hz, 2 in, 2 out; waiting for audio settings from the host.",
           "unchecked");
-    // Checked at activation: silence, and why.
+    // Checked at activation: silence, and what it waits for (PLUG-44:
+    // Waiting, as nothing failed to load).
     static_cast<void>(test::started(f, stereo));
-    check(host_status(f, stereo), Status::load_failed, "Silent: the filter is for 44100 Hz",
+    check(host_status(f, stereo), Status::unchecked,
+          "Silent, waiting for 44100 Hz: the host runs at 48000 Hz. Details in the Convolver log.",
           "mismatch at activation");
     f.load(HostState{a}, stereo);
     check(host_status(f, stereo), Status::active, "Filter loaded: 48000 Hz, 2 in, 2 out.",
@@ -2478,6 +2480,14 @@ void status_lines() {
           "Load failed, previous filter kept: the filter is for 44100 Hz; the rate has changed "
           "since. Details in the Convolver log.",
           "refused replacement, suitable rate now");
+    // Then started at a rate the playing filter does not suit: it is kept,
+    // silent, with why, but stays Load failed rather than Waiting (PLUG-44),
+    // as a refused request shows until a load is accepted.
+    static_cast<void>(test::started(f, HostLayout{44100, 2, 2}));
+    check(host_status(f, HostLayout{44100, 2, 2}), Status::load_failed,
+          "Silent: the filter is for 48000 Hz, the host runs at 44100 Hz.",
+          "kept after a refusal, unsuited");
+    static_cast<void>(test::started(f, stereo));
     // Restored while the host may still change its buses (VST3 before audio
     // has played): a filter that does not suit is kept, silent, with the
     // reason, and plays once the host's buses suit it.
@@ -2489,8 +2499,15 @@ void status_lines() {
                     kept.failure()->silent && kept.failure()->kind == HostFailureKind::channels &&
                     !kept.rejection(),
                 "a restored filter that does not suit yet was not kept silent");
-        check(host_status(kept, stereo), Status::load_failed,
-              "Silent: the filter has 2 in, 6 out, the host 2 in, 2 out.", "kept, unsuited");
+        check(host_status(kept, stereo), Status::unchecked,
+              "Silent, waiting for 2 in, 6 out: the host has 2 in, 2 out.", "kept, unsuited");
+        // Before the host's settings are known again, only what it waits for.
+        check(host_status(kept, std::nullopt), Status::unchecked,
+              "Filter kept, waiting for 2 in, 6 out.", "kept, unsuited, host unknown");
+        // Mix lets the dry signal through where the counts are all equal:
+        // not here (a crossover), so still silent.
+        check(host_status(kept, stereo, true, HostSettings{0, .5}), Status::unchecked,
+              "Silent, waiting for", "kept crossover, Mix 50%");
         static_cast<void>(test::started(kept, six));
         require(!kept.failure(), "the kept filter does not play on buses that suit it");
         check(host_status(kept, six), Status::active, "Filter loaded: 48000 Hz, 2 in, 6 out",
@@ -2505,19 +2522,23 @@ void status_lines() {
         HostFilter kept(8);
         kept.load(HostState{other_rate}, std::nullopt);
         static_cast<void>(test::started(kept, stereo));
-        check(host_status(kept, stereo, true, {}, true), Status::load_failed,
-              "Load failed. Bypass is on: only the dry signal plays. The filter is for 44100 Hz, "
-              "the host runs at 48000 Hz.",
+        check(host_status(kept, stereo, true, {}, true), Status::unchecked,
+              "Bypass is on: only the dry signal plays. Waiting for 44100 Hz: the host runs at "
+              "48000 Hz.",
               "kept at another rate, bypassed");
         // Whatever Gain and Mix are: bypass passes the input untouched.
-        check(host_status(kept, stereo, true, HostSettings{-6, .5}, true), Status::load_failed,
-              "Load failed. Bypass is on: only the dry signal plays.",
+        check(host_status(kept, stereo, true, HostSettings{-6, .5}, true), Status::unchecked,
+              "Bypass is on: only the dry signal plays.",
               "kept at another rate, Gain -6 dB, Mix 50%, bypassed");
+        // Not bypassed, Mix 50%: the dry share plays (PLUG-36's rule).
+        check(host_status(kept, stereo, true, HostSettings{0, .5}), Status::unchecked,
+              "Only the dry signal plays, waiting for 44100 Hz: the host runs at 48000 Hz.",
+              "kept at another rate, Mix 50%");
         HostFilter unsuited(8);
         unsuited.load(HostState{crossover}, std::nullopt);
         static_cast<void>(test::started(unsuited, stereo));
-        check(host_status(unsuited, stereo, true, {}, true), Status::load_failed,
-              "Silent: the filter has 2 in, 6 out", "kept crossover, bypassed");
+        check(host_status(unsuited, stereo, true, {}, true), Status::unchecked,
+              "Silent, waiting for 2 in, 6 out", "kept crossover, bypassed");
         // A kept filter the adapter could not start has no processor: nothing
         // plays, bypassed or not.
         HostFilter unstarted(8);

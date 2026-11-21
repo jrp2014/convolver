@@ -111,7 +111,7 @@ def plugin(base, layout, vendor, version):
 \t\ta lv2:ControlPort , lv2:OutputPort ;
 \t\tlv2:index 1 ;
 \t\tlv2:symbol "latency" ;
-\t\tlv2:name "Latency" ;
+\t\tlv2:name "Reported latency" ;
 \t\tlv2:designation lv2:latency ;
 \t\tlv2:portProperty lv2:reportsLatency , lv2:integer ;
 \t\tunits:unit units:frame ;
@@ -123,6 +123,7 @@ def plugin(base, layout, vendor, version):
 \t\tlv2:index 2 ;
 \t\tlv2:symbol "status" ;
 \t\tlv2:name "Status" ;
+\t\trdfs:comment "What the plug-in plays; the host's log says why a filter does not play." ;
 \t\tlv2:portProperty lv2:integer , lv2:enumeration ;
 \t\tlv2:minimum 0 ;
 \t\tlv2:maximum {STATUS[-1][0]} ;

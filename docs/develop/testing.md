@@ -419,7 +419,8 @@ cases.
   through the transport codec (PLUG-39 step 5); the Audio facts in order with
   their values, notes and help (a refused rate and a mono track's channels
   marked as problems, the Routing of a filter that is not playing, what is
-  known before the host starts), the Loudest peak and the Gain that rules
+  known before the host starts, one Host line when the host suits the
+  filter, Ring-out only where it differs from Length), the Worst-case peak and the Gain that rules
   out clipping (the same at any Mix above 0; nothing clips at Mix 0), the message's parts and
   the window's action for each kind (DIAG-2: choose filter only where the window chooses
   files, none for a preparation failure, Copy Diagnostics for a processing failure, other
@@ -444,8 +445,8 @@ cases.
   with the log turned off.
 - `native.window_model`: what every system's window does (PLUG-34), from
   a typed report: the content for each status (tone, symbol, message,
-  box, the fix's button with and without loading, the drop hint, the
-  filter's facts, Audio and reference lines) and with no report; the
+  box, the fix's button with and without loading, no drop hint under the
+  name (PLUG-44), the filter's facts, Audio and reference lines) and with no report; the
   Latency note; typed values (decimal comma, minus sign, a unit after the
   number, clamping, refusing text that is not a finite number); Choose…
   requests replaced, answered once and forgotten when the window closes;
