@@ -78,23 +78,17 @@ LATENCIES = [
 # Each fixture at the default Latency, 0; then a session saved at a larger
 # Latency, which Ardour must compensate when the export restores it: the
 # largest delay a user is likely to choose, and a multichannel one. Ardour's
-# LV2 host chooses the layout by URI. Ardour 8 runs a VST3 plug-in only with
-# its default buses (Convolver's: 2 in, 2 out), feeding a mono track to both
-# inputs, so there only the stereo cases run. Ardour 9 asks a VST3 plug-in
-# for the track's channels, in and out (HOST-10), so the mono case runs too;
-# the crossover needs more outputs than the track has inputs, which only
-# Ardour's pin configuration window sets, and its Lua API cannot.
+# LV2 host chooses the layout by URI. Ardour 8 and 9.0 run Convolver's VST3
+# only with 2 in, 2 out (HOST-10), feeding a mono track to both inputs, so
+# the mono and crossover presets do not fit there and only the stereo cases
+# run: Ardour 8 keeps a VST3's default buses, and Ardour 9.0's request for
+# the track's channels reaches the plug-in as no channels for a mono track
+# (VST3PI::request_bus_layout masks kMono with the default bus width), which
+# Convolver refuses, and as at most the default two channels otherwise.
 CASES = {
     'LV2': [('mono', 0), ('stereo', 0), ('crossover', 0), ('stereo', 1024), ('crossover', 256)],
     'VST3': [('stereo', 0), ('stereo', 1024)],
 }
-VST3_FROM_ARDOUR_9 = [('mono', 0)]
-
-
-def cases(format_name, version):
-    """The cases this Ardour can run: the mono VST3 one needs Ardour 9's bus requests."""
-    extra = VST3_FROM_ARDOUR_9 if format_name == 'VST3' and version and version >= (9, 0) else []
-    return extra + CASES[format_name]
 
 
 def tool(name):
@@ -325,7 +319,7 @@ def check(tools, environment, directory, plugin_tool, format_name, fixture_name,
         sys.exit(f'{name}: {pathlib.Path(tools["lua"]).name} failed with exit code {result.returncode}')
     log = result.stdout
     # HOST-10: Ardour must run the plug-in with the track's channels; a mono
-    # track fed to a 2-in VST3, as Ardour 8 does, leaves the mono preset
+    # track fed to a 2-in VST3, as Ardour 8 and 9.0 do, leaves a mono preset
     # unsuited and the export silent.
     channels = re.search(r'^Plug-in channels: (\d+) in, (\d+) out', log, re.MULTILINE)
     assert channels, f"{name}: the script did not report the plug-in's channels"
@@ -436,7 +430,7 @@ def main():
             library = {'LD_LIBRARY_PATH': ':'.join(filter(None, [str(scan.parent), os.environ.get('LD_LIBRARY_PATH')]))}
             run([scan, '--force', installed], {**environment, **library})
         all_fixtures = fixtures()
-        for fixture_name, latency in cases(format_name, tools['version']):
+        for fixture_name, latency in CASES[format_name]:
             worst = max(
                 worst,
                 check(

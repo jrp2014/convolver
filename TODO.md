@@ -149,11 +149,6 @@ Foundation items are parked by owner decision instead.
   `known_new_session_abort()` in `tests/plugins/ardour_tests.py` accepts it on
   9.0 only; jrp may report it upstream. **Done when** the Ardour on
   `ubuntu-latest` no longer aborts and the test stops accepting it.
-- [ ] **HOST-10 — Ardour's VST3 channels and settings.** From HOST-9:
-  Ardour 8.4 ran the VST3 only at its default 2 in, 2 out and named Latency
-  and Gain mode "hidden" ([unresolved host finding](docs/develop/host-testing.md#unresolved-host-findings)).
-  **Done when** it is known whether Ardour 9 does the same and the
-  [plug-in guide](docs/use/plugins.md) says what Ardour users need.
 - [ ] **HOST-11 — One command for the REAPER checks.** Step 3 of the
   [plan](docs/project/plans/2026-11-21-host-test-automation.md#steps): a
   ReaScript-driven script for jrp's Mac (presets, renders compared with
@@ -496,6 +491,9 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **HOST-10 — Ardour's VST3 channels and settings.** 21 November 2026,
+  PR #247: Ardour 8 and 9.0 run the VST3 only at 2 in, 2 out and hide Gain
+  mode and Latency ([plug-ins](docs/use/plugins.md#ardour)).
 - [x] **CI-48 — No GCC 12 warnings from our sources in the Linux package.** 21
   November 2026, PR #244
   ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).

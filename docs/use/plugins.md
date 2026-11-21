@@ -46,7 +46,7 @@ Contents: [formats](#formats) · [channels](#channels) ·
 [status and the Convolver log](#status-and-the-convolver-log) ·
 [settings](#settings) · [latency and tail](#latency-and-tail) · [bypass](#bypass) ·
 [replacing a filter](#replacing-a-filter) · [audio](#audio) ·
-[LV2 channel layouts](#lv2-channel-layouts) · [LV2 ports](#lv2-ports) ·
+[Ardour](#ardour) · [LV2 channel layouts](#lv2-channel-layouts) · [LV2 ports](#lv2-ports) ·
 [LV2 filter files](#lv2-filter-files) ·
 [identities](#identities) · [Audio Unit licence](#audio-unit-licence)
 
@@ -91,7 +91,8 @@ Channels are numbered in the host's order, and the `.cfg` routes refer to them
 in that order. For VST3 the order follows the speaker arrangement: 5.1 is left,
 right, centre, LFE, left surround, right surround, the same order as the WAV
 speaker mask `3F`. Any arrangement with the right number of channels is
-accepted.
+accepted. Ardour runs the VST3 plug-in only with 2 inputs and 2 outputs
+([Ardour](#ardour)).
 
 **Speaker check (VST3).** If the `.cfg` names its output speakers (the mask at
 the end of its first line, which presets keep) and the host's output
@@ -673,6 +674,9 @@ defaults play exactly as Convolver did before the settings existed.
 | **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. Whenever bypass plays silence there is no dry signal, so the mix stays at 100%: when the filter's input and output counts differ, and in the cases [bypass](#bypass) lists when no filter plays. Where bypass passes the input, the input share of Mix still plays while a kept filter is silent. |
 | **Latency** | 0, 64, 128, 256, 512, 1024, 2048 or 4096 frames | 0 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. At 0 Convolver adds no processing delay; any delay in the filter itself still plays. A larger value uses less processor time, most of all for short filters. It is the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
 
+- Hosts may leave settings that cannot be automated out of their own
+  controls: Ardour does so for the VST3 plug-in's Gain mode and Latency
+  ([Ardour](#ardour)).
 - Gain and Mix changes fade over 1.3 ms (64 samples at 48 kHz, 128 at
   96 kHz), so automating them does not click. Latency cannot be automated,
   except in LV2 hosts built on JUCE, which automate it anyway; each change
@@ -851,6 +855,36 @@ afresh.
   silent, so hosts can skip work after it. A filter's tail is never cut short:
   silent input does not mark the output while the tail is still sounding.
 
+## Ardour
+
+Ardour hosts the LV2 plug-in fully, but in Ardour 8 and 9.0 the VST3 plug-in
+gets only 2 inputs and 2 outputs, and two of its settings are missing from
+Ardour's controls. Seen in Ardour 8.4 and 9.0 on Linux, run headless in CI.
+
+- **Channels.** Whatever the track has, Ardour runs Convolver's VST3
+  plug-in with 2 inputs and 2 outputs; on a mono track it feeds the track's
+  channel to both inputs. A filter made for other counts, such as a mono
+  filter (1 in, 1 out) or a 2→6 crossover, does not fit: Convolver plays
+  silence and its Status says why. Ardour 9.0 does ask for the track's
+  channels, but on a mono track the request reaches Convolver as a layout
+  with no channels, which it refuses (the
+  [Convolver log](#status-and-the-convolver-log) then says `Refused the
+  host's channel layout: it has 0 input and 0 output channels`), and on a
+  wider track as stereo. With the VST3 plug-in in Ardour, use filters made
+  for 2 inputs and 2 outputs.
+- **Settings.** Ardour leaves Gain mode and Latency out of its own controls
+  for the VST3 plug-in, because they cannot be automated; Gain and Mix are
+  there. On macOS and Windows, Convolver's window has all four (not yet
+  tried in Ardour). On Linux the VST3 plug-in has no window, so in Ardour
+  those two stay as they are.
+- **Which to use.** On Linux, use the LV2 plug-in: add the
+  [layout](#lv2-channel-layouts) that matches the track, such as 1→1 for
+  mono or 2→6 for a crossover, choose the filter with its
+  [Filter parameter](#lv2-filter-files), and Ardour shows Gain, Mix,
+  Latency and Gain mode by name. Convolver's macOS and Windows packages have
+  no LV2 plug-in; on macOS, Ardour also hosts Audio Units, but Convolver's
+  has not yet been tried there.
+
 ## LV2 channel layouts
 
 An LV2 plug-in's inputs and outputs are fixed, so each layout is its own
@@ -873,7 +907,8 @@ URIs are `https://github.com/jrp2014/convolver/lv2#discrete-N-M`.
 | then | `notify` | Atom output | Names the file that plays |
 | then | `gain` | Control input | Gain, −100 to +24 dB (default 0) |
 | then | `mix` | Control input | Mix, 0 to 100% (default 100) |
-| last | `latency_frames` | Control input | Latency, one of 0, 64, 128, 256, 512, 1024, 2048 and 4096 frames (default 0); another value counts as the nearest |
+| then | `latency_frames` | Control input | Latency, one of 0, 64, 128, 256, 512, 1024, 2048 and 4096 frames (default 0); another value counts as the nearest |
+| last | `gain_mode` | Control input | Gain mode: 0 Set, 1 Estimate, 2 No clipping (default 0) |
 
 Load failed stays shown until a filter loads successfully, also after the
 host reactivates the plug-in; Loading is shown while the newest file choice

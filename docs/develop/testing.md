@@ -1301,22 +1301,27 @@ at a Latency:
 | Format | Cases |
 | --- | --- |
 | LV2 | Mono (1 in, 1 out), the stereo cross-feed (2 in, 2 out) and the crossover (2 in, 6 out) at Latency 0; the stereo cross-feed at 1024 and the crossover at 256 |
-| VST3 | The stereo cross-feed at Latency 0 and 1024; with Ardour 9, mono at Latency 0 too |
+| VST3 | The stereo cross-feed at Latency 0 and 1024 |
 
-Ardour 8 runs a VST3 plug-in with its default buses, which for Convolver are
-2 in and 2 out: on a mono track it feeds the one input to both, and it does
-not ask for another arrangement, so a mono or crossover filter does not fit
-and with Ardour 8 the VST3 runs only the stereo cases. Ardour 9 asks a VST3
-plug-in for the track's channel count, in and out (`request_bus_layout` in
-its `vst3_plugin.cc`, which 8.12 lacks), so the mono case runs there too
-(HOST-10). The crossover needs more outputs than the track has inputs, which
-only Ardour's pin configuration window sets; its Lua API cannot, so the VST3
-crossover is not run. The script prints the channels Ardour runs the plug-in
-with, and the test requires the track's. Ardour, 8.4 and 9.0 alike, names
-every VST3 parameter that cannot be automated (Gain mode and Latency)
-"hidden" and leaves it out of its generic controls; the script prints each
-input parameter's name, and finds the Latency parameter by its shape: the
-one input with as many entries as the Latency menu. For each case:
+Ardour 8 and 9.0 run Convolver's VST3 only with 2 in and 2 out (HOST-10):
+on a mono track they feed the one input to both, so a mono or crossover
+filter does not fit and the VST3 runs only the stereo cases. Ardour 8 keeps
+a VST3 plug-in's default buses and asks for no other arrangement. Ardour 9
+asks for the track's channel count, in and out (`request_bus_layout` in its
+`vst3_plugin.cc`, which 8.12 lacks), but 9.0 masks each request with the
+bus's default width, 2 for Convolver: a mono request (`kMono`, bit 19)
+arrives as an arrangement with no channels, which Convolver refuses ("it
+has 0 input and 0 output channels" in the Convolver log, as the Ardour job
+showed on 21 November 2026 when it ran the mono case), and a wider one as
+stereo. The crossover would also need Ardour's pin configuration window,
+which its Lua API cannot set. The script prints the channels Ardour runs the
+plug-in with, and the test requires the track's; on a mismatch it prints
+the Convolver log. Ardour, 8.4 and 9.0 alike, names every VST3 parameter
+that cannot be automated (Gain mode and Latency) "hidden" and leaves it out
+of its generic controls, while its LV2 host lists all four settings by
+name; the script prints each input parameter's name, and finds the VST3
+Latency parameter by its shape: the one input with as many entries as the
+Latency menu. For each case:
 
 1. `convolver-preset` makes a preset from the fixture's filter: an LV2
    preset bundle on `LV2_PATH`, or a `.vstpreset` in

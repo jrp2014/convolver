@@ -124,7 +124,7 @@ for n = 0, plugin:parameter_count() - 1 do
 end
 
 -- Latency, as a user chooses it from the host's controls after the preset.
--- Ardour lists the LV2 port as Latency, in frames. Ardour 8.4 names every
+-- Ardour lists the LV2 port as Latency, in frames. Ardour (8.4 and 9.0) names every
 -- VST3 parameter that cannot be automated "hidden", so the VST3 one is found
 -- by its shape instead: the one input whose steps are the menu's entries
 -- (Gain mode has three). Its value is the entry's index.
