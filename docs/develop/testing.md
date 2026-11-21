@@ -1698,7 +1698,9 @@ gave each campaign about half its executions; the
 [27 October 2026 counts](../archive/reviews/2026-11-08-testing-guide-evidence.md#fuzz-campaigns-side-by-side-27-october-2026)
 are archived). A manual workflow run defaults to
 600 seconds per target; set its `seconds` input to `60` to reproduce the
-smoke-test budget. Keep crashes
+smoke-test budget. The job stops after 45 minutes, so a hang does not run
+for GitHub's six hours; a manual run keeps the six hours, since its `seconds`
+input sets its length (CI-52). Keep crashes
 as committed regression inputs after investigating them.
 
 [`fuzz_campaigns.sh`](../../scripts/fuzz_campaigns.sh) is the scheduler: it
@@ -1850,10 +1852,14 @@ or any other metadata, only where a requirement says what it must contain.
 The package consumer tests each build with `--parallel 2`, so CTest counts
 two CPUs for each (`PROCESSORS 2`) and runs fewer other tests beside them.
 
-Every build and test job but the fuzz campaigns (whose manual runs last as
-long as asked) has a time limit (`timeout-minutes`): 15 to 30 minutes, 60
-for the native Windows job, the VST3 matrix (which has a Windows leg) and
-the release candidates, whose build-and-verify steps have 40. That is a few
+Every job but the few-second `scope` jobs has a time limit
+(`timeout-minutes`): 10 to 30 minutes for most; 45 for the Audio Unit job,
+which runs its Release and both sanitizer builds in turn (CI-51), and for
+the fuzz job, whose manual runs, lasting as long as asked, keep GitHub's 360
+(CI-52); 60 for the native Windows job, the VST3 matrix (which has a
+Windows leg), the VST3 sanitizer builds and the release candidates, whose
+build-and-verify steps have 40; and 90 for the manual workload
+measurements. That is a few
 times the longest successful job of the 60 most recent runs (13 minutes, a
 candidate). A process that CTest
 cannot end then fails the job instead of holding a runner for GitHub's
