@@ -53,9 +53,8 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 
 ### In progress
 
-DIAG-10; HOST-11 waits for jrp's second run of the REAPER
-check (PR #255). Check the open pull requests for an ID before starting
-anything.
+HOST-11 waits for jrp's second run of the REAPER check (PR #255). Check
+the open pull requests for an ID before starting anything.
 
 ### Ready
 
@@ -157,13 +156,7 @@ Foundation items are parked by owner decision instead.
   records what [every report](docs/develop/host-testing.md#every-report) lists.
 - [ ] **DIAG-9 — Numbers in the user's locale.** Low priority. **Done when**
   the window shows numbers in the system locale from one formatting path,
-  Status and the log stay plain, and a test covers other separators; best
-  after DIAG-10.
-- [ ] **DIAG-10 — Status says what the window says.** Status also names a
-  Latency not in use yet, the Estimate being found or failing, and a filter
-  still loading ([what Status leaves out](docs/use/plugins.md#status-and-the-convolver-log)),
-  from the typed report. **Done when** each format's tests cover them and
-  jrp has decided LV2's `status` port values.
+  Status and the log stay plain, and a test covers other separators.
 
 ## Plug-ins: VST3, LV2 and AU
 
@@ -492,6 +485,9 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
+- [x] **DIAG-10 — Status says what the window says.** 21 November 2026,
+  PR #261 ([plug-ins](docs/use/plugins.md#status-and-the-convolver-log),
+  [decision](docs/project/decisions.md#diagnostics)).
 - [x] **PLUG-24 — `HostProcessor` in its own source file.** 21 November
   2026, PR #260 ([architecture](docs/develop/architecture.md#components-and-source-of-truth)).
 - [x] **CI-51 — One Audio Unit job instead of three.** 21 November 2026,

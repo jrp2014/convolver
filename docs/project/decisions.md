@@ -1276,6 +1276,17 @@ were recorded in the repository; this log is their first written record.
   wording; PLUG-36). See [Contract: status and
   log](../develop/plugin-contract.md#status-and-log),
   [plug-ins](../use/plugins.md#status-and-the-convolver-log).
+- **21 November 2026.** DIAG-10: LV2's `status` port keeps its five values
+  and labels (0 Active, 1 No filter, 2 Load failed, 3 Loading, 4 Fault).
+  While the filter plays on during a Latency change or while Estimate's
+  figure is found, Active still tells the user what they hear; the details
+  go to the host's log, and Fault stays for an actual fault (jrp chose
+  "Keep its five values", asking for a test that each pending operation
+  leaves the port at Active and logs its detail). The VST3 and Audio Unit
+  Status text names a Latency not in use yet and a missing estimate, with
+  the values unchanged. See [Contract: status and
+  log](../develop/plugin-contract.md#status-and-log),
+  [plug-ins](../use/plugins.md#status-and-the-convolver-log).
 
 ## Licences and dependencies
 

@@ -353,15 +353,23 @@ fine. When the window and the sound disagree, trust the log: each copy has its
 own number (`VST3 #1`, `VST3 #2`), and the one playing logs `Started at` with
 the rate the host plays at.
 
-**What Status leaves out.** Status names one state in a short line, so some
-things only the window's report and the Convolver log say (in LV2, the
-host's log): a Latency you
-chose that is not in use yet, or could not be applied; the Gain mode's
-Estimate still being found, or why it could not be. In the VST3 and the
-Audio Unit nothing says that a filter is still loading: the earlier status
-shows until it is done. LV2's `status` port has five values (see
-[LV2 ports](#lv2-ports)): Bypassed reads as Active, and the reasons are in
-the host's log. Some things no plug-in
+**Settings that do not play as chosen.** Status also says, after its own
+words, when a setting you chose does not play as chosen: `Latency 1024
+frames not in use yet.` when the Latency you chose has not been applied (the
+log says why, if it could not be), `No estimate: No clipping's gain plays.`
+or `Too loud to estimate: No clipping's gain plays.` when the Gain mode is
+Estimate and the filter has no estimate, and `Silent: no gain figure for
+this filter.` when the filter has no figure for the Gain mode at all (`No
+gain figure for this filter: only the dry signal plays.` when Mix lets the
+dry signal through). A load failure or a fault comes first, and the
+window's report gives the details. LV2's `status` port keeps its five values (see
+[LV2 ports](#lv2-ports)): Bypassed reads as Active, and while a new Latency
+is applied or the estimate is found the filter plays on and the port stays
+at Active; the host's log says what is happening.
+
+**What Status leaves out.** In the VST3 and the Audio Unit nothing says that
+a filter is still loading: the earlier status shows until it is done, as
+these formats load on the host's own thread. Some things no plug-in
 can see: a host that stops calling Convolver instead of bypassing it (see
 Active above), a separate copy the host makes for export or playback (see
 Waiting above), and whether the host applied the latency Convolver
@@ -965,7 +973,11 @@ URIs are `https://github.com/jrp2014/convolver/lv2#discrete-N-M`.
 
 Load failed stays shown until a filter loads successfully, also after the
 host reactivates the plug-in; Loading is shown while the newest file choice
-is being loaded.
+is being loaded. While a new Latency is applied or Estimate's figure is
+found, the filter plays on and the port stays at Active; the host's log
+says so (`Latency 256 frames chosen; the plug-in keeps 0 frames while a
+processor for it is built.`, `Finding the filter's estimate for
+Estimate; ...`) and then what happened.
 
 The plug-in needs the host's `urid:map` feature, and the host's worker thread
 to load files. It writes messages through the host's log, or to standard

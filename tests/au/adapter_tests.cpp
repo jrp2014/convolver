@@ -1825,6 +1825,9 @@ void status_parameter() {
     require(value() == HostStatus::active && contains(shown(), "Filter loaded"),
             "a Latency that could not be built brought back the Fault a load had cleared: " +
                 shown());
+    // DIAG-10: Status says the chosen Latency is not in use, as the window does.
+    require(contains(shown(), " Latency 1024 frames not in use yet."),
+            "Status after a Latency that could not be built: " + shown());
     set_parameter(unit, au::latency_parameter, 0);
     require(latency_settled(unit), "the Latency work did not finish for the default Latency");
     // jrp's review of 0.4.43: Render must not write Fault over Load failed,

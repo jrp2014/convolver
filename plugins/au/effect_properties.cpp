@@ -220,7 +220,8 @@ std::shared_ptr<const Effect::Diagnostics> Effect::diagnostics() const {
 // as hosts read it: Gain and Mix may change on any thread.
 HostStatusLine Effect::status_line(const Diagnostics& d) {
     return host_status(d.filter, d.host, d.log_written, settings(), bypass_.load(),
-                       true); // Choose Filter in the window.
+                       true, // Choose Filter in the window.
+                       latency_.load());
 }
 
 HostReport Effect::report_of(const Diagnostics& d) {
