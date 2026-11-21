@@ -23,7 +23,7 @@
   [clearing processed records](docs/develop/workflow.md#clearing-processed-records),
   [source versioning](docs/develop/versioning.md#minor-and-major-versions)).
   Pre-commit now also runs the versioning tests when the version helper
-  changes; before, they ran only on `main` after a merge.
+  or its tests change, as CTest's `versioning` test already did.
 
 ## Done
 

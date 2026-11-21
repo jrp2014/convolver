@@ -196,7 +196,11 @@ class StepLabelTests(GitFixture):
         self.bin.mkdir()
         self.labels = Path(self.temp.name) / 'labels.json'
         self.calls = Path(self.temp.name) / 'calls.txt'
-        gh = self.bin / 'gh'
+        # A Python stand-in, started through gh.cmd on Windows, which cannot
+        # run a script by its #! line.
+        gh = self.bin / ('gh.py' if os.name == 'nt' else 'gh')
+        if os.name == 'nt':
+            (self.bin / 'gh.cmd').write_text(f'@"{sys.executable}" "{gh}" %*\r\n', encoding='utf-8')
         gh.write_text(
             '#!' + sys.executable + '\n'
             'import json, sys\n'
@@ -261,7 +265,8 @@ class StepLabelTests(GitFixture):
 
     def test_unreadable_labels_stop_versioning(self):
         self.change_source('// labels unknown\n')
-        (self.bin / 'gh').write_text('#!/bin/sh\nexit 1\n', encoding='utf-8')
+        failing = 'import sys\nsys.exit(1)\n'
+        (self.bin / ('gh.py' if os.name == 'nt' else 'gh')).write_text('#!' + sys.executable + '\n' + failing)
         self.run_version('--labels-from', 'owner/repo', ok=False, env=self.env)
         self.assertEqual((self.repo / 'VERSION').read_text(), '0.2.0\n')
         self.assertEqual(self.git('tag', '--list', 'v0.2.1'), '')

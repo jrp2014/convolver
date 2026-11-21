@@ -9,6 +9,7 @@ major step instead of a patch (DOC-20, docs/develop/versioning.md).
 
 import argparse
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -38,9 +39,10 @@ def git(*args):
 
 def merged_pull_request_labels(repository, commit):
     """Labels of the merged pull requests GitHub associates with a commit."""
+    # which() honours PATHEXT, so a gh.cmd or gh.exe on Windows is found too.
     names = subprocess.run(
         [
-            'gh',
+            shutil.which('gh') or 'gh',
             'api',
             f'repos/{repository}/commits/{commit}/pulls',
             '--jq',
