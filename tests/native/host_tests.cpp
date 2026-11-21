@@ -1666,14 +1666,29 @@ void request_changes() {
     require(f.estimating() && f.gains().estimate_db, "settings with Estimate found no estimate");
     f.load(HostState{a}, layout, install);
     require(f.estimating(), "a request without settings changed estimating()");
-    // The tail until a processor is built; a processor knows its own.
-    change = f.load(HostState{a}, std::nullopt);
-    require(change.inactive_tail > 0 && change.inactive_tail == configuration_tail_frames(a),
-            "the tail while inactive: " + std::to_string(change.inactive_tail));
-    require(f.load(HostState{}, std::nullopt).inactive_tail == 0, "an empty instance has a tail");
+    // The tail the adapters report while no processor plays: the accepted
+    // filter's, kept by a request for the same filter and by a refused one.
+    f.load(HostState{a}, std::nullopt);
+    require(f.filter_tail() > 0 && f.filter_tail() == configuration_tail_frames(a),
+            "the tail while inactive: " + std::to_string(f.filter_tail()));
+    Configuration longer = a;
+    longer.paths[0].impulse.resize(100);
+    require(configuration_tail_frames(longer) != configuration_tail_frames(a),
+            "the longer filter's tail is not different");
+    bool refused_longer = false;
+    try {
+        f.load(HostState{longer}, HostLayout{44100, 1, 1}, install, chosen);
+    } catch (const std::invalid_argument&) {
+        refused_longer = true;
+    }
+    require(refused_longer && f.filter_tail() == configuration_tail_frames(a),
+            "a refused request changed the tail");
+    f.load(HostState{}, std::nullopt);
+    require(f.filter_tail() == 0, "an empty instance has a tail");
     HostProcessor host(a, 64, 8);
-    change = f.load(HostState{a}, layout, [&](const HostPlayback& c) { host.play(c); }, {}, &host);
-    require(change.inactive_tail == 0, "a tail handed back while a processor plays");
+    f.load(HostState{a}, layout, [&](const HostPlayback& c) { host.play(c); }, {}, &host);
+    require(f.filter_tail() == configuration_tail_frames(a),
+            "the accepted filter's tail went while a processor plays");
 
     // A failed request silences the processor only while no filter is
     // accepted: a failed first load plays silence, not the unfiltered input.

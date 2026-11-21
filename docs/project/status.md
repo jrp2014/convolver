@@ -142,7 +142,9 @@ the playing filter and its tail when restored state or a preset holds it
 host's bus (PLUG-33, 0.13.20); a preset saved at the defaults resetting the
 settings when chosen in the window (PLUG-35, 0.13.20); the quicker restore
 of the playing filter (PLUG-39 step 1a) and the idle after the tail
-(EDGE-11), both 0.14.0. **Unverified, not defects:** listening in every
+(EDGE-11), both 0.14.0; the rest of PLUG-39's consolidation of the load
+and restore path (0.15.0 to 0.17.x), whose REAPER and GarageBand check is
+checks 2, 5 and 8 on the next published preview. **Unverified, not defects:** listening in every
 host, VoiceOver, playback while REAPER refuses a preset, and the Audacity
 steps not yet run; the required ones among them need running or a scope
 decision from jrp. The Audio Unit in REAPER, other hosts and two instances
