@@ -209,15 +209,20 @@ first published preview, keep their original grouping.
 
 - Plug-ins (PLUG-42, jrp's decision of 21 November 2026): in the VST3 and
   Audio Unit plug-ins, a filter that does not suit the host's sample rate or
-  channels is refused only while another filter that suits it is playing.
-  With nothing playing it is kept and saved with the project, plays silence
-  with the reason in Status, and plays when the host next starts the
-  plug-in at its rate and with its channels; the log says it waits for
-  audio settings that suit it. Before, it was refused and the project saved
-  the failure: in Ardour 8.4, a filter chosen just before Ardour restarted
-  the plug-in with the outputs set in Pin Connections was refused and the
-  export was silent. A filter refused while another plays stays refused,
-  and the refusal now says the playing filter stays selected when the host
+  channels, as a preset, an IR file or a `.cfg`, is refused only while
+  another filter that suits the host is playing. With nothing playing it is
+  kept and saved with the project, plays silence with the reason in Status,
+  and plays when the host next starts the plug-in at its rate and with its
+  channels; the log says it waits for audio settings that suit it. Until
+  then Mix's dry share and bypass pass the input where the host's and the
+  filter's counts are all equal, as for any filter kept that way, where a
+  refused first filter played silence. What played before it mutes within
+  1.3 ms. Before, it was refused and the project saved the failure: in
+  Ardour 8.4, a filter chosen just before Ardour restarted the plug-in with
+  the outputs set in Pin Connections was refused and the export was
+  silent. A configuration list with no entry for the host is still
+  refused. A filter refused while another plays stays refused, and the
+  refusal now says the filter Convolver has stays selected when the host
   restarts the plug-in, even with settings that suit the refused one. The
   LV2 plug-in, whose settings never change, refuses as before.
 - Plug-ins (PLUG-41, from jrp's review of 21 November 2026): a filter file

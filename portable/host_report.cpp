@@ -98,9 +98,7 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
                                       layout && dry_signal(filter, *layout), facts.bypassed);
         // PLUG-42 (jrp, 21 November 2026): a filter kept although it does
         // not suit the host plays at the next start that suits it.
-        if (filter.filter() && failure->silent &&
-            (failure->kind == HostFailureKind::channels ||
-             failure->kind == HostFailureKind::sample_rate))
+        if (filter.kept_unsuited())
             m.plays += " The filter is kept and waits for audio settings that suit it: it plays "
                        "when the host next starts the plug-in with them.";
         if (chosen_away(failure->kind))

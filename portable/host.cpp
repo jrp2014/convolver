@@ -558,9 +558,8 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
     // something playing: an accepted filter that suits the host (no failure
     // found at activation). refuse_mismatch (LV2, whose layout never
     // changes) refuses always.
-    const bool one_plays = filter_ && !failed_ && !activation_failure_;
     const bool keep_mismatch = check == HostLoadCheck::keep_until_suited ||
-                               (check == HostLoadCheck::keep_unless_one_plays && !one_plays);
+                               (check == HostLoadCheck::keep_unless_one_plays && !plays_suiting());
     request = numbered(std::move(request));
     auto& next = state.configuration;
     // PLUG-39: what the request changes besides the filter, decided here once
@@ -614,21 +613,20 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
             if (auto why = host_state_size_error(state); !why.empty())
                 refuse(HostFailureKind::too_large, std::move(why), request, carried);
         if (host && next) {
-            const bool unsettled = check == HostLoadCheck::keep_until_suited;
-            if (auto m = mismatch(*next, *host, unsettled ? "the saved filter" : "the filter")) {
+            if (auto m = mismatch(*next, *host,
+                                  check == HostLoadCheck::keep_until_suited ? "the saved filter"
+                                                                            : "the filter")) {
                 if (!keep_mismatch) {
                     // PLUG-42 (jrp, 21 November 2026): a refusal must be one
                     // the user can trust, so the refused filter is not held
                     // to replace the playing one at a later start.
                     if (check == HostLoadCheck::keep_unless_one_plays)
                         m->why.note += std::string(m->why.note.empty() ? "" : " ") +
-                                       "The filter that is playing stays selected when the "
+                                       "The filter Convolver has now stays selected when the "
                                        "host restarts the plug-in, even with settings that suit "
                                        "this one: choose this one again after changing them.";
                     refuse(m->kind, std::move(m->why), request, carried);
                 }
-                change.kept =
-                    unsettled ? HostChange::Kept::unsettled : HostChange::Kept::nothing_plays;
                 // Kept, as activation() keeps a filter that does not suit.
                 HostFailure f;
                 f.kind = m->kind;
@@ -711,6 +709,11 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
                                                        HostDrySignal::present)
                 : accepted   ? HostPlayback{}
                              : unfiltered_playback(*host, state.failed, !state.failed);
+            // PLUG-42: what plays before a kept filter that does not suit
+            // mutes at once, as for a failed first load, rather than for
+            // the new playback's warm-up (the Latency); the silent playback
+            // then takes over, with its dry share.
+            const auto before = counting ? counting->publications() : 0;
             try {
                 if (accepted && !kept_failure) {
                     // Shared, not copied: a filter can be large.
@@ -725,6 +728,8 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
                     install(HostPlayback{accepted, dry, gains, unchanged});
                 } else {
                     install(unfiltered);
+                    if (kept_failure && counting)
+                        counting->silence(before);
                 }
             } catch (const SupersededRequest&) {
                 throw; // Abandoned: nothing recorded or changed.
@@ -1527,9 +1532,15 @@ struct HostProcessor::Impl {
     // heard is already silent, as a filter published then is installed
     // directly.
     void mute(std::uint64_t through) noexcept {
-        // A filter published after `through` is already playing: nothing to mute.
-        if (current && current->number > through)
+        // A filter published after `through` is already playing: nothing to
+        // mute, except the one it is still fading out, if that was published
+        // up to `through` (silence(through) after the audio thread adopted
+        // the later publication).
+        if (current && current->number > through) {
+            if (previous && previous->number <= through)
+                previous_muted = true;
             return;
+        }
         muted = true;
         muted_through = std::max(muted_through, through);
         if (!started)
@@ -1873,8 +1884,10 @@ void HostProcessor::mute(std::uint64_t through) noexcept {
 }
 void HostProcessor::silence() noexcept {
     // The control side is the only publisher, so this count is exact.
-    impl_->silence_through.store(impl_->published.load(std::memory_order_relaxed) + 1,
-                                 std::memory_order_release);
+    silence(impl_->published.load(std::memory_order_relaxed));
+}
+void HostProcessor::silence(std::uint64_t through) noexcept {
+    impl_->silence_through.store(through + 1, std::memory_order_release);
 }
 std::size_t HostProcessor::latency_frames() const noexcept {
     return impl_->block;

@@ -408,16 +408,6 @@ struct HostChange {
     // The state's bypass, for restored state; none for a chosen file. Only
     // VST3 applies it: the Audio Unit and LV2 leave bypass to the host.
     std::optional<bool> bypass;
-    // Why an accepted filter that does not suit the host was kept instead of
-    // refused, for the adapter's log line; `none` when it suits, or when the
-    // host's configuration is not known.
-    enum class Kept {
-        none,
-        // HostLoadCheck::keep_until_suited: the host may still change it.
-        unsettled,
-        // HostLoadCheck::keep_unless_one_plays with no suiting filter playing.
-        nothing_plays,
-    } kept = Kept::none;
 };
 
 // ROBUST-8: what HostFilter::activation() found for the host, which
@@ -503,6 +493,23 @@ class HostFilter {
     // True after a failed initial load: nothing accepted, and a load failed.
     bool failed() const noexcept {
         return failed_;
+    }
+    // PLUG-42: an accepted filter plays that suits the host as last checked
+    // (no failure found at activation keeps it silent). Only then does
+    // HostLoadCheck::keep_unless_one_plays refuse a filter that does not
+    // suit; adapters ask it to read a chosen file the same way
+    // (read_chosen_file()'s `keep_unsuited`).
+    bool plays_suiting() const noexcept {
+        return filter_ && !failed_ && !activation_failure_;
+    }
+    // The contract's Kept, unsuited state: an accepted filter that does not
+    // suit the host's rate or channels, so it plays silence (with any dry
+    // share) until a start suits it. After an accepted load(), the filter it
+    // kept for that reason (PLUG-42: why depends on the check the adapter
+    // passed).
+    bool kept_unsuited() const noexcept {
+        return filter_ && activation_failure_ &&
+               activation_failure_->kind != HostFailureKind::activation;
     }
     // DIAG-1: whether host_status() shows a load failure, which comes before
     // Fault. Adapters pass it to HostProcessor::hold_fault_signal() after
@@ -921,6 +928,13 @@ class HostProcessor {
     // silence over 1.33 ms (64 frames at 48 kHz). A call already running when this one is made
     // may still play a filter it adopted.
     void silence() noexcept;
+    // The same for publications up to `through`, a count publications()
+    // returned before a later publication (PLUG-42: HostFilter::load()
+    // keeping a filter that does not suit the host reads the count, publishes
+    // its silent playback, then calls this): what played before mutes over
+    // 1.33 ms, also when the audio thread has already begun fading it out
+    // for the later publication, which takes over as any replacement does.
+    void silence(std::uint64_t through) noexcept;
     // Audio thread: how many filters replace() and publish() have handed
     // over so far.
     std::uint64_t publications() const noexcept;

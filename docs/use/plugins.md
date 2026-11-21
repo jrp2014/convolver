@@ -218,7 +218,7 @@ host:
 | No filter loaded yet, equal input and output counts | The input, unchanged (after the latency) |
 | No filter loaded yet, different counts | Silence |
 | The host gives more inputs than the filter needs, and the outputs match | The filter, from a preset, a saved project or a chosen file, reading the first inputs; the rest are ignored ([channels](#channels)) |
-| The first filter does not fit, or its preset is damaged | Silence. VST3 and Audio Unit keep a filter that does not fit and save it with the project: it plays when the host next starts the plug-in at its rate and with its channels |
+| The first filter does not fit, or its preset is damaged | Silence. VST3 and Audio Unit keep a filter that does not fit and save it with the project: it plays when the host next starts the plug-in at its rate and with its channels, and until then Mix's dry share and bypass pass the input where the host's and the filter's input and output counts are all equal ([Mix](#settings), [bypass](#bypass)). A configuration list with no entry for the host is refused |
 | A new filter does not fit while another is playing | The working filter, unchanged; the project keeps saving it, and keeps it when the host restarts the plug-in, even with settings that fit the refused filter |
 | The filter is too large to save with the project | As for a filter that does not fit: silence for a first filter, otherwise the working filter |
 
@@ -258,9 +258,12 @@ happens next depends on the format:
   stays; the refusal says so, and restarting playback does not switch to
   the refused filter, even with settings that fit it. Otherwise the new
   filter is kept, saved with the project, and plays silence with the
-  reason in Status until the host starts the plug-in with its rate and
-  channels; the log says it waits for audio settings that suit it, and the
-  window says it plays when the host starts the plug-in with them.
+  reason in Status (Mix's dry share and bypass still pass the input where
+  the counts are equal) until the host starts the plug-in with its rate
+  and channels; the log says it waits for audio settings that suit it, and
+  the window says it plays when the host starts the plug-in with them. A
+  configuration list with no entry for the host's rate and channels is
+  refused, since there is no entry to keep.
 - **LV2** refuses the filter as soon as the session opens, and `status` shows
   Load failed. **Do not save the session**: saving records the failure and
   drops the filter. Close it without saving and reopen it at the filter's rate,

@@ -212,28 +212,42 @@ before they set the sample rate and channel layout (VST3 `setState` before
   2026), in VST3 and the Audio Unit: where the rules above refuse a
   request for not suiting the host (`HostSettling::check()` answers
   `keep_unless_one_plays`), it is refused only while an accepted filter
-  that suits the host plays (no failure found at its activation). The
-  refusal then says that the playing filter stays selected when the host
-  restarts the plug-in, even with settings that suit the refused one, and
+  that suits the host plays (`HostFilter::plays_suiting()`: no failure
+  found at its activation; also while bypassed or stopped). The refusal's
+  note then says "The filter Convolver has now stays selected when the
+  host restarts the plug-in, even with settings that suit this one", and
   it does: the refused filter is not held for a later start. With nothing
-  playing (an empty instance, a failed load, or a kept filter that does
-  not suit the host either), a refusal would protect nothing, so the
-  request is kept as `keep_until_suited` keeps one: Kept, silent with the
-  reason, saved as the filter rather than as a failed load, and played at
-  the next start that suits it; the log adds "No other filter was playing,
-  so it was not refused: it waits for audio settings that suit it, ..."
-  (`HostChange::Kept::nothing_plays`) and the window's report "The filter
-  is kept and waits for audio settings that suit it". The latest request
-  is the one kept. Found by HOST-10: Ardour 8.4 restarts the plug-in with
-  the outputs set in its Pin Connections a little after they are set,
-  and a preset loaded in between was refused, never tried at the outputs
-  that suited it, and saved as a failure. Holding a refused filter beside
-  a playing one, to replace it at a start that suits it, was left until a
-  user asks for it (TODO PLUG-43). LV2 refuses as before
+  suiting playing (an empty instance, a failed load, or a kept filter that
+  does not suit the host either), a refusal would protect nothing, so the
+  request is kept as `keep_until_suited` keeps one: Kept, unsuited
+  (`HostFilter::kept_unsuited()`), saved as the filter rather than as a
+  failed load, and played at the next start that suits it. Meanwhile it
+  plays as any kept filter does: silence, with Mix's dry share and
+  bypass's input where the host's and the filter's counts are both equal
+  ([states](#states-and-transitions)), where a refused first load played
+  silence with no dry signal. What played before it (an empty instance's
+  input, say) mutes over 1.33 ms, as for a failed first load, not after
+  the new playback's warm-up (`HostProcessor::silence(through)`; jrp's
+  review of #258 measured 90.6 ms at Latency 4096 before). A chosen IR
+  file or `.cfg` is kept the same way: `read_chosen_file()`'s
+  `keep_unsuited` reads a single filter that does not suit as it is,
+  rather than refusing it; a configuration list with no entry for the
+  host's configuration is still refused, having no entry to keep. The
+  log adds "No other filter was playing, so it was not refused: it waits
+  for audio settings that suit it, ..." and the window's report "The
+  filter is kept and waits for audio settings that suit it". The latest
+  request is the one kept. Found by HOST-10: Ardour 8.4 restarts the
+  plug-in with the outputs set in its Pin Connections a little after they
+  are set, and a preset loaded in between was refused, never tried at the
+  outputs that suited it, and saved as a failure. Holding a refused filter
+  beside a playing one, to replace it at a start that suits it, was left
+  until a user asks for it (TODO PLUG-43). LV2 refuses as before
   (`refuse_mismatch`): its configuration never changes. `native.host`
   `kept_unless_one_plays` (jrp's two tests: a waiting filter starts when
   the settings fit, and a refused replacement leaves the working filter
-  selected across a restart), `native.host_settling`.
+  selected across a restart; and the mute), `native.host_settling`,
+  `vst3.adapter` `kept_until_channels_fit` and
+  `chosen_file_kept_until_it_fits`, `au.adapter` `chosen_file_kept`.
 - VST3 counts its configuration as known once the plug-in has been activated
   with it and has played audio with it (a `process` call with samples, in
   that activation or an earlier one since the rate or buses last changed),

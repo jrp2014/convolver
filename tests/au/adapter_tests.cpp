@@ -1533,6 +1533,75 @@ void wider_inputs() {
     }
 }
 
+// PLUG-42, jrp's review of #258: an IR file chosen in the window while the
+// host renders, with no filter that suits it playing, is kept as a preset
+// is (it was refused and saved as a failed load); one chosen while a
+// suiting filter plays is still refused, and that filter stays.
+void chosen_file_kept() {
+    const auto folder = std::filesystem::temp_directory_path() /
+                        ("convolver-au-chosen-kept-" + std::to_string(::getpid()));
+    std::filesystem::remove_all(folder);
+    std::filesystem::create_directories(folder);
+    const auto wav = (folder / "slow.wav").string();
+    {
+        // 16-bit PCM, two channels at 44.1 kHz, an impulse and seven zeros.
+        std::ofstream out(wav, std::ios::binary);
+        const auto put = [&](std::uint32_t value, int bytes) {
+            for (int i = 0; i < bytes; ++i)
+                out.put(static_cast<char>((value >> (8 * i)) & 0xff));
+        };
+        const std::uint32_t frames = 8, channels = 2, data = frames * channels * 2;
+        out.write("RIFF", 4);
+        put(36 + data, 4);
+        out.write("WAVEfmt ", 8);
+        put(16, 4);
+        put(1, 2);
+        put(channels, 2);
+        put(44100, 4);
+        put(44100 * channels * 2, 4);
+        put(channels * 2, 2);
+        put(16, 2);
+        out.write("data", 4);
+        put(data, 4);
+        for (std::uint32_t f = 0; f < frames; ++f)
+            for (std::uint32_t c = 0; c < channels; ++c)
+                put(f == 0 ? 16384 : 0, 2);
+        require(static_cast<bool>(out), "chosen kept: could not write the WAV");
+    }
+    const auto choose = [](Unit& unit, const std::string& path) {
+        const auto value = CFStringCreateWithBytes(
+            nullptr, reinterpret_cast<const UInt8*>(path.data()), static_cast<CFIndex>(path.size()),
+            kCFStringEncodingUTF8, false);
+        check(value ? noErr : -1, "file path string");
+        const auto status = AudioUnitSetProperty(unit.get(), au::load_property,
+                                                 kAudioUnitScope_Global, 0, &value, sizeof value);
+        CFRelease(value);
+        return status == noErr;
+    };
+    Unit unit;
+    check(unit.configure(48000, 2, 2, 512), "formats");
+    check(unit.initialize(), "initialization");
+    static_cast<void>(steady_output(unit, 1)); // The host renders: settled.
+    require(choose(unit, wav), "a 44.1 kHz WAV chosen with nothing playing refused");
+    {
+        const auto f = unit.failure();
+        require(f.present && f.silent &&
+                    f.kind == static_cast<UInt32>(HostFailureKind::sample_rate),
+                "the kept WAV not silent with its reason");
+        const auto saved = unit.saved();
+        require(saved.configuration && saved.configuration->sample_rate == 44100 && !saved.failed,
+                "the kept WAV not saved as the filter");
+    }
+    check(unit.load(state_of(stereo(48000))), "a suiting filter");
+    static_cast<void>(steady_output(unit, 1));
+    require(!choose(unit, wav), "a 44.1 kHz WAV accepted while a suiting filter played");
+    const auto saved = unit.saved();
+    require(saved.configuration && saved.configuration->sample_rate == 48000,
+            "the refused WAV replaced the playing filter");
+    unit.uninitialize();
+    std::filesystem::remove_all(folder);
+}
+
 // PLUG-26: a Convolver .vstpreset chosen in the window (load_property) loads
 // its filter with the Gain, Mix and Latency it holds, as the host's preset
 // menu brings them (jrp, 8 November 2026); one without settings (from
@@ -2242,6 +2311,7 @@ int main(int argc, char** argv) {
             {"settings_in_diagnostics", settings_in_diagnostics},
             {"wider_inputs", wider_inputs},
             {"chosen_preset", chosen_preset},
+            {"chosen_file_kept", chosen_file_kept},
         },
         [] {
             counting = false;

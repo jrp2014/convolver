@@ -58,7 +58,7 @@ std::string loaded_line(const HostFilter&, bool host_known);
 std::string loaded_line(const HostFilter&, const std::optional<HostLayout>& host);
 // PLUG-42: added to loaded_line() when HostFilter::load() kept a filter that
 // does not suit a settled host because no other filter was playing
-// (HostChange::Kept::nothing_plays).
+// (HostLoadCheck::keep_unless_one_plays, then HostFilter::kept_unsuited()).
 inline constexpr const char* kept_rather_than_refused_sentence =
     " No other filter was playing, so it was not refused: it waits for audio settings that suit "
     "it, and plays when the host next starts the plug-in at the rate and with the channels it "

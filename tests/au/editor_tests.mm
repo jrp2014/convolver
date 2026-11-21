@@ -16,6 +16,7 @@
 #include "au/au_host.hpp"
 #import "diagnostic_view.h"
 #include "filter_file.hpp"
+#include "host_log.hpp"
 #include "host_report.hpp"
 #include <algorithm>
 #include <atomic>
@@ -306,15 +307,16 @@ void properties(const au_test::LogSince& log) {
             "diagnostics:\n" + text(copied));
     // GarageBand restored the same preset five times in a second on a mono
     // track: the identical failure is logged once, not once per request.
-    // A refused load while the saved filter is kept: "Not loaded; the
-    // previous filter is kept (it does not play): …".
-    const char* refused = "Not loaded; the previous filter is kept";
-    const auto before_repeats = count(log.text(), refused);
+    // PLUG-42: no filter that suits the track plays, so each restore keeps
+    // the stereo filter rather than being refused: "Request N: Loaded … No
+    // other filter was playing, so it was not refused: …".
+    const char* kept = convolver::kept_rather_than_refused_sentence;
+    const auto before_repeats = count(log.text(), kept);
     for (int i = 0; i < 4; ++i)
         static_cast<void>(unit.load(state_of(identity(44100, 2))));
     // Exactly one: the first repeat follows the start line, whose text
-    // differs, and the rest repeat it.
-    require(count(log.text(), refused) == before_repeats + 1,
+    // differs, and the rest repeat it but for the request's number.
+    require(count(log.text(), kept) == before_repeats + 1,
             "repeated identical failures logged:\n" + log.text());
     AudioUnitRemovePropertyListenerWithUserData(unit.get(), au::report_property, report_changed,
                                                 nullptr);

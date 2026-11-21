@@ -271,7 +271,7 @@ void Effect::reject(HostFailureKind kind, const Advice& why, const HostRequest& 
 bool Effect::install(HostState next, const HostRequest& request, const SavedSettings* saved,
                      bool settings_unreadable) {
     bool accepted = false, problem = true, latency = false;
-    auto kept = HostChange::Kept::none;
+    auto check = HostLoadCheck::keep_until_suited;
     std::string message, faults;
     {
         const Locked lock(*this);
@@ -294,17 +294,17 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
         try {
             // PLUG-38: state holding the filter that plays keeps it and its
             // history; the restored settings ramp to theirs.
+            check = settling_.check(request.kind);
             const auto change = filter_.load(
                 std::move(next), known,
                 [&](const HostPlayback& c) {
                     if (host())
                         host()->play(c);
                 },
-                request, host(), settling_.check(request.kind));
+                request, host(), check);
             // Nothing from here on can throw: the request is accepted.
             latency = publish_timing();
             accepted = true;
-            kept = change.kept;
             if ((applied = change.settings)) {
                 store(*applied);
                 // The restored mode is in place, with its estimate: the
@@ -324,7 +324,7 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                 message = loaded_line(filter_, known);
                 // PLUG-42: why it is kept, and what to change.
                 if (const auto& f = filter_.failure();
-                    kept == HostChange::Kept::nothing_plays && f && f->silent)
+                    check == HostLoadCheck::keep_unless_one_plays && filter_.kept_unsuited() && f)
                     message += " It does not suit the host's present configuration: " +
                                detail::advice_line(f->message) + kept_rather_than_refused_sentence;
                 // Hosts such as GarageBand restore a project after starting the
@@ -374,10 +374,13 @@ OSStatus Effect::load_file(const std::string& path) {
     // chooses its entry for the formats last rendered with, or waits for
     // them (read_filter_file()), as in VST3.
     std::optional<HostLayout> host;
-    bool settled = false;
+    bool settled = false, keep_unsuited = false;
     {
         const Locked lock(*this);
         settled = settling_.check(request.kind) != HostLoadCheck::keep_until_suited;
+        // PLUG-42: settled, with nothing suiting playing, a single filter
+        // that does not suit is kept as a preset would be, not refused.
+        keep_unsuited = settled && !filter_.plays_suiting();
         host = known_layout();
     }
     FilterFileFailure why;
@@ -390,8 +393,8 @@ OSStatus Effect::load_file(const std::string& path) {
     const auto& reader = detail::audio_toolbox_files();
 #endif
     // The files it was read from, so the window can reload it.
-    auto next =
-        read_chosen_file(path, host, reader, why, &request.files, &request.wider_entry, settled);
+    auto next = read_chosen_file(path, host, reader, why, &request.files, &request.wider_entry,
+                                 settled, keep_unsuited);
     bool accepted = false;
     if (!next) {
         reject(why.kind, why.message, request, why.filter());

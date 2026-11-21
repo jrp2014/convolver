@@ -1365,7 +1365,7 @@ void kept_until_channels_fit() {
             // 2. A filter plays: the mono preset is refused and stays so.
             require(p.setState(state_of(mono).get()) != kResultOk,
                     "a mono preset accepted while a stereo filter played");
-            require(contains(log.text(), "The filter that is playing stays selected when the "
+            require(contains(log.text(), "The filter Convolver has now stays selected when the "
                                          "host restarts the plug-in, even with settings that "
                                          "suit this one"),
                     "the refusal does not say the playing filter stays selected");
@@ -2841,6 +2841,86 @@ void write_wav(const std::filesystem::path& path, int rate, int channels, int fr
             put(f == 0 ? 16384 : 0, 2);
     if (!out)
         throw std::runtime_error("could not write " + path.string());
+}
+// PLUG-42, jrp's review of #258: an IR file or .cfg chosen in the window
+// while the host plays, with no filter that suits it playing, is kept as a
+// preset is (it was refused and the project saved a failed load), and plays
+// once the host starts the plug-in with buses that suit it; one chosen while
+// a suiting filter plays is still refused. A list with no entry for the
+// host's configuration is still refused: it has no entry to keep.
+void chosen_file_kept_until_it_fits() {
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk && p.connect(&c) == kResultOk &&
+                c.connect(&p) == kResultOk,
+            "chosen kept: initialize");
+    SpeakerArrangement stereo = SpeakerArr::kStereo, surround = SpeakerArr::k51;
+    require(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "chosen kept: buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "chosen kept: activate");
+    p.setProcessing(true);
+    play_block(p, 2, 2, 64); // The host plays: its configuration is settled.
+    const auto folder = private_temp("convolver-vst3-chosen-kept");
+    std::filesystem::create_directories(folder);
+    write_wav(folder / "slow.wav", 44100, 2, 8);
+    write_wav(folder / "band.wav", 48000, 1, 8);
+    std::ofstream(folder / "crossover.cfg")
+        << "48000 2 6 0\n0 0\n0 0 0 0 0 0\nband.wav\n0\n0\n0\nband.wav\n0\n1\n5\n";
+    std::ofstream(folder / "slow.txt") << "slow.wav\n";
+    const auto saved = [&] {
+        MemoryStream state;
+        require(p.getState(&state) == kResultOk, "chosen kept: save");
+        state.seek(0, IBStream::kIBSeekSet, nullptr);
+        return read_state(&state);
+    };
+    // A list with no 48 kHz entry: refused, as before.
+    require(!c.load_file((folder / "slow.txt").string()), "a list with no fitting entry kept");
+    // The WAV for another rate: kept, silent with the reason, saved.
+    require(c.load_file((folder / "slow.wav").string()),
+            "a 44.1 kHz WAV chosen with nothing playing refused");
+    require(p.status().text.find("Silent: the filter is for 44100 Hz") == 0,
+            ("the kept WAV: " + p.status().text).c_str());
+    auto state = saved();
+    require(state.configuration && state.configuration->sample_rate == 44100 && !state.failed,
+            "the kept WAV not saved as the filter");
+    // The crossover .cfg on stereo buses: the WAV plays nothing, so it is
+    // kept too, the latest choice.
+    require(c.load_file((folder / "crossover.cfg").string()),
+            "a crossover chosen on stereo buses with nothing playing refused");
+    state = saved();
+    require(state.configuration && state.configuration->output_channels == 6 && !state.failed,
+            "the kept crossover not saved as the filter");
+    // The host restarts the plug-in with six channels: it plays.
+    p.setProcessing(false);
+    p.setActive(false);
+    require(p.setBusArrangements(&surround, 1, &surround, 1) == kResultOk &&
+                p.setActive(true) == kResultOk,
+            "chosen kept: 5.1 restart");
+    p.setProcessing(true);
+    play_block(p, 6, 6, 64);
+    require(!p.failure() && p.status().text ==
+                                "Filter loaded: 48000 Hz, 2 in, 6 out; plug-in inputs 3-6 "
+                                "ignored.",
+            ("the kept crossover on six channels: " + p.status().text).c_str());
+    // Now a suiting filter plays: the WAV is refused, and the crossover stays.
+    require(!c.load_file((folder / "slow.wav").string()),
+            "a 44.1 kHz WAV accepted while the crossover played");
+    state = saved();
+    require(state.configuration && state.configuration->output_channels == 6,
+            "the refused WAV replaced the playing crossover");
+    p.setProcessing(false);
+    p.setActive(false);
+    p.disconnect(&c);
+    c.disconnect(&p);
+    p.terminate();
+    c.terminate();
+    std::filesystem::remove_all(folder);
 }
 // VST3-3: the processor sends the window's report with the status, the
 // controller keeps it, and a filter file chosen in the window loads through
@@ -4338,6 +4418,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"placeholder_setup", placeholder_setup},
         {"restart_mid_transition", restart_mid_transition},
         {"kept_until_channels_fit", kept_until_channels_fit},
+        {"chosen_file_kept_until_it_fits", chosen_file_kept_until_it_fits},
         {"failed_first_loads", failed_first_loads},
         {"failure_records", failure_records},
         {"status_and_log", status_and_log},

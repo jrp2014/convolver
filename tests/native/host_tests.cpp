@@ -20,6 +20,7 @@
 #include <new>
 #include <optional>
 #include <random>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -1644,8 +1645,8 @@ void kept_unless_one_plays() {
     {
         HostFilter f(8);
         static_cast<void>(test::started(f, stereo));
-        const auto change = f.load(HostState{crossover}, stereo, {}, {}, nullptr, check);
-        require(change.kept == HostChange::Kept::nothing_plays && !f.rejection(),
+        f.load(HostState{crossover}, stereo, {}, {}, nullptr, check);
+        require(f.kept_unsuited() && !f.plays_suiting() && !f.rejection(),
                 "a filter refused with nothing playing");
         require(f.filter() && f.filter()->output_channels == 6 && f.failure() &&
                     f.failure()->silent && f.failure()->kind == HostFailureKind::channels,
@@ -1685,7 +1686,7 @@ void kept_unless_one_plays() {
                 "a replacement that does not suit accepted while a filter plays");
         require(f.rejection() && !f.rejection()->silent, "the refusal not recorded");
         require(text_of(f.rejection()->message)
-                        .find("The filter that is playing stays selected when the host restarts "
+                        .find("The filter Convolver has now stays selected when the host restarts "
                               "the plug-in, even with settings that suit this one") !=
                     std::string::npos,
                 "the refusal does not say the playing filter stays selected");
@@ -1698,6 +1699,69 @@ void kept_unless_one_plays() {
                 "a restart with the refused filter's outputs switched to it");
         require(saved_of(f).configuration && saved_of(f).configuration->output_channels == 2,
                 "the refused filter saved");
+    }
+    // jrp's review of #258: on a running empty six-channel instance at
+    // Latency 4096, a kept wrong-rate crossover left output 6 at full level
+    // for the new playback's warm-up (90.6 ms) while Status said Silent; a
+    // refusal on main muted it within 64 frames. What played mutes at once,
+    // as for a failed first load; the silent playback then takes over.
+    {
+        const HostLayout wide{48000, 6, 6};
+        HostSettings settings;
+        settings.latency = 4096;
+        HostProcessor p(unfiltered_playback(wide, false, true), 512, settings);
+        std::vector<std::vector<float>> data(6, std::vector<float>(512, 1.f));
+        std::vector<const float*> in;
+        std::vector<float*> out;
+        for (auto& c : data) {
+            in.push_back(c.data());
+            out.push_back(c.data());
+        }
+        const auto block = [&] {
+            for (auto& c : data)
+                std::fill(c.begin(), c.end(), 1.f);
+            audio_thread = true;
+            const bool ok =
+                p.process(std::span<const float* const>(in), std::span<float* const>(out), 512);
+            audio_thread = false;
+            require(ok, "a block refused");
+        };
+        for (int k = 0; k < 10; ++k) // Past the latency: the input passes.
+            block();
+        require(std::abs(data[5][511] - 1.f) < 1e-5f, "the empty instance does not pass its input");
+        HostFilter f(8);
+        auto wrong_rate = Configuration{44100, 2, 6, 0, {}, {}, {{{1}, {{0, 1}}, {{5, 1}}}}};
+        f.load(
+            HostState{wrong_rate}, wide, [&](const HostPlayback& c) { p.play(c); }, {}, &p, check);
+        require(f.failure() && f.failure()->silent, "the crossover not kept silent");
+        block();
+        for (std::size_t i = 64; i < 512; ++i)
+            require(data[5][i] == 0.f, "output 6 not muted within 64 frames of the kept filter");
+        for (int k = 0; k < 10; ++k) // Past the silent playback's warm-up.
+            block();
+        require(data[5][511] == 0.f && data[0][511] == 0.f, "the kept filter is not silent");
+        // The audio thread may adopt the silent playback before silence()
+        // reaches it: the input it is fading out mutes all the same.
+        HostProcessor q(unfiltered_playback(wide, false, true), 512, settings);
+        const auto q_block = [&] {
+            for (auto& c : data)
+                std::fill(c.begin(), c.end(), 1.f);
+            audio_thread = true;
+            const bool ok =
+                q.process(std::span<const float* const>(in), std::span<float* const>(out), 512);
+            audio_thread = false;
+            require(ok, "a block refused");
+        };
+        for (int k = 0; k < 10; ++k)
+            q_block();
+        const auto before = q.publications();
+        q.play(unfiltered_playback(wide, true, true));
+        q_block(); // Adopted: the input still plays while the new one warms up.
+        require(std::abs(data[5][511] - 1.f) < 1e-5f, "the warm-up did not play the input");
+        q.silence(before);
+        q_block();
+        for (std::size_t i = 64; i < 512; ++i)
+            require(data[5][i] == 0.f, "the faded-out input not muted by silence(through)");
     }
     // LV2 (refuse_mismatch): its layout never changes, so a filter that does
     // not suit is refused even with nothing playing.
