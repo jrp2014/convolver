@@ -1838,6 +1838,48 @@ void kept_unless_one_plays() {
             }
         }
     }
+    // Codex's review of #258: a kept filter with no dry signal (a 2-to-6
+    // crossover on six channels) replacing a kept one that had one (6 to 6)
+    // mutes the bypassed input at once, rather than for the warm-up.
+    {
+        const HostLayout wide{48000, 6, 6};
+        HostSettings settings;
+        settings.latency = 4096;
+        HostProcessor p(unfiltered_playback(wide, false, true), 512, settings);
+        std::vector<std::vector<float>> data(6, std::vector<float>(512, 1.f));
+        std::vector<const float*> in;
+        std::vector<float*> out;
+        for (auto& c : data) {
+            in.push_back(c.data());
+            out.push_back(c.data());
+        }
+        const auto block = [&] {
+            for (auto& c : data)
+                std::fill(c.begin(), c.end(), 1.f);
+            audio_thread = true;
+            p.set_bypass(true);
+            const bool ok =
+                p.process(std::span<const float* const>(in), std::span<float* const>(out), 512);
+            audio_thread = false;
+            require(ok, "a block refused");
+        };
+        HostFilter f(8);
+        const auto load = [&](const Configuration& c) {
+            f.load(HostState{c}, wide, [&](const HostPlayback& c) { p.play(c); }, {}, &p, check);
+            require(f.failure() && f.failure()->silent, "the 44.1 kHz filter not kept");
+        };
+        std::vector<FilterPath> six_paths;
+        for (std::size_t c = 0; c < 6; ++c)
+            six_paths.push_back({{1}, {{c, 1}}, {{c, 1}}});
+        load(Configuration{44100, 6, 6, 0, {}, {}, six_paths});
+        for (int k = 0; k < 20; ++k)
+            block();
+        require(std::abs(data[5][511] - 1.f) < 1e-5f, "the kept 6-to-6 filter not bypassed");
+        load(Configuration{44100, 2, 6, 0, {}, {}, {{{1}, {{0, 1}}, {{5, 1}}}}});
+        block();
+        for (std::size_t i = 64; i < 512; ++i)
+            require(data[5][i] == 0.f, "a kept crossover left the bypassed input playing");
+    }
     // LV2 (refuse_mismatch): its layout never changes, so a filter that does
     // not suit is refused even with nothing playing.
     {

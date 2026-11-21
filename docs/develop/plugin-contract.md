@@ -230,10 +230,12 @@ before they set the sample rate and channel layout (VST3 `setState` before
   over 1.33 ms, as for a failed first load, not after the new playback's
   warm-up (`HostProcessor::silence(through)`; jrp's review of #258
   measured 90.6 ms at Latency 4096 before), and so does a filter it was
-  still fading out. A filter kept before, or a failure, is not muted: it
-  plays silence with at most the dry share and bypass the new one carries
-  on, so a host restoring the same preset again (GarageBand) leaves them
-  without a gap. A muted empty instance or suiting filter that was
+  still fading out. A filter kept before, or a failure, is not muted
+  where the new one carries on its dry share and bypass: it plays silence
+  with at most those, so a host restoring the same preset again
+  (GarageBand) leaves them without a gap. Where the new one has no dry
+  signal (a crossover kept after a filter with equal counts), they mute
+  too. A muted empty instance or suiting filter that was
   bypassed passes the input again only once the kept playback has warmed
   up (about 84 ms at Latency 4096; on main such a load was refused and
   stayed silent): skipping the mute when bypass is on and the kept

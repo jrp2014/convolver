@@ -699,22 +699,26 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
         if (host && install) {
             // A kept filter that does not suit plays silence, with the dry
             // signal dry_signal_rule() gives it once committed.
-            const auto unfiltered =
-                kept_failure ? unfiltered_playback(*host, true,
-                                                   unplayed_dry(accepted.get(), true, *host) ==
-                                                       HostDrySignal::present)
-                : accepted   ? HostPlayback{}
-                             : unfiltered_playback(*host, state.failed, !state.failed);
+            const bool kept_dry =
+                kept_failure && unplayed_dry(accepted.get(), true, *host) == HostDrySignal::present;
+            const auto unfiltered = kept_failure ? unfiltered_playback(*host, true, kept_dry)
+                                    : accepted
+                                        ? HostPlayback{}
+                                        : unfiltered_playback(*host, state.failed, !state.failed);
             // PLUG-42: what plays before a kept filter that does not suit
             // mutes at once, as for a failed first load, rather than for
             // the new playback's warm-up (the Latency); the silent playback
             // then takes over, with its dry share. Only a filter that suits
             // the host, or an empty instance's input, is heard there: a
             // filter kept before, or a failure, plays silence with at most
-            // the dry share and bypass the kept one carries on, so muting
-            // would cut those for the warm-up (a host restoring the same
-            // preset again, as GarageBand does).
-            const bool heard_before = plays_suiting() || (!filter_ && !failed_);
+            // a dry share and bypass, which muting would cut for the
+            // warm-up where the kept one carries them on (a host restoring
+            // the same preset again, as GarageBand does). Where the kept one
+            // has no dry signal and the one before had, those mute too.
+            const bool dry_before = filter_ && !plays_suiting() &&
+                                    unplayed_dry(&*filter_, true, *host) == HostDrySignal::present;
+            const bool heard_before =
+                plays_suiting() || (!filter_ && !failed_) || (dry_before && !kept_dry);
             const auto before = counting ? counting->publications() : 0;
             try {
                 if (accepted && !kept_failure) {
