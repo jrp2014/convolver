@@ -6,13 +6,9 @@ name: Workload measurements
 # plug-in workloads on GitHub's Linux, macOS arm64 and Windows runners, with
 # the FFT library each platform's plug-ins ship (Ooura on Linux and Windows,
 # Accelerate on macOS). Shared runners give indicative figures only
-# (docs/develop/fft-measurements.md#supported-workloads). Started by hand, or
-# by a pull request that changes this workflow or the script it runs.
+# (docs/develop/fft-measurements.md#supported-workloads). Started by hand
+# only: each run takes about 15 minutes on three runners, one of them macOS.
 'on':
-  pull_request:
-    paths:
-      - .github/workflows/workloads.yml
-      - tests/native/benchmarks/workloads.py
   workflow_dispatch:
     inputs:
       rounds:
@@ -21,10 +17,6 @@ name: Workload measurements
 
 permissions:
   contents: read
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
 
 jobs:
   measure:

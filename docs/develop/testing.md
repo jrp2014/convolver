@@ -1750,7 +1750,9 @@ candidate workflow runs for a pull request only when it changes what the
 packages are built from or hold
 ([below](#when-pull-requests-build-the-candidates)), and the fuzz workflow
 only when it changes what the fuzz targets are built from
-([below](#when-pull-requests-run-the-fuzz-targets)). A commit pushed to a branch that has a pull request runs
+([below](#when-pull-requests-run-the-fuzz-targets)). The workload
+measurement workflow runs only when started by hand
+([supported workloads](fft-measurements.md#supported-workloads)). A commit pushed to a branch that has a pull request runs
 once, as part of that pull request; a branch without one gets no automatic
 run, so open the draft pull request early ([workflow](workflow.md#before-you-start))
 or use Actions, then "Run workflow" on the branch. A new commit on a pull request
