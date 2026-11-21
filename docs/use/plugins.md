@@ -874,7 +874,9 @@ from Ardour's controls.
 - **A mono filter on a mono track** plays once you set the channels by
   hand: in the mixer strip, right-click Convolver, choose **Pin
   Connections…**, click **Manual Config**, and set **Audio Out** to 1 and
-  the audio input pins to 1 with the − buttons. A crossover cannot be set
+  the audio input pins to 1 with the − buttons. (Tried in Ardour 8.4 and
+  9.0 through the same setting from a script, not yet in the window.) A
+  crossover cannot be set
   up this way: Convolver still gets only 2 outputs. With the VST3 plug-in in
   Ardour, use filters with 2 outputs (and 1 or 2 inputs), or a mono filter
   set up as above.

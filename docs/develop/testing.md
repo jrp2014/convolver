@@ -1318,7 +1318,10 @@ and silence. Set by hand to the track's 1 in and 1 out, as the pin
 configuration window's manual setting does (`Route::customize_plugin_insert`,
 which the script calls for the mono VST3 case), Ardour gives the plug-in a
 mono output (on Ardour 8.4, locally: 2 in, 1 out, the second input
-ignored, by the Convolver log) and the mono example plays, within 2.4e-8 of the oracle. The
+ignored, by the Convolver log) and the mono example plays, within 2.4e-8 of
+the oracle on Ardour 8.4 and 2.2e-8 on Ardour 9.0 in the Ardour job at
+`df9dcf7` ([run 44912433237](https://github.com/jrp2014/convolver/actions/runs/44912433237)),
+where the natural streams still read 2 in, 2 out and the insert 1 in, 1 out. The
 crossover set by hand (2 in, 6 out) still got 2 outputs on Ardour 8.4 and
 played silence, so the VST3 crossover is not run. The script prints the
 channels the plug-in runs with (Ardour's natural streams) and the insert's
