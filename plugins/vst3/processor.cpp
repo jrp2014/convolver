@@ -319,6 +319,8 @@ tresult Processor::activate(TBool state) {
             // No audio runs while inactive: every processor is freed.
             playing_.clear();
             active_latency_.store(inactive);
+            if (settling_.playing()) // PLUG-27: the host played the filter.
+                filter_.confirm();
             settling_.stopped();
         }
         active_ = state != 0;
@@ -383,6 +385,8 @@ HostStatusLine Processor::status_locked() const {
 }
 HostStatusLine Processor::status() {
     const Locked lock(*this);
+    if (settling_.playing()) // PLUG-27: the host plays the filter.
+        filter_.confirm();
     return status_locked();
 }
 HostReport Processor::report_locked() const {
@@ -418,6 +422,8 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
         std::string fields, text;
         {
             const Locked lock(*this);
+            if (settling_.playing()) // PLUG-27: the host plays the filter.
+                filter_.confirm();
             line = status_locked();
             const auto report = report_locked();
             fields = encode_report(report_fields(report));

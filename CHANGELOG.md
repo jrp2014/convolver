@@ -113,7 +113,9 @@ Until 1.0 the C++ API may change between minor versions.
 
 - Plug-ins (PLUG-27): a filter file chosen in Convolver's window before the
   host plays is kept and saved with the project, and checked when the host
-  starts the plug-in, as a preset is. In Audacity 4.0.2, which sets up the
+  plays audio through the plug-in; until then Status says "Filter selected.
+  Waiting for the host's audio settings." rather than judging it against a
+  brief start at a placeholder rate. In Audacity 4.0.2, which sets up the
   plug-in at 44.1 kHz until it first plays whatever the project's rate, a
   48 kHz filter chosen before playback was refused, and the project then
   saved that failure, so exports were dry or silent (jrp's run of 0.14.0,

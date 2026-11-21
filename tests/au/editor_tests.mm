@@ -924,6 +924,13 @@ void chosen_before_rendering() {
     check(unit.initialize(), "44.1 kHz initialization");
     check(choose(unit, (folder / "room.cfg").string()), "a 48 kHz .cfg chosen before rendering");
     require(rate_of(unit) == 48000, "the chosen filter is not in the saved state");
+    // jrp (20 November 2026): an unrendered start at 44.1 kHz is too little
+    // evidence to say the filter is wrong.
+    auto r = report(unit);
+    require([r[@"status name"] isEqualToString:@"Waiting"] &&
+                [r[@"summary"] isEqualToString:@"Filter selected. Waiting for the host's audio "
+                                               @"settings."],
+            "chosen before rendering: " + text(r[@"status name"]) + ": " + text(r[@"summary"]));
     unit.uninitialize();
     // Nothing rendered: a list waits, refused as any file is, saying what
     // to do.

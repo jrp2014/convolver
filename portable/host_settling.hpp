@@ -12,8 +12,9 @@
 // - known(): the host's configuration if it counts as known, to check
 //   requests against (HostFilter::load()'s `host`);
 // - check(): what a request that does not suit that configuration means
-//   (HostFilter::load()'s HostLoadCheck); a chosen file is read for that
-//   configuration only when the answer is to refuse it (PLUG-27).
+//   (HostFilter::load()'s HostLoadCheck); a chosen single filter is read for
+//   that configuration only when the answer is to refuse it, while a
+//   configuration list always chooses its entry for known() (PLUG-27).
 //
 // A file chosen in the window follows one rule in both formats (PLUG-27,
 // jrp, 20 November 2026): it is refused for not suiting the host only while
@@ -64,9 +65,13 @@ class HostSettling {
             played_.store(false, std::memory_order_relaxed);
         started_ = now;
         active_ = true;
+        blocks_.store(0, std::memory_order_relaxed);
     }
     void played() noexcept {
         played_.store(true, std::memory_order_relaxed);
+        // One writer, the audio thread; it only needs to reach 2.
+        if (blocks_.load(std::memory_order_relaxed) < 2)
+            blocks_.fetch_add(1, std::memory_order_relaxed);
     }
     void stopped() noexcept {
         active_ = false;
@@ -85,6 +90,15 @@ class HostSettling {
             return now;
         return std::nullopt;
     }
+    // PLUG-27 (jrp, 20 November 2026): whether the host is playing audio
+    // through the plug-in, which confirms a chosen filter's check
+    // (HostFilter::confirm()): started, and more than one block processed in
+    // this start. Audacity 4.0.2 passes a parameter edit by starting its
+    // window's copy at its placeholder 44.1 kHz for exactly one block of
+    // silence (FlushParameters), which says nothing about the project's rate.
+    bool playing() const noexcept {
+        return active_ && blocks_.load(std::memory_order_relaxed) > 1;
+    }
     // The configuration of the current or last start, which processors are
     // built for (VST3 builds one for a new Latency with it).
     const std::optional<HostLayout>& last_start() const noexcept {
@@ -99,7 +113,7 @@ class HostSettling {
             return HostLoadCheck::refuse_mismatch;
         switch (kind) {
         case HostRequestKind::chosen_file: // Answered above.
-            return HostLoadCheck::refuse_mismatch;
+            return HostLoadCheck::keep_until_suited;
         case HostRequestKind::restore:
             return played_.load(std::memory_order_relaxed) ? HostLoadCheck::refuse_mismatch
                                                            : HostLoadCheck::keep_until_suited;
@@ -115,6 +129,7 @@ class HostSettling {
     std::optional<HostLayout> started_;   // The current or last start.
     std::optional<HostLayout> committed_; // Audio Unit: the last start that rendered.
     std::atomic<bool> played_{false};     // Since the binding start (see started()).
+    std::atomic<unsigned> blocks_{0};     // Blocks played in this start, up to 2.
 };
 
 } // namespace convolver

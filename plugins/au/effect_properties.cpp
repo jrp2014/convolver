@@ -195,6 +195,8 @@ void Effect::update_status() noexcept {
             report_cache_.reset();
         }
         status_log_written_ = host_log_written();
+        if (settling_.playing()) // PLUG-27: the host renders the filter.
+            filter_.confirm();
         // Gain and Mix change what plays without a filter (PLUG-10).
         const bool bypassed = bypass_.load();
         status_ = host_status(filter_, known_layout(), status_log_written_, settings(), bypassed,

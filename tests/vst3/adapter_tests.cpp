@@ -3164,8 +3164,13 @@ void chosen_before_host_plays() {
     auto state = saved_filter(p);
     require(state.configuration && state.configuration->sample_rate == 48000 && !state.failed,
             "the chosen filter is not in the saved state");
-    require(p.status().text.find("waiting for audio settings") != std::string::npos,
-            ("before play: status " + p.status().text).c_str());
+    const std::string waiting = "Filter selected. Waiting for the host's audio settings.";
+    const auto status_is = [&](const std::string& text, const char* when) {
+        const auto s = p.status();
+        require(s.text == text && s.status == convolver::HostStatus::unchecked,
+                (std::string(when) + ": status " + s.text).c_str());
+    };
+    status_is(waiting, "chosen before the host played");
     // FlushParameters: started at 44.1 kHz with one block of silence, then
     // stopped. The filter is kept, silent there, and still saved.
     require(p.setActive(true) == kResultOk, "before play: Audacity's flush starts the copy");
@@ -3174,6 +3179,9 @@ void chosen_before_host_plays() {
     state = saved_filter(p);
     require(state.configuration && state.configuration->sample_rate == 48000 && !state.failed,
             "a moment's start at 44.1 kHz lost the chosen filter");
+    // jrp (20 November 2026): that start is too little evidence to say the
+    // filter is wrong, so Status still says it is waiting.
+    status_is(waiting, "after Audacity's flush at 44.1 kHz");
     // Stopped: another file chosen is kept too.
     require(c.load_file((folder / "hall.wav").string()), "a second file chosen while stopped");
     state = saved_filter(p);
@@ -3222,6 +3230,25 @@ void chosen_before_host_plays() {
     require(state.configuration && state.configuration->sample_rate == 48000 &&
                 p.status().text.find("previous filter kept") != std::string::npos,
             ("a refused file replaced the playing filter: " + p.status().text).c_str());
+    // Stopped, the 44.1 kHz file is kept, waiting; once the host plays at
+    // 48 kHz, Status says Silent with both rates, and still does after it
+    // stops: playback confirmed the mismatch.
+    require(p.setActive(false) == kResultOk, "before play: playback stops again");
+    require(c.load_file((folder / "slow.wav").string()), "a 44.1 kHz file refused while stopped");
+    status_is(waiting, "a 44.1 kHz file chosen while stopped");
+    require(p.setActive(true) == kResultOk, "before play: playback starts at 48 kHz");
+    play_block(p, 1, 1, 64);
+    play_block(p, 1, 1, 64);
+    const auto silent = [&](const char* when) {
+        const auto s = p.status();
+        require(s.status == convolver::HostStatus::load_failed && s.text.find("Silent: ") == 0 &&
+                    s.text.find("44100 Hz") != std::string::npos &&
+                    s.text.find("48000 Hz") != std::string::npos,
+                (std::string(when) + ": status " + s.text).c_str());
+    };
+    silent("a 44.1 kHz file played at 48 kHz");
+    require(p.setActive(false) == kResultOk, "before play: playback stops at last");
+    silent("stopped after playback confirmed the mismatch");
     std::filesystem::remove_all(folder);
     p.setActive(false);
     p.disconnect(&c);

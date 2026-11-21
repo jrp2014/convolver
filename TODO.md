@@ -331,8 +331,8 @@ LV2 (Linux first; also PipeWire system audio):
   **Remains:** whether the window should mark a host rate as not yet
   confirmed when it comes from a copy that has not processed audio (the
   copy in Audacity's effect window, which a host may start briefly at
-  another rate); PLUG-27, done (PR #233), made it matter less: a file
-  chosen there is no longer refused for that rate. **Done when** jrp has decided, and
+  another rate). Since PLUG-27 (PR #233) a file chosen there is no longer
+  refused for that rate, but Status still judges it against that rate. **Done when** jrp has decided, and
   the marking, if he wants it, is shown and its message tests cover it.
   Diagnostic text only, no sound change; parked until after REL-3 unless
   jrp brings it forward.

@@ -124,13 +124,22 @@ before they set the sample rate and channel layout (VST3 `setState` before
   be a placeholder: Audacity 4.0.2 sets up its window's copy at 44.1 kHz
   until it first plays, whatever the project's rate, and starts it only for
   a moment, with one block of silence, to pass on a parameter edit
-  (`FlushParameters`), so in jrp's Audacity run of 0.14.0 a 48 kHz `.cfg`
+  (`InitializeComponents` and `FlushParameters` in Audacity 4.0.2's
+  [`VST3Wrapper.cpp`](https://github.com/audacity/audacity/blob/Audacity-4.0.2/au3/libraries/au3-vst3/VST3Wrapper.cpp)), so in jrp's Audacity run of 0.14.0 a 48 kHz `.cfg`
   chosen before playback was refused and the failure was what the project
   saved. So a single IR file or `.cfg` is read as it is
   (`read_filter_file()` with `settled` false) and kept
   (`keep_until_suited`): checked at once against a configuration the host
-  is known to have, kept silent with the reason if it does not suit, and
-  checked again at the next start. A configuration list cannot be read
+  is known to have, kept silent if it does not suit, and checked again at
+  the next start. Until the host plays it (`HostSettling::playing()`:
+  started, and more than the one block Audacity's flush passes), it awaits
+  validation (`HostFilter::awaiting()`, cleared by `confirm()`, which the
+  adapters call when they see the host playing and when it stops): a start
+  that found it unsuited is too little evidence, so the status and the
+  window treat the host's configuration as not known and say "Filter
+  selected. Waiting for the host's audio settings." (jrp, 20 November 2026;
+  `HostFilter::waiting()`, `shown_failure()`); the log still says what each
+  start found. Once played, a mismatch shows as Silent with both rates. A configuration list cannot be read
   without a configuration: it chooses its entry for the one the host last
   started with (`known_layout()`), and before any start it is refused as
   any file is, with jrp's words, "No entry selected. ... Play audio once so
@@ -141,7 +150,8 @@ before they set the sample rate and channel layout (VST3 `setState` before
   first playback chooses its 44.1 kHz entry,
   since that moment's start is indistinguishable from a real one; it then
   plays silence at the project's rate, with the reason, until chosen again
-  after playing (`vst3.adapter` `chosen_before_host_plays` replays
+  after playing; and a list with no 44.1 kHz entry is refused there for
+  having none (`vst3.adapter` `chosen_before_host_plays` replays
   Audacity's order; `native.filter_file` `before_host_settles`,
   `native.host_settling` `chosen_file`).
 - One shared record holds both formats' rules: `HostSettling` in
@@ -156,8 +166,10 @@ before they set the sample rate and channel layout (VST3 `setState` before
   the last initialization that rendered; and while started, VST3 keeps
   restored state that does not suit until audio has played and never
   refuses a project the host is opening, while the Audio Unit refuses both
-  at once. A chosen file has one rule in both (above; PLUG-27 replaced the
-  VST3 rule of 13 November that checked it once the plug-in had started).
+  at once. A chosen file has one rule in both (above; PLUG-27 replaced, for
+  chosen files, the VST3 rule of 13 November that checked one once the
+  plug-in had started, and the Audio Unit rule that checked every request
+  once the formats were known).
 - VST3 counts its configuration as known once the plug-in has been activated
   with it and has played audio with it (a `process` call with samples, in
   that activation or an earlier one since the rate or buses last changed),

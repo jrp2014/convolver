@@ -510,7 +510,9 @@ preparation and steps 2, 3 and 9 below include what it found.
     export the whole project (stereo, 48000 Hz, 32-bit float WAV) and run
     `./bin/convolver --compare export.wav examples/first-use/stereo/expected.wav`.
     Save the project, quit, reopen it, export again and compare again. Both
-    comparisons must pass. Up to 0.14.0 the choice itself was refused here,
+    comparisons must pass. Right after choosing, Status in the window must
+    read "Filter selected. Waiting for the host's audio settings.", not
+    Silent. Up to 0.14.0 the choice itself was refused here,
     against the 44.1 kHz Audacity sets up before it first plays (PLUG-27,
     [record](../archive/reviews/2026-11-20-vst3-17-audacity.md)). Then
     check a configuration list: in a new project, choose a list (a text
