@@ -152,6 +152,12 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
+- Tests (HOST-9): the headless Ardour test plays the VST3 plug-in too, in
+  the VST3 workflow, on Ardour's own VST3 host, and saves sessions at a
+  larger Latency (LV2 at 256 and 1024, VST3 at 1024): Ardour must be told
+  the new latency without reopening the session, report it again after
+  reopening, and export in time, within 1e-5 of the oracle. The test moved
+  to `tests/plugins/`.
 - Builds (CI-46, from an outside audit of 20 November 2026): the VST3
   plug-in and the programs that compile its sources build with the warnings
   the core, the Audio Unit and the LV2 plug-in already had

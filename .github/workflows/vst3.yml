@@ -367,6 +367,61 @@ jobs:
         if: success() && github.run_attempt != '1'
         uses: ./.github/actions/note-retry
 
+  # HOST-9: Ardour, a full DAW whose VST3 host is its own code rather than
+  # Steinberg's or JUCE's, plays the plug-in headless: it loads a .vstpreset
+  # from its preset list, takes a Latency through its parameter, saves,
+  # reopens and exports the session in separate processes, and the export
+  # must match the oracle in time (tests/plugins/ardour_tests.py, which the
+  # LV2 workflow runs on the LV2 bundle). Ardour is the image's Ubuntu
+  # package (Ardour 9 on Ubuntu 26.04).
+  ardour:
+    # Skipped with the sdk job when the scope job finds nothing to build.
+    needs: sdk
+    name: Ardour (headless)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.x'
+      - uses: actions/download-artifact@v8
+        with:
+          name: vst3-sdk-lock
+          path: ${{ runner.temp }}/lock
+      - name: Newest VST3 SDK
+        id: sdk
+        run: >-
+          python scripts/release/sources.py --lock "$RUNNER_TEMP/lock/vst3-sdk-lock.json" --fetch
+          --cache "$RUNNER_TEMP/downloads" --destination "$RUNNER_TEMP/sources"
+          --github-output "$GITHUB_OUTPUT"
+          vst3sdk vst3-base vst3-cmake vst3-pluginterfaces vst3-public-sdk
+      - name: Ardour and libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ardour ninja-build libsndfile1-dev
+          python scripts/release/resolve.py packages ardour
+      # The newest compiler on this image (docs/develop/build.md#compilers-and-ci-machines).
+      - uses: ./.github/actions/newest-compiler
+        with:
+          compiler: gcc
+      # Release, as a host would load it; the preset tool makes the presets.
+      - name: Convolver's VST3 bundle and preset tool (Release)
+        run: |
+          cmake -S . -B build-vst3 -G Ninja -DCMAKE_BUILD_TYPE=Release -DCONVOLVER_BUILD_VST3=ON \
+            "-DCONVOLVER_VST3_SDK=${{ steps.sdk.outputs.vst3sdk }}" \
+            -DCONVOLVER_BUILD_TESTS=OFF -DCONVOLVER_LEGACY_TESTS=OFF
+          cmake --build build-vst3 --parallel --target convolver_vst3 convolver_preset_tool
+      - name: Ardour plays the stereo example, at Latency 0 and 1024
+        run: python tests/plugins/ardour_tests.py build-vst3/VST3/Release/Convolver.vst3 build-vst3/convolver-preset
+      - name: Explain a failure that may come from a new upstream release
+        if: failure()
+        run: python scripts/release/resolve.py explain-failure
+      # CI-22: a pass on re-run says so, so the earlier failure stays visible.
+      - name: Note a pass on re-run
+        if: success() && github.run_attempt != '1'
+        uses: ./.github/actions/note-retry
+
   # CI-36: the VST3 tests in Debug builds with sanitizers, as the Audio Unit
   # and LV2 workflows run theirs. The SDK's tools and pluginval are not
   # instrumented, so they cannot load an instrumented bundle: the jobs above

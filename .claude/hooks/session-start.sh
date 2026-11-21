@@ -33,7 +33,7 @@ install_build_tools() {
 }
 
 # The plug-in host tests' tools: xvfb for pluginval (JUCE needs an X server)
-# and Ardour's headless tools (the LV2 workflow's Ardour test). They are large and
+# and Ardour's headless tools (the Ardour test of the LV2 and VST3 plug-ins). They are large and
 # few changes need them, so they install in the background.
 install_host_test_tools() {
   command -v apt-get >/dev/null || return 0

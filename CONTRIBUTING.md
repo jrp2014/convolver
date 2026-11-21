@@ -216,7 +216,7 @@ python3 tests/trademarks_tests.py
 python3 tests/ci_scope_tests.py
 python3 tests/ci_evidence_tests.py
 python3 tests/fuzz/scheduler_tests.py
-python3 tests/lv2/ardour_harness_tests.py
+python3 tests/plugins/ardour_harness_tests.py
 ```
 
 [Repository checks](docs/develop/workflow.md#automated-checks) lists each rule and what
