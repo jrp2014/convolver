@@ -25,7 +25,9 @@ Contents: [kinds of task](#kinds-of-task) ·
 [definition of done](#definition-of-done) ·
 [independent review](#independent-review) ·
 [merging](#merging-and-afterwards) ·
-[recording progress in TODO](#recording-progress-in-todo)
+[recording progress in TODO](#recording-progress-in-todo) ·
+[change fragments](#change-fragments) ·
+[clearing processed records](#clearing-processed-records)
 
 ## Kinds of task
 
@@ -87,13 +89,20 @@ repository; recording a review's or a host test's results in it is a change.
   codes), state or preset formats, `.cfg` syntax, licences, defaults that
   change the sound, dependencies shipped in releases, and anything published.
   Continue only on work that does not depend on the answer. Record the answer,
-  with its date, in the [decisions log](../project/decisions.md) and in the pull
-  request. The log is the only place decision notes and their dates go: other
-  pages describe what was decided as plain fact, and may link to the log. When a decision changes what users get between releases, the
-  [changelog](../../CHANGELOG.md) entry says what changed.
-- **Keep shared files small to merge.** Several streams edit `TODO.md`,
-  `CHANGELOG.md`, `CMakeLists.txt`, `packaging/release-policy.json`,
-  and `docs/README.md`.
+  with its date, in the pull request and as a **Decisions:** section of the
+  pull request's [change fragment](#change-fragments), which folding moves
+  into the [decisions log](../project/decisions.md). The log is the only
+  place decision notes and their dates go: other pages describe what was
+  decided as plain fact, and may link to the log. When a decision changes
+  what users get between releases, the fragment's changelog entry says what
+  changed.
+- **Keep shared files small to merge.** Entries for the CHANGELOG, TODO's
+  done list and the decisions log go in the pull request's own
+  [change fragment](#change-fragments), never at the top of those pages, and
+  a version step is a label, not an edit to `VERSION`
+  ([source versioning](versioning.md#minor-and-major-versions)). Several
+  streams still edit `TODO.md`'s open items, `CMakeLists.txt`,
+  `packaging/release-policy.json` and `docs/README.md`.
   Change only the lines your item needs, and merge `main` into your branch
   often. A change to something every stream relies on (the
   [shared adapter contract](plugin-contract.md),
@@ -194,12 +203,16 @@ checklist says so:
   ([page ownership](documentation.md#one-home-for-each-topic)); a new page is in
   the [index](../README.md); user-visible changes, under Added, Changed or
   Fixed, and every finished TODO item, a contributor-only one under
-  **For contributors**, are in the [CHANGELOG](../../CHANGELOG.md) under its
-  ID. Affected product claims and
+  **For contributors**, have an entry naming the ID in the pull request's
+  [change fragment](#change-fragments), not in `CHANGELOG.md` itself.
+  Affected product claims and
   their summaries follow the [claims rule](documentation.md#current-claims-and-dated-evidence).
-- **TODO:** the item is ticked with its evidence, or says what remains,
-  what would justify it and when it is done. A plan that is now fully implemented, or superseded,
-  moves to [`archive/plans/`](../archive/plans/README.md)
+- **TODO:** the item's open text is removed and its ticked line is in the
+  fragment's **Done** section, or the item says what remains, what would
+  justify it and when it is done. Whatever the change has processed is
+  cleared ([clearing processed records](#clearing-processed-records)): a
+  plan that is now fully implemented, or superseded, moves to
+  [`archive/plans/`](../archive/plans/README.md)
   ([rule](documentation.md#current-claims-and-dated-evidence)).
 - **Reviewed:** an [independent review](#independent-review) has been done and
   its findings answered in the pull request.
@@ -303,8 +316,10 @@ approve or merge; jrp does that.
   move tags.
 - CI must be green on the final commit. A failure that is also red on `main`
   is reported in the pull request, not ignored.
-- After a merge, the version workflow bumps `VERSION` and tags `main`
-  ([source versioning](versioning.md)).
+- After a merge, the version workflow bumps `VERSION` and tags `main`: a
+  patch, or a minor or major step when the pull request carries the
+  `version:minor` or `version:major` label
+  ([source versioning](versioning.md#minor-and-major-versions)).
 - Merged branches are kept for a while, so their history can still be
   read, and jrp deletes them periodically (his choice, 6 November 2026;
   GitHub's automatic deletion stays off). Cloud agent sessions cannot delete
@@ -339,25 +354,97 @@ group non-blocking prose suggestions without hiding consequential errors in
 installation, routing or recovery instructions.
 
 When the item is complete, move lasting behaviour into the owning guide and
-any owner's decision into the [decisions log](../project/decisions.md). Then
-replace the item with one ticked line in TODO's [done](../../TODO.md#done) list:
-its ID and title, the date, the pull request if there was one, and a link to the page that now
-describes it. In the same pull request, add an entry naming the ID under
-`[Unreleased]` in the [CHANGELOG](../../CHANGELOG.md), even for work only
-contributors see, which goes under **For contributors**. TODO keeps open work only; the one-line entry keeps the ID
-defined, and the [repository checks](#automated-checks) reject a TODO ID that
-is used but never defined. When the done list grows long, a documentation
+any owner's decision into the **Decisions:** section of the pull request's
+[change fragment](#change-fragments). Then remove the item from `TODO.md` and
+write its one ticked line in the fragment's **Done** section: its ID and
+title, the date, the pull request if there was one, and a link to the page
+that now describes it. Folding puts that line at the top of TODO's
+[done](../../TODO.md#done) list. In the same fragment, add a changelog entry
+naming the ID, even for work only contributors see, which goes under
+**For contributors**. TODO keeps open work only; the one-line entry keeps the
+ID defined, in the fragment until it is folded, and the
+[repository checks](#automated-checks) reject a TODO ID that is used but
+never defined. When the done list grows long, a documentation
 change moves its lines unchanged, apart from relative links, into a new dated
 list in [`docs/archive/todo/`](../archive/todo/README.md), with a row in that
 folder's index; an ID ticked there stays defined.
+
+## Change fragments
+
+The CHANGELOG, TODO's done list and the decisions log each gain an entry at
+the same place from almost every pull request, so two open pull requests
+used to conflict there whenever one merged. Instead, each pull request adds
+its own file under [`changes/`](../../changes/README.md), named after its
+TODO ID (`changes/<ID>.md`, such as PLUG-40.md), with a section for each record it adds to:
+the changelog groups (**Added**, **Changed**, **Fixed**, **For
+contributors** and the rest), **Done** for the item's ticked TODO line and
+**Decisions:** *section* for a decision of jrp's. The
+[form](../../changes/README.md#the-form) shows an example. New entries
+reach those three pages only through fragments
+([decision](../project/decisions.md#documentation)). The pages are still
+edited directly for work on what they already hold: a fold, the heading for
+a published release ([releasing](releasing.md)), moving the done list to
+the archive, marking a decision replaced, and correcting an entry. The
+every-item rule is unchanged: every finished TODO item still gets a
+changelog entry, in its fragment.
+
+Fragments are folded, which moves each entry into its page in the order the
+fragments reached `main` and deletes the fragments. It reads that order
+from `origin/main`'s history, so a branch that has merged `main` in, such as
+a refreshed release-notes branch, still folds in merge order: run
+`git fetch origin main` first. It refuses a shallow clone, which cannot tell
+when older fragments arrived (`git fetch --unshallow` first):
+
+```sh
+python3 scripts/fold_changes.py
+```
+
+- The release-notes pull request for a preview folds them, and merges
+  `main` and folds again just before it is merged, so the tag it makes
+  carries a complete changelog and `changes/` holds only its README
+  ([releasing](releasing.md)).
+- Anyone may fold sooner in a pull request that does nothing else, for
+  example after a round of merges. Other pull requests only add fragments,
+  so a fold conflicts with none of them; a fragment merged while it is open
+  waits for the next fold. A fold pull request needs no TODO ID or fragment
+  of its own (title it `Records: fold change fragments`), and its
+  independent review checks only that the diff moves entries unchanged
+  apart from their links.
+
+Until then, read the open fragments alongside the pages:
+`changes/` holds jrp's newest decisions and the newest finished items. A
+fragment on `main` is never edited; a later pull request for the same item
+adds its own, with a suffix after the ID (PLUG-39-step6.md). Pre-commit runs
+`python3 scripts/fold_changes.py --check`, which refuses a fragment that
+could not be folded.
+
+## Clearing processed records
+
+Once something has been processed or consolidated into its lasting home,
+remove the original in the same change, so that nothing stale is left to
+contradict the record ([decision](../project/decisions.md#documentation)):
+
+- Change fragments are deleted when they are folded (the script does this).
+- A plan that is fully implemented or superseded moves to
+  [`archive/plans/`](../archive/plans/README.md); finished TODO lines move
+  to [`archive/todo/`](../archive/todo/README.md) when the done list grows
+  long ([recording progress](#recording-progress-in-todo)).
+- Anything else that only fed another record (a handoff note's working
+  files, a review's scratch output, a temporary script or step list) is
+  deleted once its result is in the pull request, the owning page or the
+  log; if it is dated evidence someone may need to check, it moves to
+  [`docs/archive/`](../archive/README.md) instead. Archived records are
+  never edited.
 
 ## Automated checks
 
 `scripts/check_repository.py` runs in pre-commit and lint CI. It checks that:
 
-- every TODO ID mentioned in the maintained documentation is defined in TODO
-  or listed as done in [`docs/archive/todo/`](../archive/todo/README.md), and
-  no ID is defined twice;
+- every TODO ID mentioned in the maintained documentation or a
+  [change fragment](#change-fragments) is defined in TODO, ticked in a
+  fragment's **Done** section or listed as done in
+  [`docs/archive/todo/`](../archive/todo/README.md), and no ID is defined
+  twice;
 - every maintained page under `docs/` is listed in the [index](../README.md)
   and sits in a reader folder (`use/`, `develop/` or `project/`);
 - every open plan in [`project/plans/`](../project/plans/) has a dated file name, and every
@@ -365,8 +452,8 @@ folder's index; an ID ticked there stays defined.
 - repository paths named in `AGENTS.md`, `CONTRIBUTING.md`, the
   [implementation map](architecture.md) and this page exist, and so do those
   four pages;
-- new source, script and maintained documentation files carry an SPDX licence
-  line;
+- new source, script, maintained documentation and change fragment files
+  carry an SPDX licence line;
 - only known folders and files sit at the top level of the repository, and
   every adapter under `plugins/` has tests under `tests/` and is named in
   [how the plug-ins behave](../use/plugins.md);

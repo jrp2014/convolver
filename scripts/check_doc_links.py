@@ -5,7 +5,8 @@
 Checks inline and reference-definition destinations, GitHub-style ATX heading
 anchors, and HTML id/name anchors. Fenced code and inline code are examples, not
 links. Dated archives/plans are not scanned as current instructions, but a link
-to one must still resolve. Repository skills under `.claude/skills/` are
+to one must still resolve. Change fragments under `changes/` are checked like any
+page; scripts/fold_changes.py rewrites their links as it folds them. Repository skills under `.claude/skills/` are
 scanned too: they point agents at sections of the maintained pages. This is intentionally not a full Markdown renderer
 or an external-URL availability check.
 """
@@ -80,6 +81,7 @@ def anchors(path):
 
 def documents(root):
     yield from sorted(root.glob('*.md'))
+    yield from sorted((root / 'changes').glob('*.md'))
     yield from sorted((root / '.claude' / 'skills').rglob('*.md'))
     for path in sorted((root / 'docs').rglob('*.md')):
         if not (set(path.relative_to(root / 'docs').parts[:-1]) & EXCLUDED):

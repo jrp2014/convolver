@@ -62,7 +62,8 @@ Claude Code sessions reach the same sections through two repository skills,
 | Start an item | [Before you start](docs/develop/workflow.md#before-you-start), then [while working](docs/develop/workflow.md#while-working) |
 | Continue someone else's branch | [Picking up someone else's work](docs/develop/workflow.md#picking-up-someone-elses-work) |
 | Stop or hand over | [Handoff note](docs/develop/workflow.md#handoff-note) |
-| Finish | [Verification](docs/develop/workflow.md#verification-for-each-kind-of-change), [definition of done](docs/develop/workflow.md#definition-of-done) |
+| Record a change, a finished item or a decision | [Change fragments](docs/develop/workflow.md#change-fragments) |
+| Finish | [Verification](docs/develop/workflow.md#verification-for-each-kind-of-change), [definition of done](docs/develop/workflow.md#definition-of-done), [clearing processed records](docs/develop/workflow.md#clearing-processed-records) |
 | Review a change | [Independent review](docs/develop/workflow.md#independent-review) |
 
 ## Read only what the task needs
@@ -86,7 +87,7 @@ whole.
 | Write host-test steps or record results | [Every report](docs/develop/host-testing.md#every-report) and the host's section of [host testing](docs/develop/host-testing.md) |
 | Candidates and preview packages | [Releasing](docs/develop/releasing.md#candidates) |
 | Change documentation | [One home for each topic](docs/develop/documentation.md#one-home-for-each-topic), [writing rules](docs/develop/documentation.md#writing-rules) |
-| What jrp has decided | [Decisions](docs/project/decisions.md) |
+| What jrp has decided | [Decisions](docs/project/decisions.md), and any **Decisions:** section in `changes/` not yet folded in |
 
 ## Build and test
 
@@ -137,9 +138,10 @@ Full rules: [source versioning](docs/develop/versioning.md).
 - `VERSION` is the one `MAJOR.MINOR.PATCH` source for the CMake package, CLI and
   plug-ins; never copy it elsewhere. Leave `VERSION` and tags alone in ordinary
   changes: after a push to `main`, **Version source changes** bumps PATCH and
-  tags `vX.Y.Z`. Edit `VERSION` only for a deliberate minor or major step (an
-  incompatible API change before 1.0 needs a minor step), and never move a
-  published tag.
+  tags `vX.Y.Z`. For a deliberate minor or major step (an incompatible API
+  change before 1.0 needs a minor step), label the pull request
+  `version:minor` or `version:major` instead of editing `VERSION`; the bot
+  applies the step on merge. Never move a published tag.
 - Do not change plug-in IDs or state-format versions to match a package
   version. The version helper creates commits and tags even without `--push`,
   so it is **not a dry run**; test versioning with
@@ -147,6 +149,17 @@ Full rules: [source versioning](docs/develop/versioning.md).
 
 ## Rules
 
+- Shared records: add new entries to `CHANGELOG.md`, TODO's done list and
+  `docs/project/decisions.md` only through the pull request's own fragment,
+  `changes/<ID>.md`, which `scripts/fold_changes.py` folds into those pages
+  ([change fragments](docs/develop/workflow.md#change-fragments), which
+  also lists the direct edits that remain, such as a fold or a release
+  heading). Every finished TODO item still gets a changelog entry, in its
+  fragment.
+- Clear what has been processed: once something is consolidated into its
+  lasting home, delete the original (folded fragments, scratch files) or move
+  dated evidence and finished plans to `docs/archive/`, in the same change
+  ([clearing processed records](docs/develop/workflow.md#clearing-processed-records)).
 - Documentation: follow the [documentation guide](docs/develop/documentation.md)
   (readers, kinds of page, writing rules, which page owns each topic), and
   keep [product claims current and substantiated](docs/develop/documentation.md#current-claims-and-dated-evidence)
