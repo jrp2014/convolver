@@ -139,8 +139,14 @@ local function status(track, fx)
   return text
 end
 
+-- Waits past "No filter" and past any waiting text ("Filter selected.
+-- Waiting..." or "...; waiting for audio settings"), so that a brief
+-- waiting state is not what the check reads.
 local function settled(track, fx)
-  return function() return status(track, fx):find("^No filter") == nil end
+  return function()
+    local text = status(track, fx)
+    return text:find("^No filter") == nil and text:find("aiting", 1, true) == nil
+  end
 end
 
 local function prepare_render(name)

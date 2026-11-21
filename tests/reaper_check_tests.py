@@ -31,7 +31,8 @@ SPEC.loader.exec_module(reaper_check)
 # FAKE_REAPER=silent restores nothing on reopening, and FAKE_REAPER=stopped
 # reads Status after the transport stopped, as REAPER did in jrp's first run.
 # FAKE_REAPER=waiting and FAKE_REAPER=dry read, with the transport running,
-# texts that start like the Active one but are not (jrp's review).
+# texts that start like the Active one but are not (jrp's review);
+# FAKE_REAPER=dry_loaded reads the Mix 0% text after loading and reopening.
 FAKE_REAPER = textwrap.dedent(
     r"""
     #!/usr/bin/env python3
@@ -45,8 +46,11 @@ FAKE_REAPER = textwrap.dedent(
     reopen = 'record("stage", "reopen")' in text
     loaded = 'Filter loaded: 48000 Hz, 2 in, 2 out.'
     status = 'Silent: no filter' if reopen and mode == 'silent' else loaded
+    if mode == 'dry_loaded':
+        status = loaded + ' Mix 0%: only the dry signal plays.'
     playing = {'waiting': 'Filter loaded: 48000 Hz, 2 in, 2 out; waiting for audio settings from the host.',
-               'dry': 'Filter loaded: 48000 Hz, 2 in, 2 out. Mix 0%: only the dry signal plays.'}.get(mode, status)
+               'dry': 'Filter loaded: 48000 Hz, 2 in, 2 out. Mix 0%: only the dry signal plays.',
+               'dry_loaded': loaded}.get(mode, status)
     lines = [('stage', 'reopen' if reopen else 'first'), ('reaper_version', '7.99/macOS-arm64'),
              ('fx_name', 'VST3: Convolver (Convolver)'), ('status_playing', playing),
              ('status_reopened' if reopen else 'status_after_preset', status),
@@ -115,6 +119,8 @@ class LuaText(unittest.TestCase):
             self.assertIn('reaper.GetSet_LoopTimeRange2(project, true, true, loop_start, loop_end, false)', text)
         self.assertEqual(reaper_check.lua_script('first', {}).count('"D_PANLAW", 1)'), 2)
         self.assertIn('TrackFX_SetPreset', reaper_check.lua_script('first', {}))
+        # A brief waiting text after loading or reopening is waited past.
+        self.assertIn('text:find("aiting", 1, true) == nil', reaper_check.lua_script('reopen', {}))
         self.assertNotIn('TrackFX_SetPreset', reaper_check.lua_script('reopen', {}))
 
 
@@ -245,7 +251,8 @@ class Run(unittest.TestCase):
     def test_a_waiting_or_dry_only_status_while_playing(self):
         # jrp's review: with the transport running, a filter still waiting for
         # the host's settings, or Mix 0%, must not pass checks 3 and 7.
-        for mode in ('waiting', 'dry'):
+        # dry_loaded: the readings after loading and reopening say Mix 0%.
+        for mode in ('waiting', 'dry', 'dry_loaded'):
             with self.subTest(mode=mode), mock.patch.dict(os.environ, {'FAKE_REAPER': mode}):
                 for folder in self.package.glob('reaper-check-*'):
                     shutil.rmtree(folder)
