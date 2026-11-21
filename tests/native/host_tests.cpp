@@ -1897,6 +1897,78 @@ void processing_faults() {
     require(explained == 3 && q.faults().rejected_input == 3,
             "a fault while a failed first load was prepared is lost from the log");
 }
+// PLUG-22, PLUG-39 step 4: a name kept apart from the filter's state
+// (VST3's controller state) shows only while its filter plays, whichever
+// order the host sends the two in; a refused filter never renames the one
+// that plays (jrp's v0.12.8 REAPER check). The VST3 adapter's own test
+// (vst3.adapter, the controller state) replays the same through its API.
+void filter_names() {
+    const HostLayout layout{48000, 1, 1};
+    const auto room = mono(.5f), hall = mono(.25f), slow = [] {
+        auto c = mono();
+        c.sample_rate = 44100;
+        return c;
+    }();
+    const auto identity = [](const Configuration& c) { return configuration_identity(c); };
+    const auto name = [](const HostFilter& f) { return f.accepted().name; };
+    const auto state = [](std::string n = {}) {
+        HostRequest r;
+        r.name = std::move(n);
+        return r;
+    };
+    {
+        // The name first, then the state it names; then the state first.
+        HostFilter f(8);
+        f.offer_name("room.wav", identity(room));
+        require(name(f).empty(), "a name shown before its filter");
+        f.load(HostState{room}, layout);
+        require(name(f) == "room.wav", "an offered name not taken by its filter");
+        HostFilter g(8);
+        g.load(HostState{room}, layout);
+        g.offer_name("room.wav", identity(room));
+        require(name(g) == "room.wav", "a name offered for the playing filter not shown");
+    }
+    {
+        // A refused preset's name, in either order, leaves the playing name;
+        // the state of the playing filter brought again keeps it.
+        for (const bool name_first : {false, true}) {
+            HostFilter f(8);
+            f.offer_name("room.wav", identity(room));
+            f.load(HostState{room}, layout);
+            if (name_first)
+                f.offer_name("slow.wav", identity(slow));
+            try {
+                f.load(HostState{slow}, layout);
+            } catch (const std::invalid_argument&) {
+            }
+            if (!name_first)
+                f.offer_name("slow.wav", identity(slow));
+            require(f.filter_identity() == identity(room) && name(f) == "room.wav",
+                    "a refused preset renamed the playing filter");
+            f.load(HostState{room}, layout);
+            require(name(f) == "room.wav",
+                    "the playing filter's state brought again lost its name");
+            // Another filter's state names nothing.
+            f.load(HostState{hall}, layout);
+            require(name(f).empty(), "a name shown for another filter");
+        }
+    }
+    {
+        // A file's own name, for the state saved from it.
+        // Never read: the filter comes with the request.
+        const auto path = std::filesystem::path("filters") / "room.wav";
+        HostFilter f(8);
+        HostRequest file{HostFilterSource::file, path.string(), 0};
+        file.kind = HostRequestKind::chosen_file;
+        f.load(HostState{room}, layout, {}, file);
+        f.load(HostState{hall}, layout);
+        f.load(HostState{room}, layout);
+        require(name(f) == "room.wav", "the state of a chosen file lost the file's name");
+        // A name the state brings itself (the Audio Unit's preset name) stands.
+        f.load(HostState{room}, layout, {}, state("Room preset"));
+        require(name(f) == "Room preset", "a state's own name replaced");
+    }
+}
 // PLUG-39 step 4: host_status_value() is the one status ordering, which
 // host_status(), the report and LV2's status port follow: a load failure,
 // then a fault, then bypass with a filter, then the filter, then a failed
@@ -2149,8 +2221,54 @@ void status_lines() {
                 contains(started_line(g, stereo, 512),
                          "Started at 48000 Hz, 2 in, 2 out, blocks of up to 512 frames. No "
                          "filter, so audio passes unchanged.") &&
-                contains(started_line(g, crossover_bus, 512), "plays silence"),
+                contains(started_line(g, crossover_bus, 512), "plays silence") &&
+                contains(started_line(g, stereo, 512, nullptr, true),
+                         "No filter. Bypass is on: audio passes unchanged."),
             "empty instance log lines");
+    {
+        // PLUG-39 step 4: with bypass on, the start line says what bypass
+        // plays, not that the filter plays.
+        HostFilter h(8);
+        h.load(HostState{a}, stereo);
+        require(contains(started_line(h, stereo, 512, nullptr, true),
+                         "Bypass is on: the input plays unfiltered. Loaded: a filter for 48000 Hz, "
+                         "2 in, 2 out.") &&
+                    !contains(started_line(h, stereo, 512, nullptr, true), "Playing"),
+                "bypassed start line");
+        // A crossover has no dry signal, so bypass plays silence.
+        HostFilter x(8);
+        x.load(HostState{crossover}, crossover_bus);
+        require(contains(started_line(x, crossover_bus, 512, nullptr, true),
+                         "Bypass is on: the outputs are silent. Loaded: a filter for 48000 Hz, "
+                         "2 in, 6 out."),
+                "bypassed crossover start line");
+        // A kept filter that does not suit the host: bypass plays its dry
+        // signal, or silence where it has none (as Status says).
+        HostFilter kept(8);
+        kept.load(HostState{other_rate}, std::nullopt);
+        static_cast<void>(test::started(kept, stereo));
+        require(contains(started_line(kept, stereo, 512, nullptr, true),
+                         "Bypass is on: only the dry signal plays. The saved filter is for "
+                         "44100 Hz"),
+                "bypassed start line of a kept filter");
+        HostFilter kept_x(8);
+        auto slow_crossover = crossover;
+        slow_crossover.sample_rate = 44100;
+        kept_x.load(HostState{slow_crossover}, std::nullopt);
+        static_cast<void>(test::started(kept_x, crossover_bus));
+        require(contains(started_line(kept_x, crossover_bus, 512, nullptr, true),
+                         "Convolver plays silence."),
+                "bypassed start line of a kept crossover");
+        // A refused replacement while a crossover plays bypassed.
+        try {
+            x.load(HostState{slow_crossover}, crossover_bus);
+        } catch (const std::invalid_argument&) {
+        }
+        require(failure_consequence(*x.failure(), &crossover_bus, {}, dry_signal(x, crossover_bus),
+                                    true) ==
+                    "The previous filter is kept. Bypass is on: the outputs are silent.",
+                "bypassed refusal of a crossover");
+    }
     g.load(HostState{other_rate}, std::nullopt);
     require(loaded_line(g, false) ==
                 "Request 1: Loaded a filter for 44100 Hz, 2 in, 2 out; waiting "
@@ -2168,6 +2286,10 @@ void status_lines() {
                                      0) == 0 &&
             rejected_line(g, true).find('\n') == std::string::npos,
         "rejected line");
+    require(rejected_line(g, true, true)
+                    .rfind("Request 2: Not loaded; the previous filter is kept (bypass is on): ",
+                           0) == 0,
+            "rejected line while bypassed");
     // Before the host starts the plug-in, the kept filter does not play yet.
     require(rejected_line(g, false).rfind("Request 2: Not loaded; the previous filter is kept: ",
                                           0) == 0,
@@ -2355,6 +2477,7 @@ int main() {
             {"saved_state_limit", saved_state_limit},
             {"status_lines", status_lines},
             {"status_ordering", status_ordering},
+            {"filter_names", filter_names},
             {"processing_faults", processing_faults},
             {"same_filter_kept", same_filter_kept},
             {"request_changes", request_changes},

@@ -293,7 +293,8 @@ struct Instance {
     void log_rejection() noexcept {
         try {
             if (filter.rejection())
-                log_error(rejected_line(filter, host != nullptr));
+                log_error(
+                    rejected_line(filter, host != nullptr, bypass.load(std::memory_order_relaxed)));
         } catch (...) { // Out of memory for the line: the status port still shows it.
         }
     }

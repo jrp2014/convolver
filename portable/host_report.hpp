@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -86,6 +87,11 @@ struct HostReport {
     // plays: HostFilter::filter_identity(), a hash of every stored value of
     // the filter, found once when it was accepted. Empty without a filter.
     std::string filter_identity;
+    // PLUG-22, PLUG-39 step 4: the name to save beside the playing filter's
+    // state: the file's name, or the name its state brought or was offered
+    // (HostFilter::accepted()); empty when it has none or nothing plays.
+    // VST3's controller state saves it.
+    std::string filter_saved_name;
     // VST3-11: the accepted filter's file as chosen (UTF-8; empty when it came
     // from saved state), which the window's Reload reads again, and every
     // file it was read from (HostRequest::files), which the window watches
@@ -124,15 +130,18 @@ HostReport host_report(const HostFilter&, const HostReportFacts&);
 // hex digits. convolver-preset writes the same text into VST3 presets
 // (PLUG-31), so the two must stay one function.
 std::string filter_identity_text(std::uint64_t identity);
+// The identity filter_identity_text() wrote: exactly 16 lowercase hex
+// digits, or none for anything else (VST3's controller state, PLUG-22).
+std::optional<std::uint64_t> parse_filter_identity_text(std::string_view text) noexcept;
 
 // The report as named text values, for a format's transport (an Audio Unit
 // property dictionary): status (the HostStatus number), status name,
 // summary (the status line), title, explanation, problem, plays, cause, fix,
 // note, action, filter name,
-// filter note, filter path, filter files (one per line), sample rate (digits, or empty), latency
-// waits ("yes" or "no"), mix note, gain note, audio (one line per fact: label, value, note,
-// "problem" or empty, and help, separated by tabs), reference (one "Label: value" line each), log
-// path and log written
+// filter note, filter identity, filter saved name, filter path, filter files (one per line), sample
+// rate (digits, or empty), latency waits ("yes" or "no"), mix note, gain note, audio (one line per
+// fact: label, value, note, "problem" or empty, and help, separated by tabs), reference (one
+// "Label: value" line each), log path and log written
 // ("yes" or "no").
 std::vector<std::pair<std::string, std::string>> report_fields(const HostReport&);
 

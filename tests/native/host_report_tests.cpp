@@ -322,6 +322,38 @@ void cases() {
          {"The host sent invalid samples (3 times). The filter keeps playing.",
           "Fix: Bypass the plug-ins before Convolver", "Note: The status shows Fault until"},
          {}},
+        // PLUG-39 step 4 (jrp's review, 20 November 2026): with bypass on,
+        // a fault and a refused replacement describe what bypass plays, not
+        // the filter.
+        {"fault, bypassed",
+         [&] {
+             HostFilter f(8);
+             f.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {});
+             HostFaults totals;
+             totals.rejected_input = 3;
+             static_cast<void>(f.observe(totals));
+             auto bypassed = facts(stereo);
+             bypassed.bypassed = true;
+             return host_report(f, bypassed);
+         },
+         HostStatus::fault,
+         {"The host sent invalid samples (3 times). Bypass is on: the input plays unfiltered."},
+         {"keeps playing"}},
+        {"refused replacement, bypassed",
+         [&] {
+             HostFilter f(8);
+             f.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {});
+             try {
+                 f.load(HostState{filter(48000, 2)}, stereo, [](const HostPlayback&) {});
+             } catch (const std::invalid_argument&) {
+             }
+             auto bypassed = facts(stereo);
+             bypassed.bypassed = true;
+             return host_report(f, bypassed);
+         },
+         HostStatus::load_failed,
+         {"The previous filter is kept. Bypass is on: the input plays unfiltered."},
+         {"keeps playing"}},
     };
     for (const auto& c : all) {
         const auto r = c.make();
@@ -448,6 +480,30 @@ void cases() {
                     none.filter_length.empty() && none.filter_speakers.empty() &&
                     none.filter_identity.empty(),
                 "filter facts without a filter");
+        // PLUG-39 step 4b: the identity's text reads back exactly (VST3's
+        // controller state), and nothing else reads as one.
+        require(parse_filter_identity_text(r.filter_identity) == f.filter_identity() &&
+                    !parse_filter_identity_text("") &&
+                    !parse_filter_identity_text(r.filter_identity.substr(1)) &&
+                    !parse_filter_identity_text(r.filter_identity + "0") &&
+                    !parse_filter_identity_text("ABCDEF0123456789") &&
+                    !parse_filter_identity_text("0123456789abcdeg"),
+                "filter identity text read back");
+        // The name saved beside the playing filter's state: none for state
+        // without one, the state's own, a file's name, and none with no filter.
+        HostFilter named(8);
+        HostRequest preset;
+        preset.name = "Room preset";
+        named.load(HostState{labelled}, std::nullopt, {}, preset);
+        const auto from_preset = host_report(named, facts(std::nullopt)).filter_saved_name;
+        HostRequest file{HostFilterSource::file,
+                         (std::filesystem::path("filters") / "room.wav").string(), 0};
+        file.kind = HostRequestKind::chosen_file;
+        named.load(HostState{labelled}, std::nullopt, {}, file);
+        const auto from_file = host_report(named, facts(std::nullopt)).filter_saved_name;
+        require(w.filter_saved_name.empty() && from_preset == "Room preset" &&
+                    from_file == "room.wav" && none.filter_saved_name.empty(),
+                "filter saved name: " + from_preset + " | " + from_file);
     }
     require(r.audio.front().label == "Host sample rate" &&
                 r.audio.back().label == "Host block size",

@@ -72,14 +72,12 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
     const auto* layout = host ? &*host : nullptr;
     const auto& failure = filter.shown_failure();
     const auto choose = facts.chooses_files ? "choose filter" : "";
-    // PLUG-36 (jrp, 20 November 2026): bypass plays the untouched input
-    // wherever there is a dry signal, so when no filter is heard the report
-    // says that bypass is on and what it plays, as host_status() does.
-    const bool bypass_dry = facts.bypassed && layout && dry_signal(filter, *layout);
+    // PLUG-36 (jrp, 20 November 2026), PLUG-39 step 4: with bypass on, what
+    // plays is what bypass plays, as host_status() says; playing_words() and
+    // failure_consequence() say it.
     const auto no_filter_plays = [&] {
-        return !host        ? std::string("No filter is loaded.")
-               : bypass_dry ? std::string("No filter. Bypass is on: audio passes unchanged.")
-                            : playing_words(filter, *host, facts.settings);
+        return !host ? std::string("No filter is loaded.")
+                     : playing_words(filter, *host, facts.settings, facts.bypassed);
     };
     Message m;
     const auto take = [&](const detail::Advice& a) {
@@ -95,10 +93,8 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         auto a = failure_message(*failure);
         a.problem = short_problem(std::move(a.problem), *failure);
         take(a);
-        m.plays = bypass_dry && failure->silent && failure->kind != HostFailureKind::activation
-                      ? std::string("Bypass is on: only the dry signal plays.")
-                      : failure_consequence(*failure, layout, facts.settings,
-                                            layout && dry_signal(filter, *layout));
+        m.plays = failure_consequence(*failure, layout, facts.settings,
+                                      layout && dry_signal(filter, *layout), facts.bypassed);
         if (chosen_away(failure->kind))
             m.action = choose;
         // Faults the load failure hides from the status.
@@ -107,8 +103,12 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
                                             fault_advice(filter.faults(), true).problem));
     } else if (status == HostStatus::fault) {
         take(fault_advice(filter.faults(), false));
-        if (filter.filter()) {
-            m.plays = "The filter keeps playing.";
+        if (const auto& c = filter.filter()) {
+            m.plays = !facts.bypassed ? std::string("The filter keeps playing.")
+                      : !host         ? std::string("Bypass is on: no filter is applied.")
+                      : dry_signal(filter, *host)
+                          ? std::string("Bypass is on: the input plays unfiltered.")
+                          : std::string("Bypass is on: the outputs are silent.");
         } else {
             // Faults are counted with no filter too (the host's samples).
             m.plays = no_filter_plays();
@@ -121,6 +121,8 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         // PLUG-22: as HostProcessor bypasses, the input when there is a dry
         // signal, otherwise silence (dry_signal_rule(), PLUG-23).
         // Nothing is wrong, so turning it off is part of the sentence, not a fix.
+        // As HostProcessor bypasses a filter: the input when there is a dry
+        // signal, otherwise silence (dry_signal_rule(), PLUG-23).
         const auto& c = *filter.filter();
         m.plays =
             (!host ? std::string("No filter is applied while bypassed.")
@@ -141,7 +143,7 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         if (host && !filter.notice().empty())
             take(filter.notice());
     } else if (status == HostStatus::load_failed) {
-        m.plays = host ? playing_words(filter, *host, facts.settings)
+        m.plays = host ? playing_words(filter, *host, facts.settings, facts.bypassed)
                        : std::string("Silent after a failed load.");
         m.fix = "Load a filter made for the host's sample rate and channels.";
         m.action = choose;
@@ -361,6 +363,21 @@ std::string filter_identity_text(std::uint64_t identity) {
     return text;
 }
 
+std::optional<std::uint64_t> parse_filter_identity_text(std::string_view text) noexcept {
+    if (text.size() != 16)
+        return std::nullopt;
+    std::uint64_t value = 0;
+    for (const char ch : text) {
+        const int digit = ch >= '0' && ch <= '9'   ? ch - '0'
+                          : ch >= 'a' && ch <= 'f' ? ch - 'a' + 10
+                                                   : -1;
+        if (digit < 0)
+            return std::nullopt;
+        value = value << 4 | static_cast<std::uint64_t>(digit);
+    }
+    return value;
+}
+
 HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
     // PLUG-27: a chosen filter awaiting validation is not judged against a
     // start that may have been at a placeholder rate (HostFilter::waiting()).
@@ -407,6 +424,9 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
         r.filter_taps = std::to_string(taps) + " taps";
         r.filter_length = length.empty() ? r.filter_taps : length;
         r.filter_identity = filter_identity_text(filter.filter_identity());
+        r.filter_saved_name = accepted.source == HostFilterSource::file && !accepted.path.empty()
+                                  ? r.filter_name
+                                  : accepted.name;
         // A list on its own, so it starts with a capital: "Front left, front right".
         r.filter_speakers = speaker_names(c->channel_mask, c->output_channels);
         if (!r.filter_speakers.empty())
@@ -516,6 +536,7 @@ std::vector<std::pair<std::string, std::string>> report_fields(const HostReport&
             {"filter length", r.filter_length},
             {"filter taps", r.filter_taps},
             {"filter identity", r.filter_identity},
+            {"filter saved name", r.filter_saved_name},
             {"filter speakers", r.filter_speakers},
             {"filter note", r.filter_note},
             {"filter path", r.filter_path},

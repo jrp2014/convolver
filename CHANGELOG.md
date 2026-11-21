@@ -71,6 +71,29 @@ Until 1.0 the C++ API may change between minor versions.
   says to keep every external dependency, compilers and CI machines
   included, on its newest formal release
   ([compilers and CI machines](docs/develop/build.md#compilers-and-ci-machines)).
+- Plug-ins (PLUG-39 step 4): with bypass on, the window's report and the
+  Convolver log say what bypass plays instead of saying that the filter
+  plays: a fault reads "Bypass is on: the input plays unfiltered." instead
+  of "The filter keeps playing.", a refused replacement "The previous
+  filter is kept. Bypass is on: the input plays unfiltered.", and the start
+  log line "Bypass is on: the input plays unfiltered. Loaded: …", as Status
+  has done since PLUG-36. VST3's log line for restored state kept until the
+  host suits it says what plays meanwhile (silence, Mix's dry share or
+  bypass) instead of always "plays silence", and the log says a list entry
+  chosen for a wider bus "is used" rather than "plays". The audio is
+  unchanged.
+- Plug-ins and Library (PLUG-39 step 4b): one rule in the library shows a
+  filter's saved name only while that filter plays (`HostFilter::offer_name()`).
+  VST3 offers the name from its controller state there instead of keeping
+  two name pairs in the processor and two in the controller, and the report
+  gains `filter saved name`, which the VST3 controller state saves. A
+  refused preset still never renames the playing filter. The Audio Unit
+  now names restored state that brings no name of its own (an "Untitled"
+  preset) after the same filter's earlier file or preset name instead of
+  "Restored filter", as VST3 already did. One rare VST3 order shows
+  "Restored filter" where it showed the name before: a refused preset, then
+  another preset, then the first filter's component state alone with no
+  controller state, since only the last offered name is kept.
 - Plug-ins and Library (PLUG-39 step 4c): one function,
   `host_status_value()`, orders a plug-in's status (a load failure, then a
   fault, then Bypassed, then the filter, then a failed load, then no

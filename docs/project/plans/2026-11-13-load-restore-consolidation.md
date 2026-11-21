@@ -90,7 +90,7 @@ where that decision is made since step 1b (PR #224):
 | Ownership of the playing processor: who may use it, and when a replaced one is freed | VST3, since step 3b: `PlayingProcessor` with a reader for `process()` and one for `setProcessing()` (which also resets the processor), freed in every control call (`Locked`); before it, `host_`, `played_host_`, `processing_host_`, `starting_host_`, `install_processor()`, `release_processor()` and `hold()`, and the control side waited. Audio Unit, since step 3c: `PlayingProcessor` with one reader, `Render()`, freed in every control call (`Effect::Locked`, and the two calls that try the lock once they hold it); before it, `host_`, `playing_`, `rendering_`, the same two functions and the mark in `Render()`, and the control side waited. LV2: `host`, `retiring`, `handover`, `playing`, with `stage()`, `retire()` and `drop_processors()`; `run()` adopts and nothing waits | One, with every reader protected ([step 3](#steps)); a format it cannot cover keeps its own with the reason recorded |
 | When the host's rate and channels count as settled | VST3: `activated_`, `active_`, `played_`, `known_layout()`, `load_check()`. Audio Unit: `initialized_`, `rendered_`, `committed_`, `known_layout()`. They differed for a file chosen while inactive after an activation that never played (since PLUG-27, #233, a chosen file has one rule in both). Since step 2: `HostSettling` in `portable/host_settling.hpp`, one record each adapter feeds with its starts, stops and played audio; `activated_`, `played_`, `initialized_`, `rendered_` and `committed_` are gone, and `known_layout()` and `load_check()` only ask it. The difference stays, as `HostBinding::activation` and `HostBinding::rendering` | One shared rule fed with the same events (step 2) |
 | The status ordering (a load failure, then a fault, then the filter) | `host_status()` for VST3 and the Audio Unit; LV2 orders them again in `update_status()` and `shown_status()`. Since step 4c: `host_status_value()` alone orders them; `host_status()`, the report's `message()` and LV2's `update_status()` (through `port_status()`) follow it, and `shown_status()` keeps only `run()`'s overlays | One (step 4) |
-| A filter's name shows only while that filter plays | `HostRequest::name` in `HostFilter::accepted()` for the Audio Unit; VST3's processor and controller each keep their own rule with a second, "kept" name pair, so that a refused preset does not rename the playing filter | One, in `HostFilter` (step 4) |
+| A filter's name shows only while that filter plays | `HostRequest::name` in `HostFilter::accepted()` for the Audio Unit; VST3's processor and controller each keep their own rule with a second, "kept" name pair, so that a refused preset does not rename the playing filter. Since step 4b: `HostFilter::offer_name()` and `load()` alone; VST3 offers its controller state's name there | One, in `HostFilter` (step 4) |
 
 **Independently maintained values.** Sixteen members in six groups, one
 group to a row:
@@ -101,7 +101,7 @@ group to a row:
 | VST3 `active_latency_`; Audio Unit `latency_` (the newest processor's latency, or the chosen one while uninitialized) | The newest processor's latency, and the chosen setting | The newest processor's latency, written by the ownership mechanism when it offers that processor, so the host reads at once the latency the next callback uses; the Audio Unit's second meaning comes from its parameter |
 | Audio Unit `status_`, `status_log_written_`, `status_bypassed_`, `report_cache_` | `host_status()` and `host_report()` of `HostFilter`, the settings and bypass | One control-side snapshot, combined when read with the live audio-side values (step 4) |
 | VST3 controller `status_text_`, `status_value_`, `report_text_` | The report the controller already holds (`report_`) | Derived from it |
-| VST3 processor `kept_name_` and `kept_identity_`, controller `kept_name_` and `kept_identity_` | The name pair of the playing filter, kept beside the newest offered pair | Removed by the shared name rule; the processor's offered pair moves into `HostFilter` |
+| VST3 processor `kept_name_` and `kept_identity_`, controller `kept_name_` and `kept_identity_` | The name pair of the playing filter, kept beside the newest offered pair | Removed by the shared name rule; the processor's offered pair moves into `HostFilter`. Since step 4b: gone; `HostFilter` keeps the offered name, and state of the filter that plays keeps the name it shows |
 | LV2 `shown` | The status ordering above | Still the value `run()` reads, written through the shared ordering |
 
 Text that goes round in a circle, written and then parsed back:
@@ -450,7 +450,8 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
      applies the rule that a name shows only while its filter plays, so a
      refused preset never renames the playing filter. The processor's name
      members and both "kept" pairs go; the controller keeps only the pair it
-     saves.
+     saves. Done on 20 November 2026 as step 4b: `HostFilter::offer_name()`, and
+     the report's `filter saved name` for the controller state.
    - LV2 sets `shown` from the shared status ordering through one mapping to
      its status values, instead of ordering failures, filters and faults
      again in `update_status()` and `shown_status()`; the audio-side
@@ -461,7 +462,9 @@ stated, and steps 3 to 5 do not depend on steps 1 and 2.
      since PLUG-36 (PR #225): `failure_consequence()`'s "previous filter
      keeps playing", the report's fault branch ("The filter keeps
      playing.") and `started_line()`, which the VST3 and Audio Unit start
-     logs use, still describe what plays with bypass off.
+     logs use, still describe what plays with bypass off. Done on 20 November 2026: `failure_consequence()`, `playing_words()`
+     and `rejected_line()` take bypass, the report's own bypass special
+     cases go, and the adapters pass their bypass to the log lines.
 5. **Typed reports and advice.** The report reaches the window as typed
    values encoded once at the transport (the VST3 message, the Audio Unit
    property) by one codec, rather than tab-separated lines parsed back; the

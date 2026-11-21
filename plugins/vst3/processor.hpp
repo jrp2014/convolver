@@ -311,14 +311,6 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // thread's value, or the controller's when it told the processor first
     // (bypass_message).
     std::atomic<bool> shown_bypass_{false};
-    // PLUG-22, under control_: the name the report gives saved state whose
-    // filter identity is saved_identity_: from the controller state
-    // (name_message), or the file last accepted, as the controller records it.
-    // kept_name_ and kept_identity_ are the pair that named the playing
-    // filter before the last name_message, so a refused preset, whose
-    // controller state names a filter that never played, leaves the playing
-    // filter's name (the report uses whichever pair matches).
-    std::string saved_name_, saved_identity_, kept_name_, kept_identity_;
     // VST3-4: Gain and Mix as process() last received them (or a state
     // restored), and the chosen Latency in frames.
     std::atomic<double> gain_db_{0}, mix_{1};
@@ -445,11 +437,10 @@ class Controller final : public Steinberg::Vst::EditController,
     bool load_accepted_ = false;
     Steinberg::int64 latency_requests_ = 0;
     bool latency_waiting_ = false;
-    // PLUG-22, under status_lock_: the filter file's name and the identity
-    // of the filter read from it, saved in the controller state. kept_name_
-    // and kept_identity_: the pair that named the playing filter before the
-    // last setState, as in the processor; getState saves whichever pair
-    // names the filter the last report says plays.
-    std::string name_, identity_, kept_name_, kept_identity_;
+    // PLUG-22, under status_lock_: the name and filter identity the last
+    // setState brought. getState saves the name the last report gives the
+    // filter that plays ("filter saved name"), and this pair only when that
+    // filter has none.
+    std::string name_, identity_;
 };
 } // namespace convolver::vst3
