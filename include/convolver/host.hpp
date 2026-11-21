@@ -518,7 +518,8 @@ class HostFilter {
         return waiting() ? load_failure_ : failure();
     }
     // failure()'s message as text, one labelled line per part after the
-    // problem (as exceptions carry it), for an adapter to log; empty if none.
+    // problem (as an exception's what() gives it), for a report or a test;
+    // empty if none. The adapters log the parts on one line instead.
     std::string error() const;
     // Why the newest request failed (or the saved failure it restored), even
     // while a failure found at activation comes first in failure(). This is
@@ -609,7 +610,14 @@ class HostFilter {
     // The adapter could not build a processor for what activation() returned
     // when the host started it, so it plays silence; recorded until the next
     // activate(). The fault count starts again, as for a new processor.
+    // `why` is the reason as a phrase, shown after "could not be started
+    // ...: ".
     void fail_activation(std::string why);
+    // The same for the exception building the processor threw: its reason is
+    // the problem of the advice it carries, without its cause or fix, so no
+    // adapter picks that part; null, for one that is not a std::exception, a
+    // reason that says the processor could not be built.
+    void fail_activation(const std::exception* error);
     // DIAG-1: processing faults since the filter that plays was accepted or
     // the instance last started (activate()), whichever is later. host_status()
     // shows them as HostStatus::fault after any load failure.

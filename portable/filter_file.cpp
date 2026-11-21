@@ -14,8 +14,8 @@ namespace {
 // DIAG-2: the reader's message, always naming the chosen file by its full
 // path, so that the log says which folder's file was refused (the window
 // shows only the file name; host_report.cpp).
-Advice refusal(const std::string& path, const char* what) {
-    auto a = detail::parse_advice(what);
+Advice refusal(const std::string& path, const std::exception& e) {
+    auto a = detail::advice_of(e);
     if (a.problem.find(path) == std::string::npos)
         a.problem = path + ": " + a.problem;
     return a;
@@ -124,7 +124,7 @@ read_filter_file(const std::string& path, const std::optional<HostLayout>& known
             }
             return state;
         } catch (const std::exception& e) {
-            failure.message = refusal(path, e.what());
+            failure.message = refusal(path, e);
         }
         return std::nullopt;
     }
@@ -208,7 +208,7 @@ read_filter_file(const std::string& path, const std::optional<HostLayout>& known
             only.output_channels = checked.front().output_channels;
             failure.carried = std::move(only);
         }
-        failure.message = refusal(path, e.what());
+        failure.message = refusal(path, e);
         // VST3-9: the selection looked for the whole part of a fractional
         // rate, which no filter can match; say so instead.
         if (host.fractional_rate != 0 && !checked.empty()) {
@@ -236,7 +236,7 @@ read_filter_file(const std::string& path, const std::optional<HostLayout>& known
     } catch (const std::exception& e) {
         if (wider_entry) // Refused after the entry was named (out of memory).
             wider_entry->clear();
-        failure.message = refusal(path, e.what());
+        failure.message = refusal(path, e);
     }
     return std::nullopt;
 }

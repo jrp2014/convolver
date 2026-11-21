@@ -62,20 +62,22 @@ std::vector<eapo::Source> load(const fs::path& input) {
                     text.replace(at, 1, "\n    ");
                 message += "\n  " + location(d.location) + text;
             }
-        throw std::runtime_error(message +
-                                 "\nFix: Correct each one, then export again; convolver "
-                                 "--validate " +
-                                 utf8_string(input) + " lists them too.");
+        throw convolver::detail::AdvisedError<std::runtime_error>(
+            {message,
+             {},
+             "Correct each one, then export again; convolver --validate " + utf8_string(input) +
+                 " lists them too.",
+             {}});
     }
     std::vector<eapo::Source> sources;
     for (const auto& c : report.configurations)
         sources.push_back({convolver::load_configuration(c.file), utf8_string(c.file.filename())});
     if (sources.empty())
-        throw std::runtime_error(
-            advice_text({utf8_string(input) + " holds no configuration to export",
-                         "The configuration list names no configuration or IR file.",
-                         "Add the filters to the list, or export a .cfg or IR file directly.",
-                         {}}));
+        throw convolver::detail::AdvisedError<std::runtime_error>(
+            {utf8_string(input) + " holds no configuration to export",
+             "The configuration list names no configuration or IR file.",
+             "Add the filters to the list, or export a .cfg or IR file directly.",
+             {}});
     return sources;
 }
 
@@ -106,30 +108,30 @@ int export_folder(const fs::path& input, const fs::path& folder) {
         const std::string config_folder = "C:\\Program Files\\EqualizerAPO\\config\\";
         for (const auto& ir : result.impulses)
             if (config_folder.size() + folder_name.size() + 1 + ir.name.size() > max_path)
-                throw std::invalid_argument(advice_text(
+                throw convolver::detail::AdvisedError<std::invalid_argument>(
                     {"the folder name " + folder_name + " is too long for Equalizer APO",
                      "Equalizer APO cannot open files whose full path is over " +
                          std::to_string(max_path) + " characters, such as " + config_folder +
                          folder_name + '\\' + ir.name + ", and would play that path unfiltered.",
                      "Choose a shorter folder name.",
-                     {}}));
+                     {}});
         std::error_code error;
         if (fs::symlink_status(folder, error).type() != fs::file_type::not_found)
-            throw std::invalid_argument(
-                advice_text({utf8_string(folder) + " already exists",
-                             "convolver-equalizer-apo writes only to a new folder, so it never "
-                             "replaces an export.",
-                             "Choose another name, or remove the old folder first.",
-                             {}}));
+            throw convolver::detail::AdvisedError<std::invalid_argument>(
+                {utf8_string(folder) + " already exists",
+                 "convolver-equalizer-apo writes only to a new folder, so it never "
+                 "replaces an export.",
+                 "Choose another name, or remove the old folder first.",
+                 {}});
         if (!fs::create_directory(folder, error) || error)
-            throw std::runtime_error(advice_text(
+            throw convolver::detail::AdvisedError<std::runtime_error>(
                 {"cannot create " + utf8_string(folder),
                  fs::is_directory(
                      folder.parent_path().empty() ? fs::path(".") : folder.parent_path(), error)
                      ? "Its parent folder exists, but this program could not write there."
                      : "Its parent folder does not exist.",
                  "Check that the parent folder exists and is writable, or choose another place.",
-                 {}}));
+                 {}});
         created = true;
         for (const auto& ir : result.impulses) {
             convolver::AudioWriter writer(folder / ir.name, {ir.sample_rate, 1},
@@ -180,7 +182,7 @@ int export_folder(const fs::path& input, const fs::path& folder) {
             std::error_code error;
             fs::remove_all(folder, error);
         }
-        auto advice = convolver::detail::parse_advice(e.what());
+        auto advice = convolver::detail::advice_of(e);
         if (created)
             advice.note +=
                 std::string(advice.note.empty() ? "" : " ") + "Nothing was kept from this run.";

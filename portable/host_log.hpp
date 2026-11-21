@@ -19,9 +19,9 @@ namespace convolver {
 // $XDG_STATE_HOME/convolver/convolver.log (default ~/.local/state) elsewhere.
 // Empty when there is nowhere to write.
 std::filesystem::path host_log_path();
-// Appends one dated line (a message in several lines, as advice.hpp writes
-// them, is joined into one with advice_line()), "<time> Convolver <version> <format> in <program>:
-// <message>" (the host's program name, where the platform gives it),
+// Appends one dated line (an adapter passes a message's parts already on one
+// line, advice_line(); any further lines are joined with " / "), "<time> Convolver <version>
+// <format> in <program>: <message>" (the host's program name, where the platform gives it),
 // creating the folder if needed. When the file has grown past 1 MB it is first renamed
 // with ".old" added (replacing an older one). On macOS the message also goes
 // to the unified log (Console, search for "Convolver"), as an error when
@@ -101,7 +101,7 @@ std::string settings_words(const HostSettings&, HostDrySignal dry,
 std::string gain_words(const HostSettings&, const FilterGains* gains);
 // PLUG-10: logged when the Gain mode changes: the new mode and the gain it
 // plays for the filter (`has_filter`), and `why` the estimate could not be
-// found, when it could not.
+// found, as a phrase (an exception's problem), when it could not.
 std::string gain_mode_line(const HostSettings&, const FilterGains&, bool has_filter,
                            const std::string& why = {});
 // PLUG-10: beside the window's Gain mode menu, briefly, empty in Set mode:
@@ -134,7 +134,7 @@ std::string bypass_sentence(bool host_known, bool dry);
 // from decode_host_state()'s exception (NewerHostState gives its own fix).
 Advice state_read_message(const std::exception&);
 // DIAG-2: why a filter could not be prepared (memory, usually); `what` is an
-// exception's own words, or empty.
+// exception's problem (detail::advice_of()), or empty.
 Advice preparation_message(const std::string& what);
 // A failure's message, or, for a failure recorded without one because memory
 // ran out (ROBUST-7), a message that says so.

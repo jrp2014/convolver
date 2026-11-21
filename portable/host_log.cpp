@@ -285,7 +285,7 @@ std::string gain_mode_line(const HostSettings& s, const FilterGains& gains, bool
     else
         line += ": " + gain_words(s, &gains) + ".";
     if (!why.empty())
-        line += " The filter's estimate could not be found (" + detail::advice_problem(why) +
+        line += " The filter's estimate could not be found (" + why +
                 "); choose Estimate again to retry.";
     return line;
 }
@@ -422,8 +422,9 @@ void host_log(const char* format, const std::string& lines, bool problem) noexce
     if (lines.empty())
         return;
     try {
-        // DIAG-2: one line per event, whatever the message's own lines.
-        const auto message = detail::advice_line(lines);
+        // DIAG-2: one line per event, whatever the message's own lines
+        // (each message's parts are already on one line, advice_line()).
+        const auto message = detail::advice_line(Advice{lines});
 #ifndef __APPLE__
         static_cast<void>(problem); // Only the unified log has levels.
 #else

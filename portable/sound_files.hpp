@@ -4,6 +4,7 @@
 // it libsndfile (io.cpp), and the Audio Unit hands it macOS's own AudioToolbox
 // (audio_toolbox.cpp), so the component needs nothing beyond macOS. Not installed.
 #pragma once
+#include "convolver/advice.hpp"
 #include "convolver/io.hpp"
 #include <cstddef>
 #include <cstdint>
@@ -93,19 +94,21 @@ inline constexpr std::string_view damaged_file_advice =
     "the file is damaged or incomplete, or is not a sound file; export it again from the "
     "program that made it";
 // A headerless file or stream whose length is not a whole number of frames.
-inline constexpr const char* raw_incomplete_frame =
-    "RAW input ends with an incomplete frame\n"
-    "Cause: Its length is not a whole number of frames.\n"
-    "Fix: Check the channel count and sample type given for it, or whether it was cut short.";
+inline Advice raw_incomplete_frame() {
+    return {"RAW input ends with an incomplete frame",
+            "Its length is not a whole number of frames.",
+            "Check the channel count and sample type given for it, or whether it was cut short.",
+            {}};
+}
 // Where a sample is, for messages: "at 0.100 s (frame 4800), channel 2".
 // Frames count from 0 and channels from 1.
 std::string sample_position(std::uint64_t frame, std::size_t channel, int sample_rate);
 // The message for a NaN or infinite sample read from `path` ("-": standard
 // input). `raw`: the file has no header and was read as this sample type, so
 // the type is the likelier cause than damage.
-std::string invalid_sample_message(const std::filesystem::path& path, std::uint64_t frame,
-                                   std::size_t channel, int sample_rate,
-                                   std::optional<RawEncoding> raw = std::nullopt);
+Advice invalid_sample_message(const std::filesystem::path& path, std::uint64_t frame,
+                              std::size_t channel, int sample_rate,
+                              std::optional<RawEncoding> raw = std::nullopt);
 // Bytes per raw sample; throws std::invalid_argument for pcm8.
 std::size_t raw_sample_bytes(SampleType);
 // One raw sample as float. Integers are scaled by 2^-(bits-1), as libsndfile does.

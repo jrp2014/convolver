@@ -21,25 +21,24 @@ void check_ir_channel(std::size_t selected, std::size_t channels, const SourceLo
     if (selected >= channels)
         throw ConfigurationError(
             "ir-channel", where,
-            advice_text(
-                {"filter channel " + std::to_string(selected) + " out of range",
-                 "The IR file has " + std::to_string(channels) +
-                     (channels == 1 ? " channel" : " channels") + ", numbered from 0.",
-                 "Use " +
-                     (channels == 1 ? std::string("IR channel 0")
-                                    : "an IR channel from 0 to " + std::to_string(channels - 1)) +
-                     ", or name an IR file with more channels.",
-                 {}}));
+            {"filter channel " + std::to_string(selected) + " out of range",
+             "The IR file has " + std::to_string(channels) +
+                 (channels == 1 ? " channel" : " channels") + ", numbered from 0.",
+             "Use " +
+                 (channels == 1 ? std::string("IR channel 0")
+                                : "an IR channel from 0 to " + std::to_string(channels - 1)) +
+                 ", or name an IR file with more channels.",
+             {}});
 }
 [[noreturn]] void decoded_limit(const SourceLocation& where) {
     throw ConfigurationError(
         "limit", where,
-        advice_text({"decoded impulse data exceeds 64 Mi samples",
-                     "Convolver holds every IR sample in memory and accepts at most 64 Mi "
-                     "(67108864) samples in one configuration, counting a file once for every "
-                     "path that names it.",
-                     "Use shorter IRs (trim their silent tails), or fewer channels per file.",
-                     {}}));
+        {"decoded impulse data exceeds 64 Mi samples",
+         "Convolver holds every IR sample in memory and accepts at most 64 Mi "
+         "(67108864) samples in one configuration, counting a file once for every "
+         "path that names it.",
+         "Use shorter IRs (trim their silent tails), or fewer channels per file.",
+         {}});
 }
 // Decodes a whole file into the channels whose target is set (one target per
 // file channel) and returns its frame count. Every decoded sample counts
@@ -71,21 +70,19 @@ std::size_t read_channels(SoundFile& reader, const std::vector<std::vector<float
     reader.close();
     if (total == 0)
         throw ConfigurationError("empty-ir", where,
-                                 advice_text({"empty impulse response",
-                                              "The IR file holds no samples.",
-                                              "Export the IR again from the program that made it.",
-                                              {}}));
+                                 {"empty impulse response",
+                                  "The IR file holds no samples.",
+                                  "Export the IR again from the program that made it.",
+                                  {}});
     return total;
 }
 // DIAG-2: a reader's message about one filter file, under the file's name as
 // the configuration spells it, with `note` added to its note.
-std::string about_filter(const std::string& prefix, const std::string& message,
-                         const std::string& note = {}) {
-    auto a = parse_advice(message);
+Advice about_filter(const std::string& prefix, Advice a, const std::string& note = {}) {
     a.problem = prefix + a.problem;
     if (!note.empty())
         a.note += (a.note.empty() ? "" : " ") + note;
-    return advice_text(a);
+    return a;
 }
 #ifndef _WIN32
 bool drive_letter(const std::string& name) {
@@ -128,24 +125,22 @@ std::string read_configuration_text(const std::filesystem::path& path) {
     if (!file)
         throw ConfigurationError(
             "unreadable", {path, 0, 0},
-            advice_text({"cannot read this file",
-                         std::filesystem::exists(path)
-                             ? "The file is there, but this program may not read it."
-                             : "There is no file at " + utf8_string(path) + ".",
-                         std::filesystem::exists(path)
-                             ? "Check the file's permissions."
-                             : "Check the name and folder (letter case counts on Linux and on "
-                               "case-sensitive macOS volumes).",
-                         {}}));
+            {"cannot read this file",
+             std::filesystem::exists(path) ? "The file is there, but this program may not read it."
+                                           : "There is no file at " + utf8_string(path) + ".",
+             std::filesystem::exists(path)
+                 ? "Check the file's permissions."
+                 : "Check the name and folder (letter case counts on Linux and on "
+                   "case-sensitive macOS volumes).",
+             {}});
     std::string text(max_text_bytes + 1, '\0');
     file.read(text.data(), static_cast<std::streamsize>(text.size()));
     if (file.bad())
-        throw ConfigurationError(
-            "unreadable", {path, 0, 0},
-            advice_text({"reading this file failed",
-                         "The system reported an error part way through the file.",
-                         "Copy the file to a local disk and try again.",
-                         {}}));
+        throw ConfigurationError("unreadable", {path, 0, 0},
+                                 {"reading this file failed",
+                                  "The system reported an error part way through the file.",
+                                  "Copy the file to a local disk and try again.",
+                                  {}});
     text.resize(static_cast<std::size_t>(file.gcount()));
     return text;
 }
@@ -156,31 +151,30 @@ namespace {
 // saved that way (ir_\xFC.wav for ir_ü.wav in Windows-1252) reaches here.
 // Convolver does not guess the code page; whether it should read
 // Windows-1252 is jrp's .cfg decision (CFG-3 in TODO).
-std::string not_utf8_advice(const std::filesystem::path& owner, const std::string& name,
-                            const SourceLocation& where) {
+Advice not_utf8_advice(const std::filesystem::path& owner, const std::string& name,
+                       const SourceLocation& where) {
     std::string_view rest = name;
     while (const auto length = utf8_character_length(rest))
         rest.remove_prefix(length);
     constexpr char digits[] = "0123456789ABCDEF";
     const auto first = static_cast<unsigned char>(rest.front());
     const std::string hex{'0', 'x', digits[first >> 4], digits[first & 15]};
-    return advice_text(
-        {"the file name '" + utf8_escaped(name) + "' is not UTF-8 text",
-         "Convolver reads configurations and lists as UTF-8 text, and byte " + hex +
-             " (shown as \\x" + hex.substr(2) +
-             ") cannot appear where it does in UTF-8. The file was most likely saved in a "
-             "Windows code page such as Windows-1252 (often called ANSI), as older versions of "
-             "Windows Notepad and the original Windows Convolver did. That turns accented "
-             "letters such as \xC3\xBC into bytes that are not UTF-8, so the name cannot match "
-             "the file.",
-         "Open " + utf8_string(owner.filename()) +
-             " in a text editor and save it again as UTF-8 (in Windows Notepad: "
-             "File > Save As, Encoding: UTF-8), then check that the name on line " +
-             std::to_string(where.line) +
-             " reads correctly. Or rename the file it names using only unaccented letters, "
-             "digits and punctuation, and change line " +
-             std::to_string(where.line) + " to match.",
-         {}});
+    return {"the file name '" + utf8_escaped(name) + "' is not UTF-8 text",
+            "Convolver reads configurations and lists as UTF-8 text, and byte " + hex +
+                " (shown as \\x" + hex.substr(2) +
+                ") cannot appear where it does in UTF-8. The file was most likely saved in a "
+                "Windows code page such as Windows-1252 (often called ANSI), as older versions of "
+                "Windows Notepad and the original Windows Convolver did. That turns accented "
+                "letters such as \xC3\xBC into bytes that are not UTF-8, so the name cannot match "
+                "the file.",
+            "Open " + utf8_string(owner.filename()) +
+                " in a text editor and save it again as UTF-8 (in Windows Notepad: "
+                "File > Save As, Encoding: UTF-8), then check that the name on line " +
+                std::to_string(where.line) +
+                " reads correctly. Or rename the file it names using only unaccented letters, "
+                "digits and punctuation, and change line " +
+                std::to_string(where.line) + " to match.",
+            {}};
 }
 } // namespace
 
@@ -208,7 +202,7 @@ std::filesystem::path resolve_reference(const std::filesystem::path& owner,
         else
             why.fix = "Copy the file into or beside this configuration's folder and give its "
                       "path relative to this configuration (for example irs/filter.wav).";
-        throw ConfigurationError("nonportable-path", ref.location, advice_text(why));
+        throw ConfigurationError("nonportable-path", ref.location, why);
     }
 #endif
     auto normalized = name;
@@ -340,8 +334,8 @@ void append(std::string& part, const std::string& sentence) {
 // `who` chose the wanted properties (explain_no_match()). For a plug-in host
 // the advice names the host's settings, not command-line options. It names no
 // window: the LV2 plug-in has none, and its host's file chooser loads the file.
-std::string explain_one(const std::filesystem::path& filter, const SelectionCandidate& c,
-                        const ConfigurationSelection& w, std::string_view subject, Chooser who) {
+Advice explain_one(const std::filesystem::path& filter, const SelectionCandidate& c,
+                   const ConfigurationSelection& w, std::string_view subject, Chooser who) {
     const bool plugin = who == Chooser::host;
     const auto name = utf8_string(filter);
     const auto diffs = differences(c, w);
@@ -438,30 +432,24 @@ std::string explain_one(const std::filesystem::path& filter, const SelectionCand
     if (w.sample_rate && w.sample_rate != c.sample_rate)
         a.fix += playback_rate_fix(who);
     // The example goes on from the fix that introduces it, before the note.
-    if (!example.empty()) {
-        auto text = advice_text({a.problem, a.cause, a.fix, {}}) + example;
-        if (!a.note.empty())
-            text += "\n" + std::string(advice_labels[2]) + a.note;
-        return text;
-    }
-    return advice_text(a);
+    a.fix += example;
+    return a;
 }
 } // namespace
 
-std::string explain_no_match(const std::filesystem::path& filter, bool list,
-                             const std::vector<SelectionCandidate>& candidates,
-                             const ConfigurationSelection& w, std::string_view subject,
-                             Chooser who) {
+Advice explain_no_match(const std::filesystem::path& filter, bool list,
+                        const std::vector<SelectionCandidate>& candidates,
+                        const ConfigurationSelection& w, std::string_view subject, Chooser who) {
     if (!list && candidates.size() == 1)
         return explain_one(filter, candidates.front(), w, subject, who);
     const bool plugin = who == Chooser::host;
     const auto name = utf8_string(filter);
     if (candidates.empty())
-        return advice_text({"the configuration list " + name + " names no IR file or configuration",
-                            "Every line of a list names a configuration or IR file to choose "
-                            "from, and this one names none.",
-                            "Add a line for each filter, one per sample rate or channel layout.",
-                            {}});
+        return {"the configuration list " + name + " names no IR file or configuration",
+                "Every line of a list names a configuration or IR file to choose "
+                "from, and this one names none.",
+                "Add a line for each filter, one per sample rate or channel layout.",
+                {}};
     std::string criteria = "sample rate and input channel count";
     if (w.output_channels)
         criteria = "sample rate, input channel count and output channel count";
@@ -525,7 +513,7 @@ std::string explain_no_match(const std::filesystem::path& filter, bool list,
     } else {
         a.fix = "Add an entry that matches, or choose the entry you want directly.";
     }
-    return advice_text(a);
+    return a;
 }
 
 Configuration configuration_graph(const ParsedConfiguration& parsed) {
@@ -627,15 +615,15 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
             if (raw && std::filesystem::is_regular_file(resolved, ec))
                 throw ConfigurationError(
                     "damaged-asset", path.ir.location,
-                    about_filter("raw filter '" + path.ir.spelling + "': ", e.what(),
+                    about_filter("raw filter '" + path.ir.spelling + "': ", advice_of(e),
                                  "Raw filters are read as mono " + raw_encoding_name(raw_encoding) +
                                      "; --raw-filter-format chooses another sample type."));
             // The file is there but the reader cannot read it (damaged, or
             // a codec its build lacks): the path hint below would mislead.
             if (!raw && std::filesystem::is_regular_file(resolved, ec))
-                throw ConfigurationError(
-                    "unreadable-asset", path.ir.location,
-                    about_filter("filter '" + path.ir.spelling + "': ", e.what(), read_as_sound));
+                throw ConfigurationError("unreadable-asset", path.ir.location,
+                                         about_filter("filter '" + path.ir.spelling + "': ",
+                                                      advice_of(e), read_as_sound));
             // CFG-3: a name that is not UTF-8, which no file has.
             if (!valid_utf8(path.ir.spelling))
                 throw ConfigurationError(
@@ -645,38 +633,36 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
             if (path.ir.spelling == "-")
                 throw ConfigurationError(
                     "missing-asset", path.ir.location,
-                    advice_text({"filter '-': standard input cannot be a filter",
-                                 "A configuration names each IR by its file name.",
-                                 "Write the IR file's name, relative to the configuration's "
-                                 "folder.",
-                                 {}}));
+                    {"filter '-': standard input cannot be a filter",
+                     "A configuration names each IR by its file name.",
+                     "Write the IR file's name, relative to the configuration's "
+                     "folder.",
+                     {}});
             const auto owner = utf8_string(doc.source.filename());
             throw ConfigurationError(
                 "missing-asset", path.ir.location,
-                advice_text({"filter '" + path.ir.spelling + "': IR file not found",
-                             "There is no file at " +
-                                 utf8_string(std::filesystem::absolute(resolved, ec)) +
-                                 ". IR file names are relative to the folder that holds " +
-                                 (owner.empty() ? std::string("the configuration") : owner) + ".",
-                             "Correct the name on line " + std::to_string(path.ir.location.line) +
-                                 ", or put the IR file in that folder.",
-                             "Letter case counts on Linux and on case-sensitive macOS volumes."}));
+                {"filter '" + path.ir.spelling + "': IR file not found",
+                 "There is no file at " + utf8_string(std::filesystem::absolute(resolved, ec)) +
+                     ". IR file names are relative to the folder that holds " +
+                     (owner.empty() ? std::string("the configuration") : owner) + ".",
+                 "Correct the name on line " + std::to_string(path.ir.location.line) +
+                     ", or put the IR file in that folder.",
+                 "Letter case counts on Linux and on case-sensitive macOS volumes."});
         }
         const auto info = ir->info();
         if (info.sample_rate != cfg.sample_rate)
             throw ConfigurationError(
                 "rate-mismatch", path.ir.location,
-                advice_text({"filter sample rate differs from configuration (" +
-                                 std::to_string(info.sample_rate) + " Hz file, " +
-                                 std::to_string(cfg.sample_rate) + " Hz configuration)",
-                             "Every IR a configuration names must have the sample rate on its "
-                             "first line.",
-                             "Use an IR made at " + std::to_string(cfg.sample_rate) +
-                                 " Hz, or change the configuration's first number to " +
-                                 std::to_string(info.sample_rate) +
-                                 " if every IR it names is at that rate.",
-                             "Convolver never resamples IRs." +
-                                 (read_as_sound.empty() ? "" : " " + read_as_sound)}));
+                {"filter sample rate differs from configuration (" +
+                     std::to_string(info.sample_rate) + " Hz file, " +
+                     std::to_string(cfg.sample_rate) + " Hz configuration)",
+                 "Every IR a configuration names must have the sample rate on its "
+                 "first line.",
+                 "Use an IR made at " + std::to_string(cfg.sample_rate) +
+                     " Hz, or change the configuration's first number to " +
+                     std::to_string(info.sample_rate) + " if every IR it names is at that rate.",
+                 "Convolver never resamples IRs." +
+                     (read_as_sound.empty() ? "" : " " + read_as_sound)});
         check_ir_channel(path.ir_channel, info.channels, path.channel_location);
         // Decode every channel that this and later paths name, so the file is
         // read once. A later path naming a channel the file lacks fails when
@@ -697,8 +683,9 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
         } catch (const ConfigurationError&) {
             throw;
         } catch (const std::runtime_error& e) {
-            throw ConfigurationError("damaged-asset", path.ir.location,
-                                     about_filter("filter '" + path.ir.spelling + "': ", e.what()));
+            throw ConfigurationError(
+                "damaged-asset", path.ir.location,
+                about_filter("filter '" + path.ir.spelling + "': ", advice_of(e)));
         }
         result.push_back({resolved, info, file.frames,
                           raw ? std::optional<RawEncoding>(raw_encoding) : std::nullopt});
@@ -737,19 +724,20 @@ Configuration decode_audio_filter(SoundFile& audio, std::size_t& budget,
     } catch (const ConfigurationError&) {
         throw;
     } catch (const std::runtime_error& e) {
-        throw ConfigurationError("damaged-asset", where, e.what());
+        throw ConfigurationError("damaged-asset", where, advice_of(e));
     }
     return cfg;
 }
 
-ConfigurationError refused_sound_file(const std::filesystem::path& path, std::string reason) {
+ConfigurationError refused_sound_file(const std::filesystem::path& path, Advice reason) {
     // The reader writes "cannot read sound file PATH: why" or "cannot open
     // audio input PATH" on the problem line.
     const auto name = " " + utf8_string(path);
-    const auto end = std::min(reason.find('\n'), reason.size());
-    const auto at = reason.find(name);
-    if (at < end && (at + name.size() == end || reason[at + name.size()] == ':'))
-        reason.erase(at, name.size());
+    auto& problem = reason.problem;
+    const auto end = std::min(problem.find('\n'), problem.size());
+    const auto at = problem.find(name);
+    if (at < end && (at + name.size() == end || problem[at + name.size()] == ':'))
+        problem.erase(at, name.size());
     return ConfigurationError("unreadable-asset", {path, 0, 0}, std::move(reason));
 }
 
@@ -763,7 +751,7 @@ Resolver::Sources Resolver::from(const SoundFiles& reader) {
             // file, so keep the reader's reason; visit() still tries it as
             // text, since a list's first entry could start with "FORM".
             if (header_marker(p) == HeaderMarker::container)
-                throw RefusedSoundFile(e.what());
+                throw RefusedSoundFile(advice_of(e));
             return nullptr; // Bounded text validation distinguishes configs from damaged audio.
         }
     };
@@ -798,31 +786,30 @@ std::filesystem::path Resolver::canonical(const std::filesystem::path& path,
     try {
         return files_.canonical(path);
     } catch (const std::filesystem::filesystem_error& e) {
-        throw ConfigurationError("unreadable", where, e.what());
+        throw ConfigurationError("unreadable", where, Advice{e.what()});
     }
 }
 
 bool Resolver::visit(const std::filesystem::path& path) {
     if (++visits_ > max_list_visits || active_.size() >= max_list_depth)
-        throw ConfigurationError(
-            "limit", {path, 0, 0},
-            advice_text({"configuration list nesting/entry limit exceeded",
-                         "Convolver follows at most " + std::to_string(max_list_depth) +
-                             " levels of lists inside lists, and at most " +
-                             std::to_string(max_list_visits) + " entries in all.",
-                         "Flatten the lists, or split them into fewer entries.",
-                         {}}));
+        throw ConfigurationError("limit", {path, 0, 0},
+                                 {"configuration list nesting/entry limit exceeded",
+                                  "Convolver follows at most " + std::to_string(max_list_depth) +
+                                      " levels of lists inside lists, and at most " +
+                                      std::to_string(max_list_visits) + " entries in all.",
+                                  "Flatten the lists, or split them into fewer entries.",
+                                  {}});
     const auto resolved = canonical(path, {path, 0, 0});
     sources_.push_back(resolved);
     chosen_sources_.push_back(resolved);
     if (!active_.insert(resolved).second)
         throw ConfigurationError(
             "cycle", {path, 0, 0},
-            advice_text({"configuration list cycle: " + utf8_string(path),
-                         "A list names itself, directly or through another list, so choosing an "
-                         "entry would never end.",
-                         "Remove the entry that leads back to this list.",
-                         {}}));
+            {"configuration list cycle: " + utf8_string(path),
+             "A list names itself, directly or through another list, so choosing an "
+             "entry would never end.",
+             "Remove the entry that leads back to this list.",
+             {}});
     struct Pop {
         std::set<std::filesystem::path>& active;
         std::filesystem::path path;
@@ -831,11 +818,11 @@ bool Resolver::visit(const std::filesystem::path& path) {
         }
     } pop{active_, resolved};
     std::unique_ptr<SoundFile> audio;
-    std::optional<std::string> refused;
+    std::optional<Advice> refused;
     try {
         audio = files_.open_audio(path);
     } catch (const RefusedSoundFile& e) {
-        refused = e.what();
+        refused = e.advice();
     }
     if (audio)
         return visitor_({path, chain_, nullptr, audio.get()});
@@ -847,11 +834,11 @@ bool Resolver::visit(const std::filesystem::path& path) {
     if (text.size() > max_total_text_bytes - text_bytes_)
         throw ConfigurationError(
             "limit", {path, 0, 0},
-            advice_text({"configuration text read for one operation exceeds 16 MiB",
-                         "The lists and configurations reached from this file add up to more "
-                         "text than Convolver reads in one go.",
-                         "Point at the configuration you need directly, or split the lists.",
-                         {}}));
+            {"configuration text read for one operation exceeds 16 MiB",
+             "The lists and configurations reached from this file add up to more "
+             "text than Convolver reads in one go.",
+             "Point at the configuration you need directly, or split the lists.",
+             {}});
     text_bytes_ += text.size();
     const auto doc = parse_configuration_text(text, path);
     if (doc.kind == ParsedDocument::Kind::configuration) {
@@ -987,12 +974,11 @@ Configuration load_configuration(const std::filesystem::path& path,
         return std::move(*selected);
     }
     const auto who = plugin ? Chooser::host : options ? Chooser::options : Chooser::audio;
-    auto explanation =
-        detail::explain_no_match(path, list, candidates, selection,
-                                 who == Chooser::host      ? "this host"
-                                 : who == Chooser::options ? "the requested selection"
-                                                           : "the audio to be filtered",
-                                 who);
+    auto explanation = explain_no_match(path, list, candidates, selection,
+                                        who == Chooser::host      ? "this host"
+                                        : who == Chooser::options ? "the requested selection"
+                                                                  : "the audio to be filtered",
+                                        who);
     throw detail::NoMatch(explanation, list, std::move(candidates));
 }
 } // namespace convolver::detail

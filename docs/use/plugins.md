@@ -342,6 +342,21 @@ fine. When the window and the sound disagree, trust the log: each copy has its
 own number (`VST3 #1`, `VST3 #2`), and the one playing logs `Started at` with
 the rate the host plays at.
 
+**What Status leaves out.** Status names one state in a short line, so some
+things only the window's report and the Convolver log say (in LV2, the
+host's log): a Latency you
+chose that is not in use yet, or could not be applied; the Gain mode's
+Estimate still being found, or why it could not be. In the VST3 and the
+Audio Unit nothing says that a filter is still loading: the earlier status
+shows until it is done. LV2's `status` port has five values (see
+[LV2 ports](#lv2-ports)): Bypassed reads as Active, and the reasons are in
+the host's log. Some things no plug-in
+can see: a host that stops calling Convolver instead of bypassing it (see
+Active above), a separate copy the host makes for export or playback (see
+Waiting above), and whether the host applied the latency Convolver
+reports. If a track sounds late after a Latency change, stop and start
+playback, and check that the host's delay compensation is on.
+
 **The rate a host plays at can differ from the rate it exports at.** A
 filter for another rate than playback's is refused during playback even
 when an export at the filter's rate works. Audacity 4 plays real-time

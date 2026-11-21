@@ -503,7 +503,10 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
             t.sample_rate = f->sample_rate;
             t.inputs = static_cast<UInt32>(f->inputs);
             t.outputs = static_cast<UInt32>(f->outputs);
-            detail::advice_text(f->message).copy(t.message, sizeof t.message - 1);
+            f->message.problem.copy(t.problem, sizeof t.problem - 1);
+            f->message.cause.copy(t.cause, sizeof t.cause - 1);
+            f->message.fix.copy(t.fix, sizeof t.fix - 1);
+            f->message.note.copy(t.note, sizeof t.note - 1);
         }
         std::memcpy(data, &t, sizeof t);
         return noErr;

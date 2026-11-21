@@ -53,15 +53,16 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 
 ### In progress
 
-PLUG-39's step 5, after step 4a (PR #236); HOST-11's first version (PR #245),
-which waits for a run on jrp's Mac. Check the open pull requests for an ID
-before starting anything.
+PLUG-39's step 5, after step 4a (PR #236); HOST-11's Status reading
+during playback (PR #251), after the first version passed in jrp's run of
+21 November 2026. Check the open pull requests for an ID before starting
+anything.
 
 ### Ready
 
 | Item | What to do | Note |
 | --- | --- | --- |
-| **PLUG-39** | Step 5's typed advice and step 6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps); steps 0 to 4, step 5a's typed report and ROBUST-8 are merged | Each step is its own reviewed pull request (jrp, 13 and 19 November 2026) |
+| **PLUG-39** | Step 6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps); steps 0 to 5 and ROBUST-8 are merged | Each step is its own reviewed pull request (jrp, 13 and 19 November 2026) |
 | **PLUG-24** | `HostProcessor` in its own source file | In PLUG-39's sequence, as its own pull request, never with a DSP change (jrp, 19 November 2026) |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
@@ -76,7 +77,7 @@ before starting anything.
 | **VST3-12**, **HOST-4** | The Windows window in hosts and a screen reader; Equalizer APO on a real device | A Windows tester or device |
 | **LV2-4** | Desktop LV2 hosts and PipeWire on a real sound card | A Linux tester |
 | **HOST-8** | Ardour 9.0's abort as `new_session` exits | A fixed Ardour on `ubuntu-latest` |
-| **HOST-11** | Step 3 of the [host-test automation plan](docs/project/plans/2026-11-21-host-test-automation.md#steps): one command for the REAPER checks | A run on jrp's Mac |
+| **HOST-11** | Step 3 of the [host-test automation plan](docs/project/plans/2026-11-21-host-test-automation.md#steps): one command for the REAPER checks. The first version passed on the 0.16.14 candidate ([record](docs/archive/reviews/2026-11-21-host11-reaper.md)) | A run on jrp's Mac with a published preview |
 | **CFG-1**, then **CFG-2** | Other `.cfg` readers, then importing and exporting their formats | Access to Roon, JRiver or Audiolense workflows |
 | **FFT-2**, **VST3-5**, **PLUG-11** | Optimisation | A workload that needs it; PERF-3's [measurements](docs/develop/fft-measurements.md#supported-workloads) showed none, though VST3-5 may for 60 s and large 96 kHz multichannel filters |
 | **VST3-13**, **VST3-2**, **VST3-6**, **HOST-2**, **LV2-3**, **LV2-6**, **DIAG-9** | The Linux window, switching filters from the host, replacing the old VST2 plug-in, CLAP, named LV2 layouts, an LV2 window, numbers in the user's locale | A stated user need |
@@ -159,6 +160,11 @@ Foundation items are parked by owner decision instead.
   the window shows numbers in the system locale from one formatting path,
   Status and the log stay plain, and a test covers other separators; best
   after PLUG-39's typed reporting.
+- [ ] **DIAG-10 — Status says what the window says.** Status also names a
+  Latency not in use yet, the Estimate being found or failing, and a filter
+  still loading ([what Status leaves out](docs/use/plugins.md#status-and-the-convolver-log));
+  in PLUG-39's typed reporting. **Done when** each format's tests cover
+  them and jrp has decided LV2's `status` port values.
 
 ## Plug-ins: VST3, LV2 and AU
 
@@ -189,8 +195,8 @@ done once for all three formats:
 - [ ] **PLUG-29 — Keep the Recent list out of the log folder.** Save it in
   each platform's application-support folder, reading the old file once.
   **Done when** the tests cover both paths and the guide names the folder.
-- [ ] **PLUG-39 — One consolidation of the load and restore path.** Steps
-  5 and 6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md).
+- [ ] **PLUG-39 — One consolidation of the load and restore path.** Step
+  6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md).
   **Done when** the plan's
   [success criterion](docs/project/plans/2026-11-13-load-restore-consolidation.md#success-criterion)
   is met.
@@ -352,14 +358,6 @@ was set and the measurements behind it are in the
 [archived text](docs/archive/todo/2026-11-20-open-item-history.md#loading-responsiveness),
 the test in [load timing](docs/develop/load-timing.md) and the procedure in
 [responsiveness qualification](docs/develop/releasing.md#responsiveness-qualification).
-
-### Keeping `host.cpp` manageable
-
-Two narrow simplifications from jrp's review of 12 November 2026 go with
-PLUG-39's [steps](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps)
-1 and 5: typed `Advice` in exceptions, and refusals returned directly in
-VST3's `load_file()` (step 5a keeps the window report typed until the
-transport boundary); none changes a message a user reads ([archived text](docs/archive/todo/2026-11-20-open-item-history.md#keeping-hostcpp-manageable)).
 
 ## Edges over other convolvers
 
