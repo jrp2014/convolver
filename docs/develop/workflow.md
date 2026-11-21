@@ -318,16 +318,14 @@ approve or merge; jrp does that.
 ## Recording progress in TODO
 
 Each item in [TODO](../../TODO.md) has a stable ID. Do not reuse or renumber IDs;
-add new ones after the highest in their group. An open item says what
-remains, what would justify doing it and what counts as finished
-(**Remains**, **Worth doing when**, **Done when**), with what is already
-built in a sentence that names its pull requests. When a pull request
-advances an item, rewrite those parts in place rather than adding a
-narrative of the work: the pull request, its records and the CHANGELOG
-keep the evidence (jrp, 12 November 2026, DOC-14). The longer
-`Progress (date, PR #N): …` lines of the items DOC-14 rewrote were moved
-to [`docs/archive/todo/`](../archive/todo/README.md); the few left in other
-items go the same way when those items next change.
+add new ones after the highest in their group. An open item is a line or
+two: what remains (**Remains**, when part is built), what counts as
+finished (**Done when**) and, when it is not to be done now, what would
+justify it (**Worth doing when**). When a pull request advances an item,
+rewrite those words in place rather than adding a narrative of the work:
+the pull request, the plan the item links and the CHANGELOG keep the
+evidence (jrp, 12 November 2026, DOC-14, and 20 November 2026, DOC-19). The items' earlier, longer text is in
+[`docs/archive/todo/`](../archive/todo/README.md).
 
 The item is the one home for its open work. The
 [status page](../project/status.md) gives only each feature's level and

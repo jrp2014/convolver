@@ -28,6 +28,12 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Documentation (DOC-19, from an outside audit jrp accepted): `TODO.md`
+  holds open work only, each item in a line or two, and its documented
+  limitations one line each, pointing at the page that owns the detail; the
+  48 finished items and the items' earlier text moved unchanged to
+  `docs/archive/todo/`. PLUG-39's step 1b is no longer listed as both in
+  progress and done.
 - Plug-ins (PLUG-39 step 1b): in LV2, choosing the file of the filter
   already playing again keeps it and what it is playing, so its tail rings
   on, as choosing it again in the VST3 and Audio Unit windows already did
