@@ -152,6 +152,12 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
+- Tests (HOST-9): the headless Ardour test plays the VST3 plug-in too, in
+  the VST3 workflow, on Ardour's own VST3 host, and saves sessions at a
+  larger Latency (LV2 at 256 and 1024, VST3 at 1024): Ardour must be told
+  the new latency without reopening the session, report it again after
+  reopening, and export in time, within 1e-5 of the oracle. The test moved
+  to `tests/plugins/`.
 - Tests (AU-18): the AVAudioEngine render of the Audio Unit also follows
   the hosts' other orders of events: GarageBand's, which starts the unit at
   its defaults and restores the project while it runs (at 44.1 kHz on a
