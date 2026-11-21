@@ -783,7 +783,10 @@ length they made 73,065 sequences per layout, and Windows CI's
 `vst3.lifecycle` went from 84 seconds to its 300-second timeout. Limited,
 `vst3.lifecycle` runs 33,877 sequences per layout against 31,174 just
 before step 0: 10.8 seconds for both layouts in a Release build on the
-cloud machine, against 10 seconds.
+cloud machine, against 10 seconds. The Intel macOS candidate's Release run
+took 124 to 221 seconds in ten passing runs on 20 and 21 November 2026 and
+passed its 300-second limit on a slow runner, so `vst3.lifecycle` has the
+600 seconds `au.lifecycle` and `lv2.lifecycle` have (CI-50).
 
 ## Load timing (PERF-9)
 

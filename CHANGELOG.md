@@ -202,6 +202,10 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
+- Tests (CI-50): `vst3.lifecycle` has a 600-second CTest limit, as
+  `au.lifecycle` and `lv2.lifecycle` have, instead of 300. The Intel macOS
+  candidate took 124 to 221 seconds in ten passing runs on 20 and 21
+  November 2026 and timed out at 300 on a slow runner (run 44934007168).
 - CI (CI-49, from an outside CI analysis jrp passed on on 21 November
   2026): pull requests no longer run the advisory **Newest upstream lilv**
   job, which builds the newest lilv, zix, serd, sord and sratom from source;
