@@ -291,11 +291,13 @@ tresult Processor::activate(TBool state) {
             // that correcting the rate or layout brings it back.
             const auto chosen = settings();
             const auto now = layout();
+            // Read once, so the log says the bypass the processor starts with.
+            const bool bypassed = bypass_.load();
             auto activation = filter_.activation(now);
             auto next = std::make_unique<HostProcessor>(
                 activation.playback, processSetup.maxSamplesPerBlock, chosen, now.inputs);
             tail_.store(static_cast<uint32>(next->tail_frames()));
-            next->set_bypass(bypass_.load());
+            next->set_bypass(bypassed);
             next->reset();
             // Not playing: the host does not process while it activates.
             playing_.offer(std::move(next));
@@ -311,7 +313,7 @@ tresult Processor::activate(TBool state) {
                 const auto& f = filter_.failure();
                 log(started_line(filter_, now,
                                  static_cast<std::size_t>(processSetup.maxSamplesPerBlock), &chosen,
-                                 bypass_.load()),
+                                 bypassed),
                     (f && f->silent) || !filter_.notice().empty());
             } catch (...) { // Out of memory for the line: it is dropped.
             }
@@ -392,6 +394,7 @@ HostReport Processor::report_locked() const {
     facts.format = tag_;
     facts.host = known_layout();
     facts.max_frames = host() ? static_cast<std::size_t>(processSetup.maxSamplesPerBlock) : 0;
+    facts.running = host() != nullptr; // setActive(false) frees every processor.
     facts.settings = settings();
     facts.latency_frames = host() ? host()->latency_frames() : facts.settings.latency;
     facts.tail_frames = tail_.load();
@@ -657,7 +660,7 @@ void Processor::choose_gain_mode(GainMode mode) noexcept {
     }
     try { // Best effort: out of memory for the line changes nothing else.
         const auto chosen = settings();
-        log(gain_mode_line(chosen, filter_.gains(), filter_.filter().has_value(), why),
+        log(gain_mode_line(chosen, filter_.gains(), filter_.filter() != nullptr, why),
             !why.empty() || (filter_.filter() && !applied_gain_db(chosen, filter_.gains())));
     } catch (...) {
     }
@@ -768,7 +771,7 @@ std::optional<HostSettings> Processor::install(HostState next, const HostRequest
         // The estimate, if the mode needs it, was found as the filter loaded.
         if (gain_mode_.exchange(saved->gain_mode) != saved->gain_mode)
             try {
-                log(gain_mode_line(settings(), filter_.gains(), filter_.filter().has_value()),
+                log(gain_mode_line(settings(), filter_.gains(), filter_.filter() != nullptr),
                     false);
             } catch (...) { // Out of memory for the line: the mode stands.
             }
@@ -894,7 +897,8 @@ tresult PLUGIN_API Processor::getState(IBStream* stream) {
         faulted = observe_faults();
         try {
             HostState state;
-            state.configuration = filter_.filter();
+            if (const auto& f = filter_.filter()) // Copied for encoding, as before.
+                state.configuration = *f;
             state.bypass = bypass_.load();
             state.failed = filter_.failed(); // Reopening stays silent (state version 2).
             state.settings = settings();     // Version 3, defaults included (PLUG-35).

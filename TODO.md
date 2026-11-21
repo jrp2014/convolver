@@ -53,7 +53,7 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 
 ### In progress
 
-PLUG-39's step 4a with PLUG-30 (PR #236); HOST-11's first version (PR #245),
+PLUG-39's step 5, after step 4a (PR #236); HOST-11's first version (PR #245),
 which waits for a run on jrp's Mac. Check the open pull requests for an ID
 before starting anything.
 
@@ -61,7 +61,7 @@ before starting anything.
 
 | Item | What to do | Note |
 | --- | --- | --- |
-| **PLUG-39** | Steps 4a (with PLUG-30), 5 and 6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps); steps 0 to 3, 4b, 4c and ROBUST-8 are merged | Each step is its own reviewed pull request (jrp, 13 and 19 November 2026) |
+| **PLUG-39** | Steps 5 and 6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md#steps); steps 0 to 4 and ROBUST-8 are merged | Each step is its own reviewed pull request (jrp, 13 and 19 November 2026) |
 | **PLUG-24** | `HostProcessor` in its own source file | In PLUG-39's sequence, as its own pull request, never with a DSP change (jrp, 19 November 2026) |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **PERF-3** | One measurement exercise: resource budgets and supported workloads | Changes no shipped code; decides whether FFT-2, VST3-5, PLUG-11 and PERF-2's tuning are worth doing |
@@ -192,12 +192,8 @@ done once for all three formats:
 - [ ] **PLUG-29 — Keep the Recent list out of the log folder.** Save it in
   each platform's application-support folder, reading the old file once.
   **Done when** the tests cover both paths and the guide names the folder.
-- [ ] **PLUG-30 — One rule for state a busy lock makes a call skip.**
-  **Done when** each adapter's skip paths follow one rule or are listed with
-  why they are safe, each with a held-lock test; taken up with PLUG-39's
-  step 4a.
 - [ ] **PLUG-39 — One consolidation of the load and restore path.** Steps
-  4a, 5 and 6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md).
+  5 and 6 of the [plan](docs/project/plans/2026-11-13-load-restore-consolidation.md).
   **Done when** the plan's
   [success criterion](docs/project/plans/2026-11-13-load-restore-consolidation.md#success-criterion)
   is met.
@@ -519,3 +515,6 @@ move to the archive.
   November 2026, PR #237 ([Ardour, headless](docs/develop/testing.md#ardour-headless)).
 - [x] **AU-18 — Render the Audio Unit in the hosts' orders of events.** 21
   November 2026, PR #242 ([AVAudioEngine render](docs/develop/testing.md#avaudioengine-render)).
+- [x] **PLUG-30 — One rule for state a busy lock makes a call skip.**
+  21 November 2026, PR #236, with PLUG-39 step 4a
+  ([calls that do not wait for the control lock](docs/develop/plugin-contract.md#calls-that-do-not-wait-for-the-control-lock)).

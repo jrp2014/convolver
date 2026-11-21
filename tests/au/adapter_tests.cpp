@@ -733,6 +733,26 @@ void render_requires_initialization() {
 // and au.harness share another), set once in main() (CI-22, CI-27).
 std::filesystem::path process_log;
 
+// PLUG-39 step 4: with bypass on, the log lines say what bypass plays, not
+// the filter: a refused replacement and the start line (Initialize).
+void bypassed_log_lines() {
+    Unit unit;
+    check(unit.configure(48000, 2, 2, 512), "formats");
+    check(unit.initialize(), "initialization");
+    check(unit.load(state_of(stereo(48000))), "filter");
+    unit.set_bypass(true);
+    const au_test::LogSince log(process_log);
+    require(unit.load(state_of(stereo(44100))) != noErr, "a wrong-rate filter accepted");
+    require(log.text().find("the previous filter is kept (bypass is on)") != std::string::npos &&
+                log.text().find("keeps playing") == std::string::npos,
+            "a refused replacement while bypassed is logged as playing: " + log.text());
+    unit.uninitialize();
+    check(unit.initialize(), "second initialization");
+    require(log.text().find("Bypass is on: the input plays unfiltered. Loaded: ") !=
+                std::string::npos,
+            "a start while bypassed is logged as playing the filter: " + log.text());
+}
+
 // CI-27: tests/au/log_evidence_tests.py runs this to check that the log
 // survives an abrupt end. One load writes a line (each line is written and
 // closed at once), then the process ends without any of its own clean-up:
@@ -1207,6 +1227,11 @@ void latency_parameter() {
         throw;
     }
     stop();
+    // Runs queued for earlier choices may still apply one of them after the
+    // reported latency first equals the last choice (an earlier run may have
+    // applied that value too): wait for every run to finish before measuring
+    // (the ThreadSanitizer job on PR #237, 20 November 2026).
+    require(latency_settled(unit), "the Latency work for the concurrent choices did not finish");
     const auto last =
         host_latencies[static_cast<std::size_t>(parameter(unit, au::latency_parameter))];
     require(reports(unit, static_cast<double>(last)),
@@ -2099,6 +2124,48 @@ void bypass_while_latency_work_holds_lock() {
     }
 }
 
+// PLUG-39 step 4a (PLUG-30): the window's report while the Latency work
+// holds the control lock comes at once from the diagnostics snapshot, with
+// the bypass set now, instead of waiting for the lock or a cached copy from
+// before the last change.
+void report_while_latency_work_holds_lock() {
+    auto unit = latency_unit();
+    const auto report = [&] {
+        CFTypeRef value = nullptr;
+        UInt32 size = sizeof value;
+        check(AudioUnitGetProperty(unit->get(), au::report_property, kAudioUnitScope_Global, 0,
+                                   &value, &size),
+              "report property");
+        require(value && CFGetTypeID(value) == CFDictionaryGetTypeID(),
+                "the report is not a dictionary");
+        const auto dict = static_cast<CFDictionaryRef>(value);
+        auto fields =
+            std::pair(string_value(dict, "status name"), string_value(dict, "filter rate"));
+        CFRelease(value);
+        return fields;
+    };
+    const HoldScope scope(unit->get(), LatencyHold::At::locked);
+    auto& hold = scope.hold;
+    check(unit->load(state_of(stereo(48000))), "filter");
+    wait_for_hold(hold, [&] { return hold.runs > 0; }, "the Latency run starting");
+    std::future<std::pair<std::string, std::string>> active =
+        std::async(std::launch::async, report);
+    require(active.wait_for(std::chrono::seconds(10)) == std::future_status::ready,
+            "the report waited for the held lock");
+    const auto [status, rate] = active.get();
+    require(status == "Active" && rate == "48000 Hz",
+            "the report while the lock was held: " + status + ", " + rate);
+    finish_within(std::async(std::launch::async, [&] { unit->set_bypass(true); }),
+                  "switching bypass");
+    auto bypassed = std::async(std::launch::async, report);
+    require(bypassed.wait_for(std::chrono::seconds(10)) == std::future_status::ready,
+            "the report waited for the held lock after bypass");
+    require(bypassed.get().first == "Bypassed",
+            "the report while the lock was held does not follow bypass");
+    release(hold);
+    require(latency_settled(*unit), "the Latency work did not finish");
+}
+
 int main(int argc, char** argv) {
     process_log = au_test::use_test_log("convolver-adapter-tests.log");
     au::latency_progress_for_tests = record_progress;
@@ -2118,6 +2185,7 @@ int main(int argc, char** argv) {
             {"channel_capabilities", channel_capabilities},
             {"timing_in_seconds", timing_in_seconds},
             {"class_info", class_info},
+            {"bypassed_log_lines", bypassed_log_lines},
             {"rejected_presets", rejected_presets},
             {"bypass_property", bypass_property},
             {"silence_flag", silence_flag},
@@ -2133,6 +2201,7 @@ int main(int argc, char** argv) {
             {"latency_witness_per_unit", latency_witness_per_unit},
             {"latency_staged_closing", latency_staged_closing},
             {"bypass_while_latency_work_holds_lock", bypass_while_latency_work_holds_lock},
+            {"report_while_latency_work_holds_lock", report_while_latency_work_holds_lock},
             {"settings_in_diagnostics", settings_in_diagnostics},
             {"wider_inputs", wider_inputs},
             {"chosen_preset", chosen_preset},

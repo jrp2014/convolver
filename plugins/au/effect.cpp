@@ -174,12 +174,14 @@ struct Effect::MainNotices {
 };
 
 Effect::Effect(AudioComponentInstance instance)
-    : AUBase(instance, 1, 1), status_(host_status(filter_, std::nullopt, true, {}, false, true)),
+    : AUBase(instance, 1, 1),
+      diagnostics_(std::make_shared<const Diagnostics>(Diagnostics{filter_, std::nullopt})),
       tag_(next_tag()) {
     set_host_log_sdk(CONVOLVER_SDK_DESCRIPTION); // The Convolver log names the SDK (CI-6).
     // Not UseIndexedParameters: that numbers parameters from 0, and Status is
     // 1001 (plugins/identities.json), so the parameter map is used instead.
-    Globals()->SetParameter(status_parameter, static_cast<AudioUnitParameterValue>(status_.status));
+    Globals()->SetParameter(status_parameter,
+                            static_cast<AudioUnitParameterValue>(HostStatus::no_filter));
     // AU-7: the settings at their defaults, which keep the sound unchanged.
     const HostSettings defaults;
     Globals()->SetParameter(gain_parameter, static_cast<AudioUnitParameterValue>(defaults.gain_db));
@@ -224,6 +226,7 @@ OSStatus Effect::Initialize() {
     std::string message, faults;
     bool started = false, problem = true;
     HostSettings current;
+    bool bypassed = false; // Read once, so the log says the bypass the processor starts with.
     {
         const Locked lock(*this);
         faults = observe_faults(); // Before the processor that counted them goes.
@@ -236,7 +239,8 @@ OSStatus Effect::Initialize() {
             auto activation = filter_.activation(now);
             auto next = std::make_unique<HostProcessor>(activation.playback, GetMaxFramesPerSlice(),
                                                         current, now.inputs);
-            next->set_bypass(bypass_.load());
+            bypassed = bypass_.load();
+            next->set_bypass(bypassed);
             next->reset();
             tail_.store(next->tail_frames());
             latency_.store(next->latency_frames());
@@ -258,7 +262,7 @@ OSStatus Effect::Initialize() {
                 const auto& f = filter_.failure();
                 problem = (f && f->silent) || !filter_.notice().empty();
                 message = started_line(filter_, *settling_.last_start(), GetMaxFramesPerSlice(),
-                                       &current, bypass_.load());
+                                       &current, bypassed);
             } catch (...) { // Out of memory for the message: the unit still plays.
             }
         }
@@ -461,7 +465,7 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
             applied_gain_mode_ = current.gain_mode;
             try { // Best effort: out of memory for the message changes nothing else.
                 mode_message =
-                    gain_mode_line(current, filter_.gains(), filter_.filter().has_value(), why);
+                    gain_mode_line(current, filter_.gains(), filter_.filter() != nullptr, why);
                 mode_problem = !why.empty() ||
                                (filter_.filter() && !applied_gain_db(current, filter_.gains()));
             } catch (...) {
@@ -470,8 +474,17 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
         }
         // AU-16: a bypass switched while another call held the lock
         // (SetProperty) is shown here, with Render's faults explained first
-        // as SetProperty does. Not needed when the update above read it.
-        if (status_bypassed_ != bypass_.load()) {
+        // as SetProperty does: the Status value is still the one for the
+        // other bypass setting. Not needed when it already shows this one
+        // (the update above read it). A Fault that Render wrote is neither,
+        // and stays until the host reads the Status text, which explains it.
+        const auto status_for = [&](bool bypassed) {
+            return static_cast<AudioUnitParameterValue>(
+                host_status_value(filter_, known_layout().has_value(), bypassed));
+        };
+        const auto shown = Globals()->GetParameter(status_parameter);
+        const bool bypassed = bypass_.load();
+        if (shown != status_for(bypassed) && shown == status_for(!bypassed)) {
             // Kept apart from any faults the old processor counted above.
             bypass_faults = observe_faults();
             update_status();

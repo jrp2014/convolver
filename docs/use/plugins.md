@@ -602,7 +602,7 @@ The text can be selected and copied. The controls are standard macOS ones
 with names for VoiceOver, which has not been tried with the window yet, and
 they follow the system's light or dark appearance. The
 window updates twice a second while it is on screen. While the host restores
-a project or preset on another thread, it shows the last report until the
+a project or preset on another thread, it shows what plays until the
 filter is ready.
 
 **In VST3**, on macOS and Windows, the window behaves as

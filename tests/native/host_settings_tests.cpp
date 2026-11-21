@@ -517,7 +517,7 @@ void settings_text() {
         require(setting_text(value, min_gain_db, max_gain_db) == text,
                 "setting text: " + setting_text(value, min_gain_db, max_gain_db));
     HostFilter filter;
-    const auto line = started_line(filter, {48000, 2, 2}, 512, &s);
+    const auto line = started_line(filter, {48000, 2, 2}, 512, &s, false);
     require(line.find("Settings: gain -6 dB, mix 50% wet, latency 1024 frames.") !=
                 std::string::npos,
             "started line without settings: " + line);
@@ -719,7 +719,7 @@ void diagnostics_follow_settings() {
         require(line.status == c.value && contains(line.text, c.status) &&
                     line.text.size() <= max_status_text,
                 std::string(c.what) + ": Status " + line.text);
-        const auto started = started_line(filter, c.host, 64, &c.settings);
+        const auto started = started_line(filter, c.host, 64, &c.settings, false);
         require(contains(started, c.started), std::string(c.what) + ": started line " + started);
         // The audible words never contradict the level heard.
         require(c.heard == 0 || (!contains(line.text, "Silent") &&
@@ -777,7 +777,8 @@ void gain_modes() {
         s.mix = .4;
         s.latency = 128;
         s.gain_mode = mode;
-        HostProcessor host(HostPlayback{c, true, gains}, 100, s);
+        HostProcessor host(HostPlayback{std::make_shared<const Configuration>(c), true, gains}, 100,
+                           s);
         const auto input = noise(random, 2 * 2000);
         const auto output = play(host, input, 2, 2, 100);
         const auto wet = test::oracle(c, input, s.latency);
@@ -806,7 +807,8 @@ void gain_modes() {
     const auto half_gains = filter_gains(half);
     HostSettings s{-20, 1, 64};
     s.gain_mode = GainMode::no_clipping;
-    HostProcessor host(HostPlayback{half, true, half_gains}, 1, s);
+    HostProcessor host(HostPlayback{std::make_shared<const Configuration>(half), true, half_gains},
+                       1, s);
     auto out = per_sample(host, 200);
     require(out[63] == 0 && std::abs(out[64] - 1) < 1e-6 && std::abs(out[199] - 1) < 1e-6,
             "No clipping should play the one-tap filter at its bound");
@@ -820,7 +822,8 @@ void gain_modes() {
     host.set_gain_mode(GainMode::no_clipping);
     per_sample(host, 100);
     const auto quarter = tap_filter(.25f);
-    host.replace(HostPlayback{quarter, true, filter_gains(quarter, false)});
+    host.replace(HostPlayback{std::make_shared<const Configuration>(quarter), true,
+                              filter_gains(quarter, false)});
     out = per_sample(host, 600);
     for (std::size_t t = 0; t < out.size(); ++t)
         require(std::abs(out[t] - 1) < 1e-5,
@@ -832,10 +835,13 @@ void gain_modes() {
     for (const std::size_t into : {std::size_t{0}, std::size_t{70}}) {
         HostSettings at_zero{0, 1, 64};
         at_zero.gain_mode = GainMode::no_clipping;
-        HostProcessor changing(HostPlayback{half, true, half_gains}, 1, at_zero);
+        HostProcessor changing(
+            HostPlayback{std::make_shared<const Configuration>(half), true, half_gains}, 1,
+            at_zero);
         per_sample(changing, 200);
         const auto eighth = tap_filter(.125f);
-        changing.replace(HostPlayback{eighth, true, filter_gains(eighth, false)});
+        changing.replace(HostPlayback{std::make_shared<const Configuration>(eighth), true,
+                                      filter_gains(eighth, false)});
         auto heard = per_sample(changing, into);
         changing.set_gain_mode(GainMode::set);
         const auto rest = per_sample(changing, 600);
@@ -856,7 +862,8 @@ void gain_modes() {
     host.set_gain_mode(GainMode::estimate);
     out = per_sample(host, 100);
     require(std::abs(out[99] - 1) < 1e-5, "Estimate without an estimate should play the bound");
-    host.replace(HostPlayback{half, true, FilterGains{std::nullopt, std::nullopt, true}});
+    host.replace(HostPlayback{std::make_shared<const Configuration>(half), true,
+                              FilterGains{std::nullopt, std::nullopt, true}});
     out = per_sample(host, 600);
     require(out[599] == 0, "a filter without figures should be silent in Estimate");
     host.set_gain_mode(GainMode::set);

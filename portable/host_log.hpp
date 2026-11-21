@@ -61,7 +61,7 @@ std::string loaded_line(const HostFilter&, const std::optional<HostLayout>& host
 // empty if there is none. `started` says whether the host has started the
 // plug-in, so that a kept filter is said to play only once it can, and
 // `bypassed` that bypass plays instead (PLUG-39 step 4).
-std::string rejected_line(const HostFilter&, bool started, bool bypassed = false);
+std::string rejected_line(const HostFilter&, bool started, bool bypassed);
 // DIAG-1: logged when the host's save call fails, which hosts may not report.
 inline constexpr const char* save_failure_message =
     "Saving failed: Convolver could not give its data to the host (out of memory, or the "
@@ -115,7 +115,7 @@ std::string gain_note(const HostSettings&, const FilterGains&, bool has_filter);
 // too, so the window and the log say the same. `bypassed`: what bypass
 // plays instead (PLUG-36, PLUG-39 step 4).
 std::string playing_words(const HostFilter&, const HostLayout& host, const HostSettings&,
-                          bool bypassed = false);
+                          bool bypassed);
 // DIAG-2: what plays because of a failure, as a sentence: "The previous
 // filter keeps playing.", "Convolver plays silence.", or with a dry signal
 // (`dry`, dry_signal()) and Mix below 100%, what of it still plays. `host`
@@ -123,7 +123,13 @@ std::string playing_words(const HostFilter&, const HostLayout& host, const HostS
 // bypass plays instead, the input where there is a dry signal (PLUG-36,
 // PLUG-39 step 4).
 std::string failure_consequence(const HostFailure&, const HostLayout* host, const HostSettings&,
-                                bool dry, bool bypassed = false);
+                                bool dry, bool bypassed);
+// PLUG-39 step 4: what bypass plays, as HostProcessor bypasses a filter, as
+// one sentence: "Bypass is on: the input plays unfiltered." with a dry
+// signal (`dry`, dry_signal()), otherwise "Bypass is on: the outputs are
+// silent."; before the host's layout is known (`host_known` false), "Bypass
+// is on: no filter is applied." The log lines and the report share it.
+std::string bypass_sentence(bool host_known, bool dry);
 // DIAG-2: why saved plug-in state could not be read, for HostFilter::reject(),
 // from decode_host_state()'s exception (NewerHostState gives its own fix).
 Advice state_read_message(const std::exception&);
@@ -142,7 +148,7 @@ Advice fault_advice(const HostFaults&, bool held);
 // notice in full), and the settings in use when the adapter has them
 // (settings_words(); PLUG-10); with `bypassed`, what bypass plays.
 std::string started_line(const HostFilter&, const HostLayout&, std::size_t max_frames,
-                         const HostSettings* settings = nullptr, bool bypassed = false);
+                         const HostSettings* settings, bool bypassed);
 // PLUG-9: the speakers a channel mask names, in plain words and channel
 // order ("front left, front right"); empty when the mask does not give one
 // known speaker per channel (as speaker_notice() compares them).

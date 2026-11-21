@@ -296,13 +296,21 @@ const char* gain_mode_name(GainMode mode) noexcept {
     return "Set";
 }
 
-HostPlayback filter_playback(Configuration c) {
-    const bool dry = own_dry(c);
+HostPlayback filter_playback(std::shared_ptr<const Configuration> c) {
+    if (!c)
+        throw std::invalid_argument("no filter to play");
+    const bool dry = own_dry(*c);
     return {std::move(c), dry, {}};
 }
 
+HostPlayback filter_playback(Configuration c) {
+    return filter_playback(std::make_shared<const Configuration>(std::move(c)));
+}
+
 HostPlayback unfiltered_playback(const HostLayout& host, bool failed, bool dry) {
-    return {unfiltered_configuration(host, failed), dry && host.inputs == host.outputs, {}};
+    return {std::make_shared<const Configuration>(unfiltered_configuration(host, failed)),
+            dry && host.inputs == host.outputs,
+            {}};
 }
 
 Configuration unfiltered_configuration(const HostLayout& host, bool failed) {
@@ -545,6 +553,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
     std::uint64_t identity = 0;
     FilterGains gains;
     std::optional<OfferedName> offered;
+    std::shared_ptr<const Configuration> accepted;
     try {
         if (state.failed && next)
             refuse(HostFailureKind::state_unreadable,
@@ -601,6 +610,17 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
             identity = configuration_identity(*next);
             same = filter_ && identity == identity_ && same_configuration(*filter_, *next);
         }
+        // PLUG-39 step 4a (jrp, 20 November 2026): the accepted filter is
+        // shared, immutable, by HostFilter, what it gives the processor and
+        // any copy an adapter keeps for its diagnostics, so none of them
+        // copies it. Built whole here, before anything is published; the
+        // same filter keeps the one already shared.
+        if (same) {
+            accepted = filter_;
+        } else if (next) {
+            accepted = std::make_shared<const Configuration>(std::move(*next));
+            carried = accepted.get();
+        }
         // PLUG-22, PLUG-39 step 4: a name shows only while its filter plays.
         // State that names nothing takes the name offered for its filter
         // (offer_name()), or keeps the one the same filter shows now; an
@@ -619,14 +639,14 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
             peak = peak_;
             gains = gains_;
             if (estimating && !gains.estimate_db && !gains.estimate_failed)
-                find_estimate(gains, *next);
-        } else if (next) {
-            peak = worst_case_peak(*next);
-            gains = gains_for(*next, peak, estimating);
+                find_estimate(gains, *accepted);
+        } else if (accepted) {
+            peak = worst_case_peak(*accepted);
+            gains = gains_for(*accepted, peak, estimating);
         }
         // Until a processor is built, the adapter reports the filter's tail.
-        if (next && !counting)
-            change.inactive_tail = configuration_tail_frames(*next);
+        if (accepted && !counting)
+            change.inactive_tail = configuration_tail_frames(*accepted);
         if (state.failed) {
             HostFailure f;
             f.kind = HostFailureKind::saved_failure;
@@ -643,16 +663,15 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
             // A kept filter that does not suit plays silence, with the dry
             // signal dry_signal_rule() gives it once committed.
             const auto unfiltered =
-                kept_failure
-                    ? unfiltered_playback(
-                          *host, true, unplayed_dry(&*next, true, *host) == HostDrySignal::present)
-                : next ? HostPlayback{}
-                       : unfiltered_playback(*host, state.failed, !state.failed);
+                kept_failure ? unfiltered_playback(*host, true,
+                                                   unplayed_dry(accepted.get(), true, *host) ==
+                                                       HostDrySignal::present)
+                : accepted   ? HostPlayback{}
+                             : unfiltered_playback(*host, state.failed, !state.failed);
             try {
-                if (next && !kept_failure) {
-                    // Moved in and back, not copied: a filter can be large.
-                    // On a throw `next` is never used again.
-                    const bool dry = own_dry(*next);
+                if (accepted && !kept_failure) {
+                    // Shared, not copied: a filter can be large.
+                    const bool dry = own_dry(*accepted);
                     // PLUG-38: the filter that plays now, unchanged, may play
                     // on with its history: one accepted, suiting the host
                     // (no failure found at activation keeps it silent), and
@@ -660,9 +679,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
                     // session the host is opening keeps nothing from before.
                     const bool unchanged = same && !failed_ && !activation_failure_ &&
                                            request.kind != HostRequestKind::session;
-                    HostPlayback playing{std::move(*next), dry, gains, unchanged};
-                    install(playing);
-                    *next = std::move(playing.filter);
+                    install(HostPlayback{accepted, dry, gains, unchanged});
                 } else {
                     install(unfiltered);
                 }
@@ -688,12 +705,12 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
         refuse(HostFailureKind::preparation, preparation_message({}), request, carried);
     }
     // The commit, which cannot throw.
-    static_assert(std::is_nothrow_move_assignable_v<std::optional<Configuration>> &&
+    static_assert(std::is_nothrow_move_assignable_v<std::shared_ptr<const Configuration>> &&
                   std::is_nothrow_move_assignable_v<HostRequest> &&
                   std::is_nothrow_move_assignable_v<std::optional<OfferedName>> &&
                   std::is_nothrow_move_assignable_v<std::optional<HostFailure>> &&
                   std::is_nothrow_move_assignable_v<Advice>);
-    filter_ = std::move(next);
+    filter_ = std::move(accepted);
     peak_ = peak;
     gains_ = gains;
     estimating_ = estimating;
@@ -754,7 +771,7 @@ HostActivation HostFilter::activation(const HostLayout& host) const {
         return a;
     }
     a.notice = speaker_notice(*filter_, host);
-    a.playback = filter_playback(*filter_);
+    a.playback = filter_playback(filter_); // Shared, not copied.
     a.playback.gains = gains_;
     return a;
 }
@@ -1686,16 +1703,25 @@ HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum,
                              const HostSettings& settings, std::size_t inputs)
     : impl_(std::make_unique<Impl>(c, own_dry(c), maximum, offered_latency(settings.latency),
                                    settings, inputs)) {}
+namespace {
+// HostPlayback::filter is never null when built by filter_playback() or
+// HostFilter; a default-constructed one is refused rather than dereferenced.
+const Configuration& played_filter(const HostPlayback& p) {
+    if (!p.filter)
+        throw std::invalid_argument("no filter to play");
+    return *p.filter;
+}
+} // namespace
 HostProcessor::HostProcessor(const HostPlayback& p, std::size_t maximum,
                              const HostSettings& settings, std::size_t inputs)
-    : impl_(std::make_unique<Impl>(p.filter, p.dry, maximum, offered_latency(settings.latency),
-                                   settings, inputs, p.gains)) {}
+    : impl_(std::make_unique<Impl>(played_filter(p), p.dry, maximum,
+                                   offered_latency(settings.latency), settings, inputs, p.gains)) {}
 HostProcessor::~HostProcessor() = default;
 void HostProcessor::replace(const Configuration& c) {
     impl_->replace(c, own_dry(c));
 }
 void HostProcessor::replace(const HostPlayback& p) {
-    impl_->replace(p.filter, p.dry, p.gains);
+    impl_->replace(played_filter(p), p.dry, p.gains);
 }
 struct HostProcessor::Replacement::Data {
     const Impl* owner = nullptr;
@@ -1715,7 +1741,7 @@ HostProcessor::Replacement HostProcessor::prepare(const Configuration& c) const 
     return Replacement(std::move(data));
 }
 HostProcessor::Replacement HostProcessor::prepare(const HostPlayback& p) const {
-    auto prepared = impl_->prepare(p.filter, p.dry, p.gains);
+    auto prepared = impl_->prepare(played_filter(p), p.dry, p.gains);
     // Member by member: Apple Clang lacks parenthesized aggregate initialization.
     auto data = std::make_unique<Replacement::Data>();
     data->owner = impl_.get();

@@ -314,6 +314,12 @@ std::string settings_words(const HostSettings& s, HostDrySignal dry, const Filte
     return gain + ", mix " + setting_text(100 * s.mix, 0, 100) + "% wet" + latency;
 }
 
+std::string bypass_sentence(bool host_known, bool dry) {
+    return !host_known ? "Bypass is on: no filter is applied."
+           : dry       ? "Bypass is on: the input plays unfiltered."
+                       : "Bypass is on: the outputs are silent.";
+}
+
 std::string failure_consequence(const HostFailure& failure, const HostLayout* host,
                                 const HostSettings& used, bool dry, bool bypassed) {
     // PLUG-36, PLUG-39 step 4: bypass plays the input wherever there is a dry
@@ -322,8 +328,7 @@ std::string failure_consequence(const HostFailure& failure, const HostLayout* ho
         if (!host)
             return "The previous filter is kept.";
         if (bypassed)
-            return dry ? "The previous filter is kept. Bypass is on: the input plays unfiltered."
-                       : "The previous filter is kept. Bypass is on: the outputs are silent.";
+            return "The previous filter is kept. " + bypass_sentence(true, dry);
         return "The previous filter keeps playing.";
     }
     // A filter the adapter could not start has no processor, so nothing
@@ -357,10 +362,8 @@ std::string playing_words(const HostFilter& filter, const HostLayout& host,
     if (const auto& c = filter.filter()) {
         // As HostProcessor bypasses: the input when there is a dry signal,
         // otherwise silence (dry_signal_rule()).
-        auto line = bypassed ? "Bypass is on: " +
-                                   std::string(equal ? "the input plays unfiltered."
-                                                     : "the outputs are silent.") +
-                                   " Loaded: " + filter_words(*c) + "." + ignored_sentence(*c, host)
+        auto line = bypassed ? bypass_sentence(true, equal) + " Loaded: " + filter_words(*c) + "." +
+                                   ignored_sentence(*c, host)
                              : "Playing " + filter_words(*c) + "." + ignored_sentence(*c, host);
         if (!filter.notice().empty())
             line += " " + detail::as_sentence(detail::advice_line(filter.notice()));

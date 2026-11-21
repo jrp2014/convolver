@@ -283,6 +283,16 @@ Contents: [direction](#direction) · [releases](#releases) ·
 
 ## Releases
 
+- **20 November 2026.** Version 0.17.0, after 0.16.x, for PLUG-39 step 4a's
+  library change (`HostFilter::filter()` returns a
+  `std::shared_ptr<const Configuration>` instead of a
+  `std::optional<Configuration>`, and `HostPlayback::filter` holds the same
+  shared filter), following the rule that an incompatible API change before
+  1.0 needs a minor step (jrp chose "A, share the accepted filter" and asked
+  for the API change to go in 0.17.0). LV2's minor version 34 is even, which
+  LV2 accepts. See
+  [Versioning](../develop/versioning.md#minor-and-major-versions),
+  [CHANGELOG](../../CHANGELOG.md).
 - **20 November 2026.** Version 0.16.0, after 0.15.0, for PLUG-39 step 1b's
   library change (`HostFilter::load()` returns a `HostChange` decided from
   `HostRequest::kind`, and `set_estimating()` is removed because a load

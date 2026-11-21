@@ -351,7 +351,12 @@ cases.
   saved name shown only while its filter plays (`filter_names`, PLUG-22 and
   PLUG-39 step 4: offered before or after its state, a refused preset's
   name leaving the playing one, a file's name for the state saved from it,
-  a state's own name standing); and the
+  a state's own name standing); the accepted filter shared, not copied
+  (`shared_filter`, PLUG-39 step 4a: the processor and activation get the
+  same object, a copy of the `HostFilter` keeps the old filter whole and
+  its record after a replacement, a refused replacement and the same filter
+  restored again keep the accepted object, the last owner frees it, and a
+  playback with no filter is refused); and the
   saved-state limit (PLUG-12): the
   size counted without encoding matches the encoding, a filter that leaves
   exactly the settings' room (PLUG-13) loads, saves with and without
@@ -400,7 +405,10 @@ cases.
   window shows (no filter, before and after the host starts; Gain −20 dB
   with no filter; a stereo filter on a mono track; a wrong rate; a failed
   first load at Mix 50%; a refused replacement; playing; not checked yet; a
-  fault), checking the status, the explanation's wording and what it must
+  fault; a fault and a refused replacement with bypass on, PLUG-39 step 4,
+  for equal and unequal channel counts and before the host starts; a fault
+  once the host has stopped, with bypass off),
+  checking the status, the explanation's wording and what it must
   not say, the fields and the plain text; the Audio facts in order with
   their values, notes and help (a refused rate and a mono track's channels
   marked as problems, the Routing of a filter that is not playing, what is
@@ -815,6 +823,9 @@ built (a test hook) keeps the running latency, is logged and is built at
 the next activation, and one made after a load has cleared a fault leaves
 Status Active (ROBUST-8, in `status_and_log()`); a choice while inactive waits for the activation; and
 a restored state with another Latency plays it at once.
+`bypassed_log_lines()` (PLUG-39 step 4) checks that with bypass on the log
+says what bypass plays: a refused replacement, a start, and restored state
+saved bypassed and kept until it suits the host.
 `latency_while_playing()` changes the Latency 24 times and replaces the
 filter 8 times while another thread calls `process()`, waiting for a block
 between changes, then checks the last filter at the last Latency; the
@@ -1003,7 +1014,9 @@ Five CTest tests run when the adapter is built (label `au`):
   rejected formats, latency and tail in seconds with change notifications, the
   `ClassInfo` keys, foreign, damaged, newer and failed presets with the failure
   record each leaves (read through a custom property, 64800, that exists for
-  the tests only), an initialization that cannot build its processor, bypass
+  the tests only), an initialization that cannot build its processor, the
+  log with bypass on (a refused replacement and a start say what bypass
+  plays, `bypassed_log_lines`, PLUG-39 step 4), bypass
   switched from another thread while rendering, the output silence flag, no
   C++ allocation while rendering, and the settings (AU-7): parameter info,
   defaults and clamping, Gain and Mix in the audio, and saving and restoring
@@ -1058,7 +1071,11 @@ Five CTest tests run when the adapter is built (label `au`):
   host switches bypass on and then off: the setter must return without
   waiting, and only a later run, which the setter must ask for, can show
   the change, so the check needs both halves of the fix (AU-16, the
-  intermittent "bypass not shown" failure made deterministic). The test
+  intermittent "bypass not shown" failure made deterministic). With a run
+  held the same way after a load, the report must come back within 10 s
+  saying Active at 48000 Hz, and Bypassed once the host switches bypass on,
+  without waiting for the lock (`report_while_latency_work_holds_lock`,
+  PLUG-30: the report is built from the diagnostics snapshot). The test
   sets these hooks once, before any unit exists, and publishes each hold
   through an atomic pointer only once the hold is complete (AU-3); leaving
   a test, even on a failed check, releases a held run, so that closing the
@@ -1122,7 +1139,8 @@ Five CTest tests run when the adapter is built (label `au`):
   responsiveness, without timing: a restore on another thread is held open
   while it holds the control lock (the adapter's `load_started_for_tests`
   hook, null in the component), and a report read must return within 10 s
-  with the last report ("No filter"); once the load is released the report
+  with the report of what plays until then, from the diagnostics snapshot
+  ("No filter"); once the load is released the report
   says Active within 10 s (the restore also wakes the Latency worker, which
   may hold the lock a moment longer). A file chosen in the window is read on
   the main thread, so this does not cover it. Then faults: invalid input rendered, the
@@ -1211,7 +1229,9 @@ python3 tests/au/avaudioengine_tests.py build-au/convolver-preset
   as described above.
 - `lv2.adapter`: the bundle's plug-ins and ports through lilv; instantiation
   refusals; the status port, log messages, saved state and failure record after
-  good and bad loads (the record through an unadvertised extension that exists
+  good and bad loads (a refused replacement with bypass on is logged as
+  what bypass plays, PLUG-39 step 4; the record through an unadvertised
+  extension that exists
   for the tests only); presets written by `convolver-preset` and lilv's own
   state round trip; long `run()` calls; filter files through the worker, run
   on a thread, synchronously (as when a host free-wheels) and with answers
