@@ -8,9 +8,10 @@
   before the change to 1024, and REAPER's log line reads `from 0 to 1024`.
   Audacity's configuration-list check loops for at least two seconds, so
   the 85 ms example cannot end before the window sees the host's settings,
-  and keeps the list selected for the export. The GarageBand preset loop
-  deletes each old preset first, so one left from an earlier preview cannot
-  stand in under the same name. jrp found all three in his 21 November
+  and keeps the list selected for the export. The GarageBand preset steps
+  delete each old preset first, so one left from an earlier preview cannot
+  stand in under the same name, and the Latency checks name the menu value,
+  not the detail beside it, which shows the time added. jrp found all three in his 21 November
   review.
 
 ## Done

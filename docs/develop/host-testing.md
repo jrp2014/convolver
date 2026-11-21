@@ -277,7 +277,7 @@ Do this once. Run the commands in the extracted preview package folder.
    GarageBand presets, mono and stereo, from the package's VST3 examples, so they appear in the
    unit's preset menu. The loop deletes each old copy first: the tool
    refuses to overwrite, and a preset left from an earlier preview keeps
-   its name in the menu but may hold a different filter (before 0.18 the
+   its name in the menu but may hold a different filter (before REL-10 the
    echo was a single copy 5 ms later):
 
    ```sh
@@ -397,8 +397,8 @@ Do this once. Run the commands in the extracted preview package folder.
     playing, and record what the window's Latency row and the log say,
     what REAPER shows as the plug-in's latency (its delay compensation),
     and when the new latency comes into use: since VST3-16 at once (the log
-    says `Latency changed from 0 to 1024 frames`, since the default is
-    0), with REAPER's delay
+    says `Latency changed from 0 to 1024 frames`, as the default is 0),
+    with REAPER's delay
     compensation following. Open the
     disclosure triangle: REAPER's FX window grows to fit.
     Click **Copy Diagnostics** and paste into the report. Save, quit and
@@ -615,10 +615,16 @@ preparation and steps 2, 3 and 9 below include what it found.
 6. Save the project, quit, reopen and play: the echo is still there.
 7. Export the song (*Share › Export Song to Disk*) and check that the file holds
    the echo.
-8. Build a 48 kHz preset with `./bin/convolver-preset
-   presets/echo-48000-stereo/echo-48000-stereo.vstpreset
-   ~/Library/Audio/Presets/Convolver/Convolver/echo-48000-stereo.aupreset`
-   and choose it while the 44.1 kHz echo plays. The echo keeps playing. Record
+8. Build a 48 kHz preset, deleting any old copy first as in
+   [preparation](#prepare-the-mac):
+
+   ```sh
+   out=~/Library/Audio/Presets/Convolver/Convolver/echo-48000-stereo.aupreset
+   rm -f "$out"
+   ./bin/convolver-preset presets/echo-48000-stereo/echo-48000-stereo.vstpreset "$out"
+   ```
+
+   Choose it while the 44.1 kHz echo plays. The echo keeps playing. Record
    what GarageBand shows. Status, where it is shown, reads `Load failed,
    previous filter kept: the filter is for 48000 Hz, the host runs at 44100
    Hz. ...` (or only `Load failed`); the full reason is in the system log (the `log show` command in
@@ -627,10 +633,10 @@ preparation and steps 2, 3 and 9 below include what it found.
 9. The [settings](../use/plugins.md#settings). Choose `repeat-44100-stereo`,
    where the changes are easiest to hear, and play. Latency starts at 0
    frames, the default; choose 256 frames while playing and check that it
-   is in use before going on: the window's Latency detail reads 256 frames
-   without "not in use yet", and the log has `Latency changed from 0 to
-   256 frames`. Record where the window
-   shows Gain and Mix and how it shows their values. Set Gain to −12 dB: the
+   is in use before going on: the window's Latency menu shows 256 frames,
+   the detail beside it does not say "not in use yet", and the log has
+   `Latency changed from 0 to 256 frames`. Record where the window shows
+   Gain and Mix and how it shows their values. Set Gain to −12 dB: the
    level drops smoothly, without a click. Set Mix to 0%: you hear the dry
    track, without the repeat; 50% mixes the two. Save, quit and reopen the
    project: both values come back, and the log's `Loaded a filter ...` line
@@ -639,12 +645,12 @@ preparation and steps 2, 3 and 9 below include what it found.
    (GarageBand starts the plug-in with the defaults before restoring the
    project, so the `Started at ...` line just before it shows 0 dB and 100%).
 10. Latency (PLUG-10). In the window, choose 1024 frames while the project
-    plays: a gap, then the sound carries on, the window's Latency
-    detail reads 1024 frames, and the log has `Latency changed from 256 to
+    plays: a gap, then the sound carries on, the window's Latency menu
+    shows 1024 frames, and the log has `Latency changed from 256 to
     1024 frames`. Record whether the track stays in time with the other
     tracks (GarageBand compensating for the new latency) at once or only
     after stopping and starting playback. Save, quit and reopen: the window's
-    Latency detail reads 1024 frames again (the log's `Latency changed`
+    Latency menu shows 1024 frames again (the log's `Latency changed`
     line after `Restored settings` shows it was applied after GarageBand
     started the plug-in).
 
