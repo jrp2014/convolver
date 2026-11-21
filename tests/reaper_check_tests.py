@@ -106,6 +106,11 @@ class Records(unittest.TestCase):
     def test_a_line_without_a_tab_is_ignored_and_the_last_value_wins(self):
         self.assertEqual(reaper_check.parse_results('half\nkey\t1\nkey\t2\n'), {'key': '2'})
 
+    def test_a_device_at_another_rate_is_named(self):
+        self.assertEqual(reaper_check.rate_hint({'device_rate': '48000', 'device_rate_playing': '48000'}), '')
+        self.assertEqual(reaper_check.rate_hint({'device_rate': '(not reported)'}), '')
+        self.assertIn('ran at 44100 Hz: set it to 48000 Hz', reaper_check.rate_hint({'device_rate': '44100'}))
+
     def test_a_missing_file_records_nothing(self):
         self.assertEqual(reaper_check.read_results(pathlib.Path('/nonexistent/first.txt')), {})
 

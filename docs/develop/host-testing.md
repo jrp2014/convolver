@@ -422,8 +422,11 @@ as the 7 November 2026 [retest](../archive/reviews/2026-11-07-reaper-crossover-r
 did by hand. It is step 3 of the [host-test automation plan](../project/plans/2026-11-21-host-test-automation.md#steps),
 and this first version is that plan's smallest run: one render, and one
 save and reopen. Install the package's `Convolver.vst3` as in
-[prepare the Mac](#prepare-the-mac), quit REAPER, and run from the unzipped
-package folder (the one with `bin/`, `examples/` and `presets/`):
+[prepare the Mac](#prepare-the-mac), set the audio device to 48 kHz (the
+script sets the project's rate but not the device's, and at another device
+rate Status reports the mismatch while REAPER plays), quit REAPER, and run
+from the unzipped package folder (the one with `bin/`, `examples/` and
+`presets/`):
 
 ```sh
 python3 /path/to/convolver/scripts/reaper_check.py
@@ -436,16 +439,18 @@ moment, renders, saves the project and quits. The second time, REAPER
 reopens that project in a new process, plays, renders again and quits.
 `bin/convolver --compare` checks both renders against the example's
 `expected.wav`, and each Status must read `Filter loaded: 48000 Hz, 2 in,
-2 out.`. Everything goes into a new `reaper-check-DATE-TIME` folder in the
+2 out.` Everything goes into a new `reaper-check-DATE-TIME` folder in the
 package folder; its `result.md` lists the eight checks with their evidence,
 what [every report](#every-report) needs (the package's SHA-256 when its ZIP
 sits beside the folder, or from `--zip`) and the Convolver log lines written
 during the run. Paste `result.md` back (`pbcopy < result.md`). If REAPER
 stops at a dialog, answer it and note what it asked; the script waits up to
-`--timeout` seconds (300) for each run.
+`--timeout` seconds (300) for each run. Because Terminal starts REAPER,
+macOS may ask once whether Terminal may use the microphone; either answer
+works, as the script records nothing.
 
-It covers steps 2, 3, 4 (load and Status only), 6 and 7 of
-[REAPER](#reaper-vst3), in the guide's
+It covers steps 2 (apart from the device rate, which you set), 3, 4 (load
+and Status only), 6 and 7 of [REAPER](#reaper-vst3), in the guide's
 [render and reopen](../use/check-a-stereo-filter.md#4-render-the-example-in-the-host)
 form. Listening, bypass, the refused presets, the wrong host rate, the
 window, Latency and the crossover stay manual until the script grows to

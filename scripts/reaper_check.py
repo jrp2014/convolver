@@ -104,6 +104,15 @@ local function device_info(name)
   return "(not reported)"
 end
 
+-- The plug-in type ("VST3"), which REAPER's naming preferences can hide
+-- from the displayed name.
+local function fx_type(track, fx)
+  if not reaper.TrackFX_GetNamedConfigParm then return "" end
+  local ok, value = reaper.TrackFX_GetNamedConfigParm(track, fx, "fx_type")
+  if ok then return value end
+  return ""
+end
+
 local function find_convolver(track)
   for fx = 0, reaper.TrackFX_GetCount(track) - 1 do
     local _, name = reaper.TrackFX_GetFXName(track, fx, "")
@@ -164,6 +173,12 @@ local function step(action) steps[#steps + 1] = action end
 
 local function finish(message)
   if message then record("error", message) end
+  -- A project with unsaved changes would stop the quit at "Save changes?".
+  -- Opening the copy just saved, without that prompt, leaves nothing to ask.
+  if reaper.IsProjectDirty(project) ~= 0 and exists(CONFIG.project) then
+    record("dirty_at_quit", "yes")
+    reaper.Main_openProject("noprompt:" .. CONFIG.project)
+  end
   record("done", "yes")
   reaper.Main_OnCommand(40004, 0) -- File: Quit REAPER
 end
@@ -281,6 +296,7 @@ step(function()
   fx = added
   local _, name = reaper.TrackFX_GetFXName(track, fx, "")
   record("fx_name", name)
+  record("fx_type", fx_type(track, fx))
   record("fx_parameters", reaper.TrackFX_GetNumParams(track, fx))
   return 1
 end)
@@ -332,6 +348,7 @@ step(function()
   if not fx then error("The reopened project's track has no Convolver.", 0) end
   local _, name = reaper.TrackFX_GetFXName(track, fx, "")
   record("fx_name", name)
+  record("fx_type", fx_type(track, fx))
   return settled(track, fx), 15
 end)
 
@@ -525,6 +542,15 @@ def new_log_lines(start):
     return data[start:].decode('utf-8', errors='replace').strip() or '(nothing written)'
 
 
+def rate_hint(results):
+    """A note when the audio device did not run at the example's rate, which
+    makes Status report the mismatch while REAPER plays."""
+    rates = {results.get('device_rate'), results.get('device_rate_playing')} - {None, '(not reported)'}
+    if rates and rates != {str(RATE)}:
+        return f' The audio device ran at {" and ".join(sorted(rates))} Hz: set it to {RATE} Hz and run again.'
+    return ''
+
+
 def evaluate(first, reopen, first_compare, reopen_compare, project):
     """The checks, in order: (name, passed, evidence)."""
     one = first['results']
@@ -537,15 +563,15 @@ def evaluate(first, reopen, first_compare, reopen_compare, project):
         ),
         (
             "Convolver's VST3 is on the track",
-            'VST3' in one.get('fx_name', '') and 'Convolver' in one.get('fx_name', ''),
-            one.get('fx_name', '(not added)'),
+            'Convolver' in one.get('fx_name', '') and 'VST3' in (one.get('fx_type', '') + one.get('fx_name', '')),
+            f'{one.get("fx_name", "(not added)")} (type {one.get("fx_type") or "not reported"})',
         ),
         (
             'The .vstpreset loads the stereo example',
             one.get('status_after_preset', '').startswith(LOADED) or one.get('status_playing', '').startswith(LOADED),
             (
                 f'Status after the preset: {one.get("status_after_preset", "(none)")}; '
-                f'while playing: {one.get("status_playing", "(none)")}'
+                f'while playing: {one.get("status_playing", "(none)")}{rate_hint(one)}'
             ),
         ),
         ('The render matches expected.wav', first_compare['match'], last_line(first_compare['output'])),
@@ -562,7 +588,7 @@ def evaluate(first, reopen, first_compare, reopen_compare, project):
             two.get('status_reopened', '').startswith(LOADED) or two.get('status_playing', '').startswith(LOADED),
             (
                 f'Status on reopening: {two.get("status_reopened", "(none)")}; '
-                f'while playing: {two.get("status_playing", "(none)")}'
+                f'while playing: {two.get("status_playing", "(none)")}{rate_hint(two)}'
             ),
         ),
         ('The reopened render matches expected.wav', reopen_compare['match'], last_line(reopen_compare['output'])),
