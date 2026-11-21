@@ -257,10 +257,13 @@ HostReport Effect::report_locked(std::string& faults) {
         faults = observe_faults();
         report_faults_at_ = now;
     }
-    if (faults.empty())
+    // PLUG-27: the host renders a chosen filter awaiting validation, so its
+    // check stands; the Status value changes with it.
+    const bool confirmed = settling_.playing() && filter_.awaiting();
+    if (faults.empty() && !confirmed)
         refresh_status_text();
     else
-        update_status();
+        update_status(); // Confirms it.
     HostReportFacts facts;
     facts.format = tag_;
     facts.host = known_layout();

@@ -177,7 +177,9 @@ plug-in. Until then the window keeps the file's name and Status says
 host has started the plug-in briefly at another rate, as Audacity does at
 44.1 kHz to pass on an edit. Once the host plays, the filter plays if it
 fits; if not, it plays silence and Status says "Silent" with the filter's
-and the host's rates. A configuration list
+and the host's rates. Convolver takes that result when Status or the
+window is read during playback; if playback stops before then, Status may
+say it is waiting again, and the filter stays selected. A configuration list
 needs the rate and channels to choose its entry, so it uses the ones the
 host last ran the plug-in with; before the host has run it with them, the
 list is not loaded, and the window says: "Play audio once so Convolver can

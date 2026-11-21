@@ -3230,12 +3230,20 @@ void chosen_before_host_plays() {
     require(state.configuration && state.configuration->sample_rate == 48000 &&
                 p.status().text.find("previous filter kept") != std::string::npos,
             ("a refused file replaced the playing filter: " + p.status().text).c_str());
-    // Stopped, the 44.1 kHz file is kept, waiting; once the host plays at
-    // 48 kHz, Status says Silent with both rates, and still does after it
-    // stops: playback confirmed the mismatch.
+    // Stopped, the 44.1 kHz file is kept, waiting; Status read while the
+    // host plays at 48 kHz says Silent with both rates, and still does after
+    // it stops: that read confirmed the mismatch.
     require(p.setActive(false) == kResultOk, "before play: playback stops again");
     require(c.load_file((folder / "slow.wav").string()), "a 44.1 kHz file refused while stopped");
     status_is(waiting, "a 44.1 kHz file chosen while stopped");
+    // jrp (21 November 2026): a start that processes several blocks and stops
+    // with no Status read while it runs confirms nothing, however many blocks
+    // it had, so the filter is still waiting.
+    require(p.setActive(true) == kResultOk, "before play: a provisional start");
+    for (int i = 0; i < 4; ++i)
+        play_block(p, 1, 1, 64);
+    require(p.setActive(false) == kResultOk, "before play: the provisional start stops");
+    status_is(waiting, "after a start of several blocks with no Status read");
     require(p.setActive(true) == kResultOk, "before play: playback starts at 48 kHz");
     play_block(p, 1, 1, 64);
     play_block(p, 1, 1, 64);

@@ -109,11 +109,8 @@ void chosen_file() {
         s.started(probe);
         require(chosen() == HostLoadCheck::keep_until_suited,
                 name + "refused while started before any audio");
-        // Audacity's FlushParameters: one block is not playback.
         s.played();
-        require(!s.playing(), name + "one block counted as the host playing");
-        s.played();
-        require(s.playing(), name + "two blocks not counted as the host playing");
+        require(s.playing(), name + "audio processed while started is not the host playing");
         require(chosen() == HostLoadCheck::refuse_mismatch,
                 name + "kept while the host plays audio");
         s.stopped();

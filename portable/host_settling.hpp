@@ -65,13 +65,11 @@ class HostSettling {
             played_.store(false, std::memory_order_relaxed);
         started_ = now;
         active_ = true;
-        blocks_.store(0, std::memory_order_relaxed);
+        played_now_.store(false, std::memory_order_relaxed);
     }
     void played() noexcept {
         played_.store(true, std::memory_order_relaxed);
-        // One writer, the audio thread; it only needs to reach 2.
-        if (blocks_.load(std::memory_order_relaxed) < 2)
-            blocks_.fetch_add(1, std::memory_order_relaxed);
+        played_now_.store(true, std::memory_order_relaxed);
     }
     void stopped() noexcept {
         active_ = false;
@@ -90,14 +88,16 @@ class HostSettling {
             return now;
         return std::nullopt;
     }
-    // PLUG-27 (jrp, 20 November 2026): whether the host is playing audio
-    // through the plug-in, which confirms a chosen filter's check
-    // (HostFilter::confirm()): started, and more than one block processed in
-    // this start. Audacity 4.0.2 passes a parameter edit by starting its
-    // window's copy at its placeholder 44.1 kHz for exactly one block of
-    // silence (FlushParameters), which says nothing about the project's rate.
+    // PLUG-27 (jrp, 20 and 21 November 2026): whether the host is playing
+    // audio through the plug-in now: started, and audio processed in this
+    // start. Adapters confirm a chosen filter's check (HostFilter::confirm())
+    // only when they see this on a control call while the host is still
+    // running the plug-in, never at the stop, so a brief start such as
+    // Audacity 4.0.2's FlushParameters (start, one block, stop, with no
+    // control call between) confirms nothing, without guessing which starts
+    // are brief.
     bool playing() const noexcept {
-        return active_ && blocks_.load(std::memory_order_relaxed) > 1;
+        return active_ && played_now_.load(std::memory_order_relaxed);
     }
     // The configuration of the current or last start, which processors are
     // built for (VST3 builds one for a new Latency with it).
@@ -129,7 +129,7 @@ class HostSettling {
     std::optional<HostLayout> started_;   // The current or last start.
     std::optional<HostLayout> committed_; // Audio Unit: the last start that rendered.
     std::atomic<bool> played_{false};     // Since the binding start (see started()).
-    std::atomic<unsigned> blocks_{0};     // Blocks played in this start, up to 2.
+    std::atomic<bool> played_now_{false}; // Audio processed in this start.
 };
 
 } // namespace convolver

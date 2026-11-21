@@ -291,9 +291,7 @@ void Effect::Cleanup() {
     {
         const Locked lock(*this);
         faults = observe_faults(); // Before the processor that counted them goes.
-        if (settling_.playing())   // PLUG-27: the host rendered the filter.
-            filter_.confirm();
-        settling_.stopped(); // Binds the formats if audio rendered with them.
+        settling_.stopped();       // Binds the formats if audio rendered with them.
         // The host does not render while it uninitializes the unit, so the
         // processor is freed here; were Render still running, it would be
         // freed by the next control call instead, without waiting under the

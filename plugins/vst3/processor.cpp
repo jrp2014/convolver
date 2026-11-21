@@ -319,8 +319,6 @@ tresult Processor::activate(TBool state) {
             // No audio runs while inactive: every processor is freed.
             playing_.clear();
             active_latency_.store(inactive);
-            if (settling_.playing()) // PLUG-27: the host played the filter.
-                filter_.confirm();
             settling_.stopped();
         }
         active_ = state != 0;

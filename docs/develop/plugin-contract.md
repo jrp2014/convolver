@@ -131,10 +131,13 @@ before they set the sample rate and channel layout (VST3 `setState` before
   (`read_filter_file()` with `settled` false) and kept
   (`keep_until_suited`): checked at once against a configuration the host
   is known to have, kept silent if it does not suit, and checked again at
-  the next start. Until the host plays it (`HostSettling::playing()`:
-  started, and more than the one block Audacity's flush passes), it awaits
-  validation (`HostFilter::awaiting()`, cleared by `confirm()`, which the
-  adapters call when they see the host playing and when it stops): a start
+  the next start. Until the host plays it, it awaits validation
+  (`HostFilter::awaiting()`, cleared by `confirm()`, which the adapters
+  call only when a control call, such as a status or window read, finds the
+  host running the plug-in with audio processed in that start,
+  `HostSettling::playing()`; never at the stop, so Audacity's start, one
+  block and stop with no call between confirms nothing, without guessing
+  which starts are brief; jrp, 21 November 2026): a start
   that found it unsuited is too little evidence, so the status and the
   window treat the host's configuration as not known and say "Filter
   selected. Waiting for the host's audio settings." (jrp, 20 November 2026;
