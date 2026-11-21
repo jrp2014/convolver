@@ -1192,7 +1192,10 @@ before it; for a Latency chosen while running, that the host's property
 listener was called after the change while the unit reported the new
 latency (AU-17's notices on the main thread), not just at initialization. After the
 latency, the output must match the fixture's `expected.wav` from the direct
-double-precision oracle within 1e-5. It prints the worst error. To run it on
+double-precision oracle within 1e-5. It prints the worst error: on CI's
+macOS 26 runner at `07ad81f` (21 November 2026), 5.96e-8 to 8.94e-8 for the
+AU-15 cases and 7.45e-8 (GarageBand's order), 1.79e-7 (then Latency 1024),
+5.96e-8 (Latency 256) and 1.94e-7 (round trip) for AU-18's. To run it on
 a Mac with the component installed and Xcode's command-line tools:
 
 ```sh
