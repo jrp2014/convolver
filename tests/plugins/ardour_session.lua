@@ -109,6 +109,19 @@ local preset = plugin:preset_by_label(label)
 assert(preset, "Ardour does not list the preset " .. label)
 assert(plugin:load_preset(preset), "Ardour cannot load the preset " .. label)
 print("Loaded preset " .. label .. " into " .. plugin:name())
+-- HOST-10: the channels Ardour runs the plug-in with, which the test checks
+-- against the track's; and what Ardour calls each input parameter, since
+-- its generic controls leave out every one it names "hidden".
+local insert = processor:to_insert()
+print("Plug-in channels: " .. insert:input_streams():n_audio() .. " in, " ..
+	insert:output_streams():n_audio() .. " out")
+for n = 0, plugin:parameter_count() - 1 do
+	local id, found = plugin:nth_parameter(n, true)
+	if found[2] and plugin:parameter_is_input(id) then
+		local _, descriptor = plugin:get_parameter_descriptor(id, ARDOUR.ParameterDescriptor())
+		print("Parameter " .. n .. ": " .. descriptor[2].label)
+	end
+end
 
 -- Latency, as a user chooses it from the host's controls after the preset.
 -- Ardour lists the LV2 port as Latency, in frames. Ardour 8.4 names every
