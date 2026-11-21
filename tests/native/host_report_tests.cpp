@@ -884,8 +884,60 @@ void wider_inputs() {
             "an unstarted empty instance: " + ru.mix_note + " | " + ru.settings);
 }
 
+// PLUG-27 (jrp, 20 November 2026): a file chosen while the host was not
+// playing is kept; a start at another rate (Audacity's placeholder 44.1 kHz)
+// is too little evidence to say it is wrong, so Status and the window say it
+// is selected and waiting, until the adapter reports that the host played it
+// (confirm()); then Silent with both rates. The log keeps the start's facts.
+void awaiting_validation() {
+    const HostLayout placeholder{44100, 2, 2};
+    const std::string waiting = "Filter selected. Waiting for the host's audio settings.";
+    HostFilter f(8);
+    HostRequest chosen{HostFilterSource::file, "/filters/room.cfg", 0};
+    chosen.kind = HostRequestKind::chosen_file;
+    f.load(HostState{filter(48000, 2)}, std::nullopt, {}, chosen, nullptr,
+           HostLoadCheck::keep_until_suited);
+    auto s = host_status(f, std::nullopt, true, {});
+    require(f.awaiting() && s.status == HostStatus::unchecked && s.text == waiting,
+            "chosen before any start: " + s.text);
+    static_cast<void>(test::started(f, placeholder));
+    s = host_status(f, placeholder, true, {});
+    auto r = host_report(f, facts(placeholder));
+    require(f.waiting() && f.failure() && !f.shown_failure() && s.status == HostStatus::unchecked &&
+                s.text == waiting && contains(r.plays, waiting) &&
+                !contains(r.explanation, "44100 Hz"),
+            "after a start at a placeholder rate: " + s.text + " | " + r.explanation);
+    require(contains(started_line(f, placeholder, 512), "44100 Hz"),
+            "the log no longer says what the start found: " + started_line(f, placeholder, 512));
+    f.confirm();
+    s = host_status(f, placeholder, true, {});
+    require(!f.waiting() && s.status == HostStatus::load_failed && contains(s.text, "48000 Hz") &&
+                contains(s.text, "44100 Hz"),
+            "after the host played it: " + s.text);
+    // A start that could not be done at all is shown, not waited out (the
+    // independent review): the processor could not be built.
+    HostFilter unstarted(8);
+    unstarted.load(HostState{filter(48000, 2)}, std::nullopt, {}, chosen, nullptr,
+                   HostLoadCheck::keep_until_suited);
+    static_cast<void>(test::started(unstarted, HostLayout{48000, 2, 2}));
+    unstarted.fail_activation("out of memory");
+    s = host_status(unstarted, HostLayout{48000, 2, 2}, true, {});
+    require(unstarted.awaiting() && !unstarted.waiting() && s.status == HostStatus::load_failed &&
+                s.text.find("Silent: ") == 0,
+            "a start that failed is shown as waiting: " + s.text);
+    // Restored state does not wait: the earlier rule stands.
+    HostFilter restored(8);
+    restored.load(HostState{filter(48000, 2)}, std::nullopt, {}, {}, nullptr,
+                  HostLoadCheck::keep_until_suited);
+    static_cast<void>(test::started(restored, placeholder));
+    require(!restored.awaiting() &&
+                host_status(restored, placeholder, true, {}).status == HostStatus::load_failed,
+            "restored state waits as a chosen file does");
+}
+
 int main() {
     if (convolver::test::run_cases({
+            {"awaiting_validation", awaiting_validation},
             {"cases", cases},
             {"actions", actions},
             {"log_agrees", log_agrees},

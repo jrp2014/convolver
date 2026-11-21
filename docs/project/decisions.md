@@ -945,6 +945,43 @@ Contents: [direction](#direction) · [releases](#releases) ·
   the accepted filter"). See
   [Plan](plans/2026-11-13-load-restore-consolidation.md#steps),
   [TODO](../../TODO.md) PLUG-39.
+- **20 November 2026.** PLUG-27 is brought forward from parked, after jrp's
+  Audacity run of 0.14.0 refused a 48 kHz `.cfg` chosen before playback
+  against Audacity's placeholder 44.1 kHz
+  ([record](../archive/reviews/2026-11-20-vst3-17-audacity.md)). In VST3 and
+  the Audio Unit a chosen single IR file or `.cfg` is kept and checked when
+  the host supplies its audio settings, as presets are; a file that does not
+  suit is still refused while the host plays. A configuration list waits for
+  the rate and channels: chosen before them it is refused as any file is, with
+  jrp's words "No entry selected. Play audio once so Convolver can check the
+  host's sample rate and channel counts, then choose the configuration list
+  again.", and the saved state format is unchanged. This replaces, for chosen
+  files only, the 13 November rules: VST3 checked one against a start that
+  never played, and the Audio Unit checked every request once its formats were
+  known. So while the host has stopped the plug-in, a file that does not suit
+  replaces the working filter and plays silence at the next start, with the
+  reason, instead of being refused. The Audacity check then re-runs the
+  no-playback walkthrough (jrp: "A — bring PLUG-27 forward", then "A — ask the
+  user to play once, then choose the list again"). Until the host plays a
+  chosen file, Status says "Filter selected. Waiting for the host's audio
+  settings." with the file's name still shown, even after a brief start at
+  another rate; once playback or an export confirms a mismatch, it says Silent
+  with both rates (jrp: "A — show 'Waiting for audio settings.'", 20 November
+  2026). A list with no entry for the configuration the host last ran with,
+  chosen while the host is not playing, is refused as a normal mismatch naming
+  that rate, with "If the host has not played audio at your project's rate
+  yet, play audio once so Convolver can check the host's sample rate and
+  channel counts, then choose the configuration list again." added to the fix;
+  no guess at whether a start was Audacity's (jrp, 21 November 2026). The
+  waiting ends only when Status is read while the host runs the plug-in and
+  has processed audio in that start (in VST3 that read is Convolver's window,
+  open during playback, or another message to the plug-in such as a Bypass
+  change, since the host's Status control does not ask; in the Audio Unit also
+  the host's Status read), never by counting blocks; if the host stops before
+  that, Waiting may return, and the filter stays selected either way (jrp: "A
+  — drop the one-block rule", 21 November 2026). See [Contract: loading and
+  failure](../develop/plugin-contract.md#loading-and-failure),
+  [plug-ins](../use/plugins.md#loading-a-filter).
 
 ## Identities and file formats
 

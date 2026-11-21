@@ -70,7 +70,7 @@ bool chosen_away(HostFailureKind kind) {
 Message message(const HostFilter& filter, const HostReportFacts& facts) {
     const auto& host = facts.host;
     const auto* layout = host ? &*host : nullptr;
-    const auto& failure = filter.failure();
+    const auto& failure = filter.shown_failure();
     const auto choose = facts.chooses_files ? "choose filter" : "";
     // PLUG-36 (jrp, 20 November 2026), PLUG-39 step 4: with bypass on, what
     // plays is what bypass plays, as host_status() says; playing_words() and
@@ -134,7 +134,10 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
     } else if (status == HostStatus::active || status == HostStatus::unchecked) {
         // PLUG-22: while it plays, the window's heading names the filter and
         // the Audio section describes it, so nothing is said here.
-        if (!host)
+        if (!host && filter.awaiting()) // PLUG-27, jrp's words (20 November 2026).
+            m.plays = "Filter selected. Waiting for the host's audio settings. Convolver checks "
+                      "the filter when the host plays audio through the plug-in.";
+        else if (!host)
             m.plays = "Waiting for audio settings from the host. The filter then plays if it fits "
                       "the host's sample rate and channels.";
         if (host && !filter.notice().empty())
@@ -250,7 +253,7 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
     std::vector<HostFact> audio;
     const auto& host = facts.host;
     const auto& c = filter.filter();
-    const auto& failure = filter.failure();
+    const auto& failure = filter.shown_failure();
     const int rate = host ? host->sample_rate : 0;
     constexpr const char* not_started = "not known until the host sends its audio settings";
 
@@ -375,7 +378,12 @@ std::optional<std::uint64_t> parse_filter_identity_text(std::string_view text) n
     return value;
 }
 
-HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
+HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
+    // PLUG-27: a chosen filter awaiting validation is not judged against a
+    // start that may have been at a placeholder rate (HostFilter::waiting()).
+    HostReportFacts facts = given;
+    if (filter.waiting())
+        facts.host.reset();
     HostReport r;
     r.status = host_status(filter, facts.host, facts.log_written, facts.settings, facts.bypassed,
                            facts.chooses_files);
@@ -398,7 +406,7 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
     r.explanation = explanation(m);
 
     const auto& c = filter.filter();
-    const auto& failure = filter.failure();
+    const auto& failure = filter.shown_failure();
     const auto& accepted = filter.accepted();
     if (c)
         r.filter_name = accepted.source == HostFilterSource::file && !accepted.path.empty()

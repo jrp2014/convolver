@@ -699,6 +699,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
     estimating_ = estimating;
     identity_ = identity;
     failed_ = state.failed;
+    awaiting_ = request.kind == HostRequestKind::chosen_file && keep_mismatch;
     accepted_ = std::move(request);
     if (offered)
         offered_name_ = std::move(offered);
@@ -1051,7 +1052,8 @@ const char* no_dry_reason(HostDrySignal rule) noexcept {
 }
 
 HostStatus host_status_value(const HostFilter& filter, bool host_known, bool bypassed) noexcept {
-    if (filter.failure())
+    host_known = host_known && !filter.waiting(); // PLUG-27: awaiting validation.
+    if (filter.shown_failure())
         return HostStatus::load_failed;
     if (filter.faults().any() && !filter.failed())
         return HostStatus::fault;
@@ -1064,9 +1066,12 @@ HostStatus host_status_value(const HostFilter& filter, bool host_known, bool byp
     return HostStatus::no_filter;
 }
 
-HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLayout>& host,
+HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLayout>& known,
                            bool log_written, const HostSettings& settings, bool bypassed,
                            bool chooses_files) {
+    // PLUG-27: a chosen filter awaiting validation is not judged against a
+    // start that may have been at a placeholder rate.
+    const auto host = filter.waiting() ? std::optional<HostLayout>() : known;
     const char* details =
         log_written ? " Details in the Convolver log." : " The log could not be written.";
     HostStatusLine line;
@@ -1075,7 +1080,7 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
     // filter's own counts while it plays). A failed load with no filter
     // kept never has one, whatever the host (jrp, 7 November 2026).
     const bool dry_known = host && dry_signal(filter, *host);
-    const auto& failure = filter.failure();
+    const auto& failure = filter.shown_failure();
     const bool never_dry = dry_signal_before_host(filter) == HostDrySignal::failed_load;
     const bool dry_unknown = !host && !never_dry && clamp_mix(settings.mix) < 1;
     // PLUG-36 (jrp, 20 November 2026): bypass plays the untouched input
@@ -1136,6 +1141,10 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
     case HostStatus::active:
     case HostStatus::unchecked: {
         const auto& c = filter.filter();
+        if (!host && filter.awaiting()) { // PLUG-27, jrp's words (20 November 2026).
+            line.text = "Filter selected. Waiting for the host's audio settings.";
+            break;
+        }
         const auto ignored = host ? ignored_inputs(*c, *host, "-") : std::string();
         line.text = "Filter loaded: " + std::to_string(c->sample_rate) + " Hz, " +
                     ports(c->input_channels, c->output_channels) +
