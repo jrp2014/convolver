@@ -931,12 +931,14 @@ void list_read_again() {
                                        << "room.wav\n1\n1\n1\n";
     std::ofstream(folder / "rates.txt") << "slow.cfg\nroom.cfg\n";
     Unit unit;
-    // Initialized at 44.1 kHz, nothing rendered: the formats are not known.
+    // Initialized at 44.1 kHz and uninitialized with nothing rendered (a
+    // JUCE host's probe): the formats are not known. (While initialized,
+    // the list would take the entry for that initialization's formats.)
     check(unit.configure(44100, 2, 2, 512), "44.1 kHz formats for the list");
     check(unit.initialize(), "44.1 kHz initialization for the list");
+    unit.uninitialize();
     require(choose(unit, (folder / "rates.txt").string()) != noErr,
             "a list chosen before rendering");
-    unit.uninitialize();
     auto r = report(unit);
     require(r.fix.find("Play audio once") != std::string::npos,
             "before rendering, the list's Fix: " + r.fix);
