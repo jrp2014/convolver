@@ -263,7 +263,7 @@ void properties(const au_test::LogSince& log) {
             "a window offered without the component bundle");
 
     auto r = report(unit);
-    require((r.status_name == "No filter"), "empty: " + text(r.status_name));
+    require(r.status_name == "No filter", "empty: " + text(r.status_name));
     require(contains(r.explanation, "load a Convolver preset"), "empty: " + text(r.explanation));
     require(contains(r.title, "Audio Unit #"), "title: " + text(r.title));
 
@@ -274,13 +274,13 @@ void properties(const au_test::LogSince& log) {
     check(unit.load(state_of(identity(44100, 2))), "stereo preset");
     require(report_changes.load() > 0, "no report change after a load");
     r = report(unit);
-    require((r.status_name == "Waiting"), "before start: " + text(r.status_name));
+    require(r.status_name == "Waiting", "before start: " + text(r.status_name));
     check(unit.configure(44100, 1, 1, 512), "mono formats");
     const auto before = report_changes.load();
     check(unit.initialize(), "mono initialization");
     require(report_changes.load() > before, "no report change after initialization");
     r = report(unit);
-    require(r.status.status == HostStatus::load_failed && (r.status_name == "Load failed"),
+    require(r.status.status == HostStatus::load_failed && r.status_name == "Load failed",
             "mono track: " + text(r.status_name));
     for (const char* part : {"plays silence", "Give the plug-in 2 inputs and 2 outputs",
                              "put Convolver on a stereo track"})
@@ -387,7 +387,7 @@ void window() {
                 "\nNote: " + text(view.noteField.stringValue));
     // jrp, 7 November 2026: one Choose… button, highlighted, not a second
     // one in the message.
-    require((r.action == "choose filter") &&
+    require(r.action == "choose filter" &&
                 [view.chooseButton.bezelColor isEqual:[NSColor controlAccentColor]] &&
                 view.diagnosticsButton.bezelColor == nil,
             "fix button: " + text(r.action));
@@ -768,7 +768,7 @@ void files() {
             "a chosen file sent no ClassInfo or PresentPreset notification");
     require(present_preset(unit) == "stereo.wav", "present preset: " + present_preset(unit));
     auto r = report(unit);
-    require((r.status_name == "Active") && [view.statusField.stringValue isEqualToString:@"Active"],
+    require(r.status_name == "Active" && [view.statusField.stringValue isEqualToString:@"Active"],
             "after the stereo file: " + text(r.status_name) + ": " + text(r.explanation));
     require(contains(reference_text(r), stereo.c_str()) &&
                 [view.filterNameField.stringValue isEqualToString:@"stereo.wav"],
@@ -948,8 +948,8 @@ void chosen_before_rendering() {
     // jrp (20 November 2026): an unrendered start at 44.1 kHz is too little
     // evidence to say the filter is wrong.
     auto r = report(unit);
-    require((r.status_name == "Waiting") &&
-                (r.status.text == "Filter selected. Waiting for the host's audio settings."),
+    require(r.status_name == "Waiting" &&
+                r.status.text == "Filter selected. Waiting for the host's audio settings.",
             "chosen before rendering: " + text(r.status_name) + ": " + text(r.status.text));
     unit.uninitialize();
     // Nothing rendered: a list waits, refused as any file is, saying what
@@ -977,7 +977,7 @@ void chosen_before_rendering() {
     render_block(unit, 2, 2);
     unit.uninitialize();
     r = report(unit);
-    require((r.status_name == "Waiting"),
+    require(r.status_name == "Waiting",
             "rendered, stopped, unread: " + text(r.status_name) + ": " + text(r.status.text));
     // A report read while the host renders at 44.1 kHz confirms the
     // mismatch: Silent, with both rates.
@@ -985,7 +985,7 @@ void chosen_before_rendering() {
     render_block(unit, 2, 2);
     r = report(unit);
     const std::string silent = text(r.status.text);
-    require((r.status_name == "Load failed") && silent.find("Silent: ") == 0 &&
+    require(r.status_name == "Load failed" && silent.find("Silent: ") == 0 &&
                 silent.find("44100 Hz") != std::string::npos &&
                 silent.find("48000 Hz") != std::string::npos,
             "read while rendering a 48 kHz file at 44.1 kHz: " + text(r.status_name) + ": " +
@@ -1101,7 +1101,7 @@ void faults(const au_test::LogSince& log) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         r = report(unit);
     }
-    require((r.status_name == "Fault") && contains(r.explanation, logged),
+    require(r.status_name == "Fault" && contains(r.explanation, logged),
             "fault report: " + text(r.status_name) + ": " + text(r.explanation));
     require(status_value(unit) == fault, "reading the report cleared Fault");
     require(count(log.text(), logged) == 1, "fault not logged once");
@@ -1110,7 +1110,7 @@ void faults(const au_test::LogSince& log) {
         render();
         r = report(unit);
     }
-    require((r.status_name == "Fault") && status_value(unit) == fault,
+    require(r.status_name == "Fault" && status_value(unit) == fault,
             "Fault lost while faults go on");
     require(count(log.text(), logged) == 1,
             "polling logged the faults again: " + std::to_string(count(log.text(), logged)));
@@ -1120,7 +1120,7 @@ void faults(const au_test::LogSince& log) {
     // formats it rendered with, but no processor runs.
     unit.uninitialize();
     r = report(unit);
-    require((r.status_name == "Fault") &&
+    require(r.status_name == "Fault" &&
                 contains(r.plays, "The filter is kept and plays when the host starts again.") &&
                 !contains(r.plays, "keeps playing"),
             "a fault, then stopped: " + text(r.status_name) + ": " + text(r.plays));

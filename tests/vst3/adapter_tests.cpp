@@ -3822,6 +3822,105 @@ void messages_through_proxies() {
     }
     std::filesystem::remove_all(folder);
 }
+// PLUG-39 step 5a (the independent review of PR #246): a status message
+// whose report does not decode, as a damaged message would, is not shown,
+// but the load answer it carries still counts, and notify says the message
+// was not valid.
+class Damaging final : public IConnectionPoint {
+  public:
+    explicit Damaging(IConnectionPoint& to) : to_(to) {}
+    tresult PLUGIN_API connect(IConnectionPoint*) override {
+        return kResultOk;
+    }
+    tresult PLUGIN_API disconnect(IConnectionPoint*) override {
+        return kResultOk;
+    }
+    tresult PLUGIN_API notify(IMessage* message) override {
+        const void* data = nullptr;
+        uint32 size = 0;
+        auto* attributes = message ? message->getAttributes() : nullptr;
+        if (damage && attributes && attributes->getBinary("report", data, size) == kResultOk &&
+            size > 1) {
+            // The same message with the report cut short. A new message,
+            // since the SDK's HostAttributeList leaks the value setBinary
+            // replaces.
+            IPtr<HostMessage> cut = owned(new HostMessage);
+            cut->setMessageID(message->getMessageID());
+            auto* to = cut->getAttributes();
+            to->setBinary("report", data, size / 2);
+            for (const char* key : {"load request", "accepted", "latency request"}) {
+                int64 value = 0;
+                if (attributes->getInt(key, value) == kResultOk)
+                    to->setInt(key, value);
+            }
+            last = to_.notify(cut);
+            ++damaged;
+            return last;
+        }
+        return to_.notify(message);
+    }
+    tresult PLUGIN_API queryInterface(const TUID _iid, void** obj) override {
+        QUERY_INTERFACE(_iid, obj, FUnknown::iid, IConnectionPoint)
+        QUERY_INTERFACE(_iid, obj, IConnectionPoint::iid, IConnectionPoint)
+        *obj = nullptr;
+        return kNoInterface;
+    }
+    uint32 PLUGIN_API addRef() override {
+        return 1;
+    }
+    uint32 PLUGIN_API release() override {
+        return 1;
+    }
+    bool damage = false;
+    tresult last = kResultOk;
+    int damaged = 0;
+
+  private:
+    IConnectionPoint& to_;
+};
+void damaged_report_message() {
+    const auto folder = private_temp("convolver-vst3-damaged-report");
+    std::filesystem::create_directories(folder);
+    const auto good = folder / "room.wav";
+    write_wav(good, 48000, 1, 8);
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk,
+            "damaged report: initialize");
+    Damaging to_controller(c);
+    require(p.connect(&to_controller) == kResultOk && c.connect(&p) == kResultOk,
+            "damaged report: connect");
+    const auto before = shown(c.report());
+    const auto text_before = c.status_text();
+    require(before.status_name == "No filter",
+            ("damaged report: first report " + before.status_name).c_str());
+    to_controller.damage = true;
+    require(c.load_file(good.string()), "a load whose answer came with a damaged report was "
+                                        "not answered as accepted");
+    require(to_controller.damaged > 0 && to_controller.last == kInvalidArgument,
+            "notify accepted a report that does not decode");
+    const auto during = shown(c.report());
+    require(during.status_name == "No filter" && during.filter_name == before.filter_name &&
+                c.status_text() == text_before,
+            ("a damaged report replaced the one shown: " + during.status_name + " " +
+             during.filter_name)
+                .c_str());
+    require(handler.dirty == 1, "the accepted load did not mark the project changed");
+    // Whole again: the next report shows the filter.
+    to_controller.damage = false;
+    const auto after = shown(c.report());
+    require(after.filter_name == "room.wav" && c.status_text() != text_before,
+            ("the next whole report not shown: " + after.status_name + " " + after.filter_name)
+                .c_str());
+    p.disconnect(&to_controller);
+    c.disconnect(&p);
+    c.terminate();
+    p.terminate();
+    std::filesystem::remove_all(folder);
+}
 // PLUG-13 (jrp's review of 276c7dc): a filter that fills the saved state at
 // default settings loaded and saved, and after Gain changed to -6 dB
 // getState() failed. Load, change a setting, save and restore, at the limit.
@@ -4000,6 +4099,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"load_with_failing_set_dirty", [] { load_without_set_dirty(true); }},
         {"saved_filter_name", saved_filter_name},
         {"messages_through_proxies", messages_through_proxies},
+        {"damaged_report_message", damaged_report_message},
         {"settings_at_state_limit", settings_at_state_limit},
         {"tail_measured_at_output", tail_measured_at_output},
         {"output_silence_flags", output_silence_flags},

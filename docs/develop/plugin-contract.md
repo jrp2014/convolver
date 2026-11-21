@@ -635,9 +635,10 @@ separate processes, so each carries values, never pointers:
   report under its own lock, derives the Status parameter, its text and the
   window's content from it, does not show a report that does not decode
   (answering kInvalidArgument, though the load or Latency answer the message
-  carries still counts), and asks the host to reread the parameters only when the Status line
-  changed; Copy diagnostics joins the report's text with the recent log
-  lines (`diagnostics_text()`).
+  carries still counts; `vst3.adapter` `damaged_report_message`), and asks
+  the host to reread the parameters only when the Status line changed; Copy
+  diagnostics joins the report's text with the recent log lines
+  (`diagnostics_text()`).
 - A window reading the report sends `ConvolverReport`, and the processor
   answers with a fresh `ConvolverStatus`, so faults the audio thread counted
   appear as they do in the Audio Unit's twice-a-second read. It looks for new
