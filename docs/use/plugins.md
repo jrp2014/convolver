@@ -182,7 +182,10 @@ needs the rate and channels to choose its entry, so it uses the ones the
 host last ran the plug-in with; before the host has run it with them, the
 list is not loaded, and the window says: "Play audio once so Convolver can
 check the host's sample rate and channel counts, then choose the
-configuration list again." LV2 knows its host's rate and channels from the
+configuration list again." If the list has no entry for the rate the host
+last ran at, it is refused naming that rate, and while the host is not
+playing the advice adds the same step, for a host such as Audacity that
+runs the plug-in briefly at 44.1 kHz before it first plays. LV2 knows its host's rate and channels from the
 start, so it checks every file at once.
 
 ## When a filter does not fit

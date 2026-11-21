@@ -218,6 +218,17 @@ read_filter_file(const std::string& path, const std::optional<HostLayout>& known
             failure.message =
                 fractional_rate_refusal(path, host, std::move(rates), !failure.carried);
         }
+        // PLUG-27 (jrp, 21 November 2026): the host is not playing, so the
+        // configuration the list was checked against may be a placeholder
+        // (Audacity's 44.1 kHz before it first plays). The message keeps
+        // naming it, and the fix says what to do if it is one; a host that
+        // has played at that rate needs the normal fix, so this cannot loop.
+        if (e.list && !settled)
+            failure.message.fix +=
+                std::string(failure.message.fix.empty() ? "" : " ") +
+                "If the host has not played audio at your project's rate yet, play audio once so "
+                "Convolver can check the host's sample rate and channel counts, then choose the "
+                "configuration list again.";
     } catch (const std::exception& e) {
         if (wider_entry) // Refused after the entry was named (out of memory).
             wider_entry->clear();

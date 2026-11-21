@@ -150,8 +150,12 @@ before they set the sample rate and channel layout (VST3 `setState` before
   first playback chooses its 44.1 kHz entry,
   since that moment's start is indistinguishable from a real one; it then
   plays silence at the project's rate, with the reason, until chosen again
-  after playing; and a list with no 44.1 kHz entry is refused there for
-  having none (`vst3.adapter` `chosen_before_host_plays` replays
+  after playing; and a list with no 44.1 kHz entry is refused there as a
+  normal mismatch naming 44100 Hz, whose fix adds, while the host is not
+  playing, "If the host has not played audio at your project's rate yet,
+  play audio once so Convolver can check the host's sample rate and channel
+  counts, then choose the configuration list again." (jrp, 21 November
+  2026; no guess at whether a start was Audacity's) (`vst3.adapter` `chosen_before_host_plays` replays
   Audacity's order; `native.filter_file` `before_host_settles`,
   `native.host_settling` `chosen_file`).
 - One shared record holds both formats' rules: `HostSettling` in

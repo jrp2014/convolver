@@ -122,7 +122,9 @@ Until 1.0 the C++ API may change between minor versions.
   20 November 2026, [record](docs/archive/reviews/2026-11-20-vst3-17-audacity.md)).
   A configuration list needs the host's rate and channels to choose its
   entry: before the host has started the plug-in it is not loaded, and the
-  window says to play audio once, then choose the list again. While the
+  window says to play audio once, then choose the list again; a list with
+  no entry for the rate the host last ran at is refused naming it, with
+  the same step added to the advice while the host is not playing. While the
   host plays, a file that does not suit it is still refused and the working
   filter keeps playing. VST3 and the Audio Unit; not yet checked in
   Audacity ([when a chosen file is checked](docs/use/plugins.md#loading-a-filter)).

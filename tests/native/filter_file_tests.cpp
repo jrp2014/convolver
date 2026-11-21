@@ -503,6 +503,29 @@ void before_host_settles(const fs::path& dir) {
                               detail::libsndfile_files(), why) &&
                 why.kind == HostFailureKind::sample_rate,
             "a single filter for another rate accepted while the host plays");
+    // jrp (21 November 2026): a list with no entry for a configuration the
+    // host has started with but is not playing (Audacity's placeholder
+    // 44.1 kHz) is refused as a normal mismatch naming that rate, and the fix
+    // adds what to do if the host has not played at the project's rate yet;
+    // while the host plays, the fix is the normal one alone.
+    {
+        std::ofstream list(dir / "early-48k.txt");
+        list << "early.cfg\n";
+    }
+    const std::string play_once =
+        "If the host has not played audio at your project's rate yet, play audio once so "
+        "Convolver can check the host's sample rate and channel counts, then choose the "
+        "configuration list again.";
+    const HostLayout placeholder{44100, 2, 2};
+    for (const bool settled : {false, true}) {
+        require(!read_filter_file((dir / "early-48k.txt").string(), placeholder,
+                                  detail::libsndfile_files(), why, nullptr, nullptr, settled) &&
+                    why.kind == HostFailureKind::sample_rate &&
+                    has(why.message.problem, "44100 Hz") &&
+                    has(why.message.fix, play_once) == !settled && why.message.fix != play_once,
+                "a list with no entry for the host's rate, settled " + std::to_string(settled) +
+                    ": " + detail::advice_text(why.message));
+    }
     // Something that is not a filter is refused as before, naming the file.
     {
         std::ofstream junk(dir / "early-junk.cfg");
