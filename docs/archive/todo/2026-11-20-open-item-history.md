@@ -271,7 +271,7 @@ LV2 (Linux first; also PipeWire system audio):
   ordering and the filter's name) and sixteen values kept as copies. Step
   0's protection tests are in PR #200 (the lifecycle runner's Gain and
   Latency, the harness's `same-filter-new-latency`, and the
-  [list](../../project/plans/2026-11-13-load-restore-consolidation.md#protection-for-every-step)
+  [list](../plans/2026-11-13-load-restore-consolidation.md#protection-for-every-step)
   of tests that reach into the machinery). Step 1a, in PR #205, decides
   once in `HostFilter::load()` whether a request holds the accepted filter
   and then reuses its peak and gains instead of analysing it again. Step
@@ -286,7 +286,7 @@ LV2 (Linux first; also PipeWire system audio):
   Unit. Step 2, in PR #226, gathers VST3's and the Audio Unit's rules for when the host
   has settled its rate and channels into one record, `HostSettling`, each
   format keeping its own binding. Step 4c, in PR #230, gives the status one ordering, `host_status_value()`, which `host_status()`, the report and LV2's status port follow. Step 4b, in PR #231, gives a filter's saved name one rule, `HostFilter::offer_name()`, which VST3 offers its controller state's name to. Step 4's diagnostic texts (the report, the log lines), in PR #232, now follow bypass as Status does. **Remains:** the
-  [consolidation plan](../../project/plans/2026-11-13-load-restore-consolidation.md)'s
+  [consolidation plan](../plans/2026-11-13-load-restore-consolidation.md)'s
   steps 4a (the Audio Unit's snapshot, with PLUG-30, on a shared accepted
   filter as jrp chose on 20 November 2026, in 0.17.0, recorded in
   [decisions](../../project/decisions.md#plug-in-behaviour)) and 5 to 6: typed reports and advice. Plan and order approved by jrp on 13 November
@@ -845,7 +845,7 @@ only where they leave the library (DIAG-4).
 When this code next changes for another reason, three narrow
 simplifications from jrp's review of 12 November 2026 go with it; none is a
 project of its own, and none changes a message a user reads. PLUG-39's
-[steps](../../project/plans/2026-11-13-load-restore-consolidation.md#steps)
+[steps](../plans/2026-11-13-load-restore-consolidation.md#steps)
 1 and 5 carry them out:
 
 - Exceptions carry `Advice` as a typed error rather than English-labelled

@@ -231,7 +231,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
   split of `host.cpp`, a command framework or a state machine (jrp's review of
   the adapters against the historical VST plug-in). See [Independent
   review](../develop/workflow.md#check), [consolidation
-  plan](plans/2026-11-13-load-restore-consolidation.md).
+  plan](../archive/plans/2026-11-13-load-restore-consolidation.md).
 - **13 November 2026.** PLUG-39's step 3, deferred reclamation of the playing
   processor, is approved in principle ("approve deferred reclamation in
   principle, revise these contracts, and implement it as a separately
@@ -247,7 +247,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
   requirement. Success is simpler ownership with unchanged audio and host
   behaviour, measured by duplicated decisions and independently maintained
   values rather than member counts. See [Consolidation
-  plan](plans/2026-11-13-load-restore-consolidation.md#steps).
+  plan](../archive/plans/2026-11-13-load-restore-consolidation.md#steps).
 - **13 November 2026.** PLUG-39's plan and order are approved; approving the
   plan is not approving its implementation, and each step's pull request is
   reviewed and tested on its own. Step 0's protection tests wait until after
@@ -259,13 +259,13 @@ Contents: [direction](#direction) · [releases](#releases) ·
   the change-scope rule, as VST3 and the Audio Unit do (an audible change in
   its own commit); the VST3 and Audio Unit difference in when host settings
   count as settled is kept. See [Consolidation
-  plan](plans/2026-11-13-load-restore-consolidation.md#decisions).
+  plan](../archive/plans/2026-11-13-load-restore-consolidation.md#decisions).
 - **18 November 2026.** PLUG-39's step 1 starts with the redundant analysis on
   a restore: once `HostFilter::load()` has established that the request holds
   the accepted filter, equal in full, it reuses that filter's peak and gain
   figures and finds an estimate only when newly needed, as part of step 1's
   single decision rather than a separate cache (jrp's review of 0.13.28). See
-  [Consolidation plan](plans/2026-11-13-load-restore-consolidation.md#steps).
+  [Consolidation plan](../archive/plans/2026-11-13-load-restore-consolidation.md#steps).
 - **18 November 2026.** Pull requests run the fuzz workflow only when they
   change what the fuzz targets are built from (their harnesses and inputs, the
   parsers, state decoder and audio reader with the code compiled in with them,
@@ -287,6 +287,14 @@ Contents: [direction](#direction) · [releases](#releases) ·
 
 ## Releases
 
+- **21 November 2026.** Version 0.18.0, after 0.17.x, for PLUG-39 step 6's
+  library change (`HostChange::inactive_tail` is removed;
+  `HostFilter::filter_tail()` gives the accepted filter's tail), following
+  the rule that an incompatible API change before 1.0 needs a minor step
+  (jrp chose "A — close PLUG-39 when #256 merges and take 0.18.0"). LV2's
+  minor version 36 is even, which LV2 accepts. See
+  [Versioning](../develop/versioning.md#minor-and-major-versions),
+  [CHANGELOG](../../CHANGELOG.md).
 - **21 November 2026.** A plug-in workload is supported when, run as the
   plug-ins run it, its mean cost is at most 25% of one core and its
   99th-percentile callback at most half its period, on every machine
@@ -354,7 +362,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
   step 4), PLUG-36 (after step 1b) and PLUG-24 (its own pull request) leave
   the parked list and are folded into PLUG-39's sequence (jrp's "yes" to
   continuing it unattended with those four folded in). See [Consolidation
-  plan](plans/2026-11-13-load-restore-consolidation.md#steps).
+  plan](../archive/plans/2026-11-13-load-restore-consolidation.md#steps).
 - **18 November 2026.** Lifting the runtime freeze on 10 November also ended
   the 6 November hold on optional features until the first independent
   walkthrough: optional features, such as PLUG-10's meters and the EDGE items,
@@ -966,7 +974,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
   stays valid after a replacement and that a refused replacement leaves the
   accepted filter. The public API change goes in 0.17.0 (jrp chose "A, share
   the accepted filter"). See
-  [Plan](plans/2026-11-13-load-restore-consolidation.md#steps),
+  [Plan](../archive/plans/2026-11-13-load-restore-consolidation.md#steps),
   [TODO](../../TODO.md) PLUG-39.
 - **20 November 2026.** PLUG-27 is brought forward from parked, after jrp's
   Audacity run of 0.14.0 refused a 48 kHz `.cfg` chosen before playback
@@ -1005,6 +1013,17 @@ Contents: [direction](#direction) · [releases](#releases) ·
   — drop the one-block rule", 21 November 2026). See [Contract: loading and
   failure](../develop/plugin-contract.md#loading-and-failure),
   [plug-ins](../use/plugins.md#loading-a-filter).
+- **21 November 2026.** PLUG-39 closes with step 6. While the processor
+  runs, the tail the host reads stays at the longest filter it has played,
+  so audio already ringing out has time to finish after a short filter
+  replaces a long one; once the host deactivates the VST3 plug-in or
+  uninitializes the Audio Unit, the reported tail and the window's
+  Ring-out row describe the filter the user has selected. The plan's final
+  REAPER and GarageBand check stays open as status checks 2, 5 and 8 on
+  the next preview rather than holding the item open (jrp: "A — close
+  PLUG-39 when #256 merges and take 0.18.0"). See [Contract: replacement
+  and threads](../develop/plugin-contract.md#replacement-and-threads),
+  [consolidation plan](../archive/plans/2026-11-13-load-restore-consolidation.md#steps).
 - **21 November 2026.** PLUG-40, from jrp's Audacity pass: once the host's
   settings are known, a list refused before them says so, in Status and the
   window from the same known layout ("The host's settings are now known

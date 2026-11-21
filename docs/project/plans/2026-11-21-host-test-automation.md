@@ -90,4 +90,4 @@ than adding a framework; each step avoids long CI cycles for small changes;
 and the adapters' source is left to the items that own it (PLUG-39,
 PLUG-27). Host behaviour a step finds that differs from the guides is
 recorded under [unresolved host findings](../../develop/host-testing.md#unresolved-host-findings)
-with a TODO item, as HOST-9's Ardour VST3 finding is under HOST-10.
+with a TODO item, as HOST-9's Ardour VST3 finding was under HOST-10.

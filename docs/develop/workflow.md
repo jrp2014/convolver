@@ -263,9 +263,7 @@ Report only problems you can point to in the diff, with file and line.
 - [ ] **Special cases and state:** does the change remove an existing
   special case, or add another state, copy or decision that every later
   change must remember? A fix that adds one says why the existing records
-  could not carry it, and a plug-in change counts against the
-  [consolidation plan's inventory](../project/plans/2026-11-13-load-restore-consolidation.md#inventory)
-  while PLUG-39 is open.
+  could not carry it.
 - [ ] **Moves and deletions:** text removed from one page exists on another,
   and old paths and anchors are gone from code comments, scripts, workflows,
   skills and maintained index pages under `docs/archive/`, which the link
