@@ -1078,17 +1078,10 @@ void status_names_settings() {
     require(!contains(host_status(filter, layout, true, HostSettings{}).text, "estimate"),
             "Set mode says nothing about the estimate");
 
-    // Too loud to estimate, with a bound: No clipping's gain plays.
-    Configuration loud{48000, 1, 1, 0, {}, {}, {{{3e38f}, {{0, 1}}, {{0, 1}}}}};
-    const auto loud_gains = filter_gains(loud);
-    require(!loud_gains.estimate_db && loud_gains.estimate_failed && loud_gains.no_clipping_db,
-            "the loud filter should fail its estimate and keep its bound");
-    HostFilter too_loud;
-    too_loud.estimate(true);
-    too_loud.load(HostState{loud}, layout);
-    line = host_status(too_loud, layout, true, estimate);
-    require(contains(line.text, " Too loud to estimate: No clipping's gain plays."),
-            "too loud: " + line.text);
+    // "Too loud to estimate" (estimate_failed with a bound) has no portable
+    // test filter: whether the noise overflows before the bound does depends
+    // on the FFT library's intermediate values (a Release candidate build
+    // found the estimate for a 3e38 tap that a Debug build could not).
     // No figure at all: silence, whichever mode needs one.
     Configuration huge{48000, 1, 1, 0, {}, {}, {}};
     for (int i = 0; i < 2; ++i)
