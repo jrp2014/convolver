@@ -627,7 +627,7 @@ for. Both run the same engine, so the CLI alone could hide a shared defect.
 | `same-filter-new-latency` | During playback, state holding the filter already playing (lengthened as above) with Latency 256 and Gain −6 dB builds a new processor, as the Latency row of the [scope of each change](plugin-contract.md#scope-of-each-change) says: the host is told 256 frames at once, the tail is the filter's, and from the next frame the filter plays at the new latency and the state's Gain with fresh history, nothing of the earlier audio or its tail (PLUG-39 step 0). Skipped where restored settings are not applied within the restore: the Audio Unit applies a restored Latency later, on its own queue (`au.adapter`'s `latency_parameter` checks the reported latency and the delay for this case), and LV2's host sets its ports |
 | `failed-replacement` | A filter at the wrong rate, input count or output count is rejected while active; the running filter plays on uninterrupted and stays the saved state |
 | `failed-replacement-inactive` | The same while inactive: rejected at once, and reactivation plays the last valid filter |
-| `failed-initial-load` | A first filter that cannot be used is rejected, nothing is saved, and the instance plays exact silence, never its input; a valid filter loads afterwards |
+| `failed-initial-load` | A first filter that cannot be used is rejected, nothing is saved, and the instance plays exact silence, never its input; a valid filter loads afterwards. VST3 and the Audio Unit keep a wrong-rate first filter instead (PLUG-42: nothing plays that a refusal would protect), save it as the filter, and play the same silence |
 | `empty-instance` | Nothing loaded: identity for equal counts, exact silence for unequal counts |
 | `bypass` | A 1.33 ms ramp (64 frames at 48 kHz) to the input delayed by 256 frames (input *c* to output *c*), and back. With unequal counts the ramp goes to silence on every output instead |
 | `reset` | Exact silence after a reset, then the filter plays as if fresh |
@@ -1379,10 +1379,10 @@ example plays. Ardour 8's window can set only the outputs for a VST3 (its
 input pins as Ardour has them (2), and the other sets the input pins to 1
 as well. Ardour 8.4 restarts the plug-in with the new outputs a little
 after `customize_plugin_insert` returns, and runs it with the old ones
-meanwhile. A preset loaded in between is judged against 2 in, 2 out and
-refused (the log says "Not loaded"). It is not tried again when the
-plug-in restarts at 2 in, 1 out, so the session saves the refusal and the
-export is silent (PLUG-42). Before the script waited for the restart, this
+meanwhile. Until PLUG-42, a preset loaded in between was judged against
+2 in, 2 out and refused (the log said "Not loaded"); it was not tried again
+when the plug-in restarted at 2 in, 1 out, so the session saved the refusal
+and the export was silent. Before the script waited for the restart, this
 happened locally on 21 November 2026:
 
 - in 5 of 9 runs with the input pins set as well;
@@ -1393,8 +1393,7 @@ happened locally on 21 November 2026:
 A user sees the change in the window before choosing a filter. So the
 script now waits, after setting the channels, until the Convolver log says
 the plug-in started with the new outputs (by the first 50 ms poll each
-time on 8.4), and the
-guide says to choose the filter again if it was chosen before. With the
+time on 8.4). With the
 wait, both cases played within 2.6e-8 of the oracle, locally on 8.4:
 
 - in five runs on `d7a217b`'s VST3;
@@ -1412,6 +1411,18 @@ and again at `28dec71`
 ([run 44931897154](https://github.com/jrp2014/convolver/actions/runs/44931897154)),
 whose log lines show, in both, the refused request, then 2 in, 2 out, then
 1 in, 1 out.
+
+PLUG-42 keeps such a preset when no other filter plays, and plays it at
+the restart. To check that, the wait was switched off in a local copy of
+the script and the whole VST3 test run four times on 8.4 with PLUG-42's
+VST3 (`42c2f2a`, 21 November 2026): every case of every run matched the
+oracle (worst 5.96e-8; the two hand-set mono cases within 2.75e-8). In
+one run the outputs-only case met the race: the log says "Request 1:
+Loaded a filter for 48000 Hz, 1 in, 1 out. It does not suit the host's
+present configuration, so it is kept until it does", then "Started at
+48000 Hz, 2 in, 1 out ... Playing a filter for 48000 Hz, 1 in, 1 out",
+and the export matched within 2.17e-8. The script keeps the wait, since a
+user sees the change before choosing a filter.
 The crossover set by hand (2 in, 6 out) still got 2 outputs on Ardour 8.4
 and played silence, so the VST3 crossover is not run; for Ardour 9 that
 it gets 2 outputs too comes from reading `request_bus_layout`, not from a

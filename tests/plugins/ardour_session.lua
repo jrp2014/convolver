@@ -148,8 +148,9 @@ if pins ~= "" then
 		"Ardour refused " .. sinks .. " input pins, " .. outputs .. " outputs for the plug-in")
 	-- Ardour 8.4 restarts the plug-in with the new outputs a little after
 	-- customize_plugin_insert returns, while it goes on running it with the
-	-- old ones. A filter chosen in between is judged against those, refused
-	-- and not tried again (HOST-10), so the session would save the refusal.
+	-- old ones. A filter chosen in between is judged against those: until
+	-- PLUG-42 it was refused and not tried again (HOST-10), and the session
+	-- saved the refusal; now it is kept and plays at the restart.
 	-- A user sees the change in the window before choosing a filter: wait,
 	-- as they do, until the log says the plug-in started with these outputs.
 	local started = "Started at %d+ Hz, %d+ in, " .. outputs .. " out"

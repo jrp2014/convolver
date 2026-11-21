@@ -20,6 +20,7 @@
 #include <new>
 #include <optional>
 #include <random>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -1617,6 +1618,278 @@ void same_filter_kept() {
     faulty.clear_faults();
     require(faulty.keep(loud_playing), "a processor cleared of its faults not kept");
 }
+// PLUG-42 (jrp, 21 November 2026): with a host whose configuration is
+// settled now but may change at a later start (HostLoadCheck::
+// keep_unless_one_plays: VST3 and the Audio Unit while the host plays), a
+// filter that does not suit it is refused only while a suiting filter
+// plays. jrp's two tests: a waiting filter starts when the settings fit
+// (Ardour 8.4 restarting the plug-in with new outputs a little after a
+// preset loaded), and a refused replacement leaves the working filter
+// selected across a restart.
+void kept_unless_one_plays() {
+    const HostLayout stereo{48000, 2, 2}, six{48000, 2, 6};
+    const Configuration two{48000, 2, 2, 0, {}, {}, {{{.5f}, {{0, 1}}, {{0, 1}}}}};
+    const Configuration crossover{48000, 2, 6, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
+    const auto refused = [](auto&& load) {
+        try {
+            load();
+        } catch (const std::invalid_argument&) {
+            return true;
+        }
+        return false;
+    };
+    const auto check = HostLoadCheck::keep_unless_one_plays;
+    // 1. Nothing plays (an empty instance): the crossover is kept, silent
+    // with the reason, saved as the filter, and plays at the next start
+    // with the outputs it was made for.
+    {
+        HostFilter f(8);
+        static_cast<void>(test::started(f, stereo));
+        f.load(HostState{crossover}, stereo, {}, {}, nullptr, check);
+        require(f.kept_unsuited() && !f.plays_suiting() && !f.rejection(),
+                "a filter refused with nothing playing");
+        require(f.filter() && f.filter()->output_channels == 6 && f.failure() &&
+                    f.failure()->silent && f.failure()->kind == HostFailureKind::channels,
+                "the kept filter is not silent with its reason");
+        require(!f.failed() && saved_of(f).configuration &&
+                    saved_of(f).configuration->output_channels == 6,
+                "the kept filter not saved as the filter");
+        require(!f.awaiting(), "a settled host's check counted as awaiting validation");
+        const auto plays = test::started(f, six);
+        require(!f.failure() && plays.filter && plays.filter->output_channels == 6,
+                "the kept filter does not play at a start that suits it");
+    }
+    // A filter that does not suit the host after a restart plays nothing
+    // either, so the latest choice replaces it.
+    {
+        HostFilter f(8);
+        f.load(HostState{two}, stereo);
+        static_cast<void>(test::started(f, six));
+        require(f.failure() && f.failure()->silent, "a filter that does not suit plays");
+        auto quieter = two;
+        quieter.paths[0].impulse[0] = .25f;
+        require(!refused([&] { f.load(HostState{quieter}, six, {}, {}, nullptr, check); }) &&
+                    f.filter() && f.failure() && f.failure()->silent,
+                "a choice refused while the earlier filter played silence");
+        require(f.filter()->paths[0].impulse[0] == .25f, "the latest choice not kept");
+        static_cast<void>(test::started(f, stereo));
+        require(!f.failure(), "the latest choice does not play when the settings fit");
+    }
+    // 2. A suiting filter plays: the crossover is refused, and the playing
+    // filter stays selected across a restart, also at the refused filter's
+    // outputs, and is what is saved.
+    {
+        HostFilter f(8);
+        f.load(HostState{two}, stereo);
+        static_cast<void>(test::started(f, stereo));
+        require(refused([&] { f.load(HostState{crossover}, stereo, {}, {}, nullptr, check); }),
+                "a replacement that does not suit accepted while a filter plays");
+        require(f.rejection() && !f.rejection()->silent, "the refusal not recorded");
+        require(text_of(f.rejection()->message)
+                        .find("The filter Convolver has now stays selected when the host restarts "
+                              "the plug-in, even with settings that suit this one") !=
+                    std::string::npos,
+                "the refusal does not say the playing filter stays selected");
+        const auto again = test::started(f, stereo);
+        require(f.filter() && f.filter()->output_channels == 2 && again.filter &&
+                    again.filter->output_channels == 2 && f.failure() && !f.failure()->silent,
+                "a restart with the same settings switched filters");
+        static_cast<void>(test::started(f, six));
+        require(f.filter() && f.filter()->output_channels == 2,
+                "a restart with the refused filter's outputs switched to it");
+        require(saved_of(f).configuration && saved_of(f).configuration->output_channels == 2,
+                "the refused filter saved");
+    }
+    // jrp's review of #258: on a running empty six-channel instance at
+    // Latency 4096, a kept wrong-rate crossover left output 6 at full level
+    // for the new playback's warm-up (90.6 ms) while Status said Silent; a
+    // refusal on main muted it within 64 frames. What played mutes at once,
+    // as for a failed first load; the silent playback then takes over.
+    {
+        const HostLayout wide{48000, 6, 6};
+        HostSettings settings;
+        settings.latency = 4096;
+        HostProcessor p(unfiltered_playback(wide, false, true), 512, settings);
+        std::vector<std::vector<float>> data(6, std::vector<float>(512, 1.f));
+        std::vector<const float*> in;
+        std::vector<float*> out;
+        for (auto& c : data) {
+            in.push_back(c.data());
+            out.push_back(c.data());
+        }
+        const auto block = [&] {
+            for (auto& c : data)
+                std::fill(c.begin(), c.end(), 1.f);
+            audio_thread = true;
+            const bool ok =
+                p.process(std::span<const float* const>(in), std::span<float* const>(out), 512);
+            audio_thread = false;
+            require(ok, "a block refused");
+        };
+        for (int k = 0; k < 10; ++k) // Past the latency: the input passes.
+            block();
+        require(std::abs(data[5][511] - 1.f) < 1e-5f, "the empty instance does not pass its input");
+        HostFilter f(8);
+        auto wrong_rate = Configuration{44100, 2, 6, 0, {}, {}, {{{1}, {{0, 1}}, {{5, 1}}}}};
+        f.load(
+            HostState{wrong_rate}, wide, [&](const HostPlayback& c) { p.play(c); }, {}, &p, check);
+        require(f.failure() && f.failure()->silent, "the crossover not kept silent");
+        block();
+        for (std::size_t i = 64; i < 512; ++i)
+            require(data[5][i] == 0.f, "output 6 not muted within 64 frames of the kept filter");
+        for (int k = 0; k < 10; ++k) // Past the silent playback's warm-up.
+            block();
+        require(data[5][511] == 0.f && data[0][511] == 0.f, "the kept filter is not silent");
+        // The audio thread may adopt the silent playback before silence()
+        // reaches it: the input it is fading out mutes all the same.
+        HostProcessor q(unfiltered_playback(wide, false, true), 512, settings);
+        const auto q_block = [&] {
+            for (auto& c : data)
+                std::fill(c.begin(), c.end(), 1.f);
+            audio_thread = true;
+            const bool ok =
+                q.process(std::span<const float* const>(in), std::span<float* const>(out), 512);
+            audio_thread = false;
+            require(ok, "a block refused");
+        };
+        for (int k = 0; k < 10; ++k)
+            q_block();
+        const auto before = q.publications();
+        q.play(unfiltered_playback(wide, true, true));
+        q_block(); // Adopted: the input still plays while the new one warms up.
+        require(std::abs(data[5][511] - 1.f) < 1e-5f, "the warm-up did not play the input");
+        q.silence(before);
+        q_block();
+        for (std::size_t i = 64; i < 512; ++i)
+            require(data[5][i] == 0.f, "the faded-out input not muted by silence(through)");
+    }
+    // The independent review of #258: silence() during a replacement's
+    // warm-up mutes the filter still playing as well as the replacement.
+    {
+        const HostLayout pair{48000, 2, 2};
+        HostSettings settings;
+        settings.latency = 4096;
+        HostProcessor p(unfiltered_playback(pair, false, true), 512, settings);
+        std::vector<std::vector<float>> data(2, std::vector<float>(512, 1.f));
+        std::vector<const float*> in{data[0].data(), data[1].data()};
+        std::vector<float*> out{data[0].data(), data[1].data()};
+        const auto block = [&] {
+            for (auto& c : data)
+                std::fill(c.begin(), c.end(), 1.f);
+            audio_thread = true;
+            const bool ok =
+                p.process(std::span<const float* const>(in), std::span<float* const>(out), 512);
+            audio_thread = false;
+            require(ok, "a block refused");
+        };
+        for (int k = 0; k < 10; ++k)
+            block();
+        p.play(unfiltered_playback(pair, false, true));
+        block(); // Adopted: the first one plays while the replacement warms up.
+        require(std::abs(data[0][511] - 1.f) < 1e-5f, "the warm-up did not play the input");
+        p.silence();
+        block();
+        for (std::size_t i = 64; i < 512; ++i)
+            require(data[0][i] == 0.f, "silence() during a warm-up left the playing filter");
+    }
+    // The independent review of #258: a kept filter replacing one kept
+    // before (a host restoring the same preset again, as GarageBand does)
+    // mutes nothing: bypass, and Mix's dry share, play on without a gap.
+    for (const bool bypassed : {true, false}) {
+        const HostLayout pair{48000, 2, 2};
+        HostSettings settings;
+        settings.latency = 4096;
+        settings.mix = bypassed ? 1 : 0.5;
+        HostProcessor p(unfiltered_playback(pair, false, true), 512, settings);
+        std::vector<std::vector<float>> data(2, std::vector<float>(512, 1.f));
+        std::vector<const float*> in{data[0].data(), data[1].data()};
+        std::vector<float*> out{data[0].data(), data[1].data()};
+        const float heard = bypassed ? 1.f : 0.5f;
+        const auto what = std::string(bypassed ? "bypass" : "Mix 50%");
+        const auto block = [&] {
+            for (auto& c : data)
+                std::fill(c.begin(), c.end(), 1.f);
+            audio_thread = true;
+            p.set_bypass(bypassed);
+            const bool ok =
+                p.process(std::span<const float* const>(in), std::span<float* const>(out), 512);
+            audio_thread = false;
+            require(ok, "a block refused");
+        };
+        HostFilter f(8);
+        const auto load = [&](float gain) {
+            auto slow = Configuration{44100, 2, 2, 0, {}, {}, {{{gain}, {{0, 1}}, {{0, 1}}}}};
+            f.load(HostState{slow}, pair, [&](const HostPlayback& c) { p.play(c); }, {}, &p, check);
+            require(f.failure() && f.failure()->silent, what + ": the 44.1 kHz filter not kept");
+        };
+        load(1);
+        for (int k = 0; k < 20; ++k) // Past the kept playback's warm-up.
+            block();
+        require(std::abs(data[0][511] - heard) < 1e-5f && std::abs(data[1][511] - heard) < 1e-5f,
+                what + ": the kept filter does not pass its dry signal");
+        for (const float gain : {1.f, .25f}) { // The same filter again, then another.
+            load(gain);
+            for (int k = 0; k < 20; ++k) {
+                block();
+                for (std::size_t i = 0; i < 512; ++i)
+                    require(std::abs(data[0][i] - heard) < 1e-5f &&
+                                std::abs(data[1][i] - heard) < 1e-5f,
+                            what + ": a kept filter replacing a kept one cut the dry signal");
+            }
+        }
+    }
+    // Codex's review of #258: a kept filter with no dry signal (a 2-to-6
+    // crossover on six channels) replacing a kept one that had one (6 to 6)
+    // mutes the bypassed input at once, rather than for the warm-up.
+    {
+        const HostLayout wide{48000, 6, 6};
+        HostSettings settings;
+        settings.latency = 4096;
+        HostProcessor p(unfiltered_playback(wide, false, true), 512, settings);
+        std::vector<std::vector<float>> data(6, std::vector<float>(512, 1.f));
+        std::vector<const float*> in;
+        std::vector<float*> out;
+        for (auto& c : data) {
+            in.push_back(c.data());
+            out.push_back(c.data());
+        }
+        const auto block = [&] {
+            for (auto& c : data)
+                std::fill(c.begin(), c.end(), 1.f);
+            audio_thread = true;
+            p.set_bypass(true);
+            const bool ok =
+                p.process(std::span<const float* const>(in), std::span<float* const>(out), 512);
+            audio_thread = false;
+            require(ok, "a block refused");
+        };
+        HostFilter f(8);
+        const auto load = [&](const Configuration& c) {
+            f.load(HostState{c}, wide, [&](const HostPlayback& c) { p.play(c); }, {}, &p, check);
+            require(f.failure() && f.failure()->silent, "the 44.1 kHz filter not kept");
+        };
+        std::vector<FilterPath> six_paths;
+        for (std::size_t c = 0; c < 6; ++c)
+            six_paths.push_back({{1}, {{c, 1}}, {{c, 1}}});
+        load(Configuration{44100, 6, 6, 0, {}, {}, six_paths});
+        for (int k = 0; k < 20; ++k)
+            block();
+        require(std::abs(data[5][511] - 1.f) < 1e-5f, "the kept 6-to-6 filter not bypassed");
+        load(Configuration{44100, 2, 6, 0, {}, {}, {{{1}, {{0, 1}}, {{5, 1}}}}});
+        block();
+        for (std::size_t i = 64; i < 512; ++i)
+            require(data[5][i] == 0.f, "a kept crossover left the bypassed input playing");
+    }
+    // LV2 (refuse_mismatch): its layout never changes, so a filter that does
+    // not suit is refused even with nothing playing.
+    {
+        HostFilter f(8);
+        static_cast<void>(test::started(f, stereo));
+        require(refused([&] { f.load(HostState{crossover}, stereo); }) && !f.filter() &&
+                    f.failure() && f.failure()->silent,
+                "refuse_mismatch kept a filter that does not suit");
+    }
+}
 // PLUG-39 step 1b: HostFilter::load() decides what an accepted request
 // changes besides the filter (HostChange), from the request's kind and the
 // state, so that no adapter decides it again (the scope table in
@@ -2572,6 +2845,7 @@ int main() {
             {"shared_filter", shared_filter},
             {"processing_faults", processing_faults},
             {"same_filter_kept", same_filter_kept},
+            {"kept_unless_one_plays", kept_unless_one_plays},
             {"request_changes", request_changes},
             {"costly_moments_against_oracle", costly_moments_against_oracle},
         },

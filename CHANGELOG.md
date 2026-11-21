@@ -78,9 +78,9 @@ yet folded in are in [`changes/`](changes/README.md).
   layouts, while the VST3 plug-in gets 2 inputs and 2 outputs whatever the
   track has, so a mono or crossover filter plays silence; the guide gives
   Pin Connections steps that should let a mono filter play there (the same
-  settings, made from a script, played it; set the channels before choosing
-  the filter, or choose it again after), and a crossover cannot be set up
-  that way. Ardour also leaves Gain mode and Latency out of its controls
+  settings, made from a script, played it; a filter chosen before the
+  channels change plays once they do, since PLUG-42), and a crossover
+  cannot be set up that way. Ardour also leaves Gain mode and Latency out of its controls
   for the VST3 plug-in, and names all four of the LV2 plug-in's settings.
   The LV2 ports table now lists `gain_mode`.
 - Plug-ins (PLUG-40, from jrp's Audacity pass of 21 November 2026): a

@@ -41,6 +41,9 @@ class Vst3 final : public test::Adapter {
         check(process({ins, outs, setup.max_block, 0}), "first block");
         deactivate();
     }
+    bool keeps_unsuited_when_nothing_plays() const override {
+        return true; // PLUG-42.
+    }
     bool create_unconfigured() override {
         destroy();
         processor_ = std::make_unique<convolver::vst3::Processor>();

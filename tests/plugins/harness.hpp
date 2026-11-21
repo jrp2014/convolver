@@ -102,6 +102,14 @@ class Adapter {
         return false;
     }
     virtual void configure(const Setup&) {}
+    // PLUG-42: formats whose hosts may start the plug-in with another rate or
+    // layout later (VST3, the Audio Unit) keep a filter that does not suit the
+    // host when no other filter plays, rather than refusing it: it plays
+    // silence with the reason, is saved as the filter, and plays at a start
+    // that suits it. LV2, whose configuration never changes, refuses it.
+    virtual bool keeps_unsuited_when_nothing_plays() const {
+        return false;
+    }
     // Outputs marked silent by the last process call, where the format has flags.
     virtual std::optional<std::uint64_t> silent_outputs() {
         return std::nullopt;

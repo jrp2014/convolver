@@ -60,10 +60,13 @@ struct FilterFileFailure {
 // .cfg or list as filter_file_state()'s `sources`), for HostRequest::files; it is emptied when the
 // file is refused. `wider_entry`, when given, receives the entry a list's wider-bus choice read
 // (UTF-8), for HostRequest::wider_entry, or is emptied when there was no such choice.
-std::optional<HostState> read_filter_file(const std::string& path,
-                                          const std::optional<HostLayout>& host,
-                                          const detail::SoundFiles& reader,
-                                          FilterFileFailure& failure,
-                                          std::vector<std::string>* files = nullptr,
-                                          std::string* wider_entry = nullptr, bool settled = true);
+// PLUG-42: `keep_unsuited` (settled, but no filter that suits the host plays, so
+// HostFilter::load() keeps one that does not suit rather than refusing it) reads a
+// single filter that does not suit `host` as it is, as `settled` false does, rather
+// than refusing it; a list still needs an entry for `host`.
+std::optional<HostState>
+read_filter_file(const std::string& path, const std::optional<HostLayout>& host,
+                 const detail::SoundFiles& reader, FilterFileFailure& failure,
+                 std::vector<std::string>* files = nullptr, std::string* wider_entry = nullptr,
+                 bool settled = true, bool keep_unsuited = false);
 } // namespace convolver
