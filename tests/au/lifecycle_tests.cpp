@@ -225,10 +225,12 @@ int load_timing(int argc, char** argv) {
     timing::read_flags(options, argc, argv, 3);
     AudioUnitDriver driver;
     const std::vector<timing::Entry> entries{
-        {"RestoreState", [&](const timing::Filter& f,
-                             timing::Audio&) { return timing::Outcome{driver.restore(f.state)}; }},
+        {"RestoreState",
+         [&](const timing::Filter& f, timing::Audio&) {
+             return timing::Outcome{driver.restore(f.state), std::nullopt};
+         }},
         {"load property", [&](const timing::Filter& f, timing::Audio&) {
-             return timing::Outcome{driver.load_file(f.file.string())};
+             return timing::Outcome{driver.load_file(f.file.string()), std::nullopt};
          }}};
     return timing::exit_code(timing::run(driver, entries, timing::workloads(options), options));
 }

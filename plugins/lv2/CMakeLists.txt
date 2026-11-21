@@ -102,6 +102,12 @@ if(CONVOLVER_BUILD_TESTS)
             target_link_libraries(convolver_lv2_${name} PRIVATE Convolver::host Convolver::io
                 convolver_presets convolver_lv2_headers PkgConfig::CONVOLVER_LILV)
             convolver_sanitize(convolver_lv2_${name})
+            # CI-47: the plug-in's warnings for its tests too.
+            if(MSVC)
+                target_compile_options(convolver_lv2_${name} PRIVATE /W4 /permissive- /utf-8)
+            else()
+                target_compile_options(convolver_lv2_${name} PRIVATE -Wall -Wextra -Wpedantic)
+            endif()
             if(name STREQUAL "lifecycle")
                 # The plug-in library must resolve operator new and
                 # pthread_mutex_lock to the guard's definitions.
