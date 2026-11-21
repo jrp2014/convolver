@@ -53,7 +53,7 @@ Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
 
 ### In progress
 
-PLUG-24, then DIAG-10; HOST-11 waits for jrp's second run of the REAPER
+DIAG-10; HOST-11 waits for jrp's second run of the REAPER
 check (PR #255). Check the open pull requests for an ID before starting
 anything.
 
@@ -61,7 +61,6 @@ anything.
 
 | Item | What to do | Note |
 | --- | --- | --- |
-| **PLUG-24** | `HostProcessor` in its own source file | After PLUG-39, as its own pull request, never with a DSP change (jrp, 19 November 2026) |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 
@@ -206,9 +205,6 @@ done once for all three formats:
 - [ ] **PLUG-29 — Keep the Recent list out of the log folder.** Save it in
   each platform's application-support folder, reading the old file once.
   **Done when** the tests cover both paths and the guide names the folder.
-- [ ] **PLUG-24 — `HostProcessor` in its own source file.** Move its audio
-  code out of `host.cpp`, with public APIs, saved state, messages and
-  results unchanged, as its own pull request after PLUG-39.
 
 LV2 (Linux first; also PipeWire system audio):
 
@@ -493,6 +489,8 @@ its linked page and in the [CHANGELOG](CHANGELOG.md).
 Items finished since then are listed here, one line each, until the next
 move to the archive.
 
+- [x] **PLUG-24 — `HostProcessor` in its own source file.** 21 November
+  2026, PR #260 ([architecture](docs/develop/architecture.md#components-and-source-of-truth)).
 - [x] **CI-51 — One Audio Unit job instead of three.** 21 November 2026,
   PR #259 ([CI triggers](docs/develop/testing.md#ci-triggers)).
 - [x] **CI-50 — The VST3 lifecycle test's time limit matches the other

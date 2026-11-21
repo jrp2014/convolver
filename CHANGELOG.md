@@ -267,6 +267,11 @@ first published preview, keep their original grouping.
 
 ### For contributors
 
+- Code (PLUG-24): `HostProcessor`, the plug-ins' audio path, moved out of
+  `portable/host.cpp` into `portable/host_processor.cpp` unchanged; the
+  gain, Mix and dry-signal rules it shares with `HostFilter` are in
+  `portable/host_common.hpp`. Public APIs, saved state, messages and audio
+  are the same.
 - CI (CI-51): the Audio Unit workflow's two
   sanitizer jobs, the AU tests with ASan and UBSan and the fallbacks, and
   `au.adapter` under ThreadSanitizer, run as steps of its `au` job after the
