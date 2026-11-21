@@ -442,8 +442,10 @@ reopens that project in a new process, plays, renders again and quits.
 `bin/convolver --compare` checks both renders against the example's
 `expected.wav`. REAPER must accept the preset (`TrackFX_SetPreset`
 succeeds), the second REAPER must report the project the first one saved,
-and each Status must read `Filter loaded: 48000 Hz, 2 in, 2 out.`, after
-loading or reopening and again while REAPER reports its transport running.
+and each Status must read exactly `Filter loaded: 48000 Hz, 2 in, 2 out.`,
+after loading or reopening and again while REAPER reports its transport
+running. Texts that start the same way but go on (waiting for the host's
+settings, Mix 0%, speaker labels, ignored inputs) fail the check.
 Track and master pan laws are set to 0 dB, whatever REAPER's preferences
 say. Everything goes into a new `reaper-check-DATE-TIME` folder in the
 package folder; its `result.md` lists the eight checks with their evidence,

@@ -1043,7 +1043,7 @@ void chosen_before_rendering() {
             "a 44.1 kHz file accepted while rendering");
     const auto f = unit.failure();
     require(f.present && !f.silent && rate_of(unit) == 48000,
-            "a refused file replaced the playing filter: " + std::string(f.message));
+            "a refused file replaced the playing filter: " + std::string(f.problem));
     unit.uninitialize();
 
     // jrp's review (21 November 2026): a render of zero frames is not the

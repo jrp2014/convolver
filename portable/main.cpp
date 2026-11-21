@@ -102,8 +102,8 @@ Files retain the entire FIR/routing tail. Algorithmic latency is trimmed unless
 )";
 // DIAG-2: an option the command line cannot use, with its cause and fix.
 [[noreturn]] void bad_option(std::string problem, std::string cause, std::string fix) {
-    throw std::invalid_argument(
-        convolver::detail::advice_text({std::move(problem), std::move(cause), std::move(fix), {}}));
+    throw convolver::detail::AdvisedError<std::invalid_argument>(
+        {std::move(problem), std::move(cause), std::move(fix), {}});
 }
 // `option` names the value in the problem ("--block", "--raw-input's sample
 // rate"); `example` is the fix's example, by default `option` followed by 2.
@@ -317,12 +317,12 @@ std::string read_wisdom(const std::filesystem::path& path) {
                    "Give the path of a wisdom file that --tune-fft saved.");
     std::ifstream file(path, std::ios::binary);
     if (!file)
-        throw std::runtime_error(convolver::detail::advice_text(
+        throw convolver::detail::AdvisedError<std::runtime_error>(
             {"cannot open the FFTW wisdom file " + utf8_string(path),
              std::filesystem::exists(path) ? "The file is there, but this program may not read it."
                                            : "There is no file at that path.",
              "Check the path, or save wisdom first with --tune-fft.",
-             {}}));
+             {}});
     constexpr std::size_t limit = 1024 * 1024;
     std::string text(limit + 1, '\0');
     file.read(text.data(), static_cast<std::streamsize>(text.size()));
@@ -506,12 +506,12 @@ int run(int argc, char** argv) {
                                "aiff and caf also pcm8), or flac with pcm8, pcm16 or pcm24.",
                                "Use one of those, such as --output-format wav-pcm24.");
                 if (!convolver::available(parsed->container))
-                    throw std::invalid_argument(convolver::detail::advice_text(
+                    throw convolver::detail::AdvisedError<std::invalid_argument>(
                         {"this build of Convolver cannot write FLAC",
                          "Its libsndfile was built without FLAC support.",
                          "Choose another container, such as wav or rf64, and convert to FLAC "
                          "afterwards if you need it (for example with flac).",
-                         {}}));
+                         {}});
                 format = *parsed;
             } else if (option == "--dither") {
                 audio_options = true;
@@ -690,12 +690,12 @@ int run(int argc, char** argv) {
                 // As estimate_attenuation() refuses a noise response that is
                 // not finite in single precision.
                 if (!(peak <= std::numeric_limits<float>::max()))
-                    throw std::overflow_error(convolver::detail::advice_text(
+                    throw convolver::detail::AdvisedError<std::overflow_error>(
                         {"cannot choose the no-clip gain: the filter's largest possible peak "
                          "is too large for single-precision processing",
                          "The filter coefficients are far above full scale.",
                          "Check how the filter files are scaled.",
-                         {}}));
+                         {}});
             } else {
                 peak = convolver::estimate_attenuation(config).noise_peak;
             }
@@ -714,12 +714,12 @@ int run(int argc, char** argv) {
             }
             gain = static_cast<float>(std::pow(10., db / 20.));
             if (!std::isfinite(gain))
-                throw std::invalid_argument(convolver::detail::advice_text(
+                throw convolver::detail::AdvisedError<std::invalid_argument>(
                     {"the estimated gain is not representable",
                      "The filter's peak is so small or large that the gain to match it does "
                      "not fit in a 32-bit float.",
                      "Check the IRs (one may be silent or damaged), or give --gain-db as a number.",
-                     {}}));
+                     {}});
             // Printed exactly, so that --gain-db with this figure gives the
             // same gain and the same file.
             std::cerr << "convolver: " << (safe ? "no-clip" : "optimum") << " attenuation "
@@ -787,7 +787,7 @@ int run(int argc, char** argv) {
                 for (std::size_t i = 0; i < samples.size(); ++i) {
                     samples[i] *= gain;
                     if (!std::isfinite(samples[i]))
-                        throw std::runtime_error(convolver::detail::advice_text(
+                        throw convolver::detail::AdvisedError<std::runtime_error>(
                             {"the output overflowed " +
                                  convolver::detail::sample_position(
                                      written + i / channels, i % channels + 1, info.sample_rate),
@@ -796,7 +796,7 @@ int run(int argc, char** argv) {
                              "is too high.",
                              "Lower --gain-db, or use '--gain-db no-clip', which keeps "
                              "full-scale input within full scale.",
-                             {}}));
+                             {}});
                     const auto magnitude = std::abs(samples[i]);
                     auto& peak = peaks[i % channels];
                     peak = std::max(peak, magnitude);
@@ -831,7 +831,7 @@ int run(int argc, char** argv) {
                 peaks, bits ? writer.clipped_samples() : above, written,
                 automatic_gain == "no-clip");
         } catch (const std::exception& error) {
-            auto advice = convolver::detail::parse_advice(error.what());
+            auto advice = convolver::detail::advice_of(error);
             const auto incomplete =
                 (output == "-" ? std::string("the audio written to standard output")
                                : utf8_string(output)) +

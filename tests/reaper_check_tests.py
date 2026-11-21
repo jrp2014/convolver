@@ -12,6 +12,7 @@ import importlib.util
 import os
 import pathlib
 import re
+import shutil
 import stat
 import sys
 import tempfile
@@ -29,6 +30,9 @@ SPEC.loader.exec_module(reaper_check)
 # records and writes the files REAPER would. FAKE_REAPER=exit quits at once,
 # FAKE_REAPER=silent restores nothing on reopening, and FAKE_REAPER=stopped
 # reads Status after the transport stopped, as REAPER did in jrp's first run.
+# FAKE_REAPER=waiting and FAKE_REAPER=dry read, with the transport running,
+# texts that start like the Active one but are not (jrp's review);
+# FAKE_REAPER=dry_loaded reads the Mix 0% text after loading and reopening.
 FAKE_REAPER = textwrap.dedent(
     r"""
     #!/usr/bin/env python3
@@ -42,8 +46,13 @@ FAKE_REAPER = textwrap.dedent(
     reopen = 'record("stage", "reopen")' in text
     loaded = 'Filter loaded: 48000 Hz, 2 in, 2 out.'
     status = 'Silent: no filter' if reopen and mode == 'silent' else loaded
+    if mode == 'dry_loaded':
+        status = loaded + ' Mix 0%: only the dry signal plays.'
+    playing = {'waiting': 'Filter loaded: 48000 Hz, 2 in, 2 out; waiting for audio settings from the host.',
+               'dry': 'Filter loaded: 48000 Hz, 2 in, 2 out. Mix 0%: only the dry signal plays.',
+               'dry_loaded': loaded}.get(mode, status)
     lines = [('stage', 'reopen' if reopen else 'first'), ('reaper_version', '7.99/macOS-arm64'),
-             ('fx_name', 'VST3: Convolver (Convolver)'), ('status_playing', status),
+             ('fx_name', 'VST3: Convolver (Convolver)'), ('status_playing', playing),
              ('status_reopened' if reopen else 'status_after_preset', status),
              ('play_state', '0' if mode == 'stopped' else '1'), ('play_position', '1.500')]
     if reopen:
@@ -110,6 +119,8 @@ class LuaText(unittest.TestCase):
             self.assertIn('reaper.GetSet_LoopTimeRange2(project, true, true, loop_start, loop_end, false)', text)
         self.assertEqual(reaper_check.lua_script('first', {}).count('"D_PANLAW", 1)'), 2)
         self.assertIn('TrackFX_SetPreset', reaper_check.lua_script('first', {}))
+        # A brief waiting text after loading or reopening is waited past.
+        self.assertIn('text:find("aiting", 1, true) == nil', reaper_check.lua_script('reopen', {}))
         self.assertNotIn('TrackFX_SetPreset', reaper_check.lua_script('reopen', {}))
 
 
@@ -127,13 +138,28 @@ class Records(unittest.TestCase):
         self.assertIn('ran at 44100 Hz: set it to 48000 Hz', reaper_check.rate_hint({'device_rate': '44100'}))
 
     def test_only_a_reading_with_the_transport_running_counts_as_playing(self):
-        loaded = reaper_check.LOADED + '.'
+        loaded = reaper_check.ACTIVE
         self.assertTrue(reaper_check.loaded_while_playing({'play_state': '1', 'status_playing': loaded}))
         self.assertTrue(reaper_check.loaded_while_playing({'play_state': '5', 'status_playing': loaded}))
         for state in ('0', '2', '', 'x'):
             self.assertFalse(reaper_check.loaded_while_playing({'play_state': state, 'status_playing': loaded}))
         self.assertFalse(reaper_check.loaded_while_playing({'status_playing': loaded}))
         self.assertIn('did not start within 10 s', reaper_check.playing_text({'play_state': '0', 'play_started': 'no'}))
+
+    def test_only_the_whole_active_text_counts(self):
+        # jrp's review: these start with the Active text but say the filter
+        # is waiting, plays dry only, or has other labels.
+        self.assertTrue(reaper_check.active('Filter loaded: 48000 Hz, 2 in, 2 out.'))
+        for text in (
+            'Filter loaded: 48000 Hz, 2 in, 2 out; waiting for audio settings from the host.',
+            'Filter loaded: 48000 Hz, 2 in, 2 out. Mix 0%: only the dry signal plays.',
+            'Filter loaded: 48000 Hz, 2 in, 2 out. Speaker labels differ.',
+            'Filter loaded: 48000 Hz, 2 in, 2 out; plug-in input 3 ignored.',
+            "Filter selected. Waiting for the host's audio settings.",
+            '',
+            None,
+        ):
+            self.assertFalse(reaper_check.active(text), text)
 
     def test_a_missing_file_records_nothing(self):
         self.assertEqual(reaper_check.read_results(pathlib.Path('/nonexistent/first.txt')), {})
@@ -221,6 +247,21 @@ class Run(unittest.TestCase):
         self.assertIn('| 3 | The .vstpreset loads the stereo example | **FAIL** |', result)
         self.assertIn('| 7 | The reopened project restores the filter | **FAIL** |', result)
         self.assertIn('**FAIL: 6 of 8 checks passed.**', result)
+
+    def test_a_waiting_or_dry_only_status_while_playing(self):
+        # jrp's review: with the transport running, a filter still waiting for
+        # the host's settings, or Mix 0%, must not pass checks 3 and 7.
+        # dry_loaded: the readings after loading and reopening say Mix 0%.
+        for mode in ('waiting', 'dry', 'dry_loaded'):
+            with self.subTest(mode=mode), mock.patch.dict(os.environ, {'FAKE_REAPER': mode}):
+                for folder in self.package.glob('reaper-check-*'):
+                    shutil.rmtree(folder)
+                status, result = self.run_check()
+                self.assertEqual(status, 1)
+                self.assertIn('transport running', result)
+                self.assertIn('| 3 | The .vstpreset loads the stereo example | **FAIL** |', result)
+                self.assertIn('| 7 | The reopened project restores the filter | **FAIL** |', result)
+                self.assertIn('**FAIL: 6 of 8 checks passed.**', result)
 
     def test_a_preset_call_that_failed(self):
         # Status and both renders look right, but REAPER said the preset did

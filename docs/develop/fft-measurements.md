@@ -1428,11 +1428,23 @@ What the runs show:
   Latency 0 in 64-frame callbacks), with 99th percentiles up to 68% of the
   period; at Latency 256 it met the criteria on the Linux and macOS
   runners.
-- **Worst callbacks on shared machines are scheduling, not the engine.** On
-  the Linux runner the longest callback stayed within 46% of the period for
-  every supported workload (52% for the 7.1 matrix at 96 kHz, 75% for the
-  command-line-only filter); on the VM an empty 64-tap filter's longest
-  callback took 2.2 periods, and 1.3 on the Windows runner.
+- **The longest callbacks are outliers whose cause is not established.**
+  The benchmark records wall-clock time only, so it cannot separate the
+  engine's own work from time the machine spent elsewhere, such as
+  scheduling, interrupts or the hypervisor; telling them apart would need a
+  system trace of the audio thread (such as `perf sched` on Linux or
+  Instruments on macOS). On the first Linux runner the longest callback
+  stayed within 46% of the period for every supported workload (52% for
+  the 7.1 matrix at 96 kHz, 75% for the command-line-only filter); on the
+  second it reached 1.3 periods. On the VM an empty 64-tap filter's longest
+  callback took 2.2 periods, and 1.3 on the Windows runner; that filter
+  does almost no work, which suggests the machine rather than the engine
+  but does not show it. The largest outlier in the data is on the macOS
+  runner: one 7.1 correction run at
+  96 kHz (Latency 256, 64-frame callbacks, round 2) had a 99th percentile
+  of 69 µs and a longest callback of 23.7 ms, against a period of 0.667 ms.
+  The criteria judge the 99th percentile, not the longest callback, so
+  such outliers do not decide whether a workload is supported.
 - **Cost grows in proportion to length beyond about 30 s at 48 kHz.**
   Doubling 2,880,000 taps to 5,760,000 cost 1.65 to 2.25 times as much,
   where tripling 480,000 to 1,440,000 cost 1.45 to 1.9 times as much: the

@@ -2,6 +2,7 @@
 // Private: legacy configuration text parsing and list/asset resolution, shared by
 // the loader (config.cpp) and inspection (inspection.cpp). Not installed.
 #pragma once
+#include "advice.hpp"
 #include "convolver/io.hpp"
 #include "sound_files.hpp"
 #include "utf8.hpp"
@@ -51,10 +52,12 @@ using IncludeChain = std::vector<SourceLocation>;
 
 // Expected configuration failures. what() is "FILE:LINE:COLUMN: PROBLEM" plus
 // "; included from LIST:LINE" for each enclosing list, innermost first, then
-// the reason's Cause, Fix and Note lines (portable/advice.hpp).
-class ConfigurationError : public std::runtime_error {
+// the reason's Cause, Fix and Note lines (portable/advice.hpp); advice() is
+// the same message in its parts (PLUG-39 step 5b), the location and lists
+// in its problem.
+class ConfigurationError : public std::runtime_error, public Advised {
   public:
-    ConfigurationError(std::string code, SourceLocation, std::string reason);
+    ConfigurationError(std::string code, SourceLocation, Advice reason);
     const char* what() const noexcept override;
     const std::string& code() const noexcept {
         return code_;
@@ -62,8 +65,9 @@ class ConfigurationError : public std::runtime_error {
     const SourceLocation& location() const noexcept {
         return location_;
     }
-    const std::string& reason() const noexcept {
-        return reason_;
+    // The reason without the location, as text (advice_text()).
+    std::string reason() const {
+        return advice_text(reason_);
     }
     // Outermost first.
     const IncludeChain& include_chain() const noexcept {
@@ -75,7 +79,7 @@ class ConfigurationError : public std::runtime_error {
     void format();
     std::string code_;
     SourceLocation location_;
-    std::string reason_;
+    Advice reason_;
     IncludeChain chain_;
     std::string message_;
 };
@@ -165,16 +169,17 @@ struct SelectionCandidate {
 // loading the file in Convolver, not command-line options), or options alone
 // (convolver-preset: choose other values).
 enum class Chooser { audio, host, options };
-std::string explain_no_match(const std::filesystem::path& filter, bool list,
-                             const std::vector<SelectionCandidate>& candidates,
-                             const ConfigurationSelection& wanted, std::string_view subject,
-                             Chooser who = Chooser::audio);
+Advice explain_no_match(const std::filesystem::path& filter, bool list,
+                        const std::vector<SelectionCandidate>& candidates,
+                        const ConfigurationSelection& wanted, std::string_view subject,
+                        Chooser who = Chooser::audio);
 // What load_configuration() throws when no filter in the file matches the
 // selection: the explanation, and what it was worked out from, so a plug-in
 // can say which rate or channels the file was made for.
-struct NoMatch : std::runtime_error {
-    NoMatch(const std::string& explanation, bool in_list, std::vector<SelectionCandidate> checked)
-        : std::runtime_error(explanation), list(in_list),
+struct NoMatch : std::runtime_error, Advised {
+    NoMatch(Advice explanation, bool in_list, std::vector<SelectionCandidate> checked)
+        : std::runtime_error(advice_text(explanation)), Advised(std::move(explanation)),
+          list(in_list),
           candidates(std::make_shared<const std::vector<SelectionCandidate>>(std::move(checked))) {}
     bool list = false; // The file is a configuration list.
     std::shared_ptr<const std::vector<SelectionCandidate>> candidates; // In entry order.
@@ -206,13 +211,14 @@ Configuration decode_audio_filter(SoundFile&, std::size_t& budget, const SourceL
 
 // DIAG-6: the reader's reason for refusing a file that starts with a sound
 // file container's marker (header_marker()).
-struct RefusedSoundFile : std::runtime_error {
-    using std::runtime_error::runtime_error;
+struct RefusedSoundFile : std::runtime_error, Advised {
+    explicit RefusedSoundFile(Advice reason)
+        : std::runtime_error(advice_text(reason)), Advised(std::move(reason)) {}
 };
 // DIAG-6: the error for a sound file at `path` that the reader refused with
 // `reason`, code unreadable-asset. The location already names the file, so
 // the copy of its path in the reader's problem is left out.
-ConfigurationError refused_sound_file(const std::filesystem::path& path, std::string reason);
+ConfigurationError refused_sound_file(const std::filesystem::path& path, Advice reason);
 // Walks a configuration, sound file or (nested) list in entry order, with the
 // historical limits and cycle detection, and hands each leaf to a visitor.
 class Resolver {

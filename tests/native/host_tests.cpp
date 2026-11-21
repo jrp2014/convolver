@@ -583,6 +583,19 @@ void failure_reasons() {
     test::started(early, {44100, 2, 2});
     require(early.failure()->kind != Kind::activation && early.failure()->request.number == 4,
             "activation failure outlived activation");
+    // PLUG-39 step 5b: from the exception, the reason is its problem alone,
+    // so its cause and fix never appear inside the record's own; and one
+    // that is not a std::exception still gives a reason.
+    early.fail_activation(&static_cast<const std::exception&>(
+        convolver::detail::AdvisedError<std::runtime_error>({"no room", "Cause.", "Fix.", {}})));
+    require(early.failure()->kind == Kind::activation &&
+                contains(early.failure()->message.problem, ": no room") &&
+                !contains(early.error(), "Cause.") && !contains(early.error(), "Fix."),
+            "an advised exception's cause or fix reached the activation failure");
+    early.fail_activation(nullptr);
+    require(contains(early.failure()->message.problem, "the processor could not be built"),
+            "an activation failure without an exception gives no reason");
+    test::started(early, {44100, 2, 2});
     // A number the adapter supplies (an LV2 generation) is kept, and later
     // numbering continues after it.
     early.load(HostState{}, std::nullopt, {}, {HostFilterSource::file, "/x.cfg", 9});

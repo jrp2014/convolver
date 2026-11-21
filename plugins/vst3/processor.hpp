@@ -203,7 +203,8 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     HostSettings settings() const noexcept;
 
   private:
-    void record_activation_failure(const char* why) noexcept;
+    // `error` is null when something other than a std::exception was thrown.
+    void record_activation_failure(const std::exception* error) noexcept;
     // Queues a line for the Convolver log under control_, skipping a repeat
     // of the line this instance queued last, as hosts restart plug-ins often;
     // write_log() writes the queue (host_log) after control_ is released, so

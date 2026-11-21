@@ -4,6 +4,7 @@
 // loading are in effect_state.cpp; parameters, properties, the window's
 // report and logging in effect_properties.cpp.
 #include "effect.hpp"
+#include "advice.hpp"
 #include "convolver_sdk.hpp"
 #include "host_log.hpp"
 #include <algorithm>
@@ -250,9 +251,9 @@ OSStatus Effect::Initialize() {
             reset_requested_.store(false);
             started = true;
         } catch (const std::exception& e) {
-            message = activation_failed(e.what());
+            message = activation_failed(&e);
         } catch (...) {
-            message = activation_failed("the processor could not be built.");
+            message = activation_failed(nullptr);
         }
         if (started) {
             // What plays and why: a filter restored before the formats were
@@ -277,10 +278,11 @@ OSStatus Effect::Initialize() {
     return noErr;
 }
 
-std::string Effect::activation_failed(const char* why) noexcept {
+std::string Effect::activation_failed(const std::exception* error) noexcept {
     try {
-        filter_.fail_activation(why);
-        return filter_.error();
+        filter_.fail_activation(error);
+        const auto& f = filter_.failure();
+        return f ? detail::advice_line(failure_message(*f)) : std::string();
     } catch (...) { // Out of memory for the message: nothing more to keep.
         return {};
     }
@@ -420,7 +422,7 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
                 changed = true;
             } catch (const std::exception& e) {
                 try {
-                    why = e.what();
+                    why = detail::advice_line(detail::advice_of(e));
                 } catch (...) {
                 }
             } catch (...) {
@@ -457,7 +459,7 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
                 });
             } catch (const std::exception& e) {
                 try {
-                    why = e.what();
+                    why = detail::advice_of(e).problem;
                 } catch (...) {
                 }
             } catch (...) {
