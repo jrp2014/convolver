@@ -90,9 +90,9 @@ show routing; they are not a crossover ready for real speakers.
    3-6 ignored.` Convolver then reads inputs 1 and 2, so put the stereo
    source there.
 
-   If Status instead reads `Silent: the filter has 2 in, 6 out, the host
-   2 in, 2 out. Details in the Convolver log.` (or other counts for the
-   host), the host has not given Convolver at least 2 inputs and exactly
+   If Status instead reads Waiting, `Silent, waiting for 2 in, 6 out: the
+   host has 2 in, 2 out. Details in the Convolver log.` (or other counts
+   for the host), the host has not given Convolver at least 2 inputs and exactly
    6 outputs. Check the track's channel count and the
    plug-in's routing (REAPER: the button at the top right of the effect
    window that shows the plug-in's inputs and outputs); the

@@ -277,10 +277,14 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
                          false,
                          "The sample rate and channels the host runs the plug-in with, known "
                          "once it sends its audio settings."});
-    } else if (c && !failure && host->fractional_rate == 0 && host->sample_rate == c->sample_rate &&
+    } else if (c &&
+               !(failure && (failure->kind == HostFailureKind::sample_rate ||
+                             failure->kind == HostFailureKind::channels)) &&
+               host->fractional_rate == 0 && host->sample_rate == c->sample_rate &&
                host->inputs == c->input_channels && host->outputs == c->output_channels) {
         // PLUG-44: what the host gives matches the facts under the filter's
-        // name, so one line says so rather than repeating them.
+        // name, so one line says so rather than repeating them (also after
+        // a refusal for another reason, an unreadable file say).
         audio.push_back({"Host",
                          host_rate_text(*host) + ", " + arrow_ports(host->inputs, host->outputs),
                          "✓ suits the filter", false,
@@ -336,15 +340,20 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
     // PLUG-22: the latency is not a fact here; the Latency setting shows the
     // time it adds, and the note says when a choice is not in use yet.
     // PLUG-44: Ring-out shows only when it says more than the filter's
-    // Length (its delays), or when no filter rings out of something else.
+    // Length: a filter of n taps rings out for n - 1 frames at its own rate,
+    // so the line shows for delays, a Latency, another rate, or with no
+    // filter a tail that is not zero. Compared in frames, as the two round
+    // differently as times.
     const auto frames = [](std::size_t n) { return std::to_string(n) + " frames"; };
     const auto ring_out = facts.tail_frames == 0 ? std::string("none")
                           // Under 0.05 ms reads as frames, not "0.0 ms".
                           : rate && facts.tail_frames * 20000.0 >= rate
                               ? duration(facts.tail_frames, rate)
                               : frames(facts.tail_frames);
-    const auto length = c ? duration(longest_taps(*c), c->sample_rate) : std::string();
-    if (c ? ring_out != length : facts.tail_frames != 0)
+    const bool says_more =
+        c ? facts.tail_frames + 1 != longest_taps(*c) || (rate && rate != c->sample_rate)
+          : facts.tail_frames != 0;
+    if (says_more)
         audio.push_back({"Ring-out", ring_out, "", false,
                          "How long the output goes on after the input stops (the filter's tail)."});
 
@@ -496,7 +505,8 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
         // PLUG-44: the heading names the filter that plays, which the
         // status beside it (Load failed) does not describe, so say so.
         r.filter_note =
-            std::string(filter.plays_suiting() && facts.host ? "Still playing. " : "") +
+            std::string(filter.plays_suiting() && facts.host && !facts.bypassed ? "Still playing. "
+                                                                                : "") +
             (refusal->request.source == HostFilterSource::file && !refusal->request.path.empty()
                  ? file_name(refusal->request.path) + " was refused."
                  : std::string("The last filter loaded was refused."));

@@ -2079,7 +2079,8 @@ void settings_parameters() {
         };
         ParamValue v = -1;
         require(typed("256 frames (5.3 ms)", v) == kResultOk && v == normalized_latency(256) &&
-                    typed("0 frames (none)", v) == kResultOk && v == normalized_latency(0),
+                    typed("0 frames (none)", v) == kResultOk && v == normalized_latency(0) &&
+                    typed(" 512", v) == kResultOk && v == normalized_latency(512),
                 "Latency text read back");
         require(typed("300 frames", v) != kResultOk && typed("frames", v) != kResultOk,
                 "a Latency not in the menu read from text");

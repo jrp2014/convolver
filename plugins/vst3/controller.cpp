@@ -417,9 +417,12 @@ tresult PLUGIN_API Controller::getParamValueByString(ParamID id, TChar* string, 
         // start it; only a value in the menu counts.
         std::size_t frames = 0;
         std::size_t i = 0;
+        while (string[i] == u' ')
+            ++i;
+        const std::size_t first = i;
         for (; string[i] >= u'0' && string[i] <= u'9' && frames < 1000000; ++i)
             frames = frames * 10 + static_cast<std::size_t>(string[i] - u'0');
-        if (i == 0 ||
+        if (i == first ||
             std::find(host_latencies.begin(), host_latencies.end(), frames) == host_latencies.end())
             return kResultFalse;
         value = normalized_latency(frames);

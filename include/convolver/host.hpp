@@ -738,10 +738,16 @@ enum class HostStatus {
     // A filter is accepted and suits the host (PLUG-22: "Active", not
     // "Playing": the plug-in cannot tell whether the host's transport runs).
     active = 0,
-    no_filter = 1,   // An empty instance: identity, or silence for unequal counts.
-    load_failed = 2, // The newest request failed, or the instance plays silence.
-    unchecked = 3, // "Waiting": a filter is accepted, but the host has sent no audio settings yet.
-    fault = 4,     // HostFilter::faults(): the audio met a problem while playing.
+    no_filter = 1, // An empty instance: identity, or silence for unequal counts.
+    // The newest request failed, a saved failure was restored, or the
+    // accepted filter could not start, so a refusal or silence needs the
+    // user's attention.
+    load_failed = 2,
+    // "Waiting": a filter is accepted but not playing yet, either because
+    // the host has sent no audio settings, or (PLUG-44) because they do not
+    // suit it and it is kept until they do (HostFilter::waits_for_settings()).
+    unchecked = 3,
+    fault = 4, // HostFilter::faults(): the audio met a problem while playing.
     // PLUG-22: the host or the window bypasses an instance with a filter, and
     // nothing is wrong: the input plays unfiltered, or silence for unequal
     // counts. Without a filter the status stays No filter.

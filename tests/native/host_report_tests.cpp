@@ -471,7 +471,8 @@ void cases() {
     // PLUG-22: the Latency setting shows the time it adds, so the Audio
     // section does not repeat it.
     require(!has_fact(r, "Added delay"), "the latency repeated as a fact");
-    check(fact(r, "Ring-out"), "2 frames", "");
+    // PLUG-44: 3 taps ring out for 2 frames, which Length already says.
+    require(!has_fact(r, "Ring-out"), "Ring-out repeats the filter's length");
     // The identity paths have peak 1.75 (1 + .5 + .25): +4.9 dB. Gain
     // scales only the filtered path, which Mix then adds to the dry input:
     // at Gain -6 dB and Mix 25%, .25 * .501 * 1.75 + .75 = .97.
@@ -616,14 +617,19 @@ void cases() {
                     line(GainMode::no_clipping));
     }
     // PLUG-44: Ring-out shows only when it says more than the filter's
-    // Length (3 taps and a 3-frame tail both read 0.1 ms here); the title
-    // gives the release version, without the build's suffix.
+    // Length: 3 taps ring out for 2 frames, but a Latency of 256 frames
+    // adds to that; the title gives the release version, without the
+    // build's suffix.
     {
         auto same = facts(stereo);
-        same.tail_frames = 3;
+        same.tail_frames = 2;
         const auto rs = host_report(f, same);
         require(!has_fact(rs, "Ring-out") && rs.filter_length == "0.1 ms",
                 "Ring-out repeats the filter's length");
+        auto later = facts(stereo);
+        later.tail_frames = 258;
+        require(has_fact(host_report(f, later), "Ring-out"),
+                "Ring-out hidden although the Latency lengthens it");
         require(!contains(r.title, "+") && contains(reference(r, "Software"), "Convolver"),
                 "title: " + r.title);
     }
@@ -685,6 +691,22 @@ void cases() {
     require(
         contains(report_text(rr), "Host sample rate: 44100 Hz; the refused file is for 48000 Hz\n"),
         "refused report text:\n" + report_text(rr));
+    // PLUG-44: a file refused for another reason (unreadable) leaves the
+    // one Host line, as nothing about the host differs; bypassed, the
+    // filter is not heard, so the note does not say it still plays.
+    {
+        HostFilter unreadable(8);
+        unreadable.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {});
+        unreadable.reject(HostFailureKind::filter_file, {"The file could not be read."},
+                          HostRequest{HostFilterSource::file, "/filters/broken.wav"});
+        const auto ru = host_report(unreadable, facts(stereo));
+        auto bypassed = facts(stereo);
+        bypassed.bypassed = true;
+        require(has_fact(ru, "Host") && !has_fact(ru, "Host sample rate") &&
+                    ru.filter_note == "Still playing. broken.wav was refused." &&
+                    host_report(unreadable, bypassed).filter_note == "broken.wav was refused.",
+                "unreadable refusal: " + ru.filter_note);
+    }
     // VST3-11: the window's Reload and its watch on the files take the
     // accepted file's path and files, never a refused one's or saved state's.
     require(rr.filter_path.empty() && rr.filter_files.empty(), "path from saved state");

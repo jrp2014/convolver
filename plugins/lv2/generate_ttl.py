@@ -155,7 +155,11 @@ def plugin(base, layout, vendor, version):
 \t]""",
     ]
     first_setting = first_atom + 2
-    latency_points = ' ,\n'.join(f'\t\t\t[ rdfs:label "{frames} frames" ; rdf:value {frames} ]' for frames in LATENCIES)
+    # PLUG-44: the same names as the other formats' Latency values.
+    latency_points = ' ,\n'.join(
+        f'\t\t\t[ rdfs:label "{frames} frames{" (none)" if frames == 0 else ""}" ; rdf:value {frames} ]'
+        for frames in LATENCIES
+    )
     mode_points = ' ,\n'.join(f'\t\t\t[ rdfs:label "{name}" ; rdf:value {value} ]' for value, name in GAIN_MODES)
     settings = [
         f"""\t[

@@ -78,7 +78,7 @@ or a file chosen in the window. Some hosts give a plug-in as many inputs as
 outputs: REAPER gives the VST3 plug-in six inputs on a six-channel track, so a
 2→6 crossover reads inputs 1 and 2 and ignores 3 to 6. Status then ends with
 "plug-in inputs 3-6 ignored.", and the [Convolver log](#status-and-the-convolver-log)
-and the window's Host channels line say the same (`6 in, 6 out (inputs 3–6
+and the window's Host channels line say the same (`6 in → 6 out (inputs 3–6
 ignored)`). Make sure the source plays on
 the inputs the filter reads. A filter with more inputs than the host gives,
 or with a different number of outputs, is refused. From a configuration
@@ -641,7 +641,7 @@ From the top, the window has:
   | Host | When the host's rate and channels suit the filter, one line: `48000 Hz, 2 in → 2 out ✓ suits the filter`. Before the host has sent its audio settings: `not known yet` |
   | Host sample rate, Host channels | Otherwise a line each: the rate the host runs the plug-in at, and the inputs and outputs it gives it (`1 in → 1 out`) |
   | Routing | With a filter: which input feeds which output (`In 1 → Out 1`), with route gains such as `×0.5`; the first four paths, then how many more |
-  | Ring-out | How long the output goes on after the input stops (the tail), at the host's rate; only when it differs from the filter's Length |
+  | Ring-out | How long the output goes on after the input stops (the tail), at the host's rate; only when it says more than the filter's Length: delays in the filter, a Latency, or another rate |
   | Worst-case peak | The loudest output any full-scale input could make through the filter, and the Gain that rules out clipping (or that it cannot clip at the current Gain and Mix) |
   | Host block size | The largest block the host sends at a time |
 
@@ -735,9 +735,9 @@ defaults play exactly as Convolver did before the settings existed.
 | **Latency** | 0, 64, 128, 256, 512, 1024, 2048 or 4096 frames | 0 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. At 0 Convolver adds no processing delay; any delay in the filter itself still plays. A larger value uses less processor time, most of all for short filters. It is the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
 
 - In a host's own controls (its generic window or parameter list), a
-  Latency value reads as its frames and, once the host has started the
-  plug-in, the time it adds at the host's rate: `256 frames (5.3 ms)`, and
-  `0 frames (none)`. Where a VST3 host lets you type a value, type one of
+  Latency value reads as its frames, with `0 frames (none)` for 0, and in
+  VST3 and the Audio Unit, once the host has started the plug-in, the time
+  it adds at the host's rate: `256 frames (5.3 ms)`. Where a VST3 host lets you type a value, type one of
   the menu's frame counts (`256`); another number is refused. VST3 hosts with narrow controls show
   the short names Gain, Mode, Mix, Lat, Bypass and Status.
 - Hosts may leave settings that cannot be automated out of their own
@@ -841,7 +841,7 @@ with no filter reports 256 samples at a Latency of 256, because its output
 still carries the last 256 samples of input after the input stops. After a filter is replaced during
 playback, both keep reporting the longest tail used until the host stops the
 plug-in, and then report the filter's own, as the window's Ring-out row
-does (shown when it differs from the filter's Length). LV2 cannot report a tail, so hosts that stop processing at the end
+does (shown when it says more than the filter's Length). LV2 cannot report a tail, so hosts that stop processing at the end
 of a region may cut it off: render with a little silence after the audio.
 
 ## Bypass
