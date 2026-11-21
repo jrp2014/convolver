@@ -125,7 +125,14 @@ repos:
         entry: python tests/upgrade/harness_tests.py
         language: python
         pass_filenames: false
-        files: ^tests/upgrade/(run_upgrade|harness_tests)\.py$
+        files: |
+          (?x)^(
+            tests/upgrade/run_upgrade\.py|
+            tests/upgrade/harness_tests\.py|
+            tests/upgrade/0\.14\.0/au\.json|
+            tests/plugins/fixtures\.py|
+            plugins/identities\.json
+          )$
       - id: reaper-check-tests
         name: REAPER check script without REAPER (HOST-11)
         entry: python tests/reaper_check_tests.py

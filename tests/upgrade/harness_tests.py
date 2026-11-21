@@ -73,7 +73,9 @@ class AudioUnitPrefix(unittest.TestCase):
         def change(channels):
             channels[0][self.latency - 1] = -math.inf
 
-        self.assertIn('is -inf, before the reported latency', self.check(change) or '')
+        failure = self.check(change)
+        self.assertIsNotNone(failure)
+        self.assertIn('is -inf, before the reported latency', failure)
 
     def test_sound_before_the_latency_fails(self):
         def change(channels):

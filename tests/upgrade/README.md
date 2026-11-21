@@ -110,8 +110,8 @@ For each case, `run_upgrade.py`:
   build's installed unit through AVAudioEngine, renders the input in blocks
   of the size `au.json` records and drops the latency the unit reports,
   which must be the release's; every sample before it must be finite and
-  within the bound, and the audio within the bound after it (never identical samples: the expected files
-  come from Linux);
+  within the bound, and the audio within the bound after it (never
+  identical samples: the expected files come from Linux);
 - requires the same rate, channel count and frame count, and samples within
   the bound: 1e-5 (the PLUG-2 oracle tolerance), times the expected file's
   peak when it is louder than full scale, since float rounding grows with the
