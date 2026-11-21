@@ -193,9 +193,9 @@ void Effect::update_status() noexcept {
         // the HostFilter shares the accepted filter rather than copying it.
         if (settling_.playing()) // PLUG-27: the host renders the filter.
             filter_.confirm();
-        auto next = std::make_shared<const Diagnostics>(
-            Diagnostics{filter_, known_layout(), host_log_written(),
-                        host() ? static_cast<std::size_t>(GetMaxFramesPerSlice()) : 0});
+        auto next = std::make_shared<const Diagnostics>(Diagnostics{
+            filter_, known_layout(), host_log_written(),
+            host() ? static_cast<std::size_t>(GetMaxFramesPerSlice()) : 0, host() != nullptr});
         const auto status = host_status_value(next->filter, next->host.has_value(), bypass_.load());
         {
             std::lock_guard published(diagnostics_lock_);
@@ -228,6 +228,7 @@ HostReport Effect::report_of(const Diagnostics& d) {
     facts.format = tag_;
     facts.host = d.host;
     facts.max_frames = d.max_frames;
+    facts.running = d.running;
     facts.settings = settings();
     facts.latency_frames = latency_.load();
     facts.tail_frames = tail_.load();

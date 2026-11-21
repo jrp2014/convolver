@@ -35,6 +35,10 @@ struct HostReportFacts {
     bool log_written = true; // host_log_written()
     // PLUG-22: the instance is bypassed (the host's switch or the window's).
     bool bypassed = false;
+    // A processor plays now: the host has started the plug-in and not
+    // stopped it. `host` can stay known after a stop (HostSettling), so it
+    // does not say this (jrp's review of PR #236, 21 November 2026).
+    bool running = false;
     // The format's window can load a filter file (the Audio Unit's Choose
     // Filter), so an empty instance is told about it as well as presets.
     bool chooses_files = false;

@@ -92,7 +92,9 @@ first published preview, keep their original grouping.
   chosen for a wider bus "is used" rather than "plays". A fault counted
   before the host stopped, with bypass off, reads "The filter is kept and
   plays when the host starts again." instead of "The filter keeps
-  playing.", since no processor runs then. The audio is unchanged.
+  playing.", since no processor runs then, even when the host's rate and
+  channels stay known after it stopped (`HostReportFacts::running`, from
+  jrp's review). The audio is unchanged.
 - Plug-ins and Library (PLUG-39 step 4b): one rule in the library shows a
   filter's saved name only while that filter plays (`HostFilter::offer_name()`).
   VST3 offers the name from its controller state there instead of keeping

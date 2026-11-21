@@ -104,13 +104,14 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
     } else if (status == HostStatus::fault) {
         take(fault_advice(filter.faults(), false));
         if (filter.filter()) {
-            // With no host running (stopped, or not started yet), no
-            // processor plays: say what happens when it starts.
+            // With no processor running (stopped, or not started yet), even
+            // with the host's layout still known after a stop, nothing
+            // plays: say what happens when it starts.
             m.plays = facts.bypassed
                           ? bypass_sentence(host.has_value(), host && dry_signal(filter, *host))
-                      : host ? std::string("The filter keeps playing.")
-                             : std::string("The filter is kept and plays when the host "
-                                           "starts again.");
+                      : facts.running ? std::string("The filter keeps playing.")
+                                      : std::string("The filter is kept and plays when the host "
+                                                    "starts again.");
         } else {
             // Faults are counted with no filter too (the host's samples).
             m.plays = no_filter_plays();

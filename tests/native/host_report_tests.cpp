@@ -57,6 +57,7 @@ HostReportFacts facts(std::optional<HostLayout> host, HostSettings settings = {}
     f.format = "Test #7";
     f.host = host;
     f.max_frames = host ? 512 : 0;
+    f.running = host.has_value(); // Started, unless a case says it stopped.
     f.settings = settings;
     f.latency_frames = settings.latency; // In use, as chosen.
     f.tail_frames = 2;
@@ -381,6 +382,23 @@ void cases() {
              totals.rejected_input = 3;
              static_cast<void>(f.observe(totals));
              return host_report(f, facts(std::nullopt));
+         },
+         HostStatus::fault,
+         {"The filter is kept and plays when the host starts again."},
+         {"keeps playing", "Bypass is on"}},
+        // jrp's review of PR #236: after the host rendered and stopped, its
+        // layout stays known (the Audio Unit binds it, VST3 keeps the last
+        // start), but no processor runs, so nothing keeps playing.
+        {"fault, stopped with the layout known",
+         [&] {
+             HostFilter f(8);
+             f.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {});
+             HostFaults totals;
+             totals.rejected_input = 3;
+             static_cast<void>(f.observe(totals));
+             auto stopped = facts(stereo);
+             stopped.running = false;
+             return host_report(f, stopped);
          },
          HostStatus::fault,
          {"The filter is kept and plays when the host starts again."},

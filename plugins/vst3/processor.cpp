@@ -394,6 +394,7 @@ HostReport Processor::report_locked() const {
     facts.format = tag_;
     facts.host = known_layout();
     facts.max_frames = host() ? static_cast<std::size_t>(processSetup.maxSamplesPerBlock) : 0;
+    facts.running = host() != nullptr; // setActive(false) frees every processor.
     facts.settings = settings();
     facts.latency_frames = host() ? host()->latency_frames() : facts.settings.latency;
     facts.tail_frames = tail_.load();

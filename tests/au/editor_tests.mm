@@ -1095,7 +1095,16 @@ void faults(const au_test::LogSince& log) {
             "Fault lost while faults go on");
     require(count(log.text(), logged) == 1,
             "polling logged the faults again: " + std::to_string(count(log.text(), logged)));
+    require(contains(r[@"plays"], "The filter keeps playing."),
+            "a fault while rendering: " + text(r[@"plays"]));
+    // jrp's review of PR #236: stopped after rendering, the unit keeps the
+    // formats it rendered with, but no processor runs.
     unit.uninitialize();
+    r = report(unit);
+    require([r[@"status name"] isEqualToString:@"Fault"] &&
+                contains(r[@"plays"], "The filter is kept and plays when the host starts again.") &&
+                !contains(r[@"plays"], "keeps playing"),
+            "a fault, then stopped: " + text(r[@"status name"]) + ": " + text(r[@"plays"]));
 }
 } // namespace
 

@@ -282,6 +282,7 @@ class Effect final : public ausdk::AUBase {
         std::optional<HostLayout> host; // known_layout() when taken.
         bool log_written = true;        // host_log_written() when taken.
         std::size_t max_frames = 0;     // GetMaxFramesPerSlice() while initialized.
+        bool running = false;           // A processor while initialized (Cleanup frees it).
     };
     std::shared_ptr<const Diagnostics> diagnostics() const;
     // The Status line and the report from a snapshot and the values read now.
