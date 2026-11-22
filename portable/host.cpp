@@ -445,12 +445,17 @@ void HostFilter::offer_name(std::string name, std::uint64_t identity) {
         accepted_.name = std::move(shown);
 }
 
-std::string HostFilter::take_unsettled_list() {
+bool HostFilter::list_waits() const noexcept {
     const auto& r = load_failure_;
-    if (!r || r->kind != HostFailureKind::settings_unknown ||
-        r->request.source != HostFilterSource::file || r->request.path.empty() ||
-        r->request.number == list_retaken_)
+    return r && r->kind == HostFailureKind::settings_unknown &&
+           r->request.source == HostFilterSource::file && !r->request.path.empty() &&
+           r->request.number != list_retaken_;
+}
+
+std::string HostFilter::take_unsettled_list() {
+    if (!list_waits())
         return {};
+    const auto& r = load_failure_;
     auto path = r->request.path;
     list_retaken_ = r->request.number;
     return path;

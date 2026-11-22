@@ -3413,6 +3413,111 @@ void chosen_preset_before_activation() {
     c.terminate();
     p.terminate();
 }
+// PLUG-48 (jrp's live session, 22 November 2026): REAPER offered a 44.1 kHz
+// preset at 48 kHz while a filter played at Latency 1024. The processor
+// refused it and kept its filter and settings, but the controller took the
+// preset's settings, so the window and the host showed Latency 0 while 1024
+// played. The parameters follow what the processor plays; a preset it
+// accepts still brings its own.
+void refused_state_keeps_parameters() {
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk && p.connect(&c) == kResultOk &&
+                c.connect(&p) == kResultOk,
+            "refused state: initialize");
+    SpeakerArrangement mono = SpeakerArr::kMono;
+    require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "refused state: buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    const auto state_at = [](int rate, std::size_t latency, double gain_db) {
+        convolver::HostState state;
+        state.configuration =
+            convolver::Configuration{rate, 1, 1, 0, {}, {}, {{{.5f}, {{0, 1}}, {{0, 1}}}}};
+        state.settings.emplace();
+        state.settings->latency = latency;
+        state.settings->gain_db = gain_db;
+        auto stream = std::make_unique<MemoryStream>();
+        require(write_state(stream.get(), state), "refused state: encode");
+        return stream;
+    };
+    // The host restores a preset: the processor first, then the controller.
+    const auto restore = [&](IBStream& stream) {
+        stream.seek(0, IBStream::kIBSeekSet, nullptr);
+        const auto result = p.setState(&stream);
+        stream.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(c.setComponentState(&stream) == kResultOk, "refused state: the controller's");
+        return result;
+    };
+    auto playing = state_at(48000, 1024, -6);
+    require(restore(*playing) == kResultOk, "refused state: the first filter");
+    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "refused state: activate");
+    play_block(p, 1, 1, 64);
+    const auto shown_latency = [&] { return latency_frames(c.getParamNormalized(latency_id)); };
+    require(p.getLatencySamples() == 1024 && shown_latency() == 1024,
+            "refused state: Latency 1024 before");
+    const auto edits = handler.edits.size();
+    auto other_rate = state_at(44100, 0, 0);
+    require(restore(*other_rate) != kResultOk, "refused state: the 44.1 kHz preset was accepted");
+    require(p.getLatencySamples() == 1024 && shown_latency() == 1024,
+            ("refused state: the parameter shows Latency " + std::to_string(shown_latency()) +
+             " while the processor plays " + std::to_string(p.getLatencySamples()))
+                .c_str());
+    require(c.getParamNormalized(gain_id) == normalized_gain(-6),
+            "refused state: the parameter shows the refused preset's Gain");
+    require(handler.edits.size() == edits, "refused state: following what plays is an edit");
+    // A preset for the host's rate is accepted and brings its settings.
+    auto same_rate = state_at(48000, 256, 0);
+    require(restore(*same_rate) == kResultOk && p.getLatencySamples() == 256 &&
+                shown_latency() == 256 && c.getParamNormalized(gain_id) == normalized_gain(0),
+            "refused state: an accepted preset's settings");
+    // A host that gives the controller the state first (the SDK says the
+    // processor first): a refusal is followed when it comes, and an accepted
+    // preset after a refused one keeps its own settings (the independent
+    // review: a refusal of another state must not count).
+    const auto controller_first = [&](IBStream& stream) {
+        stream.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(c.setComponentState(&stream) == kResultOk, "refused state: the controller first");
+        stream.seek(0, IBStream::kIBSeekSet, nullptr);
+        return p.setState(&stream);
+    };
+    require(controller_first(*other_rate) != kResultOk && p.getLatencySamples() == 256 &&
+                shown_latency() == 256,
+            ("refused state, controller first: shown " + std::to_string(shown_latency()) +
+             ", playing " + std::to_string(p.getLatencySamples()))
+                .c_str());
+    auto another = state_at(48000, 512, -3);
+    require(controller_first(*another) == kResultOk && p.getLatencySamples() == 512 &&
+                shown_latency() == 512 && c.getParamNormalized(gain_id) == normalized_gain(-3),
+            ("refused state, controller first: an accepted preset after a refused one shows " +
+             std::to_string(shown_latency()) + " while " + std::to_string(p.getLatencySamples()) +
+             " plays")
+                .c_str());
+    // A refusal is about one restore, not about the state's bytes (Codex's
+    // review): the same preset, refused at 48 kHz, restored controller first
+    // once the host runs at 44.1 kHz, is accepted and shows its own settings.
+    require(restore(*other_rate) != kResultOk && shown_latency() == 512,
+            "refused state: the 44.1 kHz preset again");
+    p.setActive(false);
+    ProcessSetup slower{kRealtime, kSample32, 512, 44100};
+    require(p.setupProcessing(slower) == kResultOk && p.setActive(true) == kResultOk,
+            "refused state: activate at 44.1 kHz");
+    play_block(p, 1, 1, 64);
+    require(controller_first(*other_rate) == kResultOk && p.settings().latency == 0 &&
+                shown_latency() == 0 && c.getParamNormalized(gain_id) == normalized_gain(0),
+            ("refused state, controller first: the preset refused before, accepted now, shows " +
+             std::to_string(shown_latency()) + " while " + std::to_string(p.settings().latency) +
+             " plays")
+                .c_str());
+    require(handler.edits.size() == edits, "refused state: following what plays is an edit");
+    p.setActive(false);
+    c.terminate();
+    p.terminate();
+}
 // PLUG-27: Audacity 4.0.2's order for the copy behind its window. Until it
 // first plays, it sets the copy up at 44.1 kHz whatever the project's rate,
 // and starts it only for a moment, with one block of silence, to pass on a
@@ -3491,7 +3596,18 @@ void list_read_again() {
                 .c_str());
     require(p.status().text.find("now known: 48000 Hz, 1 in, 1 out") != std::string::npos,
             ("list read again: after playing at 48 kHz, Status: " + p.status().text).c_str());
-    // It plays again and the window reads its report: the list is read again.
+    // It plays again, starting as Audacity 4.0.2 starts real-time playback
+    // (VST3Wrapper::Initialize): it hands back the state it last read from
+    // the plug-in, then starts it. That state holds no list, which must
+    // still wait (jrp's live session, 22 November 2026: restoring it forgot
+    // the list, and the export was silent). Then the window reads its
+    // report: the list is read again.
+    MemoryStream own;
+    require(p.getState(&own) == kResultOk, "list read again: Audacity reads the state");
+    own.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&own) == kResultOk, "list read again: Audacity restores it");
+    own.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(c.setComponentState(&own) == kResultOk, "list read again: and the controller's");
     require(p.setActive(true) == kResultOk, "list read again: the host starts again");
     play_block(p, 1, 1, 64);
     r = c.report();
@@ -4451,6 +4567,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"chosen_preset_before_activation", chosen_preset_before_activation},
         {"chosen_before_host_plays", chosen_before_host_plays},
         {"list_read_again", list_read_again},
+        {"refused_state_keeps_parameters", refused_state_keeps_parameters},
         {"load_without_set_dirty", [] { load_without_set_dirty(false); }},
         {"load_with_failing_set_dirty", [] { load_without_set_dirty(true); }},
         {"saved_filter_name", saved_filter_name},

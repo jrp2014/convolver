@@ -592,6 +592,10 @@ class HostFilter {
     // once for each refused request, so a read again that fails no other way
     // (out of memory) is not repeated at every read; empty otherwise.
     std::string take_unsettled_list();
+    // Whether take_unsettled_list() would give a list now (PLUG-40), so an
+    // adapter can keep it waiting when the host hands back the plug-in's own
+    // state unchanged, as Audacity 4.0.2 does at every playback start.
+    bool list_waits() const noexcept;
     // The request that supplied the accepted filter (or the saved failure);
     // number 0 before any was accepted.
     const HostRequest& accepted() const noexcept {

@@ -165,7 +165,18 @@ before they set the sample rate and channel layout (VST3 `setState` before
   a chosen file (setDirty, or VST3-17's Latency edit), and the Audio Unit in
   its `report()`, through `load_file()`. An accepted list joins the
   windows' recent files there, as a chosen file does, so it does not matter
-  which window reads the report (PLUG-47). Audacity's flush plays no audio a
+  which window reads the report (PLUG-47). PLUG-49: Audacity 4.0.2 restores
+  the state it last read from the plug-in at every playback start
+  (`VST3Wrapper::Initialize` calls `FetchSettings`), and that state holds
+  no list, so in jrp's live session of 22 November 2026 the list was
+  forgotten, never read again, and the export was silent. While a list
+  waits (`HostFilter::list_waits()`), VST3's `setState` with state that is
+  exactly what `getState` would save now (`Processor::unchanged_state()`,
+  compared encoded) changes nothing; a project the host says it is
+  opening still replaces everything. A restore of that same state meant
+  to choose the filter already there (an undo back to before the list,
+  say) is then also ignored, and the list, still waiting, is read at the
+  next playback with the window open. Audacity's flush plays no audio a
   window could see, so it never triggers this. Until then, once a control
   call has seen the host playing with the configuration it still has
   (`HostFilter::confirm()` with it, `HostFilter::played_with()`; not a
@@ -1195,7 +1206,26 @@ the plan's Gain modes (12 November 2026); its meters follow later
   same Latency. A restored state sets all three
   (a version 1 or 2 state resets them to their defaults), and the
   controller's `setComponentState` mirrors them, asking for a restart when the
-  Latency differs.
+  Latency differs. PLUG-48: a state the processor refuses (REAPER's preset
+  menu offering a 44.1 kHz preset at 48 kHz while a filter plays, jrp's
+  live session of 22 November 2026) leaves the processor's settings as
+  they were, but the controller had mirrored the refused state, so the
+  window and the host showed Latency 0 while 1024 played.
+  `setComponentState` sends the processor a report request naming the
+  state it mirrored (`follow state`, a digest of the state as decoded,
+  `state_digest()`, which both halves compute alike), so the answer also
+  comes when no window is open; while the host plays, that request reads a
+  waiting list again, as the window's does. The status that follows the
+  processor's outcome for that state carries the digest (`followed state`)
+  and the settings that play: the answer to the request when the processor
+  had already refused the state (the SDK's order), or the status after its
+  own restore of it (the controller first). That status sets Gain, Gain
+  mode, Mix and Latency to what plays, without reporting edits, asking for
+  a restart if the Latency changed, so the host's order does not matter.
+  Every outcome answers, not only a refusal: a refusal of the same state in
+  an earlier restore also answers a controller-first request, and the
+  restore that follows corrects it. Bypass is the host's
+  and is not corrected.
 
 ## Channel layouts
 

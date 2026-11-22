@@ -78,6 +78,13 @@ inline constexpr const char* report_message = "ConvolverReport";
 // PLUG-40: "retried" 1 when the processor read a refused configuration list
 // again itself (HostFilter::take_unsettled_list()), with "accepted", so the
 // controller marks the project changed as for a file the user chose.
+// PLUG-48: the controller's setComponentState sends a report_message with
+// "follow state", the state_digest() of the state it mirrored. The status
+// that follows the processor's outcome for that state (its own restore of
+// it, or the follow request when it had already refused it) adds "followed
+// state" (that digest) and the settings that play, "playing gain", "playing
+// mix", "playing latency" and "playing gain mode", which the controller's
+// parameters take if it still mirrors that state.
 struct StatusAnswer {
     Steinberg::int64 load_request = 0;
     bool retried = false;
@@ -155,6 +162,10 @@ inline constexpr int max_bus_channels = identity::max_channels;
 // any arrangement using other speakers, kMono (kSpeakerM) included.
 std::uint32_t wav_speakers(Steinberg::Vst::SpeakerArrangement) noexcept;
 HostState read_state(Steinberg::IBStream*);
+// PLUG-48: a digest of restored state as decoded (never 0), which the
+// processor and the controller compute alike for the same stream, so the
+// controller knows which state a refusal was of.
+std::uint64_t state_digest(const HostState&);
 bool write_state(Steinberg::IBStream*, const HostState&);
 class Processor final : public Steinberg::Vst::AudioEffect {
   public:
@@ -201,6 +212,8 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     HostStatusLine status();
     // VST3-4: the settings the parameters hold (the latency as chosen).
     HostSettings settings() const noexcept;
+    HostState saved_state() const;
+    bool unchanged_state(const HostState&) const noexcept;
 
   private:
     // `error` is null when something other than a std::exception was thrown.
@@ -350,6 +363,14 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // restores a project and gives it the track's). Under control_, except
     // played(), which process() calls.
     HostSettling settling_{HostBinding::activation};
+    // PLUG-48, under the lock: state_digest() of the newest state the host
+    // restored if it was refused, 0 otherwise (or once a load is accepted);
+    // the state the controller says it mirrored last ("follow state"); and
+    // whether the next status says what plays, after an outcome for that
+    // state, so the controller's parameters show what plays.
+    std::uint64_t refused_state_ = 0;
+    std::uint64_t mirrored_state_ = 0;
+    bool answer_mirrored_ = false;
     bool layout_refusal_logged_ = false; // Refused layouts are logged once per instance.
     std::string logged_;                 // The last line log() queued.
     std::vector<std::pair<std::string, bool>> unlogged_; // Lines and whether each is a problem.
@@ -458,5 +479,9 @@ class Controller final : public Steinberg::Vst::EditController,
     // filter that plays ("filter saved name"), and this pair only when that
     // filter has none.
     std::string name_, identity_;
+    // PLUG-48, under status_lock_: state_digest() of the state the last
+    // setComponentState mirrored; a status that says what plays after the
+    // processor's outcome for that state sets the parameters (notify). 0: none.
+    std::uint64_t follow_state_ = 0;
 };
 } // namespace convolver::vst3

@@ -411,12 +411,17 @@ HostReport Processor::report_locked() const {
 void Processor::send_status(const StatusAnswer& answer) noexcept {
     try {
         std::string report;
+        HostSettings playing;
+        std::uint64_t followed = 0;
         {
             const Locked lock(*this);
             if (settling_.playing()) // PLUG-27: the host plays the filter.
                 filter_.confirm(known_layout());
             // PLUG-39 step 5: the report holds the Status line too.
             report = encode_report(report_locked());
+            playing = settings();
+            if (std::exchange(answer_mirrored_, false))
+                followed = mirrored_state_;
         }
         if (!getPeer())
             return;
@@ -429,6 +434,16 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
             return;
         attributes->setBinary("report", report.data(), static_cast<uint32>(report.size()));
         attributes->setBinary("format", tag_.data(), static_cast<uint32>(tag_.size()));
+        // PLUG-48: after an outcome for the state the controller mirrored,
+        // which state it was and the settings that play, which the
+        // controller's parameters take (Controller::setComponentState).
+        if (followed) {
+            attributes->setInt("followed state", static_cast<int64>(followed));
+            attributes->setFloat("playing gain", playing.gain_db);
+            attributes->setFloat("playing mix", playing.mix);
+            attributes->setInt("playing latency", static_cast<int64>(playing.latency));
+            attributes->setInt("playing gain mode", static_cast<int64>(playing.gain_mode));
+        }
         if (answer.load_request || answer.retried) {
             if (answer.load_request)
                 attributes->setInt("load request", answer.load_request);
@@ -505,8 +520,22 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
     if (id == report_message) {
         bool faulted = false;
         std::string list;
+        int64 follow = 0;
+        if (auto* attributes = message->getAttributes())
+            attributes->getInt("follow state", follow);
         {
             const Locked lock(*this);
+            // PLUG-48: the state the controller mirrored. Its status says
+            // what plays now if this processor already refused that state
+            // (the host gave it the state first); otherwise its restore of
+            // that state will. A refusal of the same state in an earlier
+            // restore also answers, and the restore that follows answers
+            // again.
+            if (follow) {
+                mirrored_state_ = static_cast<std::uint64_t>(follow);
+                if (refused_state_ == mirrored_state_)
+                    answer_mirrored_ = true;
+            }
             const auto now = std::chrono::steady_clock::now();
             if (now - report_faults_at_ >= report_fault_interval) {
                 faulted = observe_faults();
@@ -719,10 +748,16 @@ std::string state_type(IBStream* stream) {
 tresult Processor::load_state(IBStream* stream) {
     const Locked lock(*this);
     observe_faults(); // Explained under the filter that played; an accepted load clears them.
+    std::uint64_t digest = 0;
     try {
         HostState next;
         try {
             next = read_state(stream);
+            digest = state_digest(next);
+            // PLUG-48: the controller mirrored this state; the status that
+            // follows says what plays after this restore, accepted or not.
+            if (digest == mirrored_state_)
+                answer_mirrored_ = true;
         } catch (const NewerHostState& e) {
             filter_.reject(HostFailureKind::state_newer, state_read_message(e));
             throw;
@@ -737,9 +772,23 @@ tresult Processor::load_state(IBStream* stream) {
         HostRequest request;
         request.kind = state_type(stream) == StateType::kProject ? HostRequestKind::session
                                                                  : HostRequestKind::restore;
+        // PLUG-49, PLUG-40 in Audacity 4.0.2 (jrp's live session, 22
+        // November 2026): at every playback start Audacity restores the
+        // state it last read
+        // from the plug-in (VST3Wrapper::Initialize, FetchSettings) before
+        // the audio starts. A configuration list refused because the host's
+        // settings were not known is not in that state, so restoring it
+        // forgot the list, the window never read it again, and the export
+        // was silent. State that is exactly what the plug-in would save now
+        // changes nothing, so the list keeps waiting.
+        if (request.kind == HostRequestKind::restore && filter_.list_waits() &&
+            unchanged_state(next))
+            return kResultOk;
         install(std::move(next), request);
+        refused_state_ = 0;
         return kResultOk;
     } catch (...) {
+        refused_state_ = digest;
         refused();
         return kResultFalse;
     }
@@ -899,6 +948,7 @@ bool Processor::install_chosen(const std::string& path, std::optional<HostSettin
         return false;
     }
     settings = install(std::move(*next), request);
+    refused_state_ = 0;
     return true;
 }
 Advice Processor::notice() {
@@ -909,6 +959,35 @@ std::optional<HostFailure> Processor::failure() {
     const Locked lock(*this);
     return filter_.failure();
 }
+std::uint64_t state_digest(const HostState& state) {
+    // FNV-1a over the state as encoded: the same in both halves of the
+    // plug-in, which decode the same stream.
+    std::uint64_t h = 14695981039346656037ull;
+    for (const auto b : encode_host_state(state)) {
+        h ^= static_cast<std::uint64_t>(b);
+        h *= 1099511628211ull;
+    }
+    return h ? h : 1;
+}
+// Whether `next` is what getState() would save now (the lock held); false
+// when that cannot be told (out of memory), so the state is installed.
+bool Processor::unchanged_state(const HostState& next) const noexcept {
+    try {
+        return encode_host_state(next) == encode_host_state(saved_state());
+    } catch (...) {
+        return false;
+    }
+}
+// What getState() saves, with the lock held.
+HostState Processor::saved_state() const {
+    HostState state;
+    if (const auto& f = filter_.filter()) // Copied for encoding, as before.
+        state.configuration = *f;
+    state.bypass = bypass_.load();
+    state.failed = filter_.failed(); // Reopening stays silent (state version 2).
+    state.settings = settings();     // Version 3, defaults included (PLUG-35).
+    return state;
+}
 tresult PLUGIN_API Processor::getState(IBStream* stream) {
     bool faulted = false;
     tresult result = kResultFalse;
@@ -917,12 +996,7 @@ tresult PLUGIN_API Processor::getState(IBStream* stream) {
         // Hosts save often (autosave too): faults are explained here as well.
         faulted = observe_faults();
         try {
-            HostState state;
-            if (const auto& f = filter_.filter()) // Copied for encoding, as before.
-                state.configuration = *f;
-            state.bypass = bypass_.load();
-            state.failed = filter_.failed(); // Reopening stays silent (state version 2).
-            state.settings = settings();     // Version 3, defaults included (PLUG-35).
+            const auto state = saved_state();
             if (host())
                 host()->collect();
             result = write_state(stream, state) ? kResultOk : kResultFalse;

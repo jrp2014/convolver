@@ -620,8 +620,10 @@ preparation and steps 2, 3 and 9 below include what it found.
 5. Switch the plug-in off and on with the slot's power button while playing;
    note any click. GarageBand, not Convolver, saves whether the plug-in is off.
 6. Save the project, quit, reopen and play: the echo is still there.
-7. Export the song (*Share › Export Song to Disk*) and check that the file holds
-   the echo.
+7. Turn the metronome off (its button in the control bar, or **K**):
+   GarageBand can put its clicks in the export (jrp's live session, 22
+   November 2026). Export the song (*Share › Export Song to Disk*) and check
+   that the file holds the echo.
 8. Build a 48 kHz preset, deleting any old copy first as in
    [preparation](#prepare-the-mac):
 
