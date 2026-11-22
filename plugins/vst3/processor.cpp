@@ -411,12 +411,16 @@ HostReport Processor::report_locked() const {
 void Processor::send_status(const StatusAnswer& answer) noexcept {
     try {
         std::string report;
+        HostSettings playing;
+        bool restore_refused = false;
         {
             const Locked lock(*this);
             if (settling_.playing()) // PLUG-27: the host plays the filter.
                 filter_.confirm(known_layout());
             // PLUG-39 step 5: the report holds the Status line too.
             report = encode_report(report_locked());
+            playing = settings();
+            restore_refused = restore_refused_;
         }
         if (!getPeer())
             return;
@@ -429,6 +433,14 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
             return;
         attributes->setBinary("report", report.data(), static_cast<uint32>(report.size()));
         attributes->setBinary("format", tag_.data(), static_cast<uint32>(tag_.size()));
+        // PLUG-48: the settings it plays, which the controller's parameters
+        // follow after the host restores state (Controller::setComponentState).
+        attributes->setFloat("playing gain", playing.gain_db);
+        attributes->setFloat("playing mix", playing.mix);
+        attributes->setInt("playing latency", static_cast<int64>(playing.latency));
+        attributes->setInt("playing gain mode", static_cast<int64>(playing.gain_mode));
+        if (restore_refused)
+            attributes->setInt("restore refused", 1);
         if (answer.load_request || answer.retried) {
             if (answer.load_request)
                 attributes->setInt("load request", answer.load_request);
@@ -737,9 +749,23 @@ tresult Processor::load_state(IBStream* stream) {
         HostRequest request;
         request.kind = state_type(stream) == StateType::kProject ? HostRequestKind::session
                                                                  : HostRequestKind::restore;
+        // PLUG-49, PLUG-40 in Audacity 4.0.2 (jrp's live session, 22
+        // November 2026): at every playback start Audacity restores the
+        // state it last read
+        // from the plug-in (VST3Wrapper::Initialize, FetchSettings) before
+        // the audio starts. A configuration list refused because the host's
+        // settings were not known is not in that state, so restoring it
+        // forgot the list, the window never read it again, and the export
+        // was silent. State that is exactly what the plug-in would save now
+        // changes nothing, so the list keeps waiting.
+        if (request.kind == HostRequestKind::restore && filter_.list_waits() &&
+            unchanged_state(next))
+            return kResultOk;
         install(std::move(next), request);
+        restore_refused_ = false;
         return kResultOk;
     } catch (...) {
+        restore_refused_ = true;
         refused();
         return kResultFalse;
     }
@@ -909,6 +935,25 @@ std::optional<HostFailure> Processor::failure() {
     const Locked lock(*this);
     return filter_.failure();
 }
+// Whether `next` is what getState() would save now (the lock held); false
+// when that cannot be told (out of memory), so the state is installed.
+bool Processor::unchanged_state(const HostState& next) const noexcept {
+    try {
+        return encode_host_state(next) == encode_host_state(saved_state());
+    } catch (...) {
+        return false;
+    }
+}
+// What getState() saves, with the lock held.
+HostState Processor::saved_state() const {
+    HostState state;
+    if (const auto& f = filter_.filter()) // Copied for encoding, as before.
+        state.configuration = *f;
+    state.bypass = bypass_.load();
+    state.failed = filter_.failed(); // Reopening stays silent (state version 2).
+    state.settings = settings();     // Version 3, defaults included (PLUG-35).
+    return state;
+}
 tresult PLUGIN_API Processor::getState(IBStream* stream) {
     bool faulted = false;
     tresult result = kResultFalse;
@@ -917,12 +962,7 @@ tresult PLUGIN_API Processor::getState(IBStream* stream) {
         // Hosts save often (autosave too): faults are explained here as well.
         faulted = observe_faults();
         try {
-            HostState state;
-            if (const auto& f = filter_.filter()) // Copied for encoding, as before.
-                state.configuration = *f;
-            state.bypass = bypass_.load();
-            state.failed = filter_.failed(); // Reopening stays silent (state version 2).
-            state.settings = settings();     // Version 3, defaults included (PLUG-35).
+            const auto state = saved_state();
             if (host())
                 host()->collect();
             result = write_state(stream, state) ? kResultOk : kResultFalse;

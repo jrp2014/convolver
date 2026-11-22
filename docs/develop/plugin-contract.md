@@ -165,7 +165,15 @@ before they set the sample rate and channel layout (VST3 `setState` before
   a chosen file (setDirty, or VST3-17's Latency edit), and the Audio Unit in
   its `report()`, through `load_file()`. An accepted list joins the
   windows' recent files there, as a chosen file does, so it does not matter
-  which window reads the report (PLUG-47). Audacity's flush plays no audio a
+  which window reads the report (PLUG-47). PLUG-49: Audacity 4.0.2 restores
+  the state it last read from the plug-in at every playback start
+  (`VST3Wrapper::Initialize` calls `FetchSettings`), and that state holds
+  no list, so in jrp's live session of 22 November 2026 the list was
+  forgotten, never read again, and the export was silent. While a list
+  waits (`HostFilter::list_waits()`), VST3's `setState` with state that is
+  exactly what `getState` would save now (`Processor::unchanged_state()`,
+  compared encoded) changes nothing; a project the host says it is
+  opening still replaces everything. Audacity's flush plays no audio a
   window could see, so it never triggers this. Until then, once a control
   call has seen the host playing with the configuration it still has
   (`HostFilter::confirm()` with it, `HostFilter::played_with()`; not a
@@ -1195,7 +1203,19 @@ the plan's Gain modes (12 November 2026); its meters follow later
   same Latency. A restored state sets all three
   (a version 1 or 2 state resets them to their defaults), and the
   controller's `setComponentState` mirrors them, asking for a restart when the
-  Latency differs.
+  Latency differs. PLUG-48: a state the processor refuses (REAPER's preset
+  menu offering a 44.1 kHz preset at 48 kHz while a filter plays, jrp's
+  live session of 22 November 2026) leaves the processor's settings as
+  they were, but the controller had mirrored the refused state, so the
+  window and the host showed Latency 0 while 1024 played. Every
+  `ConvolverStatus` now carries the settings the processor plays, with
+  `restore refused` while the newest restored state was refused;
+  `setComponentState` asks for the report, and the next status after it
+  that says the restore was refused sets Gain, Gain mode, Mix and Latency
+  to what plays, without reporting edits, asking for a restart if the
+  Latency changed. A host that gives the controller the state before the
+  processor (the SDK says the processor first) still shows the refused
+  state's values; bypass is the host's and is not corrected.
 
 ## Channel layouts
 

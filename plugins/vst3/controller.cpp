@@ -174,6 +174,30 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     attributes->getInt("gain mode", preset_mode);
     if (preset_mode < 0 || preset_mode >= static_cast<int64>(gain_mode_count))
         preset_mode = 0;
+    // PLUG-48: the settings the processor plays, when it refused the state
+    // the host restored last; absent otherwise or from a damaged message,
+    // which then changes no parameter.
+    std::optional<HostSettings> playing;
+    int64 restore_refused = 0;
+    attributes->getInt("restore refused", restore_refused);
+    if (restore_refused) {
+        double gain = 0, mix = 0;
+        int64 latency = -1, mode = -1;
+        if (attributes->getFloat("playing gain", gain) == kResultOk &&
+            attributes->getFloat("playing mix", mix) == kResultOk &&
+            attributes->getInt("playing latency", latency) == kResultOk &&
+            attributes->getInt("playing gain mode", mode) == kResultOk && std::isfinite(gain) &&
+            std::isfinite(mix) &&
+            std::find(host_latencies.begin(), host_latencies.end(), latency) !=
+                host_latencies.end() &&
+            mode >= 0 && mode < static_cast<int64>(gain_mode_count)) {
+            playing.emplace();
+            playing->gain_db = gain;
+            playing->mix = mix;
+            playing->latency = static_cast<std::size_t>(latency);
+            playing->gain_mode = static_cast<GainMode>(mode);
+        }
+    }
     std::optional<HostReport> report;
     std::string format;
     try {
@@ -194,6 +218,7 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     if (!parameter) // Not initialized, or terminated: nothing to show it on.
         return kResultFalse;
     bool changed = false, restart = false;
+    std::optional<HostSettings> followed;
     {
         std::lock_guard lock(status_lock_);
         if (load_request) {
@@ -212,6 +237,28 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
             report_.swap(report);
             format_.swap(format);
         }
+        if (follow_settings_) {
+            follow_settings_ = false;
+            followed = playing;
+        }
+    }
+    // PLUG-48: after restored state, the settings the processor plays, which
+    // differ from the state's only when it refused that state. Not edits:
+    // the host restored them, so nothing is recorded as the user's.
+    if (followed) {
+        const auto set = [&](ParamID id, ParamValue value) {
+            if (getParamNormalized(id) == value)
+                return;
+            EditController::setParamNormalized(id, value);
+            changed = true;
+        };
+        const auto before = latency_frames(getParamNormalized(latency_id));
+        set(gain_id, normalized_gain(followed->gain_db));
+        set(mix_id, std::clamp(followed->mix, 0.0, 1.0));
+        set(gain_mode_id, normalized_gain_mode(followed->gain_mode));
+        set(latency_id, normalized_latency(followed->latency));
+        if (latency_frames(getParamNormalized(latency_id)) != before)
+            restart = true;
     }
     // A window asks for the report twice a second; only a new status line
     // is news for the host.
@@ -448,7 +495,23 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
     EditController::setParamNormalized(latency_id, normalized_latency(saved.latency));
     if (latency_frames(getParamNormalized(latency_id)) != before && componentHandler)
         componentHandler->restartComponent(kLatencyChanged);
-    return EditController::setParamNormalized(bypass_id, state.bypass ? 1 : 0);
+    const auto result = EditController::setParamNormalized(bypass_id, state.bypass ? 1 : 0);
+    // PLUG-48 (jrp's live session, 22 November 2026): the processor may
+    // have refused this state, as REAPER's preset menu offers a preset made
+    // for another rate while a filter plays; it then keeps its own settings,
+    // but the values above came from the refused preset (REAPER showed
+    // Latency 0 while 1024 played). Its report, the answer to this message,
+    // says what it plays, and the parameters follow it (notify): at once
+    // with a direct connection, when the answer arrives with a forwarding one.
+    {
+        std::lock_guard lock(status_lock_);
+        follow_settings_ = true;
+    }
+    if (auto message = owned(allocateMessage())) {
+        message->setMessageID(report_message);
+        sendMessage(message);
+    }
+    return result;
 }
 IPlugView* PLUGIN_API Controller::createView(FIDString name) {
     if (!name || std::string_view(name) != ViewType::kEditor)

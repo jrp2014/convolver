@@ -201,6 +201,8 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     HostStatusLine status();
     // VST3-4: the settings the parameters hold (the latency as chosen).
     HostSettings settings() const noexcept;
+    HostState saved_state() const;
+    bool unchanged_state(const HostState&) const noexcept;
 
   private:
     // `error` is null when something other than a std::exception was thrown.
@@ -350,6 +352,9 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // restores a project and gives it the track's). Under control_, except
     // played(), which process() calls.
     HostSettling settling_{HostBinding::activation};
+    // PLUG-48, under the lock: whether the newest state the host restored
+    // was refused, so the controller's parameters follow what plays instead.
+    bool restore_refused_ = false;
     bool layout_refusal_logged_ = false; // Refused layouts are logged once per instance.
     std::string logged_;                 // The last line log() queued.
     std::vector<std::pair<std::string, bool>> unlogged_; // Lines and whether each is a problem.
@@ -458,5 +463,8 @@ class Controller final : public Steinberg::Vst::EditController,
     // filter that plays ("filter saved name"), and this pair only when that
     // filter has none.
     std::string name_, identity_;
+    // PLUG-48, under status_lock_: setComponentState asked the processor for
+    // its report, whose settings the parameters then follow (notify).
+    bool follow_settings_ = false;
 };
 } // namespace convolver::vst3

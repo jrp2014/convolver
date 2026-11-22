@@ -192,8 +192,10 @@ window open, you need not choose it again: when the host plays, the window
 loads the list itself, choosing its entry for the host's rate and channels,
 and Convolver tells the host the project has changed and adds the list to
 Recent, as for a chosen file, even if you closed and reopened the window
-meanwhile. This is checked by automated tests, not
-yet in a host. If the window was closed while the host played, choose the
+meanwhile. This is checked by automated tests; in Audacity 4.0.2, up to
+0.18.10 the list was forgotten when playback started, so the export stayed
+silent until it was chosen again (fixed by PLUG-49, not yet repeated in a
+host). If the window was closed while the host played, choose the
 list again, or play again with the window open. Once Convolver has seen the
 host play (for example when the host reads the Audio Unit's Status while it
 plays; the VST3 plug-in's Status is not read that way), the
