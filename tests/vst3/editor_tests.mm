@@ -97,11 +97,14 @@ void window() {
                 shown.settingMenus[1].numberOfItems == 8 &&
                 [shown.settingMenus[1].titleOfSelectedItem isEqualToString:@"0 frames (none)"],
             "settings rows");
-    // PLUG-10: the Gain mode menu, with what the mode plays beside it.
+    // PLUG-50: the Gain mode menu leads the Gain row, with a note under the
+    // row only when the Gain box cannot say what plays.
     NSPopUpButton* mode = shown.settingMenus[0];
     require(mode.numberOfItems == 3 && [mode.titleOfSelectedItem isEqualToString:@"Set"] &&
-                shown.settingValues[1].stringValue.length == 0,
-            "Gain mode row " + text(shown.settingValues[1].stringValue));
+                [mode isDescendantOf:shown.settingSliders[0].superview.superview] &&
+                shown.settingValues[1].stringValue.length == 0 && shown.settingValues[1].hidden &&
+                shown.settingSliders[0].enabled,
+            "Gain mode in the Gain row " + text(shown.settingValues[1].stringValue));
     handler.edits.clear();
     [mode selectItemAtIndex:2];
     [mode sendAction:mode.action to:mode.target];
@@ -109,12 +112,18 @@ void window() {
     require(handler.kinds(gain_mode_id) == "bpe" &&
                 p.settings().gain_mode == convolver::GainMode::no_clipping &&
                 [shown.settingValues[1].stringValue
-                    isEqualToString:@"each filter plays at its own figure"],
+                    isEqualToString:@"Each filter plays at its own figure."] &&
+                !shown.settingValues[1].hidden && !shown.settingSliders[0].enabled &&
+                !shown.settingValues[0].enabled && shown.settingValues[0].stringValue.length == 0,
             "Gain mode choice: " + handler.kinds(gain_mode_id) + ", " +
                 text(shown.settingValues[1].stringValue));
     [mode selectItemAtIndex:0];
     [mode sendAction:mode.action to:mode.target];
-    require(p.settings().gain_mode == convolver::GainMode::set, "Gain mode back to Set");
+    [shown refresh];
+    require(p.settings().gain_mode == convolver::GainMode::set && shown.settingSliders[0].enabled &&
+                shown.settingValues[0].enabled &&
+                [shown.settingValues[0].stringValue isEqualToString:@"0"],
+            "Gain mode back to Set: " + text(shown.settingValues[0].stringValue));
 
     // A Gain the host set shows in the window; Option-click's reset is one
     // edit of the parameter, as the SDK asks of an editor.
@@ -201,16 +210,22 @@ void window() {
             "after loading: " + text(shown.statusField.stringValue) + ", " +
                 text(shown.filterNameField.stringValue));
 
-    // The file is now first in the Recent menu, and Reload reads it again.
-    [shown updateRecentMenu];
-    require(shown.recentButton.numberOfItems >= 2 &&
-                [shown.recentButton.itemArray[1].title hasPrefix:@"room.wav — "] &&
-                [shown.recentButton.itemArray[1].toolTip isEqualToString:@(file.c_str())],
-            "Recent menu: " + text(shown.recentButton.itemArray.lastObject.title));
-    require(shown.reloadButton.enabled && shown.watchButton.enabled &&
-                shown.watchButton.state == NSControlStateValueOn,
-            "Reload controls");
-    [shown.reloadButton performClick:nil];
+    // PLUG-50: the file is now first under Recent in the Choose Filter menu
+    // (after its title, Choose File…, Reload, the automatic reload and a
+    // separator), and Reload, named for it, reads it again.
+    [shown updateFilterMenu];
+    NSMenu* menu = shown.chooseButton.menu;
+    require(menu.numberOfItems >= 7 && [menu.itemArray[1].title isEqualToString:@"Choose File…"] &&
+                [menu.itemArray[5].title isEqualToString:@"Recent"] &&
+                [menu.itemArray[6].title hasPrefix:@"room.wav — "] &&
+                [menu.itemArray[6].toolTip isEqualToString:@(file.c_str())] &&
+                [menu.itemArray.lastObject.title isEqualToString:@"Clear Recent"],
+            "Choose Filter menu: " + text(menu.itemArray.lastObject.title));
+    require(shown.reloadItem.enabled &&
+                [shown.reloadItem.title isEqualToString:@"Reload room.wav"] &&
+                shown.watchItem.enabled && shown.watchItem.state == NSControlStateValueOn,
+            "Reload items: " + text(shown.reloadItem.title));
+    [menu performActionForItemAtIndex:[menu indexOfItem:shown.reloadItem]];
     require(handler.dirty == 2, "Reload did not load the file again");
 
     // A change to the file reloads it once the change has settled for one
@@ -225,14 +240,17 @@ void window() {
     require(![shown checkForChanges] && [shown checkForChanges] && handler.dirty == 3,
             "a changed file was not reloaded");
     require(![shown checkForChanges], "reloaded again without a change");
-    [shown.watchButton performClick:nil]; // Off.
+    [menu performActionForItemAtIndex:[menu indexOfItem:shown.watchItem]]; // Off.
     require([files
                 setAttributes:@{NSFileModificationDate : [NSDate dateWithTimeIntervalSinceNow:120]}
                  ofItemAtPath:room
                         error:nil] &&
                 ![shown checkForChanges] && ![shown checkForChanges],
-            "reloaded with the box unticked");
-    [shown.watchButton performClick:nil]; // On again: the change made while off is not reloaded.
+            "reloaded with the item unticked");
+    require(shown.watchItem.state == NSControlStateValueOff,
+            "the automatic reload is still ticked");
+    // On again: the change made while off is not reloaded.
+    [menu performActionForItemAtIndex:[menu indexOfItem:shown.watchItem]];
     std::filesystem::remove(file);
     require(![shown checkForChanges] && ![shown checkForChanges] && handler.dirty == 3,
             "a missing file was reloaded");
@@ -277,10 +295,10 @@ void window() {
     std::filesystem::remove(file);
     std::filesystem::remove(folder / "list.txt");
 
-    [shown updateRecentMenu];
-    require([shown.recentButton.itemArray[1].title isEqualToString:@"No Recent Filters"] &&
-                !shown.recentButton.itemArray[1].enabled,
-            "a missing file in the Recent menu");
+    [shown updateFilterMenu];
+    require([menu.itemArray[5].title isEqualToString:@"No Recent Filters"] &&
+                !menu.itemArray[5].enabled && menu.numberOfItems == 6,
+            "a missing file in the Choose Filter menu");
     std::filesystem::remove_all(folder);
 
     // Copy Diagnostics puts the report and the log lines on the pasteboard.

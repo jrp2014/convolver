@@ -322,12 +322,20 @@ void window(const fs::path& picture) {
     require(text(setting(shown, 2, win::low)) == L"Dry" &&
                 text(setting(shown, 2, win::high)) == L"Wet",
             "Mix's ends");
-    // PLUG-10: the Gain mode list, with what the mode plays beside it.
+    // PLUG-50: the Gain mode list leads the Gain row (its own label is not
+    // shown), with a note under the row only when the Gain box cannot say
+    // what plays.
     HWND mode = setting(shown, 1, win::control);
+    RECT mode_rect{}, gain_rect{};
+    GetWindowRect(mode, &mode_rect);
+    GetWindowRect(gain, &gain_rect);
     require(SendMessageW(mode, CB_GETCOUNT, 0, 0) == 3 &&
                 SendMessageW(mode, CB_GETCURSEL, 0, 0) == 0 &&
-                text(setting(shown, 1, win::value)).empty(),
-            "Gain mode row");
+                text(setting(shown, 1, win::value)).empty() &&
+                !IsWindowVisible(setting(shown, 1, win::label)) &&
+                mode_rect.right <= gain_rect.left && mode_rect.top < gain_rect.bottom &&
+                gain_rect.top < mode_rect.bottom && IsWindowEnabled(gain),
+            "Gain mode in the Gain row");
     handler.edits.clear();
     SendMessageW(mode, CB_SETCURSEL, 2, 0);
     SendMessageW(shown, WM_COMMAND,
@@ -337,7 +345,9 @@ void window(const fs::path& picture) {
     tick(shown, win::refresh_timer);
     require(handler.kinds(gain_mode_id) == "bpe" &&
                 p.settings().gain_mode == convolver::GainMode::no_clipping &&
-                text(setting(shown, 1, win::value)) == L"each filter plays at its own figure",
+                text(setting(shown, 1, win::value)) == L"Each filter plays at its own figure." &&
+                IsWindowVisible(setting(shown, 1, win::value)) && !IsWindowEnabled(gain) &&
+                !IsWindowEnabled(gain_box) && text(gain_box).empty(),
             "Gain mode choice: " + handler.kinds(gain_mode_id) + ", " +
                 utf8(text(setting(shown, 1, win::value))));
     SendMessageW(mode, CB_SETCURSEL, 0, 0);
@@ -345,7 +355,9 @@ void window(const fs::path& picture) {
                  MAKEWPARAM(win::settings + win::setting_stride + win::control, CBN_SELCHANGE),
                  reinterpret_cast<LPARAM>(mode));
     pump();
-    require(p.settings().gain_mode == convolver::GainMode::set, "Gain mode back to Set");
+    require(p.settings().gain_mode == convolver::GainMode::set && IsWindowEnabled(gain) &&
+                IsWindowEnabled(gain_box) && text(gain_box) == L"0",
+            "Gain mode back to Set: " + utf8(text(gain_box)));
 
     // A Gain the host set shows in the window.
     c.setParamNormalized(gain_id, normalized_gain(-6));
@@ -432,12 +444,15 @@ void window(const fs::path& picture) {
                 utf8(text(item(shown, win::filter_name))));
     require(convolver::recent_files().size() == 1, "not in the recent files");
 
-    // Reload reads it again; a change to the file reloads it once the
-    // change has settled for one check; with the box unticked it does not.
-    HWND reload = item(shown, win::reload);
-    HWND watch = item(shown, win::watch);
-    require(IsWindowEnabled(reload) && IsWindowEnabled(watch) && checked(watch), "Reload controls");
-    click(reload);
+    // PLUG-50: the Choose Filter menu's Reload reads it again; a change to
+    // the file reloads it once the change has settled for one check; with
+    // Reload When the File Changes unticked it does not. The window takes
+    // the menu's commands as WM_COMMAND, so the menu need not open.
+    const auto menu = [&](int command) {
+        SendMessageW(shown, WM_COMMAND, MAKEWPARAM(command, 0), 0);
+        pump();
+    };
+    menu(win::menu_reload);
     require(handler.dirty == 2, "Reload did not load the file again");
     const auto now = fs::file_time_type::clock::now();
     fs::last_write_time(file, now + std::chrono::minutes(1));
@@ -447,15 +462,18 @@ void window(const fs::path& picture) {
     require(handler.dirty == 3, "a changed file was not reloaded");
     tick(shown, win::files_timer);
     require(handler.dirty == 3, "reloaded again without a change");
-    click(watch); // Off.
+    menu(win::menu_watch); // Off.
     fs::last_write_time(file, now + std::chrono::minutes(2));
     tick(shown, win::files_timer);
     tick(shown, win::files_timer);
-    require(handler.dirty == 3, "reloaded with the box unticked");
-    click(watch); // On again: the change made while off is not reloaded.
+    require(handler.dirty == 3, "reloaded with the automatic reload unticked");
+    menu(win::menu_watch); // On again: the change made while off is not reloaded.
     tick(shown, win::files_timer);
     tick(shown, win::files_timer);
-    require(handler.dirty == 3, "reloaded a change made while the box was unticked");
+    require(handler.dirty == 3, "reloaded a change made while the automatic reload was unticked");
+    // A recent file from the menu loads it.
+    menu(win::menu_recent_first);
+    require(handler.dirty == 4, "the recent file did not load");
 
     // Copy Diagnostics puts the report and the log lines on the clipboard.
     click(item(shown, win::diagnostics));
@@ -478,12 +496,15 @@ void window(const fs::path& picture) {
         require(spoken == name, "UI Automation name " + utf8(spoken) + ", not " + utf8(name));
     }
 
-    // Tab moves from control to control, in reading order.
+    // Tab moves from control to control, in reading order: Choose Filter,
+    // then the Gain row's Gain mode list, its trackbar and its box.
     SetFocus(item(shown, win::choose));
     SendMessageW(item(shown, win::choose), WM_KEYDOWN, VK_TAB, 0);
-    require(GetFocus() == item(shown, win::recent), "Tab from Choose…");
-    SendMessageW(item(shown, win::recent), WM_KEYDOWN, VK_TAB, 0);
-    require(GetFocus() == reload, "Tab from Recent");
+    require(GetFocus() == mode, "Tab from Choose Filter");
+    SendMessageW(mode, WM_KEYDOWN, VK_TAB, 0);
+    require(GetFocus() == gain, "Tab from Gain mode");
+    SendMessageW(gain, WM_KEYDOWN, VK_TAB, 0);
+    require(GetFocus() == gain_box, "Tab from the Gain trackbar");
 
     // Showing the file, software and log lines makes the window taller: it
     // asks the host for the new size.
@@ -506,14 +527,14 @@ void window(const fs::path& picture) {
         keep_picture(host, picture);
 
     // A refused file: the earlier filter still plays, the message says why
-    // in its box, and Choose… is drawn as the button that fixes it.
+    // in its box, and Choose Filter is drawn as the button that fixes it.
     const auto broken = folder / "broken.wav";
     std::ofstream(broken) << "not a sound file";
     drop(shown, broken);
     HWND message = item(shown, win::message);
     require(text(item(shown, win::status)) == L"Load failed" && IsWindowVisible(message) &&
                 text(message).find(L"broken.wav") != std::wstring::npos &&
-                (GetWindowLongPtrW(item(shown, win::choose), GWL_STYLE) & 0xF) == BS_DEFPUSHBUTTON,
+                (GetWindowLongPtrW(item(shown, win::choose), GWL_STYLE) & 0xF) == BS_DEFSPLITBUTTON,
             "a refused file: " + utf8(text(item(shown, win::status))) + ", " + utf8(text(message)));
     if (!picture.empty()) {
         RedrawWindow(host, nullptr, nullptr,

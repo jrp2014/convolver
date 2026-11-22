@@ -64,7 +64,7 @@ std::string load_fix(bool chooses_files) {
                : "Load a Convolver preset from the host's preset menu (convolver-preset makes "
                  "one from an IR file, .cfg or configuration list).";
 }
-// Failures the window's Choose Filter… puts right.
+// Failures the window's Choose Filter menu puts right.
 bool chosen_away(HostFailureKind kind) {
     return kind != HostFailureKind::preparation && kind != HostFailureKind::activation;
 }
@@ -418,8 +418,8 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
         const bool set = facts.settings.gain_mode == GainMode::set;
         audio.push_back(
             {"Worst-case peak", decibels(20 * std::log10(peak)),
-             mix == 0 || bound <= 1 + 1e-9 ? (set ? "(cannot clip at this Gain and Mix)"
-                                                  : "(cannot clip in this Gain mode and Mix)")
+             mix == 0 || bound <= 1 + 1e-9 ? (set ? "(won't clip at this Gain and Mix)"
+                                                  : "(won't clip in this Gain mode and Mix)")
              : set ? "(Gain " + decibels(-20 * std::log10(peak)) + " or lower rules out clipping)"
                    : std::string("(Gain mode No clipping rules out clipping)"),
              false,
@@ -560,6 +560,7 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
     const auto* gains = filter.filter() ? &filter.gains() : nullptr;
     r.settings = settings_words(facts.settings, dry, gains);
     r.gain_note = gain_note(facts.settings, filter.gains(), gains != nullptr);
+    r.gain_played = gain_played(facts.settings, filter.gains(), gains != nullptr);
     if (dry != HostDrySignal::present) { // PLUG-23 (dry_signal_rule()).
         r.mix_note = std::string(no_dry_reason(dry)) +
                      ", so there is no dry signal: Mix has no effect, and bypass plays silence.";
@@ -621,7 +622,7 @@ namespace {
 // same order by the two classes below, so the encoding cannot drift from
 // the decoding. Numbers are 8 bytes, least significant first; a text is its
 // length then its bytes; a list is its count then its items.
-constexpr std::uint64_t report_encoding = 1; // The first number; bump on any change.
+constexpr std::uint64_t report_encoding = 2; // The first number; bump on any change.
 
 class ReportWriter {
   public:
@@ -763,7 +764,8 @@ template <class Io, class Report> bool report_io(Io& io, Report& r) {
            io.text(r.filter_path) && io.texts(r.filter_files) && io.facts(r.audio) &&
            io.text(r.settings) && io.rate(r.sample_rate) && io.flag(r.latency_waits) &&
            io.flag(r.latency_next_start) && io.text(r.mix_note) && io.text(r.gain_note) &&
-           io.pairs(r.reference) && io.text(r.log_path) && io.flag(r.log_written);
+           io.text(r.gain_played) && io.pairs(r.reference) && io.text(r.log_path) &&
+           io.flag(r.log_written);
 }
 } // namespace
 

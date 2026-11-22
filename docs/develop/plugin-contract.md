@@ -1065,8 +1065,12 @@ the plan's Gain modes (12 November 2026); its meters follow later
   its bound; a filter with no finite bound plays silence in both modes,
   which the log and the window say. Without a filter both figures are 0 dB.
   The log line `gain_mode_line()` and `settings_words()` give the mode and
-  the gain it plays (`gain_words()`), and the window report's `gain_note`
-  field says it beside the Gain mode menu in the macOS and Windows windows.
+  the gain it plays (`gain_words()`). In the macOS and Windows windows the
+  Gain mode menu leads the Gain row (PLUG-50): outside Set, the Gain
+  slider and box are disabled and the box shows the report's `gain_played`
+  (`gain_played()`), and `gain_note` (`gain_note()`) says under the row
+  what the box cannot (no filter, no figure, or No clipping until
+  estimated).
   Not automatable, like Latency, since Estimate may need time before it can
   play.
 - **Mix** is the filtered share, 0 to 1, of the output before bypass; the
@@ -1557,7 +1561,7 @@ How each adapter meets the contract where its format differs:
   attachment, `IPlugViewContentScaleSupport` gives the host's scale; a
   taller content asks the host with `IPlugFrame::resizeView`, as on macOS.
   Unlike the macOS sheet, the file dialog (`IFileOpenDialog`) and the
-  Recent menu (`TrackPopupMenu`) are Windows' own modal loops, owned by the
+  Choose Filter menu (`TrackPopupMenu`) are Windows' own modal loops, owned by the
   host's top-level window, as Windows applications expect. During either
   loop the host may remove and release the view, so the view holds a
   reference to itself until the loop returns, `removed()` closes an open

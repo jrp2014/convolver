@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
-// PLUG-26: a file chosen in a plug-in window (Choose… or a drop): a
+// PLUG-26: a file chosen in a plug-in window (Choose File… or a drop): a
 // Convolver .vstpreset through the reader convolver-preset uses
 // (presets::read_vst3_preset_file), anything else through read_filter_file().
 // For the VST3 plug-in and the Audio Unit, whose windows choose files; LV2,

@@ -12,7 +12,7 @@ namespace convolver::vst3 {
 class Controller;
 // A new view for `controller` (the caller owns the reference), or null.
 Steinberg::IPlugView* create_editor(Controller& controller);
-// Whether this system has the window, whose Choose… chooses filter files
+// Whether this system has the window, whose Choose Filter menu chooses filter files
 // (PLUG-33: the No filter Status then names choosing one).
 bool has_editor() noexcept;
 } // namespace convolver::vst3

@@ -34,8 +34,10 @@ typedef void (^ConvolverSettingGesture)(void);
 // @"low" and @"high" (NSString), words under the slider's ends (Mix: Dry and
 // Wet). With @"choices" (NSArray<NSString*>) it is a menu instead, whose value
 // is the chosen item's index (Gain mode, Latency); beside it, the time a
-// Latency choice adds, or with @"note" @"gain" the gain the Gain mode plays
-// (PLUG-10). @"tip" (NSString), if present, is the control's tooltip. Optionally @"begin" and
+// Latency choice adds. With @"note" @"gain" (Gain mode) the menu leads the
+// slider row before it (PLUG-50): in any mode but Set that slider dims and
+// its box shows the gain the mode plays, and a note under the row says what
+// the box cannot. @"tip" (NSString), if present, is the control's tooltip. Optionally @"begin" and
 // @"end" (ConvolverSettingGesture) bracket each edit: a slider calls begin when the mouse goes down
 // and end when it comes up, and every other change (typing, a menu choice, Option-click, a key)
 // calls begin, set and end, as the VST3 SDK asks of an editor. Without them, changes are only set.
@@ -51,22 +53,28 @@ typedef void (^ConvolverSettingGesture)(void);
 // the host starts) gives the time a Latency choice adds; `latencyWaits`
 // says the chosen Latency is not in use yet, and `latencyNextStart` that
 // it is selected for the next start (the host has the plug-in stopped);
-// `gainNote` is what the Gain mode plays (the report's gain note, empty in
-// Set mode).
+// `gainPlayed` is the gain Estimate or No clipping plays, for the Gain box,
+// and `gainNote` what that box cannot say (the report's gain_played and
+// gain_note, both empty in Set mode).
 - (void)readWithSampleRate:(int)sampleRate
               latencyWaits:(BOOL)latencyWaits
           latencyNextStart:(BOOL)latencyNextStart
-                  gainNote:(NSString*)gainNote;
+                  gainNote:(NSString*)gainNote
+                gainPlayed:(NSString*)gainPlayed;
+// PLUG-50: whether setting `i` (Gain mode) sits in the row before it, which
+// `rows` then holds at both indexes; the window shows that row once.
+- (BOOL)joinsRowBefore:(NSUInteger)i;
 // Setting `i` back to its default, as Option-click on its slider does.
 - (void)resetSetting:(NSUInteger)i;
 // Ends an edit still open (a drag the window stopped seeing), as when the
 // window closes.
 - (void)endGesture;
-// Each setting's row, without its "Name:" label, in the settings' order.
+// Each setting's row, without its "Name:" label, in the settings' order
+// (a joined setting's entry is the row it sits in).
 @property(readonly, nonatomic) NSArray<NSView*>* rows;
 // Each setting's slider or menu, and its value: an editable number field for
-// a slider, the time it adds for the Latency menu, the gain it plays for
-// the Gain mode menu.
+// a slider, the time it adds for the Latency menu, and for the Gain mode
+// menu the note under the Gain row.
 @property(readonly, nonatomic) NSArray<NSSlider*>* sliders;
 @property(readonly, nonatomic) NSArray<NSPopUpButton*>* menus;
 @property(readonly, nonatomic) NSArray<NSTextField*>* values;

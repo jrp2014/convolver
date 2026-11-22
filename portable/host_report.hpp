@@ -79,7 +79,7 @@ struct HostReport {
     // DIAG-2: what the window shows under the status word, each part on its
     // own: the problem as a sentence (empty when nothing is wrong), what
     // plays, then the cause, the fix and a note (each may be empty), and the
-    // window's action for the fix: "choose filter" (Choose Filter…), "copy
+    // window's action for the fix: "choose filter" (Choose Filter), "copy
     // diagnostics" (Copy Diagnostics) or empty.
     std::string problem, plays, cause, fix, note, action;
     // All of it as text: the problem and what plays, then "Cause: ", "Fix: "
@@ -133,9 +133,10 @@ struct HostReport {
     // is no dry signal (the filter's inputs and outputs differ, or with no
     // filter the host's), so Mix has no effect and bypass plays silence.
     std::string mix_note;
-    // PLUG-10: beside the window's Gain mode menu, empty in Set mode: the
-    // gain the mode plays (gain_note()).
-    std::string gain_note;
+    // PLUG-50: for the window's Gain row in Estimate and No clipping: the
+    // gain the mode plays, as its box writes it (gain_played()), and what
+    // that box cannot say, under the row (gain_note()). Both empty in Set.
+    std::string gain_note, gain_played;
     // Reference material for problem reports, smaller and folded away in
     // the window: the filter file and request, software, log.
     std::vector<std::pair<std::string, std::string>> reference;

@@ -123,7 +123,7 @@ NSDictionary<NSString*, id>* choice(AudioUnit unit, AudioUnitParameterID paramet
     if (NSDictionary<NSString*, id>* gain =
             setting(unit, convolver::identity::au_gain_parameter_id, @"Gain", @" dB"))
         [settings addObject:gain];
-    // PLUG-10: beside the menu, the gain the mode plays (the report's gain note).
+    // PLUG-50: the menu leads the Gain row, whose box shows the gain the mode plays.
     if (NSDictionary<NSString*, id>* mode =
             choice(unit, convolver::identity::au_gain_mode_parameter_id, @"Gain mode",
                    @"Which gain plays. Set: the Gain setting. Estimate: the filter's own estimate, "

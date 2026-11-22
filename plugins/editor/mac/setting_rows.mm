@@ -25,7 +25,9 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     int sampleRate_;        // The host's, for the Latency row; 0 before it starts.
     BOOL latencyWaits_;     // The chosen Latency is not in use yet.
     BOOL latencyNextStart_; // It is selected for the next start (AU-19).
-    NSString* gainNote_;    // PLUG-10: what the Gain mode plays (the report's gain note).
+    NSString* gainNote_;    // PLUG-50: what the Gain row's box cannot say (the gain note).
+    NSString* gainPlayed_;  // PLUG-50: the gain Estimate or No clipping plays, for the box.
+    NSUInteger joined_;     // PLUG-50: the Gain mode menu, in the row before it (or NSNotFound).
 }
 
 - (instancetype)initWithSettings:(NSArray<NSDictionary<NSString*, id>*>*)settings
@@ -38,6 +40,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     dragging_ = -1;
     typed_ = -1;
     gesture_ = -1;
+    joined_ = NSNotFound;
     NSMutableArray<NSView*>* rows = [NSMutableArray array];
     NSMutableArray<NSControl*>* controls = [NSMutableArray array];
     NSMutableArray<NSSlider*>* sliders = [NSMutableArray array];
@@ -58,12 +61,38 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
             menu.translatesAutoresizingMaskIntoConstraints = NO;
             control = menu;
             [menus addObject:menu];
-            value = label(body_font(), [NSColor secondaryLabelColor]);
-            stretches(value);
-            NSStackView* row =
-                stack(@[ menu, value ], NSUserInterfaceLayoutOrientationHorizontal, 12);
-            row.distribution = NSStackViewDistributionFill;
-            content = row;
+            auto* before = i > 0 && [controls.lastObject isKindOfClass:[NSSlider class]]
+                               ? static_cast<NSStackView*>(rows.lastObject)
+                               : nil;
+            if ([setting[@"note"] isEqual:@"gain"] && before) {
+                // PLUG-50: the Gain mode menu leads the Gain row, so one row
+                // says which gain plays and no "Gain mode:" label is cut
+                // short (jrp's run of 0.18.10). What the box cannot say
+                // goes under the row, hidden while empty.
+                joined_ = i;
+                [before insertArrangedSubview:menu atIndex:0];
+                [before setCustomSpacing:8 afterView:menu];
+                // The form's content width (diagnostic_view.mm: inner -
+                // form_label - 10), as for the note under Mix.
+                value = wrapping(small_font(), [NSColor secondaryLabelColor], 446);
+                value.hidden = YES;
+                NSStackView* column =
+                    stack(@[ before, value ], NSUserInterfaceLayoutOrientationVertical, 4);
+                column.alignment = NSLayoutAttributeLeading;
+                [NSLayoutConstraint
+                    activateConstraints:@[ [before.widthAnchor
+                                            constraintEqualToAnchor:column.widthAnchor] ]];
+                stretches(column);
+                rows[rows.count - 1] = column;
+                content = column;
+            } else {
+                value = label(body_font(), [NSColor secondaryLabelColor]);
+                stretches(value);
+                NSStackView* row =
+                    stack(@[ menu, value ], NSUserInterfaceLayoutOrientationHorizontal, 12);
+                row.distribution = NSStackViewDistributionFill;
+                content = row;
+            }
         } else {
             NSSlider* slider = [NSSlider sliderWithValue:[setting[@"minimum"] doubleValue]
                                                 minValue:[setting[@"minimum"] doubleValue]
@@ -140,6 +169,10 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     return self;
 }
 
+- (BOOL)joinsRowBefore:(NSUInteger)i {
+    return i == joined_;
+}
+
 // A setting's value as the window writes it ("-12", "50"): the same text as
 // the report's settings and the log (convolver::setting_text).
 - (NSString*)number:(double)value of:(NSDictionary<NSString*, id>*)setting {
@@ -166,10 +199,13 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
         const auto index = static_cast<NSInteger>(std::lround(value));
         if (index >= 0 && index < menu.numberOfItems && menu.indexOfSelectedItem != index)
             [menu selectItemAtIndex:index];
-        // PLUG-10: the Gain mode's menu shows the gain it plays instead.
-        _values[i].stringValue = [settings_[i][@"note"] isEqual:@"gain"]
-                                     ? (gainNote_ ? gainNote_ : @"")
-                                     : [self latencyNote:menu];
+        // PLUG-50: under the Gain row, what its box cannot say.
+        if (i == joined_) {
+            _values[i].stringValue = gainNote_ ? gainNote_ : @"";
+            _values[i].hidden = _values[i].stringValue.length == 0;
+        } else {
+            _values[i].stringValue = [self latencyNote:menu];
+        }
         return;
     }
     NSString* number = [self number:value of:settings_[i]];
@@ -318,11 +354,23 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
 - (void)readWithSampleRate:(int)sampleRate
               latencyWaits:(BOOL)latencyWaits
           latencyNextStart:(BOOL)latencyNextStart
-                  gainNote:(NSString*)gainNote {
+                  gainNote:(NSString*)gainNote
+                gainPlayed:(NSString*)gainPlayed {
     sampleRate_ = sampleRate;
     latencyWaits_ = latencyWaits;
     latencyNextStart_ = latencyNextStart;
     gainNote_ = [gainNote copy];
+    gainPlayed_ = [gainPlayed copy];
+    // The Gain mode chosen now: anything but Set (0) plays its own gain.
+    BOOL moded = NO;
+    if (joined_ != NSNotFound) {
+        ConvolverSettingGetter mode = settings_[joined_][@"get"];
+        const double index = mode ? mode() : NAN;
+        // Only once the report says what the mode plays: until the plug-in
+        // has applied a new mode, Gain stays as it was.
+        moded = !std::isnan(index) && std::lround(index) != 0 &&
+                (gainPlayed_.length > 0 || gainNote_.length > 0);
+    }
     if (dragging_ >= 0 && [NSEvent pressedMouseButtons] == 0) {
         dragging_ = -1; // The drag ended without a final action.
         [self endGesture];
@@ -337,6 +385,25 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
             controls_[i].enabled = NO;
             _values[i].enabled = NO;
             _values[i].stringValue = @"";
+            continue;
+        }
+        if (moded && joined_ == i + 1) {
+            // PLUG-50: Estimate and No clipping play their own gain: the
+            // Gain slider dims and its box shows that gain, greyed. The
+            // Gain setting itself is kept for Set.
+            if (dragging)
+                dragging_ = -1;
+            if (gesture_ == static_cast<NSInteger>(i))
+                [self endGesture];
+            [self dropTyping:i];
+            controls_[i].enabled = NO;
+            _values[i].enabled = NO;
+            _values[i].stringValue = gainPlayed_ ? gainPlayed_ : @"";
+            if (gainPlayed_.length)
+                controls_[i].doubleValue = gainPlayed_.doubleValue;
+            controls_[i].accessibilityValueDescription =
+                gainPlayed_.length ? [gainPlayed_ stringByAppendingString:settings_[i][@"unit"]]
+                                   : gainNote_;
             continue;
         }
         controls_[i].enabled = YES;
