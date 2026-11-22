@@ -516,7 +516,7 @@ void cases() {
     // The identity paths have peak 1.75 (1 + .5 + .25): +4.9 dB. Gain
     // scales only the filtered path, which Mix then adds to the dry input:
     // at Gain -6 dB and Mix 25%, .25 * .501 * 1.75 + .75 = .97.
-    check(fact(r, "Worst-case peak"), "+4.9 dB", "(cannot clip at this Gain and Mix)");
+    check(fact(r, "Worst-case peak"), "+4.9 dB", "(won't clip at this Gain and Mix)");
     check(fact(r, "Host block size"), "up to 512 frames", "(11.6 ms)");
     // jrp, 7 November 2026: the filter's own facts, under its name in the
     // window; the Audio section gives the host's.
@@ -613,7 +613,7 @@ void cases() {
                 "loudest peak at gain " + std::to_string(s.gain_db) + ", mix " +
                     std::to_string(s.mix));
     require(fact(host_report(f, facts(stereo, {24, 0})), "Worst-case peak").note ==
-                "(cannot clip at this Gain and Mix)",
+                "(won't clip at this Gain and Mix)",
             "loudest peak at mix 0");
     // PLUG-10: the note follows the gain that plays, not the Gain setting:
     // No clipping cannot clip at any Gain; Set at -30 dB cannot either, but
@@ -621,12 +621,22 @@ void cases() {
     // estimate), so the note names the mode.
     HostSettings moded{-30, 1, 0, GainMode::no_clipping};
     require(fact(host_report(f, facts(stereo, moded)), "Worst-case peak").note ==
-                "(cannot clip in this Gain mode and Mix)",
+                "(won't clip in this Gain mode and Mix)",
             "loudest peak in No clipping: " +
                 fact(host_report(f, facts(stereo, moded)), "Worst-case peak").note);
+    // PLUG-50: the window's Gain row shows the gain No clipping plays in
+    // its box, with nothing more to say under it; Set shows neither.
+    {
+        const auto moded_report = host_report(f, facts(stereo, moded));
+        require(moded_report.gain_played == gain_played(moded, f.gains(), true) &&
+                    !moded_report.gain_played.empty() && moded_report.gain_note.empty() &&
+                    host_report(f, facts(stereo)).gain_played.empty(),
+                "Gain row in No clipping: " + moded_report.gain_played + " | " +
+                    moded_report.gain_note);
+    }
     moded.gain_mode = GainMode::set;
     require(fact(host_report(f, facts(stereo, moded)), "Worst-case peak").note ==
-                "(cannot clip at this Gain and Mix)",
+                "(won't clip at this Gain and Mix)",
             "loudest peak at -30 dB in Set");
     HostFilter estimated(8);
     HostState with_estimate{filter(44100, 2)};
@@ -1210,6 +1220,7 @@ void encoding() {
     r.reference = {{"Software", "Convolver"}, {"", "a line without a label"}};
     r.sample_rate = 96000;
     r.latency_waits = true;
+    r.gain_played = "-7.3";
     r.log_written = false;
     const auto bytes = encode_report(r);
     const auto back = decode_report(bytes);
@@ -1222,7 +1233,7 @@ void encoding() {
     require(!decode_report(bytes + '\0'), "a report with a byte left over was read");
     // Another encoding version, or a status out of range: refused.
     auto other = bytes;
-    other[0] = 2;
+    other[0] = static_cast<char>(other[0] + 1);
     require(!decode_report(other), "another encoding version was read");
     auto status = bytes;
     status[8] = static_cast<char>(host_status_names.size());

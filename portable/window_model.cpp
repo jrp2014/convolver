@@ -110,6 +110,7 @@ WindowContent window_content(const HostReport* report, bool can_load) {
             c.reference.push_back({label, value});
         c.mix_note = r.mix_note;
         c.gain_note = r.gain_note;
+        c.gain_played = r.gain_played;
         c.sample_rate = r.sample_rate;
         c.latency_waits = r.latency_waits;
         c.latency_next_start = r.latency_next_start;

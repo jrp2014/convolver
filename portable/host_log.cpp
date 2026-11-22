@@ -294,15 +294,20 @@ std::string gain_note(const HostSettings& s, const FilterGains& gains, bool has_
     if (s.gain_mode == GainMode::set)
         return {};
     if (!has_filter)
-        return "each filter plays at its own figure";
-    const auto played = applied_gain_db(s, gains);
-    if (!played)
-        return "silence: no figure for this filter";
+        return "Each filter plays at its own figure.";
+    if (!applied_gain_db(s, gains))
+        return "Silence: this filter has no figure.";
     if (s.gain_mode == GainMode::estimate && !gains.estimate_db)
-        return figure_text(*played) + (gains.estimate_failed
-                                           ? " (No clipping: too loud to estimate)"
-                                           : " (No clipping until estimated)");
-    return figure_text(*played) + " for this filter";
+        return gains.estimate_failed ? "No clipping plays: the filter is too loud to estimate."
+                                     : "No clipping plays until the filter is estimated.";
+    return {};
+}
+
+std::string gain_played(const HostSettings& s, const FilterGains& gains, bool has_filter) {
+    if (s.gain_mode == GainMode::set || !has_filter)
+        return {};
+    const auto played = applied_gain_db(s, gains);
+    return played ? setting_text(*played, -1e9, 1e9) : std::string();
 }
 
 std::string settings_words(const HostSettings& s, HostDrySignal dry, const FilterGains* gains) {

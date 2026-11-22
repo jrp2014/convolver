@@ -653,7 +653,7 @@ From the top, the window has:
   | Host sample rate, Host channels | Otherwise a line each: the rate the host runs the plug-in at, and the inputs and outputs it gives it (`1 in → 1 out`) |
   | Routing | With a filter: which input feeds which output (`In 1 → Out 1`), with route gains such as `×0.5`; the first four paths, then how many more |
   | Ring-out | How long the output goes on after the input stops (the tail), at the host's rate; only when it says more than the filter's Length: delays in the filter, a Latency, or another rate |
-  | Worst-case peak | The loudest output any full-scale input could make through the filter, and the Gain that rules out clipping (or that it cannot clip at the current Gain and Mix) |
+  | Worst-case peak | The loudest output any full-scale input could make through the filter, and the Gain that rules out clipping (or that it won't clip at the current Gain and Mix) |
   | Host block size | The largest block the host sends at a time |
 
   A line that does not match (a filter for another rate, say) is marked with

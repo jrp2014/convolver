@@ -111,10 +111,15 @@ std::string gain_words(const HostSettings&, const FilterGains* gains);
 // found, as a phrase (an exception's problem), when it could not.
 std::string gain_mode_line(const HostSettings&, const FilterGains&, bool has_filter,
                            const std::string& why = {});
-// PLUG-10: beside the window's Gain mode menu, briefly, empty in Set mode:
-// the gain the mode plays for the filter ("-12.3 dB for this filter"), and
-// what plays when that figure is unavailable.
+// PLUG-50: under the window's Gain row in Estimate and No clipping, what the
+// gain box (gain_played()) cannot say: that each filter plays at its own
+// figure while none is loaded, that this one has no figure (silence), or
+// that No clipping plays until the filter is estimated. Empty otherwise.
 std::string gain_note(const HostSettings&, const FilterGains&, bool has_filter);
+// PLUG-50: the gain Estimate or No clipping plays for the filter, as the
+// Gain row's box writes it ("-12.3"); empty in Set mode, without a filter,
+// or when the filter has no figure.
+std::string gain_played(const HostSettings&, const FilterGains&, bool has_filter);
 // What plays under `host` and why, in full: the silent failure (with what
 // Mix's dry share still lets through), the filter with any speaker notice,
 // or what passes with no filter. The part of started_line() after the
