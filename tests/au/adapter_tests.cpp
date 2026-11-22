@@ -341,7 +341,9 @@ bool latency_settled(const Unit& unit,
 void timing_in_seconds() {
     Unit unit;
     Notifications seen;
-    for (auto id : {kAudioUnitProperty_Latency, kAudioUnitProperty_TailTime, au::report_property})
+    const std::array<AudioUnitPropertyID, 3> ids{kAudioUnitProperty_Latency,
+                                                 kAudioUnitProperty_TailTime, au::report_property};
+    for (const auto id : ids)
         check(AudioUnitAddPropertyListener(unit.get(), id, &Notifications::listener, &seen),
               "property listener");
     const auto filter = crossover(48000);
