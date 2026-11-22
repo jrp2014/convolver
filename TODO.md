@@ -502,6 +502,18 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
+- [x] **PLUG-50 — Gain mode in the Gain row; one Choose Filter menu.**
+  22 November 2026, PR #273 ([Convolver's
+  window](docs/use/plugins.md#convolvers-window)).
+- [x] **PLUG-49 — Keep a waiting configuration list when Audacity starts
+  playback.** 22 November 2026, PR #271, jrp's live session on 0.18.10
+  ([loading a filter](docs/use/plugins.md#loading-a-filter)).
+- [x] **PLUG-48 — Keep the shown settings when a restored preset is
+  refused.** 22 November 2026, PR #271, jrp's live session on 0.18.10
+  ([adapter contract](docs/develop/plugin-contract.md)).
+- [x] **HOST-11 — One command for the REAPER checks.** 22 November 2026,
+  PRs #245, #251, #255 and #274; jrp's run on 0.18.10 built from the
+  published tag ([REAPER from one command](docs/develop/host-testing.md#reaper-from-one-command)).
 - [x] **PLUG-47 — Add a list read again by itself to Recent.** 21 November
   2026, PR #269, jrp's review of the 0.18 candidate
   ([loading a filter](docs/use/plugins.md#loading-a-filter)).

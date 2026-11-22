@@ -24,6 +24,76 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ## [Unreleased]
 
+### Changed
+
+- Plug-ins (PLUG-50): in Convolver's window on macOS and Windows, the
+  **Gain mode** menu now starts the Gain row, so the cut-off "Gain mo…"
+  label is gone and one row says which gain plays. With Estimate or No
+  clipping, the Gain slider and box are dimmed and the box shows the gain
+  that mode plays; Gain keeps its value and plays again when you choose
+  Set. A note under the row appears only when the box cannot say what
+  plays: no filter loaded, a filter with no figure, or No clipping playing
+  until the filter is estimated. See [Convolver's
+  window](docs/use/plugins.md#convolvers-window).
+- Plug-ins (PLUG-50): one **Choose Filter** menu replaces the Choose…,
+  Recent and Reload buttons and the "Reload when the file changes" box. It
+  holds Choose File…, Reload (named for the file, as `Reload room.cfg`),
+  Reload When the File Changes, the recent files and Clear Recent. On
+  Windows it is a split button: its main part chooses a file and its arrow
+  opens the menu. It is highlighted when choosing a filter is the fix, and
+  dropping a file on the window still loads it. See [Convolver's
+  window](docs/use/plugins.md#convolvers-window).
+- Plug-ins (PLUG-50): the Worst-case peak note says "(won't clip at this
+  Gain and Mix)" instead of "(cannot clip …)".
+
+### Fixed
+
+- VST3 (PLUG-49, jrp's live session of 22 November 2026): in Audacity
+  4.0.2, a configuration list chosen before the first playback now loads
+  by itself when Audacity plays with Convolver's window open, as PLUG-40
+  intended, and the export holds it. Before, Audacity handed the plug-in
+  its own saved state back as playback started, which forgot the list:
+  Status stayed Load failed and every export was silent until the list was
+  chosen again. See [loading a filter](docs/use/plugins.md#loading-a-filter).
+- VST3 (PLUG-48, jrp's live session of 22 November 2026): a preset the
+  plug-in refuses, such as one for 44.1 kHz chosen from REAPER's preset
+  menu while a 48 kHz filter plays, no longer changes the Gain, Gain mode,
+  Mix and Latency the host and the window show. Before, they took the
+  refused preset's values (Latency 0) while the plug-in went on playing its
+  own (Latency 1024).
+
+### For contributors
+
+- Plug-ins (PLUG-50): the window report has a new `gain_played` field
+  (`gain_played()`), and `gain_note` now holds only what the Gain box
+  cannot say; the report's encoding number is 2. The Windows window takes
+  the Choose Filter menu's commands as `WM_COMMAND` (`win::menu_reload` and
+  the others), which its test sends instead of opening the menu.
+- Releases (REL-3): the release notes for the follow-up preview to 0.18.10
+  list, since 0.18.10, the two VST3 fixes from jrp's live session (PLUG-49
+  in Audacity, PLUG-48 for a refused preset) and the window's Choose Filter
+  menu and Gain row, credit what jrp's live session checked on 0.18.10 to
+  0.18.10 only, and say the new changes are checked only by automated
+  tests ([publishing an unsigned preview](docs/develop/releasing.md#publishing-an-unsigned-preview)).
+- Tests (PLUG-49, PLUG-48): `vst3.adapter` `list_read_again` replays
+  Audacity's playback start (its own state handed back, then a start)
+  before the window reads the report; `refused_state_keeps_parameters`
+  restores a preset for another rate while a filter plays at Latency 1024
+  and checks the parameters, then an accepted preset's. Each failed before
+  its fix; the second also gives the controller the state first, as a
+  host against the SDK's order would, including the same preset refused
+  at 48 kHz and accepted at 44.1 kHz. `HostFilter::list_waits()` and
+  `Processor::unchanged_state()`; the controller's report request names
+  the state it mirrored (`state_digest()`), and the status after the
+  processor's outcome for it carries the settings that play
+  ([adapter contract](docs/develop/plugin-contract.md)).
+- Tests (HOST-11): done. jrp's second REAPER run passed all eight checks on
+  0.18.10 built from the published tag, with Status read while the
+  transport ran; jrp accepted that run as closing it ([record](docs/archive/reviews/2026-11-22-host11-reaper-run2.md)).
+  The host-test automation plan is archived; the rest of its step 3 (the
+  other presets, the refused preset, the wrong rate, Latency and the Audio
+  Unit in REAPER) is HOST-13.
+
 ## [0.18.10] - 2026-11-22
 
 The seventh published preview, for macOS, Windows and Linux, unsigned: a
