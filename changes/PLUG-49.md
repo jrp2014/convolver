@@ -31,8 +31,8 @@
 ## Done
 
 - [x] **PLUG-49 — Keep a waiting configuration list when Audacity starts
-  playback.** 22 November 2026, PR #PR, jrp's live session on 0.18.10
+  playback.** 22 November 2026, PR #271, jrp's live session on 0.18.10
   ([loading a filter](../docs/use/plugins.md#loading-a-filter)).
 - [x] **PLUG-48 — Keep the shown settings when a restored preset is
-  refused.** 22 November 2026, PR #PR, jrp's live session on 0.18.10
+  refused.** 22 November 2026, PR #271, jrp's live session on 0.18.10
   ([adapter contract](../docs/develop/plugin-contract.md)).
