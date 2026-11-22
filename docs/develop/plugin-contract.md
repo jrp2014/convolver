@@ -163,7 +163,9 @@ before they set the sample rate and channel layout (VST3 `setState` before
   on the window's thread: VST3's processor in its `report_message`, which
   answers with `"retried"` so the controller marks the project changed as for
   a chosen file (setDirty, or VST3-17's Latency edit), and the Audio Unit in
-  its `report()`, through `load_file()`. Audacity's flush plays no audio a
+  its `report()`, through `load_file()`. An accepted list joins the
+  windows' recent files there, as a chosen file does, so it does not matter
+  which window reads the report (PLUG-47). Audacity's flush plays no audio a
   window could see, so it never triggers this. Until then, once a control
   call has seen the host playing with the configuration it still has
   (`HostFilter::confirm()` with it, `HostFilter::played_with()`; not a
@@ -484,7 +486,11 @@ format.
   says about the settings, in short, after the line's own words: a Latency
   chosen but not in use yet ("Latency 1024 frames not in use yet.", from
   the latency the processor plays at, except after a load failure, a kept
-  filter's wait or a fault, which say more), and, with a filter, Estimate chosen without an
+  filter's wait or a fault, which say more; with no processor, as while
+  the Audio Unit is uninitialized, the choice is selected for the next
+  start, so it is never "not in use yet", although for a moment, until the
+  Latency queue publishes it, the host may still read the previous
+  latency, AU-19), and, with a filter, Estimate chosen without an
   estimate ("No estimate: No clipping's gain plays." or "Too loud to
   estimate: …") or no gain figure at all ("Silent: no gain figure for this
   filter.", or "No gain figure for this filter: only the dry signal
@@ -844,7 +850,9 @@ a Convolver state carries, such as a VST3 state's, because their settings
 are parameters and ports), the bypass (restored state's, never a
 chosen file's; only VST3 applies it). The tail an adapter reports while
 no processor plays is the accepted filter's (`HostFilter::filter_tail()`,
-found when the filter was accepted, PLUG-39 step 6). The Latency in those settings goes through each format's
+found when the filter was accepted, PLUG-39 step 6), in the filter's own
+frames at its own rate: the Audio Unit's seconds, VST3's host samples and
+the report's Ring-out convert it at that rate, not the host's (PLUG-46). The Latency in those settings goes through each format's
 own Latency path, which builds a new processor only when it differs. A
 refused request returns nothing and changes none of it; every adapter then
 calls `HostFilter::fail_request()` with the processor that plays, which

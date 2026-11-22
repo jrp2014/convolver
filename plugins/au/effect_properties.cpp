@@ -6,6 +6,7 @@
 #include "core_foundation.hpp"
 #include "effect.hpp"
 #include "host_log.hpp"
+#include "recent_files.hpp"
 #include <AudioToolbox/AudioUnitUtilities.h>
 #include <algorithm>
 #include <array>
@@ -221,9 +222,12 @@ std::shared_ptr<const Effect::Diagnostics> Effect::diagnostics() const {
 // The Status line for the Gain, Mix and bypass set now (PLUG-10, PLUG-22),
 // as hosts read it: Gain and Mix may change on any thread.
 HostStatusLine Effect::status_line(const Diagnostics& d) {
-    return host_status(d.filter, d.host, d.log_written, settings(), bypass_.load(),
+    const auto current = settings(); // Read once: a host may change them meanwhile.
+    return host_status(d.filter, d.host, d.log_written, current, bypass_.load(),
                        true, // Choose Filter in the window.
-                       latency_.load());
+                       // Uninitialized, the Latency setting the next
+                       // initialization uses, as VST3's status() (AU-19).
+                       d.running ? latency_.load() : current.latency);
 }
 
 HostReport Effect::report_of(const Diagnostics& d) {
@@ -233,8 +237,10 @@ HostReport Effect::report_of(const Diagnostics& d) {
     facts.max_frames = d.max_frames;
     facts.running = d.running;
     facts.settings = settings();
-    facts.latency_frames = latency_.load();
-    facts.tail_frames = tail_.load();
+    facts.latency_frames = d.running ? latency_.load() : facts.settings.latency;
+    const auto tail = tail_.load();
+    facts.tail_frames = tail.frames;
+    facts.tail_rate = tail.rate;
     facts.log_written = d.log_written;
     facts.bypassed = bypass_.load();
     facts.chooses_files = true; // Choose Filter in the window (load_property).
@@ -331,7 +337,12 @@ HostReport Effect::report() {
     }
     if (!list.empty()) {
         try {
-            static_cast<void>(load_file(list)); // Records, logs and notifies either way.
+            // Records, logs and notifies either way. PLUG-47: an accepted
+            // list joins the windows' recent files, as when a window's
+            // choice is accepted, also when the window that chose it has
+            // closed since (jrp's review, 22 November 2026).
+            if (load_file(list) == noErr)
+                remember_recent_file(list);
         } catch (...) {
             fail_unrecorded(); // As the load property does (ROBUST-7).
         }

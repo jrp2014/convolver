@@ -12,6 +12,7 @@
 #include <cmath>
 #include <dispatch/dispatch.h>
 #include <exception>
+#include <limits>
 #include <mutex>
 #include <new>
 #include <pthread.h>
@@ -361,7 +362,12 @@ UInt32 Effect::SupportedNumChannels(const AUChannelInfo** out) {
 
 bool Effect::publish_timing() noexcept {
     const auto* const p = host();
-    tail_.store(p ? p->tail_frames() : filter_.filter_tail());
+    // The filter's own frames count at its rate, which can differ from the
+    // host's after a start at another rate (jrp's review, 21 November 2026).
+    const std::size_t frames = p ? p->tail_frames() : filter_.filter_tail();
+    tail_.store({static_cast<std::uint32_t>(
+                     std::min<std::size_t>(frames, std::numeric_limits<std::uint32_t>::max())),
+                 !p && filter_.filter() ? filter_.filter()->sample_rate : 0});
     const auto latency = p ? p->latency_frames() : settings().latency;
     return latency_.exchange(latency) != latency;
 }
@@ -372,8 +378,10 @@ Float64 Effect::GetLatency() noexcept AUSDK_RTSAFE {
 }
 
 Float64 Effect::GetTailTime() noexcept AUSDK_RTSAFE {
-    const auto rate = GetOutput0().GetStreamFormat().mSampleRate;
-    return rate > 0 ? static_cast<Float64>(tail_.load()) / rate : 0;
+    const auto tail = tail_.load();
+    const auto rate = tail.rate > 0 ? static_cast<Float64>(tail.rate)
+                                    : GetOutput0().GetStreamFormat().mSampleRate;
+    return rate > 0 ? static_cast<Float64>(tail.frames) / rate : 0;
 }
 
 void Effect::wake(std::uintptr_t why) noexcept {
@@ -514,7 +522,9 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
         } catch (...) {
         }
     }
-    if (!message.empty() || problem || bypass_shown || !mode_message.empty())
+    // `changed`: uninitialized, the Latency the next initialization uses,
+    // which the Status line and report show (AU-19).
+    if (!message.empty() || problem || bypass_shown || !mode_message.empty() || changed)
         notify_status();
     // Finished: the tests' witness (AU-14).
     if (const auto hook = latency_progress_for_tests)

@@ -70,7 +70,7 @@ struct WindowContent {
     // Set mode.
     std::string gain_note;
     int sample_rate = 0; // The host's, for the Latency row; 0 before it starts.
-    bool latency_waits = false;
+    bool latency_waits = false, latency_next_start = false;
     std::string log_path;
     // The playing filter's file and the files it was read from, one per
     // line, for Reload and reloading when they change.
@@ -92,9 +92,10 @@ struct WindowContent {
 WindowContent window_content(const HostReport* report, bool can_load);
 
 // The time a Latency choice of `frames` adds at the host's rate ("adds 5.3
-// ms"), and "not in use yet" while `waits`; empty when there is nothing to
-// say (no rate yet and not waiting).
-std::string latency_note(double frames, int sample_rate, bool waits);
+// ms"), and "not in use yet" while `waits`, or "selected for the next
+// start" while `next_start` (the host has the plug-in stopped, AU-19);
+// empty when there is nothing to say (no rate yet and neither).
+std::string latency_note(double frames, int sample_rate, bool waits, bool next_start);
 
 // A value typed in a setting's box: a decimal comma reads as a point and a
 // minus sign as a hyphen, whatever the host's locale; a unit after the

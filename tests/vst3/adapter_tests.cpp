@@ -12,6 +12,7 @@
 #include "public.sdk/source/vst/hosting/hostclasses.h"
 #include "public.sdk/source/vst/hosting/parameterchanges.h"
 #include "public.sdk/source/vst/vstpresetfile.h"
+#include "recent_files.hpp"
 #include "sound_files.hpp"
 #include <algorithm>
 #include <array>
@@ -246,6 +247,10 @@ void edge_cases() {
             "inactive replacement tail including routing delays");
     setup.sampleRate = 44100;
     require(p.setupProcessing(setup) == kResultOk, "rate change setup");
+    // jrp's review, 21 November 2026: inactive, the tail is the filter's own
+    // (1010 frames at 48 kHz) in the host's samples at 44.1 kHz, rounded up.
+    require(p.getTailSamples() == 928 + latency_samples,
+            "the inactive tail at 44.1 kHz is not the 48 kHz filter's in host samples");
     // Shared adapter contract: a kept filter that does not suit the host plays
     // silence (not the unfiltered input), and returns once the rate is corrected.
     require(p.setActive(true) == kResultOk, "a mismatched IR rate must activate, silent");
@@ -284,6 +289,12 @@ void edge_cases() {
     p.setActive(false);
     require(p.getTailSamples() == 1 + latency_samples,
             "the tail after stopping is not the accepted filter's");
+    // jrp's sequence: a start at 96 kHz and a stop leave the 48 kHz filter's
+    // tail its own length, twice as many host samples.
+    setup.sampleRate = 96000;
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk &&
+                p.setActive(false) == kResultOk && p.getTailSamples() == 2 + latency_samples,
+            "after a start at 96 kHz the tail is not the 48 kHz filter's in host samples");
     p.terminate();
 }
 void multichannel() {
@@ -3441,7 +3452,9 @@ void list_read_again() {
     std::ofstream(folder / "room.cfg") << "48000 1 1 0\n0\n0\nroom.wav\n0\n0\n0\n";
     std::ofstream(folder / "slow.cfg") << "44100 1 1 0\n0\n0\nslow.wav\n0\n0\n0\n";
     std::ofstream(folder / "rates.txt") << "slow.cfg\nroom.cfg\n";
+    convolver::forget_recent_files();
     require(!c.load_file((folder / "rates.txt").string()), "list read again: refused at first");
+    require(convolver::recent_files().empty(), "list read again: a refused list is a recent file");
     const auto edits = handler.edits.size();
     // FlushParameters: started at 44.1 kHz with one block, then stopped.
     require(p.setActive(true) == kResultOk, "list read again: the flush starts");
@@ -3486,6 +3499,10 @@ void list_read_again() {
             ("list read again: the list was not read again while playing: " +
              (r ? r->status_name + ": " + r->explanation : std::string("none")))
                 .c_str());
+    // PLUG-47: it joins the windows' recent files, as when chosen, whichever
+    // window reads the report (jrp's review, 22 November 2026).
+    require(convolver::recent_files() == std::vector<std::string>{(folder / "rates.txt").string()},
+            "list read again: not the recent file");
     MemoryStream saved;
     require(p.getState(&saved) == kResultOk, "list read again: save");
     saved.seek(0, IBStream::kIBSeekSet, nullptr);

@@ -473,6 +473,46 @@ void cases() {
     require(!has_fact(r, "Added delay"), "the latency repeated as a fact");
     // PLUG-44: 3 taps ring out for 2 frames, which Length already says.
     require(!has_fact(r, "Ring-out"), "Ring-out repeats the filter's length");
+    // jrp's review, 21 November 2026: while no processor plays, the tail is
+    // the filter's own, in its frames, so a 1 s tail of a 22050 Hz filter
+    // reads 1 s, not the 0.5 s those frames last at the host's 44100 Hz.
+    {
+        auto own = facts(stereo, {-6, .25});
+        own.running = false;
+        own.tail_frames = 22050;
+        own.tail_rate = 22050;
+        check(fact(host_report(f, own), "Ring-out"), "1.00 s", "");
+        own.tail_rate = 0; // A processor's tail, at the host's rate.
+        check(fact(host_report(f, own), "Ring-out"), "500.0 ms", "");
+    }
+    // jrp's review, 22 November 2026: stopped after the host ran at 96 kHz,
+    // a 48 kHz filter whose routing delay makes its tail longer than its
+    // paths shows the whole tail at its own rate: 24000 frames of delay and
+    // its 3-tap paths' 2 frames last 500.0 ms at 48 kHz (250.0 ms if counted
+    // at the host's 96 kHz). The same filter without the delay rings out
+    // for what its Length says, at its own rate, so no Ring-out line shows
+    // (PLUG-44 and PLUG-46 together).
+    {
+        const auto stopped_after_96k = [](const HostFilter& d) {
+            auto stopped = facts(HostLayout{96000, 2, 2});
+            stopped.running = false;
+            stopped.tail_frames = d.filter_tail();
+            stopped.tail_rate = 48000;
+            return host_report(d, stopped);
+        };
+        auto delayed = filter(48000, 2);
+        delayed.input_delays = {24000, 0};
+        HostFilter d(8);
+        d.load(HostState{delayed}, HostLayout{48000, 2, 2}, [](const HostPlayback&) {});
+        require(d.filter_tail() == 24002,
+                "the delayed filter's tail is " + std::to_string(d.filter_tail()) + " frames");
+        check(fact(stopped_after_96k(d), "Ring-out"), "500.0 ms", "");
+        HostFilter plain(8);
+        plain.load(HostState{filter(48000, 2)}, HostLayout{48000, 2, 2},
+                   [](const HostPlayback&) {});
+        require(!has_fact(stopped_after_96k(plain), "Ring-out"),
+                "a stopped 48 kHz filter's Ring-out repeats its length after 96 kHz");
+    }
     // The identity paths have peak 1.75 (1 + .5 + .25): +4.9 dB. Gain
     // scales only the filtered path, which Mix then adds to the dry input:
     // at Gain -6 dB and Mix 25%, .25 * .501 * 1.75 + .75 = .97.
@@ -776,6 +816,18 @@ void cases() {
             "waiting latency Status: " + waiting.status.text);
     require(waiting.latency_waits && !r.latency_waits && waiting.sample_rate == 44100,
             "latency waits field");
+    // AU-19 (jrp's review, 22 November 2026): with no processor, the chosen
+    // Latency is selected for the next start, never waiting; while one
+    // plays, neither.
+    auto stopped_facts = facts(stereo, {0, 1, 1024});
+    stopped_facts.running = false;
+    const auto stopped = host_report(f, stopped_facts);
+    require(stopped.latency_next_start && !stopped.latency_waits && !r.latency_next_start &&
+                !waiting.latency_next_start,
+            "latency selected for the next start");
+    // The window receives it through the encoded report.
+    const auto decoded = decode_report(encode_report(stopped));
+    require(decoded && decoded->latency_next_start, "latency_next_start not encoded");
 }
 
 std::optional<std::string> log_variable() {

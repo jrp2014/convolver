@@ -139,11 +139,19 @@ void content_tests() {
 }
 
 void latency_tests() {
-    require(latency_note(256, 48000, false) == "adds 5.3 ms", latency_note(256, 48000, false));
-    require(latency_note(256, 48000, true) == "adds 5.3 ms, not in use yet", "waiting");
-    require(latency_note(256, 0, true) == "Not in use yet", "waiting without a rate");
-    require(latency_note(256, 0, false).empty() && latency_note(0, 48000, false).empty(),
+    require(latency_note(256, 48000, false, false) == "adds 5.3 ms",
+            latency_note(256, 48000, false, false));
+    require(latency_note(256, 48000, true, false) == "adds 5.3 ms, not in use yet", "waiting");
+    require(latency_note(256, 0, true, false) == "Not in use yet", "waiting without a rate");
+    require(latency_note(256, 0, false, false).empty() &&
+                latency_note(0, 48000, false, false).empty(),
             "nothing to say");
+    // AU-19 (jrp's review, 22 November 2026): with the plug-in stopped, the
+    // choice is selected for the next start.
+    require(latency_note(256, 48000, false, true) == "adds 5.3 ms, selected for the next start",
+            latency_note(256, 48000, false, true));
+    require(latency_note(256, 0, false, true) == "Selected for the next start",
+            "stopped without a rate");
 }
 
 void typed_tests() {

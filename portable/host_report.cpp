@@ -384,13 +384,16 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
     // filter a tail that is not zero. Compared in frames, as the two round
     // differently as times.
     const auto frames = [](std::size_t n) { return std::to_string(n) + " frames"; };
+    // PLUG-46: a stopped filter's tail counts at its own rate, so it is
+    // shown and compared at that rate.
+    const int tail_rate = facts.tail_rate > 0 ? facts.tail_rate : rate;
     const auto ring_out = facts.tail_frames == 0 ? std::string("none")
                           // Under 0.05 ms reads as frames, not "0.0 ms".
-                          : rate && facts.tail_frames * 20000.0 >= rate
-                              ? duration(facts.tail_frames, rate)
+                          : tail_rate && facts.tail_frames * 20000.0 >= tail_rate
+                              ? duration(facts.tail_frames, tail_rate)
                               : frames(facts.tail_frames);
     const bool says_more =
-        c ? facts.tail_frames + 1 != longest_taps(*c) || (rate && rate != c->sample_rate)
+        c ? facts.tail_frames + 1 != longest_taps(*c) || (tail_rate && tail_rate != c->sample_rate)
           : facts.tail_frames != 0;
     if (says_more)
         audio.push_back({"Ring-out", ring_out, "", false,
@@ -564,6 +567,7 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
     }
     r.sample_rate = host ? host->sample_rate : 0;
     r.latency_waits = latency_waits(facts);
+    r.latency_next_start = !facts.running && !r.latency_waits;
 
     if (c)
         r.reference.emplace_back("Filter file", request_reference(accepted));
@@ -758,8 +762,8 @@ template <class Io, class Report> bool report_io(Io& io, Report& r) {
            io.text(r.filter_taps) && io.text(r.filter_identity) && io.text(r.filter_saved_name) &&
            io.text(r.filter_path) && io.texts(r.filter_files) && io.facts(r.audio) &&
            io.text(r.settings) && io.rate(r.sample_rate) && io.flag(r.latency_waits) &&
-           io.text(r.mix_note) && io.text(r.gain_note) && io.pairs(r.reference) &&
-           io.text(r.log_path) && io.flag(r.log_written);
+           io.flag(r.latency_next_start) && io.text(r.mix_note) && io.text(r.gain_note) &&
+           io.pairs(r.reference) && io.text(r.log_path) && io.flag(r.log_written);
 }
 } // namespace
 

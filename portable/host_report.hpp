@@ -24,6 +24,14 @@ inline constexpr std::array<const char*, 6> host_status_names{"Active",  "No fil
 static_assert(static_cast<std::size_t>(HostStatus::bypassed) == host_status_names.size() - 1);
 
 // What the adapter knows besides its HostFilter, under its control lock.
+// PLUG-46: a tail and the rate it counts at (0 for the host's), which the
+// adapters publish as one value in a lock-free std::atomic, so a host
+// reading it on another thread never pairs one tail with another's rate.
+struct HostTail {
+    std::uint32_t frames = 0;
+    std::int32_t rate = 0;
+};
+
 struct HostReportFacts {
     std::string format;             // The log tag, such as "Audio Unit #2".
     std::optional<HostLayout> host; // As for host_status(): nullopt while not known.
@@ -32,6 +40,9 @@ struct HostReportFacts {
     // The latency the processor runs at (settings.latency is the one chosen,
     // not yet in use when they differ), and the tail.
     std::size_t latency_frames = 0, tail_frames = 0;
+    // The rate tail_frames counts at when it is not the host's: the accepted
+    // filter's while no processor plays (its own tail); 0 for the host's.
+    int tail_rate = 0;
     bool log_written = true; // host_log_written()
     // PLUG-22: the instance is bypassed (the host's switch or the window's).
     bool bypassed = false;
@@ -112,9 +123,12 @@ struct HostReport {
     std::string settings;
     // For the window's Latency row: the host's rate (0 before it starts;
     // the whole part of a rate that is not whole hertz, VST3-9),
-    // and whether the chosen Latency is not in use yet (latency_waits()).
+    // and whether the chosen Latency is not in use yet (latency_waits()) or,
+    // with no processor (the host has the plug-in stopped), selected for the
+    // next start (AU-19, jrp's review of 22 November 2026).
     int sample_rate = 0;
     bool latency_waits = false;
+    bool latency_next_start = false;
     // PLUG-23: for the window's Mix row, empty when Mix applies: why there
     // is no dry signal (the filter's inputs and outputs differ, or with no
     // filter the host's), so Mix has no effect and bypass plays silence.
