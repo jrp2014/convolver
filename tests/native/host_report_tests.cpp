@@ -736,6 +736,18 @@ void cases() {
             "waiting latency Status: " + waiting.status.text);
     require(waiting.latency_waits && !r.latency_waits && waiting.sample_rate == 44100,
             "latency waits field");
+    // AU-19 (jrp's review, 22 November 2026): with no processor, the chosen
+    // Latency is selected for the next start, never waiting; while one
+    // plays, neither.
+    auto stopped_facts = facts(stereo, {0, 1, 1024});
+    stopped_facts.running = false;
+    const auto stopped = host_report(f, stopped_facts);
+    require(stopped.latency_next_start && !stopped.latency_waits && !r.latency_next_start &&
+                !waiting.latency_next_start,
+            "latency selected for the next start");
+    // The window receives it through the encoded report.
+    const auto decoded = decode_report(encode_report(stopped));
+    require(decoded && decoded->latency_next_start, "latency_next_start not encoded");
 }
 
 std::optional<std::string> log_variable() {

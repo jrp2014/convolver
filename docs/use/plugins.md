@@ -612,7 +612,8 @@ From the top, the window has:
   plays at once; if it cannot (the computer is out of memory, say), the old
   one keeps playing, the row says the choice is "not in use yet" and the
   Convolver log says why
-  ([settings](#settings)). The host is told the delay, so it can delay
+  ([settings](#settings)). While the host has the plug-in stopped, the row
+  says the choice is "selected for the next start". The host is told the delay, so it can delay
   other tracks to keep them in time.
 - **Audio**: the host's values and what plays, each a short value. The
   filter's own rate, channels, length and speakers are under its name, so

@@ -471,6 +471,7 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
     }
     r.sample_rate = host ? host->sample_rate : 0;
     r.latency_waits = latency_waits(facts);
+    r.latency_next_start = !facts.running && !r.latency_waits;
 
     if (c)
         r.reference.emplace_back("Filter file", request_reference(accepted));
@@ -665,8 +666,8 @@ template <class Io, class Report> bool report_io(Io& io, Report& r) {
            io.text(r.filter_taps) && io.text(r.filter_identity) && io.text(r.filter_saved_name) &&
            io.text(r.filter_path) && io.texts(r.filter_files) && io.facts(r.audio) &&
            io.text(r.settings) && io.rate(r.sample_rate) && io.flag(r.latency_waits) &&
-           io.text(r.mix_note) && io.text(r.gain_note) && io.pairs(r.reference) &&
-           io.text(r.log_path) && io.flag(r.log_written);
+           io.flag(r.latency_next_start) && io.text(r.mix_note) && io.text(r.gain_note) &&
+           io.pairs(r.reference) && io.text(r.log_path) && io.flag(r.log_written);
 }
 } // namespace
 

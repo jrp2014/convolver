@@ -49,10 +49,13 @@ typedef void (^ConvolverSettingGesture)(void);
 // Shows the settings as the host has them now (automation, its own
 // controls), except the slider the user is dragging. `sampleRate` (0 before
 // the host starts) gives the time a Latency choice adds; `latencyWaits`
-// says the chosen Latency is not in use yet; `gainNote` is what the Gain
-// mode plays (the report's gain note, empty in Set mode).
+// says the chosen Latency is not in use yet, and `latencyNextStart` that
+// it is selected for the next start (the host has the plug-in stopped);
+// `gainNote` is what the Gain mode plays (the report's gain note, empty in
+// Set mode).
 - (void)readWithSampleRate:(int)sampleRate
               latencyWaits:(BOOL)latencyWaits
+          latencyNextStart:(BOOL)latencyNextStart
                   gainNote:(NSString*)gainNote;
 // Setting `i` back to its default, as Option-click on its slider does.
 - (void)resetSetting:(NSUInteger)i;

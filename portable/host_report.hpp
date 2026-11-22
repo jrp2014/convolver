@@ -123,9 +123,12 @@ struct HostReport {
     std::string settings;
     // For the window's Latency row: the host's rate (0 before it starts;
     // the whole part of a rate that is not whole hertz, VST3-9),
-    // and whether the chosen Latency is not in use yet (latency_waits()).
+    // and whether the chosen Latency is not in use yet (latency_waits()) or,
+    // with no processor (the host has the plug-in stopped), selected for the
+    // next start (AU-19, jrp's review of 22 November 2026).
     int sample_rate = 0;
     bool latency_waits = false;
+    bool latency_next_start = false;
     // PLUG-23: for the window's Mix row, empty when Mix applies: why there
     // is no dry signal (the filter's inputs and outputs differ, or with no
     // filter the host's), so Mix has no effect and bypass plays silence.

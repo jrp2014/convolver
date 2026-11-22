@@ -19,12 +19,13 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     NSArray<NSDictionary<NSString*, id>*>* settings_;
     NSArray<NSControl*>* controls_; // Each setting's slider or menu, in settings_ order.
     void (^chosen_)(void);
-    NSInteger dragging_; // The slider the user is dragging, or -1.
-    NSInteger typed_;    // The box whose text the user has changed, or -1.
-    NSInteger gesture_;  // The setting whose edit is open (its begin called), or -1.
-    int sampleRate_;     // The host's, for the Latency row; 0 before it starts.
-    BOOL latencyWaits_;  // The chosen Latency is not in use yet.
-    NSString* gainNote_; // PLUG-10: what the Gain mode plays (the report's gain note).
+    NSInteger dragging_;    // The slider the user is dragging, or -1.
+    NSInteger typed_;       // The box whose text the user has changed, or -1.
+    NSInteger gesture_;     // The setting whose edit is open (its begin called), or -1.
+    int sampleRate_;        // The host's, for the Latency row; 0 before it starts.
+    BOOL latencyWaits_;     // The chosen Latency is not in use yet.
+    BOOL latencyNextStart_; // It is selected for the next start (AU-19).
+    NSString* gainNote_;    // PLUG-10: what the Gain mode plays (the report's gain note).
 }
 
 - (instancetype)initWithSettings:(NSArray<NSDictionary<NSString*, id>*>*)settings
@@ -152,7 +153,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
 // frames"). The Audio section does not repeat it (PLUG-22).
 - (NSString*)latencyNote:(NSPopUpButton*)menu {
     const auto note = convolver::view::latency_note(menu.titleOfSelectedItem.doubleValue,
-                                                    sampleRate_, latencyWaits_);
+                                                    sampleRate_, latencyWaits_, latencyNextStart_);
     return @(note.c_str());
 }
 
@@ -316,9 +317,11 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
 // anywhere else must not freeze the sliders).
 - (void)readWithSampleRate:(int)sampleRate
               latencyWaits:(BOOL)latencyWaits
+          latencyNextStart:(BOOL)latencyNextStart
                   gainNote:(NSString*)gainNote {
     sampleRate_ = sampleRate;
     latencyWaits_ = latencyWaits;
+    latencyNextStart_ = latencyNextStart;
     gainNote_ = [gainNote copy];
     if (dragging_ >= 0 && [NSEvent pressedMouseButtons] == 0) {
         dragging_ = -1; // The drag ended without a final action.

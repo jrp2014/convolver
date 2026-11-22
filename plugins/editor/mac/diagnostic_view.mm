@@ -736,6 +736,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     // it plays (PLUG-10).
     [settings_ readWithSampleRate:c.sample_rate
                      latencyWaits:c.latency_waits
+                 latencyNextStart:c.latency_next_start
                          gainNote:ns(c.gain_note)];
     _logButton.enabled = logPath_.length > 0;
     [self readBypass];
