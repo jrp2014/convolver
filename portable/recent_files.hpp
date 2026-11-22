@@ -26,6 +26,6 @@ std::vector<std::string> recent_files() noexcept;
 // at once can lose one of the two new entries. A path holding a line break
 // is not kept. Returns whether the list was saved.
 bool remember_recent_file(const std::string& path) noexcept;
-// Empties the list (a menu's Clear Menu). Returns whether it was saved.
+// Empties the list (the Choose Filter menu's Clear Recent). Returns whether it was saved.
 bool forget_recent_files() noexcept;
 } // namespace convolver

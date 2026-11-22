@@ -79,7 +79,7 @@ struct HostReport {
     // DIAG-2: what the window shows under the status word, each part on its
     // own: the problem as a sentence (empty when nothing is wrong), what
     // plays, then the cause, the fix and a note (each may be empty), and the
-    // window's action for the fix: "choose filter" (Choose Filter…), "copy
+    // window's action for the fix: "choose filter" (Choose Filter), "copy
     // diagnostics" (Copy Diagnostics) or empty.
     std::string problem, plays, cause, fix, note, action;
     // All of it as text: the problem and what plays, then "Cause: ", "Fix: "

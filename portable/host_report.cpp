@@ -64,7 +64,7 @@ std::string load_fix(bool chooses_files) {
                : "Load a Convolver preset from the host's preset menu (convolver-preset makes "
                  "one from an IR file, .cfg or configuration list).";
 }
-// Failures the window's Choose Filter… puts right.
+// Failures the window's Choose Filter menu puts right.
 bool chosen_away(HostFailureKind kind) {
     return kind != HostFailureKind::preparation && kind != HostFailureKind::activation;
 }

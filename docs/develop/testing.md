@@ -441,7 +441,7 @@ cases.
 - `native.recent_files`: the windows' recent filter files (VST3-11) beside
   the log: newest first, no repeats, ten kept, paths with spaces and
   accents, no path with a line break, nothing left beside the list after
-  it is replaced, a list with Windows line ends, Clear Menu, and no list
+  it is replaced, a list with Windows line ends, Clear Recent, and no list
   with the log turned off.
 - `native.window_model`: what every system's window does (PLUG-34), from
   a typed report: the content for each status (tone, symbol, message,

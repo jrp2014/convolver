@@ -381,7 +381,7 @@ void window() {
     require([view.statusField.stringValue isEqualToString:@"Waiting"],
             "window status " + text(view.statusField.stringValue));
     // DIAG-2: the problem and what plays, then the cause and the fix as
-    // labelled rows; the note in its own row; and Choose Filter… under the
+    // labelled rows; the note in its own row; and Choose Filter under the
     // fix, since a filter for the track's channels puts it right.
     require([view.explanationView.string hasPrefix:@(r.problem.c_str())] && !r.problem.empty() &&
                 contains(view.explanationView.string, text(r.plays).c_str()) &&
@@ -743,7 +743,7 @@ void window() {
     unit.uninitialize();
 }
 
-// Filter files: the Choose… button and the drop registration (the
+// Filter files: the Choose Filter menu and the drop registration (the
 // file dialog and a real drag need a user), then the view's load step both
 // use. A sound file loads through the load property with the step
 // convolver-preset uses, so the saved state is the one that step gives for

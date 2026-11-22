@@ -923,7 +923,7 @@ void actions() {
     HostFilter empty(8);
     require(host_report(empty, choosing).action == "choose filter" &&
                 host_report(empty, facts(stereo)).action.empty(),
-            "no filter: Choose Filter… only where the window chooses files");
+            "no filter: Choose Filter only where the window chooses files");
     HostFilter refused(8);
     refused.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {});
     try {

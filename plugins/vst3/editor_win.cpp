@@ -865,9 +865,12 @@ void Editor::create_controls() {
                              id + win::control);
             for (const auto& item : s.choices)
                 SendMessageW(s.control, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(item.c_str()));
-            // Latency's time, or the note under the Gain row.
-            s.value = make(L"STATIC", L"", shown | label, id + win::value);
-            colours_[s.value] = grey_;
+            // Latency's time; the note under the Gain row comes after
+            // Gain's controls (below), in reading order.
+            if (i != gain_mode_) {
+                s.value = make(L"STATIC", L"", shown | label, id + win::value);
+                colours_[s.value] = grey_;
+            }
         } else {
             s.control = make(TRACKBAR_CLASSW, L"", shown | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS,
                              id + win::control);
@@ -889,6 +892,13 @@ void Editor::create_controls() {
             }
         }
         name_for_screen_readers(s.control, s.name);
+        if (i + 1 == gain_mode_) { // The note under the Gain row, after the row.
+            Setting& m = settings_[gain_mode_];
+            m.value = make(L"STATIC", L"", shown | label,
+                           win::settings + win::setting_stride * static_cast<int>(gain_mode_) +
+                               win::value);
+            colours_[m.value] = grey_;
+        }
     }
     if (mix_ != SIZE_MAX) {
         mix_note_ = make(L"STATIC", L"", label, win::mix_note);
@@ -1445,7 +1455,10 @@ void Editor::read_settings() {
     // PLUG-50: in any Gain mode but Set (0), Gain's trackbar and box dim and
     // the box shows the gain the mode plays; the Gain setting is kept for Set.
     const double mode = gain_mode_ != SIZE_MAX ? plain(settings_[gain_mode_]) : NAN;
-    const bool moded = !std::isnan(mode) && std::lround(mode) != 0;
+    // Only once the report says what the mode plays: until the plug-in has
+    // applied a new mode, Gain stays as it was.
+    const bool moded = !std::isnan(mode) && std::lround(mode) != 0 &&
+                       (!content_.gain_played.empty() || !content_.gain_note.empty());
     for (std::size_t i = 0; i < settings_.size(); ++i) {
         Setting& s = settings_[i];
         const double value = plain(s);

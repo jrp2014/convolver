@@ -132,7 +132,7 @@ class ChooseRequests {
     std::uint64_t pending_ = 0, last_ = 0;
 };
 
-// One entry of the Recent menu: "room.cfg — Filters" (the file's name and
+// One recent file in the Choose Filter menu: "room.cfg — Filters" (the file's name and
 // its folder's, since several folders often hold a filter.cfg), and the
 // path it loads, also its tooltip.
 struct RecentEntry {

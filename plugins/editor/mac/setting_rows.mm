@@ -72,7 +72,9 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
                 joined_ = i;
                 [before insertArrangedSubview:menu atIndex:0];
                 [before setCustomSpacing:8 afterView:menu];
-                value = wrapping(small_font(), [NSColor secondaryLabelColor], 440);
+                // The form's content width (diagnostic_view.mm: inner -
+                // form_label - 10), as for the note under Mix.
+                value = wrapping(small_font(), [NSColor secondaryLabelColor], 446);
                 value.hidden = YES;
                 NSStackView* column =
                     stack(@[ before, value ], NSUserInterfaceLayoutOrientationVertical, 4);
@@ -364,7 +366,10 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     if (joined_ != NSNotFound) {
         ConvolverSettingGetter mode = settings_[joined_][@"get"];
         const double index = mode ? mode() : NAN;
-        moded = !std::isnan(index) && std::lround(index) != 0;
+        // Only once the report says what the mode plays: until the plug-in
+        // has applied a new mode, Gain stays as it was.
+        moded = !std::isnan(index) && std::lround(index) != 0 &&
+                (gainPlayed_.length > 0 || gainNote_.length > 0);
     }
     if (dragging_ >= 0 && [NSEvent pressedMouseButtons] == 0) {
         dragging_ = -1; // The drag ended without a final action.

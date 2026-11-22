@@ -459,6 +459,9 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [_chooseButton addItemWithTitle:@"Choose Filter"]; // A pull-down's first item is its title.
     _chooseButton.menu.delegate = self;
     _chooseButton.menu.autoenablesItems = NO; // refresh and updateFilterMenu enable each item.
+    // A chosen item does not tick itself: only Reload When the File Changes
+    // has a tick, which watchToggled: sets.
+    static_cast<NSPopUpButtonCell*>(_chooseButton.cell).altersStateOfSelectedItem = NO;
     _chooseButton.accessibilityLabel = @"Choose Filter";
     _chooseButton.toolTip =
         @"Loads an IR file, .cfg, configuration list or Convolver .vstpreset as the filter "
