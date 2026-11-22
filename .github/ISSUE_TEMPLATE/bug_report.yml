@@ -80,8 +80,8 @@ body:
       label: How the filter was loaded (plug-ins)
       multiple: true
       options:
-        - Choose… or dropped on Convolver's window
-        - Recent or Reload in Convolver's window
+        - Choose File… or dropped on Convolver's window
+        - A recent file or Reload in Convolver's window
         - A preset from the host's preset menu
         - A reopened project
         - The host's file chooser (LV2)

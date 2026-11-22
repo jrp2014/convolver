@@ -14,7 +14,7 @@ does not fit. Installing is in [install](install.md); making presets is in
 - One input and one output of 1 to 8 channels each; the counts may differ,
   for example 2 in and 6 out for a crossover.
 - You choose the filter file itself (an IR file, a `.cfg` or a
-  configuration list) with **Choose…** in Convolver's window (the Audio
+  configuration list) with **Choose Filter** in Convolver's window (the Audio
   Unit, and the VST3 plug-in on macOS and Windows), which also opens a
   Convolver `.vstpreset`, or with the host's file chooser
   (LV2, in hosts that show it); a preset from the host's preset menu is
@@ -123,14 +123,14 @@ the one list of what each way reads:
 
 | Way in | Plug-ins | Reads |
 | --- | --- | --- |
-| **Choose…**, or dropping the file, in [Convolver's window](#convolvers-window) | The Audio Unit, and the VST3 plug-in on macOS and Windows | An IR file, a `.cfg` or a configuration list, or a Convolver `.vstpreset` ([a preset in the window](#a-preset-in-the-window)), with at least its inputs ([channels](#channels)); not an `.aupreset` or LV2 preset |
+| **Choose Filter**, or dropping the file, in [Convolver's window](#convolvers-window) | The Audio Unit, and the VST3 plug-in on macOS and Windows | An IR file, a `.cfg` or a configuration list, or a Convolver `.vstpreset` ([a preset in the window](#a-preset-in-the-window)), with at least its inputs ([channels](#channels)); not an `.aupreset` or LV2 preset |
 | The host's file chooser for the **Filter** parameter | LV2, in hosts that show it ([LV2 filter files](#lv2-filter-files)) | An IR file, a `.cfg` or a configuration list, with at least its inputs ([channels](#channels)) |
 | The host's preset menu ("Load Preset…" or its preset browser) | Every format | Convolver's preset in that format: `.vstpreset` (VST3), `.aupreset` (Audio Unit) or a `NAME.preset.lv2` folder (LV2), with at least its inputs ([channels](#channels)) |
 | A saved project | Every format | The filter and settings saved in it |
 
 ### A preset in the window
 
-**Choose…** and dropping a file in Convolver's window also open a Convolver
+**Choose File…** and dropping a file in Convolver's window also open a Convolver
 `.vstpreset`, in the Audio Unit as well as the VST3 plug-in, from any
 folder: nothing has to be installed or imported first. It loads as the
 host's preset menu loads it. Its filter must suit the host's rate and
@@ -145,7 +145,7 @@ differed from the defaults, so it leaves them as they are; save it again
 to have it reset them. Bypass stays as the host has it. Another plug-in's preset,
 a damaged file or a preset saved with no filter is refused, and the
 message says what to choose instead. The window then names the filter
-after the preset file. **Reload**, and **Reload when the file changes**,
+after the preset file. **Reload**, and **Reload When the File Changes**,
 read the preset again, which sets the settings back to the
 preset's, as choosing it again would.
 
@@ -155,8 +155,8 @@ or a Convolver `.vstpreset`, and lists the folders where hosts look for
 presets. A preset is needed where the plug-in has no window (the VST3
 plug-in on Linux, and on Windows up to 0.13.2), and in an LV2 host with no file chooser. In
 Audacity 4.0.2 (VST3, on macOS) both routes are checked: its preset menu,
-and the window, where a filter chosen with Choose… was kept for exports and
-saved projects and one chosen from Recent for an export (up to 0.13.2 it
+and the window, where a filter chosen with Choose File… was kept for exports and
+saved projects and one chosen from the recent files for an export (up to 0.13.2 it
 was not kept) ([in Audacity](first-sound-in-a-host.md#in-audacity)).
 
 The filter is prepared away from the audio, then installed. A filter loaded
@@ -519,7 +519,7 @@ From the top, the window has:
   | Note | In smaller text: the host or design limit behind it, and when the status clears |
 
   When a button in the window carries out the fix, it is highlighted in the
-  accent colour: **Choose…** when a different filter puts it right, **Copy
+  accent colour: **Choose Filter** when a different filter puts it right, **Copy
   Diagnostics** for a fault in Convolver itself.
 
   A refused file is explained first, as the latest thing you did, and
@@ -536,15 +536,16 @@ From the top, the window has:
   and 1 output.** Convolver plays silence.", then Cause: "A filter plays only with
   the channel counts it was made for.", **Fix**: "Give the plug-in 2 inputs
   and 2 outputs in the host's track or routing settings, or load a filter
-  made for 1 input and 1 output." (with Choose… highlighted), and Note:
+  made for 1 input and 1 output." (with Choose Filter highlighted), and Note:
   "Hosts run an effect with one channel on a mono track (GarageBand does):
   put Convolver on a stereo track instead." While a filter simply plays,
   there is no message: the heading and the Audio section say what plays.
   With no filter, Fix says what to load, and that a file can be dropped on
-  the window, and Choose… is highlighted.
-- **Choose…**, **Recent**, **Reload** and **Reload when the file changes**,
-  on one row under the message.
-  Choose… opens the file dialog for an IR file, a `.cfg`, a
+  the window, and Choose Filter is highlighted.
+- **Choose Filter**, under the message: one menu with every file action,
+  so the window has one button for them. (On Windows it is a split button:
+  its main part is Choose File…, and its arrow opens the menu.)
+  **Choose File…** opens the file dialog for an IR file, a `.cfg`, a
   configuration list or a Convolver `.vstpreset`
   ([a preset in the window](#a-preset-in-the-window)); dropping the file anywhere on the
   window does the same. The Audio Unit reads sound files with macOS's own reader, so
@@ -581,44 +582,55 @@ From the top, the window has:
   the sandbox letting Convolver read the original files; its rate and
   channels must still fit.
 
-  Beside Choose…:
+  The rest of the menu:
 
-  - **Recent** lists the filter files last loaded in a Convolver window, in
+  - **Reload** reads the file again, for example after changing it in DRC,
+    REW or a text editor; the item names the file (`Reload room.cfg`). It
+    works for a file loaded in the window since the host opened the
+    project: a reopened project saves the filter, not the file, so Reload
+    is dimmed until a file is chosen again.
+  - **Reload When the File Changes** (ticked when the window opens) does
+    the same by itself while the window is open, as described below.
+  - Under **Recent**, the filter files last loaded in a Convolver window, in
     any host or format (up to ten, newest first, each with its folder's
     name; hold the pointer over one for its full path), leaving out files
-    that are no longer there. Choosing one loads it as Choose… does;
-    **Clear Menu** empties the list. The list is a small text file,
+    that are no longer there. Choosing one loads it as Choose File… does;
+    **Clear Recent** empties the list. The list is a small text file,
     `recent-filters.txt`, in the Convolver log's folder, never in the
     project. A sandboxed host may refuse to read a file from the list that
     it allowed through the file dialog; the explanation then says
-    permission was denied, and Choose… works.
-  - **Reload** reads the file again, for example after changing it in DRC,
-    REW or a text editor. It works for a file loaded in the window since the
-    host opened the project: a reopened project saves the filter, not the
-    file, so Reload is dimmed until a file is chosen again.
-  - **Reload when the file changes** (ticked when the window opens) does
-    the same by itself while the window is open, even behind other windows:
-    once a second it checks the file and, for a `.cfg` or list, the files it
-    names that make up the filter that plays (for a list, the lists and
-    `.cfg` files it reads and the IR files of the entry chosen, not those
-    of other entries, which need not be installed), and reloads once a
-    change has stayed the same for a second. That makes it less likely to
-    read a file still being written, but cannot rule it out: a program that
-    pauses while writing, or writes a filter's files one after another, can
-    still be caught part-way. A script or tool that writes filters for
-    Convolver should write each file under a temporary name in the same
-    folder and then rename it over the old one, so the file is only ever
-    seen whole, and rename all of a filter's files at the end, together.
-    A file that has gone (moved or deleted)
-    is not reloaded; the filter that plays stays, as it does when a reload
-    is refused (say, a `.cfg` that names a file not written yet): press
-    Reload once the file is ready. A filter the host has restored since
-    (a preset, an undo) is not replaced by a reload. Each reload tells the
-    host the project has changed, as choosing the file does.
+    permission was denied, and Choose File… works.
+
+  **Reload When the File Changes** works even behind other windows:
+  once a second it checks the file and, for a `.cfg` or list, the files it
+  names that make up the filter that plays (for a list, the lists and
+  `.cfg` files it reads and the IR files of the entry chosen, not those
+  of other entries, which need not be installed), and reloads once a
+  change has stayed the same for a second. That makes it less likely to
+  read a file still being written, but cannot rule it out: a program that
+  pauses while writing, or writes a filter's files one after another, can
+  still be caught part-way. A script or tool that writes filters for
+  Convolver should write each file under a temporary name in the same
+  folder and then rename it over the old one, so the file is only ever
+  seen whole, and rename all of a filter's files at the end, together.
+  A file that has gone (moved or deleted)
+  is not reloaded; the filter that plays stays, as it does when a reload
+  is refused (say, a `.cfg` that names a file not written yet): press
+  Reload once the file is ready. A filter the host has restored since
+  (a preset, an undo) is not replaced by a reload. Each reload tells the
+  host the project has changed, as choosing the file does.
 - **Gain** and **Mix**: a slider, the value in a box beside it and its unit.
   Type a value in the box and press Return (or move to another control) to
   set it exactly; a value beyond the range stops at its end. Option-click a
   slider to put it back to its default (0 dB, 100% wet), as in Logic.
+  The Gain row starts with the **Gain mode** menu (Set, Estimate or No
+  clipping, [settings](#settings)). With Set, the slider and box are Gain.
+  With Estimate or No clipping, the slider and box are dimmed and show the
+  gain that mode plays for the filter; Gain keeps its value and plays again
+  when you choose Set. A note under the row says what the box cannot: that
+  each filter plays at its own figure while none is loaded, that No
+  clipping plays until the filter is estimated, or that the filter has no
+  figure (silence).
   Moving or resetting a slider drops a value you had not finished typing
   in its own box.
   Leaving a box without changing it sets nothing, so the rounded value it
@@ -653,7 +665,7 @@ From the top, the window has:
   | Host sample rate, Host channels | Otherwise a line each: the rate the host runs the plug-in at, and the inputs and outputs it gives it (`1 in → 1 out`) |
   | Routing | With a filter: which input feeds which output (`In 1 → Out 1`), with route gains such as `×0.5`; the first four paths, then how many more |
   | Ring-out | How long the output goes on after the input stops (the tail), at the host's rate; only when it says more than the filter's Length: delays in the filter, a Latency, or another rate |
-  | Worst-case peak | The loudest output any full-scale input could make through the filter, and the Gain that rules out clipping (or that it cannot clip at the current Gain and Mix) |
+  | Worst-case peak | The loudest output any full-scale input could make through the filter, and the Gain that rules out clipping (or that it won't clip at the current Gain and Mix) |
   | Host block size | The largest block the host sends at a time |
 
   A line that does not match (a filter for another rate, say) is marked with
@@ -741,7 +753,7 @@ defaults play exactly as Convolver did before the settings existed.
 | Setting | Values | Default | What it does |
 | --- | --- | --- | --- |
 | **Gain** | −100 to +24 dB | 0 dB | Scales the filtered signal, as the command line's `--gain-db` does. Negative values make room for a filter that boosts some frequencies; positive values make up level. |
-| **Gain mode** | Set, Estimate or No clipping | Set | Which gain plays. **Set** plays Gain. **Estimate** plays the filter's own estimate of how much to turn it down, found by playing noise through it, as the command line's `--gain-db auto`; music rarely clips at it, but it can. **No clipping** plays the gain at which no input within full scale can clip (up to the float rounding of the convolution), found from the filter's taps as `--gain-db no-clip`; it is usually quieter than Estimate, and louder than 0 dB for a filter that can only make input quieter. It is not a limiter: input above full scale, such as floating-point audio another plug-in makes louder than 0 dBFS, can still clip. Each filter plays at its own figure, so loading another filter changes the level to suit it, and Gain keeps its value for Set. Beside the menu, the window shows the gain the mode plays. |
+| **Gain mode** | Set, Estimate or No clipping | Set | Which gain plays. **Set** plays Gain. **Estimate** plays the filter's own estimate of how much to turn it down, found by playing noise through it, as the command line's `--gain-db auto`; music rarely clips at it, but it can. **No clipping** plays the gain at which no input within full scale can clip (up to the float rounding of the convolution), found from the filter's taps as `--gain-db no-clip`; it is usually quieter than Estimate, and louder than 0 dB for a filter that can only make input quieter. It is not a limiter: input above full scale, such as floating-point audio another plug-in makes louder than 0 dBFS, can still clip. Each filter plays at its own figure, so loading another filter changes the level to suit it, and Gain keeps its value for Set. In the window the menu starts the Gain row, whose box then shows the gain the mode plays. |
 | **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. Whenever bypass plays silence there is no dry signal, so the mix stays at 100%: when the filter's input and output counts differ, and in the cases [bypass](#bypass) lists when no filter plays. Where bypass passes the input, the input share of Mix still plays while a kept filter is silent. |
 | **Latency** | 0, 64, 128, 256, 512, 1024, 2048 or 4096 frames | 0 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. At 0 Convolver adds no processing delay; any delay in the filter itself still plays. A larger value uses less processor time, most of all for short filters. It is the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
 

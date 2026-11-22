@@ -151,7 +151,7 @@ Editor::Editor(Controller& controller) : EditorView(&controller), link_(std::mak
     NSMutableArray<NSDictionary<NSString*, id>*>* settings = [NSMutableArray array];
     if (NSDictionary<NSString*, id>* gain = setting(link_, gain_id, @"Gain", @" dB"))
         [settings addObject:gain];
-    // PLUG-10: beside the menu, the gain the mode plays (the report's gain note).
+    // PLUG-50: the menu leads the Gain row, whose box shows the gain the mode plays.
     if (NSDictionary<NSString*, id>* mode =
             choice(link_, gain_mode_id, @"Gain mode",
                    @"Which gain plays. Set: the Gain setting. Estimate: the filter's own estimate, "

@@ -441,16 +441,16 @@ cases.
 - `native.recent_files`: the windows' recent filter files (VST3-11) beside
   the log: newest first, no repeats, ten kept, paths with spaces and
   accents, no path with a line break, nothing left beside the list after
-  it is replaced, a list with Windows line ends, Clear Menu, and no list
+  it is replaced, a list with Windows line ends, Clear Recent, and no list
   with the log turned off.
 - `native.window_model`: what every system's window does (PLUG-34), from
   a typed report: the content for each status (tone, symbol, message,
   box, the fix's button with and without loading, no drop hint under the
   name (PLUG-44), the filter's facts, Audio and reference lines) and with no report; the
   Latency note; typed values (decimal comma, minus sign, a unit after the
-  number, clamping, refusing text that is not a finite number); Choose…
+  number, clamping, refusing text that is not a finite number); Choose File…
   requests replaced, answered once and forgotten when the window closes;
-  the Recent menu's entries without missing files; and reloading when files
+  the recent files' entries without missing files; and reloading when files
   change only once a change has settled, not after `settle()`, and never
   for a deleted file.
 - `native.state`: fixed version-1 wire fixture, the version-2 failed-load
@@ -897,9 +897,11 @@ that is one edit, plays at once and asks the host to restart (the row
 showing the time it adds), and one whose processor cannot be built (the row
 saying it is not in use yet until the next activation), the Bypass checkbox (one
 edit per click, and following the host), a chosen WAV loaded and the
-project marked changed, the file in the Recent menu, Reload, a change to
-the file reloaded on the second check (not with the box unticked, and not
-when the file is gone), Copy Diagnostics, a resize request when the folded
+project marked changed, the Gain mode menu leading the Gain row (the Gain
+slider and box disabled outside Set, with the note under the row), the
+Choose Filter menu's items with the file under Recent, its Reload (named
+for the file), a change to the file reloaded on the second check (not with
+Reload When the File Changes unticked, and not when the file is gone), Copy Diagnostics, a resize request when the folded
 lines open, and `removed()`. With a 2→6 crossover on a six-channel bus
 (PLUG-22 and PLUG-23) it checks that Mix is dimmed with the mix note under
 it over three refreshes, while Gain stays enabled, and that Host channels
@@ -910,13 +912,17 @@ the Win32 window the same way, attached to a host window on the desktop, and
 works it through its controls as a user would: HWND only, not resizable,
 twice the width at a content scale of 2, the status and title, the trackbars
 and the Latency list, a Gain the host set, a typed value with a decimal
-comma and a key on the trackbar each one edit, a Latency choice, Bypass, a
-dropped WAV loaded and the project marked changed, Reload, a change reloaded
-on the second check (not with the box unticked, nor afterwards), Copy
+comma and a key on the trackbar each one edit, the Gain mode list leading
+the Gain row (Gain's trackbar and box disabled outside Set, with the note
+under the row), a Latency choice, Bypass, a dropped WAV loaded and the
+project marked changed, the Choose Filter menu's commands (sent as
+`WM_COMMAND`, so the menu need not open): Reload, a change reloaded on the
+second check (not with the automatic reload unticked, nor afterwards) and a
+recent file loaded, Copy
 Diagnostics on the clipboard, the names UI Automation gives the controls
 (what Narrator and NVDA read), Tab from control to control, a resize request
-when the folded lines open, a refused file shown in its box with Choose…
-drawn as the fix, and `removed()`; then the same mix-note check as on macOS.
+when the folded lines open, a refused file shown in its box with Choose
+Filter drawn as the fix, and `removed()`; then the same mix-note check as on macOS.
 It keeps two pictures of the window, `vst3-editor.bmp` and
 `vst3-editor-refused.bmp` in the build's `plugins/vst3` folder, which the VST3
 workflow keeps with the run. Under Wine, where a Linux session can run it
@@ -1113,7 +1119,7 @@ Five CTest tests run when the adapter is built (label `au`):
   logged once), then the view the factory makes, attached to an off-screen
   window: its size fitted to the content whatever size the host offers
   (between 300 and 680 points high), the message (problem, what plays, and
-  the Cause and Fix rows), Choose… highlighted as the fix's button (no
+  the Cause and Fix rows), Choose Filter highlighted as the fix's button (no
   second button in the message), the note's row, the Audio facts, and Copy Diagnostics and
   Show Log at the right of the disclosure row, in that order, the view
   ending just under that row, the folded file, software and log lines making it taller
@@ -1127,15 +1133,19 @@ Five CTest tests run when the adapter is built (label `au`):
   slider leaves it alone, typing again after Return, a box left unchanged
   setting nothing (neither its rounded text nor a value older than a host
   change), a host change moving the slider), the window following the
-  host window's light and dark appearance, the Latency menu
+  host window's light and dark appearance, the Gain mode menu leading the
+  Gain row (a choice setting the parameter, the Gain slider dimmed while
+  its box or the note under the row says what plays, Set and a host change
+  bringing Gain back), the Latency menu
   (its choices, the time it adds, a choice setting the parameter and the
   Latency row showing the new latency in use, a host change moving
   the menu), its status and
   text before and after the fix, Copy Diagnostics (onto a
   private pasteboard), the accessibility names (AppKit sets the buttons'
   roles itself and need not report them on a runner), and that a closed
-  window stops reading the unit. Then filter files: the Choose… button is
-  shown and the window accepts dropped file URLs (neither the
+  window stops reading the unit. Then filter files: the Choose Filter
+  pull-down is shown with Choose File… and a dimmed Reload, and the window
+  accepts dropped file URLs (neither the
   file dialog nor a drag is driven: a headless runner has no user to answer
   them), then the view's load step, which both use: a stereo WAV plays, the
   heading, the reference lines and the load property name it, and the saved state equals

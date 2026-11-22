@@ -66,9 +66,10 @@ struct WindowContent {
     std::vector<ReferenceLine> reference;
     // PLUG-23: why Mix has no effect; empty while it applies.
     std::string mix_note;
-    // PLUG-10: beside the Gain mode menu, the gain the mode plays; empty in
-    // Set mode.
-    std::string gain_note;
+    // PLUG-50: in Estimate and No clipping, the gain the mode plays, for the
+    // Gain row's box ("-7.3"), and what the box cannot say, under the row;
+    // both empty in Set mode.
+    std::string gain_note, gain_played;
     int sample_rate = 0; // The host's, for the Latency row; 0 before it starts.
     bool latency_waits = false, latency_next_start = false;
     std::string log_path;
@@ -87,7 +88,7 @@ struct WindowContent {
 };
 
 // What to show for `report` (nullptr: the plug-in could not give one).
-// `can_load` says whether this window can load a file (Choose…, a drop): it
+// `can_load` says whether this window can load a file (Choose File…, a drop): it
 // keeps the Choose action.
 WindowContent window_content(const HostReport* report, bool can_load);
 
@@ -103,7 +104,7 @@ std::string latency_note(double frames, int sample_rate, bool waits, bool next_s
 // the text does not start with a finite number.
 std::optional<double> typed_value(std::string_view text, double minimum, double maximum);
 
-// Choose… in two steps: start() records a request (forgetting any earlier
+// Choose File… in two steps: start() records a request (forgetting any earlier
 // one) for the file dialog; finish() says whether its answer is still
 // wanted. Closing the window, or the view leaving it, calls stop(): the host
 // may then dispose of the plug-in while the dialog is still open.
@@ -131,7 +132,7 @@ class ChooseRequests {
     std::uint64_t pending_ = 0, last_ = 0;
 };
 
-// One entry of the Recent menu: "room.cfg — Filters" (the file's name and
+// One recent file in the Choose Filter menu: "room.cfg — Filters" (the file's name and
 // its folder's, since several folders often hold a filter.cfg), and the
 // path it loads, also its tooltip.
 struct RecentEntry {

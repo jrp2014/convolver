@@ -4,12 +4,13 @@
 // title line with Bypass at its end; the filter's file name as the heading, with the
 // status beside it as a symbol and a word; under them DIAG-2's message (the problem,
 // in a box, what plays, its cause and the fix, a button that carries out the fix when
-// the window can (Choose Filter… or Copy Diagnostics), and a note), shown only when
-// there is something to say; Choose…, the recent files and Reload; a form with Gain and
-// Mix (slider, typed value, unit; Option-click resets) and Latency (menu and the time
-// it adds); the Audio facts in plain words; and the file, software and log lines
-// folded away, with Copy Diagnostics and Show Log on their row. A filter file can also
-// be dropped on it, picked from the recent files, and reloaded, by hand or when it
+// the window can (Choose Filter or Copy Diagnostics), and a note), shown only when
+// there is something to say; the Choose Filter menu (PLUG-50); a form with Gain
+// (led by the Gain mode menu) and Mix (slider, typed value, unit; Option-click
+// resets) and Latency (menu and the time it adds); the Audio facts in plain words;
+// and the file, software and log lines folded away, with Copy Diagnostics and Show
+// Log on their row. A filter file can also be dropped on it, picked from the recent
+// files, and reloaded, by hand or when it
 // changes while the window is open (VST3-11). Native AppKit controls in stack views
 // (auto layout), so screen readers, keyboard use, dark mode and text scaling come from
 // the system. It reads and sets everything through blocks a format supplies (the
@@ -62,7 +63,7 @@ typedef BOOL (^ConvolverFileLoader)(NSString* path);
                      settings:(NSArray<NSDictionary<NSString*, id>*>*)settings
                        bypass:(nullable NSDictionary<NSString*, id>*)bypass
                        loader:(nullable ConvolverFileLoader)loader;
-// What Choose… and a drop do with the file: loads it and rereads the
+// What Choose File… and a drop do with the file: loads it and rereads the
 // report. Returns whether the plug-in accepted it.
 - (BOOL)loadFile:(NSString*)path;
 // Reads the report now.
@@ -73,7 +74,7 @@ typedef BOOL (^ConvolverFileLoader)(NSString* path);
 // hidden window does not have it polled, and may dispose of the unit then.
 // Returns whether it read.
 - (BOOL)refreshIfShown;
-// Choose… in two steps, so the tests can drive it without a dialog:
+// Choose File… in two steps, so the tests can drive it without a dialog:
 // startChoosing records a request (and forgets any earlier one), and
 // finishChoosing:URL: loads its file only while that request is still the
 // pending one and the view is in a window. Closing the window, or the view
@@ -92,9 +93,10 @@ typedef BOOL (^ConvolverFileLoader)(NSString* path);
 // being written is not read half way. A missing file is not reloaded (the
 // filter that plays stays). Returns whether it reloaded.
 - (BOOL)checkForChanges;
-// Fills the Recent menu from the recent-files list (portable/recent_files.hpp),
-// leaving out files that are no longer there, as it does when it opens.
-- (void)updateRecentMenu;
+// Fills the Choose Filter menu's recent files from the recent-files list
+// (portable/recent_files.hpp), leaving out files that are no longer there,
+// as it does when it opens.
+- (void)updateFilterMenu;
 // Shows or hides the file, software and log lines, as their disclosure
 // button does.
 - (void)showReference:(BOOL)shown;
@@ -117,15 +119,16 @@ typedef BOOL (^ConvolverFileLoader)(NSString* path);
 @property(readonly, nonatomic) NSTextView* explanationView;
 // The report's note, in its own row ("Note:"), hidden when there is none.
 @property(readonly, nonatomic) NSTextField* noteField;
-// On one row under the message: Choose…, the Recent menu (a pull-down whose
-// first item is its title), Reload, and Reload When the File Changes
-// (ticked by default).
-@property(readonly, nonatomic) NSButton* chooseButton;
-@property(readonly, nonatomic) NSPopUpButton* recentButton;
-@property(readonly, nonatomic) NSButton* reloadButton;
-@property(readonly, nonatomic) NSButton* watchButton;
+// PLUG-50: under the message, one Choose Filter pull-down (its first item
+// is its title): Choose File…, Reload (named for the file, as "Reload
+// room.cfg"), Reload When the File Changes (ticked by default), then the
+// recent files under a Recent heading and Clear Recent.
+@property(readonly, nonatomic) NSPopUpButton* chooseButton;
+@property(readonly, nonatomic) NSMenuItem* reloadItem;
+@property(readonly, nonatomic) NSMenuItem* watchItem;
 // Each setting's slider or menu, and its value: an editable number field for
-// a slider, the time it adds for the Latency menu.
+// a slider, the time it adds for the Latency menu, and for the Gain mode
+// menu (which leads the Gain row, PLUG-50) the note under that row.
 @property(readonly, nonatomic) NSArray<NSSlider*>* settingSliders;
 @property(readonly, nonatomic) NSArray<NSPopUpButton*>* settingMenus;
 @property(readonly, nonatomic) NSArray<NSTextField*>* settingValues;

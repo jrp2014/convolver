@@ -12,7 +12,7 @@ window or for a host's preset library. You will make a preset from an IR or
 
 - You do not need a preset to use a filter. The ordinary way is to choose
   the IR file, `.cfg` or configuration list itself, from any folder, with
-  **Choose…** in [Convolver's window](plugins.md#convolvers-window) (the
+  **Choose Filter** in [Convolver's window](plugins.md#convolvers-window) (the
   Audio Unit and the VST® 3 plug-in on macOS and Windows) or the host's file chooser
   (LV2, in hosts that show it), then save the project
   ([your first sound in a host](first-sound-in-a-host.md)).
@@ -126,13 +126,13 @@ ignores them there.
   restart Audacity. They appear in the effect's preset menu under their
   file names, so give each preset its own name,
   such as `room-48000.vstpreset`. This preset menu is checked in Audacity,
-  as are Choose… and Recent in Convolver's window, which need no copying
+  as are Choose File… and the recent files in Convolver's window, which need no copying
   ([in Audacity](first-sound-in-a-host.md#in-audacity)). Audacity always runs Convolver with two channels, even on a
   mono track, so use a stereo (2-in, 2-out) filter, and set its playback
   rate to the filter's
   ([the rate a host plays at](plugins.md#status-and-the-convolver-log)).
 - **VST3 or AU, from Convolver's window:** choose the `.vstpreset` with
-  **Choose…**, or drop it on the window, from any folder; no preset folder,
+  **Choose File…**, or drop it on the window, from any folder; no preset folder,
   import or administrator is needed, and the Audio Unit reads it too
   ([a preset in the window](plugins.md#a-preset-in-the-window)). Its Gain,
   Mix and Latency load with the filter, as from the host's preset menu.
@@ -162,7 +162,7 @@ plug-in plays silence, see [when a preset does not fit](#when-a-preset-does-not-
 
 A preset loads from any folder through the host's preset menu. These are
 the folders where hosts look for presets on their own, to list them in a
-preset library. None of them is needed for **Choose…**.
+preset library. None of them is needed for **Choose File…**.
 
 | Format | System | Your user account | All users (needs an administrator) |
 | --- | --- | --- | --- |

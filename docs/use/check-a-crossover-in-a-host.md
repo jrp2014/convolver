@@ -80,7 +80,8 @@ show routing; they are not a crossover ready for real speakers.
 3. Add Convolver to the track as an effect. On macOS and Windows its window
    opens and shows the status; on Linux the host shows its generic controls,
    with a read-only **Status**.
-4. Load the filter: click **Choose…** in Convolver's window and pick
+4. Load the filter: in Convolver's window, choose **Choose Filter** >
+   **Choose File…** and pick
    `examples/first-use/crossover/filter.cfg`. Without the window (Linux),
    load `examples/first-use/crossover/first-use-crossover.vstpreset` from
    the host's preset menu instead (REAPER: the **+** button beside the
@@ -146,7 +147,7 @@ Load each of these in turn, the way you loaded the crossover (choose the
 REAPER also loads Audio Units. Install `Components/Convolver.component` as
 [install](install.md) says and insert Convolver's Audio Unit in step 3 in
 place of the VST3 plug-in. It has the same window, so the steps are the
-same: after **Choose…** the window reads `filter.cfg`, Active, and its Audio
+same: after **Choose File…** the window reads `filter.cfg`, Active, and its Audio
 section 48000 Hz, 2 in, 6 out, and the render and comparison are as above.
 If the host gives it more than 2 inputs, it reads inputs 1 and 2 as in
 step 4. Its preset menu takes `.aupreset` files rather than `.vstpreset`;

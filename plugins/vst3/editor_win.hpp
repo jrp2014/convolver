@@ -20,14 +20,13 @@ enum Control : int {
     message,
     note_label,
     note,
-    choose,
-    recent,
-    reload,
-    watch,
+    choose, // PLUG-50: the Choose Filter split button, which holds every file action.
     // The settings: Gain, Gain mode, Mix and Latency, each with
     // setting_stride identifiers from settings + setting_stride * i: its
-    // label, its trackbar or list, its value (a typed box, the gain the Gain
-    // mode plays or the time a Latency adds), its unit, and Mix's Dry and Wet.
+    // label, its trackbar or list, its value (a typed box, the note under
+    // the Gain row that Gain mode leads, or the time a Latency adds), its
+    // unit, and Mix's Dry and Wet. Gain mode's list comes before Gain's
+    // trackbar in Tab order, as it does on screen; its label is not shown.
     settings = 200,
     mix_note = 290,
     audio_heading = 300,
@@ -39,6 +38,18 @@ enum Control : int {
 };
 enum SettingPart : int { label = 0, control, value, unit, low, high };
 inline constexpr int setting_stride = 10;
+
+// PLUG-50: the Choose Filter menu's commands, which the window also takes
+// as WM_COMMAND (so a test need not open the menu): Choose File…, Reload,
+// Reload When the File Changes (ticked by default), Clear Recent, and the
+// recent files from menu_recent_first in the menu's order.
+enum MenuCommand : int {
+    menu_choose = 990,
+    menu_reload,
+    menu_watch,
+    menu_clear_recent,
+    menu_recent_first = 1000,
+};
 
 // Timers: the report twice a second while the window is on screen, and the
 // filter's files once a second while it is open (Reload When the File
