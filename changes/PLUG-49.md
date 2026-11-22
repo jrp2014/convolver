@@ -25,10 +25,12 @@
   restores a preset for another rate while a filter plays at Latency 1024
   and checks the parameters, then an accepted preset's. Each failed before
   its fix; the second also gives the controller the state first, as a
-  host against the SDK's order would. `HostFilter::list_waits()` and
-  `Processor::unchanged_state()`; after a refused restore,
-  `ConvolverStatus` carries that state's digest (`state_digest()`) and the
-  settings that play ([adapter contract](../docs/develop/plugin-contract.md)).
+  host against the SDK's order would, including the same preset refused
+  at 48 kHz and accepted at 44.1 kHz. `HostFilter::list_waits()` and
+  `Processor::unchanged_state()`; the controller's report request names
+  the state it mirrored (`state_digest()`), and the status after the
+  processor's outcome for it carries the settings that play
+  ([adapter contract](../docs/develop/plugin-contract.md)).
 
 ## Done
 

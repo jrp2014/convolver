@@ -174,13 +174,14 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     attributes->getInt("gain mode", preset_mode);
     if (preset_mode < 0 || preset_mode >= static_cast<int64>(gain_mode_count))
         preset_mode = 0;
-    // PLUG-48: the settings the processor plays, when it refused the state
-    // the host restored last (`refused_state`, its state_digest()); absent
-    // otherwise or from a damaged message, which then changes no parameter.
+    // PLUG-48: the settings the processor plays after its outcome for the
+    // state setComponentState mirrored (`followed_state`, its
+    // state_digest()); absent otherwise or from a damaged message, which
+    // then changes no parameter.
     std::optional<HostSettings> playing;
-    int64 refused_state = 0;
-    attributes->getInt("refused state", refused_state);
-    if (refused_state) {
+    int64 followed_state = 0;
+    attributes->getInt("followed state", followed_state);
+    if (followed_state) {
         double gain = 0, mix = 0;
         int64 latency = -1, mode = -1;
         if (attributes->getFloat("playing gain", gain) == kResultOk &&
@@ -237,14 +238,11 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
             report_.swap(report);
             format_.swap(format);
         }
-        if (follow_state_ && playing &&
-            static_cast<std::uint64_t>(refused_state) == follow_state_) {
-            follow_state_ = 0;
+        if (follow_state_ && playing && static_cast<std::uint64_t>(followed_state) == follow_state_)
             followed = playing;
-        }
     }
     // PLUG-48: after restored state, the settings the processor plays, which
-    // differ from the state's only when it refused that state. Not edits:
+    // differ from the state's when it refused that state. Not edits:
     // the host restored them, so nothing is recorded as the user's.
     if (followed) {
         const auto set = [&](ParamID id, ParamValue value) {
@@ -501,12 +499,14 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
     // have refused this state, as REAPER's preset menu offers a preset made
     // for another rate while a filter plays; it then keeps its own settings,
     // but the values above came from the refused preset (REAPER showed
-    // Latency 0 while 1024 played). A status saying the processor refused
-    // this very state (its digest) says what plays instead, and the
-    // parameters follow it (notify). Its report, the answer to this message,
-    // is that status when the processor read the state first, as the SDK
-    // says hosts do; otherwise the status its refusal sends. Any other state
-    // the processor refused, or one it accepted, changes nothing here.
+    // Latency 0 while 1024 played). This message names the state (its
+    // digest); the processor's status after its outcome for this state says
+    // what plays, and the parameters take it (notify). That status answers
+    // this message when the processor refused the state already (it read it
+    // first, as the SDK says hosts do); otherwise it follows the processor's
+    // restore. A refusal of the same state in an earlier restore also
+    // answers this message, and the restore that follows corrects it
+    // (Codex's review).
     std::uint64_t digest = 0;
     try {
         digest = state_digest(state);
@@ -518,6 +518,8 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
     }
     if (auto message = owned(allocateMessage())) {
         message->setMessageID(report_message);
+        if (auto* attributes = message->getAttributes(); attributes && digest)
+            attributes->setInt("follow state", static_cast<int64>(digest));
         sendMessage(message);
     }
     return result;

@@ -78,6 +78,13 @@ inline constexpr const char* report_message = "ConvolverReport";
 // PLUG-40: "retried" 1 when the processor read a refused configuration list
 // again itself (HostFilter::take_unsettled_list()), with "accepted", so the
 // controller marks the project changed as for a file the user chose.
+// PLUG-48: the controller's setComponentState sends a report_message with
+// "follow state", the state_digest() of the state it mirrored. The status
+// that follows the processor's outcome for that state (its own restore of
+// it, or the follow request when it had already refused it) adds "followed
+// state" (that digest) and the settings that play, "playing gain", "playing
+// mix", "playing latency" and "playing gain mode", which the controller's
+// parameters take if it still mirrors that state.
 struct StatusAnswer {
     Steinberg::int64 load_request = 0;
     bool retried = false;
@@ -357,9 +364,13 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // played(), which process() calls.
     HostSettling settling_{HostBinding::activation};
     // PLUG-48, under the lock: state_digest() of the newest state the host
-    // restored if it was refused, 0 otherwise (or once a load is accepted),
-    // so the controller's parameters follow what plays instead of it.
+    // restored if it was refused, 0 otherwise (or once a load is accepted);
+    // the state the controller says it mirrored last ("follow state"); and
+    // whether the next status says what plays, after an outcome for that
+    // state, so the controller's parameters show what plays.
     std::uint64_t refused_state_ = 0;
+    std::uint64_t mirrored_state_ = 0;
+    bool answer_mirrored_ = false;
     bool layout_refusal_logged_ = false; // Refused layouts are logged once per instance.
     std::string logged_;                 // The last line log() queued.
     std::vector<std::pair<std::string, bool>> unlogged_; // Lines and whether each is a problem.
@@ -469,8 +480,8 @@ class Controller final : public Steinberg::Vst::EditController,
     // filter has none.
     std::string name_, identity_;
     // PLUG-48, under status_lock_: state_digest() of the state the last
-    // setComponentState mirrored, until a status says the processor refused
-    // that state; the parameters then follow what plays (notify). 0: none.
+    // setComponentState mirrored; a status that says what plays after the
+    // processor's outcome for that state sets the parameters (notify). 0: none.
     std::uint64_t follow_state_ = 0;
 };
 } // namespace convolver::vst3

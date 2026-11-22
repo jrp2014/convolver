@@ -3497,6 +3497,22 @@ void refused_state_keeps_parameters() {
              std::to_string(shown_latency()) + " while " + std::to_string(p.getLatencySamples()) +
              " plays")
                 .c_str());
+    // A refusal is about one restore, not about the state's bytes (Codex's
+    // review): the same preset, refused at 48 kHz, restored controller first
+    // once the host runs at 44.1 kHz, is accepted and shows its own settings.
+    require(restore(*other_rate) != kResultOk && shown_latency() == 512,
+            "refused state: the 44.1 kHz preset again");
+    p.setActive(false);
+    ProcessSetup slower{kRealtime, kSample32, 512, 44100};
+    require(p.setupProcessing(slower) == kResultOk && p.setActive(true) == kResultOk,
+            "refused state: activate at 44.1 kHz");
+    play_block(p, 1, 1, 64);
+    require(controller_first(*other_rate) == kResultOk && p.settings().latency == 0 &&
+                shown_latency() == 0 && c.getParamNormalized(gain_id) == normalized_gain(0),
+            ("refused state, controller first: the preset refused before, accepted now, shows " +
+             std::to_string(shown_latency()) + " while " + std::to_string(p.settings().latency) +
+             " plays")
+                .c_str());
     require(handler.edits.size() == edits, "refused state: following what plays is an edit");
     p.setActive(false);
     c.terminate();

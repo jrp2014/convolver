@@ -1210,19 +1210,22 @@ the plan's Gain modes (12 November 2026); its meters follow later
   menu offering a 44.1 kHz preset at 48 kHz while a filter plays, jrp's
   live session of 22 November 2026) leaves the processor's settings as
   they were, but the controller had mirrored the refused state, so the
-  window and the host showed Latency 0 while 1024 played. While the
-  newest restored state stands refused (until a load is accepted), each
-  `ConvolverStatus` carries its `refused state`, a digest of the state as
-  decoded (`state_digest()`, which both halves compute alike), and the
-  settings that play instead. `setComponentState` remembers the digest of
-  the state it mirrored and asks for the report (so the processor's
-  answer also comes when no window is open; while the host plays, that
-  report reads a waiting list again, as the window's does). A status
-  naming that same state sets Gain, Gain mode, Mix and Latency to what
-  plays, without reporting edits, asking for a restart if the Latency
-  changed; a refusal of any other state, or an accepted one, changes
-  nothing, so the host's order does not matter. Bypass is the host's and
-  is not corrected.
+  window and the host showed Latency 0 while 1024 played.
+  `setComponentState` sends the processor a report request naming the
+  state it mirrored (`follow state`, a digest of the state as decoded,
+  `state_digest()`, which both halves compute alike), so the answer also
+  comes when no window is open; while the host plays, that request reads a
+  waiting list again, as the window's does. The status that follows the
+  processor's outcome for that state carries the digest (`followed state`)
+  and the settings that play: the answer to the request when the processor
+  had already refused the state (the SDK's order), or the status after its
+  own restore of it (the controller first). That status sets Gain, Gain
+  mode, Mix and Latency to what plays, without reporting edits, asking for
+  a restart if the Latency changed, so the host's order does not matter.
+  Every outcome answers, not only a refusal: a refusal of the same state in
+  an earlier restore also answers a controller-first request, and the
+  restore that follows corrects it. Bypass is the host's
+  and is not corrected.
 
 ## Channel layouts
 

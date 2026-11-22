@@ -412,7 +412,7 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
     try {
         std::string report;
         HostSettings playing;
-        std::uint64_t refused_state = 0;
+        std::uint64_t followed = 0;
         {
             const Locked lock(*this);
             if (settling_.playing()) // PLUG-27: the host plays the filter.
@@ -420,7 +420,8 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
             // PLUG-39 step 5: the report holds the Status line too.
             report = encode_report(report_locked());
             playing = settings();
-            refused_state = refused_state_;
+            if (std::exchange(answer_mirrored_, false))
+                followed = mirrored_state_;
         }
         if (!getPeer())
             return;
@@ -433,11 +434,11 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
             return;
         attributes->setBinary("report", report.data(), static_cast<uint32>(report.size()));
         attributes->setBinary("format", tag_.data(), static_cast<uint32>(tag_.size()));
-        // PLUG-48: after refused state, which state it was and the settings
-        // that play instead, which the controller's parameters follow if it
-        // mirrored that state (Controller::setComponentState).
-        if (refused_state) {
-            attributes->setInt("refused state", static_cast<int64>(refused_state));
+        // PLUG-48: after an outcome for the state the controller mirrored,
+        // which state it was and the settings that play, which the
+        // controller's parameters take (Controller::setComponentState).
+        if (followed) {
+            attributes->setInt("followed state", static_cast<int64>(followed));
             attributes->setFloat("playing gain", playing.gain_db);
             attributes->setFloat("playing mix", playing.mix);
             attributes->setInt("playing latency", static_cast<int64>(playing.latency));
@@ -519,8 +520,22 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
     if (id == report_message) {
         bool faulted = false;
         std::string list;
+        int64 follow = 0;
+        if (auto* attributes = message->getAttributes())
+            attributes->getInt("follow state", follow);
         {
             const Locked lock(*this);
+            // PLUG-48: the state the controller mirrored. Its status says
+            // what plays now if this processor already refused that state
+            // (the host gave it the state first); otherwise its restore of
+            // that state will. A refusal of the same state in an earlier
+            // restore also answers, and the restore that follows answers
+            // again.
+            if (follow) {
+                mirrored_state_ = static_cast<std::uint64_t>(follow);
+                if (refused_state_ == mirrored_state_)
+                    answer_mirrored_ = true;
+            }
             const auto now = std::chrono::steady_clock::now();
             if (now - report_faults_at_ >= report_fault_interval) {
                 faulted = observe_faults();
@@ -739,6 +754,10 @@ tresult Processor::load_state(IBStream* stream) {
         try {
             next = read_state(stream);
             digest = state_digest(next);
+            // PLUG-48: the controller mirrored this state; the status that
+            // follows says what plays after this restore, accepted or not.
+            if (digest == mirrored_state_)
+                answer_mirrored_ = true;
         } catch (const NewerHostState& e) {
             filter_.reject(HostFailureKind::state_newer, state_read_message(e));
             throw;
