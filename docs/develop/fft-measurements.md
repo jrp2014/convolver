@@ -16,10 +16,11 @@
   played in real time with room to spare on four shared machines
   ([supported workloads](#supported-workloads)).
 - Then and now (22 November 2026, jrp's M5 Max): with a 65,536-tap stereo
-  filter in large blocks, the historical and current engines both ran at
-  about 1,540 times real time, against 40 times on a 2006 Pentium 4; at a
-  Latency of 256 frames the current engine was 4.5 times as fast with the
-  same FFT library ([performance then and now](#performance-then-and-now)).
+  filter in large blocks, the historical 4.3 and current engines both ran
+  at about 1,540 times real time, against 40 times for 2.19 on a 2006
+  Pentium 4; at a Latency of 256 frames the current engine was 4.5 times as
+  fast with the same FFT library. Its build settings and raw timings are
+  not yet recorded ([performance then and now](#performance-then-and-now)).
 - Measure again on the target machine before a speed claim
   ([reproduce](#reproduce)).
 
@@ -1567,14 +1568,18 @@ for the other tracks and effects.
 
 **Source.** The 2006 notes for Convolver 2.19 give 40 times real time, a 3%
 processor load, for a stereo 65,536-tap filter on a 3.4 GHz Pentium 4. The
-archived filter at tag `convolver2-19` is 65,536 frames of stereo 32-bit
+Mac rows ran 4.3, released six months later; the history between the tags
+`convolver2-19` and `convolver4-3` includes "Speed improvements,
+particularly for shorter filters" and a newer FFTW, so the 39 times is not
+the hardware alone. The archived filter at tag `convolver2-19` is 65,536 frames of stereo 32-bit
 float at 44.1 kHz. At 44.1 kHz, 186 milliseconds is about 8,192 frames and
 5.8 milliseconds is 256 frames, a [Latency](../use/plugins.md#latency-and-tail)
 of 256. The current engine is 0.18.8 (`9cbcb6b`); 0.18.9 changed no engine
 code. The historical engine is the 4.3 code (tag `convolver4-3`, kept with
 recovered fixes in [`historical/`](../../historical/)). Which of those trees
 jrp rebuilt, his commands, build settings and raw timings are not recorded
-here, so the Mac rows cannot yet be reproduced from this page.
+here, nor the FFT library and version, planner mode, compiler and macOS
+version, so the Mac rows cannot yet be reproduced from this page.
 
 ## Reproduce
 
