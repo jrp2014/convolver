@@ -24,6 +24,14 @@ inline constexpr std::array<const char*, 6> host_status_names{"Active",  "No fil
 static_assert(static_cast<std::size_t>(HostStatus::bypassed) == host_status_names.size() - 1);
 
 // What the adapter knows besides its HostFilter, under its control lock.
+// PLUG-46: a tail and the rate it counts at (0 for the host's), which the
+// adapters publish as one value in a lock-free std::atomic, so a host
+// reading it on another thread never pairs one tail with another's rate.
+struct HostTail {
+    std::uint32_t frames = 0;
+    std::int32_t rate = 0;
+};
+
 struct HostReportFacts {
     std::string format;             // The log tag, such as "Audio Unit #2".
     std::optional<HostLayout> host; // As for host_status(): nullopt while not known.

@@ -23,4 +23,5 @@
 ## Done
 
 - [x] **PLUG-46 — Report a stopped plug-in's tail at the filter's own
-  rate.** 21 November 2026, jrp's review of the 0.18 candidate.
+  rate.** 21 November 2026, PR #269, jrp's review of the 0.18 candidate
+  ([adapter contract](../docs/develop/plugin-contract.md)).

@@ -19,4 +19,5 @@
 ## Done
 
 - [x] **PLUG-47 — Add a list the window reads again to Recent.** 21
-  November 2026, jrp's review of the 0.18 candidate.
+  November 2026, PR #269, jrp's review of the 0.18 candidate
+  ([loading a filter](../docs/use/plugins.md#loading-a-filter)).

@@ -183,10 +183,11 @@ tresult Processor::arrange(SpeakerArrangement* in, int32 ni, SpeakerArrangement*
     return result;
 }
 uint32 PLUGIN_API Processor::getTailSamples() {
-    std::uint64_t tail = tail_.load();
+    const auto published = tail_.load();
+    std::uint64_t tail = published.frames;
     // The filter's own frames while inactive, in the host's samples (rounded
     // up) when its rate differs (jrp's review, 21 November 2026).
-    const auto own = tail_rate_.load();
+    const auto own = published.rate;
     const auto host_rate = host_rate_.load();
     if (own > 0 && host_rate > 0 && host_rate != own)
         tail = static_cast<std::uint64_t>(
@@ -197,8 +198,8 @@ uint32 PLUGIN_API Processor::getTailSamples() {
 }
 void Processor::publish_timing() noexcept {
     const auto* const p = host();
-    tail_.store(static_cast<uint32>(p ? p->tail_frames() : filter_.filter_tail()));
-    tail_rate_.store(!p && filter_.filter() ? filter_.filter()->sample_rate : 0);
+    tail_.store({static_cast<std::uint32_t>(p ? p->tail_frames() : filter_.filter_tail()),
+                 !p && filter_.filter() ? filter_.filter()->sample_rate : 0});
     active_latency_.store(p ? p->latency_frames() : inactive);
 }
 HostSettings Processor::settings() const noexcept {
@@ -393,8 +394,9 @@ HostReport Processor::report_locked() const {
     facts.running = host() != nullptr; // setActive(false) frees every processor.
     facts.settings = settings();
     facts.latency_frames = host() ? host()->latency_frames() : facts.settings.latency;
-    facts.tail_frames = tail_.load();
-    facts.tail_rate = tail_rate_.load();
+    const auto tail = tail_.load();
+    facts.tail_frames = tail.frames;
+    facts.tail_rate = tail.rate;
     facts.bypassed = shown_bypass_.load();
     facts.log_written = host_log_written();
     facts.chooses_files = chooses_files();
