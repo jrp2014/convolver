@@ -3,7 +3,7 @@
 # Run on Apple silicon with clang++, CMake, Python 3 and libsndfile development files.
 set -eu
 if [ "$#" -ne 2 ]; then
-  echo "Usage: sh kit/reproduce.sh /path/to/convolver /new/benchmark-directory" >&2
+  echo "Usage: sh $0 /path/to/convolver /new/benchmark-directory" >&2
   exit 2
 fi
 src=$(cd "$1" && pwd)
@@ -11,6 +11,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 expected=9cbcb6b1c0c7a9cca07c29a852e5172ff3cd6376
 git -C "$src" cat-file -e "$expected^{commit}"
 git -C "$src" cat-file -e 'ee3323f2078846fef8c30da19771820f3f2f793d^{commit}'
+git -C "$src" cat-file -e '8c0814eb826fcc421fc61c9090891043f80169e5^{commit}'
 mkdir "$2"
 cd "$2"
 work=$(pwd)
