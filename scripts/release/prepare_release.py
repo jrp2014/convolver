@@ -50,8 +50,9 @@ CHANGES = (
         'counts, then choose the configuration list again." With the window open, it now loads by itself, as if '
         'chosen, as soon as the host plays; the project is marked changed and the list joins Recent. Once Convolver '
         'has seen the host '
-        'play, Status and the window say "The host\'s settings are now known (48000 Hz, 2 in, 2 out): choose the '
-        'configuration list again." instead of still calling them unknown. A brief start without audio, such as '
+        'play, the window says "The host\'s settings are now known (48000 Hz, 2 in, 2 out): choose the '
+        'configuration list again." (Status says it in short) instead of still calling them unknown. A brief start '
+        'without audio, such as '
         "Audacity's after a parameter edit, does not count. The window no longer suggests dropping a file beside "
         'every refusal.'
     ),
@@ -70,14 +71,15 @@ CHANGES = (
         '48000 Hz."), and plays when the host next starts the plug-in '
         'at a rate and channels that suit it. In Ardour 8.4, a filter chosen just before Ardour restarted the '
         'plug-in with the outputs set in Pin Connections used to be refused, and the export was silent. A filter '
-        'refused while another plays stays refused, and restarting the host does not switch to it. A configuration '
+        'refused while another plays stays refused, and the host restarting the plug-in does not switch to it. A '
+        'configuration '
         'list with no entry for the host is still refused. VST3 and the Audio Unit; LV2 refuses as before.'
     ),
     (
         'Status also says when a setting does not play as chosen, as the window already did: a Latency not in use '
         'yet ("Latency 1024 frames not in use yet."), Gain mode Estimate without an estimate for the filter ("No '
         'estimate: No clipping\'s gain plays."), and a filter with no gain figure. VST3 and the Audio Unit; in LV2 '
-        "the host's log says so."
+        "the host's log says so while a new Latency or Estimate's figure is prepared."
     ),
     (
         "In Audacity, Convolver's Choose… and Recent have been checked, on a candidate build before this version "
@@ -96,7 +98,8 @@ CHANGES = (
         'their own controls, Status ends with the gain Estimate or No clipping plays ("Estimate plays -7.3 dB."), '
         'Latency values read "0 frames (none)" or, once the host has started the plug-in, "256 frames (5.3 ms)", '
         "the VST3 parameters have short names (Gain, Mode, Mix, Lat, Bypass, Status), and LV2's latency output is "
-        'named Reported latency.'
+        'named Reported latency. A VST3 host that lets you type a Latency must be given one of the listed frame '
+        'counts.'
     ),
     (
         'A Latency chosen while the host has the plug-in stopped is "selected for the next start" in the window. In '
@@ -156,7 +159,8 @@ CHANGES = (
     ),
     (
         'Behind the scenes: the Mac packages are built with Xcode 26.6 (still for macOS 14 and later) and the Linux '
-        'package with GCC 12 (still for glibc 2.35), and every plug-in builds without compiler warnings; output may '
+        "package with GCC 12 (still for glibc 2.35), and Convolver's own sources build without compiler warnings; "
+        'output may '
         'differ from 0.14.0 within the tested tolerance. Automated host tests now play the VST3 and LV2 plug-ins in '
         'headless Ardour 9 sessions (mono, stereo, Strict-I/O, saved at Latency 256 and 1024), render the Audio '
         "Unit in GarageBand's order of events, and check that "
@@ -306,7 +310,8 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             "- In Audacity, a filter chosen with Convolver's Choose…, even before playing, is kept for exports and "
             'saved projects, and one chosen from Recent for exports (checked in Audacity 4.0.2 on macOS on 21 '
             "November 2026 with the 0.16.14 candidate, not yet repeated on this version; Audacity's own preset menu "
-            'was checked with an earlier preview). Reload and reloading when the file changes are checked only by '
+            'was last checked on 7 November 2026, with a build before the first preview). Reload and reloading when '
+            'the file changes are checked only by '
             'automated tests.\n'
             '- In Ardour, the VST3 plug-in on a Flexible-I/O track gets 2 inputs and 2 outputs whatever the track '
             'has, so a mono filter plays silence until its outputs are set by hand in Pin Connections (steps not yet '
