@@ -74,31 +74,6 @@ void run(const fs::path& dir) {
 
     require(forget_recent_files() && recent_files().empty(), "Clear Menu");
 
-    // PLUG-47 (jrp's review, 21 November 2026): a refused file the plug-in
-    // later loads by itself (PLUG-40's list) joins the list when the window
-    // shows it playing, once; not while another plays, and not after a file
-    // chosen since was accepted.
-    {
-        RefusedRecentFile refused;
-        refused.refused("/filters/rates.txt", "");
-        require(!refused.shown("") && !refused.shown("/filters/room.wav") && recent_files().empty(),
-                "a refused list remembered before it plays");
-        require(refused.shown("/filters/rates.txt") &&
-                    recent_files() == std::vector<std::string>{"/filters/rates.txt"},
-                "the list read again is not remembered: " + joined(recent_files()));
-        require(!refused.shown("/filters/rates.txt"), "remembered twice");
-        require(forget_recent_files(), "Clear Menu");
-        refused.refused("/filters/rates.txt", "");
-        refused.accepted(); // Another file chosen and accepted meanwhile.
-        require(!refused.shown("/filters/rates.txt") && recent_files().empty(),
-                "a list remembered after another file was chosen");
-        // The playing file refused again (a broken edit, Reload): it is in
-        // the list already, so nothing waits for it.
-        refused.refused("/filters/room.wav", "/filters/room.wav");
-        require(!refused.shown("/filters/room.wav") && recent_files().empty(),
-                "the playing file, refused again, remembered as a reload");
-    }
-
 #ifndef _WIN32 // Setting a variable empty removes it on Windows.
     set_log_variable("");
     require(recent_files_path().empty() && recent_files().empty() &&

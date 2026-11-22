@@ -28,27 +28,4 @@ std::vector<std::string> recent_files() noexcept;
 bool remember_recent_file(const std::string& path) noexcept;
 // Empties the list (a menu's Clear Menu). Returns whether it was saved.
 bool forget_recent_files() noexcept;
-
-// PLUG-47 (jrp's review, 21 November 2026): a file a window chose that was
-// refused, but that the plug-in then loads by itself (PLUG-40's
-// configuration list, read again once the host plays), joins the list when
-// the window first shows it playing, as it would have when chosen. One per
-// window, on its main thread.
-class RefusedRecentFile {
-  public:
-    // A chosen file was refused while `playing` (the accepted file's path,
-    // empty for none) plays. The same file as the one playing is not
-    // waited for: it is in the list already.
-    void refused(const std::string& path, const std::string& playing);
-    // A chosen file was accepted: none waits any longer.
-    void accepted() noexcept {
-        path_.clear();
-    }
-    // The window shows `playing` as the accepted file: remembers the refused
-    // file when it is that one. Returns whether it did.
-    bool shown(const std::string& playing) noexcept;
-
-  private:
-    std::string path_;
-};
 } // namespace convolver

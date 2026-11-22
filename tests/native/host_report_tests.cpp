@@ -480,6 +480,25 @@ void cases() {
         own.tail_rate = 0; // A processor's tail, at the host's rate.
         check(fact(host_report(f, own), "Ring-out"), "500.0 ms", "");
     }
+    // jrp's review, 22 November 2026: a 48 kHz filter whose routing delay
+    // makes its tail longer than its paths, stopped after the host ran at
+    // 96 kHz, shows the whole tail at its own rate: 24000 frames of delay
+    // and its 3-tap paths' 2 frames last 500.0 ms at 48 kHz (250.0 ms if
+    // counted at the host's 96 kHz). A rule that hides Ring-out when it
+    // repeats the filter's length must keep this row.
+    {
+        auto delayed = filter(48000, 2);
+        delayed.input_delays = {24000, 0};
+        HostFilter d(8);
+        d.load(HostState{delayed}, HostLayout{48000, 2, 2}, [](const HostPlayback&) {});
+        require(d.filter_tail() == 24002,
+                "the delayed filter's tail is " + std::to_string(d.filter_tail()) + " frames");
+        auto stopped = facts(HostLayout{96000, 2, 2});
+        stopped.running = false;
+        stopped.tail_frames = d.filter_tail();
+        stopped.tail_rate = 48000;
+        check(fact(host_report(d, stopped), "Ring-out"), "500.0 ms", "");
+    }
     // The identity paths have peak 1.75 (1 + .5 + .25): +4.9 dB. Gain
     // scales only the filtered path, which Mix then adds to the dry input:
     // at Gain -6 dB and Mix 25%, .25 * .501 * 1.75 + .75 = .97.

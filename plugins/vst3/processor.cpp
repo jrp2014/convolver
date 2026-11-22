@@ -10,6 +10,7 @@
 #include "pluginterfaces/vst/ivstattributes.h"
 #include "pluginterfaces/vst/ivstparameterchanges.h"
 #include "pluginterfaces/vst/vstpresetkeys.h"
+#include "recent_files.hpp"
 #include <algorithm>
 #include <array>
 #include <charconv>
@@ -526,6 +527,11 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
         if (!list.empty()) {
             std::optional<HostSettings> settings;
             const bool accepted = load_file(list, settings);
+            // PLUG-47: the list joins the windows' recent files, as when a
+            // window's choice is accepted, also when the window that chose
+            // it has closed since (jrp's review, 22 November 2026).
+            if (accepted)
+                remember_recent_file(list);
             write_log();
             send_status({.retried = true, .accepted = accepted, .settings = settings});
             return kResultOk;

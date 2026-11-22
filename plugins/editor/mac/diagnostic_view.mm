@@ -240,8 +240,6 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     // (FileWatch in window_model.hpp); timer ticks, for the checks.
     FileWatch watch_;
     unsigned ticks_;
-    // A refused file the plug-in may load by itself (PLUG-47).
-    convolver::RefusedRecentFile refusedRecent_;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame
@@ -741,9 +739,6 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
                          gainNote:ns(c.gain_note)];
     _logButton.enabled = logPath_.length > 0;
     [self readBypass];
-    // PLUG-47: a refused list the plug-in has read again by itself (PLUG-40)
-    // joins the recent files once it plays, as when chosen.
-    refusedRecent_.shown(c.filter_path);
     watch_.follow(c.filter_path, c.filter_files);
     _reloadButton.enabled = !watch_.path().empty();
     _watchButton.enabled = !watch_.path().empty();
@@ -932,15 +927,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 
 - (BOOL)loadFile:(NSString*)path {
     const BOOL accepted = loader_ && path.length > 0 && loader_(path);
-    if (accepted && path.UTF8String) {
+    if (accepted && path.UTF8String)
         convolver::remember_recent_file(path.UTF8String);
-        refusedRecent_.accepted();
-    } else if (path.UTF8String) {
-        try { // Out of memory: a later reload of it is not remembered.
-            refusedRecent_.refused(path.UTF8String, watch_.path());
-        } catch (...) {
-        }
-    }
     [self refresh]; // The report says what plays now, and why a refused file was refused.
     if (accepted)
         watch_.settle(); // What was read is what plays: nothing to reload.

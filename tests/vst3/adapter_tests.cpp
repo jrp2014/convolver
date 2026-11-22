@@ -12,6 +12,7 @@
 #include "public.sdk/source/vst/hosting/hostclasses.h"
 #include "public.sdk/source/vst/hosting/parameterchanges.h"
 #include "public.sdk/source/vst/vstpresetfile.h"
+#include "recent_files.hpp"
 #include "sound_files.hpp"
 #include <algorithm>
 #include <array>
@@ -3425,7 +3426,9 @@ void list_read_again() {
     std::ofstream(folder / "room.cfg") << "48000 1 1 0\n0\n0\nroom.wav\n0\n0\n0\n";
     std::ofstream(folder / "slow.cfg") << "44100 1 1 0\n0\n0\nslow.wav\n0\n0\n0\n";
     std::ofstream(folder / "rates.txt") << "slow.cfg\nroom.cfg\n";
+    convolver::forget_recent_files();
     require(!c.load_file((folder / "rates.txt").string()), "list read again: refused at first");
+    require(convolver::recent_files().empty(), "list read again: a refused list is a recent file");
     const auto edits = handler.edits.size();
     // FlushParameters: started at 44.1 kHz with one block, then stopped.
     require(p.setActive(true) == kResultOk, "list read again: the flush starts");
@@ -3470,6 +3473,10 @@ void list_read_again() {
             ("list read again: the list was not read again while playing: " +
              (r ? r->status_name + ": " + r->explanation : std::string("none")))
                 .c_str());
+    // PLUG-47: it joins the windows' recent files, as when chosen, whichever
+    // window reads the report (jrp's review, 22 November 2026).
+    require(convolver::recent_files() == std::vector<std::string>{(folder / "rates.txt").string()},
+            "list read again: not the recent file");
     MemoryStream saved;
     require(p.getState(&saved) == kResultOk, "list read again: save");
     saved.seek(0, IBStream::kIBSeekSet, nullptr);

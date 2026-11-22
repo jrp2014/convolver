@@ -6,6 +6,7 @@
 #include "core_foundation.hpp"
 #include "effect.hpp"
 #include "host_log.hpp"
+#include "recent_files.hpp"
 #include <AudioToolbox/AudioUnitUtilities.h>
 #include <algorithm>
 #include <array>
@@ -334,7 +335,12 @@ HostReport Effect::report() {
     }
     if (!list.empty()) {
         try {
-            static_cast<void>(load_file(list)); // Records, logs and notifies either way.
+            // Records, logs and notifies either way. PLUG-47: an accepted
+            // list joins the windows' recent files, as when a window's
+            // choice is accepted, also when the window that chose it has
+            // closed since (jrp's review, 22 November 2026).
+            if (load_file(list) == noErr)
+                remember_recent_file(list);
         } catch (...) {
             fail_unrecorded(); // As the load property does (ROBUST-7).
         }

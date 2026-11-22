@@ -393,7 +393,6 @@ class Editor final : public EditorView, public IPlugViewContentScaleSupport {
     ChooseRequests choose_requests_;
     IFileDialog* dialog_ = nullptr; // Choose…'s dialog while it is open.
     FileWatch watch_;
-    RefusedRecentFile refused_recent_; // A refused file the plug-in may load by itself (PLUG-47).
 };
 
 Editor::Editor(Controller& controller) : EditorView(&controller) {
@@ -1312,9 +1311,6 @@ void Editor::refresh() {
     const WindowContent c = read_content();
     read_settings();
     read_bypass();
-    // PLUG-47: a refused list the plug-in has read again by itself (PLUG-40)
-    // joins the recent files once it plays, as when chosen.
-    refused_recent_.shown(c.filter_path);
     watch_.follow(c.filter_path, c.filter_files);
     EnableWindow(reload_, !watch_.path().empty());
     EnableWindow(watch_box_, !watch_.path().empty());
@@ -1632,15 +1628,8 @@ void Editor::command(int id, int code, HWND control) {
 
 bool Editor::load(const std::string& path) {
     const bool accepted = controller && !path.empty() && owner().load_file(path);
-    if (accepted) {
+    if (accepted)
         remember_recent_file(path);
-        refused_recent_.accepted();
-    } else {
-        try { // Out of memory: a later reload of it is not remembered.
-            refused_recent_.refused(path, watch_.path());
-        } catch (...) {
-        }
-    }
     shown_.reset();
     refresh(); // The report says what plays now, and why a refused file was refused.
     if (accepted)
