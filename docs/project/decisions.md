@@ -287,6 +287,11 @@ Contents: [direction](#direction) · [releases](#releases) ·
 
 ## Releases
 
+- **22 November 2026.** An eighth unsigned developer preview, cut as soon
+  as PLUG-49 and PLUG-48 merged, because 0.18.10 was already published
+  when jrp's live session on it found them (jrp chose "Yes, right after
+  #271", then "Merge them all and cut new preview", which also brought in
+  PLUG-50's window changes). See [Releasing](../develop/releasing.md#publishing-an-unsigned-preview).
 - **21 November 2026.** A seventh unsigned developer preview, for live
   host testing, cut once the open pull requests of that evening were in
   `main`, PLUG-42's fixes from jrp's review included (jrp: "When the current
@@ -1083,6 +1088,13 @@ Contents: [direction](#direction) · [releases](#releases) ·
   example presets wait until after the preview (PLUG-45). See
   [status](../use/plugins.md#status-and-the-convolver-log),
   [window](../use/plugins.md#convolvers-window).
+- **22 November 2026.** jrp approved the
+  [mock-up](https://claude.ai/artifact/2WrL3kAy39753gfJtkW3sn) of the
+  window's settings and file button ("Go ahead"): Gain mode inside the Gain
+  row, one Choose Filter menu for every file action ("do we need choose +
+  recent + reload? Can we not do that in one button?"), and "won't clip"
+  rather than no note for a Worst-case peak that cannot clip, since a blank
+  note could mean safe or unchecked.
 
 ## Identities and file formats
 
