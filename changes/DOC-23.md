@@ -14,5 +14,5 @@
 
 ## Done
 
-- [x] **DOC-23 — Record performance then and now.** 22 November 2026
-  ([measurements](../docs/develop/fft-measurements.md#performance-then-and-now)).
+- [x] **DOC-23 — Record performance then and now.** 22 November 2026,
+  PR #270 ([measurements](../docs/develop/fft-measurements.md#performance-then-and-now)).
