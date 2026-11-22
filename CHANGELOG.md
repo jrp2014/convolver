@@ -24,6 +24,16 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ## [Unreleased]
 
+## [0.18.10] - 2026-11-22
+
+The seventh published preview, for macOS, Windows and Linux, unsigned: a
+filter chosen before the host plays is kept, a configuration list loads by
+itself once the host plays (with the window open), a filter that does not
+suit the host waits for a start that suits it, plainer wording in the window
+and Status, the tail reported after a stop is the current filter's own, and
+audible echo examples
+([release](https://github.com/jrp2014/convolver/releases/tag/v0.18.10)).
+
 ### Added
 
 - Documentation (PERF-3): the [limits guide](docs/use/limits.md#filter-length-channels-and-processor-load)
@@ -3201,7 +3211,8 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.18.10...HEAD
+[0.18.10]: https://github.com/jrp2014/convolver/releases/tag/v0.18.10
 [0.14.0]: https://github.com/jrp2014/convolver/releases/tag/v0.14.0
 [0.13.24]: https://github.com/jrp2014/convolver/releases/tag/v0.13.24
 [0.13.20]: https://github.com/jrp2014/convolver/releases/tag/v0.13.20
