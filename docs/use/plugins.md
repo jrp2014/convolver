@@ -723,8 +723,9 @@ as the VST3 window above, except:
   a step) and Page Up and Page Down (10). A drag is one change for the
   host's undo; each key press is one change. There is no Option-click
   reset: type the default (0 or 100) in the box.
-- Recent is a split button; either part opens the list. The file dialog is
-  Windows' own, and the host's window waits while it is open.
+- Choose Filter is a split button: its main part is Choose File…, and its
+  arrow opens the menu. The file dialog is Windows' own, and the host's
+  window waits while it is open.
 - The status is a dot and a word, the dot filled in the status colour; the
   word always says it. Text in the message and in the file, software and
   log lines can be selected and copied; other labels cannot.

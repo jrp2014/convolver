@@ -182,7 +182,7 @@ class PrepareReleaseTests(unittest.TestCase):
         self.assertIn('Checked on 0.18.10, built from its tag on one Mac', text)
         self.assertIn('Not yet repeated on 0.18.10 or this version: in REAPER', text)
         # Check 10 ran on the 0.16.14 candidate; the chosen-file path changed after it (status.md).
-        self.assertIn('a configuration list chosen before playing (fixed in this version), Recent, and save', text)
+        self.assertIn('a configuration list chosen before playing (failed on 0.18.10, fixed in this version)', text)
         self.assertIn('with the 0.16.14 candidate', text)
         # What a crossover or mono filter gets in Ardour (HOST-10).
         self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/plugins.md#ardour', text)

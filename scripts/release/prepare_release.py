@@ -54,10 +54,10 @@ CHANGES = (
         'a filter is the fix, and dropping a file on the window still loads it.'
     ),
     (
-        'The Gain mode menu now starts the Gain row, so its label is no longer cut off. With Estimate or No '
-        'clipping, the Gain slider and box are dimmed and the box shows the gain that mode plays; Gain keeps its '
-        'value and plays again when you choose Set. The Worst-case peak note says "(won\'t clip at this Gain and '
-        'Mix)".'
+        "In Convolver's window, the Gain mode menu now starts the Gain row, so its label is no longer cut off. "
+        'With Estimate or No clipping, the Gain slider and box are dimmed and the box shows the gain that mode '
+        'plays; Gain keeps its value and plays again when you choose Set. The Worst-case peak note now says it '
+        "won't clip, rather than cannot clip."
     ),
 )
 TAG = re.compile(r'v(\d+\.\d+\.\d+)')
@@ -196,9 +196,9 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             '10.4.15, exports aligned exactly at Latency 0 and within 1.2e-7 at 1024. Not yet repeated on 0.18.10 '
             'or this version: in REAPER, a refused preset while playing (0.18.10 refused it correctly but showed '
             'the wrong settings, fixed in this version) and the wrong host rate; in GarageBand, presets, bypass, '
-            'settings, a Latency change stopped and while playing, Recent and Reload; in Audacity, a configuration '
-            'list chosen before playing (fixed in this version), Recent, and save and reopen. The Windows and Linux '
-            'packages were '
+            'settings, a Latency change stopped and while playing, and the recent files and Reload in the Choose '
+            'Filter menu; in Audacity, a configuration list chosen before playing (failed on 0.18.10, fixed in this '
+            'version), the recent files, and save and reopen. The Windows and Linux packages were '
             'checked only automatically, on CI machines that had never built Convolver: the tools and examples ran '
             "from them, the plug-in's library loaded and listed its classes, and the Windows installer installed "
             'and removed itself. Nobody has used them in a host yet. '
@@ -206,8 +206,8 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'Other hosts are untested.\n'
             "- In Audacity, a filter chosen with Convolver's Choose File…, even before playing, is kept for exports "
             'and saved projects, and one chosen from its recent files for exports (checked in Audacity 4.0.2 on macOS '
-            'on 21 November 2026 with the 0.16.14 candidate, then with Choose… and Recent buttons, and Choose… before '
-            'playing again on 0.18.10 on 22 November, '
+            'on 21 November 2026 with the 0.16.14 candidate, whose window had separate Choose… and Recent buttons; '
+            'Choose… before playing was checked again on 0.18.10 on 22 November; '
             "not yet repeated on this version; Audacity's own preset menu "
             'was last checked on 7 November 2026, with a build before the first preview). Reload and reloading when '
             'the file changes are checked only by '
