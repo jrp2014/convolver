@@ -377,6 +377,8 @@ Do this once. Run the commands in the extracted preview package folder.
    filter or set the host to 44100 Hz. Record what REAPER itself shows, if anything.
 9. Set *File › Project settings* and the device to 44100 Hz and play: silence,
    with Status `Silent: the filter is for 48000 Hz, the host runs at 44100 Hz.`
+   (Load failed, not Waiting, because step 8 refused a preset; that stays
+   until a load is accepted)
    and a log line `Started at 44100 Hz, ...` explaining it. Set both back to
    48000 Hz: the echo returns. Copy the log into the report.
 10. Follow sections 4 to 6 of
@@ -506,8 +508,8 @@ preparation and steps 2, 3 and 9 below include what it found.
    a read-only Status. Audacity's window has its own copy of the plug-in,
    which normally is not started, so Status should read `Filter loaded: 48000
    Hz, 2 in, 2 out; waiting for audio settings from the host.` Audacity may start that
-   copy briefly at 44100 Hz, and then Status reads `Silent: the filter is for
-   48000 Hz, the host runs at 44100 Hz. ...` although the playing copy is
+   copy briefly at 44100 Hz, and then Status reads `Silent, waiting for
+   48000 Hz: the host runs at 44100 Hz. ...` although the playing copy is
    fine. Record what it shows, and which `VST3 #n` lines the log has.
 4. Switch the effect off and on with its power button while playing; note
    any click.

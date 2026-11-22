@@ -95,7 +95,7 @@ void window() {
             "title " + text(shown.titleField.stringValue));
     require(shown.settingSliders.count == 2 && shown.settingMenus.count == 2 &&
                 shown.settingMenus[1].numberOfItems == 8 &&
-                [shown.settingMenus[1].titleOfSelectedItem isEqualToString:@"0 frames"],
+                [shown.settingMenus[1].titleOfSelectedItem isEqualToString:@"0 frames (none)"],
             "settings rows");
     // PLUG-10: the Gain mode menu, with what the mode plays beside it.
     NSPopUpButton* mode = shown.settingMenus[0];

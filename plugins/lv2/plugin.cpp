@@ -271,10 +271,14 @@ struct Instance {
     }
     // PLUG-39 step 4: the record's status in the shared order, mapped to the
     // port's values (port_status()). LV2 always knows its rate and ports,
-    // and its host owns bypass, which the port does not show.
+    // and its host owns bypass, which the port does not show. A kept filter
+    // waiting for settings that suit it (Waiting elsewhere, PLUG-44) plays
+    // silence, and the port's only value for Waiting is running, so it keeps
+    // showing Load failed there.
     void update_status() noexcept {
-        shown.store(static_cast<int>(port_status(host_status_value(filter, true))),
-                    std::memory_order_relaxed);
+        const auto status = filter.waits_for_settings() ? convolver::HostStatus::load_failed
+                                                        : host_status_value(filter, true);
+        shown.store(static_cast<int>(port_status(status)), std::memory_order_relaxed);
     }
     // DIAG-1, control side: explains faults the processor counted that no
     // earlier call explained.

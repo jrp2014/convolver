@@ -93,14 +93,16 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
     if (result == kResultOk) {
         // VST3-4: the settings first, as generic host views list them in
         // this order (the Audio Unit lists the same).
-        auto* gain = new RangeParameter(STR16("Gain"), gain_id, STR16("dB"), min_gain_db,
-                                        max_gain_db, 0, 0, ParameterInfo::kCanAutomate);
+        // PLUG-44: short titles for control surfaces and narrow host displays.
+        auto* gain =
+            new RangeParameter(STR16("Gain"), gain_id, STR16("dB"), min_gain_db, max_gain_db, 0, 0,
+                               ParameterInfo::kCanAutomate, kRootUnitId, STR16("Gain"));
         gain->setPrecision(1);
         parameters.addParameter(gain);
         // PLUG-10: not automatable, as Latency: Estimate may need time to
         // find the filter's figure (gain_mode_message).
         auto* mode = new StringListParameter(STR16("Gain mode"), gain_mode_id, nullptr,
-                                             ParameterInfo::kIsList);
+                                             ParameterInfo::kIsList, kRootUnitId, STR16("Mode"));
         for (std::size_t i = 0; i < gain_mode_count; ++i) {
             String128 text{};
             copy(gain_mode_name(static_cast<GainMode>(i)), text);
@@ -108,24 +110,27 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
         }
         parameters.addParameter(mode);
         auto* mix = new RangeParameter(STR16("Mix"), mix_id, STR16("%"), 0, 100, 100, 0,
-                                       ParameterInfo::kCanAutomate);
+                                       ParameterInfo::kCanAutomate, kRootUnitId, STR16("Mix"));
         mix->setPrecision(0);
         parameters.addParameter(mix);
         // Not automatable: a new Latency restarts the component.
-        auto* latency =
-            new StringListParameter(STR16("Latency"), latency_id, nullptr, ParameterInfo::kIsList);
+        // PLUG-44: getParamStringByValue() adds the time at the host's rate.
+        auto* latency = new StringListParameter(STR16("Latency"), latency_id, nullptr,
+                                                ParameterInfo::kIsList, kRootUnitId, STR16("Lat"));
         for (const auto frames : host_latencies) {
             String128 text{};
-            copy(std::to_string(frames) + " frames", text);
+            copy(latency_value_text(frames, 0), text);
             latency->appendString(text);
         }
         latency->setNormalized(normalized_latency(default_host_latency));
         latency->getInfo().defaultNormalizedValue = latency->getNormalized();
         parameters.addParameter(latency);
         parameters.addParameter(STR16("Bypass"), nullptr, 1, 0,
-                                ParameterInfo::kCanAutomate | ParameterInfo::kIsBypass, bypass_id);
+                                ParameterInfo::kCanAutomate | ParameterInfo::kIsBypass, bypass_id,
+                                kRootUnitId, STR16("Bypass"));
         auto* status = new StringListParameter(STR16("Status"), status_id, nullptr,
-                                               ParameterInfo::kIsReadOnly | ParameterInfo::kIsList);
+                                               ParameterInfo::kIsReadOnly | ParameterInfo::kIsList,
+                                               kRootUnitId, STR16("Status"));
         for (const auto* name : status_names) {
             String128 text{};
             copy(name, text);
@@ -356,6 +361,17 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
 }
 tresult PLUGIN_API Controller::getParamStringByValue(ParamID id, ParamValue value,
                                                      String128 string) {
+    if (id == latency_id) {
+        // PLUG-44: the time the choice adds at the host's rate, once known.
+        int rate = 0;
+        {
+            std::lock_guard lock(status_lock_);
+            if (report_)
+                rate = report_->sample_rate;
+        }
+        copy(latency_value_text(latency_frames(value), rate), string);
+        return kResultOk;
+    }
     if (id == status_id && value == getParamNormalized(status_id)) {
         std::lock_guard lock(status_lock_);
         // The text belongs to the status the processor sent last; a Fault
@@ -395,6 +411,22 @@ tresult PLUGIN_API Controller::getParamValueByString(ParamID id, TChar* string, 
         // Not the SDK's conversion: it reads any text as 0 on macOS and
         // leaves the value unset on Windows.
         return kResultFalse;
+    }
+    if (id == latency_id) {
+        // PLUG-44: the text names the time too, so read the frames that
+        // start it; only a value in the menu counts.
+        std::size_t frames = 0;
+        std::size_t i = 0;
+        while (string[i] == u' ')
+            ++i;
+        const std::size_t first = i;
+        for (; string[i] >= u'0' && string[i] <= u'9' && frames < 1000000; ++i)
+            frames = frames * 10 + static_cast<std::size_t>(string[i] - u'0');
+        if (i == first ||
+            std::find(host_latencies.begin(), host_latencies.end(), frames) == host_latencies.end())
+            return kResultFalse;
+        value = normalized_latency(frames);
+        return kResultOk;
     }
     return EditController::getParamValueByString(id, string, value);
 }

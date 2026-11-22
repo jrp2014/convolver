@@ -511,6 +511,13 @@ class HostFilter {
         return filter_ && activation_failure_ &&
                activation_failure_->kind != HostFailureKind::activation;
     }
+    // PLUG-44 (jrp, 21 November 2026): kept_unsuited() with no newer request
+    // refused, so the instance only waits for audio settings that suit its
+    // filter. The status shows Waiting, not Load failed: nothing failed to
+    // load, and the filter plays once a start suits it.
+    bool waits_for_settings() const noexcept {
+        return kept_unsuited() && !load_failure_;
+    }
     // DIAG-1: whether host_status() shows a load failure, which comes before
     // Fault. Adapters pass it to HostProcessor::hold_fault_signal() after
     // every load, rejection and activation, so the audio thread does not show
@@ -731,10 +738,16 @@ enum class HostStatus {
     // A filter is accepted and suits the host (PLUG-22: "Active", not
     // "Playing": the plug-in cannot tell whether the host's transport runs).
     active = 0,
-    no_filter = 1,   // An empty instance: identity, or silence for unequal counts.
-    load_failed = 2, // The newest request failed, or the instance plays silence.
-    unchecked = 3, // "Waiting": a filter is accepted, but the host has sent no audio settings yet.
-    fault = 4,     // HostFilter::faults(): the audio met a problem while playing.
+    no_filter = 1, // An empty instance: identity, or silence for unequal counts.
+    // The newest request failed, a saved failure was restored, or the
+    // accepted filter could not start, so a refusal or silence needs the
+    // user's attention.
+    load_failed = 2,
+    // "Waiting": a filter is accepted but not playing yet, either because
+    // the host has sent no audio settings, or (PLUG-44) because they do not
+    // suit it and it is kept until they do (HostFilter::waits_for_settings()).
+    unchecked = 3,
+    fault = 4, // HostFilter::faults(): the audio met a problem while playing.
     // PLUG-22: the host or the window bypasses an instance with a filter, and
     // nothing is wrong: the input plays unfiltered, or silence for unequal
     // counts. Without a filter the status stays No filter.
@@ -767,10 +780,11 @@ inline constexpr std::size_t max_status_text = 127; // VST3's String128, less it
 // is chosen and the filter has no estimate, so No clipping's gain plays, or
 // when the filter has no gain figure at all and plays silence.
 // The status alone, in the order host_status() gives it (PLUG-39 step 4): a
-// load failure, then a fault (unless a failed load left no filter), then
-// Bypassed with a filter, then the filter (Active once the host's
-// configuration is known, Waiting before), then a failed load, then No
-// filter. `host_known`: the instance plays under a known configuration.
+// load failure (Waiting instead for a filter that waits for settings that
+// suit it, HostFilter::waits_for_settings()), then a fault (unless a failed
+// load left no filter), then Bypassed with a filter, then the filter (Active
+// once the host's configuration is known, Waiting before), then a failed
+// load, then No filter. `host_known`: the instance plays under a known configuration.
 // Adapters with a status of their own (LV2's port) map this value rather
 // than ordering the record again.
 HostStatus host_status_value(const HostFilter&, bool host_known, bool bypassed = false) noexcept;
