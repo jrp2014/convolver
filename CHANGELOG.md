@@ -43,6 +43,54 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### Changed
 
+- Plug-ins (PLUG-44): a filter kept because it does not suit the host's
+  sample rate or channels now shows the Status **Waiting**, not Load failed,
+  with what it waits for: `Silent, waiting for 44100 Hz: the host runs at
+  48000 Hz.` (or `Only the dry signal plays, waiting for …` where Mix lets
+  the input through). Nothing was refused, and it plays once the host starts
+  the plug-in with settings that suit it. Load failed now always means a
+  request was refused or a filter could not start; after a refusal it stays
+  until a load is accepted, as before. The window shows Waiting in plain
+  grey rather than red. LV2's `status` port keeps Load failed for it. See
+  [status](docs/use/plugins.md#status-and-the-convolver-log).
+- Plug-ins (PLUG-44): the window says each fact once. When the host's rate
+  and channels suit the filter, the Audio section shows one line, `Host
+  48000 Hz, 2 in → 2 out ✓ suits the filter`, instead of two; before the
+  host has sent its settings it says `not known yet` once; Routing shows
+  only with a filter; Ring-out shows only when it
+  says more than the filter's Length (delays, a Latency, another rate);
+  channels read `2 in → 2 out`
+  everywhere. The reminder that a file can be dropped on the window is
+  gone from under the name (the Fix and Choose…'s tip still say it). When
+  a file is refused, the message now explains that file first and says
+  once what becomes of the filter in the heading, by name: `room.cfg keeps
+  playing.` while the host plays it, `room.cfg is still selected.` after
+  Stop, and, for a kept filter that does not suit the host, `room.cfg is
+  still selected and will play at 48000 Hz.` instead of telling you to
+  change the project's rate (jrp's review). The note under the name says
+  only `broken.wav was refused.`, and now also shows when a file is
+  refused while a kept filter waits (before, only the log and the host's
+  beep said so); the message no longer repeats the Latency row's "not in use yet"; the
+  title gives the release number without the build's source revision,
+  which the Software line keeps. Loudest peak is renamed **Worst-case
+  peak**, so that it cannot be confused with the level meters planned
+  under PLUG-10. See [Convolver's
+  window](docs/use/plugins.md#convolvers-window).
+- Plug-ins (PLUG-44): for hosts that show only their own controls, Status
+  ends with the gain that Estimate or No clipping plays (`Estimate plays
+  -7.3 dB.`); Latency values read `0 frames (none)` for 0 in every format
+  and, in VST3 and the Audio Unit once the host has started the plug-in,
+  `256 frames (5.3 ms)`, and a VST3 host that types a
+  Latency must give one of the listed frame counts; the VST3 parameters
+  have short names (Gain, Mode, Mix, Lat, Bypass, Status); and LV2's
+  latency output is named Reported latency, so hosts no longer show two
+  controls called Latency. See [settings](docs/use/plugins.md#settings).
+- Packages (REL-10): the `echo` example presets and filters now sound like an
+  echo: each sound comes back three times, 0.3 s apart, each repeat 6 dB
+  quieter, where before a single copy 5 ms later only made the tone hollow.
+  The three examples (identity, echo and repeat) now sound clearly different
+  and show differently on a level meter. See
+  [the plug-in examples](examples/plugin-presets/README.md).
 - Plug-ins (DIAG-10): the VST3 and Audio Unit Status text also says when a
   setting does not play as chosen: a Latency not in use yet (`Latency 1024
   frames not in use yet.`), Estimate without an estimate for the filter
@@ -224,6 +272,31 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### Fixed
 
+- Plug-ins (PLUG-47, jrp's reviews of 21 and 22 November 2026): a
+  configuration list chosen in Convolver's window before the host had
+  played, which Convolver then loads by itself once the host plays with the
+  window open (PLUG-40), now joins Recent when it loads, as a chosen file
+  does, also when the window was closed and opened again meanwhile.
+  Before, it was never added. See
+  [loading a filter](docs/use/plugins.md#loading-a-filter).
+- Plug-ins (PLUG-46, jrp's review of 21 November 2026): while the host has
+  the plug-in stopped, the tail it reports and the window's Ring-out are the
+  filter's own length when the filter's sample rate differs from the host's.
+  Before, the filter's frames were counted at the host's rate: a 48 kHz
+  filter with a 1 s tail, after the host started the Audio Unit at 96 kHz
+  and stopped it, reported a 0.5 s tail and the window showed 500.0 ms. The
+  VST3 plug-in now gives that tail in the host's samples at its last rate,
+  rounded up. See the
+  [adapter contract](docs/develop/plugin-contract.md).
+- Audio Unit (AU-19, jrp's reviews of 21 and 22 November 2026): a Latency
+  changed while the host has the plug-in uninitialized no longer leaves
+  Status and the window saying it is "not in use yet". Uninitialized, the
+  choice is selected for the next start, as the VST3 plug-in already said,
+  and the window is told once the change is applied. Until then, for a
+  moment, the latency the host reads can still be the previous one. In
+  both formats, the window's Latency row now says "selected for the next
+  start" while the host has the plug-in stopped. See
+  [Convolver's window](docs/use/plugins.md#convolvers-window).
 - Plug-ins (PLUG-42, jrp's decision of 21 November 2026): in the VST3 and
   Audio Unit plug-ins, a filter that does not suit the host's sample rate or
   channels, as a preset, an IR file or a `.cfg`, is refused only while
@@ -304,6 +377,46 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### For contributors
 
+- Tests (PLUG-47): `vst3.adapter` `list_read_again` and `au.editor`
+  `list_read_again` check Recent before and after the list is read again;
+  the Audio Unit test chooses the list in a window that then closes.
+- Tests (PLUG-46): `au.adapter` `timing_in_seconds` follows jrp's sequence
+  (a 48 kHz filter, the host's rate changed to 96 kHz, a start and a stop);
+  `vst3.adapter` `edge_cases` checks the inactive tail at 44.1 and 96 kHz;
+  `native.host_report` checks Ring-out at the filter's rate.
+- Tests (AU-19): `au.adapter` `timing_in_seconds` changes the Latency while
+  uninitialized and checks the Status text before and after the Latency
+  work, and that the window is told; `native.host_report` and
+  `native.window_model` check the report's `latency_next_start` and the
+  Latency row's note.
+- Host layer (PLUG-44): `HostFilter::waits_for_settings()` (Kept, unsuited
+  with no refused request) gives the Waiting value; `latency_value_text()`
+  in `host_report.hpp` names a Latency for every format. Tests in
+  `native.host`, `native.host_report`, `native.window_model`,
+  `vst3.adapter`, `au.adapter` and the macOS window tests follow the new
+  text ([contract: status and log](docs/develop/plugin-contract.md#status-and-log)).
+- Host testing (DOC-22): the Mac walkthrough no longer assumes Latency
+  starts at 256. GarageBand's settings step sets 256 and checks it is in use
+  before the change to 1024, and REAPER's log line reads `from 0 to 1024`.
+  Audacity's configuration-list check loops for at least two seconds, so
+  the 85 ms example cannot end before the window sees the host's settings,
+  and keeps the list selected for the export. The GarageBand preset steps
+  delete each old preset first, so one left from an earlier preview cannot
+  stand in under the same name, and the Latency checks name the menu value,
+  not the detail beside it, which shows the time added. jrp found all three in his 21 November
+  review.
+- Tests (REL-10): the package probe checks every tap of each example against
+  its own independent list, so it follows the echo's four taps.
+- Packages (REL-10): `examples.json` gives each example's latency as 0, the
+  default since PERF-2, where it said 256. The echo examples are longer
+  (0.9 s), so the generated `presets/` folder grows from about 1.2 MB to
+  5.2 MB, and each future upgrade capture (`tests/upgrade/X.Y.Z/`) to about
+  13 to 15 MB, from 4.4 MB for 0.14.0.
+- CI (CI-52): the fuzz and version jobs have time limits, so a hang stops
+  instead of running for GitHub's six hours. The fuzz job stops after 45
+  minutes (the Monday run's four 600-second campaigns, two at a time, take
+  about 20 after the build); a manual fuzz run sets its own length, so it
+  keeps the six hours. The version job stops after 10 minutes.
 - Releases (REL-3): the draft release's notes describe the seventh
   unsigned developer preview, made for jrp's live host testing and the
   independent walkthrough: `PREVIOUS_PREVIEW` is 0.14.0, and `CHANGES` in

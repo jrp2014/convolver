@@ -48,7 +48,8 @@ CHANGES = (
         "A configuration list needs the host's rate and channels to choose its entry. Chosen before the host has "
         'played, it is refused with "Play audio once so Convolver can check the host\'s sample rate and channel '
         'counts, then choose the configuration list again." With the window open, it now loads by itself, as if '
-        'chosen, as soon as the host plays, and the project is marked changed. Once Convolver has seen the host '
+        'chosen, as soon as the host plays; the project is marked changed and the list joins Recent. Once Convolver '
+        'has seen the host '
         'play, Status and the window say "The host\'s settings are now known (48000 Hz, 2 in, 2 out): choose the '
         'configuration list again." instead of still calling them unknown. A brief start without audio, such as '
         "Audacity's after a parameter edit, does not count. The window no longer suggests dropping a file beside "
@@ -56,15 +57,17 @@ CHANGES = (
     ),
     (
         'A chosen file now waits for audio in the current start. The VST3 plug-in could refuse a file chosen just '
-        'after the host stopped and started again, judging it by the audio of the earlier start; the Audio Unit '
+        'after the host stopped and started again with the same settings, judging it by the audio of the earlier '
+        'start; the Audio Unit '
         'counted a render of no frames as playing, so it could refuse a file that should wait, and refused a '
         '48 kHz project restored after a 44.1 kHz probe (error -10851).'
     ),
     (
         "A filter that does not suit the host's sample rate or channels, as a preset, an IR file or a `.cfg`, is now "
         'refused only while another filter that suits the host is playing. With nothing playing it is kept and saved '
-        "with the project, plays silence (or, where the channel counts are equal, Mix's dry share or bypass) with "
-        'the reason in Status, and plays when the host next starts the plug-in '
+        "with the project, plays silence (or, where the channel counts are equal, Mix's dry share or bypass) while "
+        'Status says it is waiting and for what (for example "Silent, waiting for 44100 Hz: the host runs at '
+        '48000 Hz."), and plays when the host next starts the plug-in '
         'at a rate and channels that suit it. In Ardour 8.4, a filter chosen just before Ardour restarted the '
         'plug-in with the outputs set in Pin Connections used to be refused, and the export was silent. A filter '
         'refused while another plays stays refused, and restarting the host does not switch to it. A configuration '
@@ -84,11 +87,28 @@ CHANGES = (
         'changes to choosing a file, listed here, have not yet been checked in Audacity.'
     ),
     (
+        "Convolver's window says each fact once and says it more plainly. A filter waiting for settings that suit it "
+        'shows **Waiting** in grey, not Load failed in red; Load failed now always means a request was refused or a '
+        'filter could not start. When the host suits the filter, the Audio section shows one line ("Host 48000 Hz, '
+        '2 in → 2 out ✓ suits the filter"), and Ring-out shows only when it says more than the filter\'s Length. A '
+        'refused file is explained first, then what becomes of the filter in the heading, by name ("room.cfg keeps '
+        'playing.", "room.cfg is still selected."). Loudest peak is now Worst-case peak. For hosts that show only '
+        'their own controls, Status ends with the gain Estimate or No clipping plays ("Estimate plays -7.3 dB."), '
+        'Latency values read "0 frames (none)" or, once the host has started the plug-in, "256 frames (5.3 ms)", '
+        "the VST3 parameters have short names (Gain, Mode, Mix, Lat, Bypass, Status), and LV2's latency output is "
+        'named Reported latency.'
+    ),
+    (
+        'A Latency chosen while the host has the plug-in stopped is "selected for the next start" in the window. In '
+        'the Audio Unit, a Latency changed while the host has it uninitialized no longer leaves Status saying it is '
+        '"not in use yet"; the latency the host reads can still be the previous one for a moment.'
+    ),
+    (
         "Once the host stops the plug-in, the tail it reports, and the Ring-out row in the window's details, are "
         "the current filter's own. While audio plays it stays the longest tail used since the start, so a host "
         'keeps rendering a tail that is still ringing; before, after a stop it stayed at the longest one the last '
-        'start had played. Not yet right in one case: a stopped Audio Unit holding a filter for another sample rate '
-        "converts its tail at the host's last rate, so a 1 s tail at 48 kHz reads 0.5 s after a 96 kHz start."
+        "start had played. A filter for another sample rate than the host's reports its own length: a 1 s tail at "
+        '48 kHz no longer reads 0.5 s after the host has run at 96 kHz.'
     ),
     (
         'In LV2, choosing again the file of the filter already playing keeps it playing, with its tail ringing on, '
@@ -97,9 +117,9 @@ CHANGES = (
     ),
     (
         "With bypass on, Status, the window's report and the Convolver log say what bypass plays instead of "
-        'describing the filter: for example "No filter. Bypass is on: audio passes unchanged.", or "Load failed. '
-        'Bypass is on: only the dry signal plays." for a kept filter that does not suit the host, where Status '
-        'showed "Silent:" or a level the input was not played at. The audio is unchanged.'
+        'describing the filter: for example "No filter. Bypass is on: audio passes unchanged.", where Status gave '
+        'the level Gain and Mix would set, or "Bypass is on: only the dry signal plays." for a filter that does '
+        'not suit the host, where it showed "Silent:". The audio is unchanged.'
     ),
     (
         'The Audio Unit names restored state that brings no name of its own (an "Untitled" preset) after the same '

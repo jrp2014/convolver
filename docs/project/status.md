@@ -147,8 +147,11 @@ and restore path (0.15.0 to 0.17.x), whose REAPER and GarageBand check is
 checks 2, 5 and 8 on the next published preview; and, in 0.18.x, a
 configuration list loading by itself once the host plays (PLUG-40), a
 chosen file waiting for audio in the current start (PLUG-41), a filter
-that does not suit the host kept until it does (PLUG-42) and Status
-naming a setting not in use (DIAG-10). **Unverified, not defects:** listening in every
+that does not suit the host kept until it does (PLUG-42), Status
+naming a setting not in use (DIAG-10), the window's plainer wording
+(PLUG-44), the stopped tail at the filter's own rate (PLUG-46), a
+Latency chosen while stopped (AU-19) and a list loaded by itself joining
+Recent (PLUG-47). **Unverified, not defects:** listening in every
 host, VoiceOver, playback while REAPER refuses a preset, and the Audacity
 steps not yet run; the required ones among them need running or a scope
 decision from jrp. The Audio Unit in REAPER, other hosts and two instances

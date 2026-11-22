@@ -1071,6 +1071,18 @@ Contents: [direction](#direction) · [releases](#releases) ·
   [Contract: loading and
   failure](../develop/plugin-contract.md#loading-and-failure),
   [plug-ins](../use/plugins.md#when-a-filter-does-not-fit).
+- **21 November 2026.** From the interface review (PLUG-44), jrp chose
+  "Fixes now, presets later": a filter kept until the host's settings
+  suit it shows Waiting rather than Load failed (answering PLUG-42's open
+  question); the window states each fact once, which merges the host's
+  rate and channels into one Host line when they suit the filter, partly
+  reversing the 6–7 November choice to show the host's values beside the
+  filter's even when equal (they still show separately, and marked, when
+  they differ); Loudest peak becomes Worst-case peak; generic host views
+  get the played gain, Latency times and VST3 short names; built-in
+  example presets wait until after the preview (PLUG-45). See
+  [status](../use/plugins.md#status-and-the-convolver-log),
+  [window](../use/plugins.md#convolvers-window).
 
 ## Identities and file formats
 
@@ -1255,6 +1267,11 @@ were recorded in the repository; this log is their first written record.
   once ("I can't see a use case for different links to the same file in the
   configuration"). See [Resource
   limits](../develop/library.md#resource-limits) (PERF-6).
+- **21 November 2026.** jrp: "Ensure that the generated test filters create
+  a clearly audible effect, eg a distinct echo, rather that just a slight
+  smear", and he often judges by the level meters. The `echo` examples
+  became three fading repeats 0.3 s apart. See
+  [the plug-in examples](../../examples/plugin-presets/README.md).
 
 ## Diagnostics
 
