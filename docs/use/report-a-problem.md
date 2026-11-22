@@ -27,7 +27,7 @@ says what is ready and what has not been checked yet, and
 Write down, while you remember them:
 
 - What you did, what you expected and what happened instead.
-- How the filter was loaded: **Choose…**, **Recent** or **Reload** in
+- How the filter was loaded: **Choose File…**, a recent file or **Reload** in
   Convolver's window (macOS and Windows), a preset from the host's preset
   menu, or a reopened project.
 - Where the problem shows: in what you hear while playing, in an export or

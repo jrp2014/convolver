@@ -391,8 +391,8 @@ void window() {
                 !view.noteField.hidden,
             "window text:\n" + text(view.explanationView.string) +
                 "\nNote: " + text(view.noteField.stringValue));
-    // jrp, 7 November 2026: one Choose… button, highlighted, not a second
-    // one in the message.
+    // jrp, 7 November 2026: one Choose Filter button, highlighted, not a
+    // second one in the message.
     require(r.action == "choose filter" &&
                 [view.chooseButton.bezelColor isEqual:[NSColor controlAccentColor]] &&
                 view.diagnosticsButton.bezelColor == nil,
@@ -638,12 +638,18 @@ void window() {
           "Mix back");
     [view refresh];
 
-    // PLUG-10: the Gain mode menu. A choice sets the parameter; the unit's
-    // worker thread applies it, and the row then shows the gain it plays.
+    // PLUG-10: the Gain mode menu, which leads the Gain row (PLUG-50). A
+    // choice sets the parameter; the unit's worker thread applies it, and
+    // the Gain slider then dims and its box (or the note under the row)
+    // says the gain it plays. Set brings the Gain slider back.
     const auto mode_note = [&](bool shown) {
         for (int i = 0; i < 500; ++i) {
             [view refresh];
-            if ((view.settingValues[1].stringValue.length > 0) == shown)
+            const BOOL says = view.settingValues[0].stringValue.length > 0 ||
+                              view.settingValues[1].stringValue.length > 0;
+            if (shown ? !view.settingSliders[0].enabled && !view.settingValues[0].enabled && says
+                      : view.settingSliders[0].enabled &&
+                            view.settingValues[1].stringValue.length == 0)
                 return true;
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
@@ -655,6 +661,7 @@ void window() {
                 [mode.itemTitles[2] isEqualToString:@"No clipping"] &&
                 mode.indexOfSelectedItem == 0 &&
                 [mode.accessibilityLabel isEqualToString:@"Gain mode"] &&
+                [mode isDescendantOf:view.settingSliders[0].superview] &&
                 view.settingValues[1].stringValue.length == 0,
             "Gain mode menu: " + text([mode.itemTitles componentsJoinedByString:@", "]) + "; " +
                 text(view.settingValues[1].stringValue));
@@ -758,9 +765,13 @@ void files() {
     CONVOLVER_DIAGNOSTIC_VIEW* view =
         (CONVOLVER_DIAGNOSTIC_VIEW*)[factory uiViewForAudioUnit:unit.get()
                                                        withSize:NSMakeSize(0, 0)];
-    require(!view.chooseButton.hidden && [view.chooseButton.title isEqualToString:@"Choose…"] &&
-                [view.chooseButton.accessibilityLabel isEqualToString:@"Choose Filter"],
-            "Choose… button: " + text(view.chooseButton.title));
+    // PLUG-50: one Choose Filter pull-down holds every file action.
+    require(!view.chooseButton.hidden && view.chooseButton.pullsDown &&
+                [view.chooseButton.itemArray.firstObject.title isEqualToString:@"Choose Filter"] &&
+                [view.chooseButton.itemArray[1].title isEqualToString:@"Choose File…"] &&
+                [view.chooseButton.accessibilityLabel isEqualToString:@"Choose Filter"] &&
+                !view.reloadItem.enabled && [view.reloadItem.title isEqualToString:@"Reload"],
+            "Choose Filter menu: " + text(view.chooseButton.itemArray.firstObject.title));
     require([view.registeredDraggedTypes containsObject:NSPasteboardTypeFileURL],
             "the window takes no dropped files");
 

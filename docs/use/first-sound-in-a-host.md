@@ -6,14 +6,14 @@ hear it work. You will choose an example filter in Convolver's window, check
 that it fits the track, play, and save the project.
 
 **In short:** on macOS or Windows, on a stereo track at 48000 Hz, add
-Convolver, click **Choose…** in its window and pick
+Convolver, choose **Choose Filter** > **Choose File…** in its window and pick
 `presets/identity-48000-stereo/filter.cfg` from the extracted package. The
 window shows 48000 Hz and `2 in → 2 out`, and you hear no change. Choose `echo-48000-stereo/filter.cfg` (each sound
 three more times, fading) and `repeat-48000-stereo/filter.cfg` (each sound
 once more, a quarter of a second later), then save, close and reopen the project: the filter is still
 there. Your own IR file, `.cfg` or configuration list loads the same way,
 from any folder. Presets are an [optional route](#optional-load-a-preset);
-in Audacity both the preset menu and **Choose…** are checked (Audacity
+in Audacity both the preset menu and **Choose File…** are checked (Audacity
 4.0.2 on macOS, Convolver previews after 0.14.0;
 [In Audacity](#in-audacity)).
 
@@ -37,8 +37,8 @@ see the [Equalizer APO export](equalizer-apo.md) on Windows and
 - The filter's sample rate must match the host's: Convolver does not
   resample. Audacity plays effects at its Default sample rate, which can
   differ from the rate it exports at.
-- **In Audacity**, Audacity's own preset menu and Convolver's **Choose…**
-  and **Recent** are checked ways to load filters (Audacity 4.0.2, VST3 on
+- **In Audacity**, Audacity's own preset menu and Convolver's **Choose File…**
+  and recent files are checked ways to load filters (Audacity 4.0.2, VST3 on
   macOS, Convolver previews after 0.14.0; in 0.14.0 use the preset menu),
   as [In Audacity](#in-audacity) says.
 - Changing **Latency** during playback leaves a short gap and cuts off a
@@ -62,11 +62,12 @@ as `filter.cfg` and `impulse.wav`, and the same filter as a preset.
 2. Add Convolver to the track as an effect. Its window opens from the
    plug-in's slot: in GarageBand, from the plug-in's button in the track's
    Plug-ins area.
-3. Click **Choose…** under the filter's name, or drop the file on the window,
+3. Choose **Choose Filter** > **Choose File…** under the filter's name, or drop
+   the file on the window,
    and pick `presets/identity-RATE-LAYOUT/filter.cfg` for your track's rate
    and layout.
 
-**Choose…** reads an IR file (a WAV, AIFF, FLAC or other sound file), a
+**Choose File…** reads an IR file (a WAV, AIFF, FLAC or other sound file), a
 `.cfg` or a configuration list, from any folder: nothing needs installing or
 converting first. It also opens a Convolver `.vstpreset`, in the VST3
 plug-in and the Audio Unit alike
@@ -156,7 +157,8 @@ choosing an entry from a list, and the folders where hosts look for presets.
 
 ## In Audacity
 
-Audacity's own preset menu and Convolver's **Choose…** and **Recent** are
+Audacity's own preset menu and Convolver's **Choose File…** and recent files
+(separate **Choose…** and **Recent** buttons in the builds checked) are
 the routes checked in Audacity 4.0.2 (VST3, on macOS, from the preview
 after 0.14.0; [status](../project/status.md#checks-left-before-publication)):
 a filter chosen with **Choose…** before playing was in the export and, after
@@ -194,7 +196,7 @@ the export has the filter you chose (for example by comparing it with
 
    Or skip the copying: in step 3, instead of the preset menu, open
    Convolver's window (*Use vendor UI*) and choose the `.vstpreset` from
-   any folder with **Choose…**
+   any folder with **Choose File…**
    ([a preset in the window](plugins.md#a-preset-in-the-window)). A
    `.vstpreset` chosen this way is not yet checked in Audacity, so the
    export check above applies.

@@ -114,8 +114,6 @@ constexpr double check_height = 17;
 constexpr double trackbar_height = 26;
 constexpr double dot = 10; // The status's dot.
 constexpr UINT refresh_ms = 500, files_ms = 1000, copied_ms = 2000;
-constexpr int recent_first = 1000; // The Recent menu's commands.
-constexpr int recent_clear = 999;
 
 // Text between the shared model's UTF-8 and Win32's UTF-16; line ends as an
 // edit box wants them.
@@ -349,7 +347,8 @@ class Editor final : public EditorView, public IPlugViewContentScaleSupport {
     bool load(const std::string& path);
     void choose_filter();
     void stop_choosing();
-    void recent_menu();
+    void filter_menu();
+    void menu_command(int id);
     void reload();
     void check_files();
     void copy_diagnostics();
@@ -369,11 +368,12 @@ class Editor final : public EditorView, public IPlugViewContentScaleSupport {
     HWND title_ = nullptr, bypass_ = nullptr, name_ = nullptr, status_ = nullptr;
     std::array<HWND, 4> fact_headings_{}, fact_values_{};
     HWND filter_note_ = nullptr, message_ = nullptr, note_label_ = nullptr, note_ = nullptr;
-    HWND choose_ = nullptr, recent_ = nullptr, reload_ = nullptr, watch_box_ = nullptr;
+    HWND choose_ = nullptr; // PLUG-50: Choose Filter, a split button with the file actions.
     HWND mix_note_ = nullptr, audio_heading_ = nullptr;
     HWND reference_toggle_ = nullptr, diagnostics_ = nullptr, log_ = nullptr, reference_ = nullptr;
     std::vector<Setting> settings_;
     std::size_t mix_ = SIZE_MAX;
+    std::size_t gain_mode_ = SIZE_MAX; // PLUG-50: in the Gain row (the setting before it).
     std::vector<AudioRow> audio_;
     std::vector<HWND> named_; // Controls with a name for screen readers, cleared on close.
 
@@ -391,8 +391,9 @@ class Editor final : public EditorView, public IPlugViewContentScaleSupport {
 
     int gesture_ = -1; // The setting whose edit is open (beginEdit called), or -1.
     ChooseRequests choose_requests_;
-    IFileDialog* dialog_ = nullptr; // Choose…'s dialog while it is open.
+    IFileDialog* dialog_ = nullptr; // Choose File…'s dialog while it is open.
     FileWatch watch_;
+    bool watching_ = true; // Reload When the File Changes, in the Choose Filter menu.
 };
 
 Editor::Editor(Controller& controller) : EditorView(&controller) {
@@ -434,6 +435,8 @@ Editor::Editor(Controller& controller) : EditorView(&controller) {
             settings_[i].low = L"Dry"; // As reverbs label a wet/dry slider.
             settings_[i].high = L"Wet";
         }
+        if (settings_[i].tag == gain_mode_id && i > 0 && !settings_[i - 1].list)
+            gain_mode_ = i;
         if (settings_[i].tag == gain_mode_id)
             settings_[i].tip =
                 L"Which gain plays. Set: the Gain setting. Estimate: the filter's own estimate, "
@@ -631,8 +634,8 @@ LRESULT Editor::handle(UINT message, WPARAM w, LPARAM l) {
         return 0;
     case WM_NOTIFY:
         if (reinterpret_cast<const NMHDR*>(l)->code == BCN_DROPDOWN &&
-            reinterpret_cast<const NMHDR*>(l)->hwndFrom == recent_)
-            recent_menu(); // May release this view: nothing after it.
+            reinterpret_cast<const NMHDR*>(l)->hwndFrom == choose_)
+            filter_menu(); // May release this view: nothing after it.
         return 0;
     case WM_HSCROLL:
         scrolled(reinterpret_cast<HWND>(l), LOWORD(w));
@@ -838,27 +841,31 @@ void Editor::create_controls() {
     note_label_ = make(L"STATIC", L"Note:", SS_RIGHT | SS_NOPREFIX, win::note_label);
     note_ = make(L"STATIC", L"", label, win::note);
     colours_[note_label_] = colours_[note_] = grey_;
-    // Choose…, the recent files, Reload, and reloading when the file changes.
-    choose_ = make(L"BUTTON", L"Choose\u2026", shown | WS_TABSTOP | BS_PUSHBUTTON, win::choose);
+    // PLUG-50: one Choose Filter split button holds every file action (jrp's
+    // run of 0.18.10: "Can we not do that in one button?"). Its main part
+    // chooses a file, as Windows split buttons do the usual action; its
+    // arrow opens the menu: Choose File…, Reload, Reload When the File
+    // Changes, then the recent files.
+    choose_ = make(L"BUTTON", L"Choose Filter", shown | WS_TABSTOP | BS_SPLITBUTTON, win::choose);
     name_for_screen_readers(choose_, L"Choose Filter");
-    // A split button draws its own arrow; either part opens the menu.
-    recent_ = make(L"BUTTON", L"Recent", shown | WS_TABSTOP | BS_SPLITBUTTON, win::recent);
-    name_for_screen_readers(recent_, L"Recent Filters");
-    reload_ = make(L"BUTTON", L"Reload", shown | WS_TABSTOP | BS_PUSHBUTTON, win::reload);
-    name_for_screen_readers(reload_, L"Reload Filter");
-    watch_box_ = make(L"BUTTON", L"Reload when the file changes",
-                      shown | WS_TABSTOP | BS_AUTOCHECKBOX, win::watch);
-    SendMessageW(watch_box_, BM_SETCHECK, BST_CHECKED, 0);
-    // The settings, each a row of the form.
-    for (std::size_t i = 0; i < settings_.size(); ++i) {
+    // The settings, each a row of the form; Gain mode's list first in Tab
+    // order, since it leads the Gain row.
+    std::vector<std::size_t> order;
+    for (std::size_t i = 0; i < settings_.size(); ++i)
+        order.push_back(i);
+    if (gain_mode_ != SIZE_MAX)
+        std::swap(order[gain_mode_ - 1], order[gain_mode_]);
+    for (const std::size_t i : order) {
         Setting& s = settings_[i];
         const int id = win::settings + win::setting_stride * static_cast<int>(i);
-        s.label = make(L"STATIC", s.name + L":", shown | SS_RIGHT | SS_NOPREFIX, id + win::label);
+        s.label = make(L"STATIC", s.name + L":",
+                       (i == gain_mode_ ? 0 : shown) | SS_RIGHT | SS_NOPREFIX, id + win::label);
         if (s.list) {
             s.control = make(WC_COMBOBOXW, L"", shown | WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST,
                              id + win::control);
             for (const auto& item : s.choices)
                 SendMessageW(s.control, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(item.c_str()));
+            // Latency's time, or the note under the Gain row.
             s.value = make(L"STATIC", L"", shown | label, id + win::value);
             colours_[s.value] = grey_;
         } else {
@@ -919,16 +926,10 @@ void Editor::create_controls() {
         tip(bypass_, L"Lets the audio through without the filter, as the host's own bypass "
                      L"does; the host records the change like any other.");
         tip(choose_, L"Loads an IR file, .cfg, configuration list or Convolver .vstpreset as the "
-                     L"filter (a preset brings its Gain, Mix and Latency too); you can also drop "
-                     L"the file on this window. The project keeps the filter itself and its "
-                     L"file's name, as a preset does, so moving the file later does not change "
-                     L"it.");
-        tip(recent_, L"Filter files loaded recently in a Convolver window, in any host.");
-        tip(reload_, L"Reads the filter file again, for example after changing it in another "
-                     L"program. Available for a file loaded in this window, not for a filter "
-                     L"from the saved project or a preset.");
-        tip(watch_box_, L"While this window is open, reads the filter again when its file, or a "
-                        L"file a .cfg names, changes.");
+                     L"filter (a preset brings its Gain, Mix and Latency too); the arrow also "
+                     L"reloads it or loads a recent one, and you can drop the file on this "
+                     L"window. The project keeps the filter itself and its file's name, as a "
+                     L"preset does, so moving the file later does not change it.");
         tip(diagnostics_, L"Copies this report and Convolver's recent log lines, ready to paste "
                           L"into a problem report.");
         tip(log_, L"Shows the Convolver log file in File Explorer.");
@@ -998,8 +999,7 @@ void Editor::scale_to(double scale) {
         }
         for (HWND control : {filter_note_, note_label_, note_, mix_note_, reference_})
             font(control, small_);
-        for (HWND control : {message_, choose_, recent_, reload_, watch_box_, reference_toggle_,
-                             diagnostics_, log_})
+        for (HWND control : {message_, choose_, reference_toggle_, diagnostics_, log_})
             font(control, body_);
         font(audio_heading_, strong_);
         for (auto& s : settings_) {
@@ -1176,32 +1176,26 @@ int Editor::arrange(bool place_controls) {
         put(note_, 0, 0, 0, 0, false);
     }
 
-    // Choose…, Recent, Reload and the watch box, in the form's content column.
-    {
-        int x = content_left;
-        for (HWND b : {choose_, recent_, reload_}) {
-            const std::wstring label = b == choose_   ? L"Choose\u2026"
-                                       : b == recent_ ? L"Recent"
-                                                      : L"Reload";
-            const int w = button_wide(label) + (b == recent_ ? px(16) : 0); // The arrow.
-            put(b, x, y, w, button);
-            x += w + px(8);
-        }
-        const std::wstring watch = L"Reload when the file changes";
-        put(watch_box_, x, y + (button - px(check_height)) / 2,
-            std::min(check_wide(watch), left + full - x), px(check_height));
-        y += button + px(12);
-    }
+    // Choose Filter, in the form's content column; the split button's arrow
+    // takes its own width.
+    put(choose_, content_left, y, button_wide(L"Choose Filter") + px(16), button);
+    y += button + px(12);
     separators_.push_back(y);
     y += px(12);
 
     // The settings.
+    const auto menu_wide = [&](const Setting& s) {
+        int menu = px(110);
+        for (const auto& item : s.choices)
+            menu = std::max(menu, extent(body_, item).cx + px(40));
+        return menu;
+    };
     for (std::size_t i = 0; i < settings_.size(); ++i) {
         const Setting& s = settings_[i];
+        if (i == gain_mode_)
+            continue; // In the Gain row, below.
         if (s.list) {
-            int menu = px(110);
-            for (const auto& item : s.choices)
-                menu = std::max(menu, extent(body_, item).cx + px(40));
+            const int menu = menu_wide(s);
             put(s.label, left, y + (button - line) / 2, form, line);
             // A drop-down list's height includes its open list.
             put(s.control, content_left, y, menu,
@@ -1211,19 +1205,34 @@ int Editor::arrange(bool place_controls) {
             y += button + px(12);
             continue;
         }
-        const int row = std::max(px(trackbar_height), px(box_height));
-        const int track = content_wide - px(value_box) - px(unit_width) - px(16);
+        // PLUG-50: Gain mode's list leads the Gain row.
+        const Setting* mode = i + 1 == gain_mode_ ? &settings_[gain_mode_] : nullptr;
+        const int lead = mode ? menu_wide(*mode) + px(8) : 0;
+        const int row = std::max({px(trackbar_height), px(box_height), mode ? button : 0});
+        const int track = content_wide - lead - px(value_box) - px(unit_width) - px(16);
+        const int track_left = content_left + lead;
         put(s.label, left, y + (row - line) / 2, form, line);
-        put(s.control, content_left, y, track, px(trackbar_height));
-        put(s.value, content_left + track + px(8), y + (row - px(box_height)) / 2, px(value_box),
+        if (mode) {
+            put(mode->label, 0, 0, 0, 0, false);
+            put(mode->control, content_left, y + (row - button) / 2, lead - px(8),
+                button + line * static_cast<int>(mode->choices.size() + 1));
+        }
+        put(s.control, track_left, y + (row - px(trackbar_height)) / 2, track, px(trackbar_height));
+        put(s.value, track_left + track + px(8), y + (row - px(box_height)) / 2, px(value_box),
             px(box_height));
-        put(s.unit_label, content_left + track + px(8) + px(value_box) + px(8),
-            y + (row - line) / 2, px(unit_width), line);
+        put(s.unit_label, track_left + track + px(8) + px(value_box) + px(8), y + (row - line) / 2,
+            px(unit_width), line);
         y += row;
+        if (mode) {
+            // What the box cannot say in Estimate or No clipping.
+            const int h = wrapped_height(small_, wide(c.gain_note), content_wide);
+            put(mode->value, content_left, y + px(4), content_wide, h, h > 0);
+            y += h > 0 ? h + px(4) : 0;
+        }
         if (s.low_label) {
             const int end = extent(small_, s.high).cx + px(2);
-            put(s.low_label, content_left + px(4), y, track / 2, small_line);
-            put(s.high_label, content_left + track - end - px(4), y, end, small_line);
+            put(s.low_label, track_left + px(4), y, track / 2, small_line);
+            put(s.high_label, track_left + track - end - px(4), y, end, small_line);
             y += small_line;
         }
         if (i == mix_) {
@@ -1312,8 +1321,6 @@ void Editor::refresh() {
     read_settings();
     read_bypass();
     watch_.follow(c.filter_path, c.filter_files);
-    EnableWindow(reload_, !watch_.path().empty());
-    EnableWindow(watch_box_, !watch_.path().empty());
     EnableWindow(log_, !c.log_path.empty());
     if (shown_ && *shown_ == c)
         return;
@@ -1351,7 +1358,8 @@ void Editor::show(const WindowContent& c) {
     // The button that carries out the fix is drawn as the default button,
     // without being one: Return still goes to the host.
     SendMessageW(choose_, BM_SETSTYLE,
-                 c.action == WindowAction::choose_filter ? BS_DEFPUSHBUTTON : BS_PUSHBUTTON, TRUE);
+                 c.action == WindowAction::choose_filter ? BS_DEFSPLITBUTTON : BS_SPLITBUTTON,
+                 TRUE);
     SendMessageW(diagnostics_, BM_SETSTYLE,
                  c.action == WindowAction::copy_diagnostics ? BS_DEFPUSHBUTTON : BS_PUSHBUTTON,
                  TRUE);
@@ -1434,16 +1442,37 @@ int Editor::position(const Setting& s, double value) const {
 // Shows the settings as the host has them now (automation, its own
 // controls), except the one the user is dragging or typing.
 void Editor::read_settings() {
+    // PLUG-50: in any Gain mode but Set (0), Gain's trackbar and box dim and
+    // the box shows the gain the mode plays; the Gain setting is kept for Set.
+    const double mode = gain_mode_ != SIZE_MAX ? plain(settings_[gain_mode_]) : NAN;
+    const bool moded = !std::isnan(mode) && std::lround(mode) != 0;
     for (std::size_t i = 0; i < settings_.size(); ++i) {
         Setting& s = settings_[i];
         const double value = plain(s);
         if (std::isnan(value) || !s.control)
             continue;
+        if (i + 1 == gain_mode_) {
+            EnableWindow(s.control, !moded);
+            EnableWindow(s.value, !moded);
+            if (moded) {
+                if (gesture_ == static_cast<int>(i))
+                    end_gesture();
+                s.typed = false;
+                const std::string& played = content_.gain_played;
+                if (!played.empty())
+                    SendMessageW(s.control, TBM_SETPOS, TRUE,
+                                 position(s, std::strtod(played.c_str(), nullptr)));
+                setting_text_ = true;
+                set_text(s.value, wide(played));
+                setting_text_ = false;
+                continue;
+            }
+        }
         if (s.list) {
             const auto index = static_cast<LRESULT>(std::lround(value));
             if (SendMessageW(s.control, CB_GETCURSEL, 0, 0) != index)
                 SendMessageW(s.control, CB_SETCURSEL, static_cast<WPARAM>(index), 0);
-            if (s.tag == gain_mode_id) { // PLUG-10: the gain the mode plays.
+            if (i == gain_mode_) { // PLUG-50: under the Gain row.
                 set_text(s.value, wide(content_.gain_note));
                 continue;
             }
@@ -1586,6 +1615,10 @@ void Editor::command(int id, int code, HWND control) {
     }
     if (code != BN_CLICKED)
         return;
+    if (!control && id >= win::menu_choose) {
+        menu_command(id); // May release this view: nothing after it.
+        return;
+    }
     switch (id) {
     case win::bypass:
         if (parameter(bypass_id)) {
@@ -1600,15 +1633,6 @@ void Editor::command(int id, int code, HWND control) {
         break;
     case win::choose:
         choose_filter(); // May release this view: nothing after it.
-        break;
-    case win::recent:
-        recent_menu(); // As choose_filter.
-        break;
-    case win::reload:
-        reload();
-        break;
-    case win::watch:
-        watch_.settle(); // Changes made while it was off are not reloaded.
         break;
     case win::reference_toggle:
         reference_shown_ = SendMessageW(reference_toggle_, BM_GETCHECK, 0, 0) == BST_CHECKED;
@@ -1692,35 +1716,70 @@ void Editor::stop_choosing() {
     }
 }
 
-// The recent files, "room.cfg — Filters", under the Recent button.
-void Editor::recent_menu() {
+// PLUG-50: the Choose Filter menu, under its button: Choose File…, Reload
+// (named for the file, as "Reload room.cfg"), Reload When the File Changes,
+// then the recent files ("room.cfg — Filters") and Clear Recent.
+void Editor::filter_menu() {
     HMENU menu = CreatePopupMenu();
     if (!menu)
         return;
+    const std::string path = watch_.path();
+    const UINT reloadable = path.empty() ? MF_GRAYED : 0;
+    const std::wstring reload =
+        path.empty() ? L"Reload"
+                     : L"Reload " + std::filesystem::path(wide(path)).filename().wstring();
+    AppendMenuW(menu, MF_STRING, win::menu_choose, L"Choose File\u2026");
+    AppendMenuW(menu, MF_STRING | reloadable, win::menu_reload, reload.c_str());
+    AppendMenuW(menu, MF_STRING | reloadable | (watching_ ? MF_CHECKED : 0), win::menu_watch,
+                L"Reload When the File Changes");
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     const auto entries = recent_entries(recent_files());
-    for (std::size_t i = 0; i < entries.size(); ++i)
-        AppendMenuW(menu, MF_STRING, recent_first + i, wide(entries[i].title).c_str());
     if (entries.empty()) {
         AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, L"No Recent Filters");
     } else {
+        AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, L"Recent"); // A heading.
+        for (std::size_t i = 0; i < entries.size(); ++i)
+            AppendMenuW(menu, MF_STRING, win::menu_recent_first + i,
+                        wide(entries[i].title).c_str());
         AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-        AppendMenuW(menu, MF_STRING, recent_clear, L"Clear Menu");
+        AppendMenuW(menu, MF_STRING, win::menu_clear_recent, L"Clear Recent");
     }
     RECT button;
-    GetWindowRect(recent_, &button);
+    GetWindowRect(choose_, &button);
     addRef(); // The menu runs a modal loop, as the file dialog does.
     const int chosen = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_LEFTALIGN,
                                       button.left, button.bottom, 0, hwnd_, nullptr);
     DestroyMenu(menu);
-    if (hwnd_) {
-        if (chosen == recent_clear)
-            forget_recent_files();
-        else if (chosen >= recent_first &&
-                 static_cast<std::size_t>(chosen - recent_first) < entries.size() &&
-                 !load(entries[static_cast<std::size_t>(chosen - recent_first)].path))
+    if (hwnd_ && chosen)
+        menu_command(chosen);
+    release();
+}
+
+// A Choose Filter menu command, chosen there or sent as WM_COMMAND.
+void Editor::menu_command(int id) {
+    switch (id) {
+    case win::menu_choose:
+        choose_filter(); // May release this view: nothing after it.
+        return;
+    case win::menu_reload:
+        reload();
+        return;
+    case win::menu_watch:
+        watching_ = !watching_;
+        watch_.settle(); // Changes made while it was off are not reloaded.
+        return;
+    case win::menu_clear_recent:
+        forget_recent_files();
+        return;
+    default:
+        break;
+    }
+    const auto entries = recent_entries(recent_files());
+    if (id >= win::menu_recent_first &&
+        static_cast<std::size_t>(id - win::menu_recent_first) < entries.size()) {
+        if (!load(entries[static_cast<std::size_t>(id - win::menu_recent_first)].path))
             MessageBeep(MB_OK);
     }
-    release();
 }
 
 void Editor::reload() {
@@ -1733,8 +1792,7 @@ void Editor::reload() {
 // program that changes the files is then in front), and Reload When the
 // File Changes is ticked.
 void Editor::check_files() {
-    if (!hwnd_ || !IsWindowVisible(hwnd_) ||
-        SendMessageW(watch_box_, BM_GETCHECK, 0, 0) != BST_CHECKED || !watch_.due())
+    if (!hwnd_ || !IsWindowVisible(hwnd_) || !watching_ || !watch_.due())
         return;
     // The host may have replaced the filter (a preset, an undo) while the
     // window was not reading the report: reload only the file that still

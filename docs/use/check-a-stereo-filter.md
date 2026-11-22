@@ -99,7 +99,7 @@ from the filter.
 3. Add Convolver to the track as an effect. On macOS and Windows its window
    opens and shows the status; on Linux the host shows its generic controls,
    with a read-only **Status**.
-4. Click **Choose…** in Convolver's window and pick
+4. In Convolver's window, choose **Choose Filter** > **Choose File…** and pick
    `examples/first-use/stereo/filter.cfg`. The window shows 48000 Hz,
    `2 in → 2 out` and Active, and Status reads
    `Filter loaded: 48000 Hz, 2 in, 2 out.` Without the window (Linux), load `examples/first-use/stereo/first-use-stereo.vstpreset` from

@@ -120,7 +120,7 @@ WindowContent window_content(const HostReport* report, bool can_load) {
             c.filter_files += file + "\n";
     }
     // PLUG-44: no drop hint under the name. With no filter the Fix names
-    // dropping a file; otherwise Choose…'s tooltip does.
+    // dropping a file; otherwise Choose Filter's tooltip does.
     return c;
 }
 

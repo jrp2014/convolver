@@ -210,7 +210,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 
 } // namespace
 
-// The Recent menu asks the view to fill it as it opens.
+// The Choose Filter menu asks the view to fill in its recent files as it opens.
 @interface CONVOLVER_DIAGNOSTIC_VIEW () <NSMenuDelegate>
 @end
 
@@ -235,7 +235,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     std::optional<WindowContent> shown_; // What was last shown, so a refresh keeps a selection.
     NSString* logPath_;
     CONVOLVER_SETTING_ROWS* settings_; // Gain, Mix and Latency, and what the user does to them.
-    ChooseRequests choose_;            // The pending Choose… request.
+    ChooseRequests choose_;            // The pending Choose File… request.
     NSOpenPanel* panel_;               // Its dialog, while one is open.
     // Reload: the playing filter's file and the files it was read from
     // (FileWatch in window_model.hpp); timer ticks, for the checks.
@@ -367,7 +367,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _glanceValues = values;
     [self add:factsRow_ after:6];
     // Under the name, a refused file's note in the small font (PLUG-44: no
-    // drop hint; the Fix and Choose…'s tooltip name dropping a file).
+    // drop hint; the Fix and Choose Filter's tooltip name dropping a file).
     _filterNoteField = wrapping(small_font(), [NSColor secondaryLabelColor], inner - icon - 6);
     NSView* note_indent = [[NSView alloc] init];
     fixed_width(note_indent, icon);
@@ -413,7 +413,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     scroll_.documentView = _explanationView;
 
     // Then the note, in the small secondary font. The fix's button is not
-    // repeated here: the window's own Choose… or Copy Diagnostics is
+    // repeated here: the window's own Choose Filter or Copy Diagnostics is
     // highlighted instead (showAction:; jrp, 7 November 2026: "why do we
     // have two buttons that seem to do the same thing").
     NSTextField* note_label = label(small_font(), [NSColor secondaryLabelColor]);
@@ -449,46 +449,47 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     fixed_width(message_, inner);
     [self add:message_ after:10];
 
-    // Choose…, the recent files, Reload, and reloading when the file
-    // changes (for someone refining a filter in another program), under the
-    // heading; a file dropped anywhere on the window does what Choose… does.
-    _chooseButton = [NSButton buttonWithTitle:@"Choose…"
-                                       target:self
-                                       action:@selector(chooseFilter:)];
+    // PLUG-50: one Choose Filter pull-down under the message holds every
+    // file action: Choose File…, Reload and reloading when the file changes
+    // (for someone refining a filter in another program), then the recent
+    // files (jrp's run of 0.18.10: "Can we not do that in one button?"). A
+    // file dropped anywhere on the window does what Choose File… does.
+    _chooseButton = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:YES];
+    _chooseButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [_chooseButton addItemWithTitle:@"Choose Filter"]; // A pull-down's first item is its title.
+    _chooseButton.menu.delegate = self;
+    _chooseButton.menu.autoenablesItems = NO; // refresh and updateFilterMenu enable each item.
     _chooseButton.accessibilityLabel = @"Choose Filter";
     _chooseButton.toolTip =
         @"Loads an IR file, .cfg, configuration list or Convolver .vstpreset as the filter "
-        @"(a preset brings its Gain, Mix and Latency too); you can also drop the file on this "
-        @"window. The project keeps the filter itself and its file's name, as a preset does, "
-        @"so moving the file later does not change it.";
-    _recentButton = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:YES];
-    _recentButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [_recentButton addItemWithTitle:@"Recent"];
-    _recentButton.menu.delegate = self;
-    _recentButton.menu.autoenablesItems = NO; // updateRecentMenu enables each item itself.
-    _recentButton.accessibilityLabel = @"Recent Filters";
-    _recentButton.toolTip = @"Filter files loaded recently in a Convolver window, in any host.";
-    _reloadButton = [NSButton buttonWithTitle:@"Reload"
-                                       target:self
-                                       action:@selector(reloadFilter:)];
-    _reloadButton.accessibilityLabel = @"Reload Filter";
-    _reloadButton.toolTip = @"Reads the filter file again, for example after changing it in "
-                            @"another program. Available for a file loaded in this window, "
-                            @"not for a filter from the saved project or a preset.";
-    _watchButton = [NSButton checkboxWithTitle:@"Reload when the file changes"
-                                        target:self
-                                        action:@selector(watchToggled:)];
-    _watchButton.state = NSControlStateValueOn;
-    _watchButton.toolTip = @"While this window is open, reads the filter again when its file, "
-                           @"or a file a .cfg names, changes.";
+        @"(a preset brings its Gain, Mix and Latency too), reloads it, or loads a recent one; "
+        @"you can also drop the file on this window. The project keeps the filter itself and "
+        @"its file's name, as a preset does, so moving the file later does not change it.";
+    NSMenuItem* choose = [_chooseButton.menu addItemWithTitle:@"Choose File…"
+                                                       action:@selector(chooseFilter:)
+                                                keyEquivalent:@""];
+    choose.target = self;
+    _reloadItem = [_chooseButton.menu addItemWithTitle:@"Reload"
+                                                action:@selector(reloadFilter:)
+                                         keyEquivalent:@""];
+    _reloadItem.target = self;
+    _reloadItem.toolTip = @"Reads the filter file again, for example after changing it in "
+                          @"another program. Available for a file loaded in this window, "
+                          @"not for a filter from the saved project or a preset.";
+    _watchItem = [_chooseButton.menu addItemWithTitle:@"Reload When the File Changes"
+                                               action:@selector(watchToggled:)
+                                        keyEquivalent:@""];
+    _watchItem.target = self;
+    _watchItem.state = NSControlStateValueOn;
+    _watchItem.toolTip = @"While this window is open, reads the filter again when its file, "
+                         @"or a file a .cfg names, changes.";
     if (loader_) {
         NSStackView* file_row =
-            stack(@[ _chooseButton, _recentButton, _reloadButton, _watchButton ],
-                  NSUserInterfaceLayoutOrientationHorizontal, 8);
+            stack(@[ _chooseButton ], NSUserInterfaceLayoutOrientationHorizontal, 8);
         [self add:[self formRow:@"" content:file_row] after:12];
         [self registerForDraggedTypes:@[ NSPasteboardTypeFileURL ]];
     }
-    [self updateRecentMenu];
+    [self updateFilterMenu];
     if (settings.count)
         [self add:separator() after:12];
 
@@ -501,6 +502,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     mix_ = NSNotFound;
     _mixNoteField = wrapping(small_font(), [NSColor secondaryLabelColor], inner - form_label - 10);
     for (NSUInteger i = 0; i < settings_.rows.count; ++i) {
+        if ([settings_ joinsRowBefore:i])
+            continue; // PLUG-50: Gain mode, already in the Gain row.
         NSStackView* row = [self formRow:settings[i][@"name"] content:settings_.rows[i]];
         [self add:row after:12];
         if ([settings[i][@"name"] isEqualToString:@"Mix"]) {
@@ -617,7 +620,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     settings_ = nil;
 }
 
-// Forgets a pending Choose… request and closes its dialog.
+// Forgets a pending Choose File… request and closes its dialog.
 - (void)stopChoosing {
     choose_.stop();
     NSOpenPanel* panel = panel_;
@@ -735,17 +738,25 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
         coloured(c.tone) ? status_colour(c.tone) : [NSColor secondaryLabelColor];
     logPath_ = c.log_path.empty() ? nil : ns(c.log_path);
     // The Latency row shows the time a choice adds at the host's rate, and
-    // whether the chosen Latency is in use yet; the Gain mode row, the gain
-    // it plays (PLUG-10).
+    // whether the chosen Latency is in use yet; the Gain row, the gain
+    // Estimate or No clipping plays (PLUG-50).
     [settings_ readWithSampleRate:c.sample_rate
                      latencyWaits:c.latency_waits
                  latencyNextStart:c.latency_next_start
-                         gainNote:ns(c.gain_note)];
+                         gainNote:ns(c.gain_note)
+                       gainPlayed:ns(c.gain_played)];
     _logButton.enabled = logPath_.length > 0;
     [self readBypass];
     watch_.follow(c.filter_path, c.filter_files);
-    _reloadButton.enabled = !watch_.path().empty();
-    _watchButton.enabled = !watch_.path().empty();
+    // Reload names the file it reads again ("Reload room.cfg").
+    const BOOL reloadable = !watch_.path().empty();
+    NSString* reload_title =
+        reloadable ? [@"Reload " stringByAppendingString:ns(watch_.path()).lastPathComponent]
+                   : @"Reload";
+    if (![_reloadItem.title isEqualToString:reload_title])
+        _reloadItem.title = reload_title;
+    _reloadItem.enabled = reloadable;
+    _watchItem.enabled = reloadable;
     // Every refresh: reading the settings enables every control again.
     [self showMixNote:ns(c.mix_note)];
     if (shown_ && *shown_ == c)
@@ -816,7 +827,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 }
 
 // The button that carries out the fix, highlighted in the accent colour:
-// Choose… or Copy Diagnostics, or neither. Not the default button, so
+// Choose Filter or Copy Diagnostics, or neither. Not the default button, so
 // Return still goes to the host.
 - (void)showAction:(WindowAction)action {
     _chooseButton.bezelColor =
@@ -826,7 +837,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 }
 
 - (BOOL)checkForChanges {
-    if (!loader_ || _watchButton.state != NSControlStateValueOn || !watch_.due())
+    if (!loader_ || _watchItem.state != NSControlStateValueOn || !watch_.due())
         return NO;
     // The host may have replaced the filter (a preset, an undo) while the
     // window was covered and not reading the report: reload only the file
@@ -840,8 +851,9 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     return YES;
 }
 
-- (void)watchToggled:(NSButton*)button {
-    static_cast<void>(button);
+- (void)watchToggled:(NSMenuItem*)item {
+    item.state =
+        item.state == NSControlStateValueOn ? NSControlStateValueOff : NSControlStateValueOn;
     watch_.settle(); // Changes made while it was off are not reloaded.
 }
 
@@ -853,34 +865,40 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 }
 
 - (void)menuNeedsUpdate:(NSMenu*)menu {
-    if (menu == _recentButton.menu)
-        [self updateRecentMenu];
+    if (menu == _chooseButton.menu)
+        [self updateFilterMenu];
 }
 
-// "room.cfg — Filters": the file's name and its folder's, since several
-// folders often hold a filter.cfg; the full path is the item's tooltip.
-- (void)updateRecentMenu {
-    NSMenu* menu = _recentButton.menu;
-    while (menu.numberOfItems > 1) // The first item is the button's title.
-        [menu removeItemAtIndex:1];
-    BOOL any = NO;
+// Under the file actions, the recent files: "room.cfg — Filters", the
+// file's name and its folder's, since several folders often hold a
+// filter.cfg; the full path is the item's tooltip.
+- (void)updateFilterMenu {
+    NSMenu* menu = _chooseButton.menu;
+    const NSInteger fixed = [menu indexOfItem:_watchItem] + 1; // The title and the file actions.
+    while (menu.numberOfItems > fixed)
+        [menu removeItemAtIndex:fixed];
+    [menu addItem:[NSMenuItem separatorItem]];
+    NSArray<NSMenuItem*>* recent = @[];
     for (const auto& entry : recent_entries(convolver::recent_files())) {
         NSString* path = ns(entry.path);
-        NSMenuItem* item = [menu addItemWithTitle:ns(entry.title)
-                                           action:@selector(recentChosen:)
-                                    keyEquivalent:@""];
+        NSMenuItem* item = [[NSMenuItem alloc] initWithTitle:ns(entry.title)
+                                                      action:@selector(recentChosen:)
+                                               keyEquivalent:@""];
         item.target = self;
         item.representedObject = path;
         item.toolTip = path;
-        any = YES;
+        recent = [recent arrayByAddingObject:item];
     }
-    if (!any) {
+    if (recent.count == 0) {
         [menu addItemWithTitle:@"No Recent Filters" action:nil keyEquivalent:@""].enabled = NO;
         return;
     }
+    [menu addItemWithTitle:@"Recent" action:nil keyEquivalent:@""].enabled = NO; // A heading.
+    for (NSMenuItem* item in recent)
+        [menu addItem:item];
     [menu addItem:[NSMenuItem separatorItem]];
-    [menu addItemWithTitle:@"Clear Menu" action:@selector(clearRecent:) keyEquivalent:@""].target =
-        self;
+    [menu addItemWithTitle:@"Clear Recent" action:@selector(clearRecent:) keyEquivalent:@""]
+        .target = self;
 }
 
 - (void)recentChosen:(NSMenuItem*)item {
@@ -892,7 +910,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 - (void)clearRecent:(id)sender {
     static_cast<void>(sender);
     convolver::forget_recent_files();
-    [self updateRecentMenu];
+    [self updateFilterMenu];
 }
 
 // Shows the format's bypass as the host has it now (its own button,

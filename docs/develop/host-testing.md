@@ -389,7 +389,7 @@ Do this once. Run the commands in the extracted preview package folder.
     differ from REAPER's.
 11. The window and settings (macOS, VST3-11). Use a source checkout's
     `examples/first-use/stereo/filter.cfg` (48 kHz). In Convolver's window
-    click **Choose…**, pick that file: the status reads Active, the heading
+    choose **Choose Filter** > **Choose File…**, pick that file: the status reads Active, the heading
     reads `filter.cfg`, and REAPER marks the project changed (an
     asterisk in the title bar). Open *Edit* and record what *Undo* names:
     the choice should add no undo entry (VST3-17). Drag Gain to about −12 dB while playing:
@@ -533,7 +533,7 @@ preparation and steps 2, 3 and 9 below include what it found.
 9. The window (macOS, VST3-11). Open the real-time effect's window: it is
    [Convolver's window](../use/plugins.md#convolvers-window) (with **Use
    vendor UI** on, as in step 3). With playback at 48000 Hz (step 2), choose
-   `examples/first-use/stereo/filter.cfg` with **Choose…** and play (in
+   `examples/first-use/stereo/filter.cfg` with **Choose Filter** > **Choose File…** and play (in
    the 7 November run a 48000 Hz `.cfg` chosen this way was refused while
    playback ran at 44100 Hz, as it should be, and was not tried again at
    48000 Hz). Record
@@ -569,7 +569,7 @@ preparation and steps 2, 3 and 9 below include what it found.
     Audacity 4.0.2, Undo right after a choice removes the whole effect, so
     it cannot show whether undo brings back an earlier filter. Import `examples/first-use/stereo/input.wav` into
     a new 48000 Hz project and add Convolver as a real-time effect with
-    *Use vendor UI* on. With **Choose…**, pick
+    *Use vendor UI* on. With **Choose Filter** > **Choose File…**, pick
     `examples/first-use/stereo/filter.cfg` and touch no setting. Without
     playing, and with the window still open (Audacity also stores the state
     when playback stops or the window closes, which would hide the defect),

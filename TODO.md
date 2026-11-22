@@ -201,16 +201,6 @@ done once for all three formats:
   0.3 s apart, as the packaged example becomes in PR #266. A chosen preset
   saves as any filter does. jrp, 21 November 2026: after the preview. **Done when** both formats offer them, host
   tests choose each and the guide describes them.
-- [ ] **PLUG-50 — Gain mode in the Gain row; one Choose Filter menu.**
-  The macOS and Windows windows cut "Gain mode:" to "Gain mo…" and spread
-  the file actions over four controls. Put the Gain mode menu in the Gain
-  row (the slider dims and the box shows the gain Estimate or No clipping
-  plays), fold Choose…, Recent, Reload and the automatic reload into one
-  Choose Filter pull-down (a split button on Windows), and say "won't clip"
-  for a safe Worst-case peak. jrp approved the
-  [mock-up](https://claude.ai/artifact/2WrL3kAy39753gfJtkW3sn) on
-  22 November 2026. **Done when** both windows and their tests use the new
-  layout and the guide describes it.
 - [ ] **PLUG-29 — Keep the Recent list out of the log folder.** Save it in
   each platform's application-support folder, reading the old file once.
   **Done when** the tests cover both paths and the guide names the folder.

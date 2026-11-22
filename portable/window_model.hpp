@@ -88,7 +88,7 @@ struct WindowContent {
 };
 
 // What to show for `report` (nullptr: the plug-in could not give one).
-// `can_load` says whether this window can load a file (Choose…, a drop): it
+// `can_load` says whether this window can load a file (Choose File…, a drop): it
 // keeps the Choose action.
 WindowContent window_content(const HostReport* report, bool can_load);
 
@@ -104,7 +104,7 @@ std::string latency_note(double frames, int sample_rate, bool waits, bool next_s
 // the text does not start with a finite number.
 std::optional<double> typed_value(std::string_view text, double minimum, double maximum);
 
-// Choose… in two steps: start() records a request (forgetting any earlier
+// Choose File… in two steps: start() records a request (forgetting any earlier
 // one) for the file dialog; finish() says whether its answer is still
 // wanted. Closing the window, or the view leaving it, calls stop(): the host
 // may then dispose of the plug-in while the dialog is still open.
