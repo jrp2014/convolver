@@ -503,6 +503,36 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
+- [x] **PLUG-47 — Add a list read again by itself to Recent.** 21 November
+  2026, PR #269, jrp's review of the 0.18 candidate
+  ([loading a filter](docs/use/plugins.md#loading-a-filter)).
+- [x] **PLUG-46 — Report a stopped plug-in's tail at the filter's own
+  rate.** 21 November 2026, PR #269, jrp's review of the 0.18 candidate
+  ([adapter contract](docs/develop/plugin-contract.md)).
+- [x] **AU-19 — Show an uninitialized Audio Unit's Latency as selected for
+  the next start.** 21 November 2026, PR #269, jrp's review of the 0.18
+  candidate ([Status](docs/use/plugins.md#status-and-the-convolver-log)).
+- [x] **PLUG-44 — Say each fact once in the window and host views.** 21
+  November 2026, PR #267, jrp's choice of items 1 to 12 from the
+  interface review of the same day
+  ([window](docs/use/plugins.md#convolvers-window)).
+- [x] **DOC-22 — Host-testing steps that match the 0.18 defaults.**
+  21 November 2026, PR #268
+  ([host testing](docs/develop/host-testing.md#prepare-the-mac)).
+- [x] **REL-10 — Make the example echo clearly audible.** 21 November 2026,
+  PR #266 ([plug-in examples](examples/plugin-presets/README.md)).
+- [x] **CI-52 — Time limits for the fuzz and version jobs.** 21 November
+  2026, PR #263
+  ([fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns)).
+- [x] **PLUG-42 — Keep a filter refused only for the host's channels or
+  rate.** 21 November 2026, PR #258, jrp's decision of the same day (found
+  in Ardour 8.4 by HOST-10): VST3 and the Audio Unit refuse a filter that
+  does not suit the host only while one that suits it plays; otherwise
+  they keep it, save it as the filter and play it at the next start that
+  suits it ([contract](docs/develop/plugin-contract.md#loading-and-failure)).
+- [x] **DOC-20 — Shared records without merge conflicts.** 21 November
+  2026, PR #257
+  ([change fragments](docs/develop/workflow.md#change-fragments)).
 - [x] **DIAG-10 — Status says what the window says.** 21 November 2026,
   PR #261 ([plug-ins](docs/use/plugins.md#status-and-the-convolver-log),
   [decision](docs/project/decisions.md#diagnostics)).

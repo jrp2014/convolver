@@ -174,8 +174,16 @@ class PrepareReleaseTests(unittest.TestCase):
         self.assertIn('Gain mode Estimate or No clipping is refused by every preview before 0.13.20', text)
         # LV2-9's 100 ms wait mitigates, not rules out, the JUCE host crash (jrp's review of 19 November 2026).
         self.assertIn('this mitigates a host crash rather than ruling it out', text)
-        # What each preview added that only automated tests have checked (0.13.20, 0.14).
-        self.assertIn('Checked only by automated tests: new in 0.14, the quicker restore of the playing filter', text)
+        # What each preview added that only automated tests have checked (0.13.20, 0.14, 0.18).
+        self.assertIn('Checked only by automated tests: new in 0.18, everything under What changed', text)
+        self.assertIn('new in 0.14, the quicker restore of the playing filter', text)
+        # The host checks not repeated on this version stay listed as unverified (jrp, 8 November 2026).
+        self.assertIn('Not yet repeated on this version: in REAPER', text)
+        # Check 10 ran on the 0.16.14 candidate; the chosen-file path changed after it (status.md).
+        self.assertIn('in Audacity, Choose… before playing, Recent, and save and reopen', text)
+        self.assertIn('with the 0.16.14 candidate', text)
+        # What a crossover or mono filter gets in Ardour (HOST-10).
+        self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/plugins.md#ardour', text)
         self.assertIn('new in 0.13.20, the Gain mode', text)
         # What changed since the previous preview, one line per change.
         self.assertIn(f'Since {prepare_release.PREVIOUS_PREVIEW}:', text)
