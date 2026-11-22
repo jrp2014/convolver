@@ -468,15 +468,16 @@ and Status only), 6 and 7 of [REAPER](#reaper-vst3), in the guide's
 [render and reopen](../use/check-a-stereo-filter.md#4-render-the-example-in-the-host)
 form. Listening, bypass, the refused presets, the wrong host rate, the
 window, Latency and the crossover stay manual until the script grows to
-cover them, one addition per run; none is scheduled. jrp's first run, on
+cover them, one addition per run (HOST-13 in [TODO](../../TODO.md)). jrp's first run, on
 21 November 2026 with the 0.16.14 candidate, passed all eight checks
 ([record](../archive/reviews/2026-11-21-host11-reaper.md)) but read Status
 "while playing" after the transport had stopped. His second, on 22 November
-2026 with the published 0.18.10 built from its tag, passed all eight with
-both readings taken while the transport ran
-([record](../archive/reviews/2026-11-22-host11-reaper-run2.md)). The play
-position it reports is what REAPER plays out, so it reads a little under
-1.5 s. Without REAPER, `tests/reaper_check_tests.py`
+2026 with 0.18.10 built from the published tag, passed all eight with both
+readings taken while the transport ran
+([record](../archive/reviews/2026-11-22-host11-reaper-run2.md)). The
+script reads Status after playing for 1.5 s (`--play-seconds`); the play
+position it records is REAPER's `GetPlayPosition`, which allows for the
+device's output latency, so it can read a little under that. Without REAPER, `tests/reaper_check_tests.py`
 checks the script in pre-commit against a stand-in REAPER.
 
 ### Audacity (VST3)

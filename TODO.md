@@ -144,6 +144,14 @@ Foundation items are parked by owner decision instead.
   `known_new_session_abort()` in `tests/plugins/ardour_tests.py` accepts it on
   9.0 only; jrp may report it upstream. **Done when** the Ardour on
   `ubuntu-latest` no longer aborts and the test stops accepting it.
+- [ ] **HOST-13 — More of the REAPER checks from one command.** What
+  HOST-11's [script](docs/develop/host-testing.md#reaper-from-one-command)
+  does not cover yet: the other packaged presets, a refused preset with
+  Latency and the filter kept, the wrong host rate, a Latency change with
+  its render in time, and the Audio Unit in REAPER. **Worth doing when** a
+  REAPER finding comes from one of these, as the refused preset that reset
+  Latency to 0 in jrp's live session of 22 November 2026 did, or before a
+  release whose changes touch them; one addition per run on jrp's Mac.
 - [ ] **DIAG-9 — Numbers in the user's locale.** Low priority. **Done when**
   the window shows numbers in the system locale from one formatting path,
   Status and the log stay plain, and a test covers other separators.

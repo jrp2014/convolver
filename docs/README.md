@@ -135,7 +135,7 @@ plans are parked.
 [Completed and superseded plans](archive/plans/README.md) are archived,
 including the plug-in distribution, formats and editor plans, the
 first-preview acceptance plan, the load and restore consolidation
-(PLUG-39) and the host-test automation (HOST-9, AU-18, HOST-11), whose open work is now in the maintained
+(PLUG-39) and the host-test automation (HOST-9, AU-18, HOST-11; its rest is HOST-13), whose open work is now in the maintained
 guides and TODO.
 
 - [Sign and notarize the macOS packages](project/plans/2026-11-09-macos-signing.md)

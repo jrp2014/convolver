@@ -13,19 +13,22 @@
 > the line. Its `result.md` stayed on his Mac.
 >
 > All eight checks passed. Both readings "while playing" were taken with the
-> transport running, at a play position of 1.445 s. The position is
-> `GetPlayPosition`, what REAPER is playing out after the device's latency,
-> so it reads a little under the script's 1.5 s. The script's checks need
-> only the transport running, not a position. This run meets HOST-11's
-> "Done when", a run on a published preview, with one difference: the
-> package was built from the published tag rather than downloaded, so the
-> report's package SHA-256 is not the release asset's.
+> transport running, at a play position of 1.445 s. The script records
+> REAPER's `GetPlayPosition`, which allows for the device's output latency,
+> so it can read a little under the 1.5 s the script plays before reading;
+> the summary itself does not give the cause. The script's checks need
+> only the transport running, not a position. HOST-11's "Done when" asks
+> for a run on a published preview whose result file records what every
+> report lists. This run differs in two ways: the package was built from
+> the published tag rather than downloaded, so its SHA-256 is not the
+> release asset's, and this record rests on the session's summary, not on
+> the run's `result.md` (with the FFT backend, block size and log lines). Whether that closes HOST-11 is jrp's call.
 >
 > The same session found other things that are not this check's. A refused
 > 44.1 kHz preset in REAPER set Latency from 1024 frames to 0. A list chosen
 > in Audacity before playback stayed refused (PLUG-40). GarageBand's
 > metronome was included in its export. Those findings are left out of
-> this record.
+> this record; the planned REAPER check of a refused preset is HOST-13.
 
 ---
 
