@@ -15,6 +15,11 @@
   fits the plug-ins' saved state, except a full 7.1 matrix at 96 kHz,
   played in real time with room to spare on four shared machines
   ([supported workloads](#supported-workloads)).
+- Then and now (22 November 2026, jrp's M5 Max): with a 65,536-tap stereo
+  filter in large blocks, the historical and current engines both ran at
+  about 1,540 times real time, against 40 times on a 2006 Pentium 4; at a
+  Latency of 256 frames the current engine was 4.5 times as fast with the
+  same FFT library ([performance then and now](#performance-then-and-now)).
 - Measure again on the target machine before a speed claim
   ([reproduce](#reproduce)).
 
@@ -42,6 +47,7 @@ Contents: [comparing Accelerate and FFTW](#comparing-accelerate-and-fftw) ·
 [the non-uniform engine](#the-non-uniform-engine) ·
 [idle after the tail](#idle-after-the-tail) ·
 [supported workloads](#supported-workloads) ·
+[performance then and now](#performance-then-and-now) ·
 [reproduce](#reproduce)
 
 ## Comparing Accelerate and FFTW
@@ -1512,6 +1518,63 @@ What this means for the items waiting on PERF-3:
   architecture page revisits a helper thread if one instance needs a large
   share of a core. Only the 7.1 matrix at 96 kHz did (up to 52% on the VM);
   like EDGE-11's candidates, that is a reason only if users need it.
+
+## Performance then and now
+
+jrp's comparison of the 2006 release with the current engine (22 November
+2026). The Apple M5 Max figures come from jrp's own runs on his Mac.
+
+In 2006, a Pentium 4 PC running Convolver could apply a stereo
+room-correction filter to a minute of music in **1.5 seconds**. On an Apple
+M5 Max, the old Convolver code did the equivalent work in **about 0.039
+seconds**. The new computer was roughly **39 times as fast** on this task.
+
+### Old computer versus new computer
+
+| Computer | Convolver software | Processing speed | Time to process one minute of audio |
+| --- | --- | ---: | ---: |
+| Pentium 4, 2006 | Original Windows release | 40× real time | 1.5 seconds |
+| Apple M5 Max | Historical 4.3 engine, rebuilt for the Mac | 1,544× real time | 0.039 seconds |
+| Apple M5 Max | Current 0.18.8 engine | 1,535× real time | 0.039 seconds |
+
+The Pentium figure comes from the 2006 release notes. The Mac tests used
+`32bitFilterDRC.wav`, the only WAV in that release matching the published
+description of a 65,536-tap stereo filter at 44.1 kHz. The original notes
+leave the filename and buffering settings unspecified, so the comparison
+across twenty years is approximate.
+[Original release notes](https://sourceforge.net/p/convolver/news/2006/01/convolver-219-released/) ·
+[Archived filter](https://github.com/jrp2014/convolver/blob/convolver2-19/convolver/Media/32bitFilterDRC.wav)
+
+### Old algorithm versus new algorithm
+
+The two Mac results are almost identical because the historical benchmark
+gave both engines about **186 milliseconds of audio** to collect at a time.
+The old algorithm was already efficient when it could work in large batches.
+
+Smaller batches matter when recording. A singer listening through headphones
+would hear a delay of nearly a fifth of a second. With Convolver's added
+delay reduced to **5.8 milliseconds**, the old engine processed **154 seconds
+of audio per second**. On the same Mac, with the same filter and the same
+maths library, the new engine processed **694 seconds per second**: **4.5
+times as much audio in the same time**. Using Apple's Accelerate library,
+the default in the Mac plug-in, the new engine reached **523× real time**,
+or **3.4 times the old engine's speed** at the same delay.
+
+For someone playing an album, either engine has ample capacity for this
+filter. For someone recording through effects, the new algorithm's advantage
+is that it can return the sound promptly while leaving more processing time
+for the other tracks and effects.
+
+**Source.** The 2006 notes for Convolver 2.19 give 40 times real time, a 3%
+processor load, for a stereo 65,536-tap filter on a 3.4 GHz Pentium 4. The
+archived filter at tag `convolver2-19` is 65,536 frames of stereo 32-bit
+float at 44.1 kHz. At 44.1 kHz, 186 milliseconds is about 8,192 frames and
+5.8 milliseconds is 256 frames, a [Latency](../use/plugins.md#latency-and-tail)
+of 256. The current engine is 0.18.8 (`9cbcb6b`); 0.18.9 changed no engine
+code. The historical engine is the 4.3 code (tag `convolver4-3`, kept with
+recovered fixes in [`historical/`](../../historical/)). Which of those trees
+jrp rebuilt, his commands, build settings and raw timings are not recorded
+here, so the Mac rows cannot yet be reproduced from this page.
 
 ## Reproduce
 
