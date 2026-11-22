@@ -175,7 +175,7 @@ class PrepareReleaseTests(unittest.TestCase):
         # LV2-9's 100 ms wait mitigates, not rules out, the JUCE host crash (jrp's review of 19 November 2026).
         self.assertIn('this mitigates a host crash rather than ruling it out', text)
         # What each preview added that only automated tests have checked (0.13.20, 0.14, 0.18.10 and since).
-        self.assertIn('Checked only by automated tests: new since 0.18.10, both fixes under What changed', text)
+        self.assertIn('Checked only by automated tests: new since 0.18.10, everything under What changed', text)
         self.assertIn('new in 0.14, the quicker restore of the playing filter', text)
         # The host checks not repeated on this version stay listed as unverified (jrp, 8 November 2026);
         # what jrp's live session checked on 0.18.10 is credited to 0.18.10 only.

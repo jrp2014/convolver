@@ -5,8 +5,9 @@
 
 - Releases (REL-3): the release notes for the follow-up preview to 0.18.10
   list, since 0.18.10, the two VST3 fixes from jrp's live session (PLUG-49
-  in Audacity, PLUG-48 for a refused preset), and say both are checked only
-  by automated tests ([publishing an unsigned preview](../docs/develop/releasing.md#publishing-an-unsigned-preview)).
+  in Audacity, PLUG-48 for a refused preset) and the window's Choose Filter
+  menu and Gain row, credit what jrp's live session checked on 0.18.10 to
+  0.18.10 only, and say the new changes are checked only by automated tests ([publishing an unsigned preview](../docs/develop/releasing.md#publishing-an-unsigned-preview)).
 
 ## Decisions: Releases
 

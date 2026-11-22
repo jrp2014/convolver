@@ -46,6 +46,19 @@ CHANGES = (
         "In 0.18.10 they took the refused preset's values (Latency 0) while the plug-in went on playing its own "
         '(Latency 1024), so what they showed was not what played. VST3.'
     ),
+    (
+        "In Convolver's window on macOS and Windows, one Choose Filter menu replaces the Choose…, Recent and Reload "
+        'buttons and the "Reload when the file changes" box. It holds Choose File…, Reload (named for the file, as '
+        '"Reload room.cfg"), Reload When the File Changes, the recent files and Clear Recent. On Windows it is a '
+        'split button: its main part chooses a file and its arrow opens the menu. It is highlighted when choosing '
+        'a filter is the fix, and dropping a file on the window still loads it.'
+    ),
+    (
+        'The Gain mode menu now starts the Gain row, so its label is no longer cut off. With Estimate or No '
+        'clipping, the Gain slider and box are dimmed and the box shows the gain that mode plays; Gain keeps its '
+        'value and plays again when you choose Set. The Worst-case peak note says "(won\'t clip at this Gain and '
+        'Mix)".'
+    ),
 )
 TAG = re.compile(r'v(\d+\.\d+\.\d+)')
 DESCRIPTIONS = {
@@ -191,9 +204,10 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'and removed itself. Nobody has used them in a host yet. '
             f'[Status]({base}/blob/{tag}/docs/project/status.md#checks-left-before-publication) lists what is open. '
             'Other hosts are untested.\n'
-            "- In Audacity, a filter chosen with Convolver's Choose…, even before playing, is kept for exports and "
-            'saved projects, and one chosen from Recent for exports (checked in Audacity 4.0.2 on macOS on 21 '
-            'November 2026 with the 0.16.14 candidate, and Choose… before playing again on 0.18.10 on 22 November, '
+            "- In Audacity, a filter chosen with Convolver's Choose File…, even before playing, is kept for exports "
+            'and saved projects, and one chosen from its recent files for exports (checked in Audacity 4.0.2 on macOS '
+            'on 21 November 2026 with the 0.16.14 candidate, then with Choose… and Recent buttons, and Choose… before '
+            'playing again on 0.18.10 on 22 November, '
             "not yet repeated on this version; Audacity's own preset menu "
             'was last checked on 7 November 2026, with a build before the first preview). Reload and reloading when '
             'the file changes are checked only by '
@@ -204,13 +218,14 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             "Ardour's default, in either format. "
             'On Linux use the LV2 plug-in on a Flexible-I/O track for a crossover '
             f'([Ardour]({docs}/plugins.md#ardour)).\n'
-            '- Checked only by automated tests: new since 0.18.10, both fixes under What changed; new in 0.18.10, '
+            '- Checked only by automated tests: new since 0.18.10, everything under What changed; new in 0.18.10, '
             f'the changes [its notes]({base}/releases/tag/v0.18.10) list, apart from those checked on 0.18.10 '
             'above and '
             'the Audacity routes checked on the 0.16.14 candidate; new in 0.14, '
             'the quicker restore of the playing filter and '
             'the saving once the sound '
-            'has stopped; new in 0.13.20, the Gain mode, a `.vstpreset` chosen in the window, Choose… on a track '
+            'has stopped; new in 0.13.20, the Gain mode, a `.vstpreset` chosen in the window, choosing a file on a '
+            'track '
             "with more inputs than the filter's, and a preset or undo that keeps the playing filter.\n"
             '- Since 0.13, Latency starts at 0 frames. Some projects saved with 0.12.12 at its default of 256 frames '
             'open at 0; choose 256 again if you want its delay back '
@@ -227,7 +242,8 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             "Copy Diagnostics from Convolver's window on macOS and Windows, or attach the Convolver log on Linux "
             f'([where it is]({docs}/report-a-problem.md#2-collect-convolvers-messages)). '
             'Say which system, host and version you used, how you loaded the filter '
-            "(on macOS and Windows Choose…, Recent or Reload; in LV2 the host's file chooser; anywhere a preset or a "
+            "(on macOS and Windows the Choose Filter menu's Choose File…, a recent file or Reload; in LV2 the "
+            "host's file chooser; anywhere a preset or a "
             'saved project), '
             'and whether the problem is in playback, export or reopening '
             f'([how to report]({docs}/report-a-problem.md)). '
