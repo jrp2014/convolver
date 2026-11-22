@@ -1,6 +1,19 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Automate more of the host checks
 
+> **Archived 22 November 2026 as superseded.** All three steps are done:
+> HOST-9 (PR #237), AU-18 (PR #242) and HOST-11 (PRs #245, #251, #255 and
+> #274). jrp's second REAPER run passed all eight checks on 0.18.10 built
+> from the published tag
+> ([record](../reviews/2026-11-22-host11-reaper-run2.md)). Step 3 shipped as
+> its first version only: one render, one save and reopen, with Status read
+> while REAPER plays. The rest it planned (the other presets, the refused
+> preset, the wrong host rate, a Latency change and the Audio Unit in REAPER)
+> stays manual, as
+> [REAPER from one command](../../develop/host-testing.md#reaper-from-one-command)
+> says, and is TODO's HOST-13. Below is the plan as it stood, apart from
+> step 3's state.
+
 For jrp and whoever carries on the work: which of the manual host checks
 can move into CI or into one command on jrp's Mac, in what order, and
 which stay manual. jrp asked for this work on 20 November 2026 ("Start on
@@ -15,9 +28,9 @@ follows GarageBand's order of events and changes Latency while running
 (AU-18). Third, one command on jrp's Mac drives REAPER through a render,
 save, reopen, refusal and Latency change and writes a result file to paste
 back (HOST-11). The first two run unattended in CI; the third needs jrp to
-run it. None of them narrows the [checks left](../status.md#checks-left-before-publication):
+run it. None of them narrows the [checks left](../../project/status.md#checks-left-before-publication):
 whether a check can then be narrowed is jrp's decision, recorded in the
-[decisions log](../decisions.md). Contents: [steps](#steps),
+[decisions log](../../project/decisions.md). Contents: [steps](#steps),
 [what each replaces](#what-each-step-can-replace),
 [not in this plan](#not-in-this-plan), [what stays manual](#what-stays-manual),
 [rules](#rules).
@@ -28,7 +41,7 @@ whether a check can then be narrowed is jrp's decision, recorded in the
 | --- | --- | --- | --- | --- |
 | 1 | HOST-9 | Ardour, whose LV2 and VST3 hosts are its own code, plays both formats headless. Each case loads a preset from Ardour's preset list and sets Latency through Ardour's parameter: Ardour must be told the new latency without reopening, a second process that reopens the session must see the saved Latency, and a third process's export must match the oracle in time ([Ardour, headless](../../develop/testing.md#ardour-headless)) | CI, Linux: the LV2 and VST3 workflows | Done, 21 November 2026 (PR #237) |
 | 2 | AU-18 | The AVAudioEngine render (AU-15) also starts the unit at its defaults and restores the preset while it runs, as GarageBand opens a project, at GarageBand's 44.1 kHz on a mono track; chooses Latency while the engine runs, which the host's property listener must hear of; and restores a second unit from the first one's `ClassInfo` ([AVAudioEngine render](../../develop/testing.md#avaudioengine-render)) | CI, macOS: the Audio Unit workflow | Done, 21 November 2026 (PR #242) |
-| 3 | HOST-11 | A script in `scripts/` that jrp runs with one command on his Mac. It drives REAPER through ReaScript, as jrp's own runs did by hand on 7 November 2026 ([record](../../archive/reviews/2026-11-07-reaper-crossover-retest.md)): load the packaged presets, render and compare each with `convolver --compare`, save, quit, reopen and render again, a refused preset and the wrong host rate, and a Latency change with its render in time; VST3 first, then the Audio Unit in REAPER. It writes one result file for jrp to paste back | jrp's Mac, before a preview | First version (render, save and reopen) passed all eight checks in jrp's run of 21 November 2026 on the 0.16.14 candidate ([record](../../archive/reviews/2026-11-21-host11-reaper.md)); its Status reading during playback is being fixed; [how to run it](../../develop/host-testing.md#reaper-from-one-command) |
+| 3 | HOST-11 | A script in `scripts/` that jrp runs with one command on his Mac. It drives REAPER through ReaScript, as jrp's own runs did by hand on 7 November 2026 ([record](../../archive/reviews/2026-11-07-reaper-crossover-retest.md)): load the packaged presets, render and compare each with `convolver --compare`, save, quit, reopen and render again, a refused preset and the wrong host rate, and a Latency change with its render in time; VST3 first, then the Audio Unit in REAPER. It writes one result file for jrp to paste back | jrp's Mac, before a preview | Done in its first version (PRs #245, #251, #255): it passed all eight checks on the 0.16.14 candidate ([record](../../archive/reviews/2026-11-21-host11-reaper.md)) and on 0.18.10 built from the published tag ([record](../../archive/reviews/2026-11-22-host11-reaper-run2.md)); the rest is HOST-13; [how to run it](../../develop/host-testing.md#reaper-from-one-command) |
 
 Step 3 is last because each change to it costs jrp a run; steps 1 and 2
 can be finished unattended. Its first version is the smallest run that
@@ -38,7 +51,7 @@ behaviour only a host shows.
 
 ## What each step can replace
 
-The checks are those in [checks left](../status.md#checks-left-before-publication).
+The checks are those in [checks left](../../project/status.md#checks-left-before-publication).
 "Can replace" means the automated result shows the same thing in another
 host; jrp decides whether that is enough.
 

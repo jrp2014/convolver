@@ -134,8 +134,8 @@ open work and the current order are tracked in
 plans are parked.
 [Completed and superseded plans](archive/plans/README.md) are archived,
 including the plug-in distribution, formats and editor plans, the
-first-preview acceptance plan and the load and restore consolidation
-(PLUG-39), whose open work is now in the maintained
+first-preview acceptance plan, the load and restore consolidation
+(PLUG-39) and the host-test automation (HOST-9, AU-18, HOST-11; its rest is HOST-13), whose open work is now in the maintained
 guides and TODO.
 
 - [Sign and notarize the macOS packages](project/plans/2026-11-09-macos-signing.md)
@@ -146,10 +146,6 @@ guides and TODO.
   reader and the window's behaviour in shared code), the routes compared, and
   the chosen order (Windows first, Linux later). The Windows window shipped
   in 0.13.12; its host checks and the Linux window remain.
-- [Automate more of the host checks](project/plans/2026-11-21-host-test-automation.md)
-  (HOST-9, AU-18, HOST-11): which manual host checks move into CI or one
-  command on jrp's Mac, in three steps, what each can replace and what
-  stays manual.
 - [Edges over the leading convolution plug-ins](project/plans/2026-11-06-edges-over-other-convolvers.md)
   (EDGE-1 to EDGE-14, PERF-2, PERF-3, IO-2): how Convolver compares with Altiverb,
   Reverberate, Space Designer, Hang Loose Convolver, CamillaDSP and X-MCFX,
