@@ -22,7 +22,7 @@
 > report lists. This run differs in two ways: the package was built from
 > the published tag rather than downloaded, so its SHA-256 is not the
 > release asset's, and this record rests on the session's summary, not on
-> the run's `result.md` (with the FFT backend, block size and log lines). Whether that closes HOST-11 is jrp's call.
+> the run's `result.md` (with the FFT backend, block size and log lines). jrp accepted the run as closing HOST-11 on 22 November 2026.
 >
 > The same session found other things that are not this check's. A refused
 > 44.1 kHz preset in REAPER set Latency from 1024 frames to 0. A list chosen

@@ -5,7 +5,7 @@
 
 - Tests (HOST-11): done. jrp's second REAPER run passed all eight checks on
   0.18.10 built from the published tag, with Status read while the
-  transport ran ([record](../docs/archive/reviews/2026-11-22-host11-reaper-run2.md)).
+  transport ran; jrp accepted that run as closing it ([record](../docs/archive/reviews/2026-11-22-host11-reaper-run2.md)).
   The host-test automation plan is archived; the rest of its step 3 (the
   other presets, the refused preset, the wrong rate, Latency and the Audio
   Unit in REAPER) is HOST-13.
