@@ -19,8 +19,9 @@
   filter in large blocks, the historical 4.3 and current engines both ran
   at about 1,540 times real time, against 40 times for 2.19 on a 2006
   Pentium 4; at a Latency of 256 frames the current engine was 4.5 times as
-  fast with the same FFT library. Its build settings and raw timings are
-  not yet recorded ([performance then and now](#performance-then-and-now)).
+  fast with the same FFTW 3.3.11 build
+  ([performance then and now](#performance-then-and-now); commands and raw
+  timings in [reproduce](#reproducing-the-historical-stereo-comparison)).
 - Measure again on the target machine before a speed claim
   ([reproduce](#reproduce)).
 
@@ -1523,7 +1524,7 @@ What this means for the items waiting on PERF-3:
 ## Performance then and now
 
 jrp's comparison of the 2006 release with the current engine (22 November
-2026). The Apple M5 Max figures come from jrp's own runs on his Mac.
+2026). The Apple M5 Max figures were measured on jrp's Mac.
 
 In 2006, a Pentium 4 PC running Convolver could apply a stereo
 room-correction filter to a minute of music in **1.5 seconds**. On an Apple
@@ -1556,7 +1557,7 @@ Smaller batches matter when recording. A singer listening through headphones
 would hear a delay of nearly a fifth of a second. With Convolver's added
 delay reduced to **5.8 milliseconds**, the old engine processed **154 seconds
 of audio per second**. On the same Mac, with the same filter and the same
-maths library, the new engine processed **694 seconds per second**: **4.5
+single-precision FFTW 3.3.11 library, the new engine processed **694 seconds per second**: **4.5
 times as much audio in the same time**. Using Apple's Accelerate library,
 the default in the Mac plug-in, the new engine reached **523× real time**,
 or **3.4 times the old engine's speed** at the same delay.
@@ -1575,11 +1576,14 @@ the hardware alone. The archived filter at tag `convolver2-19` is 65,536 frames 
 float at 44.1 kHz. At 44.1 kHz, 186 milliseconds is about 8,192 frames and
 5.8 milliseconds is 256 frames, a [Latency](../use/plugins.md#latency-and-tail)
 of 256. The current engine is 0.18.8 (`9cbcb6b`); 0.18.9 changed no engine
-code. The historical engine is the 4.3 code (tag `convolver4-3`, kept with
-recovered fixes in [`historical/`](../../historical/)). Which of those trees
-jrp rebuilt, his commands, build settings and raw timings are not recorded
-here, nor the FFT library and version, planner mode, compiler and macOS
-version, so the Mac rows cannot yet be reproduced from this page.
+code. The harness compiled the historical DSP from the
+`convolver4-3` tag (`ee3323f2`), before the recovered fixes in
+[`historical/`](../../historical/). It used the repository's regression harness
+to supply macOS types and in-memory input and routing, with two extra
+zeroed floats for the old padded buffer copy. Both FFTW runs used the
+same ARM NEON build. The historical score includes noise generation, filtering
+and the peak scan. The playback timing uses warmed filters and 64-frame calls. The [Mac benchmark commands and raw timings](#reproducing-the-historical-stereo-comparison)
+give the settings, output checks and measurements from each round.
 
 ## Reproduce
 
@@ -1587,6 +1591,43 @@ The benchmark programs and scripts are in
 [`tests/native/benchmarks/`](../../tests/native/benchmarks/), where the
 formatting checks cover them, and the dated results stay in
 [`docs/benchmarks/`](../benchmarks/).
+
+### Reproducing the historical stereo comparison
+
+From the root of a full Convolver clone, with the Xcode Command Line Tools,
+CMake, Python 3 and libsndfile installed, run the command below. Its last
+argument must name a new directory. The [script](../benchmarks/2026-11-22-macos-stereo/kit/reproduce.sh) builds both pinned revisions
+in that directory, downloads FFTW and the period Boost headers, and checks
+the archive hashes. Each measurement first checks the output against
+independent double-precision sums through the filter's tail.
+
+```sh
+sh docs/benchmarks/2026-11-22-macos-stereo/kit/reproduce.sh "$PWD" /tmp/convolver-stereo-run
+```
+
+The CSV files below contain the original measurements on an M5 Max with macOS
+27.2.1 and Apple Clang 21.0.0.
+
+The `realtime` column is seconds of audio processed per second elapsed.
+Use rows for `32bitFilterDRC` and take the median of `realtime` across rounds.
+
+| Original timings | Rows used in the write-up |
+| --- | --- |
+| [Historical scoring method](../benchmarks/2026-11-22-macos-stereo/legacy-style.csv) | `latency=8192`, `backend=fftw`. Three rounds gave 1,544× for 4.3 and 1,535× for 0.18.8. |
+| [Warm playback](../benchmarks/2026-11-22-macos-stereo/warm.csv) | `latency=256`, 64-frame callbacks. Five rounds gave 154× and 694× with FFTW, and 523× for 0.18.8 with Accelerate. |
+| [Longer playback delays](../benchmarks/2026-11-22-macos-stereo/warm-long.csv) | The same playback measurement at 4,096 and 8,192 frames. |
+| [Original six-channel sweep](../benchmarks/2026-11-22-macos-stereo/archive-sweep.csv) | The separate 48 kHz `benchmark.txt` example, with settings 0–8, twice each. |
+
+To check the archived CSVs and print their ranges and medians without
+building either engine, run these commands from the repository root.
+
+```sh
+cd docs/benchmarks/2026-11-22-macos-stereo
+python3 kit/check.py
+```
+
+Elapsed times vary with machine load. Repeat runs should agree on the
+filter hashes, routing, latency and output checks.
 
 ### Overlap-add and overlap-save
 

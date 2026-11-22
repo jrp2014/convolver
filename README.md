@@ -55,7 +55,7 @@ tried.
   ([measurements](docs/develop/fft-measurements.md#on-apple-silicon)). On
   the same Mac at a Latency of 256 frames (5.8 ms), the 0.18.8 engine ran a
   65,536-tap stereo room correction 4.5 times as fast as the 2006 engine
-  when both used the same FFT library, and 3.4 times as fast with
+  when both used the same FFTW build, and 3.4 times as fast with
   Accelerate, which the Mac plug-ins use
   ([then and now](docs/develop/fft-measurements.md#performance-then-and-now)).
   The Latency setting trades delay for processor time when you are not

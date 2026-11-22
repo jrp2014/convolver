@@ -9,9 +9,11 @@
   and 0.18.8 engines both ran at about 1,540 times real time, against 40
   times for 2.19 on a 2006 Pentium 4; at a Latency of 256 frames (5.8 ms)
   the 0.18.8 engine was 4.5
-  times as fast as the historical one with the same FFT library, and 3.4
+  times as fast as the historical one with the same FFTW 3.3.11 build, and 3.4
   times as fast with Accelerate. The README's "Light on the system" point
-  links it.
+  links it. The benchmark kit, the commands to rerun it and all 185 original
+  measurements are in
+  [`docs/benchmarks/2026-11-22-macos-stereo/`](../docs/benchmarks/2026-11-22-macos-stereo/).
 
 ## Done
 
