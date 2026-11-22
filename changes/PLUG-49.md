@@ -24,9 +24,11 @@
   before the window reads the report; `refused_state_keeps_parameters`
   restores a preset for another rate while a filter plays at Latency 1024
   and checks the parameters, then an accepted preset's. Each failed before
-  its fix. `HostFilter::list_waits()` and `Processor::unchanged_state()`;
-  `ConvolverStatus` carries the settings that play and `restore refused`
-  ([adapter contract](../docs/develop/plugin-contract.md)).
+  its fix; the second also gives the controller the state first, as a
+  host against the SDK's order would. `HostFilter::list_waits()` and
+  `Processor::unchanged_state()`; after a refused restore,
+  `ConvolverStatus` carries that state's digest (`state_digest()`) and the
+  settings that play ([adapter contract](../docs/develop/plugin-contract.md)).
 
 ## Done
 

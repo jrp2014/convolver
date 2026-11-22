@@ -175,12 +175,12 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     if (preset_mode < 0 || preset_mode >= static_cast<int64>(gain_mode_count))
         preset_mode = 0;
     // PLUG-48: the settings the processor plays, when it refused the state
-    // the host restored last; absent otherwise or from a damaged message,
-    // which then changes no parameter.
+    // the host restored last (`refused_state`, its state_digest()); absent
+    // otherwise or from a damaged message, which then changes no parameter.
     std::optional<HostSettings> playing;
-    int64 restore_refused = 0;
-    attributes->getInt("restore refused", restore_refused);
-    if (restore_refused) {
+    int64 refused_state = 0;
+    attributes->getInt("refused state", refused_state);
+    if (refused_state) {
         double gain = 0, mix = 0;
         int64 latency = -1, mode = -1;
         if (attributes->getFloat("playing gain", gain) == kResultOk &&
@@ -237,8 +237,9 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
             report_.swap(report);
             format_.swap(format);
         }
-        if (follow_settings_) {
-            follow_settings_ = false;
+        if (follow_state_ && playing &&
+            static_cast<std::uint64_t>(refused_state) == follow_state_) {
+            follow_state_ = 0;
             followed = playing;
         }
     }
@@ -500,12 +501,20 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
     // have refused this state, as REAPER's preset menu offers a preset made
     // for another rate while a filter plays; it then keeps its own settings,
     // but the values above came from the refused preset (REAPER showed
-    // Latency 0 while 1024 played). Its report, the answer to this message,
-    // says what it plays, and the parameters follow it (notify): at once
-    // with a direct connection, when the answer arrives with a forwarding one.
+    // Latency 0 while 1024 played). A status saying the processor refused
+    // this very state (its digest) says what plays instead, and the
+    // parameters follow it (notify). Its report, the answer to this message,
+    // is that status when the processor read the state first, as the SDK
+    // says hosts do; otherwise the status its refusal sends. Any other state
+    // the processor refused, or one it accepted, changes nothing here.
+    std::uint64_t digest = 0;
+    try {
+        digest = state_digest(state);
+    } catch (...) { // Out of memory: the parameters keep the state's values.
+    }
     {
         std::lock_guard lock(status_lock_);
-        follow_settings_ = true;
+        follow_state_ = digest;
     }
     if (auto message = owned(allocateMessage())) {
         message->setMessageID(report_message);

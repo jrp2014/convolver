@@ -155,6 +155,10 @@ inline constexpr int max_bus_channels = identity::max_channels;
 // any arrangement using other speakers, kMono (kSpeakerM) included.
 std::uint32_t wav_speakers(Steinberg::Vst::SpeakerArrangement) noexcept;
 HostState read_state(Steinberg::IBStream*);
+// PLUG-48: a digest of restored state as decoded (never 0), which the
+// processor and the controller compute alike for the same stream, so the
+// controller knows which state a refusal was of.
+std::uint64_t state_digest(const HostState&);
 bool write_state(Steinberg::IBStream*, const HostState&);
 class Processor final : public Steinberg::Vst::AudioEffect {
   public:
@@ -352,9 +356,10 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // restores a project and gives it the track's). Under control_, except
     // played(), which process() calls.
     HostSettling settling_{HostBinding::activation};
-    // PLUG-48, under the lock: whether the newest state the host restored
-    // was refused, so the controller's parameters follow what plays instead.
-    bool restore_refused_ = false;
+    // PLUG-48, under the lock: state_digest() of the newest state the host
+    // restored if it was refused, 0 otherwise (or once a load is accepted),
+    // so the controller's parameters follow what plays instead of it.
+    std::uint64_t refused_state_ = 0;
     bool layout_refusal_logged_ = false; // Refused layouts are logged once per instance.
     std::string logged_;                 // The last line log() queued.
     std::vector<std::pair<std::string, bool>> unlogged_; // Lines and whether each is a problem.
@@ -463,8 +468,9 @@ class Controller final : public Steinberg::Vst::EditController,
     // filter that plays ("filter saved name"), and this pair only when that
     // filter has none.
     std::string name_, identity_;
-    // PLUG-48, under status_lock_: setComponentState asked the processor for
-    // its report, whose settings the parameters then follow (notify).
-    bool follow_settings_ = false;
+    // PLUG-48, under status_lock_: state_digest() of the state the last
+    // setComponentState mirrored, until a status says the processor refused
+    // that state; the parameters then follow what plays (notify). 0: none.
+    std::uint64_t follow_state_ = 0;
 };
 } // namespace convolver::vst3

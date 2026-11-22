@@ -3413,22 +3413,6 @@ void chosen_preset_before_activation() {
     c.terminate();
     p.terminate();
 }
-// PLUG-27: Audacity 4.0.2's order for the copy behind its window. Until it
-// first plays, it sets the copy up at 44.1 kHz whatever the project's rate,
-// and starts it only for a moment, with one block of silence, to pass on a
-// parameter edit (FlushParameters); exports run in other copies made from
-// the state this one saves. A single filter chosen there is kept and checked
-// when the host starts the plug-in, so the saved state holds it. A list
-// waits for the host's rate, with jrp's words (20 November 2026); once the
-// host has played at 48 kHz and stopped, it chooses its 48 kHz entry. While
-// the host plays, a file that does not suit is refused, as before.
-// PLUG-40 (jrp, 21 November 2026): a list refused before the host's settings
-// were known. After Audacity's flush at 44.1 kHz, which plays no audio for
-// the window to see, the window's report says the settings are known now,
-// naming that 44.1 kHz, and nothing is read again. Once the window reads its
-// report while the host plays at 48 kHz, the list is read again by itself,
-// as if chosen: its 48 kHz entry is saved, and a host without setDirty
-// (Audacity) is told the project changed by the Latency edit (VST3-17).
 // PLUG-48 (jrp's live session, 22 November 2026): REAPER offered a 44.1 kHz
 // preset at 48 kHz while a filter played at Latency 1024. The processor
 // refused it and kept its filter and settings, but the controller took the
@@ -3491,11 +3475,49 @@ void refused_state_keeps_parameters() {
     require(restore(*same_rate) == kResultOk && p.getLatencySamples() == 256 &&
                 shown_latency() == 256 && c.getParamNormalized(gain_id) == normalized_gain(0),
             "refused state: an accepted preset's settings");
+    // A host that gives the controller the state first (the SDK says the
+    // processor first): a refusal is followed when it comes, and an accepted
+    // preset after a refused one keeps its own settings (the independent
+    // review: a refusal of another state must not count).
+    const auto controller_first = [&](IBStream& stream) {
+        stream.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(c.setComponentState(&stream) == kResultOk, "refused state: the controller first");
+        stream.seek(0, IBStream::kIBSeekSet, nullptr);
+        return p.setState(&stream);
+    };
+    require(controller_first(*other_rate) != kResultOk && p.getLatencySamples() == 256 &&
+                shown_latency() == 256,
+            ("refused state, controller first: shown " + std::to_string(shown_latency()) +
+             ", playing " + std::to_string(p.getLatencySamples()))
+                .c_str());
+    auto another = state_at(48000, 512, -3);
+    require(controller_first(*another) == kResultOk && p.getLatencySamples() == 512 &&
+                shown_latency() == 512 && c.getParamNormalized(gain_id) == normalized_gain(-3),
+            ("refused state, controller first: an accepted preset after a refused one shows " +
+             std::to_string(shown_latency()) + " while " + std::to_string(p.getLatencySamples()) +
+             " plays")
+                .c_str());
+    require(handler.edits.size() == edits, "refused state: following what plays is an edit");
     p.setActive(false);
     c.terminate();
     p.terminate();
 }
-
+// PLUG-27: Audacity 4.0.2's order for the copy behind its window. Until it
+// first plays, it sets the copy up at 44.1 kHz whatever the project's rate,
+// and starts it only for a moment, with one block of silence, to pass on a
+// parameter edit (FlushParameters); exports run in other copies made from
+// the state this one saves. A single filter chosen there is kept and checked
+// when the host starts the plug-in, so the saved state holds it. A list
+// waits for the host's rate, with jrp's words (20 November 2026); once the
+// host has played at 48 kHz and stopped, it chooses its 48 kHz entry. While
+// the host plays, a file that does not suit is refused, as before.
+// PLUG-40 (jrp, 21 November 2026): a list refused before the host's settings
+// were known. After Audacity's flush at 44.1 kHz, which plays no audio for
+// the window to see, the window's report says the settings are known now,
+// naming that 44.1 kHz, and nothing is read again. Once the window reads its
+// report while the host plays at 48 kHz, the list is read again by itself,
+// as if chosen: its 48 kHz entry is saved, and a host without setDirty
+// (Audacity) is told the project changed by the Latency edit (VST3-17).
 void list_read_again() {
     HostApplication context;
     Handler handler;

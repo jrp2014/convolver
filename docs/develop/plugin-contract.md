@@ -173,7 +173,10 @@ before they set the sample rate and channel layout (VST3 `setState` before
   waits (`HostFilter::list_waits()`), VST3's `setState` with state that is
   exactly what `getState` would save now (`Processor::unchanged_state()`,
   compared encoded) changes nothing; a project the host says it is
-  opening still replaces everything. Audacity's flush plays no audio a
+  opening still replaces everything. A restore of that same state meant
+  to choose the filter already there (an undo back to before the list,
+  say) is then also ignored, and the list, still waiting, is read at the
+  next playback with the window open. Audacity's flush plays no audio a
   window could see, so it never triggers this. Until then, once a control
   call has seen the host playing with the configuration it still has
   (`HostFilter::confirm()` with it, `HostFilter::played_with()`; not a
@@ -1207,15 +1210,19 @@ the plan's Gain modes (12 November 2026); its meters follow later
   menu offering a 44.1 kHz preset at 48 kHz while a filter plays, jrp's
   live session of 22 November 2026) leaves the processor's settings as
   they were, but the controller had mirrored the refused state, so the
-  window and the host showed Latency 0 while 1024 played. Every
-  `ConvolverStatus` now carries the settings the processor plays, with
-  `restore refused` while the newest restored state was refused;
-  `setComponentState` asks for the report, and the next status after it
-  that says the restore was refused sets Gain, Gain mode, Mix and Latency
-  to what plays, without reporting edits, asking for a restart if the
-  Latency changed. A host that gives the controller the state before the
-  processor (the SDK says the processor first) still shows the refused
-  state's values; bypass is the host's and is not corrected.
+  window and the host showed Latency 0 while 1024 played. While the
+  newest restored state stands refused (until a load is accepted), each
+  `ConvolverStatus` carries its `refused state`, a digest of the state as
+  decoded (`state_digest()`, which both halves compute alike), and the
+  settings that play instead. `setComponentState` remembers the digest of
+  the state it mirrored and asks for the report (so the processor's
+  answer also comes when no window is open; while the host plays, that
+  report reads a waiting list again, as the window's does). A status
+  naming that same state sets Gain, Gain mode, Mix and Latency to what
+  plays, without reporting edits, asking for a restart if the Latency
+  changed; a refusal of any other state, or an accepted one, changes
+  nothing, so the host's order does not matter. Bypass is the host's and
+  is not corrected.
 
 ## Channel layouts
 

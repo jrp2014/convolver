@@ -412,7 +412,7 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
     try {
         std::string report;
         HostSettings playing;
-        bool restore_refused = false;
+        std::uint64_t refused_state = 0;
         {
             const Locked lock(*this);
             if (settling_.playing()) // PLUG-27: the host plays the filter.
@@ -420,7 +420,7 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
             // PLUG-39 step 5: the report holds the Status line too.
             report = encode_report(report_locked());
             playing = settings();
-            restore_refused = restore_refused_;
+            refused_state = refused_state_;
         }
         if (!getPeer())
             return;
@@ -433,14 +433,16 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
             return;
         attributes->setBinary("report", report.data(), static_cast<uint32>(report.size()));
         attributes->setBinary("format", tag_.data(), static_cast<uint32>(tag_.size()));
-        // PLUG-48: the settings it plays, which the controller's parameters
-        // follow after the host restores state (Controller::setComponentState).
-        attributes->setFloat("playing gain", playing.gain_db);
-        attributes->setFloat("playing mix", playing.mix);
-        attributes->setInt("playing latency", static_cast<int64>(playing.latency));
-        attributes->setInt("playing gain mode", static_cast<int64>(playing.gain_mode));
-        if (restore_refused)
-            attributes->setInt("restore refused", 1);
+        // PLUG-48: after refused state, which state it was and the settings
+        // that play instead, which the controller's parameters follow if it
+        // mirrored that state (Controller::setComponentState).
+        if (refused_state) {
+            attributes->setInt("refused state", static_cast<int64>(refused_state));
+            attributes->setFloat("playing gain", playing.gain_db);
+            attributes->setFloat("playing mix", playing.mix);
+            attributes->setInt("playing latency", static_cast<int64>(playing.latency));
+            attributes->setInt("playing gain mode", static_cast<int64>(playing.gain_mode));
+        }
         if (answer.load_request || answer.retried) {
             if (answer.load_request)
                 attributes->setInt("load request", answer.load_request);
@@ -731,10 +733,12 @@ std::string state_type(IBStream* stream) {
 tresult Processor::load_state(IBStream* stream) {
     const Locked lock(*this);
     observe_faults(); // Explained under the filter that played; an accepted load clears them.
+    std::uint64_t digest = 0;
     try {
         HostState next;
         try {
             next = read_state(stream);
+            digest = state_digest(next);
         } catch (const NewerHostState& e) {
             filter_.reject(HostFailureKind::state_newer, state_read_message(e));
             throw;
@@ -762,10 +766,10 @@ tresult Processor::load_state(IBStream* stream) {
             unchanged_state(next))
             return kResultOk;
         install(std::move(next), request);
-        restore_refused_ = false;
+        refused_state_ = 0;
         return kResultOk;
     } catch (...) {
-        restore_refused_ = true;
+        refused_state_ = digest;
         refused();
         return kResultFalse;
     }
@@ -925,6 +929,7 @@ bool Processor::install_chosen(const std::string& path, std::optional<HostSettin
         return false;
     }
     settings = install(std::move(*next), request);
+    refused_state_ = 0;
     return true;
 }
 Advice Processor::notice() {
@@ -934,6 +939,16 @@ Advice Processor::notice() {
 std::optional<HostFailure> Processor::failure() {
     const Locked lock(*this);
     return filter_.failure();
+}
+std::uint64_t state_digest(const HostState& state) {
+    // FNV-1a over the state as encoded: the same in both halves of the
+    // plug-in, which decode the same stream.
+    std::uint64_t h = 14695981039346656037ull;
+    for (const auto b : encode_host_state(state)) {
+        h ^= static_cast<std::uint64_t>(b);
+        h *= 1099511628211ull;
+    }
+    return h ? h : 1;
 }
 // Whether `next` is what getState() would save now (the lock held); false
 // when that cannot be told (out of memory), so the state is installed.
