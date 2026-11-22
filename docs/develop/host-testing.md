@@ -426,9 +426,9 @@ Do this once. Run the commands in the extracted preview package folder.
 `scripts/reaper_check.py` (HOST-11) runs part of the REAPER steps above with
 no clicks, through REAPER's [ReaScript](https://www.reaper.fm/sdk/reascript/reascripthelp.html),
 as the 7 November 2026 [retest](../archive/reviews/2026-11-07-reaper-crossover-retest.md)
-did by hand. It is step 3 of the [host-test automation plan](../project/plans/2026-11-21-host-test-automation.md#steps),
-and this first version is that plan's smallest run: one render, and one
-save and reopen. Install the package's `Convolver.vst3` as in
+did by hand. It was step 3 of the [host-test automation plan](../archive/plans/2026-11-21-host-test-automation.md#steps),
+which it carried out in its first version, the plan's smallest run: one
+render, and one save and reopen. Install the package's `Convolver.vst3` as in
 [prepare the Mac](#prepare-the-mac), set the audio device to 48 kHz (the
 script sets the project's rate but not the device's, and at another device
 rate Status reports the mismatch while REAPER plays), quit REAPER, and run
@@ -468,11 +468,15 @@ and Status only), 6 and 7 of [REAPER](#reaper-vst3), in the guide's
 [render and reopen](../use/check-a-stereo-filter.md#4-render-the-example-in-the-host)
 form. Listening, bypass, the refused presets, the wrong host rate, the
 window, Latency and the crossover stay manual until the script grows to
-cover them, one addition per run. jrp's first run, on 21 November 2026
-with the 0.16.14 candidate, passed all eight checks
-([record](../archive/reviews/2026-11-21-host11-reaper.md)); it read Status
-"while playing" after the transport had stopped. The repeat is meant to
-prevent that; it has not yet run in REAPER. Without REAPER, `tests/reaper_check_tests.py`
+cover them, one addition per run; none is scheduled. jrp's first run, on
+21 November 2026 with the 0.16.14 candidate, passed all eight checks
+([record](../archive/reviews/2026-11-21-host11-reaper.md)) but read Status
+"while playing" after the transport had stopped. His second, on 22 November
+2026 with the published 0.18.10 built from its tag, passed all eight with
+both readings taken while the transport ran
+([record](../archive/reviews/2026-11-22-host11-reaper-run2.md)). The play
+position it reports is what REAPER plays out, so it reads a little under
+1.5 s. Without REAPER, `tests/reaper_check_tests.py`
 checks the script in pre-commit against a stand-in REAPER.
 
 ### Audacity (VST3)

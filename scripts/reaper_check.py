@@ -26,8 +26,8 @@ could not start.
 
 This is the plan's first version: the smallest run that shows REAPER doing
 one render and one save and reopen from a script. Refusals, the wrong host
-rate, a Latency change and the Audio Unit come later
-(docs/project/plans/2026-11-21-host-test-automation.md). It uses only
+rate, a Latency change and the Audio Unit stay manual; none is scheduled
+(docs/archive/plans/2026-11-21-host-test-automation.md). It uses only
 Python's standard library, so it runs with the python3 that macOS provides.
 """
 
