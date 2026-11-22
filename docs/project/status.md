@@ -9,11 +9,13 @@ going. [TODO](../../TODO.md) is the backlog and owns the order of work; the
 linked guides own the behaviour.
 
 **In short:** checked on 20 November 2026 against `main` at `549ec9c`
-(0.16.8). jrp has published six unsigned developer previews as GitHub
+(0.16.8). jrp has published seven unsigned developer previews as GitHub
 pre-releases, for macOS from 0.12.12 and for macOS, Windows and Linux from
 0.13.2; the latest is
+[0.18.10](https://github.com/jrp2014/convolver/releases/tag/v0.18.10)
+(22 November 2026). The baseline for every check still open stays
 [0.14.0](https://github.com/jrp2014/convolver/releases/tag/v0.14.0)
-(19 November 2026), the baseline for every check still open. What each
+(19 November 2026) until jrp moves it. What each
 added is in the [CHANGELOG](../../CHANGELOG.md). The command-line renderer,
 the preset tool, the Equalizer APO export and the VST3, Audio Unit and LV2
 plug-ins are implemented and tested automatically, with Gain, Mix, Latency

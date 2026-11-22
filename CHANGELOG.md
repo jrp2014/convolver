@@ -26,11 +26,12 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ## [0.18.10] - 2026-11-22
 
-The seventh published preview, for macOS, Windows and Linux, unsigned, for
-live testing: a filter or configuration list chosen before the host plays is
-kept and loads once the host plays, a filter that does not suit the host
-waits for a start that suits it, plainer wording in the window and Status,
-the tail after a stop at the filter's own rate, and audible echo examples
+The seventh published preview, for macOS, Windows and Linux, unsigned: a
+filter chosen before the host plays is kept, a configuration list loads by
+itself once the host plays (with the window open), a filter that does not
+suit the host waits for a start that suits it, plainer wording in the window
+and Status, the tail reported after a stop is the current filter's own, and
+audible echo examples
 ([release](https://github.com/jrp2014/convolver/releases/tag/v0.18.10)).
 
 ### Added
