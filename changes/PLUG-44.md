@@ -21,10 +21,16 @@
   says more than the filter's Length (delays, a Latency, another rate);
   channels read `2 in → 2 out`
   everywhere. The reminder that a file can be dropped on the window is
-  gone from under the name (the Fix and Choose…'s tip still say it); a
-  refused file's note starts `Still playing.` when the earlier filter plays
-  on, and now also shows when a file is refused while a kept filter waits
-  (before, only the log and the host's beep said so); the message no longer repeats the Latency row's "not in use yet"; the
+  gone from under the name (the Fix and Choose…'s tip still say it). When
+  a file is refused, the message now explains that file first and says
+  once what becomes of the filter in the heading, by name: `room.cfg keeps
+  playing.` while the host plays it, `room.cfg is still selected.` after
+  Stop, and, for a kept filter that does not suit the host, `room.cfg is
+  still selected and will play at 48000 Hz.` instead of telling you to
+  change the project's rate (jrp's review). The note under the name says
+  only `broken.wav was refused.`, and now also shows when a file is
+  refused while a kept filter waits (before, only the log and the host's
+  beep said so); the message no longer repeats the Latency row's "not in use yet"; the
   title gives the release number without the build's source revision,
   which the Software line keeps. Loudest peak is renamed **Worst-case
   peak**, so that it cannot be confused with the level meters planned

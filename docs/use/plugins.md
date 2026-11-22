@@ -495,10 +495,9 @@ From the top, the window has:
   hold the pointer over them for all of them). The Audio section further
   down gives the host's values, which need not be the same: a filter made
   for 2 inputs on a host track with 6, say. Under the facts, in
-  small text, a note when the newest file was refused (also while a kept
-  filter waits for settings that suit it), which starts `Still playing.`
-  when the earlier filter plays on (`Still playing. room-48k.cfg was
-  refused.`); otherwise nothing.
+  small text, a note when the newest file was refused (`broken.wav was
+  refused.`, also while a kept filter waits for settings that suit it);
+  otherwise nothing.
 - **The status** beside the name (Active, Bypassed, No filter, Load failed,
   Waiting or Fault), the same as the Status parameter, as a symbol
   and a word, coloured for Active (green), Load failed (red) and Fault
@@ -521,6 +520,15 @@ From the top, the window has:
   When a button in the window carries out the fix, it is highlighted in the
   accent colour: **Choose…** when a different filter puts it right, **Copy
   Diagnostics** for a fault in Convolver itself.
+
+  A refused file is explained first, as the latest thing you did, and
+  "What plays" then names the filter in the heading once: `room.cfg keeps
+  playing.` while the host plays it, `room.cfg is still selected.` after
+  Stop or while bypassed, and `room.cfg is still selected and will play
+  at 48000 Hz.` when that filter is kept but does not suit the host. So a
+  broken file chosen while a 48 kHz filter waits in a 44.1 kHz project
+  reads "**broken.wav could not be read …**", then that sentence, not a fix
+  for the rate.
 
   For example, a stereo preset on a GarageBand mono track reads "**The saved
   filter has 2 inputs and 2 outputs, and the host gives the plug-in 1 input

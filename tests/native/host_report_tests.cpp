@@ -422,7 +422,7 @@ void cases() {
              return host_report(f, bypassed);
          },
          HostStatus::load_failed,
-         {"The previous filter is kept. Bypass is on: the input plays unfiltered."},
+         {"The previous filter is still selected. Bypass is on: the input plays unfiltered."},
          {"keeps playing"}},
     };
     for (const auto& c : all) {
@@ -684,28 +684,40 @@ void cases() {
     require(fact(rr, "Host sample rate").problem &&
                 fact(rr, "Host sample rate").note == "the refused file is for 48000 Hz",
             "refused rate: " + fact(rr, "Host sample rate").note);
-    // PLUG-44: the heading names the filter that still plays.
-    require(rr.filter_note == "Still playing. room-48k.cfg was refused." &&
+    // PLUG-44: the note names the refused file; the message says once what
+    // becomes of the kept filter.
+    require(rr.filter_note == "room-48k.cfg was refused." &&
+                rr.plays == "The previous filter keeps playing." &&
                 reference(rr, "Refused file") == "/filters/room-48k.cfg, request 2",
             "refused file: " + rr.filter_note);
     require(
         contains(report_text(rr), "Host sample rate: 44100 Hz; the refused file is for 48000 Hz\n"),
         "refused report text:\n" + report_text(rr));
     // PLUG-44: a file refused for another reason (unreadable) leaves the
-    // one Host line, as nothing about the host differs; bypassed, the
-    // filter is not heard, so the note does not say it still plays.
+    // one Host line, as nothing about the host differs. The message names
+    // both files (jrp's review of 735b0af): the kept one "keeps playing"
+    // only while the host plays it, and "is still selected" once stopped
+    // or bypassed, when it is not heard.
     {
         HostFilter unreadable(8);
-        unreadable.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {});
-        unreadable.reject(HostFailureKind::filter_file, {"The file could not be read."},
+        unreadable.load(
+            HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {},
+            HostRequest{HostFilterSource::file, "/filters/room.cfg"});
+        unreadable.reject(HostFailureKind::filter_file, {"/filters/broken.wav could not be read."},
                           HostRequest{HostFilterSource::file, "/filters/broken.wav"});
         const auto ru = host_report(unreadable, facts(stereo));
+        auto stopped = facts(stereo);
+        stopped.running = false;
         auto bypassed = facts(stereo);
         bypassed.bypassed = true;
         require(has_fact(ru, "Host") && !has_fact(ru, "Host sample rate") &&
-                    ru.filter_note == "Still playing. broken.wav was refused." &&
-                    host_report(unreadable, bypassed).filter_note == "broken.wav was refused.",
-                "unreadable refusal: " + ru.filter_note);
+                    ru.filter_note == "broken.wav was refused." &&
+                    ru.problem.rfind("broken.wav could not be read", 0) == 0 &&
+                    ru.plays == "room.cfg keeps playing." &&
+                    host_report(unreadable, stopped).plays == "room.cfg is still selected." &&
+                    host_report(unreadable, bypassed).plays ==
+                        "room.cfg is still selected. Bypass is on: the input plays unfiltered.",
+                "unreadable refusal: " + ru.filter_note + " | " + ru.problem + " | " + ru.plays);
     }
     // VST3-11: the window's Reload and its watch on the files take the
     // accepted file's path and files, never a refused one's or saved state's.
@@ -1062,6 +1074,18 @@ void awaiting_validation() {
                 s.status == HostStatus::load_failed &&
                 contains(s.text, "the filter is for 48000 Hz, the host runs at 44100 Hz"),
             "a file refused while a kept filter waits: " + r.filter_note + " | " + s.text);
+    // jrp's review of 735b0af: the chosen room.cfg (48 kHz) waits in a 44.1
+    // kHz host, then broken.wav is refused. The message explains broken.wav,
+    // the latest action, and says room.cfg is still selected and what it
+    // plays at, rather than telling the user to change the rate as the fix.
+    f.reject(HostFailureKind::filter_file, {"/filters/broken.wav could not be read."},
+             HostRequest{HostFilterSource::file, "/filters/broken.wav"});
+    r = host_report(f, facts(placeholder));
+    require(r.problem.rfind("broken.wav could not be read", 0) == 0 &&
+                r.plays == "room.cfg is still selected and will play at 48000 Hz." &&
+                !contains(r.fix, "48000 Hz") && r.filter_note == "broken.wav was refused.",
+            "a file refused while a chosen filter waits: " + r.problem + " | " + r.plays + " | " +
+                r.fix);
 }
 
 // PLUG-40 (jrp, 21 November 2026): a list refused before the host's

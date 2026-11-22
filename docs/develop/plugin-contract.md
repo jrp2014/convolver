@@ -467,8 +467,13 @@ format.
   `playing_words()`, `failure_consequence()` and `rejected_line()` in
   [`host_log.cpp`](../../portable/host_log.cpp): the start log line
   ("Bypass is on: the input plays unfiltered. Loaded: …"), a refused
-  replacement ("The previous filter is kept. Bypass is on: the input plays
-  unfiltered."), its log line ("the previous filter is kept (bypass is
+  replacement (the log's "The previous filter is kept. Bypass is on: the
+  input plays unfiltered."; the window's report names the kept filter
+  instead, "room.cfg is still selected. Bypass is on: …", from
+  `kept_words()` in `host_report.cpp`, which says "keeps playing" only
+  while the host runs the plug-in and, for a kept filter that does not
+  suit the host, what it will play at, explaining the refused request
+  first, PLUG-44), its log line ("the previous filter is kept (bypass is
   on)"), the report's fault explanation ("Bypass is on: the input plays
   unfiltered.") and VST3's line for restored state kept until the host
   suits it never say that the filter plays while bypass is on, and a list

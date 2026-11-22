@@ -801,12 +801,11 @@ void files() {
     require(contains(r.explanation, mono.c_str()) &&
                 contains(r.explanation, "cannot be used with this host"),
             "mono file refusal: " + text(r.explanation));
-    require(
-        [view.filterNameField.stringValue isEqualToString:@"stereo.wav"] &&
-            [view.filterNoteField.stringValue hasPrefix:@"Still playing. mono.wav was refused."] &&
-            contains(reference_text(r), "Refused file: "),
-        "Filter row after a refused file: " + text(view.filterNameField.stringValue) + " / " +
-            text(view.filterNoteField.stringValue));
+    require([view.filterNameField.stringValue isEqualToString:@"stereo.wav"] &&
+                [view.filterNoteField.stringValue hasPrefix:@"mono.wav was refused."] &&
+                contains(reference_text(r), "Refused file: "),
+            "Filter row after a refused file: " + text(view.filterNameField.stringValue) + " / " +
+                text(view.filterNoteField.stringValue));
     // The short summary (Status, Copy diagnostics) gives the refused file's
     // own counts (jrp's GarageBand run: it read "0 in, 0 out"), and the
     // explanation speaks of Convolver and the host, not command-line options.

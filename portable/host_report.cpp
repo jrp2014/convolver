@@ -68,10 +68,45 @@ std::string load_fix(bool chooses_files) {
 bool chosen_away(HostFailureKind kind) {
     return kind != HostFailureKind::preparation && kind != HostFailureKind::activation;
 }
+// PLUG-44 (jrp's review of 735b0af): what becomes of the filter Convolver
+// keeps after a request was refused, naming it, so the refused file and the
+// kept one each have an owner: "room.cfg keeps playing." only while the host
+// plays it; otherwise "room.cfg is still selected.", and when it does not suit
+// the host, what it will play at ("... and will play at 48000 Hz.").
+std::string kept_words(const HostFilter& filter, const HostReportFacts& facts) {
+    const auto& accepted = filter.accepted();
+    const auto slash = accepted.path.find_last_of("/\\");
+    const std::string name =
+        accepted.source == HostFilterSource::file && !accepted.path.empty()
+            ? (slash == std::string::npos ? accepted.path : accepted.path.substr(slash + 1))
+        : !accepted.name.empty() ? accepted.name
+                                 : std::string("The previous filter");
+    const auto& host = facts.host;
+    const bool dry = host && dry_signal(filter, *host);
+    if (filter.kept_unsuited()) {
+        const auto& c = *filter.filter();
+        return name + " is still selected and will play " +
+               (filter.failure()->kind == HostFailureKind::sample_rate
+                    ? "at " + std::to_string(c.sample_rate) + " Hz."
+                    : "with " + ports(c.input_channels, c.output_channels) + ".") +
+               (facts.bypassed && host ? " " + bypass_sentence(true, dry) : std::string());
+    }
+    if (facts.bypassed && host)
+        return name + " is still selected. " + bypass_sentence(true, dry);
+    return name + (host && facts.running ? " keeps playing." : " is still selected.");
+}
+
 Message message(const HostFilter& filter, const HostReportFacts& facts) {
     const auto& host = facts.host;
     const auto* layout = host ? &*host : nullptr;
     const auto& failure = filter.shown_failure();
+    // PLUG-44 (jrp's review of 735b0af): a request refused after the filter
+    // Convolver keeps is the user's latest action, so it is explained first,
+    // even while the kept filter's own wait is the failure Status shows.
+    const auto& refusal = filter.rejection();
+    const bool kept_after_refusal =
+        filter.filter() && refusal && refusal->request.number != filter.accepted().number;
+    const auto& explained = kept_after_refusal ? refusal : failure;
     const auto choose = facts.chooses_files ? "choose filter" : "";
     // PLUG-36 (jrp, 20 November 2026), PLUG-39 step 4: with bypass on, what
     // plays is what bypass plays, as host_status() says; playing_words() and
@@ -94,18 +129,22 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
     const auto status = host_status_value(filter, host.has_value(), facts.bypassed);
     // PLUG-44: a filter that waits for settings that suit it shows Waiting,
     // and is explained as a filter that does not suit the host.
-    if ((status == HostStatus::load_failed || filter.waits_for_settings()) && failure) {
-        auto a = shown_failure_message(*failure, filter.played_with(host));
-        a.problem = short_problem(std::move(a.problem), *failure);
+    if ((status == HostStatus::load_failed || filter.waits_for_settings()) && explained) {
+        auto a = shown_failure_message(*explained, filter.played_with(host));
+        a.problem = short_problem(std::move(a.problem), *explained);
         take(a);
-        m.plays = failure_consequence(*failure, layout, facts.settings,
-                                      layout && dry_signal(filter, *layout), facts.bypassed);
-        // PLUG-42 (jrp, 21 November 2026): a filter kept although it does
-        // not suit the host plays at the next start that suits it.
-        if (filter.kept_unsuited())
-            m.plays += " The filter is kept and waits for audio settings that suit it: it plays "
-                       "when the host next starts the plug-in with them.";
-        if (chosen_away(failure->kind))
+        if (kept_after_refusal)
+            m.plays = kept_words(filter, facts);
+        else {
+            m.plays = failure_consequence(*explained, layout, facts.settings,
+                                          layout && dry_signal(filter, *layout), facts.bypassed);
+            // PLUG-42 (jrp, 21 November 2026): a filter kept although it
+            // does not suit the host plays at the next start that suits it.
+            if (filter.kept_unsuited())
+                m.plays += " The filter is kept and waits for audio settings that suit it: it "
+                           "plays when the host next starts the plug-in with them.";
+        }
+        if (chosen_away(explained->kind))
             m.action = choose;
         // Faults the load failure hides from the status.
         if (filter.faults().any())
@@ -502,14 +541,12 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
     const auto& refusal = filter.rejection();
     const bool refused_request = refusal && refusal->request.number != accepted.number;
     if (refused_request)
-        // PLUG-44: the heading names the filter that plays, which the
-        // status beside it (Load failed) does not describe, so say so.
+        // PLUG-44: the message says what becomes of the filter named in
+        // the heading (kept_words()), so the note names only the refusal.
         r.filter_note =
-            std::string(filter.plays_suiting() && facts.host && !facts.bypassed ? "Still playing. "
-                                                                                : "") +
-            (refusal->request.source == HostFilterSource::file && !refusal->request.path.empty()
-                 ? file_name(refusal->request.path) + " was refused."
-                 : std::string("The last filter loaded was refused."));
+            refusal->request.source == HostFilterSource::file && !refusal->request.path.empty()
+                ? file_name(refusal->request.path) + " was refused."
+                : std::string("The last filter loaded was refused.");
 
     r.audio = audio_facts(filter, facts);
     const auto& host = facts.host;
