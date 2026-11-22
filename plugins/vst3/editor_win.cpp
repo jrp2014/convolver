@@ -1763,12 +1763,19 @@ void Editor::filter_menu() {
     const int chosen = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_LEFTALIGN,
                                       button.left, button.bottom, 0, hwnd_, nullptr);
     DestroyMenu(menu);
-    if (hwnd_ && chosen)
+    if (hwnd_ && chosen >= win::menu_recent_first &&
+        static_cast<std::size_t>(chosen - win::menu_recent_first) < entries.size()) {
+        // The file shown, even if another window changed the list meanwhile.
+        if (!load(entries[static_cast<std::size_t>(chosen - win::menu_recent_first)].path))
+            MessageBeep(MB_OK);
+    } else if (hwnd_ && chosen) {
         menu_command(chosen);
+    }
     release();
 }
 
-// A Choose Filter menu command, chosen there or sent as WM_COMMAND.
+// A Choose Filter menu command, sent as WM_COMMAND or chosen in the menu (a
+// recent file chosen there loads the entry the menu showed, above).
 void Editor::menu_command(int id) {
     switch (id) {
     case win::menu_choose:
