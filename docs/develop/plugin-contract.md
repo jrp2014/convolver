@@ -163,7 +163,9 @@ before they set the sample rate and channel layout (VST3 `setState` before
   on the window's thread: VST3's processor in its `report_message`, which
   answers with `"retried"` so the controller marks the project changed as for
   a chosen file (setDirty, or VST3-17's Latency edit), and the Audio Unit in
-  its `report()`, through `load_file()`. Audacity's flush plays no audio a
+  its `report()`, through `load_file()`. An accepted list joins the
+  windows' recent files there, as a chosen file does, so it does not matter
+  which window reads the report (PLUG-47). Audacity's flush plays no audio a
   window could see, so it never triggers this. Until then, once a control
   call has seen the host playing with the configuration it still has
   (`HostFilter::confirm()` with it, `HostFilter::played_with()`; not a
@@ -309,7 +311,7 @@ rules it follows.
 | --- | --- | --- | --- |
 | **Empty:** nothing accepted, or an empty state accepted | Equal host counts: identity, at the level Gain and Mix give it. Unequal: silence | No filter | No filter |
 | **Active:** an accepted filter that suits the host | The filter at Gain, with Mix's dry share when the filter's own counts are equal | The filter (VST3: with the settings and bypass) | Active; Waiting while the host's configuration is not known, as the filter is not checked yet |
-| **Kept, unsuited:** an accepted filter that does not suit the host's rate or counts, found at activation, or restored into VST3 before audio has played | Silence; Mix's dry share below 100% when the host's counts and the filter's are both equal | The filter, so correcting the host brings it back | Load failed with the reason: "Silent:", or "only the dry signal plays" |
+| **Kept, unsuited:** an accepted filter that does not suit the host's rate or counts, found at activation, or restored into VST3 before audio has played | Silence; Mix's dry share below 100% when the host's counts and the filter's are both equal | The filter, so correcting the host brings it back | Waiting with what it waits for: "Silent, waiting for 44100 Hz: the host runs at 48000 Hz.", or "Only the dry signal plays, waiting for …" (PLUG-44, `HostFilter::waits_for_settings()`); while a refused request is still shown, Load failed with the same reason ("Silent: …") |
 | **Failed:** a first load failed, or a saved failure was restored | Silence, with no dry signal whatever the counts or Mix | The failure (flag 4), no filter | Load failed: "Silent:" with the reason, or "an earlier load failed" |
 
 A host start whose processor cannot be built (`fail_activation()`,
@@ -354,7 +356,12 @@ first match wins:
 
 1. A load failure: the failure found at activation while it lasts, otherwise
    the newest refused request's. A kept filter that does not suit therefore
-   keeps showing why it is silent while a later refusal is logged.
+   keeps showing why it is silent while a later refusal is logged. With no
+   refused request since the last accepted load, that kept filter only
+   waits for settings that suit it (`waits_for_settings()`), and the value
+   is Waiting instead, with the same reason (jrp, 21 November 2026,
+   PLUG-44); LV2's port still shows Load failed for it, as its only value
+   for Waiting is running.
 2. A fault, unless a failed load left no filter. Faults stay until an
    accepted load or an activation; while a load failure is shown the report
    adds them as a note.
@@ -447,9 +454,11 @@ format.
   bypassed it keeps a failure visible but describes what bypass plays, the
   untouched input where there is a dry signal, never silence or attenuation
   that is not happening (jrp, 20 November 2026, PLUG-36): a kept filter that
-  does not suit the host reads "Load failed. Bypass is on: only the dry
-  signal plays. The filter is for 44100 Hz, the host runs at 48000 Hz."
-  (no room is left for the log's pointer), and an instance with no filter
+  does not suit the host reads "Bypass is on: only the dry signal plays.
+  Waiting for 44100 Hz: the host runs at 48000 Hz." (PLUG-44; "Load
+  failed. Bypass is on: only the dry signal plays. The filter is for 44100
+  Hz, …" while a refused request is shown, with no room for the log's
+  pointer), and an instance with no filter
   reads "No filter. Bypass is on: audio passes unchanged." whatever Gain and
   Mix are. Where bypass plays silence the line says "Silent" as before: a
   failed load with no filter kept, a filter or host with unequal counts,
@@ -460,8 +469,13 @@ format.
   `playing_words()`, `failure_consequence()` and `rejected_line()` in
   [`host_log.cpp`](../../portable/host_log.cpp): the start log line
   ("Bypass is on: the input plays unfiltered. Loaded: …"), a refused
-  replacement ("The previous filter is kept. Bypass is on: the input plays
-  unfiltered."), its log line ("the previous filter is kept (bypass is
+  replacement (the log's "The previous filter is kept. Bypass is on: the
+  input plays unfiltered."; the window's report names the kept filter
+  instead, "room.cfg is still selected. Bypass is on: …", from
+  `kept_words()` in `host_report.cpp`, which says "keeps playing" only
+  while the host runs the plug-in and, for a kept filter that does not
+  suit the host, what it will play at, explaining the refused request
+  first, PLUG-44), its log line ("the previous filter is kept (bypass is
   on)"), the report's fault explanation ("Bypass is on: the input plays
   unfiltered.") and VST3's line for restored state kept until the host
   suits it never say that the filter plays while bypass is on, and a list
@@ -471,8 +485,12 @@ format.
   play, so it says "no filter plays". DIAG-10 adds what the window's report
   says about the settings, in short, after the line's own words: a Latency
   chosen but not in use yet ("Latency 1024 frames not in use yet.", from
-  the latency the processor plays at, except after a load failure or a
-  fault, which say more), and, with a filter, Estimate chosen without an
+  the latency the processor plays at, except after a load failure, a kept
+  filter's wait or a fault, which say more; with no processor, as while
+  the Audio Unit is uninitialized, the choice is selected for the next
+  start, so it is never "not in use yet", although for a moment, until the
+  Latency queue publishes it, the host may still read the previous
+  latency, AU-19), and, with a filter, Estimate chosen without an
   estimate ("No estimate: No clipping's gain plays." or "Too loud to
   estimate: …") or no gain figure at all ("Silent: no gain figure for this
   filter.", or "No gain figure for this filter: only the dry signal
@@ -481,7 +499,11 @@ format.
   and the 127-character limit cuts what does not fit
   (`native.host_settings` `status_names_settings`; "Too loud to estimate"
   is untested, as no filter fails its estimate while keeping its bound in
-  every build). VST3's `Processor::status()` passes the same latency as its
+  every build). With a filter that plays and Gain mode at Estimate or No
+  clipping, the line ends with the gain that mode plays ("Estimate plays
+  -7.3 dB.", PLUG-44), which hosts showing only their generic controls
+  cannot see beside Gain; not where Mix lets only the dry signal through.
+  VST3's `Processor::status()` passes the same latency as its
   report. The Status value does
   not change for these. The Audio Unit
   recomputes the line each time a host reads it, as Gain and Mix may have
@@ -828,7 +850,9 @@ a Convolver state carries, such as a VST3 state's, because their settings
 are parameters and ports), the bypass (restored state's, never a
 chosen file's; only VST3 applies it). The tail an adapter reports while
 no processor plays is the accepted filter's (`HostFilter::filter_tail()`,
-found when the filter was accepted, PLUG-39 step 6). The Latency in those settings goes through each format's
+found when the filter was accepted, PLUG-39 step 6), in the filter's own
+frames at its own rate: the Audio Unit's seconds, VST3's host samples and
+the report's Ring-out convert it at that rate, not the host's (PLUG-46). The Latency in those settings goes through each format's
 own Latency path, which builds a new processor only when it differs. A
 refused request returns nothing and changes none of it; every adapter then
 calls `HostFilter::fail_request()` with the processor that plays, which
@@ -1084,7 +1108,10 @@ the plan's Gain modes (12 November 2026); its meters follow later
   (1002, an index of `GainMode` with value names Set, Estimate and No
   clipping, flagged `kAudioUnitParameterFlag_NonRealTime`), Mix (1003,
   percent) and Latency (1004, an index into `host_latencies` with value names
-  such as "256 frames", also non-real-time), listed before Status. Render
+  such as "256 frames" and "0 frames (none)", from `latency_value_text()`;
+  once initialized, `kAudioUnitProperty_ParameterStringFromValue` adds the
+  time at the output rate, "256 frames (5.3 ms)", PLUG-44; also
+  non-real-time), listed before Status. Render
   plays the Gain mode parameter's value; a new one wakes the Latency queue
   with its own bit, and the run finds Estimate's figure, gives it to the
   playing filter (`update_gains()`) and logs the mode. `RestoreState` restores the mode with the other
@@ -1130,10 +1157,14 @@ the plan's Gain modes (12 November 2026); its meters follow later
 - **VST3 (VST3-4).** Parameters Gain (0, a `RangeParameter` in dB, normalized
   linearly over −100 to +24), Mix (1003, 0 to 100 %, tagged `kDryWetMix`
   through `IParameterFunctionName`), Latency (1004, a `StringListParameter`
-  "64 frames" to "4096 frames", not automatable) and, after Gain, Gain mode
+  "0 frames (none)" to "4096 frames", not automatable; once the processor
+  has reported the host's rate, `getParamStringByValue` adds the time,
+  "256 frames (5.3 ms)", and `getParamValueByString` takes text starting
+  with one of the listed frame counts and refuses any other, PLUG-44) and, after Gain, Gain mode
   (1002, a `StringListParameter` Set, Estimate, No clipping, not
   automatable), listed before Bypass and Status, with the same IDs as the
-  Audio Unit. A new Gain mode goes from the controller to the processor in a
+  Audio Unit. Each has a short title for narrow host controls: Gain, Mode,
+  Mix, Lat, Bypass and Status (PLUG-44). A new Gain mode goes from the controller to the processor in a
   `ConvolverGainMode` message; the processor finds Estimate's figure if it
   needs it, publishes the filter with it, then plays the new mode and
   answers with its status. The controller's `setComponentState` mirrors a

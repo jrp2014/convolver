@@ -18,6 +18,7 @@
 #include "filter_file.hpp"
 #include "host_log.hpp"
 #include "host_report.hpp"
+#include "recent_files.hpp"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -281,15 +282,18 @@ void properties(const au_test::LogSince& log) {
     check(unit.initialize(), "mono initialization");
     require(report_changes.load() > before, "no report change after initialization");
     r = report(unit);
-    require(r.status.status == HostStatus::load_failed && r.status_name == "Load failed",
-            "mono track: " + text(r.status_name));
+    // PLUG-44: kept, not refused, so Waiting, with the same explanation.
+    require(r.status.status == HostStatus::unchecked && r.status_name == "Waiting" &&
+                r.status.text.rfind("Silent, waiting for 2 in, 2 out: the host has 1 in, 1 out.",
+                                    0) == 0,
+            "mono track: " + text(r.status_name) + ": " + text(r.status.text));
     for (const char* part : {"plays silence", "Give the plug-in 2 inputs and 2 outputs",
                              "put Convolver on a stereo track"})
         require(contains(r.explanation, part), "mono track explanation lacks \"" +
                                                    std::string(part) +
                                                    "\": " + text(r.explanation));
     require(contains(facts_text(r),
-                     "Host channels\t1 in, 1 out\tthe filter has 2 in, 2 out\tproblem\t") &&
+                     "Host channels\t1 in → 1 out\tthe filter has 2 in → 2 out\tproblem\t") &&
                 contains(facts_text(r), "Host block size\tup to 512 frames\t"),
             "mono track Audio facts: " + text(facts_text(r)));
     require(contains(reference_text(r), "Software: Convolver "),
@@ -374,7 +378,7 @@ void window() {
     check(unit.initialize(), "mono initialization");
     [view refresh];
     const auto r = report(unit);
-    require([view.statusField.stringValue isEqualToString:@"Load failed"],
+    require([view.statusField.stringValue isEqualToString:@"Waiting"],
             "window status " + text(view.statusField.stringValue));
     // DIAG-2: the problem and what plays, then the cause and the fix as
     // labelled rows; the note in its own row; and Choose Filter… under the
@@ -406,9 +410,9 @@ void window() {
         view.audioLabels.count >= 4 &&
             [view.audioLabels[0].stringValue isEqualToString:@"Host sample rate"] &&
             [fact("Host sample rate").stringValue hasPrefix:@"44100 Hz"] &&
-            contains(fact("Host channels").stringValue, "1 in, 1 out") &&
+            contains(fact("Host channels").stringValue, "1 in → 1 out") &&
             contains(fact("Host channels").stringValue, "\u26A0\uFE0E") &&
-            contains(fact("Host channels").stringValue, "the filter has 2 in, 2 out") &&
+            contains(fact("Host channels").stringValue, "the filter has 2 in → 2 out") &&
             fact("Host channels").toolTip.length > 0 && fact("Routing") != nil &&
             fact("Added delay") == nil,
         "Audio facts: " +
@@ -417,7 +421,7 @@ void window() {
             text([[view.audioValues valueForKey:@"stringValue"] componentsJoinedByString:@"\n"]));
     require([view.filterNameField.stringValue isEqualToString:@(r.filter_name.c_str())] &&
                 [view.filterNameField.stringValue isEqualToString:@"test"] &&
-                contains(view.filterNoteField.stringValue, "drop"),
+                view.filterNoteField.stringValue.length == 0, // PLUG-44: no drop hint.
             "Filter row: " + text(view.filterNameField.stringValue) + " / " +
                 text(view.filterNoteField.stringValue));
     require(contains(view.titleField.stringValue, "Audio Unit #"),
@@ -682,7 +686,8 @@ void window() {
         return false;
     };
     NSPopUpButton* latency = view.settingMenus[1];
-    require(latency.numberOfItems == 8 && [latency.itemTitles[0] isEqualToString:@"0 frames"] &&
+    require(latency.numberOfItems == 8 &&
+                [latency.itemTitles[0] isEqualToString:@"0 frames (none)"] &&
                 [latency.itemTitles[7] isEqualToString:@"4096 frames"] &&
                 latency.indexOfSelectedItem == 0 &&
                 [latency.accessibilityLabel isEqualToString:@"Latency"] &&
@@ -954,8 +959,19 @@ void list_read_again() {
     check(unit.configure(44100, 2, 2, 512), "44.1 kHz formats for the list");
     check(unit.initialize(), "44.1 kHz initialization for the list");
     unit.uninitialize();
-    require(choose(unit, (folder / "rates.txt").string()) != noErr,
-            "a list chosen before rendering");
+    // Chosen in a window that then closes (PLUG-47, jrp's review of 22
+    // November 2026): refused, so not a recent file yet.
+    const auto list = (folder / "rates.txt").string();
+    convolver::forget_recent_files();
+    @autoreleasepool {
+        Class factory_class = NSClassFromString(@CONVOLVER_TEXT(CONVOLVER_AU_VIEW_FACTORY));
+        id<AUCocoaUIBase> factory = [[factory_class alloc] init];
+        CONVOLVER_DIAGNOSTIC_VIEW* view =
+            (CONVOLVER_DIAGNOSTIC_VIEW*)[factory uiViewForAudioUnit:unit.get()
+                                                           withSize:NSMakeSize(0, 0)];
+        require(![view loadFile:@(list.c_str())], "a list chosen before rendering");
+    }
+    require(convolver::recent_files().empty(), "a refused list is a recent file");
     auto r = report(unit);
     require(r.fix.find("Play audio once") != std::string::npos,
             "before rendering, the list's Fix: " + r.fix);
@@ -986,7 +1002,13 @@ void list_read_again() {
               "state listener for the list");
     class_info_changes = 0;
     preset_changes = 0;
+    // A window opened since reads the report, which reads the list again.
     r = report(unit);
+    // The list joins the recent files, as when chosen, although the window
+    // that chose it has closed (PLUG-47).
+    require(convolver::recent_files() == std::vector<std::string>{list},
+            "the list read again is not the recent file: " +
+                std::to_string(convolver::recent_files().size()) + " files");
     const auto saved = unit.saved();
     require(r.status_name == "Active" && saved.configuration && !saved.failed &&
                 saved.configuration->sample_rate == 48000,
@@ -1065,12 +1087,13 @@ void chosen_before_rendering() {
     require(r.status_name == "Waiting",
             "rendered, stopped, unread: " + text(r.status_name) + ": " + text(r.status.text));
     // A report read while the host renders at 44.1 kHz confirms the
-    // mismatch: Silent, with both rates.
+    // mismatch: the kept file waits for 48 kHz (PLUG-44), with both rates.
     check(unit.initialize(), "44.1 kHz initialization for the read");
     render_block(unit, 2, 2);
     r = report(unit);
     const std::string silent = text(r.status.text);
-    require(r.status_name == "Load failed" && silent.find("Silent: ") == 0 &&
+    require(r.status_name == "Waiting" &&
+                silent.find("Silent, waiting for 48000 Hz: the host runs at 44100 Hz") == 0 &&
                 silent.find("44100 Hz") != std::string::npos &&
                 silent.find("48000 Hz") != std::string::npos,
             "read while rendering a 48 kHz file at 44.1 kHz: " + text(r.status_name) + ": " +

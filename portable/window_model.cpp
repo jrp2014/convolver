@@ -112,29 +112,30 @@ WindowContent window_content(const HostReport* report, bool can_load) {
         c.gain_note = r.gain_note;
         c.sample_rate = r.sample_rate;
         c.latency_waits = r.latency_waits;
+        c.latency_next_start = r.latency_next_start;
         c.log_path = r.log_path;
         c.filter_path = r.filter_path;
         for (const auto& file : r.filter_files)
             c.filter_files += file + "\n";
     }
-    // PLUG-40 (jrp's Audacity pass, 21 November 2026): after a refusal the
-    // message's Fix says what to do, which may be to play first; the drop
-    // hint is offered only when nothing was refused.
-    if (can_load && c.filter_note.empty())
-        c.filter_note = "Or drop an IR file, .cfg or .vstpreset on this window.";
+    // PLUG-44: no drop hint under the name. With no filter the Fix names
+    // dropping a file; otherwise Choose…'s tooltip does.
     return c;
 }
 
-std::string latency_note(double frames, int sample_rate, bool waits) {
+std::string latency_note(double frames, int sample_rate, bool waits, bool next_start) {
     std::string time;
     if (sample_rate > 0 && frames > 0) {
         char text[48];
         std::snprintf(text, sizeof text, "adds %.1f ms", 1000 * frames / sample_rate);
         time = text;
     }
-    if (!waits)
-        return time;
-    return time.empty() ? "Not in use yet" : time + ", not in use yet";
+    if (waits)
+        return time.empty() ? "Not in use yet" : time + ", not in use yet";
+    if (next_start)
+        return time.empty() ? "Selected for the next start"
+                            : time + ", selected for the next start";
+    return time;
 }
 
 std::optional<double> typed_value(std::string_view text, double minimum, double maximum) {

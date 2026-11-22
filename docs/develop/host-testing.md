@@ -275,15 +275,18 @@ Do this once. Run the commands in the extracted preview package folder.
 
    The output must end with `AU VALIDATION SUCCEEDED`. Then make the
    GarageBand presets, mono and stereo, from the package's VST3 examples, so they appear in the
-   unit's preset menu (the tool refuses to overwrite, so delete old copies
-   before running it again):
+   unit's preset menu. The loop deletes each old copy first: the tool
+   refuses to overwrite, and a preset left from an earlier preview keeps
+   its name in the menu but may hold a different filter (before REL-10 the
+   echo was a single copy 5 ms later):
 
    ```sh
    mkdir -p ~/Library/Audio/Presets/Convolver/Convolver
    for kind in identity echo repeat; do
      for layout in mono stereo; do
-       ./bin/convolver-preset "presets/$kind-44100-$layout/$kind-44100-$layout.vstpreset" \
-         ~/Library/Audio/Presets/Convolver/Convolver/$kind-44100-$layout.aupreset
+       out=~/Library/Audio/Presets/Convolver/Convolver/$kind-44100-$layout.aupreset
+       rm -f "$out"
+       ./bin/convolver-preset "presets/$kind-44100-$layout/$kind-44100-$layout.vstpreset" "$out"
      done
    done
    ```
@@ -374,6 +377,8 @@ Do this once. Run the commands in the extracted preview package folder.
    filter or set the host to 44100 Hz. Record what REAPER itself shows, if anything.
 9. Set *File › Project settings* and the device to 44100 Hz and play: silence,
    with Status `Silent: the filter is for 48000 Hz, the host runs at 44100 Hz.`
+   (Load failed, not Waiting, because step 8 refused a preset; that stays
+   until a load is accepted)
    and a log line `Started at 44100 Hz, ...` explaining it. Set both back to
    48000 Hz: the echo returns. Copy the log into the report.
 10. Follow sections 4 to 6 of
@@ -394,7 +399,8 @@ Do this once. Run the commands in the extracted preview package folder.
     playing, and record what the window's Latency row and the log say,
     what REAPER shows as the plug-in's latency (its delay compensation),
     and when the new latency comes into use: since VST3-16 at once (the log
-    says `Latency changed from 256 to 1024 frames`), with REAPER's delay
+    says `Latency changed from 0 to 1024 frames`, as the default is 0),
+    with REAPER's delay
     compensation following. Open the
     disclosure triangle: REAPER's FX window grows to fit.
     Click **Copy Diagnostics** and paste into the report. Save, quit and
@@ -502,8 +508,8 @@ preparation and steps 2, 3 and 9 below include what it found.
    a read-only Status. Audacity's window has its own copy of the plug-in,
    which normally is not started, so Status should read `Filter loaded: 48000
    Hz, 2 in, 2 out; waiting for audio settings from the host.` Audacity may start that
-   copy briefly at 44100 Hz, and then Status reads `Silent: the filter is for
-   48000 Hz, the host runs at 44100 Hz. ...` although the playing copy is
+   copy briefly at 44100 Hz, and then Status reads `Silent, waiting for
+   48000 Hz: the host runs at 44100 Hz. ...` although the playing copy is
    fine. Record what it shows, and which `VST3 #n` lines the log has.
 4. Switch the effect off and on with its power button while playing; note
    any click.
@@ -578,10 +584,14 @@ preparation and steps 2, 3 and 9 below include what it found.
     check a configuration list: in a new project, choose a list (a text
     file in the package folder naming `presets/echo-44100-stereo/filter.cfg`
     and then `examples/first-use/stereo/filter.cfg`) before playing; it must
-    be refused with "Play audio once…". With the window still open, play a
-    second and stop: the window must show the list loaded (Active, 48000
-    Hz) without choosing it again (PLUG-40). Export and compare as above:
-    the list's 48000 Hz entry must play.
+    be refused with "Play audio once…". With the window still open, turn
+    on looping and play for at least two seconds, then stop. The example
+    lasts 85 ms and the window checks the host's settings every half
+    second, so a single play can end before the window sees them and fail
+    the check falsely. The window must show the list loaded
+    (Active, 48000 Hz) without choosing it again (PLUG-40). Leave the list
+    selected, then export and compare as above: the list's 48000 Hz entry
+    must play.
 
 ### GarageBand (Audio Unit)
 
@@ -607,18 +617,28 @@ preparation and steps 2, 3 and 9 below include what it found.
 6. Save the project, quit, reopen and play: the echo is still there.
 7. Export the song (*Share › Export Song to Disk*) and check that the file holds
    the echo.
-8. Build a 48 kHz preset with `./bin/convolver-preset
-   presets/echo-48000-stereo/echo-48000-stereo.vstpreset
-   ~/Library/Audio/Presets/Convolver/Convolver/echo-48000-stereo.aupreset`
-   and choose it while the 44.1 kHz echo plays. The echo keeps playing. Record
+8. Build a 48 kHz preset, deleting any old copy first as in
+   [preparation](#prepare-the-mac):
+
+   ```sh
+   out=~/Library/Audio/Presets/Convolver/Convolver/echo-48000-stereo.aupreset
+   rm -f "$out"
+   ./bin/convolver-preset presets/echo-48000-stereo/echo-48000-stereo.vstpreset "$out"
+   ```
+
+   Choose it while the 44.1 kHz echo plays. The echo keeps playing. Record
    what GarageBand shows. Status, where it is shown, reads `Load failed,
    previous filter kept: the filter is for 48000 Hz, the host runs at 44100
    Hz. ...` (or only `Load failed`); the full reason is in the system log (the `log show` command in
    [preparation](#prepare-the-mac), or the Console application, searching
    for "Convolver").
 9. The [settings](../use/plugins.md#settings). Choose `repeat-44100-stereo`,
-   where the changes are easiest to hear, and play. Record where the window
-   shows Gain and Mix and how it shows their values. Set Gain to −12 dB: the
+   where the changes are easiest to hear, and play. Latency starts at 0
+   frames, the default; choose 256 frames while playing and check that it
+   is in use before going on: the window's Latency menu shows 256 frames,
+   the detail beside it does not say "not in use yet", and the log has
+   `Latency changed from 0 to 256 frames`. Record where the window shows
+   Gain and Mix and how it shows their values. Set Gain to −12 dB: the
    level drops smoothly, without a click. Set Mix to 0%: you hear the dry
    track, without the repeat; 50% mixes the two. Save, quit and reopen the
    project: both values come back, and the log's `Loaded a filter ...` line
@@ -627,12 +647,12 @@ preparation and steps 2, 3 and 9 below include what it found.
    (GarageBand starts the plug-in with the defaults before restoring the
    project, so the `Started at ...` line just before it shows 0 dB and 100%).
 10. Latency (PLUG-10). In the window, choose 1024 frames while the project
-    plays: a gap, then the sound carries on, the window's Latency
-    detail reads 1024 frames, and the log has `Latency changed from 256 to
+    plays: a gap, then the sound carries on, the window's Latency menu
+    shows 1024 frames, and the log has `Latency changed from 256 to
     1024 frames`. Record whether the track stays in time with the other
     tracks (GarageBand compensating for the new latency) at once or only
     after stopping and starting playback. Save, quit and reopen: the window's
-    Latency detail reads 1024 frames again (the log's `Latency changed`
+    Latency menu shows 1024 frames again (the log's `Latency changed`
     line after `Restored settings` shows it was applied after GarageBand
     started the plug-in).
 

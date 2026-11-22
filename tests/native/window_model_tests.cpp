@@ -93,7 +93,7 @@ void content_tests() {
     // The same report shows the same content: no redraw.
     require(window_content(&fields, true) == c, "equal content for an equal report");
 
-    // A window that cannot load files gives no drop hint and no Choose action.
+    // A window that cannot load files gives no Choose action.
     const auto fixed = window_content(&fields, false);
     require(fixed.filter_note == "room-48k.wav was refused." && fixed.action == WindowAction::none,
             "a window without loading");
@@ -106,9 +106,9 @@ void content_tests() {
     const auto c2 = window_content(&copy, false);
     require(c2.action == WindowAction::copy_diagnostics && c2.filter_note.empty(),
             "copy diagnostics");
-    require(window_content(&copy, true).filter_note ==
-                "Or drop an IR file, .cfg or .vstpreset on this window.",
-            "the drop hint alone");
+    // PLUG-44: no drop hint under the name; the Fix and Choose…'s tooltip
+    // name dropping a file.
+    require(window_content(&copy, true).filter_note.empty(), "a drop hint under the name");
 
     // Active, nothing to say: no message, no box.
     HostReport active;
@@ -134,16 +134,24 @@ void content_tests() {
     const auto none = window_content(nullptr, true);
     require(!none.available && none.status == -1 && none.status_name == "Not available" &&
                 none.title == "Convolver" && none.boxed() && !none.fix.empty() &&
-                none.filter_note == "Or drop an IR file, .cfg or .vstpreset on this window.",
+                none.filter_note.empty(),
             "no report");
 }
 
 void latency_tests() {
-    require(latency_note(256, 48000, false) == "adds 5.3 ms", latency_note(256, 48000, false));
-    require(latency_note(256, 48000, true) == "adds 5.3 ms, not in use yet", "waiting");
-    require(latency_note(256, 0, true) == "Not in use yet", "waiting without a rate");
-    require(latency_note(256, 0, false).empty() && latency_note(0, 48000, false).empty(),
+    require(latency_note(256, 48000, false, false) == "adds 5.3 ms",
+            latency_note(256, 48000, false, false));
+    require(latency_note(256, 48000, true, false) == "adds 5.3 ms, not in use yet", "waiting");
+    require(latency_note(256, 0, true, false) == "Not in use yet", "waiting without a rate");
+    require(latency_note(256, 0, false, false).empty() &&
+                latency_note(0, 48000, false, false).empty(),
             "nothing to say");
+    // AU-19 (jrp's review, 22 November 2026): with the plug-in stopped, the
+    // choice is selected for the next start.
+    require(latency_note(256, 48000, false, true) == "adds 5.3 ms, selected for the next start",
+            latency_note(256, 48000, false, true));
+    require(latency_note(256, 0, false, true) == "Selected for the next start",
+            "stopped without a rate");
 }
 
 void typed_tests() {

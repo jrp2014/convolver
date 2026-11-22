@@ -194,6 +194,13 @@ done once for all three formats:
   remember. **Needs** a user asking for it; jrp then decides. **Done when**
   he has decided and, if he wants it, the contract and adapter tests cover
   it.
+- [ ] **PLUG-45 — Built-in example presets in hosts' preset menus.**
+  Identity, Echo and Repeat as Audio Unit factory presets and a VST3
+  program list, generated when chosen at the host's rate and channels, so
+  they always fit and need no files; Echo with three fading repeats
+  0.3 s apart, as the packaged example becomes in PR #266. A chosen preset
+  saves as any filter does. jrp, 21 November 2026: after the preview. **Done when** both formats offer them, host
+  tests choose each and the guide describes them.
 - [ ] **PLUG-29 — Keep the Recent list out of the log folder.** Save it in
   each platform's application-support folder, reading the old file once.
   **Done when** the tests cover both paths and the guide names the folder.

@@ -1122,7 +1122,7 @@ int Editor::arrange(bool place_controls) {
             put(fact_values_[i], 0, 0, 0, 0, false);
         }
     }
-    // A refused file and the drop hint.
+    // A refused file's note; empty, and so hidden, otherwise (PLUG-44).
     const int note_height = wrapped_height(small_, wide(c.filter_note), full);
     put(filter_note_, left, y, full, note_height, note_height > 0);
     y += note_height + px(10);
@@ -1454,7 +1454,8 @@ void Editor::read_settings() {
                     ? std::wcstod(s.choices[static_cast<std::size_t>(index)].c_str(), nullptr)
                     : 0;
             set_text(s.value,
-                     wide(latency_note(frames, content_.sample_rate, content_.latency_waits)));
+                     wide(latency_note(frames, content_.sample_rate, content_.latency_waits,
+                                       content_.latency_next_start)));
             continue;
         }
         if (static_cast<int>(i) != gesture_)

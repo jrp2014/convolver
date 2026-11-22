@@ -12,6 +12,7 @@
 #include "public.sdk/source/vst/hosting/hostclasses.h"
 #include "public.sdk/source/vst/hosting/parameterchanges.h"
 #include "public.sdk/source/vst/vstpresetfile.h"
+#include "recent_files.hpp"
 #include "sound_files.hpp"
 #include <algorithm>
 #include <array>
@@ -246,6 +247,10 @@ void edge_cases() {
             "inactive replacement tail including routing delays");
     setup.sampleRate = 44100;
     require(p.setupProcessing(setup) == kResultOk, "rate change setup");
+    // jrp's review, 21 November 2026: inactive, the tail is the filter's own
+    // (1010 frames at 48 kHz) in the host's samples at 44.1 kHz, rounded up.
+    require(p.getTailSamples() == 928 + latency_samples,
+            "the inactive tail at 44.1 kHz is not the 48 kHz filter's in host samples");
     // Shared adapter contract: a kept filter that does not suit the host plays
     // silence (not the unfiltered input), and returns once the rate is corrected.
     require(p.setActive(true) == kResultOk, "a mismatched IR rate must activate, silent");
@@ -284,6 +289,12 @@ void edge_cases() {
     p.setActive(false);
     require(p.getTailSamples() == 1 + latency_samples,
             "the tail after stopping is not the accepted filter's");
+    // jrp's sequence: a start at 96 kHz and a stop leave the 48 kHz filter's
+    // tail its own length, twice as many host samples.
+    setup.sampleRate = 96000;
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk &&
+                p.setActive(false) == kResultOk && p.getTailSamples() == 2 + latency_samples,
+            "after a start at 96 kHz the tail is not the 48 kHz filter's in host samples");
     p.terminate();
 }
 void multichannel() {
@@ -1350,7 +1361,7 @@ void kept_until_channels_fit() {
             // 1. Nothing plays: the mono preset waits, saved as the filter.
             require(p.setState(state_of(mono).get()) == kResultOk,
                     "a mono preset refused with nothing playing");
-            require(contains(p.status().text, "Silent: the filter has 1 in, 1 out"),
+            require(contains(p.status().text, "Silent, waiting for 1 in, 1 out"),
                     ("kept mono preset: " + p.status().text).c_str());
             require(contains(log.text(), "No other filter was playing, so it was not refused: it "
                                          "waits for audio settings that suit it"),
@@ -1544,9 +1555,10 @@ void status_and_log() {
     // explained in the log. With nothing playing it is kept rather than
     // refused (PLUG-42), and the log says it waits for settings that suit it.
     require(p.setState(stream(wrong).get()) == kResultOk, "status wrong rate refused");
-    require(shown() == "Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details "
-                       "in the Convolver log." &&
-                status() == convolver::HostStatus::load_failed,
+    // PLUG-44: Waiting, as nothing failed to load.
+    require(shown() == "Silent, waiting for 44100 Hz: the host runs at 48000 Hz. Details in the "
+                       "Convolver log." &&
+                status() == convolver::HostStatus::unchecked,
             "kept first load not shown");
     require(contains(log_text(), "It does not suit the host's present configuration, so it is "
                                  "kept until it does. Convolver plays silence. The filter is for "
@@ -1738,7 +1750,7 @@ void status_and_log() {
     setup.sampleRate = 44100;
     require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
             "status activate at 44.1 kHz");
-    require(contains(shown(), "Silent: the filter is for 48000 Hz, the host runs at 44100 Hz") &&
+    require(contains(shown(), "Silent, waiting for 48000 Hz: the host runs at 44100 Hz") &&
                 contains(log_text(), "Started at 44100 Hz, 2 in, 2 out, blocks of up to 64 "
                                      "frames. Convolver plays silence. The saved filter is for "
                                      "48000 Hz"),
@@ -2025,6 +2037,12 @@ void settings_parameters() {
         require(c.getParameterInfo(i, info) == kResultOk && info.id == order[i],
                 "settings parameter order");
         const bool automatable = (info.flags & ParameterInfo::kCanAutomate) != 0;
+        // PLUG-44: a short title for control surfaces and narrow displays.
+        require(info.shortTitle[0] != 0, "a parameter has no short title");
+        if (info.id == latency_id)
+            require(info.shortTitle[0] == u'L' && info.shortTitle[1] == u'a' &&
+                        info.shortTitle[2] == u't' && info.shortTitle[3] == 0,
+                    "Latency's short title");
         if (info.id == gain_id)
             require(automatable && info.stepCount == 0 &&
                         std::abs(info.defaultNormalizedValue - normalized_gain(0)) < 1e-12,
@@ -2056,9 +2074,28 @@ void settings_parameters() {
     };
     require(text(gain_id, normalized_gain(-6.5)) == "-6.5" && text(mix_id, .25) == "25" &&
                 text(latency_id, normalized_latency(1024)) == "1024 frames" &&
+                text(latency_id, normalized_latency(0)) == "0 frames (none)" &&
                 text(gain_mode_id, normalized_gain_mode(convolver::GainMode::no_clipping)) ==
                     "No clipping",
             "settings value text");
+    // PLUG-44: Latency's text names the time once the host's rate is known,
+    // so typed text is read by the frames that start it; only a value in the
+    // menu counts.
+    {
+        const auto typed = [&](const char* ascii, ParamValue& v) {
+            String128 t{};
+            for (int i = 0; ascii[i] && i < 127; ++i)
+                t[i] = static_cast<TChar>(ascii[i]);
+            return c.getParamValueByString(latency_id, t, v);
+        };
+        ParamValue v = -1;
+        require(typed("256 frames (5.3 ms)", v) == kResultOk && v == normalized_latency(256) &&
+                    typed("0 frames (none)", v) == kResultOk && v == normalized_latency(0) &&
+                    typed(" 512", v) == kResultOk && v == normalized_latency(512),
+                "Latency text read back");
+        require(typed("300 frames", v) != kResultOk && typed("frames", v) != kResultOk,
+                "a Latency not in the menu read from text");
+    }
     // Hosts find the wet/dry mix by its function name.
     IParameterFunctionName* function = nullptr;
     require(c.queryInterface(IParameterFunctionName::iid, reinterpret_cast<void**>(&function)) ==
@@ -2889,7 +2926,7 @@ void chosen_file_kept_until_it_fits() {
     // The WAV for another rate: kept, silent with the reason, saved.
     require(c.load_file((folder / "slow.wav").string()),
             "a 44.1 kHz WAV chosen with nothing playing refused");
-    require(p.status().text.find("Silent: the filter is for 44100 Hz") == 0,
+    require(p.status().text.find("Silent, waiting for 44100 Hz") == 0,
             ("the kept WAV: " + p.status().text).c_str());
     auto state = saved();
     require(state.configuration && state.configuration->sample_rate == 44100 && !state.failed,
@@ -3415,7 +3452,9 @@ void list_read_again() {
     std::ofstream(folder / "room.cfg") << "48000 1 1 0\n0\n0\nroom.wav\n0\n0\n0\n";
     std::ofstream(folder / "slow.cfg") << "44100 1 1 0\n0\n0\nslow.wav\n0\n0\n0\n";
     std::ofstream(folder / "rates.txt") << "slow.cfg\nroom.cfg\n";
+    convolver::forget_recent_files();
     require(!c.load_file((folder / "rates.txt").string()), "list read again: refused at first");
+    require(convolver::recent_files().empty(), "list read again: a refused list is a recent file");
     const auto edits = handler.edits.size();
     // FlushParameters: started at 44.1 kHz with one block, then stopped.
     require(p.setActive(true) == kResultOk, "list read again: the flush starts");
@@ -3460,6 +3499,10 @@ void list_read_again() {
             ("list read again: the list was not read again while playing: " +
              (r ? r->status_name + ": " + r->explanation : std::string("none")))
                 .c_str());
+    // PLUG-47: it joins the windows' recent files, as when chosen, whichever
+    // window reads the report (jrp's review, 22 November 2026).
+    require(convolver::recent_files() == std::vector<std::string>{(folder / "rates.txt").string()},
+            "list read again: not the recent file");
     MemoryStream saved;
     require(p.getState(&saved) == kResultOk, "list read again: save");
     saved.seek(0, IBStream::kIBSeekSet, nullptr);
@@ -3619,7 +3662,8 @@ void chosen_before_host_plays() {
     play_block(p, 1, 1, 64);
     const auto silent = [&](const char* when) {
         const auto s = p.status();
-        require(s.status == convolver::HostStatus::load_failed && s.text.find("Silent: ") == 0 &&
+        require(s.status == convolver::HostStatus::unchecked &&
+                    s.text.find("Silent, waiting for ") == 0 &&
                     s.text.find("44100 Hz") != std::string::npos &&
                     s.text.find("48000 Hz") != std::string::npos,
                 (std::string(when) + ": status " + s.text).c_str());
@@ -3629,7 +3673,7 @@ void chosen_before_host_plays() {
     {
         const auto r = c.report();
         const auto summary = r ? r->status.text : std::string();
-        require(r && r->status_name == "Load failed" && summary.find("Silent: ") == 0 &&
+        require(r && r->status_name == "Waiting" && summary.find("Silent, waiting for ") == 0 &&
                     summary.find("44100 Hz") != std::string::npos &&
                     summary.find("48000 Hz") != std::string::npos,
                 ("the window's report while playing at 48 kHz: " + summary).c_str());

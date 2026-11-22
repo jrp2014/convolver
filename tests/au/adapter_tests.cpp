@@ -73,6 +73,10 @@ using namespace convolver;
 using au_test::check;
 using au_test::Unit;
 
+// Defined with the parameter tests below.
+void set_parameter(Unit& unit, AudioUnitParameterID id, AudioUnitParameterValue v);
+std::string status_text(Unit& unit);
+
 namespace {
 void require(bool condition, const std::string& message) {
     if (!condition)
@@ -337,7 +341,9 @@ bool latency_settled(const Unit& unit,
 void timing_in_seconds() {
     Unit unit;
     Notifications seen;
-    for (auto id : {kAudioUnitProperty_Latency, kAudioUnitProperty_TailTime})
+    const std::array<AudioUnitPropertyID, 3> ids{kAudioUnitProperty_Latency,
+                                                 kAudioUnitProperty_TailTime, au::report_property};
+    for (const auto id : ids)
         check(AudioUnitAddPropertyListener(unit.get(), id, &Notifications::listener, &seen),
               "property listener");
     const auto filter = crossover(48000);
@@ -351,6 +357,22 @@ void timing_in_seconds() {
             "latency at 48 kHz is not 256 frames in seconds");
     check(unit.load(state_of(filter)), "load before initialization");
     require(seen.of(kAudioUnitProperty_TailTime) > 0, "no tail notification after a load");
+    // AU-19 (jrp's review, 21 November 2026): uninitialized, a new Latency is
+    // the one the next initialization uses, never "not in use yet", even
+    // before the Latency work has run, and the window is told once it has.
+    require(latency_settled(unit), "the Latency work the load woke did not finish");
+    seen.clear(); // The load's notices.
+    for (const auto index : {2, 3}) {
+        set_parameter(unit, au::latency_parameter, static_cast<float>(index));
+        require(status_text(unit).find("not in use yet") == std::string::npos,
+                "Status uninitialized after a Latency change: " + status_text(unit));
+        require(latency_settled(unit), "the Latency work did not finish uninitialized");
+        require(status_text(unit).find("not in use yet") == std::string::npos,
+                "Status uninitialized once the Latency work ran: " + status_text(unit));
+        require(seen.of(au::report_property) > 0,
+                "the window was not told of a Latency change uninitialized");
+        seen.clear();
+    }
     require(unit.seconds(kAudioUnitProperty_TailTime) == static_cast<double>(tail) / 48000,
             "tail before initialization is not the filter's tail in seconds");
     check(unit.initialize(), "initialization");
@@ -377,6 +399,15 @@ void timing_in_seconds() {
             "no timing notifications after a sample-rate change");
     require(unit.seconds(kAudioUnitProperty_Latency) == 256.0 / 96000,
             "latency at 96 kHz is not 256 frames in seconds");
+    // jrp's review, 21 November 2026: uninitialized, the tail is the 48 kHz
+    // filter's own, so the host's new rate does not halve it, also after a
+    // start at 96 kHz and a stop.
+    require(unit.seconds(kAudioUnitProperty_TailTime) == static_cast<double>(short_tail) / 48000,
+            "at 96 kHz the uninitialized tail is not the 48 kHz filter's in seconds");
+    check(unit.initialize(), "initialization at 96 kHz");
+    unit.uninitialize();
+    require(unit.seconds(kAudioUnitProperty_TailTime) == static_cast<double>(short_tail) / 48000,
+            "after a start at 96 kHz and a stop, the tail is not the 48 kHz filter's in seconds");
 }
 
 std::string string_value(CFDictionaryRef dict, const char* key) {
@@ -1028,7 +1059,7 @@ void latency_parameter() {
     CFStringGetCString(static_cast<CFStringRef>(CFArrayGetValueAtIndex(names, 0)), first,
                        sizeof first, kCFStringEncodingUTF8);
     CFRelease(names);
-    require(std::string(first) == "0 frames", std::string("first Latency name: ") + first);
+    require(std::string(first) == "0 frames (none)", std::string("first Latency name: ") + first);
     require(value_name(unit, au::latency_parameter, 5) == "1024 frames",
             "Latency 5 reads " + value_name(unit, au::latency_parameter, 5));
     require(parameter(unit, au::latency_parameter) == 0, "Latency default");
@@ -1073,6 +1104,9 @@ void latency_parameter() {
     require(latency_settled(unit), "the Latency work for an unchanged choice did not finish");
     require(seen.of(kAudioUnitProperty_Latency) == 1, "a notification without a change");
     check(unit.initialize(), "initialization at 512 frames");
+    // PLUG-44: initialized, a Latency value also reads as the time it adds.
+    require(value_name(unit, au::latency_parameter, 5) == "1024 frames (21.3 ms)",
+            "Latency 5 at 48000 Hz reads " + value_name(unit, au::latency_parameter, 5));
     require(impulse_delay(unit) == 512, "the audio is not delayed by 512 frames");
 
     // Chosen while initialized: applied at once, the host is told, and the
@@ -1720,8 +1754,9 @@ void settings_in_diagnostics() {
             "a wrong-rate first preset refused with nothing playing");
     require(std::abs(steady_output(unit, 3) - .25f) < 1e-5, "Mix 50% after a kept first load");
     const auto shown = status_text(unit);
-    require(shown == "Load failed, only the dry signal plays: the filter is for 44100 Hz, the "
-                     "host runs at 48000 Hz. Details in the Convolver log.",
+    // PLUG-44: Status says it waits for settings that suit the kept filter.
+    require(shown == "Only the dry signal plays, waiting for 44100 Hz: the host runs at 48000 "
+                     "Hz. Details in the Convolver log.",
             "kept first load at Mix 50%: " + shown);
     // Started again, the start line says what Mix lets through.
     unit.uninitialize();
@@ -1733,7 +1768,7 @@ void settings_in_diagnostics() {
     // At Mix 100% it is silent, and Status says so.
     set_parameter(unit, au::mix_parameter, 100);
     require(std::abs(steady_output(unit, 3)) < 1e-6, "Mix 100% after a kept first load");
-    require(contains(status_text(unit), "Silent: the filter is for 44100 Hz"),
+    require(contains(status_text(unit), "Silent, waiting for 44100 Hz"),
             "Status at Mix 100%: " + status_text(unit));
     unit.uninitialize();
 }
@@ -1810,9 +1845,10 @@ void status_parameter() {
     // explained. With nothing playing it is kept rather than refused, and
     // the log says it waits for settings that suit it (PLUG-42).
     require(unit.load(state_of(stereo(44100))) == noErr, "wrong-rate first preset refused");
-    require(shown() == "Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in "
+    // PLUG-44: Waiting, not Load failed, since nothing was refused.
+    require(shown() == "Silent, waiting for 44100 Hz: the host runs at 48000 Hz. Details in "
                        "the Convolver log." &&
-                value() == HostStatus::load_failed,
+                value() == HostStatus::unchecked,
             "kept first load not shown: " + shown());
     require(contains(log_text(), "It does not suit the host's present configuration: the filter "
                                  "is for 44100 Hz, and the host runs at 48000 Hz.") &&

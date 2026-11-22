@@ -78,7 +78,7 @@ or a file chosen in the window. Some hosts give a plug-in as many inputs as
 outputs: REAPER gives the VST3 plug-in six inputs on a six-channel track, so a
 2→6 crossover reads inputs 1 and 2 and ignores 3 to 6. Status then ends with
 "plug-in inputs 3-6 ignored.", and the [Convolver log](#status-and-the-convolver-log)
-and the window's Host channels line say the same (`6 in, 6 out (inputs 3–6
+and the window's Host channels line say the same (`6 in → 6 out (inputs 3–6
 ignored)`). Make sure the source plays on
 the inputs the filter reads. A filter with more inputs than the host gives,
 or with a different number of outputs, is refused. From a configuration
@@ -190,8 +190,9 @@ says: "Play audio once so Convolver can check the host's sample rate and
 channel counts, then choose the configuration list again." With Convolver's
 window open, you need not choose it again: when the host plays, the window
 loads the list itself, choosing its entry for the host's rate and channels,
-and Convolver tells the host the project has changed, as for a chosen file
-(the list is not added to Recent). This is checked by automated tests, not
+and Convolver tells the host the project has changed and adds the list to
+Recent, as for a chosen file, even if you closed and reopened the window
+meanwhile. This is checked by automated tests, not
 yet in a host. If the window was closed while the host played, choose the
 list again, or play again with the window open. Once Convolver has seen the
 host play (for example when the host reads the Audio Unit's Status while it
@@ -257,10 +258,11 @@ happens next depends on the format:
   is refused only while another filter that fits is playing, so that one
   stays; the refusal says so, and restarting playback does not switch to
   the refused filter, even with settings that fit it. Otherwise the new
-  filter is kept, saved with the project, and plays silence with the
-  reason in Status (Mix's dry share and bypass still pass the input where
-  the counts are equal) until the host starts the plug-in with its rate
-  and channels; the log says it waits for audio settings that suit it, and
+  filter is kept, saved with the project, and plays silence (Mix's dry
+  share and bypass still pass the input where the counts are equal) until
+  the host starts the plug-in with its rate and channels. Status reads
+  Waiting and names what the filter waits for (`Silent, waiting for 44100
+  Hz: the host runs at 48000 Hz.`), since nothing was refused; the log says it waits for audio settings that suit it, and
   the window says it plays when the host starts the plug-in with them. A
   configuration list with no entry for the host's rate and channels is
   refused, since there is no entry to keep.
@@ -301,9 +303,10 @@ example (some hosts show only the status name in the first column):
 | --- | --- |
 | Active | `Filter loaded: 48000 Hz, 2 in, 2 out.` |
 | No filter | `No filter: audio passes unchanged. Choose a filter or load a Convolver preset.` (without a window, on Linux: `… Load a Convolver preset.`) |
-| Load failed (silence) | `Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in the Convolver log.` |
+| Load failed (silence) | `Silent: the plug-in could not start the filter. Details in the Convolver log.` (or, for a damaged first preset or file, what is wrong with it) |
 | Load failed (previous filter kept) | `Load failed, previous filter kept: the filter has 2 in, 6 out, the host 2 in, 2 out. Details in the Convolver log.` |
 | Waiting | `Filter loaded: 44100 Hz, 2 in, 2 out; waiting for audio settings from the host.` (for a file chosen in the window: `Filter selected. Waiting for the host's audio settings.`, see [when a chosen file is checked](#loading-a-filter)) |
+| Waiting (a kept filter that does not suit the host) | `Silent, waiting for 44100 Hz: the host runs at 48000 Hz. Details in the Convolver log.` (`Silent, waiting for 2 in, 6 out: the host has 2 in, 2 out. …` for the channels) |
 | Fault | `Fault: output too large, silenced and the filter restarted. Details in the Convolver log.` |
 | Bypassed | `Bypassed: the input plays unfiltered.` (`Bypassed: silent, as the filter's inputs and outputs differ.` for a filter with different input and output counts, such as a crossover) |
 
@@ -320,14 +323,15 @@ was; what you hear then is the host's doing.
 The text also follows the [settings](#settings) when no filter
 is heard. With no filter loaded and Gain or Mix changed, it reads, for
 example, `No filter: audio passes at -20.0 dB (Gain and Mix).`; when a
-kept filter does not fit and Mix is below 100%, `Load failed, only the dry
-signal plays: ...` instead of `Silent: ...`, as the dry share still plays
-(only where there is a dry signal: see [bypass](#bypass)). While bypassed
-it still shows a failure but says what bypass plays, the input unchanged
-where there is a dry signal: a kept filter that does not fit reads `Load
-failed. Bypass is on: only the dry signal plays. The filter is for 44100 Hz,
-the host runs at 48000 Hz.`, and with no filter loaded it reads `No filter.
-Bypass is on: audio passes unchanged.` whatever Gain and Mix are. Where
+kept filter does not fit and Mix is below 100%, `Only the dry signal plays,
+waiting for ...` instead of `Silent, waiting for ...`, as the dry share
+still plays (only where there is a dry signal: see [bypass](#bypass)).
+While bypassed it still shows a failure, or what a kept filter waits for,
+but says what bypass plays, the input unchanged where there is a dry
+signal: a kept filter that does not fit reads `Bypass is on: only the dry
+signal plays. Waiting for 44100 Hz: the host runs at 48000 Hz.`, and with
+no filter loaded it reads `No filter. Bypass is on: audio passes
+unchanged.` whatever Gain and Mix are. Where
 bypass plays silence, after a failed load with no filter kept or when the
 filter's or the host's inputs and outputs differ, it still says so. The
 window's report and the Convolver log say the same: with bypass on they
@@ -352,11 +356,16 @@ saved or the host restarts the plug-in.
 **Waiting** means a filter is loaded but the host has not sent its audio
 settings (sample rate and channels) yet, usually because it has not started
 the plug-in; pressing Play is not needed. Once it sends them, the status
-becomes Active if the filter fits, or Load failed if it does not. Some hosts show a separate copy of the
+becomes Active if the filter fits. If it does not, the filter is kept and
+the status stays Waiting, with what the filter waits for (`Silent, waiting
+for 44100 Hz: the host runs at 48000 Hz.`), until the host starts the
+plug-in with settings that suit it; the status is plain, not red, as
+nothing was refused. Load failed always means a request was refused or a
+filter could not start. Some hosts show a separate copy of the
 plug-in in its window, not the one that plays. Audacity's real-time effects
 window is one: its copy usually reads Waiting, but Audacity may start it briefly at
-44100 Hz, whatever the project's rate, and then it can read `Silent: the
-filter is for 48000 Hz, the host runs at 44100 Hz` while the playing copy is
+44100 Hz, whatever the project's rate, and then it can read `Silent,
+waiting for 48000 Hz: the host runs at 44100 Hz` while the playing copy is
 fine. When the window and the sound disagree, trust the log: each copy has its
 own number (`VST3 #1`, `VST3 #2`), and the one playing logs `Started at` with
 the rate the host plays at.
@@ -369,8 +378,12 @@ or `Too loud to estimate: No clipping's gain plays.` when the Gain mode is
 Estimate and the filter has no estimate, and `Silent: no gain figure for
 this filter.` when the filter has no figure for the Gain mode at all (`No
 gain figure for this filter: only the dry signal plays.` when Mix lets the
-dry signal through). A load failure or a fault comes first, and the
-window's report gives the details. LV2's `status` port keeps its five values (see
+dry signal through). A load failure, a fault or a kept filter's wait
+comes first, and the window's report gives the details. With Gain mode at
+Estimate or No clipping, Status also gives the gain that mode plays
+(`Filter loaded: 48000 Hz, 2 in, 2 out. Estimate plays -7.3 dB.`), for
+hosts that show only their own controls, where Gain's value is not what
+plays. LV2's `status` port keeps its five values (see
 [LV2 ports](#lv2-ports)): Bypassed reads as Active, and while a new Latency
 is applied or the estimate is found the filter plays on and the port stays
 at Active; the host's log says what is happening.
@@ -389,7 +402,7 @@ filter for another rate than playback's is refused during playback even
 when an export at the filter's rate works. Audacity 4 plays real-time
 effects at the rate in *Audio setup › Audio settings › Default sample rate*
 (44100 Hz unless changed). Check the playing copy's `Started at` line in
-the log for the rate it runs at (in Audacity the window's Host sample rate
+the log for the rate it runs at (in Audacity the window's Host line
 can belong to a copy that does not play), and set the host's playback rate
 to the filter's. Every refusal for the rate ends its Fix with "The host may
 play at a different rate from the one it exports at.", wherever the Fix is
@@ -458,7 +471,9 @@ show the same window, and the VST3 plug-in on Windows shows it too, with the
 differences listed after the description.
 From the top, the window has:
 
-- **A title line** with the Convolver version, the instance (`Audio Unit #2`,
+- **A title line** with the Convolver version (the release number; the
+  Software line under File, software and log also names the source revision
+  of a build from a Git checkout), the instance (`Audio Unit #2`,
   as in the log) and the program that runs the plug-in, or "the host's
   plug-in process" when the host runs plug-ins in Apple's separate service,
   as GarageBand does (the Software line names that process). The VST3
@@ -481,12 +496,14 @@ From the top, the window has:
   hold the pointer over them for all of them). The Audio section further
   down gives the host's values, which need not be the same: a filter made
   for 2 inputs on a host track with 6, say. Under the facts, in
-  small text: a note when the newest file was refused, and a reminder that
-  a file can be dropped on the window.
+  small text, a note when the newest file was refused (`broken.wav was
+  refused.`, also while a kept filter waits for settings that suit it);
+  otherwise nothing.
 - **The status** beside the name (Active, Bypassed, No filter, Load failed,
   Waiting or Fault), the same as the Status parameter, as a symbol
   and a word, coloured for Active (green), Load failed (red) and Fault
-  (orange).
+  (orange). Waiting is plain, even with a kept filter that does not suit
+  the host, as nothing has gone wrong.
 - **The message**, under the heading, only when there is something to say.
   A problem sits in a box tinted with the status colour; Bypassed's line
   ("The input plays unfiltered. Turn bypass off to hear the filter.", or
@@ -505,6 +522,15 @@ From the top, the window has:
   accent colour: **Choose…** when a different filter puts it right, **Copy
   Diagnostics** for a fault in Convolver itself.
 
+  A refused file is explained first, as the latest thing you did, and
+  "What plays" then names the filter in the heading once: `room.cfg keeps
+  playing.` while the host plays it, `room.cfg is still selected.` after
+  Stop or while bypassed, and `room.cfg is still selected and will play
+  at 48000 Hz.` when that filter is kept but does not suit the host. So a
+  broken file chosen while a 48 kHz filter waits in a 44.1 kHz project
+  reads "**broken.wav could not be read …**", then that sentence, not a fix
+  for the rate.
+
   For example, a stereo preset on a GarageBand mono track reads "**The saved
   filter has 2 inputs and 2 outputs, and the host gives the plug-in 1 input
   and 1 output.** Convolver plays silence.", then Cause: "A filter plays only with
@@ -514,7 +540,8 @@ From the top, the window has:
   "Hosts run an effect with one channel on a mono track (GarageBand does):
   put Convolver on a stereo track instead." While a filter simply plays,
   there is no message: the heading and the Audio section say what plays.
-  With no filter, Fix says what to load, and Choose… is highlighted.
+  With no filter, Fix says what to load, and that a file can be dropped on
+  the window, and Choose… is highlighted.
 - **Choose…**, **Recent**, **Reload** and **Reload when the file changes**,
   on one row under the message.
   Choose… opens the file dialog for an IR file, a `.cfg`, a
@@ -606,12 +633,14 @@ From the top, the window has:
   does not yet mark the start and end of a drag, so a host recording
   automation from it may record each step separately; not yet tried in
   GarageBand.
-- **Latency**: a menu of delays in frames, from 0 (none) up, with the delay
+- **Latency**: a menu of delays in frames, from `0 frames (none)` up, with the delay
   a choice adds at the host's rate beside it ("adds 21.3 ms"). A new choice
   plays at once; if it cannot (the computer is out of memory, say), the old
-  one keeps playing, the row says the choice is "not in use yet" and the
-  Convolver log says why
-  ([settings](#settings)). The host is told the delay, so it can delay
+  one keeps playing, the row says the choice is "not in use yet" (the
+  message does not repeat it) and the Convolver log says why
+  ([settings](#settings)). While the host has the plug-in stopped, the row
+  says the choice is "selected for the next start". The host is told the
+  delay, so it can delay
   other tracks to keep them in time.
 - **Audio**: the host's values and what plays, each a short value. The
   filter's own rate, channels, length and speakers are under its name, so
@@ -620,11 +649,11 @@ From the top, the window has:
 
   | Line | What it says |
   | --- | --- |
-  | Host sample rate | The rate the host runs the plug-in at |
-  | Host channels | The inputs and outputs the host gives the plug-in |
-  | Routing | Which input feeds which output (`In 1 → Out 1`), with route gains such as `×0.5`; the first four paths, then how many more |
-  | Ring-out | How long the output goes on after the input stops (the tail) |
-  | Loudest peak | The loudest output any full-scale input could make through the filter, and the Gain that rules out clipping (or that it cannot clip at the current Gain and Mix) |
+  | Host | When the host's rate and channels suit the filter, one line: `48000 Hz, 2 in → 2 out ✓ suits the filter`. Before the host has sent its audio settings: `not known yet` |
+  | Host sample rate, Host channels | Otherwise a line each: the rate the host runs the plug-in at, and the inputs and outputs it gives it (`1 in → 1 out`) |
+  | Routing | With a filter: which input feeds which output (`In 1 → Out 1`), with route gains such as `×0.5`; the first four paths, then how many more |
+  | Ring-out | How long the output goes on after the input stops (the tail), at the host's rate; only when it says more than the filter's Length: delays in the filter, a Latency, or another rate |
+  | Worst-case peak | The loudest output any full-scale input could make through the filter, and the Gain that rules out clipping (or that it cannot clip at the current Gain and Mix) |
   | Host block size | The largest block the host sends at a time |
 
   A line that does not match (a filter for another rate, say) is marked with
@@ -716,6 +745,12 @@ defaults play exactly as Convolver did before the settings existed.
 | **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. Whenever bypass plays silence there is no dry signal, so the mix stays at 100%: when the filter's input and output counts differ, and in the cases [bypass](#bypass) lists when no filter plays. Where bypass passes the input, the input share of Mix still plays while a kept filter is silent. |
 | **Latency** | 0, 64, 128, 256, 512, 1024, 2048 or 4096 frames | 0 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. At 0 Convolver adds no processing delay; any delay in the filter itself still plays. A larger value uses less processor time, most of all for short filters. It is the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
 
+- In a host's own controls (its generic window or parameter list), a
+  Latency value reads as its frames, with `0 frames (none)` for 0, and in
+  VST3 and the Audio Unit, once the host has started the plug-in, the time
+  it adds at the host's rate: `256 frames (5.3 ms)`. Where a VST3 host lets you type a value, type one of
+  the menu's frame counts (`256`); another number is refused. VST3 hosts with narrow controls show
+  the short names Gain, Mode, Mix, Lat, Bypass and Status.
 - Hosts may leave settings that cannot be automated out of their own
   controls: Ardour does so for the VST3 plug-in's Gain mode and Latency
   ([Ardour](#ardour)).
@@ -817,7 +852,7 @@ with no filter reports 256 samples at a Latency of 256, because its output
 still carries the last 256 samples of input after the input stops. After a filter is replaced during
 playback, both keep reporting the longest tail used until the host stops the
 plug-in, and then report the filter's own, as the window's Ring-out row
-does. LV2 cannot report a tail, so hosts that stop processing at the end
+does (shown when it says more than the filter's Length). LV2 cannot report a tail, so hosts that stop processing at the end
 of a region may cut it off: render with a little silence after the audio.
 
 ## Bypass
@@ -969,7 +1004,7 @@ URIs are `https://github.com/jrp2014/convolver/lv2#discrete-N-M`.
 | Index | Symbol | Kind | Meaning |
 | --- | --- | --- | --- |
 | 0 | `enabled` | Control input | 1 processes, 0 bypasses (a 1.3 ms fade) |
-| 1 | `latency` | Control output | The latency that plays, in frames (the Latency setting) |
+| 1 | `latency` | Control output | The latency that plays, in frames (the Latency setting); hosts show it as Reported latency |
 | 2 | `status` | Control output | 0 Active, 1 No filter, 2 Load failed, 3 Loading, 4 Fault |
 | 3… | `in_1` … `in_N` | Audio input | Input channels in order |
 | then | `out_1` … `out_M` | Audio output | Output channels in order |

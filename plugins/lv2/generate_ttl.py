@@ -111,7 +111,7 @@ def plugin(base, layout, vendor, version):
 \t\ta lv2:ControlPort , lv2:OutputPort ;
 \t\tlv2:index 1 ;
 \t\tlv2:symbol "latency" ;
-\t\tlv2:name "Latency" ;
+\t\tlv2:name "Reported latency" ;
 \t\tlv2:designation lv2:latency ;
 \t\tlv2:portProperty lv2:reportsLatency , lv2:integer ;
 \t\tunits:unit units:frame ;
@@ -123,6 +123,7 @@ def plugin(base, layout, vendor, version):
 \t\tlv2:index 2 ;
 \t\tlv2:symbol "status" ;
 \t\tlv2:name "Status" ;
+\t\trdfs:comment "What the plug-in plays; the host's log says why a filter does not play." ;
 \t\tlv2:portProperty lv2:integer , lv2:enumeration ;
 \t\tlv2:minimum 0 ;
 \t\tlv2:maximum {STATUS[-1][0]} ;
@@ -154,7 +155,11 @@ def plugin(base, layout, vendor, version):
 \t]""",
     ]
     first_setting = first_atom + 2
-    latency_points = ' ,\n'.join(f'\t\t\t[ rdfs:label "{frames} frames" ; rdf:value {frames} ]' for frames in LATENCIES)
+    # PLUG-44: the same names as the other formats' Latency values.
+    latency_points = ' ,\n'.join(
+        f'\t\t\t[ rdfs:label "{frames} frames{" (none)" if frames == 0 else ""}" ; rdf:value {frames} ]'
+        for frames in LATENCIES
+    )
     mode_points = ' ,\n'.join(f'\t\t\t[ rdfs:label "{name}" ; rdf:value {value} ]' for value, name in GAIN_MODES)
     settings = [
         f"""\t[
