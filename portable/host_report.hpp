@@ -145,6 +145,10 @@ struct HostReport {
 };
 
 HostReport host_report(const HostFilter&, const HostReportFacts&);
+// PLUG-44: a Latency value as hosts' own controls name it: "0 frames
+// (none)", "256 frames (5.3 ms)" at a known rate (`sample_rate` > 0), else
+// "256 frames". ASCII, as VST3's parameter text is.
+std::string latency_value_text(std::size_t frames, int sample_rate);
 // PLUG-22: HostReport::filter_identity's text for a filter identity
 // (HostFilter::filter_identity(), configuration_identity()): 16 lowercase
 // hex digits. convolver-preset writes the same text into VST3 presets

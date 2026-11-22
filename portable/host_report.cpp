@@ -68,17 +68,54 @@ std::string load_fix(bool chooses_files) {
 bool chosen_away(HostFailureKind kind) {
     return kind != HostFailureKind::preparation && kind != HostFailureKind::activation;
 }
+// PLUG-44 (jrp's review of 735b0af): what becomes of the filter Convolver
+// keeps after a request was refused, naming it, so the refused file and the
+// kept one each have an owner: "room.cfg keeps playing." only while the host
+// plays it; otherwise "room.cfg is still selected.", and when it does not suit
+// the host, what it will play at ("... and will play at 48000 Hz.").
+std::string kept_words(const HostFilter& filter, const HostReportFacts& facts) {
+    const auto& accepted = filter.accepted();
+    const auto slash = accepted.path.find_last_of("/\\");
+    const std::string name =
+        accepted.source == HostFilterSource::file && !accepted.path.empty()
+            ? (slash == std::string::npos ? accepted.path : accepted.path.substr(slash + 1))
+        : !accepted.name.empty() ? accepted.name
+                                 : std::string("The previous filter");
+    const auto& host = facts.host;
+    const bool dry = host && dry_signal(filter, *host);
+    if (filter.kept_unsuited()) {
+        const auto& c = *filter.filter();
+        return name + " is still selected and will play " +
+               (filter.failure()->kind == HostFailureKind::sample_rate
+                    ? "at " + std::to_string(c.sample_rate) + " Hz."
+                    : "with " + ports(c.input_channels, c.output_channels) + ".") +
+               (facts.bypassed && host ? " " + bypass_sentence(true, dry) : std::string());
+    }
+    if (facts.bypassed && host)
+        return name + " is still selected. " + bypass_sentence(true, dry);
+    return name + (host && facts.running ? " keeps playing." : " is still selected.");
+}
+
 Message message(const HostFilter& filter, const HostReportFacts& facts) {
     const auto& host = facts.host;
     const auto* layout = host ? &*host : nullptr;
     const auto& failure = filter.shown_failure();
+    // PLUG-44 (jrp's review of 735b0af): a request refused after the filter
+    // Convolver keeps is the user's latest action, so it is explained first,
+    // even while the kept filter's own wait is the failure Status shows.
+    const auto& refusal = filter.rejection();
+    const bool kept_after_refusal =
+        filter.filter() && refusal && refusal->request.number != filter.accepted().number;
+    const auto& explained = kept_after_refusal ? refusal : failure;
     const auto choose = facts.chooses_files ? "choose filter" : "";
     // PLUG-36 (jrp, 20 November 2026), PLUG-39 step 4: with bypass on, what
     // plays is what bypass plays, as host_status() says; playing_words() and
     // failure_consequence() say it.
     const auto no_filter_plays = [&] {
-        return !host ? std::string("No filter is loaded.")
-                     : playing_words(filter, *host, facts.settings, facts.bypassed);
+        // PLUG-44: before the host's settings, the heading's "None" and the
+        // status say there is no filter; what follows says why nothing is
+        // known yet.
+        return !host ? std::string() : playing_words(filter, *host, facts.settings, facts.bypassed);
     };
     Message m;
     const auto take = [&](const detail::Advice& a) {
@@ -90,18 +127,24 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
     // Which state the report explains, in the order Status gives it
     // (host_status_value()).
     const auto status = host_status_value(filter, host.has_value(), facts.bypassed);
-    if (status == HostStatus::load_failed && failure) {
-        auto a = shown_failure_message(*failure, filter.played_with(host));
-        a.problem = short_problem(std::move(a.problem), *failure);
+    // PLUG-44: a filter that waits for settings that suit it shows Waiting,
+    // and is explained as a filter that does not suit the host.
+    if ((status == HostStatus::load_failed || filter.waits_for_settings()) && explained) {
+        auto a = shown_failure_message(*explained, filter.played_with(host));
+        a.problem = short_problem(std::move(a.problem), *explained);
         take(a);
-        m.plays = failure_consequence(*failure, layout, facts.settings,
-                                      layout && dry_signal(filter, *layout), facts.bypassed);
-        // PLUG-42 (jrp, 21 November 2026): a filter kept although it does
-        // not suit the host plays at the next start that suits it.
-        if (filter.kept_unsuited())
-            m.plays += " The filter is kept and waits for audio settings that suit it: it plays "
-                       "when the host next starts the plug-in with them.";
-        if (chosen_away(failure->kind))
+        if (kept_after_refusal)
+            m.plays = kept_words(filter, facts);
+        else {
+            m.plays = failure_consequence(*explained, layout, facts.settings,
+                                          layout && dry_signal(filter, *layout), facts.bypassed);
+            // PLUG-42 (jrp, 21 November 2026): a filter kept although it
+            // does not suit the host plays at the next start that suits it.
+            if (filter.kept_unsuited())
+                m.plays += " The filter is kept and waits for audio settings that suit it: it "
+                           "plays when the host next starts the plug-in with them.";
+        }
+        if (chosen_away(explained->kind))
             m.action = choose;
         // Faults the load failure hides from the status.
         if (filter.faults().any())
@@ -160,13 +203,10 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         m.action = choose;
     }
     if (!host && !(filter.filter() && !failure))
-        m.plays += " The host has not sent its audio settings yet.";
-    if (latency_waits(facts))
-        add_note(m, "Latency " + std::to_string(facts.settings.latency) +
-                        " frames is chosen but not in use yet, so the plug-in keeps " +
-                        std::to_string(facts.latency_frames) +
-                        " frames for now. If it could not be applied, the Convolver log says "
-                        "why.");
+        m.plays += std::string(m.plays.empty() ? "" : " ") +
+                   "The host has not sent its audio settings yet.";
+    // PLUG-44: a Latency not in use yet is said by the window's Latency row
+    // and the Status line, not again in the message.
     return m;
 }
 
@@ -246,6 +286,12 @@ bool delayed(const Configuration& c) {
     return any(c.input_delays) || any(c.output_delays);
 }
 
+// PLUG-44: channel counts as the facts under the filter's name write them,
+// "2 in → 2 out", so the window uses one form (Status keeps ASCII ports()).
+std::string arrow_ports(std::size_t inputs, std::size_t outputs) {
+    return std::to_string(inputs) + " in → " + std::to_string(outputs) + " out";
+}
+
 std::string file_name(const std::string& path) {
     const auto slash = path.find_last_of("/\\");
     return slash == std::string::npos ? path : path.substr(slash + 1);
@@ -262,38 +308,61 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
     const auto& c = filter.filter();
     const auto& failure = filter.shown_failure();
     const int rate = host ? host->sample_rate : 0;
-    constexpr const char* not_started = "not known until the host sends its audio settings";
-
-    HostFact sample_rate{"Host sample rate",
-                         host ? host_rate_text(*host) : std::string(not_started),
+    if (!host) {
+        // PLUG-44: one line, not two with the message's words again.
+        audio.push_back({"Host",
+                         "not known yet",
                          {},
                          false,
-                         "The rate the host runs the plug-in at. A filter must be made for the "
-                         "same rate: Convolver does not resample."};
-    if (failure && failure->kind == HostFailureKind::sample_rate && failure->sample_rate > 0) {
-        sample_rate.note = refused_words(*failure) + std::to_string(failure->sample_rate) + " Hz";
-        sample_rate.problem = true;
-    }
-    audio.push_back(std::move(sample_rate));
+                         "The sample rate and channels the host runs the plug-in with, known "
+                         "once it sends its audio settings."});
+    } else if (c &&
+               !(failure && (failure->kind == HostFailureKind::sample_rate ||
+                             failure->kind == HostFailureKind::channels)) &&
+               host->fractional_rate == 0 && host->sample_rate == c->sample_rate &&
+               host->inputs == c->input_channels && host->outputs == c->output_channels) {
+        // PLUG-44: what the host gives matches the facts under the filter's
+        // name, so one line says so rather than repeating them (also after
+        // a refusal for another reason, an unreadable file say).
+        audio.push_back({"Host",
+                         host_rate_text(*host) + ", " + arrow_ports(host->inputs, host->outputs),
+                         "✓ suits the filter", false,
+                         "The sample rate and channels the host runs the plug-in with: the "
+                         "filter's own."});
+    } else {
+        HostFact sample_rate{"Host sample rate",
+                             host_rate_text(*host),
+                             {},
+                             false,
+                             "The rate the host runs the plug-in at. A filter must be made for "
+                             "the same rate: Convolver does not resample."};
+        if (failure && failure->kind == HostFailureKind::sample_rate && failure->sample_rate > 0) {
+            sample_rate.note =
+                refused_words(*failure) + std::to_string(failure->sample_rate) + " Hz";
+            sample_rate.problem = true;
+        }
+        audio.push_back(std::move(sample_rate));
 
-    HostFact channels{"Host channels",
-                      host ? ports(host->inputs, host->outputs) : not_started,
-                      {},
-                      false,
-                      "The inputs and outputs the host gives the plug-in."};
-    if (failure && failure->kind == HostFailureKind::channels &&
-        (failure->inputs || failure->outputs)) {
-        channels.note = (failure->silent ? std::string("the filter has ")
-                                         : std::string("the refused file has ")) +
-                        ports(failure->inputs, failure->outputs);
-        channels.problem = true;
-    } else if (c && host) {
-        // PLUG-23: a host that gives more inputs than the filter reads.
-        if (const auto ignored = ignored_inputs(*c, *host); !ignored.empty())
-            channels.note = "(" + ignored + " ignored)";
+        HostFact channels{"Host channels",
+                          arrow_ports(host->inputs, host->outputs),
+                          {},
+                          false,
+                          "The inputs and outputs the host gives the plug-in."};
+        if (failure && failure->kind == HostFailureKind::channels &&
+            (failure->inputs || failure->outputs)) {
+            channels.note = (failure->silent ? std::string("the filter has ")
+                                             : std::string("the refused file has ")) +
+                            arrow_ports(failure->inputs, failure->outputs);
+            channels.problem = true;
+        } else if (c) {
+            // PLUG-23: a host that gives more inputs than the filter reads.
+            if (const auto ignored = ignored_inputs(*c, *host); !ignored.empty())
+                channels.note = "(" + ignored + " ignored)";
+        }
+        audio.push_back(std::move(channels));
     }
-    audio.push_back(std::move(channels));
 
+    // PLUG-44: with no filter there is no routing to show.
     if (c) {
         // A filter the host could not start stays accepted (it is saved),
         // but it does not play.
@@ -305,23 +374,30 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
                          false,
                          "Which input feeds which output through the filter; ×0.5 is a gain "
                          "on that route."});
-    } else {
-        audio.push_back({"Routing", "none", "(no filter)", false,
-                         "Which input feeds which output through the filter."});
     }
 
     // PLUG-22: the latency is not a fact here; the Latency setting shows the
     // time it adds, and the note says when a choice is not in use yet.
+    // PLUG-44: Ring-out shows only when it says more than the filter's
+    // Length: a filter of n taps rings out for n - 1 frames at its own rate,
+    // so the line shows for delays, a Latency, another rate, or with no
+    // filter a tail that is not zero. Compared in frames, as the two round
+    // differently as times.
     const auto frames = [](std::size_t n) { return std::to_string(n) + " frames"; };
+    // PLUG-46: a stopped filter's tail counts at its own rate, so it is
+    // shown and compared at that rate.
     const int tail_rate = facts.tail_rate > 0 ? facts.tail_rate : rate;
-    audio.push_back({"Ring-out",
-                     facts.tail_frames == 0 ? std::string("none")
-                     // Under 0.05 ms reads as frames, not "0.0 ms".
-                     : tail_rate && facts.tail_frames * 20000.0 >= tail_rate
-                         ? duration(facts.tail_frames, tail_rate)
-                         : frames(facts.tail_frames),
-                     "", false,
-                     "How long the output goes on after the input stops (the filter's tail)."});
+    const auto ring_out = facts.tail_frames == 0 ? std::string("none")
+                          // Under 0.05 ms reads as frames, not "0.0 ms".
+                          : tail_rate && facts.tail_frames * 20000.0 >= tail_rate
+                              ? duration(facts.tail_frames, tail_rate)
+                              : frames(facts.tail_frames);
+    const bool says_more =
+        c ? facts.tail_frames + 1 != longest_taps(*c) || (tail_rate && tail_rate != c->sample_rate)
+          : facts.tail_frames != 0;
+    if (says_more)
+        audio.push_back({"Ring-out", ring_out, "", false,
+                         "How long the output goes on after the input stops (the filter's tail)."});
 
     if (c && filter.filter_peak() > 0) {
         // As HostProcessor::process() applies them: Gain on the filtered
@@ -341,7 +417,7 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
             played ? mix * std::pow(10.0, *played / 20) * peak + (1 - mix) : 1 - mix;
         const bool set = facts.settings.gain_mode == GainMode::set;
         audio.push_back(
-            {"Loudest peak", decibels(20 * std::log10(peak)),
+            {"Worst-case peak", decibels(20 * std::log10(peak)),
              mix == 0 || bound <= 1 + 1e-9 ? (set ? "(cannot clip at this Gain and Mix)"
                                                   : "(cannot clip in this Gain mode and Mix)")
              : set ? "(Gain " + decibels(-20 * std::log10(peak)) + " or lower rules out clipping)"
@@ -365,6 +441,19 @@ std::string request_reference(const HostRequest& r) {
            (r.number ? ", request " + std::to_string(r.number) : std::string());
 }
 } // namespace
+
+std::string latency_value_text(std::size_t frames, int sample_rate) {
+    auto text = std::to_string(frames) + " frames";
+    if (frames == 0)
+        return text + " (none)";
+    if (sample_rate > 0) {
+        char time[32] = {};
+        std::snprintf(time, sizeof time, " (%.1f ms)",
+                      1000.0 * static_cast<double>(frames) / sample_rate);
+        text += time;
+    }
+    return text;
+}
 
 std::string filter_identity_text(std::uint64_t identity) {
     char text[17] = {};
@@ -401,7 +490,11 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
     // Out of process (GarageBand, Logic) the program is Apple's hosting
     // service, which names no host; the Software detail still gives it.
     const bool service = program.rfind("AUHostingService", 0) == 0;
-    r.title = "Convolver " CONVOLVER_VERSION_STRING ", " + facts.format +
+    // PLUG-44: the release version; the Software line keeps the build's
+    // full identity ("0.18.5+gb3b45578b60f").
+    std::string version = CONVOLVER_VERSION_STRING;
+    version = version.substr(0, version.find('+'));
+    r.title = "Convolver " + version + ", " + facts.format +
               (program.empty() ? ""
                : service       ? std::string(" in the host's plug-in process")
                                : " in " + program);
@@ -415,7 +508,6 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
     r.explanation = explanation(m);
 
     const auto& c = filter.filter();
-    const auto& failure = filter.shown_failure();
     const auto& accepted = filter.accepted();
     if (c)
         r.filter_name = accepted.source == HostFilterSource::file && !accepted.path.empty()
@@ -426,8 +518,7 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
         r.filter_name = "None";
     if (c) {
         r.filter_rate = std::to_string(c->sample_rate) + " Hz";
-        r.filter_channels = std::to_string(c->input_channels) + " in → " +
-                            std::to_string(c->output_channels) + " out";
+        r.filter_channels = arrow_ports(c->input_channels, c->output_channels);
         const auto taps = longest_taps(*c);
         const auto length = duration(taps, c->sample_rate);
         r.filter_taps = std::to_string(taps) + " taps";
@@ -447,13 +538,18 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
         r.filter_files = accepted.files;
     }
     // A refused request (not a failure found when the host started the
-    // accepted filter, which names no new file).
-    const bool refused_request = failure && failure->request.number != accepted.number;
+    // accepted filter, which names no new file). Named even while a kept
+    // filter's wait is the failure shown, so a file refused then is not
+    // only in the log (jrp, 21 November 2026, PLUG-44).
+    const auto& refusal = filter.rejection();
+    const bool refused_request = refusal && refusal->request.number != accepted.number;
     if (refused_request)
+        // PLUG-44: the message says what becomes of the filter named in
+        // the heading (kept_words()), so the note names only the refusal.
         r.filter_note =
-            failure->request.source == HostFilterSource::file && !failure->request.path.empty()
-                ? file_name(failure->request.path) + " was refused."
-                : "The last filter loaded was refused.";
+            refusal->request.source == HostFilterSource::file && !refusal->request.path.empty()
+                ? file_name(refusal->request.path) + " was refused."
+                : std::string("The last filter loaded was refused.");
 
     r.audio = audio_facts(filter, facts);
     const auto& host = facts.host;
@@ -485,7 +581,7 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
                                      " (when the list was chosen, no entry had the host's input "
                                      "count; this one had the most inputs below it)");
     if (refused_request)
-        r.reference.emplace_back("Refused file", request_reference(failure->request));
+        r.reference.emplace_back("Refused file", request_reference(refusal->request));
     auto software = execution_line();
     if (software.starts_with("Session: "))
         software.erase(0, 9);

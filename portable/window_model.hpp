@@ -88,7 +88,7 @@ struct WindowContent {
 
 // What to show for `report` (nullptr: the plug-in could not give one).
 // `can_load` says whether this window can load a file (Choose…, a drop): it
-// adds the drop hint and keeps the Choose action.
+// keeps the Choose action.
 WindowContent window_content(const HostReport* report, bool can_load);
 
 // The time a Latency choice of `frames` adds at the host's rate ("adds 5.3

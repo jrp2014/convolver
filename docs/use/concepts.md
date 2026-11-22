@@ -42,7 +42,7 @@ they are not automatically normalized.
 | PCM | Pulse-code modulation; the CLI's PCM format names refer to integer samples, such as 16-bit or 24-bit WAV |
 | Dither | Low-level noise added before integer rounding to reduce signal-dependent quantization distortion |
 | Noise shaping | Feedback that changes the frequency distribution of quantization error |
-| DAW / host | A digital audio workstation, or another application that schedules audio processing and loads plug-ins; its rate and channels are shown as "Host sample rate" and "Host channels" |
+| DAW / host | A digital audio workstation, or another application that schedules audio processing and loads plug-ins; its rate and channels are shown on the window's Host line, or as "Host sample rate" and "Host channels" when they do not suit the filter |
 
 ## Words Convolver uses
 

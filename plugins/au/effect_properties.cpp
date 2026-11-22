@@ -22,8 +22,10 @@ namespace {
 constexpr auto& status_names = host_status_names;
 
 // The Latency parameter's value names, in host_latencies order.
-std::string latency_name(std::size_t frames) {
-    return std::to_string(frames) + " frames";
+// PLUG-44: "0 frames (none)", and the time at the host's rate where it is
+// known (`sample_rate` > 0): "256 frames (5.3 ms)".
+std::string latency_name(std::size_t frames, int sample_rate = 0) {
+    return latency_value_text(frames, sample_rate);
 }
 
 // A Latency value (an index) as a position in host_latencies: rounded,
@@ -618,9 +620,14 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
             // parameter whose values have strings).
             const auto value =
                 request->inValue ? *request->inValue : Globals()->GetParameter(latency_parameter);
+            // The host's rate once it has initialized the unit (PLUG-44).
+            const int rate =
+                IsInitialized()
+                    ? static_cast<int>(std::lround(Output(0).GetStreamFormat().mSampleRate))
+                    : 0;
             try {
                 request->outString =
-                    cf_string(latency_name(host_latencies[latency_index(value)])).release();
+                    cf_string(latency_name(host_latencies[latency_index(value)], rate)).release();
             } catch (...) {
                 return kAudioUnitErr_InvalidPropertyValue;
             }

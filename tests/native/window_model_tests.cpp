@@ -93,7 +93,7 @@ void content_tests() {
     // The same report shows the same content: no redraw.
     require(window_content(&fields, true) == c, "equal content for an equal report");
 
-    // A window that cannot load files gives no drop hint and no Choose action.
+    // A window that cannot load files gives no Choose action.
     const auto fixed = window_content(&fields, false);
     require(fixed.filter_note == "room-48k.wav was refused." && fixed.action == WindowAction::none,
             "a window without loading");
@@ -106,9 +106,9 @@ void content_tests() {
     const auto c2 = window_content(&copy, false);
     require(c2.action == WindowAction::copy_diagnostics && c2.filter_note.empty(),
             "copy diagnostics");
-    require(window_content(&copy, true).filter_note ==
-                "Or drop an IR file, .cfg or .vstpreset on this window.",
-            "the drop hint alone");
+    // PLUG-44: no drop hint under the name; the Fix and Choose…'s tooltip
+    // name dropping a file.
+    require(window_content(&copy, true).filter_note.empty(), "a drop hint under the name");
 
     // Active, nothing to say: no message, no box.
     HostReport active;
@@ -134,7 +134,7 @@ void content_tests() {
     const auto none = window_content(nullptr, true);
     require(!none.available && none.status == -1 && none.status_name == "Not available" &&
                 none.title == "Convolver" && none.boxed() && !none.fix.empty() &&
-                none.filter_note == "Or drop an IR file, .cfg or .vstpreset on this window.",
+                none.filter_note.empty(),
             "no report");
 }
 

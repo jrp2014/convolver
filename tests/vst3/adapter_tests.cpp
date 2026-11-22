@@ -1361,7 +1361,7 @@ void kept_until_channels_fit() {
             // 1. Nothing plays: the mono preset waits, saved as the filter.
             require(p.setState(state_of(mono).get()) == kResultOk,
                     "a mono preset refused with nothing playing");
-            require(contains(p.status().text, "Silent: the filter has 1 in, 1 out"),
+            require(contains(p.status().text, "Silent, waiting for 1 in, 1 out"),
                     ("kept mono preset: " + p.status().text).c_str());
             require(contains(log.text(), "No other filter was playing, so it was not refused: it "
                                          "waits for audio settings that suit it"),
@@ -1555,9 +1555,10 @@ void status_and_log() {
     // explained in the log. With nothing playing it is kept rather than
     // refused (PLUG-42), and the log says it waits for settings that suit it.
     require(p.setState(stream(wrong).get()) == kResultOk, "status wrong rate refused");
-    require(shown() == "Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details "
-                       "in the Convolver log." &&
-                status() == convolver::HostStatus::load_failed,
+    // PLUG-44: Waiting, as nothing failed to load.
+    require(shown() == "Silent, waiting for 44100 Hz: the host runs at 48000 Hz. Details in the "
+                       "Convolver log." &&
+                status() == convolver::HostStatus::unchecked,
             "kept first load not shown");
     require(contains(log_text(), "It does not suit the host's present configuration, so it is "
                                  "kept until it does. Convolver plays silence. The filter is for "
@@ -1749,7 +1750,7 @@ void status_and_log() {
     setup.sampleRate = 44100;
     require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
             "status activate at 44.1 kHz");
-    require(contains(shown(), "Silent: the filter is for 48000 Hz, the host runs at 44100 Hz") &&
+    require(contains(shown(), "Silent, waiting for 48000 Hz: the host runs at 44100 Hz") &&
                 contains(log_text(), "Started at 44100 Hz, 2 in, 2 out, blocks of up to 64 "
                                      "frames. Convolver plays silence. The saved filter is for "
                                      "48000 Hz"),
@@ -2036,6 +2037,12 @@ void settings_parameters() {
         require(c.getParameterInfo(i, info) == kResultOk && info.id == order[i],
                 "settings parameter order");
         const bool automatable = (info.flags & ParameterInfo::kCanAutomate) != 0;
+        // PLUG-44: a short title for control surfaces and narrow displays.
+        require(info.shortTitle[0] != 0, "a parameter has no short title");
+        if (info.id == latency_id)
+            require(info.shortTitle[0] == u'L' && info.shortTitle[1] == u'a' &&
+                        info.shortTitle[2] == u't' && info.shortTitle[3] == 0,
+                    "Latency's short title");
         if (info.id == gain_id)
             require(automatable && info.stepCount == 0 &&
                         std::abs(info.defaultNormalizedValue - normalized_gain(0)) < 1e-12,
@@ -2067,9 +2074,28 @@ void settings_parameters() {
     };
     require(text(gain_id, normalized_gain(-6.5)) == "-6.5" && text(mix_id, .25) == "25" &&
                 text(latency_id, normalized_latency(1024)) == "1024 frames" &&
+                text(latency_id, normalized_latency(0)) == "0 frames (none)" &&
                 text(gain_mode_id, normalized_gain_mode(convolver::GainMode::no_clipping)) ==
                     "No clipping",
             "settings value text");
+    // PLUG-44: Latency's text names the time once the host's rate is known,
+    // so typed text is read by the frames that start it; only a value in the
+    // menu counts.
+    {
+        const auto typed = [&](const char* ascii, ParamValue& v) {
+            String128 t{};
+            for (int i = 0; ascii[i] && i < 127; ++i)
+                t[i] = static_cast<TChar>(ascii[i]);
+            return c.getParamValueByString(latency_id, t, v);
+        };
+        ParamValue v = -1;
+        require(typed("256 frames (5.3 ms)", v) == kResultOk && v == normalized_latency(256) &&
+                    typed("0 frames (none)", v) == kResultOk && v == normalized_latency(0) &&
+                    typed(" 512", v) == kResultOk && v == normalized_latency(512),
+                "Latency text read back");
+        require(typed("300 frames", v) != kResultOk && typed("frames", v) != kResultOk,
+                "a Latency not in the menu read from text");
+    }
     // Hosts find the wet/dry mix by its function name.
     IParameterFunctionName* function = nullptr;
     require(c.queryInterface(IParameterFunctionName::iid, reinterpret_cast<void**>(&function)) ==
@@ -2900,7 +2926,7 @@ void chosen_file_kept_until_it_fits() {
     // The WAV for another rate: kept, silent with the reason, saved.
     require(c.load_file((folder / "slow.wav").string()),
             "a 44.1 kHz WAV chosen with nothing playing refused");
-    require(p.status().text.find("Silent: the filter is for 44100 Hz") == 0,
+    require(p.status().text.find("Silent, waiting for 44100 Hz") == 0,
             ("the kept WAV: " + p.status().text).c_str());
     auto state = saved();
     require(state.configuration && state.configuration->sample_rate == 44100 && !state.failed,
@@ -3636,7 +3662,8 @@ void chosen_before_host_plays() {
     play_block(p, 1, 1, 64);
     const auto silent = [&](const char* when) {
         const auto s = p.status();
-        require(s.status == convolver::HostStatus::load_failed && s.text.find("Silent: ") == 0 &&
+        require(s.status == convolver::HostStatus::unchecked &&
+                    s.text.find("Silent, waiting for ") == 0 &&
                     s.text.find("44100 Hz") != std::string::npos &&
                     s.text.find("48000 Hz") != std::string::npos,
                 (std::string(when) + ": status " + s.text).c_str());
@@ -3646,7 +3673,7 @@ void chosen_before_host_plays() {
     {
         const auto r = c.report();
         const auto summary = r ? r->status.text : std::string();
-        require(r && r->status_name == "Load failed" && summary.find("Silent: ") == 0 &&
+        require(r && r->status_name == "Waiting" && summary.find("Silent, waiting for ") == 0 &&
                     summary.find("44100 Hz") != std::string::npos &&
                     summary.find("48000 Hz") != std::string::npos,
                 ("the window's report while playing at 48 kHz: " + summary).c_str());

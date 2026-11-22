@@ -1059,7 +1059,7 @@ void latency_parameter() {
     CFStringGetCString(static_cast<CFStringRef>(CFArrayGetValueAtIndex(names, 0)), first,
                        sizeof first, kCFStringEncodingUTF8);
     CFRelease(names);
-    require(std::string(first) == "0 frames", std::string("first Latency name: ") + first);
+    require(std::string(first) == "0 frames (none)", std::string("first Latency name: ") + first);
     require(value_name(unit, au::latency_parameter, 5) == "1024 frames",
             "Latency 5 reads " + value_name(unit, au::latency_parameter, 5));
     require(parameter(unit, au::latency_parameter) == 0, "Latency default");
@@ -1104,6 +1104,9 @@ void latency_parameter() {
     require(latency_settled(unit), "the Latency work for an unchanged choice did not finish");
     require(seen.of(kAudioUnitProperty_Latency) == 1, "a notification without a change");
     check(unit.initialize(), "initialization at 512 frames");
+    // PLUG-44: initialized, a Latency value also reads as the time it adds.
+    require(value_name(unit, au::latency_parameter, 5) == "1024 frames (21.3 ms)",
+            "Latency 5 at 48000 Hz reads " + value_name(unit, au::latency_parameter, 5));
     require(impulse_delay(unit) == 512, "the audio is not delayed by 512 frames");
 
     // Chosen while initialized: applied at once, the host is told, and the
@@ -1751,8 +1754,9 @@ void settings_in_diagnostics() {
             "a wrong-rate first preset refused with nothing playing");
     require(std::abs(steady_output(unit, 3) - .25f) < 1e-5, "Mix 50% after a kept first load");
     const auto shown = status_text(unit);
-    require(shown == "Load failed, only the dry signal plays: the filter is for 44100 Hz, the "
-                     "host runs at 48000 Hz. Details in the Convolver log.",
+    // PLUG-44: Status says it waits for settings that suit the kept filter.
+    require(shown == "Only the dry signal plays, waiting for 44100 Hz: the host runs at 48000 "
+                     "Hz. Details in the Convolver log.",
             "kept first load at Mix 50%: " + shown);
     // Started again, the start line says what Mix lets through.
     unit.uninitialize();
@@ -1764,7 +1768,7 @@ void settings_in_diagnostics() {
     // At Mix 100% it is silent, and Status says so.
     set_parameter(unit, au::mix_parameter, 100);
     require(std::abs(steady_output(unit, 3)) < 1e-6, "Mix 100% after a kept first load");
-    require(contains(status_text(unit), "Silent: the filter is for 44100 Hz"),
+    require(contains(status_text(unit), "Silent, waiting for 44100 Hz"),
             "Status at Mix 100%: " + status_text(unit));
     unit.uninitialize();
 }
@@ -1841,9 +1845,10 @@ void status_parameter() {
     // explained. With nothing playing it is kept rather than refused, and
     // the log says it waits for settings that suit it (PLUG-42).
     require(unit.load(state_of(stereo(44100))) == noErr, "wrong-rate first preset refused");
-    require(shown() == "Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in "
+    // PLUG-44: Waiting, not Load failed, since nothing was refused.
+    require(shown() == "Silent, waiting for 44100 Hz: the host runs at 48000 Hz. Details in "
                        "the Convolver log." &&
-                value() == HostStatus::load_failed,
+                value() == HostStatus::unchecked,
             "kept first load not shown: " + shown());
     require(contains(log_text(), "It does not suit the host's present configuration: the filter "
                                  "is for 44100 Hz, and the host runs at 48000 Hz.") &&
