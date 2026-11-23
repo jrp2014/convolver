@@ -179,8 +179,11 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     // state_digest()); absent otherwise or from a damaged message, which
     // then changes no parameter.
     std::optional<HostSettings> playing;
-    int64 followed_state = 0;
+    int64 followed_state = 0, heard_latency = 0, heard_gain_mode = 0;
     attributes->getInt("followed state", followed_state);
+    // VST3-18: the last Latency and Gain mode choices the processor had heard.
+    attributes->getInt("heard latency request", heard_latency);
+    attributes->getInt("heard gain mode request", heard_gain_mode);
     if (followed_state) {
         double gain = 0, mix = 0;
         int64 latency = -1, mode = -1;
@@ -220,7 +223,7 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         return kResultFalse;
     bool changed = false, restart = false;
     std::optional<HostSettings> followed;
-    unsigned edited_since_restore = 0;
+    unsigned keep = 0; // VST3-18: the settings the answer leaves as they are.
     {
         std::lock_guard lock(status_lock_);
         if (load_request) {
@@ -241,17 +244,22 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         }
         if (follow_state_ && playing && static_cast<std::uint64_t>(followed_state) == follow_state_)
             followed = playing;
-        edited_since_restore = edited_since_restore_;
+        keep = edited_since_restore_;
+        if (latency_requests_ > heard_latency)
+            keep |= setting_bit(latency_id);
+        if (gain_mode_requests_ > heard_gain_mode)
+            keep |= setting_bit(gain_mode_id);
     }
     // PLUG-48: after restored state, the settings the processor plays, which
     // differ from the state's when it refused that state. Not edits:
     // the host restored them, so nothing is recorded as the user's.
     // VST3-18 (jrp's review of 0.18.12): a host that delivers messages later
-    // may bring this answer after the user changed a setting; the processor
-    // already has the change, so the setting keeps it.
+    // may bring this answer after the user chose another setting. A Latency
+    // or Gain mode the processor had not yet heard, which it will play once
+    // it does, and a Gain or Mix changed since the restore, keep their values.
     if (followed) {
         const auto set = [&](ParamID id, ParamValue value) {
-            if ((edited_since_restore & setting_bit(id)) || getParamNormalized(id) == value)
+            if ((keep & setting_bit(id)) || getParamNormalized(id) == value)
                 return;
             EditController::setParamNormalized(id, value);
             changed = true;
@@ -393,12 +401,17 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
         const auto result = EditController::setParamNormalized(id, value);
         const auto after = gain_mode(getParamNormalized(gain_mode_id));
         if (result == kResultOk && after != before) {
-            edited_since_restore(id);
+            int64 request = 0;
+            {
+                std::lock_guard lock(status_lock_);
+                request = ++gain_mode_requests_;
+            }
             // The processor answers with its status_message.
             if (auto message = owned(allocateMessage())) {
                 message->setMessageID(gain_mode_message);
                 if (auto* attributes = message->getAttributes()) {
                     attributes->setInt("mode", static_cast<int64>(after));
+                    attributes->setInt("request", request);
                     sendMessage(message);
                 }
             }
@@ -409,10 +422,8 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
         const auto before = latency_frames(getParamNormalized(latency_id));
         const auto result = EditController::setParamNormalized(id, value);
         const auto after = latency_frames(getParamNormalized(latency_id));
-        if (result == kResultOk && after != before) {
-            edited_since_restore(id);
+        if (result == kResultOk && after != before)
             latency_chosen(after);
-        }
         return result;
     }
     if (id == gain_id || id == mix_id) {

@@ -84,7 +84,11 @@ inline constexpr const char* report_message = "ConvolverReport";
 // it, or the follow request when it had already refused it) adds "followed
 // state" (that digest) and the settings that play, "playing gain", "playing
 // mix", "playing latency" and "playing gain mode", which the controller's
-// parameters take if it still mirrors that state.
+// parameters take if it still mirrors that state. VST3-18: with them, the
+// numbers of the last latency_message and gain_mode_message the processor
+// had heard ("heard latency request", "heard gain mode request"), so the
+// controller can tell a choice still on its way from one the answer
+// already includes.
 struct StatusAnswer {
     Steinberg::int64 load_request = 0;
     bool retried = false;
@@ -130,10 +134,9 @@ inline constexpr const char* latency_message = "ConvolverLatency";
 // automatable, as Latency: Estimate may filter noise for a long filter
 // before it can play, which the audio thread must not do. The controller
 // passes a new choice to the processor in a gain_mode_message ("mode", the
-// GainMode as an integer); the processor finds the estimate if it needs it,
-// publishes the filter with it (the crossfade covers the change) and then
-// plays the new mode. Saved in the component state (host state version 4
-// when not Set).
+// GainMode as an integer, and "request", its number, VST3-18); the processor finds the estimate if
+// it needs it, publishes the filter with it (the crossfade covers the change) and then plays the
+// new mode. Saved in the component state (host state version 4 when not Set).
 inline constexpr Steinberg::Vst::ParamID gain_mode_id = identity::vst3_gain_mode_parameter_id;
 inline constexpr const char* gain_mode_message = "ConvolverGainMode";
 // PLUG-22: the controller's bypass_message ("bypass": 0 or 1) when the host
@@ -371,6 +374,9 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     std::uint64_t refused_state_ = 0;
     std::uint64_t mirrored_state_ = 0;
     bool answer_mirrored_ = false;
+    // VST3-18, under the lock: the "request" of the last latency_message and
+    // gain_mode_message heard, which a status after a mirrored state carries.
+    Steinberg::int64 heard_latency_request_ = 0, heard_gain_mode_request_ = 0;
     bool layout_refusal_logged_ = false; // Refused layouts are logged once per instance.
     std::string logged_;                 // The last line log() queued.
     std::vector<std::pair<std::string, bool>> unlogged_; // Lines and whether each is a problem.
@@ -459,9 +465,8 @@ class Controller final : public Steinberg::Vst::EditController,
     // processor answers that it has them (notify), since the host reads the
     // latency during the restart.
     void latency_chosen(std::size_t frames);
-    // VST3-18: Gain, Mix, Gain mode and Latency as bits of
-    // edited_since_restore_ (0 for any other parameter), and recording that
-    // the host or the window changed one.
+    // VST3-18: Gain and Mix as bits of edited_since_restore_ (0 for any
+    // other parameter), and recording that the host or the window changed one.
     static unsigned setting_bit(Steinberg::Vst::ParamID) noexcept;
     void edited_since_restore(Steinberg::Vst::ParamID);
     // The host may restore state (and so send the status) on another thread
@@ -479,6 +484,8 @@ class Controller final : public Steinberg::Vst::EditController,
     bool load_accepted_ = false;
     Steinberg::int64 latency_requests_ = 0;
     bool latency_waiting_ = false;
+    // VST3-18, under status_lock_: the last gain_mode_message's number.
+    Steinberg::int64 gain_mode_requests_ = 0;
     // PLUG-22, under status_lock_: the name and filter identity the last
     // setState brought. getState saves the name the last report gives the
     // filter that plays ("filter saved name"), and this pair only when that
@@ -488,11 +495,12 @@ class Controller final : public Steinberg::Vst::EditController,
     // setComponentState mirrored; a status that says what plays after the
     // processor's outcome for that state sets the parameters (notify). 0: none.
     std::uint64_t follow_state_ = 0;
-    // VST3-18, under status_lock_: the settings (setting_bit()) the host or
-    // the window changed since that setComponentState. The status that says
-    // what plays leaves them as they are: it may have left the processor
-    // before the change reached it (a host that delivers messages later),
-    // and the processor plays the change.
+    // VST3-18, under status_lock_: Gain and Mix (setting_bit()) as the host
+    // or the window changed them since that setComponentState. The status
+    // that says what plays leaves them as they are: they reach the processor
+    // in process(), whose order against the status cannot be told, so the
+    // host's latest value counts. Latency and Gain mode go as messages, in
+    // order, and the status says which it had heard.
     unsigned edited_since_restore_ = 0;
 };
 } // namespace convolver::vst3

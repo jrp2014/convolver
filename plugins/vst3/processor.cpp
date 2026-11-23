@@ -413,6 +413,7 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
         std::string report;
         HostSettings playing;
         std::uint64_t followed = 0;
+        int64 heard_latency = 0, heard_gain_mode = 0;
         {
             const Locked lock(*this);
             if (settling_.playing()) // PLUG-27: the host plays the filter.
@@ -422,6 +423,8 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
             playing = settings();
             if (std::exchange(answer_mirrored_, false))
                 followed = mirrored_state_;
+            heard_latency = heard_latency_request_;
+            heard_gain_mode = heard_gain_mode_request_;
         }
         if (!getPeer())
             return;
@@ -443,6 +446,8 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
             attributes->setFloat("playing mix", playing.mix);
             attributes->setInt("playing latency", static_cast<int64>(playing.latency));
             attributes->setInt("playing gain mode", static_cast<int64>(playing.gain_mode));
+            attributes->setInt("heard latency request", heard_latency);
+            attributes->setInt("heard gain mode request", heard_gain_mode);
         }
         if (answer.load_request || answer.retried) {
             if (answer.load_request)
@@ -483,6 +488,7 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
         attributes->getInt("request", request);
         {
             const Locked lock(*this);
+            heard_latency_request_ = request;
             choose_latency(static_cast<std::size_t>(frames));
         }
         write_log();
@@ -495,8 +501,11 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
         if (!attributes || attributes->getInt("mode", mode) != kResultOk || mode < 0 ||
             mode >= static_cast<int64>(gain_mode_count))
             return kInvalidArgument;
+        int64 request = 0;
+        attributes->getInt("request", request);
         {
             const Locked lock(*this);
+            heard_gain_mode_request_ = request;
             choose_gain_mode(static_cast<GainMode>(mode));
         }
         write_log();
