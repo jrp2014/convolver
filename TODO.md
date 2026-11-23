@@ -338,8 +338,9 @@ relevant to a convolver unless the product changes.
   and 120 s stereo filters, against the same with a short filter. **Done
   when** that delay is recorded and, if it is noticeable, a cheaper check
   that the state is the one mirrored (or none) is chosen, with
-  `vst3.adapter` `refused_state_keeps_parameters` and
-  `edits_survive_late_answer` still passing.
+  `vst3.adapter` `refused_state_keeps_parameters`,
+  `edits_survive_late_answer` and `edits_before_controller_first_restore`
+  still passing.
 - [ ] **PERF-16 — Loading stages timed inside the plug-in.** Split a load's
   hold into its stages outside the audio path, so a failed run names the
   stage.
