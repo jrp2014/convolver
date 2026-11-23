@@ -1229,7 +1229,14 @@ the plan's Gain modes (12 November 2026); its meters follow later
   Every outcome answers, not only a refusal: a refusal of the same state in
   an earlier restore also answers a controller-first request, and the
   restore that follows corrects it. Bypass is the host's
-  and is not corrected.
+  and is not corrected. VST3-18 (jrp's review of 0.18.12, 23 November
+  2026): a host that delivers messages later can bring that status after
+  the user has changed a setting, so it once set Latency back to the 1024
+  played at the refusal while the processor played the user's 256. A
+  setting the host or the window changed after `setComponentState`
+  (`setParamNormalized` with a new value) keeps its value; the processor
+  already has the change, as a message or in `process()`. The others still
+  take what plays (`vst3.adapter` `edits_survive_late_answer`).
 
 ## Channel layouts
 
