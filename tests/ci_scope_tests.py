@@ -1069,6 +1069,7 @@ class CarryForward(unittest.TestCase):
             self.run_record(5, self.BASE),
         ]
         self.comparison = {'status': 'ahead', 'files': [{'filename': 'TODO.md'}]}
+        self.comparisons = {}  # 'old...new': answer, where it differs.
         self.requests = []
         patcher = mock.patch.object(ci_scope, 'github', self.github)
         patcher.start()
@@ -1092,7 +1093,7 @@ class CarryForward(unittest.TestCase):
     def github(self, path):
         self.requests.append(path)
         if '/compare/' in path:
-            return self.comparison
+            return self.comparisons.get(path.split('/compare/')[1], self.comparison)
         if '/check-runs/' in path:
             # The scope job's notices; its id is the run's number times ten.
             number = int(path.split('/check-runs/')[1].split('/')[0]) // 10
@@ -1169,34 +1170,44 @@ class CarryForward(unittest.TestCase):
         self.assertIn('tests against is unknown', why())
         self.merged_into = self.MAIN
         self.runs[2]['tested'] = None
-        self.assertIn('an unrecorded commit', why())
+        self.assertIn('recorded no main commit', why())
 
     def test_main_moved_since_the_full_run(self):
         """jrp's sequence, 23 November 2026: a code change passes in full,
         main moves on, and a documentation follow-up on the pull request
-        must not carry the earlier result, which tested the branch with the
-        earlier main."""
-        code = ['portable/host.cpp', 'TODO.md']
-        self.merged_into = 'd' * 40  # main has moved since run 5.
-        paths, reason = ci_scope.carried_from('vst3', 'pull_request', self.pull_request())
-        self.assertIsNone(paths)
-        self.assertIn(f'merged into main at {self.MAIN[:12]}, this run merges it into dddddddddddd', reason)
+        carries the earlier result, which tested the branch with the earlier
+        main, only when nothing that landed on main needs the workflow."""
+        moved = 'd' * 40
+        self.merged_into = moved
+        on_main = f'{self.MAIN}...{moved}'
+
+        def carried(*files, status='ahead'):
+            self.comparisons[on_main] = {'status': status, 'files': [{'filename': name} for name in files]}
+            return ci_scope.carried_from('vst3', 'pull_request', self.pull_request())
+
+        # A shared header on main: it counts as changed, so VST3 runs.
+        paths, _ = carried('include/convolver/engine.hpp', 'VERSION')
+        self.assertEqual(paths, ['TODO.md', 'include/convolver/engine.hpp'])
+        self.assertTrue(self.requests[-1].endswith(f'/compare/{on_main}'))
+        # Documentation and the version bot's VERSION on main: it stands.
+        self.assertEqual(carried('docs/use/limits.md', 'VERSION')[0], ['TODO.md', 'docs/use/limits.md'])
+        # main rewritten, or too much to list: nothing is carried.
+        self.assertIn('on main since run 5, cccccccccccc is not an ancestor', carried(status='diverged')[1])
+        self.assertIn('more than 299 files', carried(*(f'f{n}' for n in range(300)))[1])
+        # main() runs VST3 for the header and records the new main commit.
+        self.comparisons[on_main] = {'status': 'ahead', 'files': [{'filename': 'include/convolver/engine.hpp'}]}
         with tempfile.TemporaryDirectory() as temporary:
             output, payload = Path(temporary) / 'output', Path(temporary) / 'event.json'
             payload.write_text(json.dumps(self.pull_request()))
             stdout = io.StringIO()
             environment = {'GITHUB_EVENT_PATH': str(payload), 'GITHUB_STEP_SUMMARY': ''}
             with mock.patch.dict(os.environ, environment), mock.patch.object(
-                ci_scope, 'changed_files', return_value=code
+                ci_scope, 'changed_files', return_value=['portable/host.cpp', 'TODO.md']
             ), mock.patch('sys.stdout', stdout):
                 ci_scope.main(['--event', 'pull_request', '--workflow', 'vst3', '--github-output', str(output)])
             answer = dict(line.split('=', 1) for line in output.read_text().splitlines())
         self.assertEqual((answer['build'], answer['proving']), ('true', 'true'))
-        # The new full run records the main commit it tests against.
-        self.assertIn(f'::notice title={ci_scope.BASE_TITLE}::{"d" * 40}\n', stdout.getvalue())
-        # With main where it was, the same follow-up carries.
-        self.merged_into = self.MAIN
-        self.assertEqual(ci_scope.carried_from('vst3', 'pull_request', self.pull_request())[0], ['TODO.md'])
+        self.assertIn(f'::notice title={ci_scope.BASE_TITLE}::{moved}\n', stdout.getvalue())
 
     def test_pull_request_base(self):
         merge = subprocess.CompletedProcess([], 0, stdout=f'{self.HEAD} {self.MAIN} {self.BASE}\n')

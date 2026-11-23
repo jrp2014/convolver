@@ -62,12 +62,13 @@ nothing changed since then that this workflow needs, it skips its jobs and
 says which run it relies on. Without such a run, when the commits have
 diverged, when the comparison cannot be listed, or when a person re-runs a
 run, nothing is carried. A pull request run tests the branch merged into
-main as it was then, so it is carried only when main is where it was: a
-full pull request run records the main commit it was merged into as a notice
-titled BASE_TITLE on its scope job, and a later run carries its result only
-when its own merge has the same first parent (jrp, 23 November 2026). On a
-pull request the comparison decides for each
-workflow; on main every workflow runs as before when anything but
+main as it was then (jrp, 23 November 2026): a full pull request run records
+the main commit it was merged into as a notice titled BASE_TITLE on its
+scope job, and when main has moved since, a later run counts what changed
+on main between that commit and the first parent of its own merge as
+changed too (but for the version bot's VERSION commits). Without that
+record, nothing is carried. On a pull request the comparison decides for
+each workflow; on main every workflow runs as before when anything but
 documentation changed, so a merge that changes code or tests gets the full
 run (jrp, 21 November 2026), and one that changes only documentation runs
 Lint alone (main_carries()).
@@ -673,27 +674,39 @@ def carried_from(workflow, event, payload):
         )
         if base is None:
             return None, f'no full passed run of this workflow on {branch} to compare with'
-        if event == 'pull_request':
-            tested = tested_base(job, repository)
-            if tested != merged_into:
-                return None, (
-                    f'run {base["id"]} tested this branch merged into main at '
-                    f'{tested[:12] if tested else "an unrecorded commit"}, this run merges it into {merged_into[:12]}'
-                )
-        comparison = github(f'/repos/{repository}/compare/{base["head_sha"]}...{sha}')
+        tested = tested_base(job, repository) if event == 'pull_request' else None
+        if event == 'pull_request' and not tested:
+            return None, f'run {base["id"]} recorded no main commit that it tested against'
+        paths = changed_between(repository, base['head_sha'], sha)
+        if isinstance(paths, str):
+            return None, paths
+        if tested and tested != merged_into:
+            # main moved since: what landed on it counts as changed too,
+            # except the version bot's VERSION commits (as in main_carries()).
+            on_main = changed_between(repository, tested, merged_into)
+            if isinstance(on_main, str):
+                return None, f'on main since run {base["id"]}, {on_main}'
+            paths |= on_main - {'VERSION'}
     except (OSError, KeyError, ValueError) as error:
         return None, f'could not look up earlier runs ({error})'
+    return sorted(paths), base
+
+
+def changed_between(repository, old, new):
+    """The files changed from commit old to commit new (both names of a
+    rename), or why they cannot be listed."""
+    comparison = github(f'/repos/{repository}/compare/{old}...{new}')
     if comparison.get('status') not in ('ahead', 'identical'):
-        return None, f'{base["head_sha"][:12]} is not an ancestor of {sha[:12]}'
+        return f'{old[:12]} is not an ancestor of {new[:12]}'
     files = comparison.get('files') or []
     if len(files) >= COMPARE_LIMIT:
-        return None, f'more than {COMPARE_LIMIT - 1} files changed since {base["head_sha"][:12]}'
+        return f'more than {COMPARE_LIMIT - 1} files changed since {old[:12]}'
     paths = set()
     for entry in files:
         paths.add(entry['filename'])
         if entry.get('previous_filename'):
             paths.add(entry['previous_filename'])
-    return sorted(paths), base
+    return paths
 
 
 def main_carries(since):
@@ -790,7 +803,7 @@ def main(argv=None):
                 carried = not since or not runs(decide(since, args.workflow, carried_kind))
             lines.append(
                 f'Since run {base["id"]} passed in full on {base["head_sha"][:12]} ({base.get("html_url", "")}), '
-                f'{len(since)} file(s) changed:'
+                f'{len(since)} file(s) changed, on the branch or on main:'
             )
             lines.extend(f'  {carried_kind(path):13} {path}' for path in since)
             if carried:

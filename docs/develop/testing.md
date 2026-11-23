@@ -1929,21 +1929,22 @@ commit after each merge starts no run, so it is left out of that
 comparison; the runs started by hand on a release's tag test it. Nothing is carried, and the
 workflow runs as before, when no such run exists (a draft's runs do not
 count, nor do runs before CI-53), when the earlier commit is not an
-ancestor (a rebase), when `main` has moved since (below), when 300 or more
-files changed, when the lookup fails,
+ancestor (a rebase), when 300 or more files changed, when the lookup fails,
 for a re-run (attempt 2 or later) and for scheduled and manual runs.
 
-A pull request run tests the branch merged into `main` as it was then, so
-a result is carried only while `main` has not moved (jrp, 23 November 2026,
-after a docs-only push carried a result tested against an earlier `main`).
-A full pull request run records the `main` commit it was merged into as a
-notice titled "CI-53 base" on its `scope` job; a later run carries the
-result only when its own merge has the same first parent, and runs in full
-when the earlier run recorded none. Merges to `main`, the version bot's
-commit after each included, therefore end the carrying until the next full
-run. Merging `main` into the branch changes its code, so it runs again.
-Each `scope` job makes at most eight API calls with the run's token (a list
-of runs, the jobs of up to five, the notices of one job, one comparison). Every release and
+A pull request run tests the branch merged into `main` as it was then (jrp,
+23 November 2026, after a docs-only push carried a result tested against an
+earlier `main`). A full pull request run records the `main` commit it was
+merged into as a notice titled "CI-53 base" on its `scope` job. When `main`
+has moved since, a later run also counts as changed every file that landed
+on `main` between that commit and the first parent of its own merge, except
+the version bot's `VERSION`; so a shared header merged to `main` runs the
+workflows, and a page of documentation does not. When the earlier run
+recorded no `main` commit, or `main`'s changes cannot be listed (rewritten,
+or 300 files or more), nothing is carried. Merging `main` into the branch
+changes its code, so it runs again. Each `scope` job makes at most nine API
+calls with the run's token (a list of runs, the jobs of up to five, the
+notices of one job, two comparisons). Every release and
 preview also passes every workflow started by hand on its tag
 ([publishing](releasing.md#publishing-an-unsigned-preview)).
 
