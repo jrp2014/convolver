@@ -21,7 +21,8 @@ to that page, not here. The link checker checks these links.
 - **Finishing:** run the checks in the
   [verification table](../../../docs/develop/workflow.md#verification-for-each-kind-of-change),
   work through the [definition of done](../../../docs/develop/workflow.md#definition-of-done),
-  then have the [independent review](../../../docs/develop/workflow.md#independent-review)
+  then, when the change [needs one](../../../docs/develop/workflow.md#which-changes-need-one),
+  have the [independent review](../../../docs/develop/workflow.md#independent-review)
   done in a fresh session (the `review-change` skill) or by a person. Mark the
   pull request ready and request review from jrp.
 

@@ -8,6 +8,8 @@ name: Plug-in distribution candidates
   push:
     branches: [main]
   pull_request:
+    # ready_for_review: a draft runs Lint and the Linux jobs only (CI-54).
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
   # Each Monday, so that a new upstream release of a library or NSIS shows up
   # within a week even when nothing here changes (CI-6).
@@ -34,14 +36,47 @@ jobs:
   # docs/develop/testing.md#when-pull-requests-build-the-candidates).
   scope:
     runs-on: ubuntu-latest
+    # Reads this workflow's earlier runs, and the main commit each tested
+    # against (its scope job's notice), to carry a passed result forward
+    # (CI-53).
+    permissions:
+      contents: read
+      actions: read
+      checks: read
     outputs:
       package: ${{ steps.scope.outputs.package }}
+      full: ${{ steps.scope.outputs.full }}
+      candidates: ${{ steps.scope.outputs.candidates }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 2
       - id: scope
-        run: python3 scripts/ci_scope.py --workflow release --github-output "$GITHUB_OUTPUT"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # The candidates job's matrix, listed here so that a draft pull
+          # request builds the Linux candidate alone (CI-54). Lines starting
+          # with # are comments.
+          # Older images on purpose: Ubuntu 22.04 keeps the Linux package
+          # loading with glibc 2.35 and libstdc++ 12, and Windows Server
+          # 2022's Visual Studio 2022 keeps the Windows package from needing
+          # the 2026 Microsoft C++ runtime, which jrp chose to keep for now
+          # (docs/develop/build.md#compilers-and-ci-machines).
+          # The macOS entries are the newest generally available macOS images
+          # and their newest Xcode (CI-43). The package still targets macOS 14
+          # (CMAKE_OSX_DEPLOYMENT_TARGET in candidate.py).
+          CANDIDATES: |
+            [
+              {"os": "ubuntu-22.04", "platform": "linux-x86_64"},
+              {"os": "windows-2022", "platform": "windows-x86_64"},
+              {"os": "macos-26", "platform": "macos-arm64"},
+              {"os": "macos-26-intel", "platform": "macos-x86_64"}
+            ]
+        run: >-
+          python3 scripts/ci_scope.py --workflow release --github-output "$GITHUB_OUTPUT" --matrix candidates=CANDIDATES
+      - name: 'Full run: later pushes compare with this commit'
+        if: steps.scope.outputs.proving == 'true'
+        run: echo "Every job of this workflow runs, on every platform (CI-53)."
 
   sources:
     needs: scope
@@ -80,27 +115,13 @@ jobs:
           if-no-files-found: error
 
   candidates:
-    needs: sources
+    needs: [scope, sources]
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # Older images on purpose: Ubuntu 22.04 keeps the Linux package
-          # loading with glibc 2.35 and libstdc++ 12, and Windows Server
-          # 2022's Visual Studio 2022 keeps the Windows package from needing
-          # the 2026 Microsoft C++ runtime, which jrp chose to keep for now
-          # (docs/develop/build.md#compilers-and-ci-machines).
-          - os: ubuntu-22.04
-            platform: linux-x86_64
-          - os: windows-2022
-            platform: windows-x86_64
-          # The newest generally available macOS images and their newest
-          # Xcode (CI-43). The package still targets macOS 14
-          # (CMAKE_OSX_DEPLOYMENT_TARGET in candidate.py).
-          - os: macos-26
-            platform: macos-arm64
-          - os: macos-26-intel
-            platform: macos-x86_64
+        # Listed in the scope job (CANDIDATES), which keeps only the Linux
+        # candidate for a draft pull request (CI-54).
+        include: ${{ fromJSON(needs.scope.outputs.candidates) }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     env:
@@ -231,7 +252,10 @@ jobs:
             build/candidate/**/release-build-info-*.json
 
   collect:
-    needs: candidates
+    needs: [scope, candidates]
+    # The complete candidate needs every platform, which a draft does not
+    # build (CI-54).
+    if: needs.scope.outputs.full == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

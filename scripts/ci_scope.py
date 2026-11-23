@@ -55,16 +55,45 @@ that FUZZED names every repository file compiled into the targets
 (--fuzz-sources), so a new dependency is caught on the pull request that
 adds it, which has to change a file already listed.
 
-Pushes to main, scheduled and manual runs always get everything, and so does
-a pull request whose changed files cannot be listed. See
+A later push carries a passed result forward (CI-53): each workflow looks up
+its own last full run that passed on the same branch (a run whose scope job
+reached the step PROVING_STEP; a newer failed run means none stands) and
+compares that commit with this one. When
+nothing changed since then that this workflow needs, it skips its jobs and
+says which run it relies on. Without such a run, when the commits have
+diverged, when the comparison cannot be listed, or when a person re-runs a
+run, nothing is carried. A pull request run tests the branch merged into
+main as it was then (jrp, 23 November 2026): a full pull request run records
+the main commit it was merged into as a notice titled BASE_TITLE on its
+scope job, and when main has moved since, a later run counts what changed
+on main between that commit and the first parent of its own merge as
+changed too (but for the version bot's VERSION commits). Without that
+record, nothing is carried. On a pull request the comparison decides for
+each workflow; on main every workflow runs as before when anything but
+documentation changed, so a merge that changes code or tests gets the full
+run (jrp, 21 November 2026), and one that changes only documentation runs
+Lint alone (main_carries()).
+
+A draft pull request runs Lint and the Linux jobs only (CI-54): the scope
+job answers full=false, the macOS and Windows jobs are gated on full, and
+the matrices that mix platforms are listed in the scope job (--matrix) and
+filtered here. Marking the pull request ready runs the rest; a person or
+agent who wants every platform sooner starts the workflows by hand on the
+branch.
+
+Pushes to main that change code, scheduled and manual runs get everything,
+and so does a pull request whose changed files cannot be listed. See
 docs/develop/testing.md#ci-triggers.
 """
 
 import argparse
+import json
 import os
 import re
 import subprocess
 import sys
+import urllib.parse
+import urllib.request
 from pathlib import Path, PurePosixPath
 
 # Pages whose commands the examples.first_use CTest entry runs as written
@@ -265,6 +294,17 @@ FUZZED = (
 FUZZED_GENERATED = ()
 # Workflows gated by this script, named by their file in .github/workflows/.
 WORKFLOWS = ('regression', 'fuzz', 'vst3', 'au', 'lv2', 'release')
+# The scope job's step that runs only when the workflow's jobs ran in full:
+# built (or packaged), on every platform and not carried forward. Later
+# pushes compare with the commit of the newest passed run that reached it
+# (CI-53); the name is how they find it, so the workflows use it exactly.
+PROVING_STEP = 'Full run: later pushes compare with this commit'
+# Runs inspected for one, newest first, and the most files a comparison lists.
+CARRY_RUNS = 10
+# A full pull request run records the main commit it tested against as a
+# notice with this title on its scope job (CI-53).
+BASE_TITLE = 'CI-53 base'
+COMPARE_LIMIT = 300
 
 
 def matches(path, entries):
@@ -361,10 +401,17 @@ def guide_needs_candidates(path):
     return texts is None or any(EXAMPLE.search(text) or IMAGE.search(text) for text in texts)
 
 
-def candidates(paths):
+def carried_kind(path):
+    """page_kind() for a file changed since an earlier run (CI-53). A page in
+    COMMANDED counts as code, as page_kind() compares its commands with the
+    base commit, not with the earlier run's."""
+    return classify(path) if path in COMMANDED else page_kind(path)
+
+
+def candidates(paths, kind_of=page_kind):
     """Whether a pull request changing these paths builds the candidates."""
     for path in paths:
-        what = page_kind(path)
+        what = kind_of(path)
         if what == 'documentation':
             continue
         if what == 'packaged' and guide(path):
@@ -376,17 +423,17 @@ def candidates(paths):
     return False
 
 
-def fuzzed(paths):
+def fuzzed(paths, kind_of=page_kind):
     """Whether a pull request changing these paths runs the fuzz targets."""
-    return any(matches(path, FUZZED) and page_kind(path) == 'code' for path in paths)
+    return any(matches(path, FUZZED) and kind_of(path) == 'code' for path in paths)
 
 
-def needed(paths):
+def needed(paths, kind_of=page_kind):
     """The workflows that must run for a pull request's changed paths. An
     empty list (a merge that changes nothing) runs everything."""
     if not paths:
         return set(WORKFLOWS)
-    kinds = {page_kind(path) for path in paths}
+    kinds = {kind_of(path) for path in paths}
     if 'code' in kinds:
         workflows = set(WORKFLOWS)
     else:
@@ -403,19 +450,19 @@ def needed(paths):
             elif kind.startswith('workflow:'):
                 workflows.add(kind.split(':', 1)[1])
     workflows.discard('release')
-    if candidates(paths):
+    if candidates(paths, kind_of):
         workflows.add('release')
-    if 'workflow:fuzz' not in kinds and not fuzzed(paths):
+    if 'workflow:fuzz' not in kinds and not fuzzed(paths, kind_of):
         workflows.discard('fuzz')
     # Lint and the version workflow are not gated; changing them builds nothing.
     return workflows & set(WORKFLOWS)
 
 
-def decide(paths, workflow=None):
+def decide(paths, workflow=None, kind_of=page_kind):
     """What one workflow must do: build (and test), and package, which only
     the candidate workflow reads; for the candidates the two are the same.
     Without a workflow name, build says whether any other workflow builds."""
-    workflows = needed(paths)
+    workflows = needed(paths, kind_of)
     package = 'release' in workflows
     build = bool(workflows - {'release'}) if workflow is None else workflow in workflows
     return {'build': build, 'package': package}
@@ -518,6 +565,183 @@ def check_fuzz_sources(source):
     return 0
 
 
+def runs(answer):
+    """Whether a workflow's own jobs run, given decide() for that workflow.
+
+    Only build: package says whether the candidates are needed, which only
+    the candidate workflow reads, and for that workflow build is the same."""
+    return answer['build']
+
+
+def event_payload():
+    """The event that started the run ($GITHUB_EVENT_PATH), or {}."""
+    path = os.environ.get('GITHUB_EVENT_PATH')
+    if not path:
+        return {}
+    try:
+        return json.loads(Path(path).read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return {}
+
+
+def full_run(event, payload):
+    """Whether every platform runs: all but a draft pull request (CI-54)."""
+    return not (event == 'pull_request' and payload.get('pull_request', {}).get('draft'))
+
+
+def github(path):
+    """A GitHub REST API answer, read with the run's token."""
+    url = os.environ.get('GITHUB_API_URL', 'https://api.github.com') + path
+    request = urllib.request.Request(  # noqa: S310 (GitHub's API URL, https://)
+        url,
+        headers={
+            'Accept': 'application/vnd.github+json',
+            'Authorization': 'Bearer ' + os.environ['GITHUB_TOKEN'],
+            'X-GitHub-Api-Version': '2022-11-28',
+        },
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+        return json.load(response)
+
+
+def proving(run, repository):
+    """A run's scope job if it reached PROVING_STEP, else None."""
+    jobs = github(f'/repos/{repository}/actions/runs/{run["id"]}/jobs?filter=latest&per_page=100')['jobs']
+    for job in jobs:
+        if job.get('name') == 'scope':
+            reached = any(
+                step.get('name') == PROVING_STEP and step.get('conclusion') == 'success'
+                for step in job.get('steps') or []
+            )
+            return job if reached else None
+    return None
+
+
+def newest_full_pass(found, repository, branch):
+    """The newest of the runs found (newest first) that passed in full, and
+    its scope job; or None and why not. A newer run that failed hides every
+    older pass until the workflow passes again (jrp, 23 November 2026): CI
+    fetches tools and SDKs as it runs, so a failure can be real although
+    no file it needs changed. Cancelled runs, and runs that passed without
+    running in full (carried, or a draft's), are passed over."""
+    current = os.environ.get('GITHUB_RUN_ID')
+    for run in found:
+        if str(run['id']) == current or (run.get('head_repository') or {}).get('full_name') != repository:
+            continue
+        if run.get('conclusion') in ('failure', 'timed_out', 'startup_failure'):
+            return None, f'run {run["id"]} on {branch} failed, so no earlier pass stands'
+        if run.get('conclusion') != 'success':
+            continue
+        job = proving(run, repository)
+        if job:
+            return run, job
+    return None, f'no full passed run of this workflow on {branch} to compare with'
+
+
+def tested_base(job, repository):
+    """The main commit a full pull request run tested against, from the
+    BASE_TITLE notice on its scope job, or None."""
+    notes = github(f'/repos/{repository}/check-runs/{job["id"]}/annotations?per_page=100')
+    return next((note.get('message', '').strip() for note in notes if note.get('title') == BASE_TITLE), None)
+
+
+def pull_request_base():
+    """The main commit this pull request run tests against: the first parent
+    of the merge commit GitHub checks out, or None."""
+    try:
+        parents = subprocess.run(
+            ['git', 'rev-list', '--parents', '-n', '1', 'HEAD'], check=True, capture_output=True, text=True
+        ).stdout.split()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return parents[1] if len(parents) == 3 else None
+
+
+def carried_from(workflow, event, payload):
+    """The files changed since this workflow's last full passed run on the
+    same branch, and that run: (paths, run), or (None, why not)."""
+    repository = os.environ.get('GITHUB_REPOSITORY', '')
+    if not os.environ.get('GITHUB_TOKEN') or not repository:
+        return None, 'no token to look up earlier runs'
+    if os.environ.get('GITHUB_RUN_ATTEMPT', '1') != '1':
+        return None, 'a person re-ran this run'
+    if event == 'pull_request':
+        pull = payload.get('pull_request') or {}
+        head = pull.get('head') or {}
+        if (head.get('repo') or {}).get('full_name') != repository:
+            return None, 'the pull request comes from another repository'
+        branch, sha = head.get('ref'), head.get('sha')
+        merged_into = pull_request_base()
+        if not merged_into:
+            return None, 'the main commit this run tests against is unknown'
+    elif event == 'push' and os.environ.get('GITHUB_REF') == 'refs/heads/main':
+        branch, sha = 'main', os.environ.get('GITHUB_SHA')
+    else:
+        return None, f'"{event}" runs carry nothing'
+    if not branch or not sha:
+        return None, 'the event names no branch or commit'
+    query = urllib.parse.urlencode({'event': event, 'branch': branch, 'status': 'completed', 'per_page': CARRY_RUNS})
+    try:
+        found = github(f'/repos/{repository}/actions/workflows/{workflow}.yml/runs?{query}')['workflow_runs']
+        base, job = newest_full_pass(found, repository, branch)
+        if base is None:
+            return None, job
+        tested = tested_base(job, repository) if event == 'pull_request' else None
+        if event == 'pull_request' and not tested:
+            return None, f'run {base["id"]} recorded no main commit that it tested against'
+        paths = changed_between(repository, base['head_sha'], sha)
+        if isinstance(paths, str):
+            return None, paths
+        if tested and tested != merged_into:
+            # main moved since: what landed on it counts as changed too,
+            # except the version bot's VERSION commits (as in main_carries()).
+            on_main = changed_between(repository, tested, merged_into)
+            if isinstance(on_main, str):
+                return None, f'on main since run {base["id"]}, {on_main}'
+            paths |= on_main - {'VERSION'}
+    except (OSError, KeyError, ValueError) as error:
+        return None, f'could not look up earlier runs ({error})'
+    return sorted(paths), base
+
+
+def changed_between(repository, old, new):
+    """The files changed from commit old to commit new (both names of a
+    rename), or why they cannot be listed."""
+    comparison = github(f'/repos/{repository}/compare/{old}...{new}')
+    if comparison.get('status') not in ('ahead', 'identical'):
+        return f'{old[:12]} is not an ancestor of {new[:12]}'
+    files = comparison.get('files') or []
+    if len(files) >= COMPARE_LIMIT:
+        return f'more than {COMPARE_LIMIT - 1} files changed since {old[:12]}'
+    paths = set()
+    for entry in files:
+        paths.add(entry['filename'])
+        if entry.get('previous_filename'):
+            paths.add(entry['previous_filename'])
+    return paths
+
+
+def main_carries(since):
+    """Whether a push to main carries the last full run's result forward:
+    only when everything changed since is documentation, packaged pages
+    included, that the candidates need not run for (jrp, 21 November 2026:
+    keep the full post-merge run whenever code or tests change). The version
+    bot's VERSION commit after each merge starts no run, so it is always in
+    the comparison; it is left out, and the tag's own runs test it before a
+    release."""
+    paths = [path for path in since if path != 'VERSION']
+    return all(carried_kind(path) in ('documentation', 'packaged') for path in paths) and not candidates(
+        paths, carried_kind
+    )
+
+
+def matrix(text, *, full):
+    """A matrix's entries, listed as JSON (lines starting with # are
+    comments), keeping only the Linux ones unless every platform runs."""
+    entries = json.loads('\n'.join(line for line in text.splitlines() if not line.lstrip().startswith('#')))
+    return entries if full else [entry for entry in entries if entry['os'].startswith('ubuntu')]
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n', 1)[0])
     parser.add_argument(
@@ -528,7 +752,15 @@ def main(argv=None):
     parser.add_argument(
         '--workflow', choices=WORKFLOWS, help='the workflow asking, by file name (default: any workflow)'
     )
-    parser.add_argument('--github-output', help='append build=… and package=… here')
+    parser.add_argument('--github-output', help='append build=…, package=…, full=… and proving=… here')
+    parser.add_argument(
+        '--matrix',
+        action='append',
+        default=[],
+        metavar='NAME=VARIABLE',
+        help='also write NAME=, the JSON matrix in environment variable VARIABLE, '
+        'keeping only its Linux entries for a draft pull request (CI-54)',
+    )
     parser.add_argument(
         '--fuzz-sources',
         metavar='FILE',
@@ -540,6 +772,8 @@ def main(argv=None):
     if args.fuzz_sources:
         return check_fuzz_sources(args.fuzz_sources)
 
+    payload = event_payload()
+    full = full_run(args.event, payload)
     if args.paths:
         paths, reason = args.paths, 'paths given on the command line'
     elif args.event != 'pull_request':
@@ -566,15 +800,58 @@ def main(argv=None):
                 'The fuzz targets do not run: nothing they are built from changed (CI-34). '
                 'To run them for this branch, start "Fuzz smoke tests" by hand on it.'
             )
-        if args.workflow:
+
+    # CI-53: carry a passed result forward when nothing this workflow needs
+    # changed since its last full run.
+    carried = False
+    if args.workflow and not args.paths and runs(answer) and args.event in ('pull_request', 'push'):
+        since, base = carried_from(args.workflow, args.event, payload)
+        if since is None:
+            lines.append(f'Nothing carried forward: {base}.')
+        else:
+            if args.event == 'push':
+                carried = main_carries(since)
+            else:
+                carried = not since or not runs(decide(since, args.workflow, carried_kind))
             lines.append(
-                f'This workflow ({args.workflow}) '
-                + ('runs.' if answer['build'] or answer['package'] else 'is skipped.')
+                f'Since run {base["id"]} passed in full on {base["head_sha"][:12]} ({base.get("html_url", "")}), '
+                f'{len(since)} file(s) changed, on the branch or on main:'
             )
+            lines.extend(f'  {carried_kind(path):13} {path}' for path in since)
+            if carried:
+                answer = {'build': False, 'package': False}
+                lines.append(
+                    f'None of them needs this workflow ({args.workflow}): its jobs are skipped and '
+                    f'the result of run {base["id"]} stands (CI-53).'
+                )
+            else:
+                lines.append(f'This workflow ({args.workflow}) needs them, so it runs.')
+    if not full:
+        lines.append(
+            'A draft pull request runs Lint and the Linux jobs only (CI-54). Marking it ready runs every '
+            'platform; to run them sooner, start the workflows by hand on the branch.'
+        )
+    if args.workflow:
+        lines.append(f'This workflow ({args.workflow}) ' + ('runs.' if runs(answer) else 'is skipped.'))
+    outputs = dict(answer, full=full, proving=runs(answer) and full and not carried)
+    for option in args.matrix:
+        name, _, variable = option.partition('=')
+        outputs[name] = json.dumps(matrix(os.environ[variable], full=full), separators=(',', ':'))
     print('\n'.join(lines))
+    if args.event == 'pull_request' and outputs['proving']:
+        merged_into = pull_request_base()
+        if merged_into:
+            # The record a later run checks before it carries this result.
+            print(f'::notice title={BASE_TITLE}::{merged_into}')
+    summary = os.environ.get('GITHUB_STEP_SUMMARY')
+    if summary and args.workflow:
+        with Path(summary).open('a', encoding='utf-8') as stream:
+            stream.write('### CI scope\n\n```text\n' + '\n'.join(lines) + '\n```\n')
     if args.github_output:
         with Path(args.github_output).open('a', encoding='utf-8') as stream:
-            stream.writelines(f'{key}={str(value).lower()}\n' for key, value in answer.items())
+            stream.writelines(
+                f'{key}={value if isinstance(value, str) else str(value).lower()}\n' for key, value in outputs.items()
+            )
     return 0
 
 
