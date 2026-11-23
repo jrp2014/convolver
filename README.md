@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Convolver
 
-**Download:** [Convolver 0.18.10 for macOS, Windows and Linux](https://github.com/jrp2014/convolver/releases/tag/v0.18.10), an
+**Download:** [Convolver 0.18.12 for macOS, Windows and Linux](https://github.com/jrp2014/convolver/releases/tag/v0.18.12), an
 unsigned developer preview; read [opening an unsigned preview](docs/use/install.md#unsigned-previews)
 first.
 
@@ -52,8 +52,13 @@ tried.
   In jrp's recorded comparison on an Apple silicon Mac (8 November 2026,
   0.13.0), at a Latency of 256 frames, the engine used 15 to 17 times less
   processor time for 30-second filters than the first preview's engine
-  ([measurements](docs/develop/fft-measurements.md#on-apple-silicon)). The
-  Latency setting trades delay for processor time when you are not
+  ([measurements](docs/develop/fft-measurements.md#on-apple-silicon)). On
+  the same Mac at a Latency of 256 frames (5.8 ms), the 0.18.8 engine ran a
+  65,536-tap stereo room correction 4.5 times as fast as the 2006 engine
+  when both used the same FFTW build, and 3.4 times as fast with
+  Accelerate, which the Mac plug-ins use
+  ([then and now](docs/develop/fft-measurements.md#performance-then-and-now)).
+  The Latency setting trades delay for processor time when you are not
   monitoring live.
 - **Robust.** Every plug-in format is held to the same lifecycle tests:
   loading before and after the host starts, restoring saved projects,
@@ -152,7 +157,7 @@ playing for hours with the window closed. Convolver is built for that:
 
 ## Preview status
 
-Convolver is a developer preview: the latest, [0.18.10](https://github.com/jrp2014/convolver/releases/tag/v0.18.10), is an
+Convolver is a developer preview: the latest, [0.18.12](https://github.com/jrp2014/convolver/releases/tag/v0.18.12), is an
 unsigned pre-release for macOS, Windows and Linux. Its VST3 plug-in has a
 window on macOS and Windows and uses the host's controls on Linux, and the
 Linux package holds the LV2 plug-in. 0.13.20 added the Gain mode and
@@ -161,7 +166,9 @@ LV2 crash in hosts built on JUCE after a Gain mode change; 0.14.0 restores
 the playing filter more quickly, uses less CPU once the sound has stopped
 and reports clipping after a command-line render; 0.18.10 keeps a filter
 chosen before the host plays, waits for a start that suits a filter and
-words the window and Status more plainly. These previews
+words the window and Status more plainly; 0.18.12 fixes a configuration
+list chosen before Audacity first plays and replaces the window's Choose…,
+Recent and Reload controls with one Choose Filter menu. These previews
 were published before anyone listened to the new audio engine (since 0.13)
 or tried the Windows window, LV2 or the features new since 0.13.20 in a host, and
 before an independent user's walkthrough, which are still to come
@@ -174,7 +181,7 @@ Convolver does not do.
 | I want to… | Read |
 | --- | --- |
 | Use Convolver | [Using Convolver](docs/use/README.md), then [your first filter](docs/use/first-filter.md) |
-| Download the preview (macOS, Windows, Linux) | [0.18.10 pre-release](https://github.com/jrp2014/convolver/releases/tag/v0.18.10) |
+| Download the preview (macOS, Windows, Linux) | [0.18.12 pre-release](https://github.com/jrp2014/convolver/releases/tag/v0.18.12) |
 | Use the plug-ins | [Install](docs/use/install.md) and [your first sound in a host](docs/use/first-sound-in-a-host.md) |
 | Build it, embed it or change it | [Build from source](docs/develop/build.md), [library guide](docs/develop/library.md), [implementation map](docs/develop/architecture.md), [contributing](CONTRIBUTING.md) |
 | Find any page | [Documentation index](docs/README.md) |
