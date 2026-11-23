@@ -52,8 +52,13 @@ tried.
   In jrp's recorded comparison on an Apple silicon Mac (8 November 2026,
   0.13.0), at a Latency of 256 frames, the engine used 15 to 17 times less
   processor time for 30-second filters than the first preview's engine
-  ([measurements](docs/develop/fft-measurements.md#on-apple-silicon)). The
-  Latency setting trades delay for processor time when you are not
+  ([measurements](docs/develop/fft-measurements.md#on-apple-silicon)). On
+  the same Mac at a Latency of 256 frames (5.8 ms), the 0.18.8 engine ran a
+  65,536-tap stereo room correction 4.5 times as fast as the 2006 engine
+  when both used the same FFTW build, and 3.4 times as fast with
+  Accelerate, which the Mac plug-ins use
+  ([then and now](docs/develop/fft-measurements.md#performance-then-and-now)).
+  The Latency setting trades delay for processor time when you are not
   monitoring live.
 - **Robust.** Every plug-in format is held to the same lifecycle tests:
   loading before and after the host starts, restoring saved projects,
