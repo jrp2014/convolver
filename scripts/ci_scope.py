@@ -61,7 +61,12 @@ reached the step PROVING_STEP) and compares that commit with this one. When
 nothing changed since then that this workflow needs, it skips its jobs and
 says which run it relies on. Without such a run, when the commits have
 diverged, when the comparison cannot be listed, or when a person re-runs a
-run, nothing is carried. On a pull request the comparison decides for each
+run, nothing is carried. A pull request run tests the branch merged into
+main as it was then, so it is carried only when main is where it was: a
+full pull request run records the main commit it was merged into as a notice
+titled BASE_TITLE on its scope job, and a later run carries its result only
+when its own merge has the same first parent (jrp, 23 November 2026). On a
+pull request the comparison decides for each
 workflow; on main every workflow runs as before when anything but
 documentation changed, so a merge that changes code or tests gets the full
 run (jrp, 21 November 2026), and one that changes only documentation runs
@@ -294,6 +299,9 @@ WORKFLOWS = ('regression', 'fuzz', 'vst3', 'au', 'lv2', 'release')
 PROVING_STEP = 'Full run: later pushes compare with this commit'
 # Runs inspected for one, newest first, and the most files a comparison lists.
 CARRY_RUNS = 5
+# A full pull request run records the main commit it tested against as a
+# notice with this title on its scope job (CI-53).
+BASE_TITLE = 'CI-53 base'
 COMPARE_LIMIT = 300
 
 
@@ -595,15 +603,35 @@ def github(path):
 
 
 def proving(run, repository):
-    """Whether a run's scope job reached PROVING_STEP."""
+    """A run's scope job if it reached PROVING_STEP, else None."""
     jobs = github(f'/repos/{repository}/actions/runs/{run["id"]}/jobs?filter=latest&per_page=100')['jobs']
     for job in jobs:
         if job.get('name') == 'scope':
-            return any(
+            reached = any(
                 step.get('name') == PROVING_STEP and step.get('conclusion') == 'success'
                 for step in job.get('steps') or []
             )
-    return False
+            return job if reached else None
+    return None
+
+
+def tested_base(job, repository):
+    """The main commit a full pull request run tested against, from the
+    BASE_TITLE notice on its scope job, or None."""
+    notes = github(f'/repos/{repository}/check-runs/{job["id"]}/annotations?per_page=100')
+    return next((note.get('message', '').strip() for note in notes if note.get('title') == BASE_TITLE), None)
+
+
+def pull_request_base():
+    """The main commit this pull request run tests against: the first parent
+    of the merge commit GitHub checks out, or None."""
+    try:
+        parents = subprocess.run(
+            ['git', 'rev-list', '--parents', '-n', '1', 'HEAD'], check=True, capture_output=True, text=True
+        ).stdout.split()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return parents[1] if len(parents) == 3 else None
 
 
 def carried_from(workflow, event, payload):
@@ -620,6 +648,9 @@ def carried_from(workflow, event, payload):
         if (head.get('repo') or {}).get('full_name') != repository:
             return None, 'the pull request comes from another repository'
         branch, sha = head.get('ref'), head.get('sha')
+        merged_into = pull_request_base()
+        if not merged_into:
+            return None, 'the main commit this run tests against is unknown'
     elif event == 'push' and os.environ.get('GITHUB_REF') == 'refs/heads/main':
         branch, sha = 'main', os.environ.get('GITHUB_SHA')
     else:
@@ -630,18 +661,25 @@ def carried_from(workflow, event, payload):
     try:
         found = github(f'/repos/{repository}/actions/workflows/{workflow}.yml/runs?{query}')['workflow_runs']
         current = os.environ.get('GITHUB_RUN_ID')
-        base = next(
+        base, job = next(
             (
-                run
+                (run, job)
                 for run in found
-                if str(run['id']) != current
-                and (run.get('head_repository') or {}).get('full_name') == repository
-                and proving(run, repository)
+                if str(run['id']) != current and (run.get('head_repository') or {}).get('full_name') == repository
+                for job in [proving(run, repository)]
+                if job
             ),
-            None,
+            (None, None),
         )
         if base is None:
             return None, f'no full passed run of this workflow on {branch} to compare with'
+        if event == 'pull_request':
+            tested = tested_base(job, repository)
+            if tested != merged_into:
+                return None, (
+                    f'run {base["id"]} tested this branch merged into main at '
+                    f'{tested[:12] if tested else "an unrecorded commit"}, this run merges it into {merged_into[:12]}'
+                )
         comparison = github(f'/repos/{repository}/compare/{base["head_sha"]}...{sha}')
     except (OSError, KeyError, ValueError) as error:
         return None, f'could not look up earlier runs ({error})'
@@ -775,6 +813,11 @@ def main(argv=None):
         name, _, variable = option.partition('=')
         outputs[name] = json.dumps(matrix(os.environ[variable], full=full), separators=(',', ':'))
     print('\n'.join(lines))
+    if args.event == 'pull_request' and outputs['proving']:
+        merged_into = pull_request_base()
+        if merged_into:
+            # The record a later run checks before it carries this result.
+            print(f'::notice title={BASE_TITLE}::{merged_into}')
     summary = os.environ.get('GITHUB_STEP_SUMMARY')
     if summary and args.workflow:
         with Path(summary).open('a', encoding='utf-8') as stream:

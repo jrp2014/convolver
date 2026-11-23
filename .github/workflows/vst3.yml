@@ -30,11 +30,13 @@ jobs:
   # (scripts/ci_scope.py, docs/develop/testing.md#documentation-only-pull-requests).
   scope:
     runs-on: ubuntu-latest
-    # Reads this workflow's earlier runs to carry a passed result forward
+    # Reads this workflow's earlier runs, and the main commit each tested
+    # against (its scope job's notice), to carry a passed result forward
     # (CI-53).
     permissions:
       contents: read
       actions: read
+      checks: read
     outputs:
       build: ${{ steps.scope.outputs.build }}
       full: ${{ steps.scope.outputs.full }}

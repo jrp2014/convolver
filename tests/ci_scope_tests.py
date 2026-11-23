@@ -3,6 +3,7 @@
 """Tests for scripts/ci_scope.py and for the workflows that rely on it."""
 
 import importlib.util
+import io
 import json
 import os
 import re
@@ -540,6 +541,7 @@ class Workflows(unittest.TestCase):
                 self.assertIn('types: [opened, synchronize, reopened, ready_for_review]', text)
                 scope = found['scope']
                 self.assertIn('      actions: read\n', scope)
+                self.assertIn('      checks: read\n', scope)
                 self.assertIn('GITHUB_TOKEN: ${{ github.token }}', scope)
                 self.assertIn(f"      - name: '{ci_scope.PROVING_STEP}'\n", scope)
                 self.assertIn("        if: steps.scope.outputs.proving == 'true'\n", scope)
@@ -1047,6 +1049,7 @@ class CarryForward(unittest.TestCase):
     REPOSITORY = 'owner/name'
     BASE = 'a' * 40
     HEAD = 'b' * 40
+    MAIN = 'c' * 40  # The main commit both runs merge the branch into.
 
     def setUp(self):
         environment = {
@@ -1070,27 +1073,42 @@ class CarryForward(unittest.TestCase):
         patcher = mock.patch.object(ci_scope, 'github', self.github)
         patcher.start()
         self.addCleanup(patcher.stop)
+        self.merged_into = self.MAIN
+        self.real_pull_request_base = ci_scope.pull_request_base
+        patcher = mock.patch.object(ci_scope, 'pull_request_base', lambda: self.merged_into)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
-    def run_record(self, number, sha, *, proving=True):
+    def run_record(self, number, sha, *, proving=True, tested=MAIN):
         return {
             'id': number,
             'head_sha': sha,
             'html_url': f'https://example.invalid/{number}',
             'head_repository': {'full_name': self.REPOSITORY},
             'proving': proving,
+            'tested': tested,
         }
 
     def github(self, path):
         self.requests.append(path)
         if '/compare/' in path:
             return self.comparison
+        if '/check-runs/' in path:
+            # The scope job's notices; its id is the run's number times ten.
+            number = int(path.split('/check-runs/')[1].split('/')[0]) // 10
+            run = next(run for run in self.runs if run['id'] == number)
+            notes = [{'title': 'Something else', 'message': 'x'}]
+            if run['tested']:
+                notes.append({'title': ci_scope.BASE_TITLE, 'message': run['tested'] + '\n'})
+            return notes
         if path.endswith('/jobs?filter=latest&per_page=100'):
             number = int(path.split('/runs/')[1].split('/')[0])
             run = next(run for run in self.runs if run['id'] == number)
             conclusion = 'success' if run['proving'] else 'skipped'
             steps = [{'name': 'Run actions/checkout@v7', 'conclusion': 'success'}]
             steps.append({'name': ci_scope.PROVING_STEP, 'conclusion': conclusion})
-            return {'jobs': [{'name': 'sdk', 'steps': []}, {'name': 'scope', 'steps': steps}]}
+            scope = {'name': 'scope', 'id': number * 10, 'steps': steps}
+            return {'jobs': [{'name': 'sdk', 'id': 1, 'steps': []}, scope]}
         return {'workflow_runs': self.runs}
 
     def pull_request(self, *, draft=False, repository=REPOSITORY):
@@ -1109,6 +1127,7 @@ class CarryForward(unittest.TestCase):
         paths, run = ci_scope.carried_from('vst3', 'push', {})
         self.assertEqual(run['id'], 5)
         self.assertIn('event=push&branch=main&status=success', self.requests[-4])
+        self.assertFalse(any('/check-runs/' in path for path in self.requests[-4:]))
         # A run of another repository's branch of the same name is passed over.
         self.runs[2]['head_repository'] = {'full_name': 'fork/name'}
         self.runs.append(self.run_record(3, self.BASE))
@@ -1144,6 +1163,51 @@ class CarryForward(unittest.TestCase):
             self.assertIn('no token', why())
         with mock.patch.object(ci_scope, 'github', side_effect=OSError('refused')):
             self.assertIn('could not look up', why())
+        self.runs[2]['proving'] = True
+        self.comparison = {'status': 'ahead', 'files': [{'filename': 'TODO.md'}]}
+        self.merged_into = None
+        self.assertIn('tests against is unknown', why())
+        self.merged_into = self.MAIN
+        self.runs[2]['tested'] = None
+        self.assertIn('an unrecorded commit', why())
+
+    def test_main_moved_since_the_full_run(self):
+        """jrp's sequence, 23 November 2026: a code change passes in full,
+        main moves on, and a documentation follow-up on the pull request
+        must not carry the earlier result, which tested the branch with the
+        earlier main."""
+        code = ['portable/host.cpp', 'TODO.md']
+        self.merged_into = 'd' * 40  # main has moved since run 5.
+        paths, reason = ci_scope.carried_from('vst3', 'pull_request', self.pull_request())
+        self.assertIsNone(paths)
+        self.assertIn(f'merged into main at {self.MAIN[:12]}, this run merges it into dddddddddddd', reason)
+        with tempfile.TemporaryDirectory() as temporary:
+            output, payload = Path(temporary) / 'output', Path(temporary) / 'event.json'
+            payload.write_text(json.dumps(self.pull_request()))
+            stdout = io.StringIO()
+            environment = {'GITHUB_EVENT_PATH': str(payload), 'GITHUB_STEP_SUMMARY': ''}
+            with mock.patch.dict(os.environ, environment), mock.patch.object(
+                ci_scope, 'changed_files', return_value=code
+            ), mock.patch('sys.stdout', stdout):
+                ci_scope.main(['--event', 'pull_request', '--workflow', 'vst3', '--github-output', str(output)])
+            answer = dict(line.split('=', 1) for line in output.read_text().splitlines())
+        self.assertEqual((answer['build'], answer['proving']), ('true', 'true'))
+        # The new full run records the main commit it tests against.
+        self.assertIn(f'::notice title={ci_scope.BASE_TITLE}::{"d" * 40}\n', stdout.getvalue())
+        # With main where it was, the same follow-up carries.
+        self.merged_into = self.MAIN
+        self.assertEqual(ci_scope.carried_from('vst3', 'pull_request', self.pull_request())[0], ['TODO.md'])
+
+    def test_pull_request_base(self):
+        merge = subprocess.CompletedProcess([], 0, stdout=f'{self.HEAD} {self.MAIN} {self.BASE}\n')
+        single = subprocess.CompletedProcess([], 0, stdout=f'{self.HEAD} {self.MAIN}\n')
+        real = self.real_pull_request_base
+        with mock.patch.object(subprocess, 'run', return_value=merge):
+            self.assertEqual(real(), self.MAIN)
+        with mock.patch.object(subprocess, 'run', return_value=single):
+            self.assertIsNone(real())
+        with mock.patch.object(subprocess, 'run', side_effect=OSError('no git')):
+            self.assertIsNone(real())
 
     def answer(self, event, changed, since, workflow='vst3', *, draft=False):
         """What main() writes for a run, given the pull request's files and
