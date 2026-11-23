@@ -62,7 +62,7 @@ Check the open pull requests for an ID before starting anything.
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **PLUG-51** | Every output's routes in the window and Copy Diagnostics | From jrp's usage review of 22 November 2026 (PR #277) |
-| **HOST-12** | A 30-minute REAPER soak with four reverb returns, counting dropouts | The script unattended; one run on jrp's Mac |
+| **HOST-12** | A 30-minute REAPER soak with four reverb returns, checking for underruns | The script unattended; one run on jrp's Mac |
 | **PERF-21** | The everyday load budget, checked before each preview | Uses the existing workload measurements |
 
 ### Depends on
@@ -160,12 +160,16 @@ Foundation items are parked by owner decision instead.
   response each) at a small buffer for 30 minutes, with sparse passages and
   one filter replacement, run by an option of HOST-11's
   [script](docs/develop/host-testing.md#reaper-from-one-command) that reads
-  REAPER's underrun counter (`GetUnderrunTime`) before and after. The short
-  engine measurements cannot show the host's dropouts over a long session.
-  Ordinary use, not a corner case, so outside the park of 8 November
-  (jrp approved it on 23 November 2026). **Done when** the option exists with its harness tests and jrp's first
-  run is recorded in [host testing](docs/develop/host-testing.md), with
-  the dropouts it counted.
+  REAPER's last-underrun times (`GetUnderrunTime`) before and after. Those
+  give the time of the most recent audio and media underrun, not a count,
+  so one dropout and ten look the same; the result is one of: no new
+  underrun, at least one new underrun, or underrun reporting unavailable.
+  The short engine measurements cannot show the host's dropouts over a
+  long session. Ordinary use, not a corner case, so outside the park of
+  8 November (jrp approved it on 23 November 2026). **Done when** the
+  option exists with its harness tests and jrp's first run is recorded in
+  [host testing](docs/develop/host-testing.md) with one of those three
+  results.
 - [ ] **DIAG-9 — Numbers in the user's locale.** Low priority. **Done when**
   the window shows numbers in the system locale from one formatting path,
   Status and the log stay plain, and a test covers other separators.

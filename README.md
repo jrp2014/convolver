@@ -131,10 +131,12 @@ playing for hours with the window closed. Convolver is built for that:
   [configuration list](docs/use/configuration.md#paths-and-configuration-lists).
   The command-line tool takes the entry for each file's rate. A plug-in
   takes the entry for the host's rate when you choose the list, and the
-  project keeps that one: if the player later runs at another rate, the
-  plug-in plays silence and says why rather than playing the wrong filter.
-  VST3 and the Audio Unit play it again when the rate returns; LV2 refuses
-  it ([another rate](docs/use/plugins.md#when-a-filter-does-not-fit)). To
+  project keeps that one. If the player later runs at another rate, the
+  filter stops processing and the plug-in says why, rather than playing
+  the wrong filter. At the default 100% Mix you hear silence; on a stereo
+  path, a lower Mix still passes its dry share. VST3 and the Audio Unit
+  play the filter again when the rate returns; LV2 refuses it
+  ([another rate](docs/use/plugins.md#when-a-filter-does-not-fit)). To
   play at the new rate, choose the list again.
 - **Reverb on a send.** Choose the reverb's IR file and leave Mix at its
   fully wet default; a stereo file plays as it is, and a mono or

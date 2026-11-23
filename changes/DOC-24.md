@@ -11,11 +11,10 @@
 
 ## For contributors
 
-- TODO (DOC-24): new items from jrp's usage review of 22 November 2026 (summarised in
-  PR #277):
-  PLUG-51 (every output's routes in the window and Copy Diagnostics),
-  HOST-12 (a 30-minute REAPER soak with four reverb returns, counting
-  dropouts) and PERF-21 (the everyday load budget); PERF-16 also reports
+- TODO (DOC-24): new items from jrp's usage review of 22 November 2026
+  (summarised in PR #277): PLUG-51 (every output's routes in the window
+  and Copy Diagnostics), HOST-12 (a 30-minute REAPER soak with four reverb
+  returns, checking for new underruns) and PERF-21 (the everyday load budget); PERF-16 also reports
   the time until a chosen filter is fully heard, and EDGE-4 suggests
   preparing the second filter only when a comparison starts. See
   [TODO](../TODO.md#execution-priorities).
