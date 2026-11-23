@@ -24,6 +24,14 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ## [Unreleased]
 
+## [0.18.12] - 2026-11-23
+
+The eighth published preview, for macOS, Windows and Linux, unsigned: a
+configuration list chosen before Audacity first plays now loads and
+exports, a refused preset no longer changes the settings shown, one Choose
+Filter menu holds every file action in the window, and the Gain mode menu
+starts the Gain row ([release](https://github.com/jrp2014/convolver/releases/tag/v0.18.12)).
+
 ### Changed
 
 - Plug-ins (PLUG-50): in Convolver's window on macOS and Windows, the
@@ -3281,7 +3289,8 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.18.10...HEAD
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.18.12...HEAD
+[0.18.12]: https://github.com/jrp2014/convolver/releases/tag/v0.18.12
 [0.18.10]: https://github.com/jrp2014/convolver/releases/tag/v0.18.10
 [0.14.0]: https://github.com/jrp2014/convolver/releases/tag/v0.14.0
 [0.13.24]: https://github.com/jrp2014/convolver/releases/tag/v0.13.24

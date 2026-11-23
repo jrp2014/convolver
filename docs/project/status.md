@@ -9,11 +9,11 @@ going. [TODO](../../TODO.md) is the backlog and owns the order of work; the
 linked guides own the behaviour.
 
 **In short:** checked on 20 November 2026 against `main` at `549ec9c`
-(0.16.8). jrp has published seven unsigned developer previews as GitHub
+(0.16.8). jrp has published eight unsigned developer previews as GitHub
 pre-releases, for macOS from 0.12.12 and for macOS, Windows and Linux from
 0.13.2; the latest is
-[0.18.10](https://github.com/jrp2014/convolver/releases/tag/v0.18.10)
-(22 November 2026). The baseline for every check still open stays
+[0.18.12](https://github.com/jrp2014/convolver/releases/tag/v0.18.12)
+(23 November 2026). The baseline for every check still open stays
 [0.14.0](https://github.com/jrp2014/convolver/releases/tag/v0.14.0)
 (19 November 2026) until jrp moves it. What each
 added is in the [CHANGELOG](../../CHANGELOG.md). The command-line renderer,
@@ -122,7 +122,7 @@ published preview. The steps are those of the
 | 3 | REAPER: the stereo journey and the 2→6 crossover, each following its guide, with **Choose File…** on a six-channel track | REAPER steps 10 and 12 | 25 min | Not run since the guides were rewritten (DOC-10) |
 | 4 | Audacity, through its preset menu only ([decision](decisions.md#plug-in-behaviour)): packaged presets and one of your own, listening, an export compared with the CLI, save and reopen, a refused preset, a mono track, a Latency change, the window's layout (HOST-1, VST3-11) | [Prepare the Mac](../develop/host-testing.md#prepare-the-mac) step 3; [Audacity](../develop/host-testing.md#audacity-vst3) steps 1 to 8 and 10; step 9 only for the window's layout, Gain, Mix and Latency | 30 min | v0.12.8: failed through **Choose…** (VST3-17), which passed on 0.16.14 in check 10; the rest open |
 | 5 | GarageBand: a packaged preset and save and reopen, listening, a click on bypass, the track in time after a Latency change, the recent files and **Reload** in the Choose Filter menu, VoiceOver (AU-4, AU-6) | [GarageBand](../develop/host-testing.md#garageband-audio-unit) steps 4 to 6, 9 and 10 | 20 min | v0.12.8: the preset, save and reopen, **Recent** and **Reload** passed; the rest open |
-| 6 | The exact candidate: the candidates workflow on the preview's tag, and the draft release's clean-machine checks | [Releasing](../develop/releasing.md#candidates) | CI | **Passed** for 0.14.0: [run 44611563339](https://github.com/jrp2014/convolver/actions/runs/44611563339), then [run 44616436091](https://github.com/jrp2014/convolver/actions/runs/44616436091) |
+| 6 | The exact candidate: the candidates workflow on the preview's tag, and the draft release's clean-machine checks | [Releasing](../develop/releasing.md#candidates) | CI | **Passed** for 0.18.12: [run 45030498591](https://github.com/jrp2014/convolver/actions/runs/45030498591), then [run 45033419474](https://github.com/jrp2014/convolver/actions/runs/45033419474), with every other workflow run by hand on its tag; for 0.18.10, runs [44971449967](https://github.com/jrp2014/convolver/actions/runs/44971449967) and [44973857366](https://github.com/jrp2014/convolver/actions/runs/44973857366); for 0.14.0, runs [44611563339](https://github.com/jrp2014/convolver/actions/runs/44611563339) and [44616436091](https://github.com/jrp2014/convolver/actions/runs/44616436091) |
 | 7 | The independent walkthrough of 0.14.0 (REL-3) | [Above](#next-milestone-an-independent-user-runs-a-preview) | The tester | Not started |
 | 8 | GarageBand with the window open: Latency changed stopped and while playing, then save and reopen (AU-17 changed how the unit reports latency) | GarageBand steps 4 to 6 | 5 min | Exports in time at Latency 0 and 1024 on a build of the v0.18.10 tag, 22 November 2026, the pending latency clearing while playing ([record](../archive/reviews/2026-11-22-live-session-0.18.10.md)); the window, a change while playing and save and reopen not reported |
 | 9 | PERF-2's session: a long filter at Latency 0 by ear in REAPER and GarageBand, Latency changes and replacement while playing, projects from 0.12.12 reopening at the Latency the [plug-in guide](../use/plugins.md#settings) gives, and a saved Latency of 1024 reopening in time | PERF-2 in [TODO](../../TODO.md) | 30 min | A 30-second filter at Latency 0 played a full loop in REAPER without underruns on a build of the v0.18.10 tag, 22 November 2026 ([record](../archive/reviews/2026-11-22-live-session-0.18.10.md)); listening and the rest not run |
