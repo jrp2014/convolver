@@ -21,7 +21,7 @@
 
 ## Done
 
-- [x] **DOC-24 — What to expect, for each use.** 23 November 2026, PR #PR
+- [x] **DOC-24 — What to expect, for each use.** 23 November 2026, PR #277
   ([README](../README.md#what-to-expect)).
 
 ## Decisions: Direction
