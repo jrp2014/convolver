@@ -120,8 +120,8 @@ the playing filter more quickly, uses less CPU once the sound has stopped
 and reports clipping after a command-line render; 0.18.10 keeps a filter
 chosen before the host plays, waits for a start that suits a filter and
 words the window and Status more plainly; 0.18.12 fixes a configuration
-list chosen before Audacity first plays and gathers the window's file
-actions into one Choose Filter menu. These previews
+list chosen before Audacity first plays and replaces the window's Choose…,
+Recent and Reload controls with one Choose Filter menu. These previews
 were published before anyone listened to the new audio engine (since 0.13)
 or tried the Windows window, LV2 or the features new since 0.13.20 in a host, and
 before an independent user's walkthrough, which are still to come

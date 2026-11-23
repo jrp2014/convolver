@@ -27,10 +27,11 @@ yet folded in are in [`changes/`](changes/README.md).
 ## [0.18.12] - 2026-11-23
 
 The eighth published preview, for macOS, Windows and Linux, unsigned: a
-configuration list chosen before Audacity first plays now loads and
-exports, a refused preset no longer changes the settings shown, one Choose
-Filter menu holds every file action in the window, and the Gain mode menu
-starts the Gain row ([release](https://github.com/jrp2014/convolver/releases/tag/v0.18.12)).
+configuration list chosen before Audacity first plays now loads when it
+plays with the window open, and exports hold it; a refused preset no longer
+changes the settings shown; one Choose Filter menu replaces the window's
+Choose…, Recent and Reload controls; and the Gain mode menu starts the Gain
+row ([release](https://github.com/jrp2014/convolver/releases/tag/v0.18.12)).
 
 ### Changed
 
