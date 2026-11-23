@@ -108,6 +108,45 @@ Convolver plays the response you give it as it is, so it brings no library
 of sampled spaces and no controls that reshape a reverb's decay or tone;
 you bring the filter.
 
+## What to expect
+
+Most people compare a few filters while setting up, then leave one playing
+for hours with the window closed. Convolver is built for that:
+
+- **Room correction and crossovers.** Load the IR file or `.cfg` that DRC,
+  REW or Audiolense wrote, with its routing, gains and per-driver delays, up
+  to 8 inputs and 8 outputs in a plug-in. On the measured machines, a
+  correction or crossover with a 1.4-second filter per output took at most
+  4% of one core at 48 kHz (9% at 96 kHz), with no added delay
+  ([processor load](docs/use/limits.md#filter-length-channels-and-processor-load)).
+  The window shows the filter that plays, its rate and channels, and which
+  input feeds which output (the first four paths); a new filter that does
+  not fit is refused and the working one keeps playing. Check your setup
+  with a render ([check a crossover in a host](docs/use/check-a-crossover-in-a-host.md)),
+  and choose the Gain mode **No clipping** if the filter boosts
+  ([settings](docs/use/plugins.md#settings)).
+- **Music at each track's own sample rate.** Convolver never resamples, so
+  make one filter per rate with your design tool and name them in a
+  [configuration list](docs/use/configuration.md#paths-and-configuration-lists).
+  The command-line tool takes the entry for each file's rate. A plug-in
+  takes the entry for the host's rate when you choose the list, and the
+  project keeps that one: if the player later runs at another rate, the
+  plug-in plays silence and says why rather than playing the wrong filter,
+  and plays again when the rate returns. To play at the new rate, choose
+  the list again. Roon and JRiver choose among per-rate files themselves
+  ([other programs](docs/use/other-programs.md)).
+- **Reverb on a send.** Choose the reverb's IR file and leave Mix at its
+  fully wet default; a stereo file plays as it is, and a mono or true-stereo response needs a
+  short `.cfg` ([configuration](docs/use/configuration.md)). A reverb of up
+  to 30 seconds took at most 4% of one core at 48 kHz with no added delay,
+  and once the input has been silent for longer than the tail, an instance
+  costs 93 to 99% less, measured on Linux
+  ([idle after the tail](docs/develop/fft-measurements.md#idle-after-the-tail)).
+  Gain and Mix changes ramp smoothly and keep the decay that is sounding.
+  VST3 and the Audio Unit tell the host how long the tail is, so an export
+  can include it; with LV2, export with some silence after the audio
+  ([latency and tail](docs/use/plugins.md#latency-and-tail)).
+
 ## Preview status
 
 Convolver is a developer preview: the latest, [0.18.10](https://github.com/jrp2014/convolver/releases/tag/v0.18.10), is an
