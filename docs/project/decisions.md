@@ -217,7 +217,8 @@ Contents: [direction](#direction) · [releases](#releases) ·
   not each benchmarked, replacing the 7 November row; the sample-rate edge
   starts with "the actual rate-mismatch workflow" (IO-2), where explicit
   offline conversion may be enough, and EDGE-1's multi-rate state is taken up
-  only if it is not (that order replaced 23 November 2026); PERF-1, PERF-3 and EDGE-5 are one measurement exercise;
+  only if it is not (that order replaced 23 November 2026); PERF-1, PERF-3
+  and EDGE-5 are one measurement exercise;
   meters start with the output peak and clipping, with a callback-load meter
   only if hosts' CPU displays prove insufficient; distribution packages and
   macOS or Windows LV2 bundles only on request; CI-32 stays dormant. See

@@ -61,7 +61,7 @@ Check the open pull requests for an ID before starting anything.
 | --- | --- | --- |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
-| **PLUG-51** | Every output's routes in the window and Copy Diagnostics | From the usage review of 22 November 2026 |
+| **PLUG-51** | Every output's routes in the window and Copy Diagnostics | From jrp's usage review of 22 November 2026 (PR #277) |
 | **HOST-12** | A 30-minute REAPER soak with four reverb returns, counting dropouts | The script unattended; one run on jrp's Mac |
 | **PERF-21** | The everyday load budget, checked before each preview | Uses the existing workload measurements |
 
@@ -162,7 +162,8 @@ Foundation items are parked by owner decision instead.
   [script](docs/develop/host-testing.md#reaper-from-one-command) that reads
   REAPER's underrun counter (`GetUnderrunTime`) before and after. The short
   engine measurements cannot show the host's dropouts over a long session.
-  **Done when** the option exists with its harness tests and jrp's first
+  Ordinary use, not a corner case, so outside the park of 8 November
+  (jrp approved it on 23 November 2026). **Done when** the option exists with its harness tests and jrp's first
   run is recorded in [host testing](docs/develop/host-testing.md), with
   the dropouts it counted.
 - [ ] **DIAG-9 — Numbers in the user's locale.** Low priority. **Done when**
@@ -182,9 +183,8 @@ done once for all three formats:
   change, with an oracle-backed test and nothing new allocating or locking.
 - [ ] **PLUG-51 — Every output's routes.** The window's Routing line lists
   the first four paths and then how many more, so a ten-path crossover
-  hides six, and nothing says which outputs no path feeds (an Audiolense
-  user heard high-passed mains and nothing from the subs while setting up
-  JRiver). **Done when** the window's details and Copy Diagnostics give one
+  hides six, and nothing says which outputs no path feeds, so a crossover
+  that leaves the subwoofers silent cannot be spotted there. **Done when** the window's details and Copy Diagnostics give one
   line per output with its inputs, route gains and delays, mark an output
   that nothing feeds, and say what bypass plays there (the input or
   silence), for VST3 and the Audio Unit, with window-model and report tests
@@ -409,10 +409,10 @@ and the owner's decision its row names, and keeps its
 
 - [ ] **EDGE-1 — A filter for every sample rate in one plug-in state.** For
   a player that runs the plug-in at each track's own rate, which no offline
-  conversion can serve; first in the edges since 23 November 2026, with
-  the window naming which rate's entry plays. **Done when** a list's entries
-  that fit are saved in the state, the host's rate plays and a rate change
-  crossfades, other rates refused as now; needs jrp's decision on the state
+  conversion can serve; first in the edges since 23 November 2026.
+  **Done when** a list's entries that fit are saved in the state, the
+  host's rate plays and a rate change crossfades, the window and Copy
+  Diagnostics name the entry that plays, other rates refused as now; needs jrp's decision on the state
   format. Effort M.
 - [ ] **EDGE-2 — Show what a filter does.** **Done when** `--inspect --json`
   and the library report each path's magnitude, phase, group delay and

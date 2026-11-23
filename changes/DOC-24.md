@@ -11,7 +11,8 @@
 
 ## For contributors
 
-- TODO (DOC-24): new items from the usage review of 22 November 2026:
+- TODO (DOC-24): new items from jrp's usage review of 22 November 2026 (summarised in
+  PR #277):
   PLUG-51 (every output's routes in the window and Copy Diagnostics),
   HOST-12 (a 30-minute REAPER soak with four reverb returns, counting
   dropouts) and PERF-21 (the everyday load budget); PERF-16 also reports
