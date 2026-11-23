@@ -61,6 +61,9 @@ Check the open pull requests for an ID before starting anything.
 | --- | --- | --- |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
+| **PLUG-51** | Every output's routes in the window and Copy Diagnostics | From jrp's usage review of 22 November 2026 (PR #277) |
+| **HOST-12** | A 30-minute REAPER soak with four reverb returns, checking for underruns | The script unattended; one run on jrp's Mac |
+| **PERF-21** | The everyday load budget, checked before each preview | Uses the existing workload measurements |
 
 ### Depends on
 
@@ -82,7 +85,7 @@ Check the open pull requests for an ID before starting anything.
 | Item | What remains | The decision |
 | --- | --- | --- |
 | **REL-1**, **PLUG-20** | Signing and notarization, verified minimum versions and the final licence review; the VST logo in the window (optional) | jrp's signing choices in the [signing plan](docs/project/plans/2026-11-09-macos-signing.md), then his setup |
-| **IO-2**, **EDGE-1** and the other **EDGE** items | First the limitations users cite (IO-2, EDGE-11's other candidates, EDGE-10, EDGE-3, EDGE-13); then EDGE-12, EDGE-9, EDGE-2, EDGE-4 and EDGE-5; then EDGE-6 to EDGE-8; EDGE-14 and EDGE-15 | Each starts with the owner's decision its row in the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) names, and the plan's gate. Feedback that asks for one moves it up |
+| **IO-2**, **EDGE-1** and the other **EDGE** items | First EDGE-1, with IO-2's documented route; then the other limitations users cite (IO-2's conversion, EDGE-11's other candidates, EDGE-10, EDGE-3, EDGE-13); then EDGE-12, EDGE-9, EDGE-2, EDGE-4 and EDGE-5; then EDGE-6 to EDGE-8; EDGE-14 and EDGE-15 | Each starts with the owner's decision its row in the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) names, and the plan's gate. Feedback that asks for one moves it up |
 
 ### Parked
 
@@ -152,6 +155,21 @@ Foundation items are parked by owner decision instead.
   REAPER finding comes from one of these, as the refused preset that reset
   Latency to 0 in jrp's live session of 22 November 2026 did, or before a
   release whose changes touch them; one addition per run on jrp's Mac.
+- [ ] **HOST-12 — A long REAPER soak with reverb returns.** Four tracks
+  feeding four Convolver reverb returns (a long stereo or true-stereo
+  response each) at a small buffer for 30 minutes, with sparse passages and
+  one filter replacement, run by an option of HOST-11's
+  [script](docs/develop/host-testing.md#reaper-from-one-command) that reads
+  REAPER's last-underrun times (`GetUnderrunTime`) before and after. Those
+  give the time of the most recent audio and media underrun, not a count,
+  so one dropout and ten look the same; the result is one of: no new
+  underrun, at least one new underrun, or underrun reporting unavailable.
+  The short engine measurements cannot show the host's dropouts over a
+  long session. Ordinary use, not a corner case, so outside the park of
+  8 November (jrp approved it on 23 November 2026). **Done when** the
+  option exists with its harness tests and jrp's first run is recorded in
+  [host testing](docs/develop/host-testing.md) with one of those three
+  results.
 - [ ] **DIAG-9 — Numbers in the user's locale.** Low priority. **Done when**
   the window shows numbers in the system locale from one formatting path,
   Status and the log stay plain, and a test covers other separators.
@@ -167,6 +185,14 @@ done once for all three formats:
   kept as audio-thread counters and shown in each window and in Copy
   Diagnostics. **Done when** each format shows them since the last filter
   change, with an oracle-backed test and nothing new allocating or locking.
+- [ ] **PLUG-51 — Every output's routes.** The window's Routing line lists
+  the first four paths and then how many more, so a ten-path crossover
+  hides six, and nothing says which outputs no path feeds, so a crossover
+  that leaves the subwoofers silent cannot be spotted there. **Done when** the window's details and Copy Diagnostics give one
+  line per output with its inputs, route gains and delays, mark an output
+  that nothing feeds, and say what bypass plays there (the input or
+  silence), for VST3 and the Audio Unit, with window-model and report tests
+  for a crossover and a matrix.
 - [ ] **PLUG-11 — FFT planning in FFTW-built plug-ins (optional).** A Quick
   or Measured planning choice, only in plug-ins built with FFTW, applied
   while preparing. **Worth doing when** a workload needs it: with estimate
@@ -315,9 +341,21 @@ relevant to a convolver unless the product changes.
   non-uniform engine shipped in 0.13.2. **Remains:** check 9's session, the
   CPU indication beside the Latency menu and block sizes tuned on Apple
   silicon ([measurements](docs/develop/fft-measurements.md#the-non-uniform-engine)).
+- [ ] **PERF-21 — An everyday load budget.** Beside the supported-workload
+  ceiling (25% of one core, the 99th-percentile callback within half its
+  period), stereo room correction and the 2-to-6 crossover stay at or
+  under 3% of one core at 48 kHz, Latency 0 and 64-frame callbacks, on the
+  named machines of the
+  [workload measurements](docs/develop/fft-measurements.md#supported-workloads)
+  (0.6 to 2.1% when measured on 21 November 2026). **Done when**
+  `workloads.py` reports each workload against the budget, the
+  [release steps](docs/develop/releasing.md#candidates) run it before each
+  preview, and a result over the budget is investigated before the
+  preview is published.
 - [ ] **PERF-16 — Loading stages timed inside the plug-in.** Split a load's
   hold into its stages outside the audio path, so a failed run names the
-  stage.
+  stage, and report the time from choosing a filter until it is fully
+  heard (preparation plus the crossfade) beside the host-thread limits.
 - [ ] **PERF-17 — Platform audio scheduling in the measurement host.**
   Audio workgroups on macOS and MMCSS on Windows, in the test host only.
 - [ ] **PERF-18 — Performance regressions measured apart from CI.**
@@ -373,10 +411,12 @@ only after the plan's
 and the owner's decision its row names, and keeps its
 [non-negotiables](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#non-negotiables).
 
-- [ ] **EDGE-1 — A filter for every sample rate in one plug-in state.** Only
-  if IO-2's conversion proves inadequate. **Done when** a list's entries
-  that fit are saved in the state, the host's rate plays and a rate change
-  crossfades, other rates refused as now; needs jrp's decision on the state
+- [ ] **EDGE-1 — A filter for every sample rate in one plug-in state.** For
+  a player that runs the plug-in at each track's own rate, which no offline
+  conversion can serve; first in the edges since 23 November 2026.
+  **Done when** a list's entries that fit are saved in the state, the
+  host's rate plays and a rate change crossfades, the window and Copy
+  Diagnostics name the entry that plays, other rates refused as now; needs jrp's decision on the state
   format. Effort M.
 - [ ] **EDGE-2 — Show what a filter does.** **Done when** `--inspect --json`
   and the library report each path's magnitude, phase, group delay and
@@ -385,9 +425,12 @@ and the owner's decision its row names, and keeps its
   when** mono on stereo and true stereo load without a `.cfg`, matching the
   equivalent `.cfg`, and an ambiguous file is never guessed; needs jrp's
   decision on the four-channel order. Effort S to M.
-- [ ] **EDGE-4 — Compare two filters, level-matched.** **Done when** two
-  filters are held and switched with the crossfade at matched loudness,
-  within the saved-state limit; needs jrp's decision on state and the
+- [ ] **EDGE-4 — Compare two filters, level-matched.** Suggested: prepare
+  the second filter only when a comparison starts, so everyday memory stays
+  as it is (a 30 s true-stereo filter took 76 MiB playing and 165 MiB while
+  being replaced). **Done when** two filters are held and switched with the
+  crossfade at matched loudness, within the saved-state limit if both are
+  saved; needs jrp's decision on state and the
   loudness measure. Effort M.
 - [ ] **EDGE-5 — Publish the workloads and the evidence.** **Done when**
   the guides state PERF-3's workloads beside other convolvers and a
