@@ -1928,7 +1928,10 @@ unless the candidates need them) runs Lint. The version bot's `VERSION`
 commit after each merge starts no run, so it is left out of that
 comparison; the runs started by hand on a release's tag test it. Nothing is carried, and the
 workflow runs as before, when no such run exists (a draft's runs do not
-count, nor do runs before CI-53), when the earlier commit is not an
+count, nor do runs before CI-53), when a newer run of the workflow on the
+branch failed (jrp, 23 November 2026: CI fetches tools and SDKs as it runs,
+so a failure can be real although no file changed; a cancelled run does not
+count, and the next full pass ends it), when the earlier commit is not an
 ancestor (a rebase), when 300 or more files changed, when the lookup fails,
 for a re-run (attempt 2 or later) and for scheduled and manual runs.
 
@@ -1942,9 +1945,9 @@ the version bot's `VERSION`; so a shared header merged to `main` runs the
 workflows, and a page of documentation does not. When the earlier run
 recorded no `main` commit, or `main`'s changes cannot be listed (rewritten,
 or 300 files or more), nothing is carried. Merging `main` into the branch
-changes its code, so it runs again. Each `scope` job makes at most nine API
-calls with the run's token (a list of runs, the jobs of up to five, the
-notices of one job, two comparisons). Every release and
+changes its code, so it runs again. Each `scope` job makes few API
+calls with the run's token (a list of runs, the jobs of the passed runs
+among the last ten, the notices of one job, two comparisons). Every release and
 preview also passes every workflow started by hand on its tag
 ([publishing](releasing.md#publishing-an-unsigned-preview)).
 

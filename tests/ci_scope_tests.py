@@ -1080,9 +1080,10 @@ class CarryForward(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def run_record(self, number, sha, *, proving=True, tested=MAIN):
+    def run_record(self, number, sha, *, proving=True, tested=MAIN, conclusion='success'):
         return {
             'id': number,
+            'conclusion': conclusion,
             'head_sha': sha,
             'html_url': f'https://example.invalid/{number}',
             'head_repository': {'full_name': self.REPOSITORY},
@@ -1123,11 +1124,11 @@ class CarryForward(unittest.TestCase):
     def test_compares_with_the_last_full_passed_run(self):
         paths, run = ci_scope.carried_from('vst3', 'pull_request', self.pull_request())
         self.assertEqual((paths, run['id']), (['TODO.md'], 5))
-        self.assertIn('event=pull_request&branch=topic&status=success', self.requests[0])
+        self.assertIn('event=pull_request&branch=topic&status=completed', self.requests[0])
         self.assertTrue(self.requests[-1].endswith(f'/compare/{self.BASE}...{self.HEAD}'))
         paths, run = ci_scope.carried_from('vst3', 'push', {})
         self.assertEqual(run['id'], 5)
-        self.assertIn('event=push&branch=main&status=success', self.requests[-4])
+        self.assertIn('event=push&branch=main&status=completed', self.requests[-4])
         self.assertFalse(any('/check-runs/' in path for path in self.requests[-4:]))
         # A run of another repository's branch of the same name is passed over.
         self.runs[2]['head_repository'] = {'full_name': 'fork/name'}
@@ -1137,6 +1138,29 @@ class CarryForward(unittest.TestCase):
         # The same commit (a pull request marked ready again): nothing changed.
         self.comparison = {'status': 'identical', 'files': []}
         self.assertEqual(ci_scope.carried_from('vst3', 'pull_request', self.pull_request())[0], [])
+
+    def test_a_newer_failure_hides_an_older_pass(self):
+        """jrp's sequence, 23 November 2026: full run 5 passes, full run 8
+        fails, and a push that changes only TODO.md must not carry run 5's
+        result: CI fetches tools and SDKs as it runs, so the failure can be
+        real although no file the workflow needs changed."""
+        self.runs.insert(1, self.run_record(8, self.HEAD, conclusion='failure'))
+        for event, payload in (('pull_request', self.pull_request()), ('push', {})):
+            paths, reason = ci_scope.carried_from('vst3', event, payload)
+            self.assertIsNone(paths)
+            self.assertIn('run 8 on', reason)
+        self.runs[1]['conclusion'] = 'timed_out'
+        self.assertIsNone(ci_scope.carried_from('vst3', 'pull_request', self.pull_request())[0])
+        # A cancelled run (a newer push replaced it) hides nothing.
+        self.runs[1]['conclusion'] = 'cancelled'
+        self.assertEqual(ci_scope.carried_from('vst3', 'pull_request', self.pull_request())[1]['id'], 5)
+        # Once the workflow passes in full again, that pass stands.
+        self.runs[1]['conclusion'] = 'failure'
+        self.runs.insert(1, self.run_record(9, self.HEAD))
+        self.assertEqual(ci_scope.carried_from('vst3', 'pull_request', self.pull_request())[1]['id'], 9)
+        # A pass that did not run in full (carried, or a draft's) does not.
+        self.runs[1]['proving'] = False
+        self.assertIn('run 8 on', ci_scope.carried_from('vst3', 'pull_request', self.pull_request())[1])
 
     def test_renames_count_both_names(self):
         self.comparison['files'] = [{'filename': 'docs/new.md', 'previous_filename': 'portable/old.cpp'}]

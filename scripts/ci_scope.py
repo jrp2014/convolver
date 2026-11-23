@@ -57,7 +57,8 @@ adds it, which has to change a file already listed.
 
 A later push carries a passed result forward (CI-53): each workflow looks up
 its own last full run that passed on the same branch (a run whose scope job
-reached the step PROVING_STEP) and compares that commit with this one. When
+reached the step PROVING_STEP; a newer failed run means none stands) and
+compares that commit with this one. When
 nothing changed since then that this workflow needs, it skips its jobs and
 says which run it relies on. Without such a run, when the commits have
 diverged, when the comparison cannot be listed, or when a person re-runs a
@@ -299,7 +300,7 @@ WORKFLOWS = ('regression', 'fuzz', 'vst3', 'au', 'lv2', 'release')
 # (CI-53); the name is how they find it, so the workflows use it exactly.
 PROVING_STEP = 'Full run: later pushes compare with this commit'
 # Runs inspected for one, newest first, and the most files a comparison lists.
-CARRY_RUNS = 5
+CARRY_RUNS = 10
 # A full pull request run records the main commit it tested against as a
 # notice with this title on its scope job (CI-53).
 BASE_TITLE = 'CI-53 base'
@@ -616,6 +617,27 @@ def proving(run, repository):
     return None
 
 
+def newest_full_pass(found, repository, branch):
+    """The newest of the runs found (newest first) that passed in full, and
+    its scope job; or None and why not. A newer run that failed hides every
+    older pass until the workflow passes again (jrp, 23 November 2026): CI
+    fetches tools and SDKs as it runs, so a failure can be real although
+    no file it needs changed. Cancelled runs, and runs that passed without
+    running in full (carried, or a draft's), are passed over."""
+    current = os.environ.get('GITHUB_RUN_ID')
+    for run in found:
+        if str(run['id']) == current or (run.get('head_repository') or {}).get('full_name') != repository:
+            continue
+        if run.get('conclusion') in ('failure', 'timed_out', 'startup_failure'):
+            return None, f'run {run["id"]} on {branch} failed, so no earlier pass stands'
+        if run.get('conclusion') != 'success':
+            continue
+        job = proving(run, repository)
+        if job:
+            return run, job
+    return None, f'no full passed run of this workflow on {branch} to compare with'
+
+
 def tested_base(job, repository):
     """The main commit a full pull request run tested against, from the
     BASE_TITLE notice on its scope job, or None."""
@@ -658,22 +680,12 @@ def carried_from(workflow, event, payload):
         return None, f'"{event}" runs carry nothing'
     if not branch or not sha:
         return None, 'the event names no branch or commit'
-    query = urllib.parse.urlencode({'event': event, 'branch': branch, 'status': 'success', 'per_page': CARRY_RUNS})
+    query = urllib.parse.urlencode({'event': event, 'branch': branch, 'status': 'completed', 'per_page': CARRY_RUNS})
     try:
         found = github(f'/repos/{repository}/actions/workflows/{workflow}.yml/runs?{query}')['workflow_runs']
-        current = os.environ.get('GITHUB_RUN_ID')
-        base, job = next(
-            (
-                (run, job)
-                for run in found
-                if str(run['id']) != current and (run.get('head_repository') or {}).get('full_name') == repository
-                for job in [proving(run, repository)]
-                if job
-            ),
-            (None, None),
-        )
+        base, job = newest_full_pass(found, repository, branch)
         if base is None:
-            return None, f'no full passed run of this workflow on {branch} to compare with'
+            return None, job
         tested = tested_base(job, repository) if event == 'pull_request' else None
         if event == 'pull_request' and not tested:
             return None, f'run {base["id"]} recorded no main commit that it tested against'
