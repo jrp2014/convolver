@@ -245,9 +245,12 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         if (follow_state_ && playing && static_cast<std::uint64_t>(followed_state) == follow_state_)
             followed = playing;
         keep = edited_since_restore_;
-        if (latency_requests_ > heard_latency)
+        // Only a choice made since the restore: one before it was replaced
+        // by the state, and one the processor never heard (a message lost)
+        // must not keep a setting for later restores.
+        if (latency_requests_ > std::max<int64>(heard_latency, latency_at_restore_))
             keep |= setting_bit(latency_id);
-        if (gain_mode_requests_ > heard_gain_mode)
+        if (gain_mode_requests_ > std::max<int64>(heard_gain_mode, gain_mode_at_restore_))
             keep |= setting_bit(gain_mode_id);
     }
     // PLUG-48: after restored state, the settings the processor plays, which
@@ -256,7 +259,7 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     // VST3-18 (jrp's review of 0.18.12): a host that delivers messages later
     // may bring this answer after the user chose another setting. A Latency
     // or Gain mode the processor had not yet heard, which it will play once
-    // it does, and a Gain or Mix changed since the restore, keep their values.
+    // it does, and a Gain or Mix the host set since the restore, keep their values.
     if (followed) {
         const auto set = [&](ParamID id, ParamValue value) {
             if ((keep & setting_bit(id)) || getParamNormalized(id) == value)
@@ -427,9 +430,12 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
         return result;
     }
     if (id == gain_id || id == mix_id) {
-        const auto before = getParamNormalized(id);
+        // VST3-18: a value the host passes here it passes to the processor
+        // in process() too (automation, or the window's edit through the
+        // host), also when it is the value shown: automation to the refused
+        // preset's Gain plays that Gain (jrp's review of PR #278).
         const auto result = EditController::setParamNormalized(id, value);
-        if (result == kResultOk && getParamNormalized(id) != before)
+        if (result == kResultOk)
             edited_since_restore(id);
         return result;
     }
@@ -560,6 +566,8 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
         std::lock_guard lock(status_lock_);
         follow_state_ = digest;
         edited_since_restore_ = 0;
+        latency_at_restore_ = latency_requests_;
+        gain_mode_at_restore_ = gain_mode_requests_;
     }
     if (auto message = owned(allocateMessage())) {
         message->setMessageID(report_message);

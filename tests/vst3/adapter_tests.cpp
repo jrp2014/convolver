@@ -4422,6 +4422,32 @@ void edits_survive_late_answer() {
     require(c.getParamNormalized(mix_id) == .5 && p.settings().mix == .5 &&
                 gain_mode(c.getParamNormalized(gain_mode_id)) == convolver::GainMode::no_clipping,
             "late answer: after the second refusal, Mix or Gain mode not as edited or played");
+    // jrp's review of PR #278: refused once more, the processor first, and
+    // the processor answers at once (-12 dB, 50%) but the answer is late.
+    // Host automation then sets Gain and Mix to the very values the refused
+    // preset shows (0 dB, 25%), on both halves; they agree until the late
+    // answer arrives, and must agree after it.
+    require(restore(*other_rate) != kResultOk, "late answer: refused a third time");
+    to_processor.deliver();
+    require(c.setParamNormalized(gain_id, normalized_gain(0)) == kResultOk &&
+                c.setParamNormalized(mix_id, .25) == kResultOk,
+            "late answer: the host's automation");
+    host_sends(gain_id, normalized_gain(0));
+    host_sends(mix_id, .25);
+    to_controller.deliver();
+    c.report();
+    deliver();
+    require(c.getParamNormalized(gain_id) == normalized_gain(0) &&
+                std::abs(p.settings().gain_db) < 1e-9,
+            ("late answer: after automation to the shown Gain, the parameter shows " +
+             std::to_string(c.getParamNormalized(gain_id)) + " while the processor plays " +
+             std::to_string(p.settings().gain_db) + " dB")
+                .c_str());
+    require(c.getParamNormalized(mix_id) == .25 && p.settings().mix == .25,
+            ("late answer: after automation to the shown Mix, the parameter shows " +
+             std::to_string(c.getParamNormalized(mix_id)) + " while the processor plays " +
+             std::to_string(p.settings().mix))
+                .c_str());
     require(handler.edits.size() == edits, "late answer: following what plays is an edit");
     p.setActive(false);
     p.disconnect(&to_controller);
@@ -4432,10 +4458,11 @@ void edits_survive_late_answer() {
 }
 // VST3-18 (its independent review): a host that gives the controller the
 // state first, with the user's Latency and Gain mode chosen between the two
-// calls. With a direct connection the processor hears them and then
-// installs the state, which replaces them: the answer, which says it had
-// heard them, is followed. With a deferring one they arrive after the
-// restore and play. Either way the parameters show what plays.
+// calls, which the processor hears before it installs the state, which
+// replaces them: the answer, which says it had heard them, is followed. A
+// Latency set before the processor was connected, whose message was lost,
+// does not keep it from following a refused preset later (the review).
+// Either way the parameters show what plays.
 void edits_before_controller_first_restore() {
     for (const bool defer : {false, true}) {
         const std::string how = defer ? " (deferring proxy)" : " (forwarding proxy)";
@@ -4450,6 +4477,9 @@ void edits_before_controller_first_restore() {
         check(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
                   c.setComponentHandler(&handler) == kResultOk,
               "initialize");
+        // A host that sets Latency before connecting the halves: the
+        // message reaches nobody.
+        c.setParamNormalized(latency_id, normalized_latency(2048));
         Proxy to_controller(c, defer), to_processor(p, defer);
         check(p.connect(&to_controller) == kResultOk && c.connect(&to_processor) == kResultOk,
               "connect");
@@ -4485,6 +4515,26 @@ void edits_before_controller_first_restore() {
         check(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk, "activate");
         play_block(p, 1, 1, 64);
         deliver();
+        // A 44.1 kHz preset, the processor first: refused, and the lost
+        // Latency must not keep the refused preset's 0 on show.
+        auto other_rate = state_with(0);
+        {
+            other_rate->seek(0, IBStream::kIBSeekSet, nullptr);
+            auto state = read_state(other_rate.get());
+            state.configuration->sample_rate = 44100;
+            other_rate = std::make_unique<MemoryStream>();
+            check(write_state(other_rate.get(), state), "encode 44.1 kHz");
+        }
+        other_rate->seek(0, IBStream::kIBSeekSet, nullptr);
+        check(p.setState(other_rate.get()) != kResultOk, "the 44.1 kHz preset was accepted");
+        other_rate->seek(0, IBStream::kIBSeekSet, nullptr);
+        check(c.setComponentState(other_rate.get()) == kResultOk, "the controller's 44.1 kHz");
+        deliver();
+        check(latency_frames(c.getParamNormalized(latency_id)) == 1024 &&
+                  p.getLatencySamples() == 1024,
+              "after a lost Latency message, a refused preset shows Latency " +
+                  std::to_string(latency_frames(c.getParamNormalized(latency_id))) +
+                  " while the processor plays " + std::to_string(p.getLatencySamples()));
         auto next = state_with(512);
         check(controller_first(*next,
                                [&] {
@@ -4492,13 +4542,14 @@ void edits_before_controller_first_restore() {
                                    c.setParamNormalized(
                                        gain_mode_id,
                                        normalized_gain_mode(convolver::GainMode::no_clipping));
+                                   to_processor.deliver(); // Before the processor's restore.
                                }) == kResultOk,
               "the second filter");
         deliver();
         c.report();
         deliver();
         const auto shown = latency_frames(c.getParamNormalized(latency_id));
-        check(shown == p.getLatencySamples() && shown == (defer ? 256u : 512u),
+        check(shown == p.getLatencySamples() && shown == 512,
               "the parameter shows Latency " + std::to_string(shown) +
                   " while the processor plays " + std::to_string(p.getLatencySamples()));
         check(gain_mode(c.getParamNormalized(gain_mode_id)) == p.settings().gain_mode,

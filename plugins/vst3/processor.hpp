@@ -466,7 +466,7 @@ class Controller final : public Steinberg::Vst::EditController,
     // latency during the restart.
     void latency_chosen(std::size_t frames);
     // VST3-18: Gain and Mix as bits of edited_since_restore_ (0 for any
-    // other parameter), and recording that the host or the window changed one.
+    // other parameter), and recording that the host or the window set one.
     static unsigned setting_bit(Steinberg::Vst::ParamID) noexcept;
     void edited_since_restore(Steinberg::Vst::ParamID);
     // The host may restore state (and so send the status) on another thread
@@ -496,11 +496,14 @@ class Controller final : public Steinberg::Vst::EditController,
     // processor's outcome for that state sets the parameters (notify). 0: none.
     std::uint64_t follow_state_ = 0;
     // VST3-18, under status_lock_: Gain and Mix (setting_bit()) as the host
-    // or the window changed them since that setComponentState. The status
+    // or the window set them since that setComponentState, changed or not. The status
     // that says what plays leaves them as they are: they reach the processor
     // in process(), whose order against the status cannot be told, so the
     // host's latest value counts. Latency and Gain mode go as messages, in
     // order, and the status says which it had heard.
     unsigned edited_since_restore_ = 0;
+    // VST3-18, under status_lock_: the last Latency and Gain mode request
+    // numbers at that setComponentState; only later choices can keep theirs.
+    Steinberg::int64 latency_at_restore_ = 0, gain_mode_at_restore_ = 0;
 };
 } // namespace convolver::vst3

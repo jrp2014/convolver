@@ -1241,9 +1241,11 @@ the plan's Gain modes (12 November 2026); its meters follow later
   it (or the restore that replaced it, when the host gave the controller
   the state first and the choice came between the two calls). Gain and Mix
   reach the processor in `process()`, whose order against the status
-  cannot be told, so a Gain or Mix the host or the window changed after
-  `setComponentState` (`setParamNormalized` with a new value) keeps its
-  value. The one order that leaves them apart: a host that restores the
+  cannot be told, so a Gain or Mix the host or the window set after
+  `setComponentState` (any `setParamNormalized`, even to the value shown,
+  since the host passes it to `process()` too: jrp's review found
+  automation to the refused preset's own Gain and Mix left apart) keeps
+  its value. The one order that leaves them apart: a host that restores the
   controller first and passes a Gain or Mix edit made between the two calls
   to `process()` before restoring the processor, whose restore then
   replaces it. The others still take what plays (`vst3.adapter`
