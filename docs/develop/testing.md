@@ -942,6 +942,31 @@ a margin instead. The validator, the adapter tests and the plug-in
 all use Steinberg's SDK code, so CI also loads the bundle in an independent
 host, pluginval.
 
+`vst3.sync` (VST3-25, [`sync_tests.cpp`](../../tests/vst3/sync_tests.cpp))
+generates sequences of what a host and a user do to one processor and
+controller pair: Latency and Gain mode choices, Gain, Mix and Bypass
+automation, a preset and a missing file chosen in the window, and an
+accepted and a refused restore. It runs every sequence of one and two steps
+in every variant, and 300 seeded random sequences of three to five steps.
+The variants are the connection (direct, a proxy that forwards at once, one
+that delivers later, with what it delivers after each step and whether it
+delivers between the two calls of a restore), the restore order, and
+whether the host plays a block after each step. Once the host has
+delivered everything, one oracle judges each sequence: the controller's
+parameters, the host's view of them, the window's settings line, what the
+processor plays (its settings, its latency and its impulse response
+against a fresh processor restored from the expected state), the latency
+the host last read, the saved state and what a processor restored from it
+plays must all match the latest step that succeeded, and every host
+callback must come on the UI thread. Gain, Mix and Bypass are judged only
+after the host has delivered them in `process()`. Named cases cover two
+instances at once and closing one, a processor with no controller, a
+restore on another thread in an offline render, and a save between a Gain
+edit and its delivery. A failure prints the sequence and its variant, for
+example `delaying proxy, processor first, playing: W [none] G`;
+`--tsv FILE` writes every result, and `--random`, `--seed` and `--length`
+change the random part.
+
 The [VST3 workflow](../../.github/workflows/vst3.yml) runs these tests in
 Release builds on Linux (Ooura), macOS and Windows, with the validator and
 pluginval. Its `sanitizers` job (CI-36) runs two Debug builds with Clang on
