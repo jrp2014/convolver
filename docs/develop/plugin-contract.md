@@ -734,8 +734,9 @@ format.
   (ROBUST-7): `HostFilter` marks the instance failed (`fail_request()`)
   before it allocates anything for the record, which then keeps the kind
   and request number but may lack the message (`failure_message()` gives
-  general advice instead) or the path. The adapters' call to
-  `fail_request()` covers a request that throws before `HostFilter`
+  general advice instead, from a constant built when the library loads, so
+  that choosing the message needs no memory; VST3-20) or the path. The
+  adapters' call to `fail_request()` covers a request that throws before `HostFilter`
   records it too: VST3 in
   `refused()`, the Audio Unit in `fail_unrecorded()`, and LV2 in
   `restore()`, `work()` and `record_dropped()`. The allocation-starvation
@@ -768,8 +769,10 @@ separate processes, so each carries values, never pointers:
   attribute, and the log tag ("VST3 #2"). The controller keeps the decoded
   report under its own lock, derives the Status parameter, its text and the
   window's content from it, does not show a report that does not decode
-  (answering kInvalidArgument, though the load or Latency answer the message
-  carries still counts; `vst3.adapter` `damaged_report_message`), and asks
+  (answering kInvalidArgument, though the load or Latency answer and the
+  settings that play which the message carries still count, and the Status
+  parameter keeps its value; `vst3.adapter` `damaged_report_message` and
+  `damaged_report_keeps_status`, VST3-22), and asks
   the host to reread the parameters only when the Status line changed; Copy
   diagnostics joins the report's text with the recent log lines
   (`diagnostics_text()`).
@@ -1216,10 +1219,12 @@ the plan's Gain modes (12 November 2026); its meters follow later
   they were, but the controller had mirrored the refused state, so the
   window and the host showed Latency 0 while 1024 played.
   `setComponentState` sends the processor a report request naming the
-  state it mirrored (`follow state`, a digest of the state as decoded,
-  `state_digest()`, which both halves compute alike), so the answer also
-  comes when no window is open; while the host plays, that request reads a
-  waiting list again, as the window's does. The status that follows the
+  state it mirrored (`follow state`, a digest of the state's bytes as
+  `read_state()` reads them, the same in both halves; it copies nothing,
+  so memory running short after the read no longer makes a valid state
+  count as unreadable, VST3-20), so the answer also comes when no window
+  is open; while the host plays, that request reads a waiting list again,
+  as the window's does. The status that follows the
   processor's outcome for that state carries the digest (`followed state`)
   and the settings that play: the answer to the request when the processor
   had already refused the state (the SDK's order), or the status after its

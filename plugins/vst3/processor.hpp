@@ -79,7 +79,7 @@ inline constexpr const char* report_message = "ConvolverReport";
 // again itself (HostFilter::take_unsettled_list()), with "accepted", so the
 // controller marks the project changed as for a file the user chose.
 // PLUG-48: the controller's setComponentState sends a report_message with
-// "follow state", the state_digest() of the state it mirrored. The status
+// "follow state", read_state()'s digest of the state it mirrored. The status
 // that follows the processor's outcome for that state (its own restore of
 // it, or the follow request when it had already refused it) adds "followed
 // state" (that digest) and the settings that play, "playing gain", "playing
@@ -170,11 +170,12 @@ inline constexpr int max_bus_channels = identity::max_channels;
 // meaning in both, and VST3 orders channels by bit. 0 (no named speakers) for
 // any arrangement using other speakers, kMono (kSpeakerM) included.
 std::uint32_t wav_speakers(Steinberg::Vst::SpeakerArrangement) noexcept;
-HostState read_state(Steinberg::IBStream*);
-// PLUG-48: a digest of restored state as decoded (never 0), which the
-// processor and the controller compute alike for the same stream, so the
-// controller knows which state a refusal was of.
-std::uint64_t state_digest(const HostState&);
+// Reads restored state. With `digest`, also sets it to PLUG-48's digest of
+// the state (never 0), which the processor and the controller compute alike
+// for the same stream, so the controller knows which state a refusal was of.
+// VST3-20: it hashes the bytes read, which copies nothing and cannot fail,
+// so memory running short after the read cannot make the state unreadable.
+HostState read_state(Steinberg::IBStream*, std::uint64_t* digest = nullptr);
 bool write_state(Steinberg::IBStream*, const HostState&);
 // PLUG-48, VST3-18, VST3-19: the processor's half of following a restore
 // the controller mirrored (the report_message's "follow state"). A host may
@@ -555,7 +556,7 @@ class Controller final : public Steinberg::Vst::EditController,
     // filter that plays ("filter saved name"), and this pair only when that
     // filter has none.
     std::string name_, identity_;
-    // PLUG-48, under status_lock_: state_digest() of the state the last
+    // PLUG-48, under status_lock_: read_state()'s digest of the state the last
     // setComponentState mirrored; a status that says what plays after the
     // processor's outcome for that state sets the parameters (notify). 0: none.
     std::uint64_t follow_state_ = 0;

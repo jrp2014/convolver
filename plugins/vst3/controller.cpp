@@ -176,7 +176,7 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         preset_mode = 0;
     // PLUG-48: the settings the processor plays after its outcome for the
     // state setComponentState mirrored (`followed_state`, its
-    // state_digest()); absent otherwise or from a damaged message, which
+    // read_state()'s digest); absent otherwise or from a damaged message, which
     // then changes no parameter.
     std::optional<HostSettings> playing;
     int64 followed_state = 0, heard_latency = 0, heard_gain_mode = 0;
@@ -292,8 +292,11 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     // A window asks for the report twice a second; only a new status line
     // is news for the host.
     if (changed) {
-        EditController::setParamNormalized(
-            status_id, parameter->toNormalized(static_cast<ParamValue>(status)));
+        // VST3-22: a report that does not decode says nothing of the status,
+        // though the settings it carries changed: Status keeps its value.
+        if (readable)
+            EditController::setParamNormalized(
+                status_id, parameter->toNormalized(static_cast<ParamValue>(status)));
         // Ask the host to read the parameters again (the status is not edited
         // by the user, so performEdit does not apply). Hosts may ignore this.
         if (componentHandler)
@@ -542,8 +545,9 @@ tresult PLUGIN_API Controller::getParamValueByString(ParamID id, TChar* string, 
 }
 tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
     HostState state;
+    std::uint64_t digest = 0;
     try {
-        state = read_state(stream);
+        state = read_state(stream, &digest);
     } catch (...) {
         return kResultFalse;
     }
@@ -572,12 +576,7 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
     // restore. A refusal of the same state in an earlier restore also
     // answers this message, and the restore that follows corrects it
     // (Codex's review).
-    std::uint64_t digest = 0;
     int64 latency_before = 0, gain_mode_before = 0;
-    try {
-        digest = state_digest(state);
-    } catch (...) { // Out of memory: the parameters keep the state's values.
-    }
     {
         std::lock_guard lock(status_lock_);
         follow_state_ = digest;

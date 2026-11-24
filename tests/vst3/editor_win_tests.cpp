@@ -32,6 +32,7 @@
 #include <shlobj.h>
 #include <uiautomation.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -101,6 +102,24 @@ void type(HWND box, const std::wstring& typed) {
 }
 bool checked(HWND box) {
     return SendMessageW(box, BM_GETCHECK, 0, 0) == BST_CHECKED;
+}
+HFONT font_of(HWND control) {
+    return reinterpret_cast<HFONT>(SendMessageW(control, WM_GETFONT, 0, 0));
+}
+// Whether a static control's text, wrapped at its width in its own font,
+// fits its height, so no line is cut off.
+bool fits(HWND control) {
+    RECT client{};
+    GetClientRect(control, &client);
+    const auto words = text(control);
+    HDC dc = GetDC(control);
+    const auto old = SelectObject(dc, font_of(control));
+    RECT need{0, 0, std::max<LONG>(client.right, 1), 0};
+    DrawTextW(dc, words.c_str(), static_cast<int>(words.size()), &need,
+              DT_CALCRECT | DT_WORDBREAK | DT_EDITCONTROL | DT_NOPREFIX);
+    SelectObject(dc, old);
+    ReleaseDC(control, dc);
+    return need.bottom - need.top <= client.bottom - client.top;
 }
 
 // A file dropped on the window from File Explorer.
@@ -350,6 +369,12 @@ void window(const fs::path& picture) {
                 !IsWindowEnabled(gain_box) && text(gain_box).empty(),
             "Gain mode choice: " + handler.kinds(gain_mode_id) + ", " +
                 utf8(text(setting(shown, 1, win::value))));
+    // VST3-21 (jrp's review of 0.18.14): the note is in the small type of
+    // Mix's note, which its height was measured in; in the larger type it
+    // was cut off.
+    require(font_of(setting(shown, 1, win::value)) == font_of(item(shown, win::mix_note)) &&
+                fits(setting(shown, 1, win::value)),
+            "the note under the Gain row is not in the notes' small type, or is cut off");
     SendMessageW(mode, CB_SETCURSEL, 0, 0);
     SendMessageW(shown, WM_COMMAND,
                  MAKEWPARAM(win::settings + win::setting_stride + win::control, CBN_SELCHANGE),
