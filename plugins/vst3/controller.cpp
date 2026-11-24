@@ -278,8 +278,11 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     // A window asks for the report twice a second; only a new status line
     // is news for the host.
     if (changed) {
-        EditController::setParamNormalized(
-            status_id, parameter->toNormalized(static_cast<ParamValue>(status)));
+        // VST3-22: a report that does not decode says nothing of the status,
+        // though the settings it carries changed: Status keeps its value.
+        if (readable)
+            EditController::setParamNormalized(
+                status_id, parameter->toNormalized(static_cast<ParamValue>(status)));
         // Ask the host to read the parameters again (the status is not edited
         // by the user, so performEdit does not apply). Hosts may ignore this.
         if (componentHandler)

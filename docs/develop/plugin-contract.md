@@ -768,8 +768,10 @@ separate processes, so each carries values, never pointers:
   attribute, and the log tag ("VST3 #2"). The controller keeps the decoded
   report under its own lock, derives the Status parameter, its text and the
   window's content from it, does not show a report that does not decode
-  (answering kInvalidArgument, though the load or Latency answer the message
-  carries still counts; `vst3.adapter` `damaged_report_message`), and asks
+  (answering kInvalidArgument, though the load or Latency answer and the
+  settings that play which the message carries still count, and the Status
+  parameter keeps its value; `vst3.adapter` `damaged_report_message` and
+  `damaged_report_keeps_status`, VST3-22), and asks
   the host to reread the parameters only when the Status line changed; Copy
   diagnostics joins the report's text with the recent log lines
   (`diagnostics_text()`).
