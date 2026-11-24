@@ -1309,13 +1309,17 @@ the plan's Gain modes (12 November 2026); its meters follow later
   reported with the value it was set to, which the refused state replaced
   in the controller. The status after a restore also carries the Bypass
   that plays, which the controller takes unless the host set Bypass since,
-  so a refused state's Bypass is not shown. One order still ends at an
+  so a refused state's Bypass is not shown; Bypass reaches the processor in
+  `process()` and follows the Gain rule above. One order still ends at an
   older Gain or Mix: a host that delivers messages between its two restore
-  calls brings a window preset's answer after the processor's restore, the
-  controller reports again the Gain set after that preset, and the host
-  passes it to `process()` after the restore, so it plays, is shown and is
-  saved instead of the restored preset's. The controller cannot tell that
-  the processor's restore came first.
+  calls can bring a window preset's answer after the processor's restore
+  and before `setComponentState`. The controller cannot tell that the
+  processor's restore came first, so it reports the window preset's Gain
+  and Mix (or a Gain or Mix set after choosing it) as edits, and the host
+  passes them to `process()` after the restore: the restored preset's
+  filter and Latency play with the window preset's Gain and Mix, and that
+  is shown and saved. Undoing it would report a host restore as the
+  user's edits.
 
   The processor keeps the restores it has read whose report request has
   not arrived, oldest first (`RestoreFollow`); each request matches one, in
