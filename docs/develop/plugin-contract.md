@@ -1255,6 +1255,33 @@ the plan's Gain modes (12 November 2026); its meters follow later
   to `process()` before restoring the processor, whose restore then
   replaces it. The others still take what plays (`vst3.adapter`
   `edits_survive_late_answer`, `edits_before_controller_first_restore`).
+  VST3-19 (jrp's review of 0.18.14, 24 November 2026): the other way
+  round, a Latency or Gain mode chosen before a restore the processor
+  accepts, delivered after it, played and was saved while the window
+  showed the restored preset's. The report request also carries the
+  controller's request numbers when it mirrored the state; a processor
+  that accepted that state and then played a choice numbered at or below
+  them plays the state's setting again, and its status says so
+  (`latency restored`), so the controller asks the host to read the
+  latency again. A processor that accepted the state answers that request
+  too. `setComponentState` asks the host to read a changed latency, which
+  is before the processor restores when the host gives the controller the
+  state first; the controller asks again when the status says the outcome
+  came from the processor's own restore (`restored after mirror`), or when
+  the answer arrives after its request was sent rather than during it (a
+  host that delivers messages later may have restored the processor in
+  between; with one that restores the processor first this is one extra
+  read). Restoring the same state again in the SDK's order asks nothing
+  more (`vst3.adapter` `accepted_restore_beats_queued_edit`). The
+  processor compares a request only with the newest restore, while it is
+  accepted and nothing else has installed since (`RestoreFollow` in
+  `processor.hpp`): a request for an older state, delivered late, leaves it
+  for its own request; each request for the same state, sent again,
+  compares with the choices numbered before it; any later install, a
+  chosen file included, clears it, so a later refused restore of the same
+  state cannot bring its settings back; and a refused restore of another
+  state leaves it, since the accepted restore still plays (jrp's reviews
+  of PR #279, `accepted_restore_follows_its_own_request`).
 
 ## Channel layouts
 

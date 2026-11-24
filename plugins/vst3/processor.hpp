@@ -88,7 +88,13 @@ inline constexpr const char* report_message = "ConvolverReport";
 // numbers of the last latency_message and gain_mode_message the processor
 // had heard ("heard latency request", "heard gain mode request"), so the
 // controller can tell a choice still on its way from one the answer
-// already includes.
+// already includes. VST3-19: the report_message also carries the
+// controller's "latency requests" and "gain mode requests" when it mirrored
+// the state; a processor that accepted that state and then played a choice
+// sent before it plays the state's setting again. Its status answers that
+// request (also with nothing to revert), and says "latency restored" when
+// that changed the Latency, and "restored after mirror" when the outcome
+// came from its own restore.
 struct StatusAnswer {
     Steinberg::int64 load_request = 0;
     bool retried = false;
@@ -171,6 +177,75 @@ std::uint32_t wav_speakers(Steinberg::Vst::SpeakerArrangement) noexcept;
 // so memory running short after the read cannot make the state unreadable.
 HostState read_state(Steinberg::IBStream*, std::uint64_t* digest = nullptr);
 bool write_state(Steinberg::IBStream*, const HostState&);
+// PLUG-48, VST3-18, VST3-19: the processor's half of following a restore
+// the controller mirrored (the report_message's "follow state"). A host may
+// restore either half first and deliver messages later, so the processor
+// may hear the controller's report request before or after its own restore
+// of that state, and Latency and Gain mode choices out of step with both.
+// Each event below is one method, so every path that changes what plays
+// keeps or clears what the next event needs (jrp's review of PR #279).
+// The Processor holds one under its lock.
+class RestoreFollow {
+  public:
+    // The number ("request") of a latency_message or gain_mode_message heard.
+    void heard_latency(Steinberg::int64 request) noexcept {
+        heard_latency_ = request;
+    }
+    void heard_gain_mode(Steinberg::int64 request) noexcept {
+        heard_gain_mode_ = request;
+    }
+    // A restore read the state with this digest (0 if it could not be
+    // read), before it was accepted or refused.
+    void read(std::uint64_t digest) noexcept;
+    // Any accepted install, a restore or a file chosen or read again: what
+    // plays no longer follows an earlier restore's outcome.
+    void installed() noexcept {
+        refused_ = 0;
+        accepted_ = 0;
+    }
+    // After installed(), a restore of this state was accepted with these
+    // settings. Or a restore of this state (0: unreadable) was refused: the
+    // last attempt, which answers its own request, while the last accepted
+    // restore still owns the filter that plays and its settings (jrp's
+    // review of PR #279 at 13a6e1a).
+    void accepted(std::uint64_t digest, const HostSettings& restored) noexcept;
+    void refused(std::uint64_t digest) noexcept {
+        refused_ = digest;
+    }
+    // The controller's report request named `follow` (0: none), with its
+    // Latency and Gain mode request numbers when it mirrored that state.
+    // What to play again: the restore's settings, over a choice sent before
+    // the controller mirrored it that arrived after the restore (VST3-19).
+    struct Again {
+        std::optional<std::size_t> latency;
+        std::optional<GainMode> gain_mode;
+    };
+    Again requested(std::uint64_t follow, Steinberg::int64 latency_requests,
+                    Steinberg::int64 gain_mode_requests, const HostSettings& playing) noexcept;
+    // What the next status adds: the state whose outcome it gives (0: none,
+    // and nothing else applies), the numbers heard, and whether the outcome
+    // came from this processor's own restore after the request, or played
+    // the restore's Latency again.
+    struct Answer {
+        std::uint64_t followed = 0;
+        Steinberg::int64 heard_latency = 0, heard_gain_mode = 0;
+        bool restored_after_mirror = false, latency_restored = false;
+    };
+    Answer take_answer() noexcept;
+
+  private:
+    std::uint64_t refused_ = 0;  // The newest restore's, if it was refused.
+    std::uint64_t mirrored_ = 0; // The last report request's state.
+    bool answer_ = false, restored_after_mirror_ = false, latency_restored_ = false;
+    Steinberg::int64 heard_latency_ = 0, heard_gain_mode_ = 0;
+    // The last accepted restore, while nothing else has installed since (a
+    // refused restore installs nothing): its digest (0: none), its Latency
+    // and Gain mode, and the numbers heard then.
+    std::uint64_t accepted_ = 0;
+    std::size_t accepted_latency_ = default_host_latency;
+    GainMode accepted_gain_mode_ = GainMode::set;
+    Steinberg::int64 latency_at_accept_ = 0, gain_mode_at_accept_ = 0;
+};
 class Processor final : public Steinberg::Vst::AudioEffect {
   public:
     Processor();
@@ -367,17 +442,8 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // restores a project and gives it the track's). Under control_, except
     // played(), which process() calls.
     HostSettling settling_{HostBinding::activation};
-    // PLUG-48, under the lock: read_state()'s digest of the newest state the host
-    // restored if it was refused, 0 otherwise (or once a load is accepted);
-    // the state the controller says it mirrored last ("follow state"); and
-    // whether the next status says what plays, after an outcome for that
-    // state, so the controller's parameters show what plays.
-    std::uint64_t refused_state_ = 0;
-    std::uint64_t mirrored_state_ = 0;
-    bool answer_mirrored_ = false;
-    // VST3-18, under the lock: the "request" of the last latency_message and
-    // gain_mode_message heard, which a status after a mirrored state carries.
-    Steinberg::int64 heard_latency_request_ = 0, heard_gain_mode_request_ = 0;
+    // PLUG-48, VST3-18, VST3-19, under the lock.
+    RestoreFollow follow_;
     bool layout_refusal_logged_ = false; // Refused layouts are logged once per instance.
     std::string logged_;                 // The last line log() queued.
     std::vector<std::pair<std::string, bool>> unlogged_; // Lines and whether each is a problem.
@@ -506,5 +572,14 @@ class Controller final : public Steinberg::Vst::EditController,
     // VST3-18, under status_lock_: the last Latency and Gain mode request
     // numbers at that setComponentState; only later choices can keep theirs.
     Steinberg::int64 latency_at_restore_ = 0, gain_mode_at_restore_ = 0;
+    // VST3-19, under status_lock_: that setComponentState asked the host to
+    // read a changed latency, perhaps before the processor restored the
+    // state (the controller first); the status after the processor's own
+    // restore asks again.
+    bool restart_at_restore_ = false;
+    // VST3-19, under status_lock_: setComponentState is sending its report
+    // request; an answer that arrives meanwhile came through a direct or
+    // forwarding connection.
+    bool sending_follow_ = false;
 };
 } // namespace convolver::vst3
