@@ -362,7 +362,11 @@ relevant to a convolver unless the product changes.
   | 120 s | 0.18.14 | 105.3 ms | 209.2 ms | 187.7 ms | 204.7 ms | 708 ms |
   | 120 s | VST3-20 | 110.5 ms | 130.5 ms | 91.1 ms | 206.5 ms | 538 ms |
 
-  Restarting the processor in `setActive` is now the largest part.
+  VST3-18's thread measured 0.18.13 the same way (23 November 2026): 134 ms
+  and 703 ms in all, the digests alone 22.2 ms and 110.6 ms. Restarting
+  the processor in `setActive` is now the largest part; the remaining
+  question changed from choosing a cheaper digest (VST3-20 did) to whether
+  the delay is still noticeable.
   **Remains:** time the user's action itself, pressing Play in Audacity on
   jrp's Mac with 30 s and 120 s stereo filters, against the same with a
   short filter. **Done when** that delay is recorded and, if it is still
