@@ -5,6 +5,8 @@
 #include "../plugins/audio_guard.hpp"
 #include "../plugins/lifecycle.hpp"
 #include "../plugins/load_timing.hpp"
+#include "convolver/engine.hpp"
+#include "host_log.hpp"
 #include "processor.hpp"
 #include "public.sdk/source/common/memorystream.h"
 #include "public.sdk/source/vst/hosting/hostclasses.h"
@@ -15,6 +17,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <exception>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <new>
@@ -273,6 +276,18 @@ void restore_short_of_memory() {
     // Diagnostic: an attempt that waits 20 s says so and exits.
     std::atomic<int> progress{0};
     std::atomic<bool> finished{false};
+    std::atomic<convolver::vst3::Processor*> current{nullptr};
+    // Whether `op`, on a thread of its own, returns within a second: one that
+    // does not waits on a lock the stuck attempt holds.
+    const auto returns = [](const char* what, std::function<void()> op) {
+        auto done = std::make_shared<std::atomic<bool>>(false);
+        std::thread([op, done] {
+            op();
+            *done = true;
+        }).detach();
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::cerr << "  " << what << (*done ? " returned" : " waits") << std::endl;
+    };
     std::thread watchdog([&] {
         int seen = -1;
         auto since = std::chrono::steady_clock::now();
@@ -288,6 +303,14 @@ void restore_short_of_memory() {
                              "refused so far "
                           << before << ", a second later " << guard::refused_allocations()
                           << std::endl;
+                if (auto* stuck = current.load())
+                    returns("the processor's control lock (failure())",
+                            [stuck] { static_cast<void>(stuck->failure()); });
+                returns("the log file's lock (host_log)",
+                        [] { convolver::host_log("VST3 test", "watchdog probe", false); });
+                if (convolver::fft_supports_wisdom())
+                    returns("FFTW's planner lock (export_fft_wisdom)",
+                            [] { static_cast<void>(convolver::export_fft_wisdom()); });
                 std::_Exit(4);
             }
         }
@@ -317,10 +340,12 @@ void restore_short_of_memory() {
         stream.seek(0, IBStream::kIBSeekSet, nullptr);
         bool accepted = false;
         step("setState");
+        current = &p;
         {
             guard::Starve starve(allowed, once);
             accepted = p.setState(&stream) == kResultOk;
         }
+        current = nullptr;
         step(accepted ? "accepted; failure" : "refused; failure");
         if (failure)
             *failure = p.failure();
