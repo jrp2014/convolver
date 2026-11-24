@@ -263,6 +263,13 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
             report_.swap(report);
             format_.swap(format);
         }
+        // An install for any restore the controller mirrored, answered after
+        // the load: that restore replaced the load's choice, so a later
+        // refusal leaves it, not the choice, playing (Codex's review of PR
+        // #281: a window preset, Gain, an accepted host preset, then a
+        // refused one revived the Gain).
+        if (followed_state && !followed_refused)
+            load_held_ = 0;
         if (follow_state_ && playing &&
             static_cast<std::uint64_t>(followed_state) == follow_state_) {
             followed = playing;

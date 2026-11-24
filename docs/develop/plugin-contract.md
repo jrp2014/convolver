@@ -1303,8 +1303,9 @@ the plan's Gain modes (12 November 2026); its meters follow later
   back while the controller reports an edit. An answer that arrives after a
   later `setComponentState` waits for that restore's outcome: if the
   processor accepted the restore, the restore's settings stand (PLUG-48);
-  if it refused it, the window's choice still plays, and its settings are
-  reported as edits, with the project marked changed, when that outcome
+  if it refused it, the window's choice still plays (unless an accepted
+  restore answered since replaced it), and its settings are reported as
+  edits, with the project marked changed, when that outcome
   arrives (`followed refused`); a Gain or Mix set after the choice is
   reported with the value it was set to, which the refused state replaced
   in the controller. The status after a restore also carries the Bypass

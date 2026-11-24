@@ -4975,6 +4975,9 @@ void latest_action_wins() {
         {"a host preset, then Gain", "RG", .5f, 512, GainMode::set, -3},
         {"Gain, then a refused host preset", "GX", 1, 4096, GainMode::set, -3},
         {"a window preset, Gain, then a host preset", "WGR", .5f, 512},
+        {"Codex's review: a window preset, Gain, a host preset, then a refused one", "WGRX", .5f,
+         512},
+        {"a window preset, Mix, a host preset, then a refused one", "WKRX", .5f, 512},
         {"a window preset, then Mix", "WK", .125f, 2048, GainMode::set, 0, .25},
         {"Mix, then a window preset", "KW", .125f, 2048},
         {"a window preset, Mix, then a refused host preset", "WKX", .125f, 2048, GainMode::set, 0,
@@ -5083,7 +5086,8 @@ void latest_action_wins() {
                     // preset; the controller cannot tell that the processor's restore
                     // came first, and the host passes the edit to process() after the
                     // restore, so it plays, shows and saves (the contract's VST3-24
-                    // paragraph). Cleared by a later action that sets Gain or Mix.
+                    // paragraph). Cleared by a later action that sets Gain or Mix (a
+                    // refused restore changes nothing).
                     std::optional<ParamValue> split_gain, split_mix;
                     std::vector<std::size_t> latency_read;
                     // Order 2: a host that delivers the queued messages between its
@@ -5155,7 +5159,7 @@ void latest_action_wins() {
                         }
                         edits_before = handler.edits.size();
                         reads_before = latency_read.size();
-                        if (actions[i] != 'L' && actions[i] != 'M' && actions[i] != 'B')
+                        if (std::string_view("WwFGKRQ").find(actions[i]) != std::string_view::npos)
                             split_gain = split_mix = std::nullopt;
                         if (i == chosen_last) {
                             dirty_at_choice = handler.dirty;
