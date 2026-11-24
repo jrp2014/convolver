@@ -376,6 +376,30 @@ void restore_short_of_memory() {
     // Each step on standard error as it starts, so a timeout shows where.
     std::cerr << "VST3 short of memory: reading the state takes " << read
               << " allocations; finding a whole restore's" << std::endl;
+    // Diagnostic: whether a function's static whose initialization ran out of
+    // memory can be built later, or waits for ever (MSVC?).
+    {
+        static std::atomic<bool> built{false};
+        const auto probe = []() -> const convolver::Advice& {
+            static const convolver::Advice a{
+                "a text long enough to need the heap, twice over", {}, {}, {}};
+            return a;
+        };
+        {
+            guard::Starve starve(0);
+            try {
+                probe();
+            } catch (const std::bad_alloc&) {
+            }
+        }
+        std::thread([probe] {
+            probe();
+            built = true;
+        }).detach();
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+        std::cerr << "VST3 short of memory: a static whose initialization ran out of memory "
+                  << (built ? "is built later" : "waits") << std::endl;
+    }
     // Diagnostic: the shared HostFilter's load alone, as the processor calls
     // it, with memory running out after each allocation in turn.
     for (std::size_t allowed = 0; allowed < 500; ++allowed) {

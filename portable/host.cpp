@@ -151,13 +151,19 @@ Advice preparation_message(const std::string& what) {
             {}};
 }
 
+// Built when the library loads, not at its first use: a failure recorded
+// without a message is explained when memory has run out, and a function's
+// static built then fails with it. MSVC then left that static marked as
+// being built, so the next explanation waited for ever under the
+// processor's lock (VST3-20, a VST3 restore on Windows).
+const Advice unrecorded_failure{
+    "the load failed, and memory ran out before Convolver could record why",
+    "Memory had run out.",
+    "Close other projects or programs, then load the filter again.",
+    {}};
+
 const Advice& failure_message(const HostFailure& f) {
-    static const Advice unrecorded{
-        "the load failed, and memory ran out before Convolver could record why",
-        "Memory had run out.",
-        "Close other projects or programs, then load the filter again.",
-        {}};
-    return f.message.empty() ? unrecorded : f.message;
+    return f.message.empty() ? unrecorded_failure : f.message;
 }
 
 std::string settings_now_known(const HostLayout& host) {
