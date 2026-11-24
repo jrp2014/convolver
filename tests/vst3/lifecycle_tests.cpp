@@ -290,7 +290,7 @@ void restore_short_of_memory() {
     // the state, so the first `read` of a restore's allocations are the
     // read's; one that allocated earlier would need `read` counted again.
     const auto needed = [](auto&& attempt) {
-        for (std::size_t allowed = 0; allowed < 100000; ++allowed)
+        for (std::size_t allowed = 0; allowed < 2000; ++allowed)
             if (attempt(allowed))
                 return allowed;
         throw std::runtime_error("VST3 short of memory: never succeeded");
@@ -308,7 +308,11 @@ void restore_short_of_memory() {
     // Each step on standard error as it starts, so a timeout shows where.
     std::cerr << "VST3 short of memory: reading the state takes " << read
               << " allocations; finding a whole restore's" << std::endl;
-    const auto whole = needed([&](std::size_t allowed) { return restore(allowed, false); });
+    const auto whole = needed([&](std::size_t allowed) {
+        std::cerr << ' ' << allowed << std::flush;
+        return restore(allowed, false);
+    });
+    std::cerr << std::endl;
     check(whole > read, "short of memory: a restore allocating after the read");
     std::cerr << "VST3 short of memory: a restore takes " << whole
               << "; memory runs out once at allocation";
