@@ -204,11 +204,13 @@ class RestoreFollow {
         accepted_ = 0;
     }
     // After installed(), a restore of this state was accepted with these
-    // settings. Or a restore of this state (0: unreadable) was refused.
+    // settings. Or a restore of this state (0: unreadable) was refused: the
+    // last attempt, which answers its own request, while the last accepted
+    // restore still owns the filter that plays and its settings (jrp's
+    // review of PR #279 at 13a6e1a).
     void accepted(std::uint64_t digest, const HostSettings& restored) noexcept;
     void refused(std::uint64_t digest) noexcept {
         refused_ = digest;
-        accepted_ = 0;
     }
     // The controller's report request named `follow` (0: none), with its
     // Latency and Gain mode request numbers when it mirrored that state.
@@ -236,9 +238,9 @@ class RestoreFollow {
     std::uint64_t mirrored_ = 0; // The last report request's state.
     bool answer_ = false, restored_after_mirror_ = false, latency_restored_ = false;
     Steinberg::int64 heard_latency_ = 0, heard_gain_mode_ = 0;
-    // The newest restore, if it was accepted and nothing has installed
-    // since: its digest (0: none), its Latency and Gain mode, and the
-    // numbers heard then.
+    // The last accepted restore, while nothing else has installed since (a
+    // refused restore installs nothing): its digest (0: none), its Latency
+    // and Gain mode, and the numbers heard then.
     std::uint64_t accepted_ = 0;
     std::size_t accepted_latency_ = default_host_latency;
     GainMode accepted_gain_mode_ = GainMode::set;

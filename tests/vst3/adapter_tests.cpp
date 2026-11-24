@@ -4714,13 +4714,19 @@ void accepted_restore_beats_queued_edit() {
 //    second's comparison (the independent review).
 // 4. A deferring host restores P twice, then the user chooses 256 and the
 //    host restores P a third time.
+// 5. A deferring host: the user chooses 256, the host restores P (512),
+//    then a 44.1 kHz preset, which the processor refuses. The refusal
+//    leaves P playing, so P's 512 wins over the earlier choice (jrp's
+//    review of PR #279 at 13a6e1a: everything ended at 256).
+// Each checks the action that should win: the filter the processor saves,
+// as well as the Latency shown, played and saved.
 void accepted_restore_follows_its_own_request() {
     const auto folder = private_temp("convolver-vst3-own-request");
     std::filesystem::create_directories(folder);
     const auto room = folder / "room.wav";
     write_wav(room, 48000, 1, 8);
     for (const bool controller_first : {false, true})
-        for (const int sequence : {1, 2, 3, 4}) {
+        for (const int sequence : {1, 2, 3, 4, 5}) {
             if (sequence == 2 && !controller_first)
                 continue;
             const bool defer = sequence != 2;
@@ -4779,6 +4785,7 @@ void accepted_restore_follows_its_own_request() {
                 deliver();
             };
             std::size_t expected = 0;
+            float expected_tap = .75f; // P, or preset 2; sequence 2 plays room.wav.
             if (sequence == 1) {
                 auto first = state_with(48000, .5f, 1024);
                 check(restore(*first) == kResultOk, "the first filter");
@@ -4789,7 +4796,7 @@ void accepted_restore_follows_its_own_request() {
                 c.setParamNormalized(latency_id, normalized_latency(256));
                 check(restore(*two) == kResultOk, "preset 2");
                 expected = 512;
-            } else if (sequence >= 3) {
+            } else if (sequence == 3 || sequence == 4) {
                 auto first = state_with(48000, .5f, 1024);
                 check(restore(*first) == kResultOk, "the first filter");
                 deliver();
@@ -4803,6 +4810,16 @@ void accepted_restore_follows_its_own_request() {
                 c.setParamNormalized(latency_id, normalized_latency(256));
                 check(restore(*preset) == kResultOk, "preset P once more");
                 expected = 512;
+            } else if (sequence == 5) {
+                auto first = state_with(48000, .5f, 1024);
+                check(restore(*first) == kResultOk, "the first filter");
+                deliver();
+                activate();
+                c.setParamNormalized(latency_id, normalized_latency(256));
+                auto preset = state_with(48000, .75f, 512), other = state_with(44100, .25f, 0);
+                check(restore(*preset) == kResultOk, "preset P");
+                check(restore(*other) != kResultOk, "the 44.1 kHz preset was accepted");
+                expected = 512;
             } else {
                 auto a = state_with(44100, .5f, 512);
                 check(restore(*a) == kResultOk, "preset A was refused before the host played");
@@ -4813,6 +4830,7 @@ void accepted_restore_follows_its_own_request() {
                       "the chosen file");
                 check(restore(*a) != kResultOk, "preset A was accepted at 48 kHz");
                 expected = 256;
+                expected_tap = 0;
             }
             deliver();
             c.report();
@@ -4821,13 +4839,20 @@ void accepted_restore_follows_its_own_request() {
             MemoryStream saved_stream;
             check(p.getState(&saved_stream) == kResultOk, "getState");
             saved_stream.seek(0, IBStream::kIBSeekSet, nullptr);
-            const auto saved =
-                read_state(&saved_stream).settings.value_or(convolver::HostSettings{});
+            const auto saved_state = read_state(&saved_stream);
+            const auto saved = saved_state.settings.value_or(convolver::HostSettings{});
             check(shown == expected && p.getLatencySamples() == expected &&
                       saved.latency == expected,
                   "shown " + std::to_string(shown) + ", playing " +
                       std::to_string(p.getLatencySamples()) + ", saved " +
                       std::to_string(saved.latency) + ", expected " + std::to_string(expected));
+            // The filter of the action that should win is the one saved.
+            if (expected_tap != 0) {
+                const auto& config = saved_state.configuration;
+                check(config && config->paths.size() == 1 &&
+                          config->paths.front().impulse == std::vector<float>{expected_tap},
+                      "the saved filter is not the preset that should win");
+            }
             p.setActive(false);
             p.disconnect(&to_controller);
             c.disconnect(&to_processor);

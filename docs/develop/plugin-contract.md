@@ -1277,10 +1277,11 @@ the plan's Gain modes (12 November 2026); its meters follow later
   accepted and nothing else has installed since (`RestoreFollow` in
   `processor.hpp`): a request for an older state, delivered late, leaves it
   for its own request; each request for the same state, sent again,
-  compares with the choices numbered before it; and any later install, a
+  compares with the choices numbered before it; any later install, a
   chosen file included, clears it, so a later refused restore of the same
-  state cannot bring its settings back (jrp's review of PR #279,
-  `accepted_restore_follows_its_own_request`).
+  state cannot bring its settings back; and a refused restore of another
+  state leaves it, since the accepted restore still plays (jrp's reviews
+  of PR #279, `accepted_restore_follows_its_own_request`).
 
 ## Channel layouts
 
