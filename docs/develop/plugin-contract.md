@@ -1258,11 +1258,16 @@ the plan's Gain modes (12 November 2026); its meters follow later
   that accepted that state and then played a choice numbered at or below
   them plays the state's setting again, and its status says so
   (`latency restored`), so the controller asks the host to read the
-  latency again. A host that gives the controller the state first is
-  asked to read it when `setComponentState` changes it, perhaps before
-  the processor has restored; the status after the processor's own
-  restore (`restored after mirror`) asks again (`vst3.adapter`
-  `accepted_restore_beats_queued_edit`).
+  latency again. A processor that accepted the state answers that request
+  too. `setComponentState` asks the host to read a changed latency, which
+  is before the processor restores when the host gives the controller the
+  state first; the controller asks again when the status says the outcome
+  came from the processor's own restore (`restored after mirror`), or when
+  the answer arrives after its request was sent rather than during it (a
+  host that delivers messages later may have restored the processor in
+  between; with one that restores the processor first this is one extra
+  read). Restoring the same state again in the SDK's order asks nothing
+  more (`vst3.adapter` `accepted_restore_beats_queued_edit`).
 
 ## Channel layouts
 

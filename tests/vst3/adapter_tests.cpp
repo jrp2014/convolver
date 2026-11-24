@@ -4662,6 +4662,31 @@ void accepted_restore_beats_queued_edit() {
             check(latency_at_restart.empty() || latency_at_restart.back() == 512,
                   "the host last read Latency " +
                       std::to_string(latency_at_restart.empty() ? 0 : latency_at_restart.back()));
+            // The same preset again (Audacity hands its state back at every
+            // playback start): nothing to read again in the SDK's order with
+            // a direct connection (the independent review).
+            latency_at_restart.clear();
+            check(restore(*preset) == kResultOk, "the preset again");
+            deliver();
+            c.report();
+            deliver();
+            check(defer || controller_first || latency_at_restart.empty(),
+                  "the same preset again asked the host to read the latency " +
+                      std::to_string(latency_at_restart.size()) + " times");
+            // Another preset with no choice before it: in every order the
+            // host last reads the latency that plays.
+            latency_at_restart.clear();
+            auto longer = state_with(1024);
+            check(restore(*longer) == kResultOk, "the 1024 preset");
+            deliver();
+            c.report();
+            deliver();
+            check(!latency_at_restart.empty() && latency_at_restart.back() == 1024 &&
+                      p.getLatencySamples() == 1024 &&
+                      latency_frames(c.getParamNormalized(latency_id)) == 1024,
+                  "after a 1024 preset the host last read Latency " +
+                      std::to_string(latency_at_restart.empty() ? 0 : latency_at_restart.back()) +
+                      " while " + std::to_string(p.getLatencySamples()) + " plays");
             handler.on_restart = nullptr;
             p.setActive(false);
             p.disconnect(&to_controller);

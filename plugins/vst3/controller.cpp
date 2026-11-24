@@ -256,7 +256,13 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
             keep |= setting_bit(latency_id);
         if (gain_mode_requests_ > std::max<int64>(heard_gain_mode, gain_mode_at_restore_))
             keep |= setting_bit(gain_mode_id);
-        if (followed && (latency_restored || (restored_after_mirror && restart_at_restore_)))
+        // VST3-19: setComponentState asked the host to read a changed
+        // latency. That was before the processor restored the state if the
+        // outcome came from the processor's own restore, or if this answer
+        // arrives later than the request's own delivery (a host that
+        // delivers messages later may have restored the processor between).
+        if (followed && (latency_restored ||
+                         (restart_at_restore_ && (restored_after_mirror || !sending_follow_))))
             restart = true;
         if (followed)
             restart_at_restore_ = false;
@@ -579,6 +585,7 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
         latency_at_restore_ = latency_requests_;
         gain_mode_at_restore_ = gain_mode_requests_;
         restart_at_restore_ = latency_changed;
+        sending_follow_ = true;
         latency_before = latency_at_restore_;
         gain_mode_before = gain_mode_at_restore_;
     }
@@ -590,6 +597,10 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
             attributes->setInt("gain mode requests", gain_mode_before);
         }
         sendMessage(message);
+    }
+    {
+        std::lock_guard lock(status_lock_);
+        sending_follow_ = false;
     }
     return result;
 }

@@ -91,9 +91,10 @@ inline constexpr const char* report_message = "ConvolverReport";
 // already includes. VST3-19: the report_message also carries the
 // controller's "latency requests" and "gain mode requests" when it mirrored
 // the state; a processor that accepted that state and then played a choice
-// sent before it plays the state's setting again, and its status says
-// "latency restored" when that changed the Latency, and "restored after
-// mirror" when the outcome came from its own restore.
+// sent before it plays the state's setting again. Its status answers that
+// request (also with nothing to revert), and says "latency restored" when
+// that changed the Latency, and "restored after mirror" when the outcome
+// came from its own restore.
 struct StatusAnswer {
     Steinberg::int64 load_request = 0;
     bool retried = false;
@@ -524,5 +525,9 @@ class Controller final : public Steinberg::Vst::EditController,
     // state (the controller first); the status after the processor's own
     // restore asks again.
     bool restart_at_restore_ = false;
+    // VST3-19, under status_lock_: setComponentState is sending its report
+    // request; an answer that arrives meanwhile came through a direct or
+    // forwarding connection.
+    bool sending_follow_ = false;
 };
 } // namespace convolver::vst3

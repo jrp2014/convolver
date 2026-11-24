@@ -568,20 +568,22 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
                 // controller chose before it mirrored the state (a host that
                 // delivers messages later), and played it. The restore is
                 // newer: play its setting again, and say so, so the host
-                // reads the latency once more.
+                // reads the latency once more. Answered either way, so the
+                // controller knows the outcome came before its request.
                 else if (accepted_state_ == mirrored_state_) {
+                    answer_mirrored_ = true;
                     if (heard_latency_request_ > latency_heard_at_accept_ &&
                         heard_latency_request_ <= latency_before &&
                         settings().latency != accepted_latency_) {
                         choose_latency(accepted_latency_);
                         latency_restored_ = true;
-                        reverted = answer_mirrored_ = true;
+                        reverted = true;
                     }
                     if (heard_gain_mode_request_ > gain_mode_heard_at_accept_ &&
                         heard_gain_mode_request_ <= gain_mode_before &&
                         settings().gain_mode != accepted_gain_mode_) {
                         choose_gain_mode(accepted_gain_mode_);
-                        reverted = answer_mirrored_ = true;
+                        reverted = true;
                     }
                 }
                 accepted_state_ = 0; // Answered: later requests name newer states.
