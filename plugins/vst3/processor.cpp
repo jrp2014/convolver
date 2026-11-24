@@ -17,6 +17,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -61,13 +62,22 @@ HostState read_state(IBStream* stream, std::uint64_t* digest) {
         throw std::invalid_argument("truncated state");
     auto state = decode_host_state(bytes);
     if (digest) {
-        // VST3-20: FNV-1a over the bytes as read, which both halves read
-        // from the same stream. It allocates nothing and cannot throw.
-        std::uint64_t h = 14695981039346656037ull;
-        for (const auto b : bytes) {
-            h ^= static_cast<std::uint64_t>(b);
-            h *= 1099511628211ull;
+        // VST3-20: FNV-1a's steps eight bytes at a time over the bytes as
+        // read, which both halves read from the same stream; a final mix
+        // spreads the last words' bits. It allocates nothing and cannot
+        // throw, and is never saved, so byte order does not matter.
+        std::uint64_t h = 14695981039346656037ull ^ size;
+        std::size_t i = 0;
+        for (; i + 8 <= bytes.size(); i += 8) {
+            std::uint64_t word;
+            std::memcpy(&word, bytes.data() + i, 8);
+            h = (h ^ word) * 1099511628211ull;
         }
+        for (; i < bytes.size(); ++i)
+            h = (h ^ static_cast<std::uint64_t>(bytes[i])) * 1099511628211ull;
+        h ^= h >> 33;
+        h *= 0xff51afd7ed558ccdull;
+        h ^= h >> 33;
         *digest = h ? h : 1;
     }
     return state;
@@ -770,20 +780,24 @@ tresult Processor::load_state(IBStream* stream) {
     observe_faults(); // Explained under the filter that played; an accepted load clears them.
     std::uint64_t digest = 0;
     try {
-        HostState next;
-        try {
-            next = read_state(stream, &digest);
-            // PLUG-48: the controller mirrored this state; the status that
-            // follows says what plays after this restore, accepted or not.
-            if (digest == mirrored_state_)
-                answer_mirrored_ = true;
-        } catch (const NewerHostState& e) {
-            filter_.reject(HostFailureKind::state_newer, state_read_message(e));
-            throw;
-        } catch (const std::exception& e) {
-            filter_.reject(HostFailureKind::state_unreadable, state_read_message(e));
-            throw;
-        }
+        // Only reading the state counts as unreadable: `next` is built from
+        // what read_state() returns, with no move that a debug library's
+        // allocation could fail in that catch (VST3-20).
+        HostState next = [&] {
+            try {
+                return read_state(stream, &digest);
+            } catch (const NewerHostState& e) {
+                filter_.reject(HostFailureKind::state_newer, state_read_message(e));
+                throw;
+            } catch (const std::exception& e) {
+                filter_.reject(HostFailureKind::state_unreadable, state_read_message(e));
+                throw;
+            }
+        }();
+        // PLUG-48: the controller mirrored this state; the status that
+        // follows says what plays after this restore, accepted or not.
+        if (digest == mirrored_state_)
+            answer_mirrored_ = true;
         // VST3-4: restored state without settings (an older state, or a
         // preset from convolver-preset) restores the defaults.
         if (!next.settings)

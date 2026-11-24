@@ -286,6 +286,9 @@ void restore_short_of_memory() {
         return accepted;
     };
     // The allocations reading the state makes, and those a restore makes.
+    // An inactive processor allocates nothing in setState before it reads
+    // the state, so the first `read` of a restore's allocations are the
+    // read's; one that allocated earlier would need `read` counted again.
     const auto needed = [](auto&& attempt) {
         for (std::size_t allowed = 0; allowed < 100000; ++allowed)
             if (attempt(allowed))
@@ -303,7 +306,7 @@ void restore_short_of_memory() {
         }
     });
     const auto whole = needed([&](std::size_t allowed) { return restore(allowed, false); });
-    check(whole > read, "short of memory: a restore allocates only while reading");
+    check(whole > read, "short of memory: a restore allocating after the read");
     for (std::size_t allowed = read; allowed < whole; ++allowed) {
         std::optional<convolver::HostFailure> failure;
         if (restore(allowed, true, &failure) || !failure)

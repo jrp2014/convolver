@@ -167,8 +167,8 @@ std::uint32_t wav_speakers(Steinberg::Vst::SpeakerArrangement) noexcept;
 // Reads restored state. With `digest`, also sets it to PLUG-48's digest of
 // the state (never 0), which the processor and the controller compute alike
 // for the same stream, so the controller knows which state a refusal was of.
-// VST3-20: it hashes the bytes read, so it copies nothing and cannot run out
-// of memory.
+// VST3-20: it hashes the bytes read, which copies nothing and cannot fail,
+// so memory running short after the read cannot make the state unreadable.
 HostState read_state(Steinberg::IBStream*, std::uint64_t* digest = nullptr);
 bool write_state(Steinberg::IBStream*, const HostState&);
 class Processor final : public Steinberg::Vst::AudioEffect {
