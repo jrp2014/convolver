@@ -40,8 +40,6 @@ class Pause {
 // std::bad_alloc (nothrow forms return null), as when memory runs out; with
 // `once`, only the next one fails and memory then returns. A Pause exempts
 // host code, as it does from counting.
-// How many allocations a Starve has refused, on any thread, since the start.
-std::size_t refused_allocations() noexcept;
 class Starve {
   public:
     explicit Starve(std::size_t allowed, bool once = false) noexcept;

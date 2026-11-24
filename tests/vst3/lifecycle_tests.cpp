@@ -5,26 +5,18 @@
 #include "../plugins/audio_guard.hpp"
 #include "../plugins/lifecycle.hpp"
 #include "../plugins/load_timing.hpp"
-#include "convolver/engine.hpp"
-#include "host_log.hpp"
 #include "processor.hpp"
 #include "public.sdk/source/common/memorystream.h"
 #include "public.sdk/source/vst/hosting/hostclasses.h"
 #include "public.sdk/source/vst/hosting/parameterchanges.h"
 #include <array>
-#include <atomic>
-#include <chrono>
-#include <cstdlib>
 #include <cstring>
-#include <exception>
-#include <functional>
 #include <iostream>
 #include <memory>
 #include <new>
 #include <optional>
 #include <stdexcept>
 #include <string>
-#include <thread>
 #include <vector>
 
 using namespace Steinberg;
@@ -263,7 +255,10 @@ class Vst3 final : public lc::Driver {
 // after the read, and memory running out there refused the state as "the
 // saved project or preset could not be read: std::bad_alloc". Memory runs
 // out once at each allocation from the end of the read to the end of a
-// restore that succeeds; a refusal for that names another cause.
+// restore that succeeds; a refusal for that names another cause. Each
+// attempt must also finish: on Windows, the first allocation after the read
+// once left the next attempt waiting for ever under the processor's lock
+// (the test then times out).
 void restore_short_of_memory() {
     convolver::HostState state;
     convolver::Configuration x{48000, 1, 1, 0, {}, {}, {}};
@@ -273,65 +268,10 @@ void restore_short_of_memory() {
     MemoryStream stream;
     check(convolver::vst3::write_state(&stream, state), "short of memory: encode");
     HostApplication context;
-    // Diagnostic: an attempt that waits 20 s says so and exits.
-    std::atomic<int> progress{0};
-    std::atomic<bool> finished{false};
-    std::atomic<convolver::vst3::Processor*> current{nullptr};
-    // Whether `op`, on a thread of its own, returns within a second: one that
-    // does not waits on a lock the stuck attempt holds.
-    const auto returns = [](const char* what, std::function<void()> op) {
-        auto done = std::make_shared<std::atomic<bool>>(false);
-        std::thread([op, done] {
-            op();
-            *done = true;
-        }).detach();
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        std::cerr << "  " << what << (*done ? " returned" : " waits") << std::endl;
-    };
-    std::thread watchdog([&] {
-        int seen = -1;
-        auto since = std::chrono::steady_clock::now();
-        while (!finished.load()) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
-            if (const int now = progress.load(); now != seen) {
-                seen = now;
-                since = std::chrono::steady_clock::now();
-            } else if (std::chrono::steady_clock::now() - since > std::chrono::seconds(20)) {
-                const auto before = guard::refused_allocations();
-                std::this_thread::sleep_for(std::chrono::seconds(1));
-                std::cerr << "VST3 short of memory: an attempt has waited 20 s; allocations "
-                             "refused so far "
-                          << before << ", a second later " << guard::refused_allocations()
-                          << std::endl;
-                if (auto* stuck = current.load())
-                    returns("the processor's control lock (failure())",
-                            [stuck] { static_cast<void>(stuck->failure()); });
-                returns("the log file's lock (host_log)",
-                        [] { convolver::host_log("VST3 test", "watchdog probe", false); });
-                if (convolver::fft_supports_wisdom())
-                    returns("FFTW's planner lock (export_fft_wisdom)",
-                            [] { static_cast<void>(convolver::export_fft_wisdom()); });
-                std::_Exit(4);
-            }
-        }
-    });
-    struct Join {
-        std::atomic<bool>& finished;
-        std::thread& watchdog;
-        ~Join() {
-            finished = true;
-            watchdog.join();
-        }
-    } join{finished, watchdog};
     // A fresh, inactive processor for each attempt, so each starts alike;
     // memory runs out after `allowed` allocations, once or from then on.
     const auto restore = [&](std::size_t allowed, bool once,
                              std::optional<convolver::HostFailure>* failure = nullptr) {
-        const auto step = [&](const char* what) {
-            ++progress;
-            std::cerr << "  " << allowed << (once ? " once: " : ": ") << what << std::endl;
-        };
-        step("initialize");
         convolver::vst3::Processor p;
         SpeakerArrangement mono = SpeakerArr::kMono;
         check(p.initialize(&context) == kResultOk &&
@@ -339,17 +279,12 @@ void restore_short_of_memory() {
               "short of memory: initialize");
         stream.seek(0, IBStream::kIBSeekSet, nullptr);
         bool accepted = false;
-        step("setState");
-        current = &p;
         {
             guard::Starve starve(allowed, once);
             accepted = p.setState(&stream) == kResultOk;
         }
-        current = nullptr;
-        step(accepted ? "accepted; failure" : "refused; failure");
         if (failure)
             *failure = p.failure();
-        step("terminate");
         p.terminate();
         return accepted;
     };
@@ -358,7 +293,7 @@ void restore_short_of_memory() {
     // the state, so the first `read` of a restore's allocations are the
     // read's; one that allocated earlier would need `read` counted again.
     const auto needed = [](auto&& attempt) {
-        for (std::size_t allowed = 0; allowed < 2000; ++allowed)
+        for (std::size_t allowed = 0; allowed < 100000; ++allowed)
             if (attempt(allowed))
                 return allowed;
         throw std::runtime_error("VST3 short of memory: never succeeded");
@@ -373,59 +308,8 @@ void restore_short_of_memory() {
             return false;
         }
     });
-    // Each step on standard error as it starts, so a timeout shows where.
-    std::cerr << "VST3 short of memory: reading the state takes " << read
-              << " allocations; finding a whole restore's" << std::endl;
-    // Diagnostic: whether a function's static whose initialization ran out of
-    // memory can be built later, or waits for ever (MSVC?).
-    {
-        static std::atomic<bool> built{false};
-        const auto probe = []() -> const convolver::Advice& {
-            static const convolver::Advice a{
-                "a text long enough to need the heap, twice over", {}, {}, {}};
-            return a;
-        };
-        {
-            guard::Starve starve(0);
-            try {
-                probe();
-            } catch (const std::bad_alloc&) {
-            }
-        }
-        std::thread([probe] {
-            probe();
-            built = true;
-        }).detach();
-        std::this_thread::sleep_for(std::chrono::seconds(2));
-        std::cerr << "VST3 short of memory: a static whose initialization ran out of memory "
-                  << (built ? "is built later" : "waits") << std::endl;
-    }
-    // Diagnostic: the shared HostFilter's load alone, as the processor calls
-    // it, with memory running out after each allocation in turn.
-    for (std::size_t allowed = 0; allowed < 500; ++allowed) {
-        convolver::HostFilter filter{8};
-        auto copy = state;
-        copy.settings.emplace();
-        convolver::HostRequest request;
-        request.kind = convolver::HostRequestKind::restore;
-        ++progress;
-        std::cerr << "  HostFilter::load " << allowed << std::endl;
-        bool loaded = false;
-        {
-            guard::Starve starve(allowed);
-            try {
-                filter.load(std::move(copy), std::nullopt, {}, request, nullptr,
-                            convolver::HostLoadCheck::keep_until_suited);
-                loaded = true;
-            } catch (...) {
-            }
-        }
-        if (loaded)
-            break;
-    }
     const auto whole = needed([&](std::size_t allowed) { return restore(allowed, false); });
     check(whole > read, "short of memory: a restore allocating after the read");
-    std::cerr << "VST3 short of memory: a restore takes " << whole << std::endl;
     for (std::size_t allowed = read; allowed < whole; ++allowed) {
         std::optional<convolver::HostFailure> failure;
         if (restore(allowed, true, &failure) || !failure)
@@ -459,21 +343,6 @@ int load_timing(int argc, char** argv) {
 } // namespace
 
 int main(int argc, char** argv) {
-    // An exception leaving a noexcept function says so and exits at once,
-    // rather than waiting on Windows' error report until CTest's timeout.
-    std::set_terminate([] {
-        std::cerr << "VST3 lifecycle: std::terminate";
-        if (const auto e = std::current_exception()) {
-            try {
-                std::rethrow_exception(e);
-            } catch (const std::exception& x) {
-                std::cerr << ": " << x.what();
-            } catch (...) {
-            }
-        }
-        std::cerr << std::endl;
-        std::_Exit(3);
-    });
     try {
         if (argc > 1 && std::strcmp(argv[1], "--load-timing") == 0)
             return load_timing(argc, argv);
