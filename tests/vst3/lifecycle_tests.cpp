@@ -10,13 +10,18 @@
 #include "public.sdk/source/vst/hosting/hostclasses.h"
 #include "public.sdk/source/vst/hosting/parameterchanges.h"
 #include <array>
+#include <atomic>
+#include <chrono>
+#include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <iostream>
 #include <memory>
 #include <new>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 using namespace Steinberg;
@@ -265,11 +270,37 @@ void restore_short_of_memory() {
     MemoryStream stream;
     check(convolver::vst3::write_state(&stream, state), "short of memory: encode");
     HostApplication context;
+    // Diagnostic: an attempt that waits 20 s says so and exits.
+    std::atomic<int> progress{0};
+    std::atomic<bool> finished{false};
+    std::thread watchdog([&] {
+        int seen = -1;
+        auto since = std::chrono::steady_clock::now();
+        while (!finished.load()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            if (const int now = progress.load(); now != seen) {
+                seen = now;
+                since = std::chrono::steady_clock::now();
+            } else if (std::chrono::steady_clock::now() - since > std::chrono::seconds(20)) {
+                std::cerr << "VST3 short of memory: an attempt has waited 20 s" << std::endl;
+                std::_Exit(4);
+            }
+        }
+    });
+    struct Join {
+        std::atomic<bool>& finished;
+        std::thread& watchdog;
+        ~Join() {
+            finished = true;
+            watchdog.join();
+        }
+    } join{finished, watchdog};
     // A fresh, inactive processor for each attempt, so each starts alike;
     // memory runs out after `allowed` allocations, once or from then on.
     const auto restore = [&](std::size_t allowed, bool once,
                              std::optional<convolver::HostFailure>* failure = nullptr) {
         const auto step = [&](const char* what) {
+            ++progress;
             std::cerr << "  " << allowed << (once ? " once: " : ": ") << what << std::endl;
         };
         step("initialize");
@@ -351,6 +382,21 @@ int load_timing(int argc, char** argv) {
 } // namespace
 
 int main(int argc, char** argv) {
+    // An exception leaving a noexcept function says so and exits at once,
+    // rather than waiting on Windows' error report until CTest's timeout.
+    std::set_terminate([] {
+        std::cerr << "VST3 lifecycle: std::terminate";
+        if (const auto e = std::current_exception()) {
+            try {
+                std::rethrow_exception(e);
+            } catch (const std::exception& x) {
+                std::cerr << ": " << x.what();
+            } catch (...) {
+            }
+        }
+        std::cerr << std::endl;
+        std::_Exit(3);
+    });
     try {
         if (argc > 1 && std::strcmp(argv[1], "--load-timing") == 0)
             return load_timing(argc, argv);
