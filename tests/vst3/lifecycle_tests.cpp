@@ -376,6 +376,29 @@ void restore_short_of_memory() {
     // Each step on standard error as it starts, so a timeout shows where.
     std::cerr << "VST3 short of memory: reading the state takes " << read
               << " allocations; finding a whole restore's" << std::endl;
+    // Diagnostic: the shared HostFilter's load alone, as the processor calls
+    // it, with memory running out after each allocation in turn.
+    for (std::size_t allowed = 0; allowed < 500; ++allowed) {
+        convolver::HostFilter filter{8};
+        auto copy = state;
+        copy.settings.emplace();
+        convolver::HostRequest request;
+        request.kind = convolver::HostRequestKind::restore;
+        ++progress;
+        std::cerr << "  HostFilter::load " << allowed << std::endl;
+        bool loaded = false;
+        {
+            guard::Starve starve(allowed);
+            try {
+                filter.load(std::move(copy), std::nullopt, {}, request, nullptr,
+                            convolver::HostLoadCheck::keep_until_suited);
+                loaded = true;
+            } catch (...) {
+            }
+        }
+        if (loaded)
+            break;
+    }
     const auto whole = needed([&](std::size_t allowed) { return restore(allowed, false); });
     check(whole > read, "short of memory: a restore allocating after the read");
     std::cerr << "VST3 short of memory: a restore takes " << whole << std::endl;
