@@ -13,8 +13,11 @@
 #include <cstring>
 #include <iostream>
 #include <memory>
+#include <new>
 #include <optional>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 using namespace Steinberg;
 using namespace Steinberg::Vst;
@@ -246,6 +249,81 @@ class Vst3 final : public lc::Driver {
     int64 requests_ = 0; // load_file's and set_latency's message numbers.
 };
 
+// VST3-20 (jrp's review of 0.18.14). Contract, loading and failure: a valid
+// saved project or preset is called unreadable only when reading it is what
+// ran out of memory. PLUG-48's digest encoded a second copy of the filter
+// after the read, and memory running out there refused the state as "the
+// saved project or preset could not be read: std::bad_alloc". Memory runs
+// out once at each allocation from the end of the read to the end of a
+// restore that succeeds; a refusal for that names another cause. Each
+// attempt must also finish: on Windows, the first allocation after the read
+// once left the next attempt waiting for ever under the processor's lock
+// (the test then times out).
+void restore_short_of_memory() {
+    convolver::HostState state;
+    convolver::Configuration x{48000, 1, 1, 0, {}, {}, {}};
+    x.paths.push_back({std::vector<float>(4096, 0.f), {{0, 1}}, {{0, 1}}});
+    x.paths[0].impulse[0] = 1;
+    state.configuration = x;
+    MemoryStream stream;
+    check(convolver::vst3::write_state(&stream, state), "short of memory: encode");
+    HostApplication context;
+    // A fresh, inactive processor for each attempt, so each starts alike;
+    // memory runs out after `allowed` allocations, once or from then on.
+    const auto restore = [&](std::size_t allowed, bool once,
+                             std::optional<convolver::HostFailure>* failure = nullptr) {
+        convolver::vst3::Processor p;
+        SpeakerArrangement mono = SpeakerArr::kMono;
+        check(p.initialize(&context) == kResultOk &&
+                  p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk,
+              "short of memory: initialize");
+        stream.seek(0, IBStream::kIBSeekSet, nullptr);
+        bool accepted = false;
+        {
+            guard::Starve starve(allowed, once);
+            accepted = p.setState(&stream) == kResultOk;
+        }
+        if (failure)
+            *failure = p.failure();
+        p.terminate();
+        return accepted;
+    };
+    // The allocations reading the state makes, and those a restore makes.
+    // An inactive processor allocates nothing in setState before it reads
+    // the state, so the first `read` of a restore's allocations are the
+    // read's; one that allocated earlier would need `read` counted again.
+    const auto needed = [](auto&& attempt) {
+        for (std::size_t allowed = 0; allowed < 100000; ++allowed)
+            if (attempt(allowed))
+                return allowed;
+        throw std::runtime_error("VST3 short of memory: never succeeded");
+    };
+    const auto read = needed([&](std::size_t allowed) {
+        stream.seek(0, IBStream::kIBSeekSet, nullptr);
+        guard::Starve starve(allowed);
+        try {
+            convolver::vst3::read_state(&stream);
+            return true;
+        } catch (const std::bad_alloc&) {
+            return false;
+        }
+    });
+    const auto whole = needed([&](std::size_t allowed) { return restore(allowed, false); });
+    check(whole > read, "short of memory: a restore allocating after the read");
+    for (std::size_t allowed = read; allowed < whole; ++allowed) {
+        std::optional<convolver::HostFailure> failure;
+        if (restore(allowed, true, &failure) || !failure)
+            continue;
+        if (failure->kind == convolver::HostFailureKind::state_unreadable ||
+            failure->kind == convolver::HostFailureKind::state_newer)
+            throw std::runtime_error(
+                "VST3 short of memory: a valid state was called unreadable when memory ran out "
+                "at allocation " +
+                std::to_string(allowed) + ", after the " + std::to_string(read) +
+                " reading it makes: " + failure->message.problem);
+    }
+}
+
 // The loading-responsiveness timings (tests/plugins/load_timing.hpp): the
 // host's setState and the window's file, each on the host's thread.
 int load_timing(int argc, char** argv) {
@@ -268,6 +346,7 @@ int main(int argc, char** argv) {
     try {
         if (argc > 1 && std::strcmp(argv[1], "--load-timing") == 0)
             return load_timing(argc, argv);
+        restore_short_of_memory();
         lc::Options options;
         if (argc > 1)
             options.length = std::stoul(argv[1]);

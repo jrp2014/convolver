@@ -1020,6 +1020,10 @@ void Editor::scale_to(double scale) {
             if (s.list && s.control)
                 SendMessageW(s.control, CB_SETMINVISIBLE, s.choices.size(), 0);
         }
+        // VST3-21: Gain mode's value is the note under the Gain row, in the
+        // small type arrange() measures it in, as Mix's note is.
+        if (gain_mode_ != SIZE_MAX)
+            font(settings_[gain_mode_].value, small_);
         for (const auto& row : audio_) {
             font(row.label, body_);
             font(row.value, body_);

@@ -4588,10 +4588,17 @@ class Damaging final : public IConnectionPoint {
             cut->setMessageID(message->getMessageID());
             auto* to = cut->getAttributes();
             to->setBinary("report", data, size / 2);
-            for (const char* key : {"load request", "accepted", "latency request"}) {
+            for (const char* key : {"load request", "accepted", "latency request", "followed state",
+                                    "playing latency", "playing gain mode", "heard latency request",
+                                    "heard gain mode request"}) {
                 int64 value = 0;
                 if (attributes->getInt(key, value) == kResultOk)
                     to->setInt(key, value);
+            }
+            for (const char* key : {"playing gain", "playing mix"}) {
+                double value = 0;
+                if (attributes->getFloat(key, value) == kResultOk)
+                    to->setFloat(key, value);
             }
             last = to_.notify(cut);
             ++damaged;
@@ -4660,6 +4667,81 @@ void damaged_report_message() {
     c.terminate();
     p.terminate();
     std::filesystem::remove_all(folder);
+}
+// VST3-22 (jrp's review of 0.18.14): a damaged status message that answers
+// a refused preset still sets the parameters to what plays (PLUG-48), but
+// its report says nothing of the status, so the Status parameter keeps the
+// last one a whole report gave. It showed Active after a refusal.
+void damaged_report_keeps_status() {
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk,
+            "damaged status: initialize");
+    Damaging to_controller(c);
+    require(p.connect(&to_controller) == kResultOk && c.connect(&p) == kResultOk,
+            "damaged status: connect");
+    SpeakerArrangement mono = SpeakerArr::kMono;
+    require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "damaged status: buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    const auto state_at = [](int rate, std::size_t latency) {
+        convolver::HostState state;
+        state.configuration =
+            convolver::Configuration{rate, 1, 1, 0, {}, {}, {{{.5f}, {{0, 1}}, {{0, 1}}}}};
+        state.settings.emplace();
+        state.settings->latency = latency;
+        auto stream = std::make_unique<MemoryStream>();
+        require(write_state(stream.get(), state), "damaged status: encode");
+        return stream;
+    };
+    const auto restore = [&](IBStream& stream) {
+        stream.seek(0, IBStream::kIBSeekSet, nullptr);
+        const auto result = p.setState(&stream);
+        stream.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(c.setComponentState(&stream) == kResultOk, "damaged status: the controller's");
+        return result;
+    };
+    const auto status = [&] {
+        return static_cast<convolver::HostStatus>(
+            std::lround(c.getParameterObject(status_id)->toPlain(c.getParamNormalized(status_id))));
+    };
+    const auto shown_latency = [&] { return latency_frames(c.getParamNormalized(latency_id)); };
+    auto playing = state_at(48000, 1024);
+    require(restore(*playing) == kResultOk, "damaged status: the first filter");
+    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "damaged status: activate");
+    play_block(p, 1, 1, 64);
+    require(status() == convolver::HostStatus::active, "damaged status: Active before");
+    // A preset for another rate is refused while the filter plays: Load
+    // failed, and the parameters show the 1024 that plays.
+    auto other_rate = state_at(44100, 0);
+    require(restore(*other_rate) != kResultOk && status() == convolver::HostStatus::load_failed &&
+                shown_latency() == 1024,
+            "damaged status: the first refusal");
+    // Refused again, with every report damaged on its way: the answer still
+    // brings Latency back to 1024 from the preset's 0, and Status still says
+    // the newest request failed.
+    to_controller.damage = true;
+    require(restore(*other_rate) != kResultOk && to_controller.damaged > 0,
+            "damaged status: the second refusal");
+    require(shown_latency() == 1024 && p.getLatencySamples() == 1024,
+            ("damaged status: the parameter shows Latency " + std::to_string(shown_latency()) +
+             " while the processor plays " + std::to_string(p.getLatencySamples()))
+                .c_str());
+    require(status() == convolver::HostStatus::load_failed,
+            ("damaged status: a report that does not decode set Status to " +
+             std::to_string(static_cast<int>(status())))
+                .c_str());
+    to_controller.damage = false;
+    p.setActive(false);
+    p.disconnect(&to_controller);
+    c.disconnect(&p);
+    c.terminate();
+    p.terminate();
 }
 // PLUG-13 (jrp's review of 276c7dc): a filter that fills the saved state at
 // default settings loaded and saved, and after Gain changed to -6 dB
@@ -4844,6 +4926,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"edits_survive_late_answer", edits_survive_late_answer},
         {"edits_before_controller_first_restore", edits_before_controller_first_restore},
         {"damaged_report_message", damaged_report_message},
+        {"damaged_report_keeps_status", damaged_report_keeps_status},
         {"settings_at_state_limit", settings_at_state_limit},
         {"tail_measured_at_output", tail_measured_at_output},
         {"output_silence_flags", output_silence_flags},
