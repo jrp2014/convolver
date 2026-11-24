@@ -1250,6 +1250,19 @@ the plan's Gain modes (12 November 2026); its meters follow later
   to `process()` before restoring the processor, whose restore then
   replaces it. The others still take what plays (`vst3.adapter`
   `edits_survive_late_answer`, `edits_before_controller_first_restore`).
+  VST3-19 (jrp's review of 0.18.14, 24 November 2026): the other way
+  round, a Latency or Gain mode chosen before a restore the processor
+  accepts, delivered after it, played and was saved while the window
+  showed the restored preset's. The report request also carries the
+  controller's request numbers when it mirrored the state; a processor
+  that accepted that state and then played a choice numbered at or below
+  them plays the state's setting again, and its status says so
+  (`latency restored`), so the controller asks the host to read the
+  latency again. A host that gives the controller the state first is
+  asked to read it when `setComponentState` changes it, perhaps before
+  the processor has restored; the status after the processor's own
+  restore (`restored after mirror`) asks again (`vst3.adapter`
+  `accepted_restore_beats_queued_edit`).
 
 ## Channel layouts
 

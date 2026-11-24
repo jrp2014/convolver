@@ -414,6 +414,7 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
         HostSettings playing;
         std::uint64_t followed = 0;
         int64 heard_latency = 0, heard_gain_mode = 0;
+        bool restored_after_mirror = false, latency_restored = false;
         {
             const Locked lock(*this);
             if (settling_.playing()) // PLUG-27: the host plays the filter.
@@ -425,6 +426,10 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
                 followed = mirrored_state_;
             heard_latency = heard_latency_request_;
             heard_gain_mode = heard_gain_mode_request_;
+            if (followed) {
+                restored_after_mirror = std::exchange(restored_after_mirror_, false);
+                latency_restored = std::exchange(latency_restored_, false);
+            }
         }
         if (!getPeer())
             return;
@@ -448,6 +453,14 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
             attributes->setInt("playing gain mode", static_cast<int64>(playing.gain_mode));
             attributes->setInt("heard latency request", heard_latency);
             attributes->setInt("heard gain mode request", heard_gain_mode);
+            // VST3-19: the outcome came from this processor's own restore,
+            // after the controller mirrored the state (the controller asked
+            // the host to read the latency before it played); or the
+            // restore's Latency plays again, over an earlier choice.
+            if (restored_after_mirror)
+                attributes->setInt("restored after mirror", 1);
+            if (latency_restored)
+                attributes->setInt("latency restored", 1);
         }
         if (answer.load_request || answer.retried) {
             if (answer.load_request)
@@ -529,9 +542,15 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
     if (id == report_message) {
         bool faulted = false;
         std::string list;
-        int64 follow = 0;
-        if (auto* attributes = message->getAttributes())
+        int64 follow = 0, latency_before = 0, gain_mode_before = 0;
+        if (auto* attributes = message->getAttributes()) {
             attributes->getInt("follow state", follow);
+            // VST3-19: the controller's last Latency and Gain mode request
+            // numbers when it mirrored that state.
+            attributes->getInt("latency requests", latency_before);
+            attributes->getInt("gain mode requests", gain_mode_before);
+        }
+        bool reverted = false;
         {
             const Locked lock(*this);
             // PLUG-48: the state the controller mirrored. Its status says
@@ -544,6 +563,28 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
                 mirrored_state_ = static_cast<std::uint64_t>(follow);
                 if (refused_state_ == mirrored_state_)
                     answer_mirrored_ = true;
+                // VST3-19 (jrp's review of 0.18.14): this processor accepted
+                // that state, then heard a Latency or Gain mode the
+                // controller chose before it mirrored the state (a host that
+                // delivers messages later), and played it. The restore is
+                // newer: play its setting again, and say so, so the host
+                // reads the latency once more.
+                else if (accepted_state_ == mirrored_state_) {
+                    if (heard_latency_request_ > latency_heard_at_accept_ &&
+                        heard_latency_request_ <= latency_before &&
+                        settings().latency != accepted_latency_) {
+                        choose_latency(accepted_latency_);
+                        latency_restored_ = true;
+                        reverted = answer_mirrored_ = true;
+                    }
+                    if (heard_gain_mode_request_ > gain_mode_heard_at_accept_ &&
+                        heard_gain_mode_request_ <= gain_mode_before &&
+                        settings().gain_mode != accepted_gain_mode_) {
+                        choose_gain_mode(accepted_gain_mode_);
+                        reverted = answer_mirrored_ = true;
+                    }
+                }
+                accepted_state_ = 0; // Answered: later requests name newer states.
             }
             const auto now = std::chrono::steady_clock::now();
             if (now - report_faults_at_ >= report_fault_interval) {
@@ -560,7 +601,7 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
                 } catch (...) { // Out of memory: the refusal's advice stays.
                 }
         }
-        if (faulted)
+        if (faulted || reverted)
             write_log();
         if (!list.empty()) {
             std::optional<HostSettings> settings;
@@ -765,8 +806,10 @@ tresult Processor::load_state(IBStream* stream) {
             digest = state_digest(next);
             // PLUG-48: the controller mirrored this state; the status that
             // follows says what plays after this restore, accepted or not.
-            if (digest == mirrored_state_)
+            if (digest == mirrored_state_) {
                 answer_mirrored_ = true;
+                restored_after_mirror_ = true; // VST3-19.
+            }
         } catch (const NewerHostState& e) {
             filter_.reject(HostFailureKind::state_newer, state_read_message(e));
             throw;
@@ -793,11 +836,21 @@ tresult Processor::load_state(IBStream* stream) {
         if (request.kind == HostRequestKind::restore && filter_.list_waits() &&
             unchanged_state(next))
             return kResultOk;
+        const auto restored = *next.settings;
         install(std::move(next), request);
         refused_state_ = 0;
+        // VST3-19: what this restore set, and the controller's choices heard
+        // by then, so the controller's report request can tell a choice it
+        // sent before this restore that arrived after it.
+        accepted_state_ = digest;
+        accepted_latency_ = restored.latency;
+        accepted_gain_mode_ = restored.gain_mode;
+        latency_heard_at_accept_ = heard_latency_request_;
+        gain_mode_heard_at_accept_ = heard_gain_mode_request_;
         return kResultOk;
     } catch (...) {
         refused_state_ = digest;
+        accepted_state_ = 0;
         refused();
         return kResultFalse;
     }

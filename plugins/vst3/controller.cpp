@@ -184,6 +184,10 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     // VST3-18: the last Latency and Gain mode choices the processor had heard.
     attributes->getInt("heard latency request", heard_latency);
     attributes->getInt("heard gain mode request", heard_gain_mode);
+    // VST3-19: the latency that plays changed since the host last read it.
+    int64 latency_restored = 0, restored_after_mirror = 0;
+    attributes->getInt("latency restored", latency_restored);
+    attributes->getInt("restored after mirror", restored_after_mirror);
     if (followed_state) {
         double gain = 0, mix = 0;
         int64 latency = -1, mode = -1;
@@ -252,6 +256,10 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
             keep |= setting_bit(latency_id);
         if (gain_mode_requests_ > std::max<int64>(heard_gain_mode, gain_mode_at_restore_))
             keep |= setting_bit(gain_mode_id);
+        if (followed && (latency_restored || (restored_after_mirror && restart_at_restore_)))
+            restart = true;
+        if (followed)
+            restart_at_restore_ = false;
     }
     // PLUG-48: after restored state, the settings the processor plays, which
     // differ from the state's when it refused that state. Not edits:
@@ -542,7 +550,8 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
     // host is asked to read it again when it changed.
     const auto before = latency_frames(getParamNormalized(latency_id));
     EditController::setParamNormalized(latency_id, normalized_latency(saved.latency));
-    if (latency_frames(getParamNormalized(latency_id)) != before && componentHandler)
+    const bool latency_changed = latency_frames(getParamNormalized(latency_id)) != before;
+    if (latency_changed && componentHandler)
         componentHandler->restartComponent(kLatencyChanged);
     const auto result = EditController::setParamNormalized(bypass_id, state.bypass ? 1 : 0);
     // PLUG-48 (jrp's live session, 22 November 2026): the processor may
@@ -558,6 +567,7 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
     // answers this message, and the restore that follows corrects it
     // (Codex's review).
     std::uint64_t digest = 0;
+    int64 latency_before = 0, gain_mode_before = 0;
     try {
         digest = state_digest(state);
     } catch (...) { // Out of memory: the parameters keep the state's values.
@@ -568,11 +578,17 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
         edited_since_restore_ = 0;
         latency_at_restore_ = latency_requests_;
         gain_mode_at_restore_ = gain_mode_requests_;
+        restart_at_restore_ = latency_changed;
+        latency_before = latency_at_restore_;
+        gain_mode_before = gain_mode_at_restore_;
     }
     if (auto message = owned(allocateMessage())) {
         message->setMessageID(report_message);
-        if (auto* attributes = message->getAttributes(); attributes && digest)
+        if (auto* attributes = message->getAttributes(); attributes && digest) {
             attributes->setInt("follow state", static_cast<int64>(digest));
+            attributes->setInt("latency requests", latency_before);
+            attributes->setInt("gain mode requests", gain_mode_before);
+        }
         sendMessage(message);
     }
     return result;

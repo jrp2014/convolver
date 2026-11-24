@@ -88,7 +88,12 @@ inline constexpr const char* report_message = "ConvolverReport";
 // numbers of the last latency_message and gain_mode_message the processor
 // had heard ("heard latency request", "heard gain mode request"), so the
 // controller can tell a choice still on its way from one the answer
-// already includes.
+// already includes. VST3-19: the report_message also carries the
+// controller's "latency requests" and "gain mode requests" when it mirrored
+// the state; a processor that accepted that state and then played a choice
+// sent before it plays the state's setting again, and its status says
+// "latency restored" when that changed the Latency, and "restored after
+// mirror" when the outcome came from its own restore.
 struct StatusAnswer {
     Steinberg::int64 load_request = 0;
     bool retried = false;
@@ -377,6 +382,15 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // VST3-18, under the lock: the "request" of the last latency_message and
     // gain_mode_message heard, which a status after a mirrored state carries.
     Steinberg::int64 heard_latency_request_ = 0, heard_gain_mode_request_ = 0;
+    // VST3-19, under the lock: the digest of the state the last restore
+    // accepted (0 once a report request named it, or after a refusal), the
+    // Latency and Gain mode it set, and the request numbers heard then; and
+    // what the next status after a mirrored state says besides.
+    std::uint64_t accepted_state_ = 0;
+    std::size_t accepted_latency_ = default_host_latency;
+    GainMode accepted_gain_mode_ = GainMode::set;
+    Steinberg::int64 latency_heard_at_accept_ = 0, gain_mode_heard_at_accept_ = 0;
+    bool restored_after_mirror_ = false, latency_restored_ = false;
     bool layout_refusal_logged_ = false; // Refused layouts are logged once per instance.
     std::string logged_;                 // The last line log() queued.
     std::vector<std::pair<std::string, bool>> unlogged_; // Lines and whether each is a problem.
@@ -505,5 +519,10 @@ class Controller final : public Steinberg::Vst::EditController,
     // VST3-18, under status_lock_: the last Latency and Gain mode request
     // numbers at that setComponentState; only later choices can keep theirs.
     Steinberg::int64 latency_at_restore_ = 0, gain_mode_at_restore_ = 0;
+    // VST3-19, under status_lock_: that setComponentState asked the host to
+    // read a changed latency, perhaps before the processor restored the
+    // state (the controller first); the status after the processor's own
+    // restore asks again.
+    bool restart_at_restore_ = false;
 };
 } // namespace convolver::vst3

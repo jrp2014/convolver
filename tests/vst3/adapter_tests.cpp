@@ -4562,6 +4562,115 @@ void edits_before_controller_first_restore() {
         p.terminate();
     }
 }
+// VST3-19 (jrp's review of 0.18.14, 24 November 2026): the user chose
+// Latency 256 and No clipping, then the host restored a preset with 512 and
+// Set, which the processor accepted. A host that delivered the choices
+// only after the restore had the processor play and save 256 while the
+// window showed 512. A restore the processor accepts wins over a choice
+// sent before it, in either order of restore, so what plays, what is shown
+// and what is saved agree.
+void accepted_restore_beats_queued_edit() {
+    for (const bool defer : {false, true})
+        for (const bool controller_first : {false, true}) {
+            const std::string how =
+                std::string(defer ? " (deferring proxy" : " (forwarding proxy") +
+                (controller_first ? ", controller first)" : ")");
+            const auto check = [&](bool v, const std::string& what) {
+                if (!v)
+                    throw std::runtime_error("accepted restore: " + what + how);
+            };
+            HostApplication context;
+            Handler handler;
+            Processor p;
+            Controller c;
+            check(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                      c.setComponentHandler(&handler) == kResultOk,
+                  "initialize");
+            Proxy to_controller(c, defer), to_processor(p, defer);
+            check(p.connect(&to_controller) == kResultOk && c.connect(&to_processor) == kResultOk,
+                  "connect");
+            const auto deliver = [&] {
+                while (to_controller.deliver() + to_processor.deliver() > 0) {
+                }
+            };
+            SpeakerArrangement mono = SpeakerArr::kMono;
+            check(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "buses");
+            p.activateBus(kAudio, kInput, 0, true);
+            p.activateBus(kAudio, kOutput, 0, true);
+            const auto state_with = [&](std::size_t latency) {
+                convolver::HostState state;
+                state.configuration =
+                    convolver::Configuration{48000, 1, 1, 0, {}, {}, {{{.5f}, {{0, 1}}, {{0, 1}}}}};
+                state.settings.emplace();
+                state.settings->latency = latency;
+                auto stream = std::make_unique<MemoryStream>();
+                check(write_state(stream.get(), state), "encode");
+                return stream;
+            };
+            const auto restore = [&](IBStream& stream) {
+                tresult result = kResultFalse;
+                stream.seek(0, IBStream::kIBSeekSet, nullptr);
+                if (!controller_first)
+                    result = p.setState(&stream);
+                stream.seek(0, IBStream::kIBSeekSet, nullptr);
+                check(c.setComponentState(&stream) == kResultOk, "the controller's restore");
+                if (controller_first) {
+                    stream.seek(0, IBStream::kIBSeekSet, nullptr);
+                    result = p.setState(&stream);
+                }
+                return result;
+            };
+            auto first = state_with(1024);
+            check(restore(*first) == kResultOk, "the first filter");
+            deliver();
+            ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+            check(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+                  "activate");
+            play_block(p, 1, 1, 64);
+            deliver();
+            // The user's choices, then the preset; a deferring host delivers
+            // the choices only after the restore.
+            c.setParamNormalized(latency_id, normalized_latency(256));
+            c.setParamNormalized(gain_mode_id,
+                                 normalized_gain_mode(convolver::GainMode::no_clipping));
+            std::vector<std::size_t> latency_at_restart;
+            handler.on_restart = [&](int32 flags) {
+                if (flags & kLatencyChanged)
+                    latency_at_restart.push_back(p.getLatencySamples());
+            };
+            auto preset = state_with(512);
+            check(restore(*preset) == kResultOk, "the preset was refused");
+            deliver();
+            c.report();
+            deliver();
+            const auto shown = latency_frames(c.getParamNormalized(latency_id));
+            MemoryStream saved_stream;
+            check(p.getState(&saved_stream) == kResultOk, "getState");
+            saved_stream.seek(0, IBStream::kIBSeekSet, nullptr);
+            const auto saved =
+                read_state(&saved_stream).settings.value_or(convolver::HostSettings{});
+            check(shown == 512 && p.getLatencySamples() == 512 && saved.latency == 512,
+                  "shown " + std::to_string(shown) + ", playing " +
+                      std::to_string(p.getLatencySamples()) + ", saved " +
+                      std::to_string(saved.latency));
+            const auto shown_mode = gain_mode(c.getParamNormalized(gain_mode_id));
+            check(shown_mode == convolver::GainMode::set &&
+                      p.settings().gain_mode == convolver::GainMode::set &&
+                      saved.gain_mode == convolver::GainMode::set,
+                  "the Gain mode shown, played or saved is not the preset's");
+            // The host read the latency that plays when last asked.
+            check(latency_at_restart.empty() || latency_at_restart.back() == 512,
+                  "the host last read Latency " +
+                      std::to_string(latency_at_restart.empty() ? 0 : latency_at_restart.back()));
+            handler.on_restart = nullptr;
+            p.setActive(false);
+            p.disconnect(&to_controller);
+            c.disconnect(&to_processor);
+            deliver();
+            c.terminate();
+            p.terminate();
+        }
+}
 // PLUG-39 step 5a (the independent review of PR #246): a status message
 // whose report does not decode, as a damaged message would, is not shown,
 // but the load answer it carries still counts, and notify says the message
@@ -4843,6 +4952,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"messages_through_proxies", messages_through_proxies},
         {"edits_survive_late_answer", edits_survive_late_answer},
         {"edits_before_controller_first_restore", edits_before_controller_first_restore},
+        {"accepted_restore_beats_queued_edit", accepted_restore_beats_queued_edit},
         {"damaged_report_message", damaged_report_message},
         {"settings_at_state_limit", settings_at_state_limit},
         {"tail_measured_at_output", tail_measured_at_output},
