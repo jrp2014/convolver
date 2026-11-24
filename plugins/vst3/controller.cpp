@@ -193,6 +193,9 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     int64 latency_restored = 0, restored_after_mirror = 0;
     attributes->getInt("latency restored", latency_restored);
     attributes->getInt("restored after mirror", restored_after_mirror);
+    // VST3-24: that outcome was not an accepted install.
+    int64 followed_refused = 0;
+    attributes->getInt("followed refused", followed_refused);
     if (followed_state) {
         double gain = 0, mix = 0;
         int64 latency = -1, mode = -1;
@@ -235,23 +238,18 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     // VST3-18: the settings the answer leaves as they are.
     bool keep_gain = false, keep_mix = false, keep_mode = false, keep_latency = false;
     // VST3-24: the load was answered after a later setComponentState, so
-    // the host's restore is the later action; or the processor's answer
-    // that it superseded the load came with no setComponentState since, so
-    // the load goes again (`retry`, the path).
+    // its settings are left to that restore's outcome; and, when such a
+    // load's choice still plays because that restore was refused, the
+    // restore's number (`held`: its settings are reported below).
     bool after_restore = false;
-    std::string retry;
-    int64 retry_request = 0;
+    int64 held = 0;
     {
         std::lock_guard lock(status_lock_);
         if (load_request) {
             load_answered_ = load_request;
             load_accepted_ = load_accepted != 0;
             after_restore = mirrored_ > load_request;
-            if (load_superseded && !after_restore && load_request == load_requests_ &&
-                !load_path_.empty()) {
-                retry = load_path_;
-                retry_request = load_requests_ = next_action();
-            }
+            load_held_ = after_restore && load_accepted_ ? load_request : 0;
         }
         // The Latency sent last: an earlier one's answer asks for nothing,
         // as the processor has later choices still to come.
@@ -265,8 +263,14 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
             report_.swap(report);
             format_.swap(format);
         }
-        if (follow_state_ && playing && static_cast<std::uint64_t>(followed_state) == follow_state_)
+        if (follow_state_ && playing &&
+            static_cast<std::uint64_t>(followed_state) == follow_state_) {
             followed = playing;
+            // Compared with actions since the restore's mirror, as the
+            // settings below are (VST3-18): the mirror replaced earlier ones.
+            held = followed_refused && load_held_ ? mirrored_ : 0;
+            load_held_ = 0;
+        }
         keep_gain = gain_set_ > mirrored_;
         keep_mix = mix_set_ > mirrored_;
         // Only a choice made since the restore: one before it was replaced
@@ -292,7 +296,7 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     // may bring this answer after the user chose another setting. A Latency
     // or Gain mode the processor had not yet heard, which it will play once
     // it does, and a Gain or Mix the host set since the restore, keep their values.
-    if (followed) {
+    if (followed && !held) {
         const auto set = [&](ParamID id, ParamValue value, bool keep) {
             if (keep || getParamNormalized(id) == value)
                 return;
@@ -322,8 +326,12 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     }
     // PLUG-26: a chosen preset's Gain, Gain mode, Mix and Latency, which the
     // processor already plays, reach the host as the user's edits would
-    // (publish_preset). VST3-24: not after a later restore, whose settings
-    // the processor's status gives (PLUG-48).
+    // (publish_preset). VST3-24: not after a later restore, whose outcome
+    // decides: an accepted restore replaced them (PLUG-48 sets what plays);
+    // after a refused one the chosen file still plays, and its settings, as
+    // that outcome gives them, are reported now with the project marked
+    // changed, as if the load's answer had come first (jrp's review of PR
+    // #281 at 4cf4712b: a window preset, then a refused host preset).
     bool edited = false;
     if (preset_settings && !after_restore) {
         HostSettings preset;
@@ -332,11 +340,14 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         preset.latency = static_cast<std::size_t>(preset_latency);
         preset.gain_mode = static_cast<GainMode>(preset_mode);
         edited = publish_preset(load_request, preset, restart);
+    } else if (held) {
+        edited = publish_preset(held, *followed, restart);
     }
     // The component state now holds the file's filter: the host saves it
     // only if it knows the project changed. Edits reported for a preset's
     // settings tell a host without setDirty already.
-    if (loaded && load_accepted && !after_restore && setDirty(true) != kResultOk && !edited) {
+    if (((loaded && load_accepted && !after_restore) || held) && setDirty(true) != kResultOk &&
+        !edited) {
         // VST3-17, a narrow fix: setDirty did not succeed, so the host may
         // not know the state changed. Audacity 4.0.2 offers no
         // IComponentHandler2 and, while the window stays open and playback
@@ -350,10 +361,19 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         // implementing IComponentHandler2 (draft Audacity issue, VST3-17).
         // Like setDirty, this runs on the thread that delivered the answer:
         // the UI thread for a direct or forwarding connection.
+        // VST3-23: a host that hands the edit back to setParamNormalized
+        // must not make it a Latency choice (chosen_again(), jrp's review
+        // of PR #281 at 4cf4712b and the independent review).
         const auto latency = getParamNormalized(latency_id);
+        {
+            std::lock_guard lock(status_lock_);
+            publishing_ = true;
+        }
         beginEdit(latency_id);
         performEdit(latency_id, latency);
         endEdit(latency_id);
+        std::lock_guard lock(status_lock_);
+        publishing_ = false;
     }
     // The SDK's way to report a new latency: the host deactivates the
     // component, reads getLatencySamples() and activates it again; some
@@ -365,12 +385,6 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     // status messages from setActive.
     if (restart && componentHandler)
         componentHandler->restartComponent(kLatencyChanged);
-    // VST3-24: a host that restored the processor and not this controller
-    // sends no report request for that restore, so the processor would wait
-    // for it for ever; the second try ends the wait. Last: with a direct
-    // connection the processor answers it inside this call.
-    if (!retry.empty())
-        send_load(retry, retry_request, true);
     return readable ? kResultOk : kInvalidArgument;
 }
 bool Controller::publish_preset(int64 request, const HostSettings& preset, bool& restart) {
@@ -673,37 +687,39 @@ std::string Controller::diagnostics() {
     return diagnostics_text(*report, format);
 }
 bool Controller::load_file(const std::string& path) {
-    if (path.empty())
-        return false;
-    int64 request = 0;
-    try {
-        std::lock_guard lock(status_lock_);
-        load_path_ = path;
-        request = load_requests_ = next_action();
-    } catch (...) { // Out of memory for the path.
-        return false;
-    }
-    const bool sent = send_load(path, request, false);
-    // A direct connection or a forwarding proxy has brought the answer
-    // (notify, which marks the project changed), or the answer to the
-    // second try it led to (VST3-24); a deferring one brings it later.
-    std::lock_guard lock(status_lock_);
-    if (load_answered_ >= request)
-        return load_accepted_;
-    return sent; // Not sent, or not delivered yet.
-}
-bool Controller::send_load(const std::string& path, int64 request, bool unmirrored) {
     auto message = owned(allocateMessage());
-    if (!message)
+    if (!message || path.empty())
         return false;
     message->setMessageID(load_message);
+    int64 request = 0;
+    {
+        std::lock_guard lock(status_lock_);
+        request = next_action();
+    }
     auto* attributes = message->getAttributes();
     if (!attributes ||
         attributes->setBinary("path", path.data(), static_cast<uint32>(path.size())) != kResultOk ||
-        attributes->setInt("request", request) != kResultOk ||
-        (unmirrored && attributes->setInt("unmirrored", 1) != kResultOk))
+        attributes->setInt("request", request) != kResultOk)
         return false;
-    return sendMessage(message) == kResultOk;
+    {
+        // Numbered as sent only now: a load that never left has no answer
+        // to wait for (chosen_again(), jrp's review of PR #281 at 4cf4712b).
+        std::lock_guard lock(status_lock_);
+        load_requests_ = request;
+    }
+    if (sendMessage(message) != kResultOk) {
+        std::lock_guard lock(status_lock_);
+        if (load_answered_ < request) { // Not delivered: no answer is to come.
+            load_answered_ = request;
+            load_accepted_ = false;
+        }
+        return false;
+    }
+    // A direct connection or a forwarding proxy has brought the answer
+    // (notify, which marks the project changed); a deferring one brings it
+    // later.
+    std::lock_guard lock(status_lock_);
+    return load_answered_ != request || load_accepted_;
 }
 tresult PLUGIN_API Controller::getParameterIDFromFunctionName(UnitID unit, FIDString name,
                                                               ParamID& id) {

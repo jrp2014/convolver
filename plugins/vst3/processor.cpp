@@ -473,6 +473,8 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
                 attributes->setInt("restored after mirror", 1);
             if (follow.latency_restored)
                 attributes->setInt("latency restored", 1);
+            if (follow.refused) // VST3-24.
+                attributes->setInt("followed refused", 1);
         }
         if (answer.load_request || answer.retried) {
             if (answer.load_request)
@@ -545,16 +547,12 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
         auto* attributes = message->getAttributes();
         if (!attributes || attributes->getBinary("path", data, size) != kResultOk || !size || !data)
             return kInvalidArgument;
-        int64 request = 0, unmirrored = 0;
+        int64 request = 0;
         attributes->getInt("request", request);
-        // VST3-24: the controller's second try at a choice this processor
-        // answered as superseded, when the controller had mirrored no restore
-        // since it sent the first.
-        attributes->getInt("unmirrored", unmirrored);
         std::optional<HostSettings> settings;
-        bool superseded = false;
-        const bool accepted = load_file({static_cast<const char*>(data), size}, settings,
-                                        &superseded, unmirrored != 0);
+        bool superseded = false; // VST3-24.
+        const bool accepted =
+            load_file({static_cast<const char*>(data), size}, settings, &superseded);
         write_log();
         send_status({.load_request = request,
                      .accepted = accepted,
@@ -949,15 +947,13 @@ void Processor::refused() noexcept {
     }
 }
 bool Processor::load_file(std::string_view chosen, std::optional<HostSettings>& settings,
-                          bool* superseded, bool unmirrored) {
+                          bool* superseded) {
     settings.reset();
     const Locked lock(*this);
     if (superseded) {
         // VST3-24: a window's choice sent before the controller mirrored the
         // restore this processor accepted last; the restore is the later
         // action, so its filter and settings stay.
-        if (unmirrored)
-            follow_.unmirrored();
         *superseded = follow_.waits_for_mirror();
         if (*superseded) {
             try {
@@ -1041,14 +1037,20 @@ void RestoreFollow::read(std::uint64_t digest) noexcept {
     if (digest == mirrored_) {
         answer_ = true;
         restored_after_mirror_ = true; // VST3-19.
+        answer_refused_ = true;        // VST3-24: until accepted() says otherwise.
     }
     // VST3-24: a request that came first belongs to this restore; one for
-    // another state will not be matched now.
-    read_early_ = early_count_ > 0 && early_ == digest;
-    if (read_early_)
-        --early_count_;
-    else
-        early_count_ = 0;
+    // another state will not be matched now. Otherwise this restore's
+    // request is still to come.
+    read_requested_ = early_ == digest;
+    early_ = 0;
+    if (read_requested_)
+        return;
+    if (unrequested_count_ == unrequested_limit) {
+        std::move(unrequested_.begin() + 1, unrequested_.end(), unrequested_.begin());
+        --unrequested_count_;
+    }
+    unrequested_[unrequested_count_++] = {digest, false};
 }
 void RestoreFollow::accepted(std::uint64_t digest, const HostSettings& restored) noexcept {
     // VST3-19: what this restore set, and the choices heard by then, so the
@@ -1059,14 +1061,17 @@ void RestoreFollow::accepted(std::uint64_t digest, const HostSettings& restored)
     accepted_gain_mode_ = restored.gain_mode;
     latency_at_accept_ = heard_latency_;
     gain_mode_at_accept_ = heard_gain_mode_;
-    // VST3-24: its request is still to come, unless it came first.
-    if (std::exchange(read_early_, false))
-        return;
-    if (waiting_ != digest) {
-        waiting_ = digest;
-        waiting_count_ = 0;
-    }
-    ++waiting_count_;
+    if (answer_ && digest == mirrored_)
+        answer_refused_ = false;
+    // VST3-24: read() kept this restore last, unless its request came first.
+    if (!std::exchange(read_requested_, false) && unrequested_count_ &&
+        unrequested_[unrequested_count_ - 1].digest == digest)
+        unrequested_[unrequested_count_ - 1].accepted = true;
+}
+bool RestoreFollow::waits_for_mirror() const noexcept {
+    return std::any_of(unrequested_.begin(),
+                       unrequested_.begin() + static_cast<std::ptrdiff_t>(unrequested_count_),
+                       [](const Unrequested& u) { return u.accepted; });
 }
 RestoreFollow::Again RestoreFollow::requested(std::uint64_t follow,
                                               Steinberg::int64 latency_requests,
@@ -1076,21 +1081,31 @@ RestoreFollow::Again RestoreFollow::requested(std::uint64_t follow,
     if (!follow)
         return again;
     mirrored_ = follow;
-    // VST3-24: the request of an accepted restore ends its wait; any other
-    // came before its restore, or is for an older state.
-    if (follow == waiting_ && waiting_count_ > 0) {
-        --waiting_count_;
+    // VST3-24: the oldest restore of that state still waiting is the one
+    // this request mirrors; with none, its restore is still to come. A
+    // restore of it that was not accepted (refused, or the same as what
+    // plays) is answered with what plays now, also after a later install: a
+    // window choice installed since was sent before the controller mirrored
+    // that state (jrp's rerun of PR #281: the window showed the refused
+    // preset's Latency 0 while the chosen preset's 2048 played).
+    const auto end = unrequested_.begin() + static_cast<std::ptrdiff_t>(unrequested_count_);
+    const auto match = std::find_if(unrequested_.begin(), end,
+                                    [follow](const Unrequested& u) { return u.digest == follow; });
+    bool not_installed = false;
+    if (match == end) {
+        early_ = follow;
     } else {
-        if (early_ != follow) {
-            early_ = follow;
-            early_count_ = 0;
-        }
-        ++early_count_;
+        not_installed = !match->accepted;
+        if (not_installed)
+            answer_ = true;
+        unrequested_count_ = static_cast<std::size_t>(
+            std::move(match + 1, end, unrequested_.begin()) - unrequested_.begin());
     }
     // A refusal of that state answers now, also one in an earlier restore
     // (the restore that follows answers again).
     if (refused_ == follow) {
         answer_ = true;
+        not_installed = true;
     } else if (accepted_ == follow) {
         // Answered either way, so the controller knows the outcome came
         // before its request. A choice heard since the restore and sent
@@ -1113,12 +1128,15 @@ RestoreFollow::Again RestoreFollow::requested(std::uint64_t follow,
     // controller first), or the request is for an older state, delivered
     // late: the accepted restore stays for its own request (jrp's review of
     // PR #279).
+    if (answer_)
+        answer_refused_ = not_installed;
     return again;
 }
 RestoreFollow::Answer RestoreFollow::take_answer() noexcept {
-    Answer answer{0, heard_latency_, heard_gain_mode_, false, false};
+    Answer answer{0, heard_latency_, heard_gain_mode_, false, false, false};
     if (std::exchange(answer_, false)) {
         answer.followed = mirrored_;
+        answer.refused = std::exchange(answer_refused_, false);
         answer.restored_after_mirror = std::exchange(restored_after_mirror_, false);
         answer.latency_restored = std::exchange(latency_restored_, false);
     }

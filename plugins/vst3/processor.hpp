@@ -97,9 +97,9 @@ inline constexpr const char* report_message = "ConvolverReport";
 // came from its own restore.
 // VST3-24: a load_message's answer says "superseded" 1 (with "accepted" 0)
 // when a restore the processor accepted after the controller sent it
-// superseded it (RestoreFollow::waits_for_mirror()); the controller, if it
-// mirrored no restore since, sends the load_message again with
-// "unmirrored" 1, which ends that wait.
+// superseded it (RestoreFollow::waits_for_mirror()). The status that
+// follows a restore's outcome says "followed refused" 1 when that outcome
+// was not an accepted install.
 struct StatusAnswer {
     Steinberg::int64 load_request = 0;
     bool retried = false;
@@ -204,14 +204,11 @@ class RestoreFollow {
     // read), before it was accepted or refused.
     void read(std::uint64_t digest) noexcept;
     // Any accepted install, a restore or a file chosen or read again: what
-    // plays no longer follows an earlier accepted restore. A refused one's
-    // request is still answered with what plays: a window choice the
-    // processor installed after the refusal and before that request was
-    // sent before the controller mirrored the refused state, and the
-    // controller leaves its settings to that answer (VST3-24, jrp's rerun of
-    // PR #281: the window showed the refused preset's Latency 0 while the
-    // chosen preset's 2048 played).
+    // plays no longer follows an earlier restore's outcome. (A restore not
+    // accepted whose request is still to come is answered when it arrives:
+    // requested().)
     void installed() noexcept {
+        refused_ = 0;
         accepted_ = 0;
     }
     // After installed(), a restore of this state was accepted with these
@@ -222,6 +219,8 @@ class RestoreFollow {
     void accepted(std::uint64_t digest, const HostSettings& restored) noexcept;
     void refused(std::uint64_t digest) noexcept {
         refused_ = digest;
+        if (answer_ && digest == mirrored_)
+            answer_refused_ = true; // VST3-24.
     }
     // The controller's report request named `follow` (0: none), with its
     // Latency and Gain mode request numbers when it mirrored that state.
@@ -241,6 +240,7 @@ class RestoreFollow {
         std::uint64_t followed = 0;
         Steinberg::int64 heard_latency = 0, heard_gain_mode = 0;
         bool restored_after_mirror = false, latency_restored = false;
+        bool refused = false; // VST3-24: the outcome was not an accepted install.
     };
     Answer take_answer() noexcept;
     // VST3-24 (jrp's review of PR #279): the controller's messages arrive in
@@ -248,31 +248,37 @@ class RestoreFollow {
     // processor accepted a restore, and before the controller's report
     // request for that restore, was sent before the controller mirrored it:
     // the host's restore is the later action and keeps playing. True while
-    // the newest accepted restore's request has not arrived. A host that
-    // restores the processor alone never sends it: the controller re-sends
-    // the choice marked unmirrored(), which ends the wait.
-    bool waits_for_mirror() const noexcept {
-        return waiting_count_ > 0;
-    }
-    void unmirrored() noexcept {
-        waiting_count_ = 0;
-    }
+    // an accepted restore's request has not arrived. The SDK has the host
+    // restore both halves (Audacity 4 does, VST3Wrapper); a host that
+    // restored the processor alone would hold window choices back until its
+    // next restore of both.
+    bool waits_for_mirror() const noexcept;
 
   private:
-    // VST3-24: matches each report request to one restore, also when the
-    // host restores the same state again. `waiting_` counts accepted
-    // restores of its digest whose request has not arrived; `early_` counts
-    // requests that arrived before a restore of their state (the controller
-    // first). A request for an older state, delivered late, counts as early,
-    // and the next restore of another state forgets early requests, so a
-    // mismatch only ever ends a wait sooner. `read_early_`: the restore being
-    // read had its request already.
-    std::uint64_t waiting_ = 0, early_ = 0;
-    int waiting_count_ = 0, early_count_ = 0;
-    bool read_early_ = false;
-    std::uint64_t refused_ = 0;  // The newest restore's, if it was refused.
-    std::uint64_t mirrored_ = 0; // The last report request's state.
+    // VST3-24: the restores read whose report request has not arrived,
+    // oldest first, and whether each was accepted. The host restores both
+    // halves in one order, so requests arrive in the order of the restores
+    // they mirror and each matches one restore, also when the host restores
+    // the same state twice (jrp's review of PR #281 at 4cf4712b: counts kept
+    // per digest left a stale match behind). A request that matches none
+    // arrived before its restore (the controller first): `early_`, which the
+    // next restore takes if it reads that state, and forgets otherwise. A
+    // request that skips older entries drops them (a host that restored the
+    // processor alone). At most unrequested_limit are kept, dropping the
+    // oldest.
+    struct Unrequested {
+        std::uint64_t digest = 0;
+        bool accepted = false;
+    };
+    static constexpr std::size_t unrequested_limit = 8;
+    std::array<Unrequested, unrequested_limit> unrequested_{};
+    std::size_t unrequested_count_ = 0;
+    std::uint64_t early_ = 0;
+    bool read_requested_ = false; // The restore being read had its request already.
+    std::uint64_t refused_ = 0;   // The newest restore's, if it was refused.
+    std::uint64_t mirrored_ = 0;  // The last report request's state.
     bool answer_ = false, restored_after_mirror_ = false, latency_restored_ = false;
+    bool answer_refused_ = false; // VST3-24: Answer::refused.
     Steinberg::int64 heard_latency_ = 0, heard_gain_mode_ = 0;
     // The last accepted restore, while nothing else has installed since (a
     // refused restore installs nothing): its digest (0: none), its Latency
@@ -418,10 +424,9 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // settings an accepted preset applied, or none. VST3-24: with
     // `superseded`, a window's choice, which is not loaded, and sets it,
     // while a restore accepted since the controller sent it waits for the
-    // controller's report request (RestoreFollow::waits_for_mirror());
-    // `unmirrored` (the controller's second try) ends that wait first.
+    // controller's report request (RestoreFollow::waits_for_mirror()).
     bool load_file(std::string_view path, std::optional<HostSettings>& settings,
-                   bool* superseded = nullptr, bool unmirrored = false);
+                   bool* superseded = nullptr);
     // load_file()'s reading and install(): false after recording why the
     // file was refused; throws when install() refuses it, or when memory runs
     // out.
@@ -590,10 +595,6 @@ class Controller final : public Steinberg::Vst::EditController,
     // played and saved 2048. Not for a value the host hands back while
     // publish_preset() reports it.
     bool chosen_again();
-    // A load_message for `path` numbered `request`; VST3-24: `unmirrored`
-    // for the second try at a choice the processor answered as superseded.
-    // False if it could not be sent.
-    bool send_load(const std::string& path, Steinberg::int64 request, bool unmirrored);
     // The host may restore state (and so send the status) on another thread
     // than the one reading parameter text.
     std::mutex status_lock_;
@@ -619,10 +620,11 @@ class Controller final : public Steinberg::Vst::EditController,
     bool latency_waiting_ = false;
     // VST3-18, under status_lock_: the last gain_mode_message's number.
     Steinberg::int64 gain_mode_requests_ = 0;
-    // VST3-24, under status_lock_: the last load_message's path (UTF-8), sent
-    // again marked "unmirrored" if the processor answers that a restore it
-    // accepted superseded it, when no setComponentState followed the request.
-    std::string load_path_;
+    // VST3-24, under status_lock_: the last load answered was accepted after a
+    // later setComponentState, so its settings wait for that restore's
+    // outcome: if the processor refused it, the load's choice plays and is
+    // reported then as the load's own answer would have been.
+    Steinberg::int64 load_held_ = 0;
     // PLUG-22, under status_lock_: the name and filter identity the last
     // setState brought. getState saves the name the last report gives the
     // filter that plays ("filter saved name"), and this pair only when that
@@ -640,9 +642,9 @@ class Controller final : public Steinberg::Vst::EditController,
     // Latency and Gain mode go as messages, in order, and a later choice
     // keeps its value once the processor has heard it or will.
     Steinberg::int64 mirrored_ = 0, gain_set_ = 0, mix_set_ = 0;
-    // VST3-23, under status_lock_: publish_preset() is reporting edits; a
-    // host that hands one straight back to setParamNormalized is not
-    // recorded as setting it.
+    // VST3-23, under status_lock_: publish_preset() or VST3-17's unchanged
+    // Latency edit is reporting edits; a host that hands one straight back
+    // to setParamNormalized is not recorded as setting it.
     bool publishing_ = false;
     // VST3-19, under status_lock_: that setComponentState asked the host to
     // read a changed latency, perhaps before the processor restored the

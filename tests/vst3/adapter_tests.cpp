@@ -86,6 +86,8 @@ class Handler final : public IComponentHandler, public IComponentHandler2 {
     }
     tresult PLUGIN_API performEdit(ParamID id, ParamValue value) override {
         edits.push_back({'p', id, value});
+        if (on_perform) // A host that hands the edit straight back.
+            on_perform(id, value);
         return kResultOk;
     }
     tresult PLUGIN_API endEdit(ParamID id) override {
@@ -143,7 +145,8 @@ class Handler final : public IComponentHandler, public IComponentHandler2 {
             restarts.begin(), restarts.end(), [](int32 f) { return (f & kLatencyChanged) != 0; }));
     }
     std::vector<int32> restarts;
-    std::function<void(int32)> on_restart; // What a host does when asked to restart.
+    std::function<void(int32)> on_restart;               // What a host does when asked to restart.
+    std::function<void(ParamID, ParamValue)> on_perform; // What a host does with an edit.
     int dirty = 0;
 };
 void edge_cases() {
@@ -4868,17 +4871,24 @@ void accepted_restore_follows_its_own_request() {
 // that should win. Every row runs with each choice of delivery between the
 // actions (none, the processor's queue only, or both ways until quiet), with
 // the host restoring the processor first (the SDK's order) and the
-// controller first, through connections that deliver later, in order. After
-// the last delivery the window (the controller's Latency), the processor
-// (what plays, and the filter and Latency getState saves) and the host (the
-// last Latency edit and latency read since the last action) must all name
+// controller first, through connections that deliver later, in order, and
+// with two hosts: one with setDirty, and one without it (Audacity 4.0.2,
+// VST3-17) that hands every edit straight back to setParamNormalized. After
+// the last delivery the window (the controller's Latency and Gain mode), the
+// processor (what plays, and the filter, Latency and Gain mode getState
+// saves) and the host (the last Latency edit and latency read since the last
+// action) must all name
 // the winning action, not merely agree with one another: in jrp's case 1
 // every component agreed on the wrong Latency.
 //   W: the window chooses preset A (tap .125, Latency 2048).
 //   w: the window chooses preset B (tap .25, Latency 1024).
+//   F: the window chooses a preset with no settings (tap .0625).
 //   L: the user sets Latency 256.
+//   M: the user sets Gain mode to No clipping.
 //   R: the host restores preset P (tap .5, Latency 512), accepted.
+//   Q: the host restores preset Q (tap .375, Latency 128), accepted.
 //   X: the host restores a 44.1 kHz preset, refused at 48 kHz.
+// Every preset and restored state has Gain mode Set.
 // The rows named after jrp's cases are his reproductions: before this
 // change "W L" ended with the window and the host at 2048 while 256 played
 // and was saved, and "W R" saved A's filter and 2048 though P was restored
@@ -4888,12 +4898,15 @@ void accepted_restore_follows_its_own_request() {
 void latest_action_wins() {
     const auto folder = private_temp("convolver-vst3-latest-action");
     std::filesystem::create_directories(folder);
+    // `latency` 0: a preset without settings, as convolver-preset makes.
     const auto preset_file = [&](const char* name, float tap, std::size_t latency) {
         convolver::HostState state;
         state.configuration = convolver::Configuration{48000, 1, 1, 0, {}, {}, {}};
         state.configuration->paths.push_back({{tap}, {{0, 1}}, {{0, 1}}});
-        state.settings.emplace();
-        state.settings->latency = latency;
+        if (latency) {
+            state.settings.emplace();
+            state.settings->latency = latency;
+        }
         const auto path = folder / name;
         const auto bytes = convolver::presets::vst3_preset(state);
         std::ofstream out(path, std::ios::binary);
@@ -4904,11 +4917,14 @@ void latest_action_wins() {
     };
     const auto preset_a = preset_file("a.vstpreset", .125f, 2048);
     const auto preset_b = preset_file("b.vstpreset", .25f, 1024);
+    const auto filter_f = preset_file("f.vstpreset", .0625f, 0);
+    using convolver::GainMode;
     struct Row {
         const char* name;
         const char* actions;
         float tap;
         std::size_t latency;
+        GainMode mode = GainMode::set;
     };
     const Row rows[] = {
         {"jrp's case 2: a window preset, then Latency before its answer", "WL", .125f, 256},
@@ -4926,6 +4942,16 @@ void latest_action_wins() {
         {"a window preset, a host preset, then a refused one", "WRX", .5f, 512},
         {"a window preset, a refused host preset, then Latency", "WXL", .125f, 256},
         {"two window presets, then a host preset", "WwR", .5f, 512},
+        {"jrp's review 3: two host presets, a window preset, the first again", "RQWR", .5f, 512},
+        {"the same host preset twice around a window preset", "RWR", .5f, 512},
+        {"a window preset, then the same host preset twice", "WRR", .5f, 512},
+        {"a window preset, then Gain mode", "WM", .125f, 2048, GainMode::no_clipping},
+        {"Gain mode, then a window preset", "MW", .125f, 2048},
+        {"Gain mode, a window preset, then the same Gain mode", "MWM", .125f, 2048,
+         GainMode::no_clipping},
+        {"jrp's review 4: Latency, a filter without settings, then a preset", "LFw", .25f, 1024},
+        {"a filter without settings, then Latency", "FL", .0625f, 256},
+        {"a window preset, then a filter without settings", "WF", .0625f, 2048},
     };
     const char* const deliveries[] = {"no delivery", "the processor's queue", "both queues"};
     std::size_t runs = 0;
@@ -4934,156 +4960,215 @@ void latest_action_wins() {
         std::size_t timings = 1;
         for (std::size_t i = 1; i < actions.size(); ++i)
             timings *= 3;
-        for (const bool controller_first : {false, true})
-            for (std::size_t timing = 0; timing < timings; ++timing) {
-                std::string how = " (" + std::string(row.name) + "; " +
-                                  (controller_first ? "controller first" : "processor first");
-                for (std::size_t i = 1, t = timing; i < actions.size(); ++i, t /= 3)
-                    how += std::string(", then ") + deliveries[t % 3];
-                how += ")";
-                const auto check = [&](bool v, const std::string& what) {
-                    if (!v)
-                        throw std::runtime_error("latest action: " + what + how);
-                };
-                HostApplication context;
-                Handler handler;
-                Processor p;
-                Controller c;
-                check(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
-                          c.setComponentHandler(&handler) == kResultOk,
-                      "initialize");
-                Proxy to_controller(c, true), to_processor(p, true);
-                check(p.connect(&to_controller) == kResultOk &&
-                          c.connect(&to_processor) == kResultOk,
-                      "connect");
-                const auto deliver = [&] {
-                    while (to_controller.deliver() + to_processor.deliver() > 0) {
-                    }
-                };
-                SpeakerArrangement mono = SpeakerArr::kMono;
-                check(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "buses");
-                p.activateBus(kAudio, kInput, 0, true);
-                p.activateBus(kAudio, kOutput, 0, true);
-                const auto state_with = [&](int rate, float tap, std::size_t latency) {
-                    convolver::HostState state;
-                    state.configuration = convolver::Configuration{
-                        rate, 1, 1, 0, {}, {}, {{{tap}, {{0, 1}}, {{0, 1}}}}};
-                    state.settings.emplace();
-                    state.settings->latency = latency;
-                    auto stream = std::make_unique<MemoryStream>();
-                    check(write_state(stream.get(), state), "encode");
-                    return stream;
-                };
-                const auto restore = [&](IBStream& stream) {
-                    tresult result = kResultFalse;
-                    stream.seek(0, IBStream::kIBSeekSet, nullptr);
-                    if (!controller_first)
-                        result = p.setState(&stream);
-                    stream.seek(0, IBStream::kIBSeekSet, nullptr);
-                    check(c.setComponentState(&stream) == kResultOk, "the controller's restore");
-                    if (controller_first) {
+        for (const bool hands_back : {false, true})
+            for (const int order : {0, 1, 2})
+                for (std::size_t timing = 0; timing < timings; ++timing) {
+                    const char* const orders[] = {"processor first", "controller first",
+                                                  "processor, delivery, then controller"};
+                    std::string how = " (" + std::string(row.name) + "; " +
+                                      (hands_back ? "no setDirty, edits handed back; " : "") +
+                                      orders[order];
+                    for (std::size_t i = 1, t = timing; i < actions.size(); ++i, t /= 3)
+                        how += std::string(", then ") + deliveries[t % 3];
+                    how += ")";
+                    const auto check = [&](bool v, const std::string& what) {
+                        if (!v)
+                            throw std::runtime_error("latest action: " + what + how);
+                    };
+                    HostApplication context;
+                    Handler handler;
+                    handler.offers_dirty = !hands_back;
+                    Processor p;
+                    Controller c;
+                    check(p.initialize(&context) == kResultOk &&
+                              c.initialize(&context) == kResultOk &&
+                              c.setComponentHandler(&handler) == kResultOk,
+                          "initialize");
+                    if (hands_back)
+                        handler.on_perform = [&](ParamID id, ParamValue value) {
+                            c.setParamNormalized(id, value);
+                        };
+                    Proxy to_controller(c, true), to_processor(p, true);
+                    check(p.connect(&to_controller) == kResultOk &&
+                              c.connect(&to_processor) == kResultOk,
+                          "connect");
+                    const auto deliver = [&] {
+                        while (to_controller.deliver() + to_processor.deliver() > 0) {
+                        }
+                    };
+                    SpeakerArrangement mono = SpeakerArr::kMono;
+                    check(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "buses");
+                    p.activateBus(kAudio, kInput, 0, true);
+                    p.activateBus(kAudio, kOutput, 0, true);
+                    const auto state_with = [&](int rate, float tap, std::size_t latency) {
+                        convolver::HostState state;
+                        state.configuration = convolver::Configuration{
+                            rate, 1, 1, 0, {}, {}, {{{tap}, {{0, 1}}, {{0, 1}}}}};
+                        state.settings.emplace();
+                        state.settings->latency = latency;
+                        auto stream = std::make_unique<MemoryStream>();
+                        check(write_state(stream.get(), state), "encode");
+                        return stream;
+                    };
+                    // What the host was told before the last action, and the
+                    // latency it read when asked to restart.
+                    std::size_t edits_before = 0, reads_before = 0;
+                    std::vector<std::size_t> latency_read;
+                    // Order 2: a host that delivers the queued messages between its
+                    // two calls (jrp's review of PR #281 at 4cf4712b). What it was
+                    // told then answers earlier actions: the restore's own call is
+                    // the host's last word.
+                    const auto restore = [&](IBStream& stream) {
+                        tresult result = kResultFalse;
                         stream.seek(0, IBStream::kIBSeekSet, nullptr);
-                        result = p.setState(&stream);
-                    }
-                    return result;
-                };
-                auto first = state_with(48000, 1, 4096);
-                check(restore(*first) == kResultOk, "the first filter");
-                deliver();
-                ProcessSetup setup{kRealtime, kSample32, 512, 48000};
-                check(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
-                      "activate");
-                play_block(p, 1, 1, 64);
-                deliver();
-                auto preset_p = state_with(48000, .5f, 512), preset_x = state_with(44100, .75f, 64);
-                std::vector<std::size_t> latency_read;
-                handler.on_restart = [&](int32 flags) {
-                    if (flags & kLatencyChanged)
-                        latency_read.push_back(p.getLatencySamples());
-                };
-                std::size_t edits_before = 0, reads_before = 0;
-                for (std::size_t i = 0, t = timing; i < actions.size(); ++i) {
-                    if (i > 0) {
-                        if (t % 3 == 1)
-                            to_processor.deliver();
-                        else if (t % 3 == 2)
+                        if (order != 1)
+                            result = p.setState(&stream);
+                        if (order == 2) {
                             deliver();
-                        t /= 3;
+                            edits_before = handler.edits.size();
+                            reads_before = latency_read.size();
+                        }
+                        stream.seek(0, IBStream::kIBSeekSet, nullptr);
+                        check(c.setComponentState(&stream) == kResultOk,
+                              "the controller's restore");
+                        if (order == 1) {
+                            stream.seek(0, IBStream::kIBSeekSet, nullptr);
+                            result = p.setState(&stream);
+                        }
+                        return result;
+                    };
+                    auto first = state_with(48000, 1, 4096);
+                    check(restore(*first) == kResultOk, "the first filter");
+                    deliver();
+                    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+                    check(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+                          "activate");
+                    play_block(p, 1, 1, 64);
+                    deliver();
+                    auto preset_p = state_with(48000, .5f, 512),
+                         preset_q = state_with(48000, .375f, 128),
+                         preset_x = state_with(44100, .75f, 64);
+                    handler.on_restart = [&](int32 flags) {
+                        if (flags & kLatencyChanged)
+                            latency_read.push_back(p.getLatencySamples());
+                    };
+                    // Where the winning filter was chosen in the window: the host must
+                    // be told the project changed after that choice (setDirty, or an
+                    // edit for a host without it), also when a later host preset was
+                    // refused (jrp's review of PR #281 at 4cf4712b).
+                    const auto chosen_last = actions.find_last_of("WwFRQ");
+                    const bool window_wins = chosen_last != std::string_view::npos &&
+                                             std::string_view("WwF").find(actions[chosen_last]) !=
+                                                 std::string_view::npos;
+                    int dirty_at_choice = 0;
+                    std::size_t edits_at_choice = 0;
+                    for (std::size_t i = 0, t = timing; i < actions.size(); ++i) {
+                        if (i > 0) {
+                            if (t % 3 == 1)
+                                to_processor.deliver();
+                            else if (t % 3 == 2)
+                                deliver();
+                            t /= 3;
+                        }
+                        edits_before = handler.edits.size();
+                        reads_before = latency_read.size();
+                        if (i == chosen_last) {
+                            dirty_at_choice = handler.dirty;
+                            edits_at_choice = handler.edits.size();
+                        }
+                        switch (actions[i]) {
+                        case 'W':
+                            check(c.load_file(preset_a), "preset A was refused");
+                            break;
+                        case 'w':
+                            check(c.load_file(preset_b), "preset B was refused");
+                            break;
+                        case 'F':
+                            check(c.load_file(filter_f), "filter F was refused");
+                            break;
+                        case 'L':
+                            c.setParamNormalized(latency_id, normalized_latency(256));
+                            break;
+                        case 'M':
+                            c.setParamNormalized(gain_mode_id,
+                                                 normalized_gain_mode(GainMode::no_clipping));
+                            break;
+                        case 'R':
+                            check(restore(*preset_p) == kResultOk, "preset P was refused");
+                            break;
+                        case 'Q':
+                            check(restore(*preset_q) == kResultOk, "preset Q was refused");
+                            break;
+                        default:
+                            check(restore(*preset_x) != kResultOk,
+                                  "the 44.1 kHz preset was accepted");
+                        }
                     }
-                    edits_before = handler.edits.size();
-                    reads_before = latency_read.size();
-                    switch (actions[i]) {
-                    case 'W':
-                        check(c.load_file(preset_a), "preset A was refused");
-                        break;
-                    case 'w':
-                        check(c.load_file(preset_b), "preset B was refused");
-                        break;
-                    case 'L':
-                        c.setParamNormalized(latency_id, normalized_latency(256));
-                        break;
-                    case 'R':
-                        check(restore(*preset_p) == kResultOk, "preset P was refused");
-                        break;
-                    default:
-                        check(restore(*preset_x) != kResultOk, "the 44.1 kHz preset was accepted");
-                    }
+                    deliver();
+                    c.report();
+                    deliver();
+                    const auto shown_latency = latency_frames(c.getParamNormalized(latency_id));
+                    MemoryStream saved_stream;
+                    check(p.getState(&saved_stream) == kResultOk, "getState");
+                    saved_stream.seek(0, IBStream::kIBSeekSet, nullptr);
+                    const auto saved = read_state(&saved_stream);
+                    const auto saved_latency =
+                        saved.settings.value_or(convolver::HostSettings{}).latency;
+                    const auto saved_mode =
+                        saved.settings.value_or(convolver::HostSettings{}).gain_mode;
+                    const auto shown_mode = gain_mode(c.getParamNormalized(gain_mode_id));
+                    const auto& config = saved.configuration;
+                    const bool saved_filter =
+                        config && config->paths.size() == 1 &&
+                        config->paths.front().impulse == std::vector<float>{row.tap};
+                    // What the host was last told since the last action: a Latency
+                    // edit, and the latency it read when asked to restart.
+                    std::optional<ParamValue> edited;
+                    for (auto i = edits_before; i < handler.edits.size(); ++i)
+                        if (handler.edits[i].kind == 'p' && handler.edits[i].id == latency_id)
+                            edited = handler.edits[i].value;
+                    const auto read = latency_read.size() > reads_before
+                                          ? std::optional<std::size_t>(latency_read.back())
+                                          : std::nullopt;
+                    check(shown_latency == row.latency && p.getLatencySamples() == row.latency &&
+                              saved_latency == row.latency && saved_filter &&
+                              (!edited || latency_frames(*edited) == row.latency) &&
+                              (!read || *read == row.latency) && shown_mode == row.mode &&
+                              p.settings().gain_mode == row.mode && saved_mode == row.mode &&
+                              (!window_wins || handler.dirty > dirty_at_choice ||
+                               (hands_back && handler.edits.size() > edits_at_choice)),
+                          "expected tap " + std::to_string(row.tap) + " and Latency " +
+                              std::to_string(row.latency) + "; shown " +
+                              std::to_string(shown_latency) + ", playing " +
+                              std::to_string(p.getLatencySamples()) + ", saved " +
+                              std::to_string(saved_latency) +
+                              (saved_filter ? " with that filter" : " with another filter") +
+                              ", host last told " +
+                              (edited ? std::to_string(latency_frames(*edited)) : "nothing") +
+                              ", host last read " + (read ? std::to_string(*read) : "nothing") +
+                              "; Gain mode expected " + convolver::gain_mode_name(row.mode) +
+                              ", shown " + convolver::gain_mode_name(shown_mode) + ", playing " +
+                              convolver::gain_mode_name(p.settings().gain_mode) + ", saved " +
+                              convolver::gain_mode_name(saved_mode) +
+                              (window_wins && handler.dirty == dirty_at_choice
+                                   ? "; the host was not told the project changed"
+                                   : ""));
+                    handler.on_restart = nullptr;
+                    p.setActive(false);
+                    p.disconnect(&to_controller);
+                    c.disconnect(&to_processor);
+                    deliver();
+                    c.terminate();
+                    p.terminate();
+                    ++runs;
                 }
-                deliver();
-                c.report();
-                deliver();
-                const auto shown_latency = latency_frames(c.getParamNormalized(latency_id));
-                MemoryStream saved_stream;
-                check(p.getState(&saved_stream) == kResultOk, "getState");
-                saved_stream.seek(0, IBStream::kIBSeekSet, nullptr);
-                const auto saved = read_state(&saved_stream);
-                const auto saved_latency =
-                    saved.settings.value_or(convolver::HostSettings{}).latency;
-                const auto& config = saved.configuration;
-                const bool saved_filter =
-                    config && config->paths.size() == 1 &&
-                    config->paths.front().impulse == std::vector<float>{row.tap};
-                // What the host was last told since the last action: a Latency
-                // edit, and the latency it read when asked to restart.
-                std::optional<ParamValue> edited;
-                for (auto i = edits_before; i < handler.edits.size(); ++i)
-                    if (handler.edits[i].kind == 'p' && handler.edits[i].id == latency_id)
-                        edited = handler.edits[i].value;
-                const auto read = latency_read.size() > reads_before
-                                      ? std::optional<std::size_t>(latency_read.back())
-                                      : std::nullopt;
-                check(shown_latency == row.latency && p.getLatencySamples() == row.latency &&
-                          saved_latency == row.latency && saved_filter &&
-                          (!edited || latency_frames(*edited) == row.latency) &&
-                          (!read || *read == row.latency),
-                      "expected tap " + std::to_string(row.tap) + " and Latency " +
-                          std::to_string(row.latency) + "; shown " + std::to_string(shown_latency) +
-                          ", playing " + std::to_string(p.getLatencySamples()) + ", saved " +
-                          std::to_string(saved_latency) +
-                          (saved_filter ? " with that filter" : " with another filter") +
-                          ", host last told " +
-                          (edited ? std::to_string(latency_frames(*edited)) : "nothing") +
-                          ", host last read " + (read ? std::to_string(*read) : "nothing"));
-                handler.on_restart = nullptr;
-                p.setActive(false);
-                p.disconnect(&to_controller);
-                c.disconnect(&to_processor);
-                deliver();
-                c.terminate();
-                p.terminate();
-                ++runs;
-            }
     }
     require(runs > 100, "latest action: the table did not run");
     std::filesystem::remove_all(folder);
 }
-// VST3-24's safeguard: a host that restores the processor and not the
-// controller sends no report request for that restore, so the processor
-// would answer every later window choice as superseded. The controller,
-// which mirrored no restore since it sent the choice, sends it again marked
-// unmirrored, which ends the wait: the choice plays, through a connection
-// that delivers later and through a direct one, and the next choice plays at
-// once. VST3-23: a Gain the user sets after choosing a preset in the window,
+// VST3-23, VST3-24: what the window is told of a refused and an accepted
+// choice, through a direct connection and one that delivers later, and what
+// plays then. VST3-23: a Gain the user sets after choosing a preset in the window,
 // before its answer, keeps its value and is reported to the host again (the
 // preset replaced it in the processor); a Gain left alone takes the preset's.
 void window_choice_orders() {
@@ -5162,17 +5247,27 @@ void window_choice_orders() {
                    p.getLatencySamples() == latency &&
                    latency_frames(c.getParamNormalized(latency_id)) == latency;
         };
-        // The host restores the processor alone; the window's choice, sent
-        // before that restore or after it, plays.
-        auto preset_p = state_with(.5f, 512);
-        preset_p->seek(0, IBStream::kIBSeekSet, nullptr);
-        if (defer)
-            check(c.load_file(preset_a), "preset A was refused");
-        check(p.setState(preset_p.get()) == kResultOk, "preset P");
-        if (!defer)
-            check(c.load_file(preset_a), "preset A was refused");
+        // What the window is told (jrp's review of PR #281 at 4cf4712b): a
+        // refused file is refused through a direct connection, and leaves what
+        // plays; an accepted one is accepted. A connection that delivers later
+        // cannot say yet.
+        const auto other_rate = [&] {
+            convolver::HostState state;
+            state.configuration = convolver::Configuration{44100, 1, 1, 0, {}, {}, {}};
+            state.configuration->paths.push_back({{.75f}, {{0, 1}}, {{0, 1}}});
+            const auto path = folder / "other rate.vstpreset";
+            const auto bytes = convolver::presets::vst3_preset(state);
+            std::ofstream out(path, std::ios::binary);
+            out.write(reinterpret_cast<const char*>(bytes.data()),
+                      static_cast<std::streamsize>(bytes.size()));
+            return path.string();
+        }();
+        check(c.load_file(other_rate) == defer, "the window was told the wrong outcome");
         deliver();
-        check(plays(.125f, 2048), "preset A does not play after a restore the host did not mirror");
+        check(plays(1, 4096), "a refused file changed what plays");
+        check(c.load_file(preset_a), "preset A was refused");
+        deliver();
+        check(plays(.125f, 2048), "preset A does not play");
         check(c.load_file(preset_b), "preset B was refused");
         deliver();
         check(plays(.25f, 1024), "preset B does not play");
@@ -5216,6 +5311,102 @@ void window_choice_orders() {
         p.terminate();
     }
     std::filesystem::remove_all(folder);
+}
+// VST3-19 with VST3-24 (jrp's review of PR #281 at 4cf4712b): a preset the
+// processor refused (44.1 kHz while the host plays 48 kHz) is accepted
+// later, once the host plays 44.1 kHz, after the user chose Latency 256 and
+// a host that delivers messages later brings that choice after the
+// restore. The restore is the later action: its 512 and filter play, are
+// shown and saved. The earlier refusal must not make the processor answer
+// the restore's request as a refusal.
+void refused_state_accepted_later() {
+    for (const bool controller_first : {false, true}) {
+        const std::string how = controller_first ? " (controller first)" : " (processor first)";
+        const auto check = [&](bool v, const std::string& what) {
+            if (!v)
+                throw std::runtime_error("refused, then accepted: " + what + how);
+        };
+        HostApplication context;
+        Handler handler;
+        Processor p;
+        Controller c;
+        check(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                  c.setComponentHandler(&handler) == kResultOk,
+              "initialize");
+        Proxy to_controller(c, true), to_processor(p, true);
+        check(p.connect(&to_controller) == kResultOk && c.connect(&to_processor) == kResultOk,
+              "connect");
+        const auto deliver = [&] {
+            while (to_controller.deliver() + to_processor.deliver() > 0) {
+            }
+        };
+        SpeakerArrangement mono = SpeakerArr::kMono;
+        check(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "buses");
+        p.activateBus(kAudio, kInput, 0, true);
+        p.activateBus(kAudio, kOutput, 0, true);
+        const auto state_with = [&](int rate, float tap, std::size_t latency) {
+            convolver::HostState state;
+            state.configuration =
+                convolver::Configuration{rate, 1, 1, 0, {}, {}, {{{tap}, {{0, 1}}, {{0, 1}}}}};
+            state.settings.emplace();
+            state.settings->latency = latency;
+            auto stream = std::make_unique<MemoryStream>();
+            check(write_state(stream.get(), state), "encode");
+            return stream;
+        };
+        const auto restore = [&](IBStream& stream) {
+            tresult result = kResultFalse;
+            stream.seek(0, IBStream::kIBSeekSet, nullptr);
+            if (!controller_first)
+                result = p.setState(&stream);
+            stream.seek(0, IBStream::kIBSeekSet, nullptr);
+            check(c.setComponentState(&stream) == kResultOk, "the controller's restore");
+            if (controller_first) {
+                stream.seek(0, IBStream::kIBSeekSet, nullptr);
+                result = p.setState(&stream);
+            }
+            return result;
+        };
+        const auto start = [&](double rate) {
+            ProcessSetup setup{kRealtime, kSample32, 512, rate};
+            check(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+                  "activate");
+            play_block(p, 1, 1, 64);
+            deliver();
+        };
+        auto first = state_with(48000, 1, 4096), x = state_with(44100, .75f, 512);
+        check(restore(*first) == kResultOk, "the first filter");
+        deliver();
+        start(48000);
+        check(restore(*x) != kResultOk, "the 44.1 kHz preset was accepted at 48 kHz");
+        deliver();
+        check(p.setActive(false) == kResultOk, "deactivate");
+        start(44100);
+        c.setParamNormalized(latency_id, normalized_latency(256));
+        check(restore(*x) == kResultOk, "the 44.1 kHz preset was refused at 44.1 kHz");
+        deliver();
+        c.report();
+        deliver();
+        MemoryStream saved_stream;
+        check(p.getState(&saved_stream) == kResultOk, "getState");
+        saved_stream.seek(0, IBStream::kIBSeekSet, nullptr);
+        const auto saved = read_state(&saved_stream);
+        const auto& config = saved.configuration;
+        const auto shown = latency_frames(c.getParamNormalized(latency_id));
+        const auto saved_latency = saved.settings.value_or(convolver::HostSettings{}).latency;
+        check(shown == 512 && p.getLatencySamples() == 512 && saved_latency == 512 && config &&
+                  config->paths.size() == 1 &&
+                  config->paths.front().impulse == std::vector<float>{.75f},
+              "shown " + std::to_string(shown) + ", playing " +
+                  std::to_string(p.getLatencySamples()) + ", saved " +
+                  std::to_string(saved_latency) + ", expected the preset's 512");
+        p.setActive(false);
+        p.disconnect(&to_controller);
+        c.disconnect(&to_processor);
+        deliver();
+        c.terminate();
+        p.terminate();
+    }
 }
 // PLUG-39 step 5a (the independent review of PR #246): a status message
 // whose report does not decode, as a damaged message would, is not shown,
@@ -5584,6 +5775,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"accepted_restore_follows_its_own_request", accepted_restore_follows_its_own_request},
         {"latest_action_wins", latest_action_wins},
         {"window_choice_orders", window_choice_orders},
+        {"refused_state_accepted_later", refused_state_accepted_later},
         {"damaged_report_message", damaged_report_message},
         {"damaged_report_keeps_status", damaged_report_keeps_status},
         {"settings_at_state_limit", settings_at_state_limit},
