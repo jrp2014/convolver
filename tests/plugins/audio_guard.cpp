@@ -46,12 +46,19 @@ Starve::Starve(std::size_t allowed, bool once) noexcept {
 Starve::~Starve() {
     budget = -1;
 }
+namespace {
+std::atomic<std::size_t> refused{0};
+}
+std::size_t refused_allocations() noexcept {
+    return refused.load(std::memory_order_relaxed);
+}
 bool allocation_allowed() noexcept {
     if (paused) // Host code the plug-in calls back.
         return true;
     if (budget == 0) {
         if (fail_once)
             budget = -1;
+        refused.fetch_add(1, std::memory_order_relaxed);
         return false;
     }
     if (budget > 0)

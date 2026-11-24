@@ -282,7 +282,12 @@ void restore_short_of_memory() {
                 seen = now;
                 since = std::chrono::steady_clock::now();
             } else if (std::chrono::steady_clock::now() - since > std::chrono::seconds(20)) {
-                std::cerr << "VST3 short of memory: an attempt has waited 20 s" << std::endl;
+                const auto before = guard::refused_allocations();
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+                std::cerr << "VST3 short of memory: an attempt has waited 20 s; allocations "
+                             "refused so far "
+                          << before << ", a second later " << guard::refused_allocations()
+                          << std::endl;
                 std::_Exit(4);
             }
         }
