@@ -52,7 +52,8 @@ convolver::HostReport shown(const std::optional<convolver::HostReport>& report) 
 // audio with its configuration has settled it, so restored state that does
 // not suit it is refused from then on (until then REAPER may still change
 // the buses it started the plug-in with).
-void play_block(Processor& p, int inputs, int outputs, int frames) {
+void play_block(Processor& p, int inputs, int outputs, int frames,
+                IParameterChanges* changes = nullptr) {
     std::vector<std::vector<float>> in(inputs, std::vector<float>(frames)),
         out(outputs, std::vector<float>(frames));
     std::vector<float*> ins, outs;
@@ -71,6 +72,7 @@ void play_block(Processor& p, int inputs, int outputs, int frames) {
     d.inputs = &input;
     d.outputs = &output;
     d.numSamples = frames;
+    d.inputParameterChanges = changes;
     require(p.process(d) == kResultOk, "a block of silence");
 }
 // The default Latency, the delay these tests expect unless they choose another.
@@ -4888,7 +4890,18 @@ void accepted_restore_follows_its_own_request() {
 //   R: the host restores preset P (tap .5, Latency 512), accepted.
 //   Q: the host restores preset Q (tap .375, Latency 128), accepted.
 //   X: the host restores a 44.1 kHz preset, refused at 48 kHz.
-// Every preset and restored state has Gain mode Set.
+//   G: the host sets Gain -3 dB (automation, or the window's edit).
+//   K: the host sets Mix 25%.
+//   B: the host turns Bypass on.
+// Every preset and restored state has Gain mode Set, Gain 0 dB, Mix 100% and
+// Bypass off. Gain, Mix and Bypass reach the processor in process(): the
+// host queues each it sets, and each edit the controller reports, for the
+// next block, which it plays where it delivers both queues, before each
+// restore and at the end.
+// Right after setting one, the window shows the value asked for, and
+// getState saves what plays, as the processor has not heard it yet; after
+// the host delivers everything, the window, what plays and what is saved
+// must all hold the winning value.
 // The rows named after jrp's cases are his reproductions: before this
 // change "W L" ended with the window and the host at 2048 while 256 played
 // and was saved, and "W R" saved A's filter and 2048 though P was restored
@@ -4925,6 +4938,8 @@ void latest_action_wins() {
         float tap;
         std::size_t latency;
         GainMode mode = GainMode::set;
+        double gain = 0, mix = 1;
+        bool bypass = false;
     };
     const Row rows[] = {
         {"jrp's case 2: a window preset, then Latency before its answer", "WL", .125f, 256},
@@ -4952,6 +4967,24 @@ void latest_action_wins() {
         {"jrp's review 4: Latency, a filter without settings, then a preset", "LFw", .25f, 1024},
         {"a filter without settings, then Latency", "FL", .0625f, 256},
         {"a window preset, then a filter without settings", "WF", .0625f, 2048},
+        {"a window preset, then Gain", "WG", .125f, 2048, GainMode::set, -3},
+        {"Gain, then a window preset", "GW", .125f, 2048},
+        {"the review of 574686d: a window preset, Gain, then a refused host preset", "WGX", .125f,
+         2048, GainMode::set, -3},
+        {"Gain, then a host preset", "GR", .5f, 512},
+        {"a host preset, then Gain", "RG", .5f, 512, GainMode::set, -3},
+        {"Gain, then a refused host preset", "GX", 1, 4096, GainMode::set, -3},
+        {"a window preset, Gain, then a host preset", "WGR", .5f, 512},
+        {"a window preset, then Mix", "WK", .125f, 2048, GainMode::set, 0, .25},
+        {"Mix, then a window preset", "KW", .125f, 2048},
+        {"a window preset, Mix, then a refused host preset", "WKX", .125f, 2048, GainMode::set, 0,
+         .25},
+        {"a host preset, then Mix", "RK", .5f, 512, GainMode::set, 0, .25},
+        {"Bypass, then a window preset", "BW", .125f, 2048, GainMode::set, 0, 1, true},
+        {"a window preset, Bypass, then a refused host preset", "WBX", .125f, 2048, GainMode::set,
+         0, 1, true},
+        {"Bypass, then a host preset", "BR", .5f, 512},
+        {"Bypass, then a refused host preset", "BX", 1, 4096, GainMode::set, 0, 1, true},
     };
     const char* const deliveries[] = {"no delivery", "the processor's queue", "both queues"};
     std::size_t runs = 0;
@@ -4984,16 +5017,48 @@ void latest_action_wins() {
                               c.initialize(&context) == kResultOk &&
                               c.setComponentHandler(&handler) == kResultOk,
                           "initialize");
-                    if (hands_back)
-                        handler.on_perform = [&](ParamID id, ParamValue value) {
+                    // Gain, Mix and Bypass the host passes to the processor in its
+                    // next block.
+                    std::vector<std::pair<ParamID, ParamValue>> queued;
+                    const auto queue = [&](ParamID id, ParamValue value) {
+                        if (id == gain_id || id == mix_id || id == bypass_id)
+                            queued.emplace_back(id, value);
+                    };
+                    handler.on_perform = [&](ParamID id, ParamValue value) {
+                        queue(id, value);
+                        if (hands_back)
                             c.setParamNormalized(id, value);
-                        };
+                    };
                     Proxy to_controller(c, true), to_processor(p, true);
                     check(p.connect(&to_controller) == kResultOk &&
                               c.connect(&to_processor) == kResultOk,
                           "connect");
+                    const auto deliver_messages = [&] {
+                        bool any = false;
+                        while (to_controller.deliver() + to_processor.deliver() > 0)
+                            any = true;
+                        return any;
+                    };
+                    // The host's next block, with what it queued.
+                    const auto play_queued = [&] {
+                        if (queued.empty())
+                            return false;
+                        ParameterChanges changes;
+                        for (const auto& [id, value] : queued) {
+                            int32 index = 0;
+                            if (auto* data = changes.addParameterData(id, index))
+                                data->addPoint(0, value, index);
+                        }
+                        queued.clear();
+                        play_block(p, 1, 1, 64, &changes);
+                        return true;
+                    };
+                    // That block, then the messages, until neither has more.
                     const auto deliver = [&] {
-                        while (to_controller.deliver() + to_processor.deliver() > 0) {
+                        for (;;) {
+                            const bool played = play_queued();
+                            if (!deliver_messages() && !played)
+                                return;
                         }
                     };
                     SpeakerArrangement mono = SpeakerArr::kMono;
@@ -5013,18 +5078,36 @@ void latest_action_wins() {
                     // What the host was told before the last action, and the
                     // latency it read when asked to restart.
                     std::size_t edits_before = 0, reads_before = 0;
+                    // Order 2: a window preset's answer delivered between the host's
+                    // two restore calls reports again a Gain or Mix set after that
+                    // preset; the controller cannot tell that the processor's restore
+                    // came first, and the host passes the edit to process() after the
+                    // restore, so it plays, shows and saves (the contract's VST3-24
+                    // paragraph). Cleared by a later action that sets Gain or Mix.
+                    std::optional<ParamValue> split_gain, split_mix;
                     std::vector<std::size_t> latency_read;
                     // Order 2: a host that delivers the queued messages between its
                     // two calls (jrp's review of PR #281 at 4cf4712b). What it was
                     // told then answers earlier actions: the restore's own call is
                     // the host's last word.
+                    // The host passes what it queued to the processor before it
+                    // restores: a Gain or Mix delivered after a restore it was set
+                    // before plays then (the contract's VST3-18 paragraph).
                     const auto restore = [&](IBStream& stream) {
                         tresult result = kResultFalse;
+                        play_queued();
                         stream.seek(0, IBStream::kIBSeekSet, nullptr);
                         if (order != 1)
                             result = p.setState(&stream);
                         if (order == 2) {
+                            const auto at = handler.edits.size();
                             deliver();
+                            for (auto e = at; e < handler.edits.size(); ++e)
+                                if (handler.edits[e].kind == 'p' &&
+                                    (handler.edits[e].id == gain_id ||
+                                     handler.edits[e].id == mix_id))
+                                    (handler.edits[e].id == gain_id ? split_gain : split_mix) =
+                                        handler.edits[e].value;
                             edits_before = handler.edits.size();
                             reads_before = latency_read.size();
                         }
@@ -5072,6 +5155,8 @@ void latest_action_wins() {
                         }
                         edits_before = handler.edits.size();
                         reads_before = latency_read.size();
+                        if (actions[i] != 'L' && actions[i] != 'M' && actions[i] != 'B')
+                            split_gain = split_mix = std::nullopt;
                         if (i == chosen_last) {
                             dirty_at_choice = handler.dirty;
                             edits_at_choice = handler.edits.size();
@@ -5093,6 +5178,33 @@ void latest_action_wins() {
                             c.setParamNormalized(gain_mode_id,
                                                  normalized_gain_mode(GainMode::no_clipping));
                             break;
+                        case 'G':
+                        case 'K':
+                        case 'B': {
+                            const auto id = actions[i] == 'G'   ? gain_id
+                                            : actions[i] == 'K' ? mix_id
+                                                                : bypass_id;
+                            const ParamValue value = actions[i] == 'G'   ? normalized_gain(-3)
+                                                     : actions[i] == 'K' ? .25
+                                                                         : 1;
+                            c.setParamNormalized(id, value);
+                            queue(id, value);
+                            // Asked for, shown at once; not yet heard by the processor,
+                            // so a save in between keeps what plays.
+                            MemoryStream between;
+                            check(p.getState(&between) == kResultOk, "getState in between");
+                            between.seek(0, IBStream::kIBSeekSet, nullptr);
+                            const auto at = read_state(&between);
+                            const auto now = at.settings.value_or(convolver::HostSettings{});
+                            const auto playing = p.settings();
+                            check(c.getParamNormalized(id) == value &&
+                                      now.gain_db == playing.gain_db && now.mix == playing.mix,
+                                  "right after setting it, the window shows " +
+                                      std::to_string(c.getParamNormalized(id)) + " for " +
+                                      std::to_string(value) +
+                                      ", or a save in between differs from what plays");
+                            break;
+                        }
                         case 'R':
                             check(restore(*preset_p) == kResultOk, "preset P was refused");
                             break;
@@ -5117,6 +5229,32 @@ void latest_action_wins() {
                     const auto saved_mode =
                         saved.settings.value_or(convolver::HostSettings{}).gain_mode;
                     const auto shown_mode = gain_mode(c.getParamNormalized(gain_mode_id));
+                    const auto settings_saved = saved.settings.value_or(convolver::HostSettings{});
+                    const auto shown_gain =
+                        gain_db(static_cast<float>(c.getParamNormalized(gain_id)));
+                    const auto shown_mix = c.getParamNormalized(mix_id);
+                    const bool shown_bypass = c.getParamNormalized(bypass_id) >= .5;
+                    const auto near = [](double a, double b) { return std::abs(a - b) < 1e-3; };
+                    const double expected_gain =
+                        split_gain ? gain_db(static_cast<float>(*split_gain)) : row.gain;
+                    const double expected_mix = split_mix.value_or(row.mix);
+                    check(near(shown_gain, expected_gain) &&
+                              near(p.settings().gain_db, expected_gain) &&
+                              near(settings_saved.gain_db, expected_gain) &&
+                              near(shown_mix, expected_mix) &&
+                              near(p.settings().mix, expected_mix) &&
+                              near(settings_saved.mix, expected_mix) &&
+                              shown_bypass == row.bypass && saved.bypass == row.bypass,
+                          "expected Gain " + std::to_string(expected_gain) + " dB, Mix " +
+                              std::to_string(expected_mix) + ", Bypass " +
+                              (row.bypass ? "on" : "off") + "; shown " +
+                              std::to_string(shown_gain) + ", " + std::to_string(shown_mix) + ", " +
+                              (shown_bypass ? "on" : "off") + "; playing " +
+                              std::to_string(p.settings().gain_db) + ", " +
+                              std::to_string(p.settings().mix) + "; saved " +
+                              std::to_string(settings_saved.gain_db) + ", " +
+                              std::to_string(settings_saved.mix) + ", " +
+                              (saved.bypass ? "on" : "off"));
                     const auto& config = saved.configuration;
                     const bool saved_filter =
                         config && config->paths.size() == 1 &&

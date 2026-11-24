@@ -433,6 +433,7 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
     try {
         std::string report;
         HostSettings playing;
+        bool bypassed = false;
         RestoreFollow::Answer follow;
         {
             const Locked lock(*this);
@@ -441,6 +442,7 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
             // PLUG-39 step 5: the report holds the Status line too.
             report = encode_report(report_locked());
             playing = settings();
+            bypassed = bypass_.load();
             follow = follow_.take_answer();
         }
         if (!getPeer())
@@ -463,6 +465,8 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
             attributes->setFloat("playing mix", playing.mix);
             attributes->setInt("playing latency", static_cast<int64>(playing.latency));
             attributes->setInt("playing gain mode", static_cast<int64>(playing.gain_mode));
+            // VST3-24: Bypass too, which a refused state set in the controller.
+            attributes->setInt("playing bypass", bypassed ? 1 : 0);
             attributes->setInt("heard latency request", follow.heard_latency);
             attributes->setInt("heard gain mode request", follow.heard_gain_mode);
             // VST3-19: the outcome came from this processor's own restore,
@@ -833,7 +837,8 @@ tresult Processor::load_state(IBStream* stream) {
         // settings were not known is not in that state, so restoring it
         // forgot the list, the window never read it again, and the export
         // was silent. State that is exactly what the plug-in would save now
-        // changes nothing, so the list keeps waiting.
+        // changes nothing, so the list keeps waiting; nor does it supersede
+        // a window choice still queued (VST3-24): no setting changed.
         if (request.kind == HostRequestKind::restore && filter_.list_waits() &&
             unchanged_state(next))
             return kResultOk;
@@ -1046,6 +1051,9 @@ void RestoreFollow::read(std::uint64_t digest) noexcept {
     early_ = 0;
     if (read_requested_)
         return;
+    // More restores than that before any message is delivered: the oldest
+    // is forgotten, and a window choice queued before it is no longer
+    // superseded by it.
     if (unrequested_count_ == unrequested_limit) {
         std::move(unrequested_.begin() + 1, unrequested_.end(), unrequested_.begin());
         --unrequested_count_;
@@ -1093,7 +1101,13 @@ RestoreFollow::Again RestoreFollow::requested(std::uint64_t follow,
                                     [follow](const Unrequested& u) { return u.digest == follow; });
     bool not_installed = false;
     if (match == end) {
+        // Its restore is still to come. Every earlier restore's request
+        // arrived before this one, so a restore still kept was never
+        // mirrored: a host that restored the processor alone, or passed
+        // setComponentState other bytes. It no longer holds window choices
+        // back (the independent review of PR #281).
         early_ = follow;
+        unrequested_count_ = 0;
     } else {
         not_installed = !match->accepted;
         if (not_installed)

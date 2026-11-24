@@ -1305,7 +1305,17 @@ the plan's Gain modes (12 November 2026); its meters follow later
   processor accepted the restore, the restore's settings stand (PLUG-48);
   if it refused it, the window's choice still plays, and its settings are
   reported as edits, with the project marked changed, when that outcome
-  arrives (`followed refused`).
+  arrives (`followed refused`); a Gain or Mix set after the choice is
+  reported with the value it was set to, which the refused state replaced
+  in the controller. The status after a restore also carries the Bypass
+  that plays, which the controller takes unless the host set Bypass since,
+  so a refused state's Bypass is not shown. One order still ends at an
+  older Gain or Mix: a host that delivers messages between its two restore
+  calls brings a window preset's answer after the processor's restore, the
+  controller reports again the Gain set after that preset, and the host
+  passes it to `process()` after the restore, so it plays, is shown and is
+  saved instead of the restored preset's. The controller cannot tell that
+  the processor's restore came first.
 
   The processor keeps the restores it has read whose report request has
   not arrived, oldest first (`RestoreFollow`); each request matches one, in
@@ -1314,15 +1324,22 @@ the plan's Gain modes (12 November 2026); its meters follow later
   request was sent before the controller mirrored that restore: the
   processor answers it as superseded (`superseded`) and logs why. A request
   that arrives before its restore (the controller first) means its restore
-  does not wait; a request for a restore not accepted answers with what
-  plays, also after a later install. This relies on the SDK's rule that the
-  host restores both halves, as Audacity 4 does (`VST3Wrapper`); a host
+  does not wait, and the restores still kept were never mirrored (every
+  earlier request has arrived), so they are dropped; a request for a
+  restore not accepted answers with what plays, also after a later
+  install. A restore of exactly what the plug-in would save while a
+  configuration list waits changes nothing (PLUG-49), so it supersedes
+  nothing either. More than eight restores before any message is
+  delivered forget the oldest. This relies on the SDK's rule that the
+  host restores both halves, as Audacity 4 does after a `setState` that
+  succeeds (`VST3Wrapper`); a host
   that delivers messages between its two calls is covered, but one that
   restored the processor alone would hold window choices back until its
   next restore of both (`vst3.adapter` `latest_action_wins`: rows of user
-  and host actions, each with the filter, Latency and Gain mode that should
-  win, run with every delivery between the actions, in three restore
-  orders, for a host with `setDirty` and one without it that hands edits
+  and host actions, each with the filter, Latency, Gain mode, Gain, Mix and
+  Bypass that should win, run with every delivery between the actions, in
+  three restore orders, with Gain, Mix and Bypass reaching the processor in
+  the host's next block (shown at once, saved as what plays until then), for a host with `setDirty` and one without it that hands edits
   back, checking the window, what plays, what is saved and what the host
   was last told; `window_choice_orders`; `refused_state_accepted_later`).
 

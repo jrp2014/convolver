@@ -249,9 +249,10 @@ class RestoreFollow {
     // request for that restore, was sent before the controller mirrored it:
     // the host's restore is the later action and keeps playing. True while
     // an accepted restore's request has not arrived. The SDK has the host
-    // restore both halves (Audacity 4 does, VST3Wrapper); a host that
-    // restored the processor alone would hold window choices back until its
-    // next restore of both.
+    // restore both halves (Audacity 4 calls setComponentState after a
+    // setState that succeeds, VST3Wrapper); a host that restored the
+    // processor alone would hold window choices back until its next restore
+    // of both.
     bool waits_for_mirror() const noexcept;
 
   private:
@@ -584,10 +585,14 @@ class Controller final : public Steinberg::Vst::EditController,
     }
     // VST3-23: a load_message's answer said the processor accepted it with
     // a preset's settings, which it plays. Reports to the host, as edits,
-    // those the user has not changed since `request`, and the Gain and Mix
-    // the user set since, which the preset replaced in the processor. True
-    // if it reported any.
-    bool publish_preset(Steinberg::int64 request, const HostSettings& preset, bool& restart);
+    // those the user has not changed since the load's `request`, and the
+    // Gain and Mix the user set since, which the preset may have replaced
+    // in the processor. A Latency or Gain mode chosen after `choices_since`
+    // keeps its value (the request, or the refused restore's mirror after
+    // it: the processor plays the choices sent before that). True if it
+    // reported any.
+    bool publish_preset(Steinberg::int64 request, Steinberg::int64 choices_since,
+                        const HostSettings& preset, bool& restart);
     // VST3-23 (jrp's rerun of PR #281): a Latency or Gain mode set to the
     // value shown is still the user's choice while a load_message's answer
     // is to come, as a preset it loads may change that setting: Latency 256,
@@ -635,13 +640,18 @@ class Controller final : public Steinberg::Vst::EditController,
     // processor's outcome for that state sets the parameters (notify). 0: none.
     std::uint64_t follow_state_ = 0;
     // VST3-23, under status_lock_: the last setComponentState's number (0:
-    // none), and the last Gain and Mix the host or the window set, changed
+    // none), and the last Gain, Mix and Bypass the host or the window set, changed
     // or not (VST3-18). An answer leaves a Gain or Mix set after the action it
     // answers as it is: they reach the processor in process(), whose order
     // against the answer cannot be told, so the host's latest value counts.
     // Latency and Gain mode go as messages, in order, and a later choice
     // keeps its value once the processor has heard it or will.
-    Steinberg::int64 mirrored_ = 0, gain_set_ = 0, mix_set_ = 0;
+    Steinberg::int64 mirrored_ = 0, gain_set_ = 0, mix_set_ = 0, bypass_set_ = 0;
+    // VST3-24, under status_lock_: the Gain and Mix those sets left, which
+    // a later setComponentState replaces in the controller; a window
+    // preset's answer held back for a refused restore reports them again
+    // (the independent review of PR #281).
+    Steinberg::Vst::ParamValue gain_value_ = 0, mix_value_ = 0;
     // VST3-23, under status_lock_: publish_preset() or VST3-17's unchanged
     // Latency edit is reporting edits; a host that hands one straight back
     // to setParamNormalized is not recorded as setting it.

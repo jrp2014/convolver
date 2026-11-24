@@ -159,11 +159,6 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     const bool loaded = load_request || load_retried;
     attributes->getInt("accepted", load_accepted);
     attributes->getInt("latency request", latency_request);
-    // VST3-24: the processor did not load the file, as a restore it had
-    // accepted since the request superseded it.
-    int64 load_superseded = 0;
-    if (load_request)
-        attributes->getInt("superseded", load_superseded);
     // PLUG-26: the settings an accepted .vstpreset applied, which the
     // processor already plays.
     double preset_gain = 0, preset_mix = 0;
@@ -214,6 +209,9 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
             playing->gain_mode = static_cast<GainMode>(mode);
         }
     }
+    // VST3-24: the Bypass that plays then; absent from an older processor.
+    int64 playing_bypass = -1;
+    attributes->getInt("playing bypass", playing_bypass);
     std::optional<HostReport> report;
     std::string format;
     try {
@@ -236,13 +234,15 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     bool changed = false, restart = false;
     std::optional<HostSettings> followed;
     // VST3-18: the settings the answer leaves as they are.
-    bool keep_gain = false, keep_mix = false, keep_mode = false, keep_latency = false;
+    bool keep_gain = false, keep_mix = false, keep_mode = false, keep_latency = false,
+         keep_bypass = false;
     // VST3-24: the load was answered after a later setComponentState, so
     // its settings are left to that restore's outcome; and, when such a
     // load's choice still plays because that restore was refused, the
-    // restore's number (`held`: its settings are reported below).
+    // load's number (`held`) and the restore's (`held_mirror`): its
+    // settings are reported below.
     bool after_restore = false;
-    int64 held = 0;
+    int64 held = 0, held_mirror = 0;
     {
         std::lock_guard lock(status_lock_);
         if (load_request) {
@@ -266,13 +266,13 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         if (follow_state_ && playing &&
             static_cast<std::uint64_t>(followed_state) == follow_state_) {
             followed = playing;
-            // Compared with actions since the restore's mirror, as the
-            // settings below are (VST3-18): the mirror replaced earlier ones.
-            held = followed_refused && load_held_ ? mirrored_ : 0;
+            held = followed_refused ? load_held_ : 0;
+            held_mirror = mirrored_;
             load_held_ = 0;
         }
         keep_gain = gain_set_ > mirrored_;
         keep_mix = mix_set_ > mirrored_;
+        keep_bypass = bypass_set_ > mirrored_;
         // Only a choice made since the restore: one before it was replaced
         // by the state, and one the processor never heard (a message lost)
         // must not keep a setting for later restores.
@@ -311,6 +311,17 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         if (latency_frames(getParamNormalized(latency_id)) != before)
             restart = true;
     }
+    // VST3-24 (Bypass rows of `latest_action_wins`): a refused state set the
+    // controller's Bypass, while the processor kept its own; as Gain, a
+    // Bypass the host set since the restore keeps its value. Bypass is not a
+    // preset setting, so also after a held window choice.
+    if (followed && playing_bypass >= 0 && !keep_bypass) {
+        const ParamValue bypass = playing_bypass ? 1 : 0;
+        if (getParamNormalized(bypass_id) != bypass) {
+            EditController::setParamNormalized(bypass_id, bypass);
+            changed = true;
+        }
+    }
     // A window asks for the report twice a second; only a new status line
     // is news for the host.
     if (changed) {
@@ -339,9 +350,9 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         preset.mix = preset_mix;
         preset.latency = static_cast<std::size_t>(preset_latency);
         preset.gain_mode = static_cast<GainMode>(preset_mode);
-        edited = publish_preset(load_request, preset, restart);
+        edited = publish_preset(load_request, load_request, preset, restart);
     } else if (held) {
-        edited = publish_preset(held, *followed, restart);
+        edited = publish_preset(held, held_mirror, *followed, restart);
     }
     // The component state now holds the file's filter: the host saves it
     // only if it knows the project changed. Edits reported for a preset's
@@ -387,8 +398,10 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         componentHandler->restartComponent(kLatencyChanged);
     return readable ? kResultOk : kInvalidArgument;
 }
-bool Controller::publish_preset(int64 request, const HostSettings& preset, bool& restart) {
+bool Controller::publish_preset(int64 request, int64 choices_since, const HostSettings& preset,
+                                bool& restart) {
     bool kept_gain = false, kept_mix = false, kept_mode = false, kept_latency = false;
+    ParamValue gain = 0, mix = 0;
     {
         std::lock_guard lock(status_lock_);
         // VST3-23 (jrp's review of PR #279): the user changed these after
@@ -397,10 +410,18 @@ bool Controller::publish_preset(int64 request, const HostSettings& preset, bool&
         // value. A later Gain or Mix may have reached the processor in
         // process() before the preset replaced it: it is reported again
         // below, so the host hands it to the processor once more.
+        // The values they were set to: a refused restore mirrored since
+        // replaced them in the controller (the independent review of PR
+        // #281: a window preset, Gain -3, then a refused host preset showed
+        // and reported the preset's -6).
         kept_gain = gain_set_ > request;
         kept_mix = mix_set_ > request;
-        kept_mode = gain_mode_requests_ > request;
-        kept_latency = latency_requests_ > request;
+        gain = gain_value_;
+        mix = mix_value_;
+        // After a refused restore's mirror, the processor plays the choices
+        // sent before it, which `preset` (what plays) holds.
+        kept_mode = gain_mode_requests_ > choices_since;
+        kept_latency = latency_requests_ > choices_since;
         publishing_ = true;
     }
     // One gesture for each setting that changes, so the host's parameters and
@@ -411,23 +432,25 @@ bool Controller::publish_preset(int64 request, const HostSettings& preset, bool&
     // change, so no latency_message follows. A changed Latency asks for the
     // restart, as a restored one does (setComponentState).
     bool edited = false;
-    const auto report = [&](ParamID id, ParamValue value, bool kept) {
-        if (getParamNormalized(id) == value)
+    const auto report = [&](ParamID id, ParamValue value, std::optional<ParamValue> kept) {
+        const auto target = kept.value_or(value);
+        if (getParamNormalized(id) == target && target == value)
             return;
-        if (!kept)
-            EditController::setParamNormalized(id, value);
+        if (getParamNormalized(id) != target)
+            EditController::setParamNormalized(id, target);
         beginEdit(id);
         performEdit(id, getParamNormalized(id));
         endEdit(id);
         edited = true;
     };
+    const auto kept = [](bool k, ParamValue v) { return k ? std::optional(v) : std::nullopt; };
     const auto before = latency_frames(getParamNormalized(latency_id));
-    report(gain_id, normalized_gain(preset.gain_db), kept_gain);
+    report(gain_id, normalized_gain(preset.gain_db), kept(kept_gain, gain));
     if (!kept_mode)
-        report(gain_mode_id, normalized_gain_mode(preset.gain_mode), false);
-    report(mix_id, std::clamp(preset.mix, 0.0, 1.0), kept_mix);
+        report(gain_mode_id, normalized_gain_mode(preset.gain_mode), std::nullopt);
+    report(mix_id, std::clamp(preset.mix, 0.0, 1.0), kept(kept_mix, mix));
     if (!kept_latency)
-        report(latency_id, normalized_latency(preset.latency), false);
+        report(latency_id, normalized_latency(preset.latency), std::nullopt);
     if (latency_frames(getParamNormalized(latency_id)) != before)
         restart = true;
     std::lock_guard lock(status_lock_);
@@ -461,6 +484,12 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
         const bool before = getParamNormalized(bypass_id) >= .5;
         const auto result = EditController::setParamNormalized(id, value);
         const bool after = getParamNormalized(bypass_id) >= .5;
+        if (result == kResultOk) {
+            // VST3-24: numbered as a Gain set is (it reaches the processor
+            // in process() too).
+            std::lock_guard lock(status_lock_);
+            bypass_set_ = next_action();
+        }
         if (result == kResultOk && after != before) {
             if (auto message = owned(allocateMessage())) {
                 message->setMessageID(bypass_message);
@@ -510,8 +539,10 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
         const auto result = EditController::setParamNormalized(id, value);
         if (result == kResultOk) {
             std::lock_guard lock(status_lock_);
-            if (!publishing_)
+            if (!publishing_) {
                 (id == gain_id ? gain_set_ : mix_set_) = next_action();
+                (id == gain_id ? gain_value_ : mix_value_) = getParamNormalized(id);
+            }
         }
         return result;
     }
