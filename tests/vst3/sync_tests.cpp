@@ -446,9 +446,10 @@ struct Pair {
     bool restore(const HostState& state, bool controller_first, bool split_delivery) {
         auto stream = stream_of(state);
         tresult result = kResultFalse;
-        // A host does not pass automation queued before a restore after it
-        // (JUCE's host fix a37f5f23 for the same race).
-        host.pending.clear();
+        // A host passes automation queued before a restore before it, never
+        // after it (the race JUCE's host fixed in a37f5f23).
+        if (!host.pending.empty())
+            play();
         if (!controller_first)
             result = p.setState(stream.get());
         if (split_delivery)

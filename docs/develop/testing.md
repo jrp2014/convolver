@@ -942,7 +942,7 @@ a margin instead. The validator, the adapter tests and the plug-in
 all use Steinberg's SDK code, so CI also loads the bundle in an independent
 host, pluginval.
 
-`vst3.sync` (VST3-25, [`sync_tests.cpp`](../../tests/vst3/sync_tests.cpp))
+`convolver_vst3_sync` (VST3-25, [`sync_tests.cpp`](../../tests/vst3/sync_tests.cpp))
 generates sequences of what a host and a user do to one processor and
 controller pair: Latency and Gain mode choices, Gain, Mix and Bypass
 automation, a preset and a missing file chosen in the window, and an
@@ -965,7 +965,10 @@ restore on another thread in an offline render, and a save between a Gain
 edit and its delivery. A failure prints the sequence and its variant, for
 example `delaying proxy, processor first, playing: W [none] G`;
 `--tsv FILE` writes every result, and `--random`, `--seed` and `--length`
-change the random part.
+change the random part. It is built with the VST3 tests but is not yet a
+CTest test, because `main` still fails it; run
+`build/plugins/vst3/convolver_vst3_sync` after a build with the VST3 SDK.
+The change that makes it pass registers it.
 
 The [VST3 workflow](../../.github/workflows/vst3.yml) runs these tests in
 Release builds on Linux (Ooura), macOS and Windows, with the validator and
