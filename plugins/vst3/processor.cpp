@@ -49,7 +49,7 @@ std::uint32_t wav_speakers(SpeakerArrangement arrangement) noexcept {
     constexpr SpeakerArrangement shared = (SpeakerArrangement(1) << 18) - 1;
     return arrangement & ~shared ? 0 : static_cast<std::uint32_t>(arrangement);
 }
-HostState read_state(IBStream* stream) {
+HostState read_state(IBStream* stream, std::uint64_t* digest) {
     std::array<std::byte, 4> header{};
     if (!transfer(stream, header.data(), 4, false))
         throw std::invalid_argument("missing state length");
@@ -59,7 +59,18 @@ HostState read_state(IBStream* stream) {
     std::vector<std::byte> bytes(size);
     if (!transfer(stream, bytes.data(), size, false))
         throw std::invalid_argument("truncated state");
-    return decode_host_state(bytes);
+    auto state = decode_host_state(bytes);
+    if (digest) {
+        // VST3-20: FNV-1a over the bytes as read, which both halves read
+        // from the same stream. It allocates nothing and cannot throw.
+        std::uint64_t h = 14695981039346656037ull;
+        for (const auto b : bytes) {
+            h ^= static_cast<std::uint64_t>(b);
+            h *= 1099511628211ull;
+        }
+        *digest = h ? h : 1;
+    }
+    return state;
 }
 bool write_state(IBStream* stream, const HostState& state) {
     auto bytes = encode_host_state(state);
@@ -761,8 +772,7 @@ tresult Processor::load_state(IBStream* stream) {
     try {
         HostState next;
         try {
-            next = read_state(stream);
-            digest = state_digest(next);
+            next = read_state(stream, &digest);
             // PLUG-48: the controller mirrored this state; the status that
             // follows says what plays after this restore, accepted or not.
             if (digest == mirrored_state_)
@@ -967,16 +977,6 @@ Advice Processor::notice() {
 std::optional<HostFailure> Processor::failure() {
     const Locked lock(*this);
     return filter_.failure();
-}
-std::uint64_t state_digest(const HostState& state) {
-    // FNV-1a over the state as encoded: the same in both halves of the
-    // plug-in, which decode the same stream.
-    std::uint64_t h = 14695981039346656037ull;
-    for (const auto b : encode_host_state(state)) {
-        h ^= static_cast<std::uint64_t>(b);
-        h *= 1099511628211ull;
-    }
-    return h ? h : 1;
 }
 // Whether `next` is what getState() would save now (the lock held); false
 // when that cannot be told (out of memory), so the state is installed.

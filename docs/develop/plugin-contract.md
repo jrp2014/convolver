@@ -1216,10 +1216,11 @@ the plan's Gain modes (12 November 2026); its meters follow later
   they were, but the controller had mirrored the refused state, so the
   window and the host showed Latency 0 while 1024 played.
   `setComponentState` sends the processor a report request naming the
-  state it mirrored (`follow state`, a digest of the state as decoded,
-  `state_digest()`, which both halves compute alike), so the answer also
-  comes when no window is open; while the host plays, that request reads a
-  waiting list again, as the window's does. The status that follows the
+  state it mirrored (`follow state`, a digest of the state's bytes as
+  `read_state()` reads them, the same in both halves; it copies nothing, so
+  memory running short cannot refuse a valid state, VST3-20), so the
+  answer also comes when no window is open; while the host plays, that
+  request reads a waiting list again, as the window's does. The status that follows the
   processor's outcome for that state carries the digest (`followed state`)
   and the settings that play: the answer to the request when the processor
   had already refused the state (the SDK's order), or the status after its
