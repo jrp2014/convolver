@@ -4293,6 +4293,275 @@ void messages_through_proxies() {
     }
     std::filesystem::remove_all(folder);
 }
+// VST3-18 (jrp's review of 0.18.12, 23 November 2026): a host that delivers
+// messages later. After a refused preset the user chose Latency 256 before
+// the processor's answer to the restore arrived; both halves had 256, then
+// that older answer set the controller back to the 1024 played at the
+// refusal, and Gain, Mix and Gain mode to what played then, while the
+// processor kept 256. A Latency or Gain mode the processor had not heard
+// when it answered, and a Gain or Mix changed since the restore, keep their
+// values; the others still follow what plays.
+void edits_survive_late_answer() {
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk,
+            "late answer: initialize");
+    Proxy to_controller(c, true), to_processor(p, true);
+    require(p.connect(&to_controller) == kResultOk && c.connect(&to_processor) == kResultOk,
+            "late answer: connect");
+    const auto deliver = [&] {
+        while (to_controller.deliver() + to_processor.deliver() > 0) {
+        }
+    };
+    SpeakerArrangement mono = SpeakerArr::kMono;
+    require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "late answer: buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    const auto state_at = [](int rate, convolver::HostSettings settings) {
+        convolver::HostState state;
+        state.configuration =
+            convolver::Configuration{rate, 1, 1, 0, {}, {}, {{{.5f}, {{0, 1}}, {{0, 1}}}}};
+        state.settings = settings;
+        auto stream = std::make_unique<MemoryStream>();
+        require(write_state(stream.get(), state), "late answer: encode");
+        return stream;
+    };
+    // The SDK's order: the processor first, then the controller.
+    const auto restore = [&](IBStream& stream) {
+        stream.seek(0, IBStream::kIBSeekSet, nullptr);
+        const auto result = p.setState(&stream);
+        stream.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(c.setComponentState(&stream) == kResultOk, "late answer: the controller's");
+        return result;
+    };
+    auto playing = state_at(48000, {.gain_db = -6, .mix = 1, .latency = 1024});
+    require(restore(*playing) == kResultOk, "late answer: the first filter");
+    deliver();
+    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "late answer: activate");
+    play_block(p, 1, 1, 64);
+    deliver();
+    // Gain and Mix reach the processor in process(), as hosts pass them.
+    const auto host_sends = [&](ParamID id, ParamValue value) {
+        ParameterChanges changes;
+        int32 index = 0;
+        changes.addParameterData(id, index)->addPoint(0, value, index);
+        std::vector<float> in(64), out(64);
+        float* ins[] = {in.data()};
+        float* outs[] = {out.data()};
+        AudioBusBuffers input{}, output{};
+        input.numChannels = output.numChannels = 1;
+        input.channelBuffers32 = ins;
+        output.channelBuffers32 = outs;
+        ProcessData d{};
+        d.symbolicSampleSize = kSample32;
+        d.numInputs = d.numOutputs = 1;
+        d.inputs = &input;
+        d.outputs = &output;
+        d.numSamples = 64;
+        d.inputParameterChanges = &changes;
+        require(p.process(d) == kResultOk, "late answer: a block with the host's edit");
+    };
+    const auto shown_latency = [&] { return latency_frames(c.getParamNormalized(latency_id)); };
+    const auto apart = [&](const char* what) {
+        return std::string("late answer: ") + what + ": the parameter shows Latency " +
+               std::to_string(shown_latency()) + " while the processor plays " +
+               std::to_string(p.getLatencySamples());
+    };
+    require(p.getLatencySamples() == 1024 && shown_latency() == 1024, apart("before").c_str());
+    const auto edits = handler.edits.size();
+    // A preset for 44.1 kHz from the host's menu: refused, but the
+    // controller mirrors it until the processor's answer arrives.
+    auto other_rate = state_at(
+        44100,
+        {.gain_db = 0, .mix = .25, .latency = 0, .gain_mode = convolver::GainMode::estimate});
+    require(restore(*other_rate) != kResultOk, "late answer: the 44.1 kHz preset was accepted");
+    // Before that answer, the user chooses Latency 256, Gain -12 dB and No
+    // clipping, but leaves Mix.
+    require(c.setParamNormalized(latency_id, normalized_latency(256)) == kResultOk &&
+                c.setParamNormalized(gain_id, normalized_gain(-12)) == kResultOk &&
+                c.setParamNormalized(gain_mode_id,
+                                     normalized_gain_mode(convolver::GainMode::no_clipping)) ==
+                    kResultOk,
+            "late answer: the user's edits");
+    host_sends(gain_id, normalized_gain(-12));
+    // The processor reads the restore's request, then the edits; both
+    // halves have 256. Then its answers arrive, the older first.
+    to_processor.deliver();
+    require(p.getLatencySamples() == 256 && shown_latency() == 256,
+            apart("after the edit reached the processor").c_str());
+    to_controller.deliver();
+    require(p.getLatencySamples() == 256 && shown_latency() == 256,
+            apart("after the older answer").c_str());
+    require(c.getParamNormalized(gain_id) == normalized_gain(-12) &&
+                std::abs(p.settings().gain_db + 12) < 1e-9,
+            "late answer: the older answer set back the user's Gain");
+    require(gain_mode(c.getParamNormalized(gain_mode_id)) == convolver::GainMode::no_clipping &&
+                p.settings().gain_mode == convolver::GainMode::no_clipping,
+            "late answer: the older answer set back the user's Gain mode");
+    // Mix was not edited: it shows what plays, not the refused 25%.
+    require(c.getParamNormalized(mix_id) == 1,
+            "late answer: an unedited Mix does not show what plays");
+    // Reading the Status again keeps them together.
+    c.report();
+    deliver();
+    require(p.getLatencySamples() == 256 && shown_latency() == 256,
+            apart("after reading the Status again").c_str());
+    // A later refused restore follows again: edits count since the restore
+    // they come after. Only Mix is edited this time.
+    require(restore(*other_rate) != kResultOk, "late answer: refused again");
+    require(c.setParamNormalized(mix_id, .5) == kResultOk, "late answer: the user's Mix");
+    host_sends(mix_id, .5);
+    deliver();
+    require(p.getLatencySamples() == 256 && shown_latency() == 256,
+            apart("after the second refusal").c_str());
+    require(c.getParamNormalized(mix_id) == .5 && p.settings().mix == .5 &&
+                gain_mode(c.getParamNormalized(gain_mode_id)) == convolver::GainMode::no_clipping,
+            "late answer: after the second refusal, Mix or Gain mode not as edited or played");
+    // jrp's review of PR #278: refused once more, the processor first, and
+    // the processor answers at once (-12 dB, 50%) but the answer is late.
+    // Host automation then sets Gain and Mix to the very values the refused
+    // preset shows (0 dB, 25%), on both halves; they agree until the late
+    // answer arrives, and must agree after it.
+    require(restore(*other_rate) != kResultOk, "late answer: refused a third time");
+    to_processor.deliver();
+    require(c.setParamNormalized(gain_id, normalized_gain(0)) == kResultOk &&
+                c.setParamNormalized(mix_id, .25) == kResultOk,
+            "late answer: the host's automation");
+    host_sends(gain_id, normalized_gain(0));
+    host_sends(mix_id, .25);
+    to_controller.deliver();
+    c.report();
+    deliver();
+    require(c.getParamNormalized(gain_id) == normalized_gain(0) &&
+                std::abs(p.settings().gain_db) < 1e-9,
+            ("late answer: after automation to the shown Gain, the parameter shows " +
+             std::to_string(c.getParamNormalized(gain_id)) + " while the processor plays " +
+             std::to_string(p.settings().gain_db) + " dB")
+                .c_str());
+    require(c.getParamNormalized(mix_id) == .25 && p.settings().mix == .25,
+            ("late answer: after automation to the shown Mix, the parameter shows " +
+             std::to_string(c.getParamNormalized(mix_id)) + " while the processor plays " +
+             std::to_string(p.settings().mix))
+                .c_str());
+    require(handler.edits.size() == edits, "late answer: following what plays is an edit");
+    p.setActive(false);
+    p.disconnect(&to_controller);
+    c.disconnect(&to_processor);
+    deliver();
+    c.terminate();
+    p.terminate();
+}
+// VST3-18 (its independent review): a host that gives the controller the
+// state first, with the user's Latency and Gain mode chosen between the two
+// calls, which the processor hears before it installs the state, which
+// replaces them: the answer, which says it had heard them, is followed. A
+// Latency set before the processor was connected, whose message was lost,
+// does not keep it from following a refused preset later (the review).
+// Either way the parameters show what plays.
+void edits_before_controller_first_restore() {
+    for (const bool defer : {false, true}) {
+        const std::string how = defer ? " (deferring proxy)" : " (forwarding proxy)";
+        const auto check = [&](bool v, const std::string& what) {
+            if (!v)
+                throw std::runtime_error("controller first: " + what + how);
+        };
+        HostApplication context;
+        Handler handler;
+        Processor p;
+        Controller c;
+        check(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                  c.setComponentHandler(&handler) == kResultOk,
+              "initialize");
+        // A host that sets Latency before connecting the halves: the
+        // message reaches nobody.
+        c.setParamNormalized(latency_id, normalized_latency(2048));
+        Proxy to_controller(c, defer), to_processor(p, defer);
+        check(p.connect(&to_controller) == kResultOk && c.connect(&to_processor) == kResultOk,
+              "connect");
+        const auto deliver = [&] {
+            while (to_controller.deliver() + to_processor.deliver() > 0) {
+            }
+        };
+        SpeakerArrangement mono = SpeakerArr::kMono;
+        check(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "buses");
+        p.activateBus(kAudio, kInput, 0, true);
+        p.activateBus(kAudio, kOutput, 0, true);
+        const auto state_with = [&](std::size_t latency) {
+            convolver::HostState state;
+            state.configuration =
+                convolver::Configuration{48000, 1, 1, 0, {}, {}, {{{.5f}, {{0, 1}}, {{0, 1}}}}};
+            state.settings.emplace();
+            state.settings->latency = latency;
+            auto stream = std::make_unique<MemoryStream>();
+            check(write_state(stream.get(), state), "encode");
+            return stream;
+        };
+        const auto controller_first = [&](IBStream& stream, const std::function<void()>& between) {
+            stream.seek(0, IBStream::kIBSeekSet, nullptr);
+            check(c.setComponentState(&stream) == kResultOk, "the controller's restore");
+            between();
+            stream.seek(0, IBStream::kIBSeekSet, nullptr);
+            return p.setState(&stream);
+        };
+        auto first = state_with(1024);
+        check(controller_first(*first, [] {}) == kResultOk, "the first filter");
+        deliver();
+        ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+        check(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk, "activate");
+        play_block(p, 1, 1, 64);
+        deliver();
+        // A 44.1 kHz preset, the processor first: refused, and the lost
+        // Latency must not keep the refused preset's 0 on show.
+        auto other_rate = state_with(0);
+        {
+            other_rate->seek(0, IBStream::kIBSeekSet, nullptr);
+            auto state = read_state(other_rate.get());
+            state.configuration->sample_rate = 44100;
+            other_rate = std::make_unique<MemoryStream>();
+            check(write_state(other_rate.get(), state), "encode 44.1 kHz");
+        }
+        other_rate->seek(0, IBStream::kIBSeekSet, nullptr);
+        check(p.setState(other_rate.get()) != kResultOk, "the 44.1 kHz preset was accepted");
+        other_rate->seek(0, IBStream::kIBSeekSet, nullptr);
+        check(c.setComponentState(other_rate.get()) == kResultOk, "the controller's 44.1 kHz");
+        deliver();
+        check(latency_frames(c.getParamNormalized(latency_id)) == 1024 &&
+                  p.getLatencySamples() == 1024,
+              "after a lost Latency message, a refused preset shows Latency " +
+                  std::to_string(latency_frames(c.getParamNormalized(latency_id))) +
+                  " while the processor plays " + std::to_string(p.getLatencySamples()));
+        auto next = state_with(512);
+        check(controller_first(*next,
+                               [&] {
+                                   c.setParamNormalized(latency_id, normalized_latency(256));
+                                   c.setParamNormalized(
+                                       gain_mode_id,
+                                       normalized_gain_mode(convolver::GainMode::no_clipping));
+                                   to_processor.deliver(); // Before the processor's restore.
+                               }) == kResultOk,
+              "the second filter");
+        deliver();
+        c.report();
+        deliver();
+        const auto shown = latency_frames(c.getParamNormalized(latency_id));
+        check(shown == p.getLatencySamples() && shown == 512,
+              "the parameter shows Latency " + std::to_string(shown) +
+                  " while the processor plays " + std::to_string(p.getLatencySamples()));
+        check(gain_mode(c.getParamNormalized(gain_mode_id)) == p.settings().gain_mode,
+              "the Gain mode shown is not the one that plays");
+        p.setActive(false);
+        p.disconnect(&to_controller);
+        c.disconnect(&to_processor);
+        deliver();
+        c.terminate();
+        p.terminate();
+    }
+}
 // PLUG-39 step 5a (the independent review of PR #246): a status message
 // whose report does not decode, as a damaged message would, is not shown,
 // but the load answer it carries still counts, and notify says the message
@@ -4572,6 +4841,8 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"load_with_failing_set_dirty", [] { load_without_set_dirty(true); }},
         {"saved_filter_name", saved_filter_name},
         {"messages_through_proxies", messages_through_proxies},
+        {"edits_survive_late_answer", edits_survive_late_answer},
+        {"edits_before_controller_first_restore", edits_before_controller_first_restore},
         {"damaged_report_message", damaged_report_message},
         {"settings_at_state_limit", settings_at_state_limit},
         {"tail_measured_at_output", tail_measured_at_output},

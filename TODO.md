@@ -72,6 +72,7 @@ Check the open pull requests for an ID before starting anything.
 | **REL-3** | The independent walkthrough of the published 0.14.0 files | A tester, whom jrp chooses |
 | **HOST-1**, **VST3-11**, **AU-4**, **AU-6**, **PERF-2**, **COMPAT-1** | [Checks left](docs/project/status.md#checks-left-before-publication) 1 to 5, 8 and 9; COMPAT-1's REAPER project saved with 0.14.0 | jrp's Mac session on 0.14.0 |
 | **PERF-2**, after its session | The CPU indication beside the Latency menu, and block sizes tuned on Apple silicon (first a largest block above 8,192 frames for filters over 30 s) | Check 9 and the [workload measurements](docs/develop/fft-measurements.md#supported-workloads) run on jrp's Mac |
+| **PERF-22** | Audacity's playback start timed with 30 s and 120 s filters, before changing how VST3 restores state | jrp's Mac with Audacity |
 | **VST3-12**, **HOST-4** | The Windows window in hosts and a screen reader; Equalizer APO on a real device | A Windows tester or device |
 | **LV2-4** | Desktop LV2 hosts and PipeWire on a real sound card | A Linux tester |
 | **HOST-8** | Ardour 9.0's abort as `new_session` exits | A fixed Ardour on `ubuntu-latest` |
@@ -341,6 +342,31 @@ relevant to a convolver unless the product changes.
   non-uniform engine shipped in 0.13.2. **Remains:** check 9's session, the
   CPU indication beside the Latency menu and block sizes tuned on Apple
   silicon ([measurements](docs/develop/fft-measurements.md#the-non-uniform-engine)).
+- [ ] **PERF-22 — VST3 restore cost at Audacity's playback start.**
+  Audacity 4.0.2 hands the VST3 its own state back at every playback start
+  (`getState`, `setState`, the controller's `setComponentState`, then
+  `setActive`), and since PLUG-48 both halves encode and hash the whole
+  embedded filter (`state_digest()`), the processor under its lock. jrp
+  measured the digest alone at a median 12.9 ms for a 30 s stereo filter
+  and 52.0 ms for 120 s on an M5 Max (release build, 23 November 2026).
+  That sequence through the production processor and controller, a Linux
+  release build on a 4-core cloud machine (VST3-18's thread, 23 November
+  2026, medians of 7, 48 kHz stereo, not committed):
+
+  | Filter | `getState` | `setState` | `setComponentState` | `setActive` | Total | Digest alone |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | 30 s | 20.6 ms | 33.3 ms | 25.2 ms | 52.1 ms | 134 ms | 22.2 ms |
+  | 120 s | 100.5 ms | 196.7 ms | 171.5 ms | 229.3 ms | 703 ms | 110.6 ms |
+
+  The two digests are about a third of the total; restarting the
+  processor in `setActive` is the largest part. **Remains:** time the
+  user's action itself, pressing Play in Audacity on jrp's Mac with 30 s
+  and 120 s stereo filters, against the same with a short filter. **Done
+  when** that delay is recorded and, if it is noticeable, a cheaper check
+  that the state is the one mirrored (or none) is chosen, with
+  `vst3.adapter` `refused_state_keeps_parameters`,
+  `edits_survive_late_answer` and `edits_before_controller_first_restore`
+  still passing.
 - [ ] **PERF-21 — An everyday load budget.** Beside the supported-workload
   ceiling (25% of one core, the 99th-percentile callback within half its
   period), stereo room correction and the 2-to-6 crossover stay at or

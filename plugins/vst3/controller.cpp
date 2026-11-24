@@ -179,8 +179,11 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     // state_digest()); absent otherwise or from a damaged message, which
     // then changes no parameter.
     std::optional<HostSettings> playing;
-    int64 followed_state = 0;
+    int64 followed_state = 0, heard_latency = 0, heard_gain_mode = 0;
     attributes->getInt("followed state", followed_state);
+    // VST3-18: the last Latency and Gain mode choices the processor had heard.
+    attributes->getInt("heard latency request", heard_latency);
+    attributes->getInt("heard gain mode request", heard_gain_mode);
     if (followed_state) {
         double gain = 0, mix = 0;
         int64 latency = -1, mode = -1;
@@ -220,6 +223,7 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         return kResultFalse;
     bool changed = false, restart = false;
     std::optional<HostSettings> followed;
+    unsigned keep = 0; // VST3-18: the settings the answer leaves as they are.
     {
         std::lock_guard lock(status_lock_);
         if (load_request) {
@@ -240,13 +244,25 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         }
         if (follow_state_ && playing && static_cast<std::uint64_t>(followed_state) == follow_state_)
             followed = playing;
+        keep = edited_since_restore_;
+        // Only a choice made since the restore: one before it was replaced
+        // by the state, and one the processor never heard (a message lost)
+        // must not keep a setting for later restores.
+        if (latency_requests_ > std::max<int64>(heard_latency, latency_at_restore_))
+            keep |= setting_bit(latency_id);
+        if (gain_mode_requests_ > std::max<int64>(heard_gain_mode, gain_mode_at_restore_))
+            keep |= setting_bit(gain_mode_id);
     }
     // PLUG-48: after restored state, the settings the processor plays, which
     // differ from the state's when it refused that state. Not edits:
     // the host restored them, so nothing is recorded as the user's.
+    // VST3-18 (jrp's review of 0.18.12): a host that delivers messages later
+    // may bring this answer after the user chose another setting. A Latency
+    // or Gain mode the processor had not yet heard, which it will play once
+    // it does, and a Gain or Mix the host set since the restore, keep their values.
     if (followed) {
         const auto set = [&](ParamID id, ParamValue value) {
-            if (getParamNormalized(id) == value)
+            if ((keep & setting_bit(id)) || getParamNormalized(id) == value)
                 return;
             EditController::setParamNormalized(id, value);
             changed = true;
@@ -331,6 +347,24 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         componentHandler->restartComponent(kLatencyChanged);
     return readable ? kResultOk : kInvalidArgument;
 }
+unsigned Controller::setting_bit(ParamID id) noexcept {
+    switch (id) {
+    case gain_id:
+        return 1U;
+    case mix_id:
+        return 2U;
+    case gain_mode_id:
+        return 4U;
+    case latency_id:
+        return 8U;
+    default:
+        return 0;
+    }
+}
+void Controller::edited_since_restore(ParamID id) {
+    std::lock_guard lock(status_lock_);
+    edited_since_restore_ |= setting_bit(id);
+}
 void Controller::latency_chosen(std::size_t frames) {
     int64 request = 0;
     {
@@ -370,11 +404,17 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
         const auto result = EditController::setParamNormalized(id, value);
         const auto after = gain_mode(getParamNormalized(gain_mode_id));
         if (result == kResultOk && after != before) {
+            int64 request = 0;
+            {
+                std::lock_guard lock(status_lock_);
+                request = ++gain_mode_requests_;
+            }
             // The processor answers with its status_message.
             if (auto message = owned(allocateMessage())) {
                 message->setMessageID(gain_mode_message);
                 if (auto* attributes = message->getAttributes()) {
                     attributes->setInt("mode", static_cast<int64>(after));
+                    attributes->setInt("request", request);
                     sendMessage(message);
                 }
             }
@@ -387,6 +427,16 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
         const auto after = latency_frames(getParamNormalized(latency_id));
         if (result == kResultOk && after != before)
             latency_chosen(after);
+        return result;
+    }
+    if (id == gain_id || id == mix_id) {
+        // VST3-18: a value the host passes here it passes to the processor
+        // in process() too (automation, or the window's edit through the
+        // host), also when it is the value shown: automation to the refused
+        // preset's Gain plays that Gain (jrp's review of PR #278).
+        const auto result = EditController::setParamNormalized(id, value);
+        if (result == kResultOk)
+            edited_since_restore(id);
         return result;
     }
     const auto result = EditController::setParamNormalized(id, value);
@@ -515,6 +565,9 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
     {
         std::lock_guard lock(status_lock_);
         follow_state_ = digest;
+        edited_since_restore_ = 0;
+        latency_at_restore_ = latency_requests_;
+        gain_mode_at_restore_ = gain_mode_requests_;
     }
     if (auto message = owned(allocateMessage())) {
         message->setMessageID(report_message);

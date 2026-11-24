@@ -1229,7 +1229,27 @@ the plan's Gain modes (12 November 2026); its meters follow later
   Every outcome answers, not only a refusal: a refusal of the same state in
   an earlier restore also answers a controller-first request, and the
   restore that follows corrects it. Bypass is the host's
-  and is not corrected.
+  and is not corrected. VST3-18 (jrp's review of 0.18.12, 23 November
+  2026): a host that delivers messages later can bring that status after
+  the user has changed a setting, so it once set Latency back to the 1024
+  played at the refusal while the processor played the user's 256. Latency
+  and Gain mode reach the processor as numbered messages, in order with the
+  report request, so that status also carries the numbers of the last
+  `latency_message` and `gain_mode_message` the processor had heard: a
+  choice it had not heard keeps its value, since the processor plays it
+  once it does, and one it had heard follows the status, which includes
+  it (or the restore that replaced it, when the host gave the controller
+  the state first and the choice came between the two calls). Gain and Mix
+  reach the processor in `process()`, whose order against the status
+  cannot be told, so a Gain or Mix the host or the window set after
+  `setComponentState` (any `setParamNormalized`, even to the value shown,
+  since the host passes it to `process()` too: jrp's review found
+  automation to the refused preset's own Gain and Mix left apart) keeps
+  its value. The one order that leaves them apart: a host that restores the
+  controller first and passes a Gain or Mix edit made between the two calls
+  to `process()` before restoring the processor, whose restore then
+  replaces it. The others still take what plays (`vst3.adapter`
+  `edits_survive_late_answer`, `edits_before_controller_first_restore`).
 
 ## Channel layouts
 
