@@ -4709,16 +4709,21 @@ void accepted_restore_beats_queued_edit() {
 //    and the host restores A again, which the processor refuses (A is
 //    for 44.1 kHz, the host now plays 48 kHz). The refused preset must not
 //    bring back A's 512: the user's 256 plays and is shown (VST3-18).
+// 3. A deferring host restores preset P (512), the user chooses 256, and
+//    the host restores P again: the first request must not use up the
+//    second's comparison (the independent review).
+// 4. A deferring host restores P twice, then the user chooses 256 and the
+//    host restores P a third time.
 void accepted_restore_follows_its_own_request() {
     const auto folder = private_temp("convolver-vst3-own-request");
     std::filesystem::create_directories(folder);
     const auto room = folder / "room.wav";
     write_wav(room, 48000, 1, 8);
     for (const bool controller_first : {false, true})
-        for (const int sequence : {1, 2}) {
+        for (const int sequence : {1, 2, 3, 4}) {
             if (sequence == 2 && !controller_first)
                 continue;
-            const bool defer = sequence == 1;
+            const bool defer = sequence != 2;
             const std::string how = std::string(" (sequence ") + std::to_string(sequence) +
                                     (controller_first ? ", controller first)" : ")");
             const auto check = [&](bool v, const std::string& what) {
@@ -4783,6 +4788,20 @@ void accepted_restore_follows_its_own_request() {
                 check(restore(*one) == kResultOk, "preset 1");
                 c.setParamNormalized(latency_id, normalized_latency(256));
                 check(restore(*two) == kResultOk, "preset 2");
+                expected = 512;
+            } else if (sequence >= 3) {
+                auto first = state_with(48000, .5f, 1024);
+                check(restore(*first) == kResultOk, "the first filter");
+                deliver();
+                activate();
+                auto preset = state_with(48000, .75f, 512);
+                check(restore(*preset) == kResultOk, "preset P");
+                if (sequence == 4) {
+                    check(restore(*preset) == kResultOk, "preset P again");
+                    deliver();
+                }
+                c.setParamNormalized(latency_id, normalized_latency(256));
+                check(restore(*preset) == kResultOk, "preset P once more");
                 expected = 512;
             } else {
                 auto a = state_with(44100, .5f, 512);

@@ -1268,13 +1268,14 @@ the plan's Gain modes (12 November 2026); its meters follow later
   between; with one that restores the processor first this is one extra
   read). Restoring the same state again in the SDK's order asks nothing
   more (`vst3.adapter` `accepted_restore_beats_queued_edit`). The
-  processor compares only with an accepted restore whose own request has
-  not arrived yet (`RestoreFollow` in `processor.hpp`): a request for an
-  older state, delivered late, leaves it waiting; a request that came
-  before the restore (the controller restored first) leaves nothing to
-  compare; and any later install, a chosen file included, clears it, so a
-  later refused restore of the same state cannot bring its settings back
-  (jrp's review of PR #279, `accepted_restore_follows_its_own_request`).
+  processor compares a request only with the newest restore, while it is
+  accepted and nothing else has installed since (`RestoreFollow` in
+  `processor.hpp`): a request for an older state, delivered late, leaves it
+  for its own request; each request for the same state, sent again,
+  compares with the choices numbered before it; and any later install, a
+  chosen file included, clears it, so a later refused restore of the same
+  state cannot bring its settings back (jrp's review of PR #279,
+  `accepted_restore_follows_its_own_request`).
 
 ## Channel layouts
 

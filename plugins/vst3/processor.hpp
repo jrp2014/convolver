@@ -202,9 +202,9 @@ class RestoreFollow {
         refused_ = 0;
         accepted_ = 0;
     }
-    // After installed(), the restore read() saw was accepted with these
+    // After installed(), a restore of this state was accepted with these
     // settings. Or a restore of this state (0: unreadable) was refused.
-    void accepted(const HostSettings& restored) noexcept;
+    void accepted(std::uint64_t digest, const HostSettings& restored) noexcept;
     void refused(std::uint64_t digest) noexcept {
         refused_ = digest;
         accepted_ = 0;
@@ -231,17 +231,13 @@ class RestoreFollow {
     Answer take_answer() noexcept;
 
   private:
-    std::uint64_t read_ = 0;     // The digest the last restore read.
     std::uint64_t refused_ = 0;  // The newest restore's, if it was refused.
     std::uint64_t mirrored_ = 0; // The last report request's state.
-    // The last report request named a state with no outcome here yet: the
-    // restore of it that follows already answers it (a host that restores
-    // the controller first), so it leaves nothing to compare later.
-    bool waiting_ = false, read_was_requested_ = false;
     bool answer_ = false, restored_after_mirror_ = false, latency_restored_ = false;
     Steinberg::int64 heard_latency_ = 0, heard_gain_mode_ = 0;
-    // An accepted restore whose report request has not arrived: its digest
-    // (0: none), its Latency and Gain mode, and the numbers heard then.
+    // The newest restore, if it was accepted and nothing has installed
+    // since: its digest (0: none), its Latency and Gain mode, and the
+    // numbers heard then.
     std::uint64_t accepted_ = 0;
     std::size_t accepted_latency_ = default_host_latency;
     GainMode accepted_gain_mode_ = GainMode::set;

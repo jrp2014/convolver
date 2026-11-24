@@ -806,7 +806,7 @@ tresult Processor::load_state(IBStream* stream) {
             return kResultOk;
         const auto restored = *next.settings;
         install(std::move(next), request);
-        follow_.accepted(restored);
+        follow_.accepted(digest, restored);
         return kResultOk;
     } catch (...) {
         follow_.refused(digest);
@@ -984,23 +984,16 @@ void RestoreFollow::read(std::uint64_t digest) noexcept {
     // The controller mirrored this state: the status that follows says what
     // plays after this restore, accepted or not. Also for a request
     // answered before, as after a refusal of the same state (PLUG-48).
-    read_ = digest;
-    read_was_requested_ = digest == mirrored_ && waiting_;
     if (digest == mirrored_) {
         answer_ = true;
         restored_after_mirror_ = true; // VST3-19.
-        waiting_ = false;
     }
 }
-void RestoreFollow::accepted(const HostSettings& restored) noexcept {
+void RestoreFollow::accepted(std::uint64_t digest, const HostSettings& restored) noexcept {
     // VST3-19: what this restore set, and the choices heard by then, so the
     // controller's report request can tell a choice it sent before this
-    // restore that arrived after it. Nothing is left to compare if that
-    // request came first: a later request naming the same state is for a
-    // later restore of it (jrp's review of PR #279).
-    if (read_was_requested_)
-        return;
-    accepted_ = read_;
+    // restore that arrived after it.
+    accepted_ = digest;
     accepted_latency_ = restored.latency;
     accepted_gain_mode_ = restored.gain_mode;
     latency_at_accept_ = heard_latency_;
@@ -1018,13 +1011,15 @@ RestoreFollow::Again RestoreFollow::requested(std::uint64_t follow,
     // (the restore that follows answers again).
     if (refused_ == follow) {
         answer_ = true;
-        waiting_ = false;
     } else if (accepted_ == follow) {
         // Answered either way, so the controller knows the outcome came
         // before its request. A choice heard since the restore and sent
-        // before the request plays the restore's setting again.
+        // before the request plays the restore's setting again. The
+        // restore stays until something else installs: the host may send
+        // the same state again, and the request of each restore of it
+        // compares with the choices numbered before it (the independent
+        // review); a choice made after a request is numbered above it.
         answer_ = true;
-        waiting_ = false;
         if (heard_latency_ > latency_at_accept_ && heard_latency_ <= latency_requests &&
             playing.latency != accepted_latency_) {
             again.latency = accepted_latency_;
@@ -1033,14 +1028,11 @@ RestoreFollow::Again RestoreFollow::requested(std::uint64_t follow,
         if (heard_gain_mode_ > gain_mode_at_accept_ && heard_gain_mode_ <= gain_mode_requests &&
             playing.gain_mode != accepted_gain_mode_)
             again.gain_mode = accepted_gain_mode_;
-        accepted_ = 0;
-    } else {
-        // An older request (a host that delivers messages later), or one
-        // the restore that follows answers. Either way an accepted restore
-        // still waiting for its own request keeps waiting (jrp's review of
-        // PR #279).
-        waiting_ = true;
     }
+    // Otherwise the restore that follows answers (a host that restores the
+    // controller first), or the request is for an older state, delivered
+    // late: the accepted restore stays for its own request (jrp's review of
+    // PR #279).
     return again;
 }
 RestoreFollow::Answer RestoreFollow::take_answer() noexcept {
