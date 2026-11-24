@@ -735,8 +735,8 @@ format.
   before it allocates anything for the record, which then keeps the kind
   and request number but may lack the message (`failure_message()` gives
   general advice instead, from a constant built when the library loads, so
-  that explaining the failure needs no memory; VST3-20) or the path. The adapters' call to
-  `fail_request()` covers a request that throws before `HostFilter`
+  that choosing the message needs no memory; VST3-20) or the path. The
+  adapters' call to `fail_request()` covers a request that throws before `HostFilter`
   records it too: VST3 in
   `refused()`, the Audio Unit in `fail_unrecorded()`, and LV2 in
   `restore()`, `work()` and `record_dropped()`. The allocation-starvation
