@@ -269,6 +269,10 @@ void restore_short_of_memory() {
     // memory runs out after `allowed` allocations, once or from then on.
     const auto restore = [&](std::size_t allowed, bool once,
                              std::optional<convolver::HostFailure>* failure = nullptr) {
+        const auto step = [&](const char* what) {
+            std::cerr << "  " << allowed << (once ? " once: " : ": ") << what << std::endl;
+        };
+        step("initialize");
         convolver::vst3::Processor p;
         SpeakerArrangement mono = SpeakerArr::kMono;
         check(p.initialize(&context) == kResultOk &&
@@ -276,12 +280,15 @@ void restore_short_of_memory() {
               "short of memory: initialize");
         stream.seek(0, IBStream::kIBSeekSet, nullptr);
         bool accepted = false;
+        step("setState");
         {
             guard::Starve starve(allowed, once);
             accepted = p.setState(&stream) == kResultOk;
         }
+        step(accepted ? "accepted; failure" : "refused; failure");
         if (failure)
             *failure = p.failure();
+        step("terminate");
         p.terminate();
         return accepted;
     };
@@ -308,16 +315,10 @@ void restore_short_of_memory() {
     // Each step on standard error as it starts, so a timeout shows where.
     std::cerr << "VST3 short of memory: reading the state takes " << read
               << " allocations; finding a whole restore's" << std::endl;
-    const auto whole = needed([&](std::size_t allowed) {
-        std::cerr << ' ' << allowed << std::flush;
-        return restore(allowed, false);
-    });
-    std::cerr << std::endl;
+    const auto whole = needed([&](std::size_t allowed) { return restore(allowed, false); });
     check(whole > read, "short of memory: a restore allocating after the read");
-    std::cerr << "VST3 short of memory: a restore takes " << whole
-              << "; memory runs out once at allocation";
+    std::cerr << "VST3 short of memory: a restore takes " << whole << std::endl;
     for (std::size_t allowed = read; allowed < whole; ++allowed) {
-        std::cerr << ' ' << allowed << std::flush;
         std::optional<convolver::HostFailure> failure;
         if (restore(allowed, true, &failure) || !failure)
             continue;
@@ -329,7 +330,6 @@ void restore_short_of_memory() {
                 std::to_string(allowed) + ", after the " + std::to_string(read) +
                 " reading it makes: " + failure->message.problem);
     }
-    std::cerr << std::endl;
 }
 
 // The loading-responsiveness timings (tests/plugins/load_timing.hpp): the
