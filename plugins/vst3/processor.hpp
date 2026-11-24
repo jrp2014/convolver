@@ -95,6 +95,11 @@ inline constexpr const char* report_message = "ConvolverReport";
 // request (also with nothing to revert), and says "latency restored" when
 // that changed the Latency, and "restored after mirror" when the outcome
 // came from its own restore.
+// VST3-24: a load_message's answer says "superseded" 1 (with "accepted" 0)
+// when a restore the processor accepted after the controller sent it
+// superseded it (RestoreFollow::waits_for_mirror()); the controller, if it
+// mirrored no restore since, sends the load_message again with
+// "unmirrored" 1, which ends that wait.
 struct StatusAnswer {
     Steinberg::int64 load_request = 0;
     bool retried = false;

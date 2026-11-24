@@ -1282,6 +1282,40 @@ the plan's Gain modes (12 November 2026); its meters follow later
   state cannot bring its settings back; and a refused restore of another
   state leaves it, since the accepted restore still plays (jrp's reviews
   of PR #279, `accepted_restore_follows_its_own_request`).
+  VST3-23 and VST3-24 (jrp's review of PR #279, 24 November 2026): a
+  filter or preset chosen in the window lost to an older request in two
+  ways. A preset's answer that arrived after the user set Latency to 256
+  put the window back at the preset's 2048 and reported 2048 to the host
+  as an edit while 256 played; and a window choice still queued when the
+  host restored another preset replaced it, so the project saved the
+  older choice. The rule now is that the latest successful action wins
+  and a refusal keeps what plays. The controller numbers every action
+  from one count: each `latency_message`, `gain_mode_message` and
+  `load_message`, each `setComponentState` (the restore it mirrors) and
+  each Gain or Mix set, and messages reach the processor in that order.
+  A preset's answer reports, as edits, only the settings the user has not
+  changed since choosing it; a later Latency or Gain mode keeps its value,
+  since the processor heard it after the preset, and a later Gain or Mix
+  is reported again, since the preset replaced it in the processor. A
+  Latency or Gain mode set to the value shown counts as a choice while
+  such an answer is still to come, as the preset may change it. An answer
+  that arrives after a later `setComponentState` reports nothing: the
+  status after that restore's outcome says what plays (PLUG-48), also
+  when the restore was refused after the choice was installed. The
+  processor answers a `load_message` that arrives after it accepted a
+  restore, and before that restore's report request, as superseded
+  (`superseded`), and logs why: in order, it was sent before the
+  controller mirrored the restore. `RestoreFollow` counts accepted
+  restores of one state against the requests naming it, so the same
+  state restored twice is matched twice, and a request that arrives
+  before its restore (the controller first) means no wait. The SDK has the
+  host restore both halves, as Audacity 4's source does; a host that
+  restores the processor alone would leave it waiting, so a controller
+  that has mirrored no restore since the request sends it again with
+  `unmirrored`, which ends the wait (`vst3.adapter` `latest_action_wins`,
+  a table of user and host actions run with every delivery order in both
+  restore orders, checking the window, what plays, the filter and Latency
+  saved and what the host was last told; `window_choice_orders`).
 
 ## Channel layouts
 

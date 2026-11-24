@@ -683,13 +683,14 @@ bool Controller::load_file(const std::string& path) {
     } catch (...) { // Out of memory for the path.
         return false;
     }
-    if (!send_load(path, request, false))
-        return false; // Refused, or not delivered.
+    const bool sent = send_load(path, request, false);
     // A direct connection or a forwarding proxy has brought the answer
-    // (notify, which marks the project changed); a deferring one brings it
-    // later.
+    // (notify, which marks the project changed), or the answer to the
+    // second try it led to (VST3-24); a deferring one brings it later.
     std::lock_guard lock(status_lock_);
-    return load_answered_ != request || load_accepted_;
+    if (load_answered_ >= request)
+        return load_accepted_;
+    return sent; // Not sent, or not delivered yet.
 }
 bool Controller::send_load(const std::string& path, int64 request, bool unmirrored) {
     auto message = owned(allocateMessage());

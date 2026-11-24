@@ -5077,6 +5077,146 @@ void latest_action_wins() {
     require(runs > 100, "latest action: the table did not run");
     std::filesystem::remove_all(folder);
 }
+// VST3-24's safeguard: a host that restores the processor and not the
+// controller sends no report request for that restore, so the processor
+// would answer every later window choice as superseded. The controller,
+// which mirrored no restore since it sent the choice, sends it again marked
+// unmirrored, which ends the wait: the choice plays, through a connection
+// that delivers later and through a direct one, and the next choice plays at
+// once. VST3-23: a Gain the user sets after choosing a preset in the window,
+// before its answer, keeps its value and is reported to the host again (the
+// preset replaced it in the processor); a Gain left alone takes the preset's.
+void window_choice_orders() {
+    const auto folder = private_temp("convolver-vst3-window-orders");
+    std::filesystem::create_directories(folder);
+    const auto preset_file = [&](const char* name, float tap, std::size_t latency, double gain) {
+        convolver::HostState state;
+        state.configuration = convolver::Configuration{48000, 1, 1, 0, {}, {}, {}};
+        state.configuration->paths.push_back({{tap}, {{0, 1}}, {{0, 1}}});
+        state.settings.emplace();
+        state.settings->latency = latency;
+        state.settings->gain_db = gain;
+        const auto path = folder / name;
+        const auto bytes = convolver::presets::vst3_preset(state);
+        std::ofstream out(path, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
+        require(static_cast<bool>(out), "window orders: write a preset");
+        return path.string();
+    };
+    const auto preset_a = preset_file("a.vstpreset", .125f, 2048, -6);
+    const auto preset_b = preset_file("b.vstpreset", .25f, 1024, -6);
+    for (const bool defer : {false, true}) {
+        const std::string how = defer ? " (deferring proxy)" : " (forwarding proxy)";
+        const auto check = [&](bool v, const std::string& what) {
+            if (!v)
+                throw std::runtime_error("window orders: " + what + how);
+        };
+        HostApplication context;
+        Handler handler;
+        Processor p;
+        Controller c;
+        check(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                  c.setComponentHandler(&handler) == kResultOk,
+              "initialize");
+        Proxy to_controller(c, defer), to_processor(p, defer);
+        check(p.connect(&to_controller) == kResultOk && c.connect(&to_processor) == kResultOk,
+              "connect");
+        const auto deliver = [&] {
+            while (to_controller.deliver() + to_processor.deliver() > 0) {
+            }
+        };
+        SpeakerArrangement mono = SpeakerArr::kMono;
+        check(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "buses");
+        p.activateBus(kAudio, kInput, 0, true);
+        p.activateBus(kAudio, kOutput, 0, true);
+        const auto state_with = [&](float tap, std::size_t latency) {
+            convolver::HostState state;
+            state.configuration =
+                convolver::Configuration{48000, 1, 1, 0, {}, {}, {{{tap}, {{0, 1}}, {{0, 1}}}}};
+            state.settings.emplace();
+            state.settings->latency = latency;
+            auto stream = std::make_unique<MemoryStream>();
+            check(write_state(stream.get(), state), "encode");
+            return stream;
+        };
+        auto first = state_with(1, 4096);
+        first->seek(0, IBStream::kIBSeekSet, nullptr);
+        check(p.setState(first.get()) == kResultOk, "the first filter");
+        first->seek(0, IBStream::kIBSeekSet, nullptr);
+        check(c.setComponentState(first.get()) == kResultOk, "the controller's first restore");
+        deliver();
+        ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+        check(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk, "activate");
+        play_block(p, 1, 1, 64);
+        deliver();
+        const auto plays = [&](float tap, std::size_t latency) {
+            MemoryStream saved_stream;
+            if (p.getState(&saved_stream) != kResultOk)
+                return false;
+            saved_stream.seek(0, IBStream::kIBSeekSet, nullptr);
+            const auto saved = read_state(&saved_stream);
+            const auto& config = saved.configuration;
+            return config && config->paths.size() == 1 &&
+                   config->paths.front().impulse == std::vector<float>{tap} &&
+                   p.getLatencySamples() == latency &&
+                   latency_frames(c.getParamNormalized(latency_id)) == latency;
+        };
+        // The host restores the processor alone; the window's choice, sent
+        // before that restore or after it, plays.
+        auto preset_p = state_with(.5f, 512);
+        preset_p->seek(0, IBStream::kIBSeekSet, nullptr);
+        if (defer)
+            check(c.load_file(preset_a), "preset A was refused");
+        check(p.setState(preset_p.get()) == kResultOk, "preset P");
+        if (!defer)
+            check(c.load_file(preset_a), "preset A was refused");
+        deliver();
+        check(plays(.125f, 2048), "preset A does not play after a restore the host did not mirror");
+        check(c.load_file(preset_b), "preset B was refused");
+        deliver();
+        check(plays(.25f, 1024), "preset B does not play");
+        // Gain: the user's -3 dB, set before preset A's answer, stays and
+        // is the host's last Gain edit; preset B's -6 dB, with Gain left
+        // alone, is reported.
+        c.setParamNormalized(gain_id, normalized_gain(0));
+        handler.edits.clear();
+        check(c.load_file(preset_a), "preset A again was refused");
+        c.setParamNormalized(gain_id, normalized_gain(-3));
+        deliver();
+        const auto last_gain = [&]() -> std::optional<double> {
+            std::optional<double> value;
+            for (const auto& e : handler.edits)
+                if (e.kind == 'p' && e.id == gain_id)
+                    value = gain_db(e.value);
+            return value;
+        };
+        const auto shown_gain = gain_db(c.getParamNormalized(gain_id));
+        // A direct connection answers before the user's -3 dB: the preset's
+        // -6 dB is reported, then the user's edit follows in the host.
+        if (defer)
+            check(std::abs(shown_gain + 3) < 1e-6 && last_gain() &&
+                      std::abs(*last_gain() + 3) < 1e-6,
+                  "the Gain set after choosing the preset: shown " + std::to_string(shown_gain) +
+                      " dB, host last told " +
+                      (last_gain() ? std::to_string(*last_gain()) : std::string("nothing")));
+        else
+            check(std::abs(shown_gain + 3) < 1e-6, "the Gain the user set");
+        handler.edits.clear();
+        check(c.load_file(preset_b), "preset B again was refused");
+        deliver();
+        check(std::abs(gain_db(c.getParamNormalized(gain_id)) + 6) < 1e-6 && last_gain() &&
+                  std::abs(*last_gain() + 6) < 1e-6,
+              "preset B's Gain was not reported");
+        p.setActive(false);
+        p.disconnect(&to_controller);
+        c.disconnect(&to_processor);
+        deliver();
+        c.terminate();
+        p.terminate();
+    }
+    std::filesystem::remove_all(folder);
+}
 // PLUG-39 step 5a (the independent review of PR #246): a status message
 // whose report does not decode, as a damaged message would, is not shown,
 // but the load answer it carries still counts, and notify says the message
@@ -5443,6 +5583,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"accepted_restore_beats_queued_edit", accepted_restore_beats_queued_edit},
         {"accepted_restore_follows_its_own_request", accepted_restore_follows_its_own_request},
         {"latest_action_wins", latest_action_wins},
+        {"window_choice_orders", window_choice_orders},
         {"damaged_report_message", damaged_report_message},
         {"damaged_report_keeps_status", damaged_report_keeps_status},
         {"settings_at_state_limit", settings_at_state_limit},
