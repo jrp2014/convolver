@@ -8,6 +8,8 @@ name: Native and historical tests
   push:
     branches: [main]
   pull_request:
+    # ready_for_review: a draft runs Lint and the Linux jobs only (CI-54).
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -25,14 +27,46 @@ jobs:
   # (scripts/ci_scope.py, docs/develop/testing.md#documentation-only-pull-requests).
   scope:
     runs-on: ubuntu-latest
+    # Reads this workflow's earlier runs, and the main commit each tested
+    # against (its scope job's notice), to carry a passed result forward
+    # (CI-53).
+    permissions:
+      contents: read
+      actions: read
+      checks: read
     outputs:
       build: ${{ steps.scope.outputs.build }}
+      full: ${{ steps.scope.outputs.full }}
+      unix: ${{ steps.scope.outputs.unix }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 2
       - id: scope
-        run: python3 scripts/ci_scope.py --workflow regression --github-output "$GITHUB_OUTPUT"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # The unix job's matrix, listed here so that a draft pull request
+          # runs its Linux entries alone (CI-54). Lines starting with # are
+          # comments.
+          UNIX: |
+            [
+              # Checks of the repository itself (CTest label "repository") run in
+              # one full build per OS; see docs/develop/testing.md#which-configurations-run-which-tests.
+              {"os": "ubuntu-latest", "cxx": "clang++", "build": "Debug", "sanitizers": "ON", "full_tests": ""},
+              # FFMPEG-1: native.ffmpeg_pipe runs where FFmpeg is installed.
+              {"os": "ubuntu-latest", "cxx": "g++", "build": "Release", "sanitizers": "OFF",
+               "full_tests": "-LE repository", "packages": "ffmpeg"},
+              # AUTO is Accelerate on macOS (FFT-3), which the step below
+              # builds, so the main macOS build names FFTW to keep testing it
+              # (wisdom and measured plans) and to compare the backends.
+              {"os": "macos-latest", "cxx": "clang++", "build": "Debug", "sanitizers": "ON", "full_tests": "",
+               "fft": "FFTW"}
+            ]
+        run: >-
+          python3 scripts/ci_scope.py --workflow regression --github-output "$GITHUB_OUTPUT" --matrix unix=UNIX
+      - name: 'Full run: later pushes compare with this commit'
+        if: steps.scope.outputs.proving == 'true'
+        run: echo "Every job of this workflow runs, on every platform (CI-53)."
 
   unix:
     needs: scope
@@ -43,30 +77,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # Checks of the repository itself (CTest label "repository") run in
-          # one full build per OS; see docs/develop/testing.md#which-configurations-run-which-tests.
-          - os: ubuntu-latest
-            cxx: clang++
-            build: Debug
-            sanitizers: 'ON'
-            full_tests: ''
-          - os: ubuntu-latest
-            cxx: g++
-            build: Release
-            sanitizers: 'OFF'
-            full_tests: -LE repository
-            # FFMPEG-1: native.ffmpeg_pipe runs where FFmpeg is installed.
-            packages: ffmpeg
-          # AUTO is Accelerate on macOS (FFT-3), which the step below
-          # builds, so the main macOS build names FFTW to keep testing it
-          # (wisdom and measured plans) and to compare the backends.
-          - os: macos-latest
-            cxx: clang++
-            build: Debug
-            sanitizers: 'ON'
-            full_tests: ''
-            fft: FFTW
+        # Listed in the scope job (UNIX), which keeps only the Linux entries
+        # for a draft pull request (CI-54).
+        include: ${{ fromJSON(needs.scope.outputs.unix) }}
     env:
       CMAKE_C_COMPILER_LAUNCHER: ccache
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
@@ -186,7 +199,8 @@ jobs:
         uses: ./.github/actions/note-retry
   windows:
     needs: scope
-    if: needs.scope.outputs.build == 'true'
+    # A draft pull request runs the Linux jobs only (CI-54).
+    if: needs.scope.outputs.build == 'true' && needs.scope.outputs.full == 'true'
     runs-on: windows-latest
     timeout-minutes: 60
     steps:

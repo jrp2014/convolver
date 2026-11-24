@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Convolver
 
-**Download:** [Convolver 0.18.10 for macOS, Windows and Linux](https://github.com/jrp2014/convolver/releases/tag/v0.18.10), an
+**Download:** [Convolver 0.18.12 for macOS, Windows and Linux](https://github.com/jrp2014/convolver/releases/tag/v0.18.12), an
 unsigned developer preview; read [opening an unsigned preview](docs/use/install.md#unsigned-previews)
 first.
 
@@ -52,8 +52,13 @@ tried.
   In jrp's recorded comparison on an Apple silicon Mac (8 November 2026,
   0.13.0), at a Latency of 256 frames, the engine used 15 to 17 times less
   processor time for 30-second filters than the first preview's engine
-  ([measurements](docs/develop/fft-measurements.md#on-apple-silicon)). The
-  Latency setting trades delay for processor time when you are not
+  ([measurements](docs/develop/fft-measurements.md#on-apple-silicon)). On
+  the same Mac at a Latency of 256 frames (5.8 ms), the 0.18.8 engine ran a
+  65,536-tap stereo room correction 4.5 times as fast as the 2006 engine
+  when both used the same FFTW build, and 3.4 times as fast with
+  Accelerate, which the Mac plug-ins use
+  ([then and now](docs/develop/fft-measurements.md#performance-then-and-now)).
+  The Latency setting trades delay for processor time when you are not
   monitoring live.
 - **Robust.** Every plug-in format is held to the same lifecycle tests:
   loading before and after the host starts, restoring saved projects,
@@ -108,9 +113,51 @@ Convolver plays the response you give it as it is, so it brings no library
 of sampled spaces and no controls that reshape a reverb's decay or tone;
 you bring the filter.
 
+## What to expect
+
+Typically you compare a few filters while setting up, then leave one
+playing for hours with the window closed. Convolver is built for that:
+
+- **Room correction and crossovers.** Load the IR file or `.cfg` that DRC,
+  REW or Audiolense wrote, with its routing, gains and per-driver delays, up
+  to 8 inputs and 8 outputs in a plug-in. On the measured machines, a
+  correction or crossover with a 1.4-second filter per output took at most
+  4% of one core at 48 kHz (9% at 96 kHz), with no added delay
+  ([processor load](docs/use/limits.md#filter-length-channels-and-processor-load)).
+  The window (in the Audio Unit, and in VST3 on macOS and Windows) shows
+  the filter that plays, its rate and channels, and which
+  input feeds which output (the first four paths); a new filter that does
+  not fit is refused and the working one keeps playing. Check your setup
+  with a render ([check a crossover in a host](docs/use/check-a-crossover-in-a-host.md)),
+  and choose the Gain mode **No clipping** if the filter boosts
+  ([settings](docs/use/plugins.md#settings)).
+- **Music at each track's own sample rate.** Convolver never resamples, so
+  make one filter per rate with your design tool and name them in a
+  [configuration list](docs/use/configuration.md#paths-and-configuration-lists).
+  The command-line tool takes the entry for each file's rate. A plug-in
+  takes the entry for the host's rate when you choose the list, and the
+  project keeps that one. If the player later runs at another rate, the
+  filter stops processing and the plug-in says why, rather than playing
+  the wrong filter. At the default 100% Mix you hear silence; on a stereo
+  path, a lower Mix still passes its dry share. VST3 and the Audio Unit
+  play the filter again when the rate returns; LV2 refuses it
+  ([another rate](docs/use/plugins.md#when-a-filter-does-not-fit)). To
+  play at the new rate, choose the list again.
+- **Reverb on a send.** Choose the reverb's IR file and leave Mix at its
+  fully wet default; a stereo file plays as it is, and a mono or
+  true-stereo response needs a short `.cfg` ([configuration](docs/use/configuration.md)). A reverb of up
+  to 30 seconds took at most 4% of one core at 48 kHz with no added delay,
+  and once the input has been silent for longer than the tail, an instance
+  costs 93 to 99% less, measured on Linux
+  ([idle after the tail](docs/develop/fft-measurements.md#idle-after-the-tail)).
+  Gain and Mix changes ramp smoothly and keep the decay that is sounding.
+  VST3 and the Audio Unit tell the host how long the tail is, so an export
+  can include it; with LV2, export with some silence after the audio
+  ([latency and tail](docs/use/plugins.md#latency-and-tail)).
+
 ## Preview status
 
-Convolver is a developer preview: the latest, [0.18.10](https://github.com/jrp2014/convolver/releases/tag/v0.18.10), is an
+Convolver is a developer preview: the latest, [0.18.12](https://github.com/jrp2014/convolver/releases/tag/v0.18.12), is an
 unsigned pre-release for macOS, Windows and Linux. Its VST3 plug-in has a
 window on macOS and Windows and uses the host's controls on Linux, and the
 Linux package holds the LV2 plug-in. 0.13.20 added the Gain mode and
@@ -119,7 +166,9 @@ LV2 crash in hosts built on JUCE after a Gain mode change; 0.14.0 restores
 the playing filter more quickly, uses less CPU once the sound has stopped
 and reports clipping after a command-line render; 0.18.10 keeps a filter
 chosen before the host plays, waits for a start that suits a filter and
-words the window and Status more plainly. These previews
+words the window and Status more plainly; 0.18.12 fixes a configuration
+list chosen before Audacity first plays and replaces the window's Choose…,
+Recent and Reload controls with one Choose Filter menu. These previews
 were published before anyone listened to the new audio engine (since 0.13)
 or tried the Windows window, LV2 or the features new since 0.13.20 in a host, and
 before an independent user's walkthrough, which are still to come
@@ -132,7 +181,7 @@ Convolver does not do.
 | I want to… | Read |
 | --- | --- |
 | Use Convolver | [Using Convolver](docs/use/README.md), then [your first filter](docs/use/first-filter.md) |
-| Download the preview (macOS, Windows, Linux) | [0.18.10 pre-release](https://github.com/jrp2014/convolver/releases/tag/v0.18.10) |
+| Download the preview (macOS, Windows, Linux) | [0.18.12 pre-release](https://github.com/jrp2014/convolver/releases/tag/v0.18.12) |
 | Use the plug-ins | [Install](docs/use/install.md) and [your first sound in a host](docs/use/first-sound-in-a-host.md) |
 | Build it, embed it or change it | [Build from source](docs/develop/build.md), [library guide](docs/develop/library.md), [implementation map](docs/develop/architecture.md), [contributing](CONTRIBUTING.md) |
 | Find any page | [Documentation index](docs/README.md) |

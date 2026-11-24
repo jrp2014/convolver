@@ -21,6 +21,8 @@ name: LV2
   push:
     branches: [main]
   pull_request:
+    # ready_for_review: a draft runs Lint and the Linux jobs only (CI-54).
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
   # Each Monday, so that a new upstream release of a tool or library shows up
   # within a week even when nothing here changes (CI-6).
@@ -51,14 +53,28 @@ jobs:
   # (scripts/ci_scope.py, docs/develop/testing.md#documentation-only-pull-requests).
   scope:
     runs-on: ubuntu-latest
+    # Reads this workflow's earlier runs, and the main commit each tested
+    # against (its scope job's notice), to carry a passed result forward
+    # (CI-53).
+    permissions:
+      contents: read
+      actions: read
+      checks: read
     outputs:
       build: ${{ steps.scope.outputs.build }}
+      full: ${{ steps.scope.outputs.full }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 2
       - id: scope
-        run: python3 scripts/ci_scope.py --workflow lv2 --github-output "$GITHUB_OUTPUT"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          python3 scripts/ci_scope.py --workflow lv2 --github-output "$GITHUB_OUTPUT"
+      - name: 'Full run: later pushes compare with this commit'
+        if: steps.scope.outputs.proving == 'true'
+        run: echo "Every job of this workflow runs, on every platform (CI-53)."
 
   tools:
     needs: scope

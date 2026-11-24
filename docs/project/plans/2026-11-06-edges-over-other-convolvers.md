@@ -224,10 +224,13 @@ custom-drawn plug-in windows lack; and CLAP (HOST-2), on request.
 
 ### 1. A filter for every sample rate
 
-**Order since 12 November 2026** ([decision](../decisions.md#direction)):
-start with the actual rate-mismatch workflow (IO-2). An explicit offline
-conversion of the filter may be enough; the multi-rate saved state below
-(EDGE-1) is a separate, larger capability, taken up only if it is not.
+**Order since 23 November 2026** ([decision](../decisions.md#direction)):
+EDGE-1 first, with IO-2's documented route. A player that runs the
+plug-in at each track's own rate, as a native-rate playlist does, needs
+the right entry of a list at every rate, which no offline conversion can
+give; it should also be clear which rate's entry plays. IO-2's explicit
+conversion follows, for a rate no filter was made for. (From 12 November
+2026 the conversion came first and EDGE-1 only if it proved inadequate.)
 
 **Approach.** Keep each entry of a configuration list in the plug-in state
 and play the one matching the host's rate; switch when the rate changes,
@@ -467,7 +470,10 @@ plan).
 ### 9. Compare two filters, level-matched
 
 **Approach.** Hold two filters and switch between them with the existing
-crossfade, at matched loudness.
+crossfade, at matched loudness. Preparing the second filter only when a
+comparison starts keeps everyday memory as it is: a 30 s true-stereo
+filter took 76 MiB playing and 165 MiB while being replaced
+([measurements](../../develop/fft-measurements.md#supported-workloads)).
 
 **Gap.** Hang Loose Convolver switches filter sets in real time, with level
 matching. Convolver replaces one filter with another.

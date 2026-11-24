@@ -11,6 +11,8 @@ name: Fuzz smoke tests
   # built from (CI-34, scripts/ci_scope.py FUZZED); each Monday a longer
   # campaign runs whatever changed.
   pull_request:
+    # ready_for_review: a draft runs Lint and the Linux jobs only (CI-54).
+    types: [opened, synchronize, reopened, ready_for_review]
   schedule:
     - cron: '23 6 * * 1'
   workflow_dispatch:
@@ -34,14 +36,28 @@ jobs:
   # docs/develop/testing.md#when-pull-requests-run-the-fuzz-targets).
   scope:
     runs-on: ubuntu-latest
+    # Reads this workflow's earlier runs, and the main commit each tested
+    # against (its scope job's notice), to carry a passed result forward
+    # (CI-53).
+    permissions:
+      contents: read
+      actions: read
+      checks: read
     outputs:
       build: ${{ steps.scope.outputs.build }}
+      full: ${{ steps.scope.outputs.full }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 2
       - id: scope
-        run: python3 scripts/ci_scope.py --workflow fuzz --github-output "$GITHUB_OUTPUT"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          python3 scripts/ci_scope.py --workflow fuzz --github-output "$GITHUB_OUTPUT"
+      - name: 'Full run: later pushes compare with this commit'
+        if: steps.scope.outputs.proving == 'true'
+        run: echo "Every job of this workflow runs, on every platform (CI-53)."
 
   libfuzzer:
     needs: scope
