@@ -199,9 +199,14 @@ class RestoreFollow {
     // read), before it was accepted or refused.
     void read(std::uint64_t digest) noexcept;
     // Any accepted install, a restore or a file chosen or read again: what
-    // plays no longer follows an earlier restore's outcome.
+    // plays no longer follows an earlier accepted restore. A refused one's
+    // request is still answered with what plays: a window choice the
+    // processor installed after the refusal and before that request was
+    // sent before the controller mirrored the refused state, and the
+    // controller leaves its settings to that answer (VST3-24, jrp's rerun of
+    // PR #281: the window showed the refused preset's Latency 0 while the
+    // chosen preset's 2048 played).
     void installed() noexcept {
-        refused_ = 0;
         accepted_ = 0;
     }
     // After installed(), a restore of this state was accepted with these
@@ -573,6 +578,13 @@ class Controller final : public Steinberg::Vst::EditController,
     // the user set since, which the preset replaced in the processor. True
     // if it reported any.
     bool publish_preset(Steinberg::int64 request, const HostSettings& preset, bool& restart);
+    // VST3-23 (jrp's rerun of PR #281): a Latency or Gain mode set to the
+    // value shown is still the user's choice while a load_message's answer
+    // is to come, as a preset it loads may change that setting: Latency 256,
+    // a 2048 preset chosen in the window, then 256 again before its answer,
+    // played and saved 2048. Not for a value the host hands back while
+    // publish_preset() reports it.
+    bool chosen_again();
     // A load_message for `path` numbered `request`; VST3-24: `unmirrored`
     // for the second try at a choice the processor answered as superseded.
     // False if it could not be sent.

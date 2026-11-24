@@ -4862,6 +4862,221 @@ void accepted_restore_follows_its_own_request() {
         }
     std::filesystem::remove_all(folder);
 }
+// VST3-23, VST3-24 (jrp's review of PR #279 at 13a6e1a): the latest
+// successful action wins, and a refusal keeps what plays. Each row is a few
+// user and host actions, in order, and the filter (its one tap) and Latency
+// that should win. Every row runs with each choice of delivery between the
+// actions (none, the processor's queue only, or both ways until quiet), with
+// the host restoring the processor first (the SDK's order) and the
+// controller first, through connections that deliver later, in order. After
+// the last delivery the window (the controller's Latency), the processor
+// (what plays, and the filter and Latency getState saves) and the host (the
+// last Latency edit and latency read since the last action) must all name
+// the winning action, not merely agree with one another: in jrp's case 1
+// every component agreed on the wrong Latency.
+//   W: the window chooses preset A (tap .125, Latency 2048).
+//   w: the window chooses preset B (tap .25, Latency 1024).
+//   L: the user sets Latency 256.
+//   R: the host restores preset P (tap .5, Latency 512), accepted.
+//   X: the host restores a 44.1 kHz preset, refused at 48 kHz.
+// The rows named after jrp's cases are his reproductions: before this
+// change "W L" ended with the window and the host at 2048 while 256 played
+// and was saved, and "W R" saved A's filter and 2048 though P was restored
+// later. His rerun of the first version of PR #281 found "L W L" playing
+// and saving 2048 (the second 256 matched the value shown, so it was not
+// sent) and "W X" showing the refused preset's Latency while A's played.
+void latest_action_wins() {
+    const auto folder = private_temp("convolver-vst3-latest-action");
+    std::filesystem::create_directories(folder);
+    const auto preset_file = [&](const char* name, float tap, std::size_t latency) {
+        convolver::HostState state;
+        state.configuration = convolver::Configuration{48000, 1, 1, 0, {}, {}, {}};
+        state.configuration->paths.push_back({{tap}, {{0, 1}}, {{0, 1}}});
+        state.settings.emplace();
+        state.settings->latency = latency;
+        const auto path = folder / name;
+        const auto bytes = convolver::presets::vst3_preset(state);
+        std::ofstream out(path, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
+        require(static_cast<bool>(out), "latest action: write a preset");
+        return path.string();
+    };
+    const auto preset_a = preset_file("a.vstpreset", .125f, 2048);
+    const auto preset_b = preset_file("b.vstpreset", .25f, 1024);
+    struct Row {
+        const char* name;
+        const char* actions;
+        float tap;
+        std::size_t latency;
+    };
+    const Row rows[] = {
+        {"jrp's case 2: a window preset, then Latency before its answer", "WL", .125f, 256},
+        {"jrp's case 3: a window choice, then a host preset while it is queued", "WR", .5f, 512},
+        {"jrp's case 1: Latency, an accepted preset, then a refused one", "LRX", .5f, 512},
+        {"Latency, then a window preset", "LW", .125f, 2048},
+        {"a host preset, then a window preset", "RW", .125f, 2048},
+        {"jrp's rerun 2: a window preset, then a refused host preset", "WX", .125f, 2048},
+        {"jrp's rerun 1: Latency 256, a window preset, then 256 again", "LWL", .125f, 256},
+        {"two window presets", "Ww", .25f, 1024},
+        {"a window preset, Latency, then a host preset", "WLR", .5f, 512},
+        {"a window preset, a host preset, then Latency", "WRL", .5f, 256},
+        {"a host preset, a window preset, then Latency", "RWL", .125f, 256},
+        {"a host preset, Latency, then a window preset", "RLW", .125f, 2048},
+        {"a window preset, a host preset, then a refused one", "WRX", .5f, 512},
+        {"a window preset, a refused host preset, then Latency", "WXL", .125f, 256},
+        {"two window presets, then a host preset", "WwR", .5f, 512},
+    };
+    const char* const deliveries[] = {"no delivery", "the processor's queue", "both queues"};
+    std::size_t runs = 0;
+    for (const auto& row : rows) {
+        const std::string_view actions = row.actions;
+        std::size_t timings = 1;
+        for (std::size_t i = 1; i < actions.size(); ++i)
+            timings *= 3;
+        for (const bool controller_first : {false, true})
+            for (std::size_t timing = 0; timing < timings; ++timing) {
+                std::string how = " (" + std::string(row.name) + "; " +
+                                  (controller_first ? "controller first" : "processor first");
+                for (std::size_t i = 1, t = timing; i < actions.size(); ++i, t /= 3)
+                    how += std::string(", then ") + deliveries[t % 3];
+                how += ")";
+                const auto check = [&](bool v, const std::string& what) {
+                    if (!v)
+                        throw std::runtime_error("latest action: " + what + how);
+                };
+                HostApplication context;
+                Handler handler;
+                Processor p;
+                Controller c;
+                check(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                          c.setComponentHandler(&handler) == kResultOk,
+                      "initialize");
+                Proxy to_controller(c, true), to_processor(p, true);
+                check(p.connect(&to_controller) == kResultOk &&
+                          c.connect(&to_processor) == kResultOk,
+                      "connect");
+                const auto deliver = [&] {
+                    while (to_controller.deliver() + to_processor.deliver() > 0) {
+                    }
+                };
+                SpeakerArrangement mono = SpeakerArr::kMono;
+                check(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "buses");
+                p.activateBus(kAudio, kInput, 0, true);
+                p.activateBus(kAudio, kOutput, 0, true);
+                const auto state_with = [&](int rate, float tap, std::size_t latency) {
+                    convolver::HostState state;
+                    state.configuration = convolver::Configuration{
+                        rate, 1, 1, 0, {}, {}, {{{tap}, {{0, 1}}, {{0, 1}}}}};
+                    state.settings.emplace();
+                    state.settings->latency = latency;
+                    auto stream = std::make_unique<MemoryStream>();
+                    check(write_state(stream.get(), state), "encode");
+                    return stream;
+                };
+                const auto restore = [&](IBStream& stream) {
+                    tresult result = kResultFalse;
+                    stream.seek(0, IBStream::kIBSeekSet, nullptr);
+                    if (!controller_first)
+                        result = p.setState(&stream);
+                    stream.seek(0, IBStream::kIBSeekSet, nullptr);
+                    check(c.setComponentState(&stream) == kResultOk, "the controller's restore");
+                    if (controller_first) {
+                        stream.seek(0, IBStream::kIBSeekSet, nullptr);
+                        result = p.setState(&stream);
+                    }
+                    return result;
+                };
+                auto first = state_with(48000, 1, 4096);
+                check(restore(*first) == kResultOk, "the first filter");
+                deliver();
+                ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+                check(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+                      "activate");
+                play_block(p, 1, 1, 64);
+                deliver();
+                auto preset_p = state_with(48000, .5f, 512), preset_x = state_with(44100, .75f, 64);
+                std::vector<std::size_t> latency_read;
+                handler.on_restart = [&](int32 flags) {
+                    if (flags & kLatencyChanged)
+                        latency_read.push_back(p.getLatencySamples());
+                };
+                std::size_t edits_before = 0, reads_before = 0;
+                for (std::size_t i = 0, t = timing; i < actions.size(); ++i) {
+                    if (i > 0) {
+                        if (t % 3 == 1)
+                            to_processor.deliver();
+                        else if (t % 3 == 2)
+                            deliver();
+                        t /= 3;
+                    }
+                    edits_before = handler.edits.size();
+                    reads_before = latency_read.size();
+                    switch (actions[i]) {
+                    case 'W':
+                        check(c.load_file(preset_a), "preset A was refused");
+                        break;
+                    case 'w':
+                        check(c.load_file(preset_b), "preset B was refused");
+                        break;
+                    case 'L':
+                        c.setParamNormalized(latency_id, normalized_latency(256));
+                        break;
+                    case 'R':
+                        check(restore(*preset_p) == kResultOk, "preset P was refused");
+                        break;
+                    default:
+                        check(restore(*preset_x) != kResultOk, "the 44.1 kHz preset was accepted");
+                    }
+                }
+                deliver();
+                c.report();
+                deliver();
+                const auto shown_latency = latency_frames(c.getParamNormalized(latency_id));
+                MemoryStream saved_stream;
+                check(p.getState(&saved_stream) == kResultOk, "getState");
+                saved_stream.seek(0, IBStream::kIBSeekSet, nullptr);
+                const auto saved = read_state(&saved_stream);
+                const auto saved_latency =
+                    saved.settings.value_or(convolver::HostSettings{}).latency;
+                const auto& config = saved.configuration;
+                const bool saved_filter =
+                    config && config->paths.size() == 1 &&
+                    config->paths.front().impulse == std::vector<float>{row.tap};
+                // What the host was last told since the last action: a Latency
+                // edit, and the latency it read when asked to restart.
+                std::optional<ParamValue> edited;
+                for (auto i = edits_before; i < handler.edits.size(); ++i)
+                    if (handler.edits[i].kind == 'p' && handler.edits[i].id == latency_id)
+                        edited = handler.edits[i].value;
+                const auto read = latency_read.size() > reads_before
+                                      ? std::optional<std::size_t>(latency_read.back())
+                                      : std::nullopt;
+                check(shown_latency == row.latency && p.getLatencySamples() == row.latency &&
+                          saved_latency == row.latency && saved_filter &&
+                          (!edited || latency_frames(*edited) == row.latency) &&
+                          (!read || *read == row.latency),
+                      "expected tap " + std::to_string(row.tap) + " and Latency " +
+                          std::to_string(row.latency) + "; shown " + std::to_string(shown_latency) +
+                          ", playing " + std::to_string(p.getLatencySamples()) + ", saved " +
+                          std::to_string(saved_latency) +
+                          (saved_filter ? " with that filter" : " with another filter") +
+                          ", host last told " +
+                          (edited ? std::to_string(latency_frames(*edited)) : "nothing") +
+                          ", host last read " + (read ? std::to_string(*read) : "nothing"));
+                handler.on_restart = nullptr;
+                p.setActive(false);
+                p.disconnect(&to_controller);
+                c.disconnect(&to_processor);
+                deliver();
+                c.terminate();
+                p.terminate();
+                ++runs;
+            }
+    }
+    require(runs > 100, "latest action: the table did not run");
+    std::filesystem::remove_all(folder);
+}
 // PLUG-39 step 5a (the independent review of PR #246): a status message
 // whose report does not decode, as a damaged message would, is not shown,
 // but the load answer it carries still counts, and notify says the message
@@ -5227,6 +5442,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"edits_before_controller_first_restore", edits_before_controller_first_restore},
         {"accepted_restore_beats_queued_edit", accepted_restore_beats_queued_edit},
         {"accepted_restore_follows_its_own_request", accepted_restore_follows_its_own_request},
+        {"latest_action_wins", latest_action_wins},
         {"damaged_report_message", damaged_report_message},
         {"damaged_report_keeps_status", damaged_report_keeps_status},
         {"settings_at_state_limit", settings_at_state_limit},

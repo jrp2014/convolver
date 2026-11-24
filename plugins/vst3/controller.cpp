@@ -420,6 +420,10 @@ bool Controller::publish_preset(int64 request, const HostSettings& preset, bool&
     publishing_ = false;
     return edited;
 }
+bool Controller::chosen_again() {
+    std::lock_guard lock(status_lock_);
+    return !publishing_ && load_requests_ > load_answered_;
+}
 void Controller::latency_chosen(std::size_t frames) {
     int64 request = 0;
     {
@@ -458,7 +462,7 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
         const auto before = gain_mode(getParamNormalized(gain_mode_id));
         const auto result = EditController::setParamNormalized(id, value);
         const auto after = gain_mode(getParamNormalized(gain_mode_id));
-        if (result == kResultOk && after != before) {
+        if (result == kResultOk && (after != before || chosen_again())) {
             int64 request = 0;
             {
                 std::lock_guard lock(status_lock_);
@@ -480,7 +484,7 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
         const auto before = latency_frames(getParamNormalized(latency_id));
         const auto result = EditController::setParamNormalized(id, value);
         const auto after = latency_frames(getParamNormalized(latency_id));
-        if (result == kResultOk && after != before)
+        if (result == kResultOk && (after != before || chosen_again()))
             latency_chosen(after);
         return result;
     }
