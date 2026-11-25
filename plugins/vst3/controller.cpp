@@ -311,9 +311,11 @@ void Controller::restart(int32 flags) {
 tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) {
     // The host's value goes over what the processor said before it.
     refresh_if_changed();
-    if ((id == gain_id || id == mix_id || id == bypass_id) && !bridge()) {
-        // Unpaired: when, so that the first read after pairing keeps it if
-        // it is newer than the processor's last restore.
+    if (const auto bridge = this->bridge();
+        (id == gain_id || id == mix_id || id == bypass_id) && !(bridge && bridge->attached())) {
+        // Unpaired, or the processor has gone (its terminate reached only a
+        // proxy): when, so that the first read after pairing keeps it if it
+        // is newer than the processor's last restore.
         auto& at = id == gain_id ? gain_edit_at_ : id == mix_id ? mix_edit_at_ : bypass_edit_at_;
         at = Bridges::stamp();
     }
@@ -453,9 +455,12 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
         if (bridge->attached())
             return kResultOk;
     }
-    // A choice made before pairing is older than this restore.
+    // A choice or an edit made before pairing is older than this restore,
+    // whose values the parameters now take; once paired, the processor's
+    // replace them unless it refused the restore.
     unsent_latency_.reset();
     unsent_gain_mode_.reset();
+    gain_edit_at_ = mix_edit_at_ = bypass_edit_at_ = 0;
     // Unpaired: the state's values, as the host restored them.
     HostState state;
     try {
