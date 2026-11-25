@@ -216,7 +216,10 @@ struct ConfigurationSelection {
 
 // IR audio file, legacy .cfg, or configuration list. A list selects the first
 // entry matching every specified property. A sound file has as many outputs as
-// inputs.
+// inputs. Only when nothing matches, and inputs are given (2 or more) with
+// outputs omitted or as many, the first filter with one input and one output
+// is returned laid out on each channel (on_each_channel()), or a four-channel
+// IR file on two inputs as true stereo, LL, LR, RL, RR (EDGE-3).
 // raw_filters receives the selected configuration's IR files that were read as
 // headerless raw filters, with selection.raw_filter_encoding.
 Configuration load_configuration(const std::filesystem::path&, const ConfigurationSelection&,

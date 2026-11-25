@@ -81,7 +81,9 @@ outputs: REAPER gives the VST3 plug-in six inputs on a six-channel track, so a
 and the window's Host channels line say the same (`6 in → 6 out (inputs 3–6
 ignored)`). Make sure the source plays on
 the inputs the filter reads. A filter with more inputs than the host gives,
-or with a different number of outputs, is refused. From a configuration
+or with a different number of outputs, is refused, except a mono filter on a
+track with as many outputs as inputs, which plays on each channel
+([when a filter does not fit](#when-a-filter-does-not-fit)). From a configuration
 list, an entry with exactly the host's inputs comes first; otherwise the
 entry for the host's rate and outputs with the most inputs below the host's
 is chosen. The Convolver log (for LV2, the host's log) and the window's
@@ -218,7 +220,13 @@ file at once.
 
 A filter, chosen as a file or loaded as a preset, has one sample rate and
 fixed input and output channel counts. Each plug-in checks it against the
-host:
+host. Two filters fit more than their own counts: one with one input and
+one output (a mono IR file, say) plays on each channel of a track with as
+many outputs as inputs, and a four-channel IR file chosen while the host
+gives two inputs and two outputs plays as true stereo
+([mono and true-stereo IR files](configuration.md#mono-and-true-stereo-ir-files)).
+Status adds `on each of 2 channels` or `true stereo` to the loaded line, and
+the Convolver log says so in a sentence.
 
 | Situation | What plays |
 | --- | --- |
@@ -668,7 +676,7 @@ From the top, the window has:
   | --- | --- |
   | Host | When the host's rate and channels suit the filter, one line: `48000 Hz, 2 in → 2 out ✓ suits the filter`. Before the host has sent its audio settings: `not known yet` |
   | Host sample rate, Host channels | Otherwise a line each: the rate the host runs the plug-in at, and the inputs and outputs it gives it (`1 in → 1 out`) |
-  | Routing | With a filter: which input feeds which output (`In 1 → Out 1`), with route gains such as `×0.5`; the first four paths, then how many more |
+  | Routing | With a filter: which input feeds which output (`In 1 → Out 1`), with route gains such as `×0.5`; the first four paths, then how many more. `(the one-channel filter on each channel)` or `(true stereo)` follows when Convolver chose that routing |
   | Ring-out | How long the output goes on after the input stops (the tail), at the host's rate; only when it says more than the filter's Length: delays in the filter, a Latency, or another rate |
   | Worst-case peak | The loudest output any full-scale input could make through the filter, and the Gain that rules out clipping (or that it won't clip at the current Gain and Mix) |
   | Host block size | The largest block the host sends at a time |
@@ -966,7 +974,8 @@ names the channels Ardour gave it
 - **Strict-I/O track (Ardour's default).** Ardour keeps the track's channel
   count through its plug-ins, so Convolver gets as many outputs as the
   track has inputs. A mono filter on a mono track and a stereo filter on a
-  stereo track play, in the VST3 and the LV2 plug-in. With the VST3 on a
+  stereo track play, in the VST3 and the LV2 plug-in, and so does a mono
+  filter on a stereo track, on each channel. With the VST3 on a
   mono track, Ardour 9's log first says `Refused the host's channel
   layout: it has 0 input and 0 output channels`; the `Started at` line
   after it, ending `1 out`, is what plays. A filter with more
@@ -979,23 +988,15 @@ names the channels Ardour gave it
   play as they do elsewhere.
 - **Flexible-I/O track, VST3 plug-in.** Ardour gives the VST3 plug-in 2
   inputs and 2 outputs whatever the track has, feeding a mono track's
-  channel to both inputs, so a filter with other outputs, such as a mono
-  filter or a 2→6 crossover, plays silence. On a mono track, Ardour 9 asks
-  for one channel, but the request reaches Convolver as a layout with no
-  channels and the log says `Refused the host's channel layout: it has 0
-  input and 0 output channels`. A mono filter plays once you set the
-  channels by hand: right-click Convolver, choose **Pin Connections…**,
-  click **Manual Config**, and set **Audio Out** to 1 with its − button;
-  leave Ardour 9's **Audio Input Pins** as they are. The log's next
-  `Started at` line then ends `1 out` (with `2 in` on Ardour 8, where
-  Convolver plays the first input and ignores the second). A mono filter
-  chosen before that, while Convolver still has 2 outputs, waits: Status
-  says Silent with the reason, and it plays once that `Started at` line
-  shows 1 output (checked by automated tests). A filter chosen while
-  another one plays is still refused: choose it again after the channels
-  change. These steps are not yet confirmed in Ardour's window.
-  A crossover cannot be set up this way: Convolver still gets only 2
-  outputs.
+  channel to both inputs. A mono filter plays on each of the two channels,
+  so it filters a mono track's audio too (checked with Ardour 8.4 by
+  automated tests, not yet in Ardour's window). On a mono track,
+  Ardour 9 first asks for one channel, but the request reaches Convolver as
+  a layout with no channels and the log says `Refused the host's channel
+  layout: it has 0 input and 0 output channels`; the `Started at` line
+  after it names the channels that play. A filter with other outputs, such
+  as a 2→6 crossover, plays silence, because Convolver still gets only 2
+  outputs: use the LV2 plug-in for it.
 - **Settings.** Ardour leaves Gain mode and Latency out of its own controls
   for the VST3 plug-in, because they cannot be automated; Gain and Mix are
   there. On macOS and Windows, Convolver's window has all four (not yet

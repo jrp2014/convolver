@@ -160,6 +160,28 @@ void detail::disable_idle(bool disabled) noexcept {
     idle_disabled = disabled;
 }
 
+Configuration on_each_channel(const Configuration& c, std::size_t channels) {
+    if (c.input_channels != 1 || c.output_channels != 1 || channels == 0)
+        throw std::invalid_argument("only a filter with one input and one output plays on "
+                                    "each channel");
+    Configuration each;
+    each.sample_rate = c.sample_rate;
+    each.input_channels = each.output_channels = channels;
+    each.input_delays.assign(channels, c.input_delays.empty() ? 0 : c.input_delays.front());
+    each.output_delays.assign(channels, c.output_delays.empty() ? 0 : c.output_delays.front());
+    each.paths.reserve(channels * c.paths.size());
+    for (std::size_t channel = 0; channel < channels; ++channel)
+        for (const auto& path : c.paths) {
+            auto copy = path;
+            for (auto& route : copy.inputs)
+                route.channel = channel;
+            for (auto& route : copy.outputs)
+                route.channel = channel;
+            each.paths.push_back(std::move(copy));
+        }
+    return each;
+}
+
 ConfigurationAnalysis analyze_configuration(const Configuration& c, std::size_t latency) {
     return validate(c, latency);
 }

@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdio>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -32,6 +33,14 @@ std::string counts(std::size_t inputs, std::size_t outputs) {
 }
 using detail::Advice;
 using detail::advice_text;
+// EDGE-3: what plays on `host`: a filter with one input and one output laid
+// out on each of its channels, any other the accepted filter itself, shared.
+std::shared_ptr<const Configuration> played_on(std::shared_ptr<const Configuration> c,
+                                               const HostLayout& host) {
+    if (!plays_on_each_channel(*c, host))
+        return c;
+    return std::make_shared<const Configuration>(on_each_channel(*c, host.inputs));
+}
 struct Mismatch {
     HostFailureKind kind;
     Advice why;
@@ -61,8 +70,10 @@ std::optional<Mismatch> mismatch(const Configuration& c, const HostLayout& host,
              {}}};
     }
     // PLUG-23: more inputs than the filter's are fine (it reads the first
-    // ones); fewer are not, and the outputs must match.
-    if (c.input_channels > host.inputs || c.output_channels != host.outputs) {
+    // ones); fewer are not, and the outputs must match. EDGE-3: a filter with
+    // one input and one output plays on each channel.
+    if ((c.input_channels > host.inputs || c.output_channels != host.outputs) &&
+        !plays_on_each_channel(c, host)) {
         const auto made = counts(c.input_channels, c.output_channels),
                    given = counts(host.inputs, host.outputs);
         Advice a{filter + " has " + made + ", and the host gives the plug-in " + given,
@@ -79,6 +90,13 @@ std::optional<Mismatch> mismatch(const Configuration& c, const HostLayout& host,
             c.output_channels == 2)
             a.note = "Hosts run an effect with one channel on a mono track (GarageBand does): "
                      "put Convolver on a stereo track instead.";
+        // EDGE-3: a four-channel IR file is read as true stereo only for two
+        // channels, so one chosen before the host gave the plug-in its
+        // channels was read with four.
+        if (host.inputs == 2 && host.outputs == 2 && c.input_channels == 4 &&
+            c.output_channels == 4)
+            a.note = "A four-channel IR file plays as true stereo when it is chosen while the "
+                     "host gives the plug-in two channels: if this is one, choose it again.";
         return Mismatch{HostFailureKind::channels, std::move(a)};
     }
     return std::nullopt;
@@ -411,8 +429,36 @@ bool same_configuration(const Configuration& a, const Configuration& b) noexcept
 }
 } // namespace
 
+bool plays_on_each_channel(const Configuration& c, const HostLayout& host) noexcept {
+    return c.input_channels == 1 && c.output_channels == 1 && host.inputs >= 2 &&
+           host.inputs == host.outputs;
+}
+
+bool true_stereo_routing(const Configuration& c) noexcept {
+    if (c.input_channels != 2 || c.output_channels != 2 || c.paths.size() != 4)
+        return false;
+    constexpr std::size_t from[4] = {0, 0, 1, 1}, to[4] = {0, 1, 0, 1};
+    for (std::size_t i = 0; i < 4; ++i) {
+        const auto& p = c.paths[i];
+        if (p.inputs.size() != 1 || p.outputs.size() != 1 || p.inputs[0].channel != from[i] ||
+            p.outputs[0].channel != to[i] || p.inputs[0].gain != 1 || p.outputs[0].gain != 1)
+            return false;
+    }
+    return true;
+}
+
+std::string routing_sentence(const Configuration& c, const HostLayout& host) {
+    if (plays_on_each_channel(c, host))
+        return "The filter has one input and one output, so it plays on each of the host's " +
+               std::to_string(host.inputs) + " channels.";
+    if (true_stereo_routing(c))
+        return "It plays as true stereo: left to left, left to right, right to left and right "
+               "to right.";
+    return {};
+}
+
 std::string ignored_inputs(const Configuration& c, const HostLayout& host, const char* dash) {
-    if (host.inputs <= c.input_channels)
+    if (host.inputs <= c.input_channels || plays_on_each_channel(c, host))
         return {};
     const auto first = std::to_string(c.input_channels + 1);
     if (host.inputs == c.input_channels + 1)
@@ -743,7 +789,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
                     // session the host is opening keeps nothing from before.
                     const bool unchanged = same && !failed_ && !activation_failure_ &&
                                            request.kind != HostRequestKind::session;
-                    install(HostPlayback{accepted, dry, gains, unchanged});
+                    install(HostPlayback{played_on(accepted, *host), dry, gains, unchanged});
                 } else {
                     install(unfiltered);
                     if (kept_failure && heard_before && counting)
@@ -839,7 +885,7 @@ HostActivation HostFilter::activation(const HostLayout& host) const {
         return a;
     }
     a.notice = speaker_notice(*filter_, host);
-    a.playback = filter_playback(filter_); // Shared, not copied.
+    a.playback = filter_playback(played_on(filter_, host)); // Shared, not copied.
     a.playback.gains = gains_;
     return a;
 }
@@ -1272,8 +1318,14 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
             break;
         }
         const auto ignored = host ? ignored_inputs(*c, *host, "-") : std::string();
+        // EDGE-3: a default routing is named where it plays.
+        const auto routing = !host ? std::string()
+                             : plays_on_each_channel(*c, *host)
+                                 ? "; on each of " + std::to_string(host->inputs) + " channels"
+                             : true_stereo_routing(*c) ? std::string("; true stereo")
+                                                       : std::string();
         line.text = "Filter loaded: " + std::to_string(c->sample_rate) + " Hz, " +
-                    ports(c->input_channels, c->output_channels) +
+                    ports(c->input_channels, c->output_channels) + routing +
                     (!host             ? "; waiting for audio settings from the host."
                      : ignored.empty() ? "."
                                        : "; plug-in " + ignored + " ignored.");

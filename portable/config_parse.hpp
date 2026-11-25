@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -154,12 +155,37 @@ Configuration configuration_graph(const ParsedConfiguration&);
 bool matches(int sample_rate, std::size_t input_channels, std::size_t output_channels,
              const ConfigurationSelection&);
 
+// EDGE-3 (jrp, 25 November 2026): how a filter whose channels do not match a
+// selection's may still play, without a configuration saying how. Only when
+// the selection's inputs are 2 or more and its outputs, if given, are as many:
+// - each_channel: a filter with one input and one output (a mono IR file, or
+//   a configuration) filters every channel on its own, as a configuration
+//   repeating its paths for each channel would;
+// - true_stereo: a four-channel IR file used directly, on two channels, is a
+//   true-stereo response in the order left to left, left to right, right to
+//   left, right to right (Steinberg's REVerence, SIR3, IR.lv2's convert4chan).
+// as_is is an exact match. An exact match always wins over these, across a
+// whole list, so no list that played before plays another entry now.
+enum class FilterLayout { as_is, each_channel, true_stereo };
+std::optional<FilterLayout> default_layout(bool sound_file, std::size_t inputs, std::size_t outputs,
+                                           std::size_t wanted_inputs,
+                                           std::size_t wanted_outputs) noexcept;
+// The configuration as `layout` plays it on `channels` channels: each_channel
+// repeats a one-input, one-output configuration's paths and delays for each
+// channel; true_stereo routes the four paths of a four-channel IR file read
+// as it is (one per channel) as left to left, left to right, right to left
+// and right to right. as_is returns it unchanged. Not for the audio thread.
+Configuration laid_out(Configuration, FilterLayout, std::size_t channels);
+
 // A filter considered during selection, for explaining why none matched.
 struct SelectionCandidate {
     std::filesystem::path path;
     bool sound_file = false;
     int sample_rate = 0;
     std::size_t input_channels = 0, output_channels = 0;
+    // EDGE-3: a four-channel WAV whose header marks it as Ambisonics B-format,
+    // which is never taken for true stereo (ambisonic_b_format()).
+    bool ambisonic = false;
 };
 // A self-contained explanation of why no candidate matches `wanted`, naming each
 // difference and what to change. `subject` says where the wanted properties came

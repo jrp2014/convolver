@@ -24,6 +24,10 @@ and are maintained here.
   log, LV2's status port and, later, a status display in the other formats.
 - A filter plays on exactly its outputs and at least its inputs: on a wider
   input bus it reads the first inputs and ignores the rest, and says so.
+  Where neither fits, two default routings: a one-input, one-output filter plays on
+  each channel of a host with as many outputs as inputs, and a four-channel
+  IR file chosen on two inputs and two outputs plays as true stereo
+  ([below](#default-routings)), and Convolver says so.
 - Bypass ramps over 1.33 ms (64 samples at 48 kHz) to the input delayed by
   the latency, or to silence when there is no dry signal: the filter's
   counts differ, or with no filter playing, the host's or a kept filter's
@@ -273,7 +277,7 @@ before they set the sample rate and channel layout (VST3 `setState` before
   `native.host_settling`,
   `vst3.adapter` `kept_until_channels_fit` and
   `chosen_file_kept_until_it_fits`, `au.adapter` `chosen_file_kept` and
-  `au.editor` `files` (a mono file chosen on an empty stereo unit).
+  `au.editor` `files` (a three-channel file chosen on an empty stereo unit).
 - VST3 counts its configuration as known once the plug-in has been activated
   with it and has played audio with it (a `process` call with samples, in
   that activation or an earlier one since the rate or buses last changed),
@@ -1292,8 +1296,8 @@ every filter in one processor shares the input stride while keeping its own
 dry rule ([bypass](#bypass) for the fade when that changes). The user is told: Status ends "plug-in inputs 3-6 ignored.",
 the loaded, playing and started log lines add "Inputs 3–6 are ignored: the
 filter reads inputs 1–2.", and the window report's Channels fact says the
-same (`ignored_inputs()`). Outputs stay exact: a filter is never spread over,
-or cut to, other outputs.
+same (`ignored_inputs()`). Outputs stay exact: a filter is never cut to
+other outputs, and only a one-channel filter is spread over them (below).
 
 A file chosen in a window or through LV2's file parameter follows the same
 rule (PLUG-33, `read_filter_file()`): it is read for the host's exact
@@ -1305,8 +1309,33 @@ entry is chosen that way, `HostRequest::wider_entry` names it, and the
 loaded line in the Convolver log (LV2 writes it as a note to the host's
 log, for that choice only) and the window's reference lines ("List
 entry") say which entry plays and why. The command line still selects
-exactly. With no filter, Status names choosing a filter before a
+exactly, apart from the default routings below. With no filter, Status names choosing a filter before a
 preset where the plug-in has a window (`host_status()`'s `chooses_files`).
+
+<a id="default-routings"></a>**Default routings (EDGE-3).** A filter with
+one input and one output (a mono IR file, a `.cfg` or a preset) suits a
+host with two or more inputs and as many outputs, and plays on each
+channel: `plays_on_each_channel()` answers `mismatch()`, and `played_on()`
+lays the filter out with `on_each_channel()` when it is installed and at
+each activation, so the accepted filter, the saved state and a preset keep
+its own 1/1 and the layout follows the host's channels at every start. A
+four-channel IR file is read as true stereo (paths LL, LR, RL, RR) only
+when it is read for a host known to give two inputs and two outputs
+(`read_filter_file()` tries the known counts first, then the file as it
+is), because that is decided in `load_configuration()`'s
+`default_layout()`; the state then holds the 2→2 configuration. A
+four-channel file read before any start and started on two channels is
+refused with a note to choose it again. A WAVE file marked as Ambisonic
+B-format is never taken for true stereo. In a list, an entry that matches
+exactly wins over the whole list, then the wider-input rule above, and
+only then a default routing. Status ends `on each of 2 channels` or `true
+stereo`, the log's loaded line adds a sentence (`routing_sentence()`), and
+the report's Routing fact a note
+([configuration](../use/configuration.md#mono-and-true-stereo-ir-files),
+[decision](../project/decisions.md#configuration-and-sound)). Tests:
+`native.io` (the reading rule), `native.filter_file` `default_layouts`,
+`vst3.adapter` `kept_until_channels_fit`, `au.editor` `files`, the Ardour
+`mono` VST3 case on a Flexible-I/O track.
 
 ## Replacement and threads
 

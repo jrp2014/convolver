@@ -199,8 +199,11 @@ std::string loaded_line(const HostFilter& filter, bool host_known) {
 std::string loaded_line(const HostFilter& filter, const std::optional<HostLayout>& host) {
     auto line = loaded_line(filter, host.has_value());
     const auto& f = filter.failure();
-    if (const auto& c = filter.filter(); host && c && !(f && f->silent))
+    if (const auto& c = filter.filter(); host && c && !(f && f->silent)) {
         line += ignored_sentence(*c, *host);
+        if (auto routing = routing_sentence(*c, *host); !routing.empty())
+            line += " " + routing;
+    }
     if (const auto& entry = filter.accepted().wider_entry; !entry.empty() && host)
         line += " " + wider_entry_sentence(entry, *host);
     return line;

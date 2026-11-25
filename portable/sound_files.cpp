@@ -192,6 +192,46 @@ std::optional<WaveSizes> validate_wave(const std::filesystem::path& path) {
              {}});
     }
 }
+bool ambisonic_b_format(const std::filesystem::path& path) noexcept {
+    try {
+        std::ifstream file(path, std::ios::binary);
+        std::array<unsigned char, 40> bytes{};
+        file.read(reinterpret_cast<char*>(bytes.data()), 12);
+        if (file.gcount() != 12 ||
+            std::string_view(reinterpret_cast<char*>(bytes.data()), 4) != "RIFF" ||
+            std::string_view(reinterpret_cast<char*>(bytes.data() + 8), 4) != "WAVE")
+            return false;
+        // The B-format subtypes of WAVE_FORMAT_EXTENSIBLE, as stored: the
+        // GUIDs 00000001- (PCM) and 00000003-0721-11d3-8644-c8c1ca000000
+        // (float), the first field naming the sample format.
+        constexpr std::array<unsigned char, 14> b_format{0x00, 0x00, 0x00, 0x21, 0x07, 0xd3, 0x11,
+                                                         0x86, 0x44, 0xc8, 0xc1, 0xca, 0x00, 0x00};
+        std::uint64_t position = 12;
+        for (int chunks = 0; chunks < 64; ++chunks) {
+            file.seekg(static_cast<std::streamoff>(position));
+            file.read(reinterpret_cast<char*>(bytes.data()), 8);
+            if (file.gcount() != 8)
+                return false;
+            const std::uint64_t length =
+                detail::read_le32(std::as_bytes(std::span(bytes)).subspan(4));
+            if (std::string_view(reinterpret_cast<char*>(bytes.data()), 4) == "fmt ") {
+                if (length < 40)
+                    return false;
+                file.read(reinterpret_cast<char*>(bytes.data()), 40);
+                if (file.gcount() != 40 ||
+                    detail::read_le16(std::as_bytes(std::span(bytes))) != 0xfffe)
+                    return false;
+                const unsigned sample = bytes[24];
+                return (sample == 1 || sample == 3) &&
+                       std::equal(b_format.begin(), b_format.end(), bytes.begin() + 25) &&
+                       bytes[39] == 0x00;
+            }
+            position += 8 + length + (length & 1u);
+        }
+    } catch (...) {
+    }
+    return false;
+}
 std::string sample_position(std::uint64_t frame, std::size_t channel, int sample_rate) {
     char seconds[32];
     std::snprintf(seconds, sizeof seconds, "%.3f",

@@ -174,7 +174,8 @@ the export has the filter you chose (for example by comparing it with
 1. Set *Audio setup › Audio settings › Default sample rate*, and the
    project's rate, to the filter's rate. Audacity plays effects at the
    Default sample rate, which can differ from the rate it exports at. Use
-   stereo filters: Audacity runs the plug-in in stereo even on a mono track.
+   stereo or mono filters: Audacity runs the plug-in in stereo even on a
+   mono track, and a mono filter plays on each channel.
 2. Audacity's preset menu does not import `.vstpreset` files; it lists the
    ones in the VST3 folder for all users,
    `/Library/Audio/Presets/Convolver/Convolver/` on macOS

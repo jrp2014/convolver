@@ -17,6 +17,7 @@
 #include <vector>
 
 namespace convolver::detail {
+enum class FilterLayout; // config_parse.hpp
 // One open filter file, read once from the start.
 class SoundFile {
   public:
@@ -55,13 +56,20 @@ const SoundFiles& audio_toolbox_files();
 // options alone, with no audio (convolver-preset), so the advice is to
 // choose other values. `chosen_paths` receives what the selected filter was
 // read from (Resolver::chosen_sources()): unlike `source_paths`, not the IRs
-// of list entries passed over.
+// of list entries passed over. `chosen_layout` receives the routing the
+// result was laid out with (EDGE-3, default_layout()): as_is for an exact
+// match. A plug-in or preset keeps a one-channel filter as it is, and
+// chosen_layout still says each_channel. `default_layouts` false takes an
+// exact match only, so a plug-in can try PLUG-33's fewer inputs before the
+// default routings (read_filter_file()); a refusal then explains only that.
 Configuration load_configuration(const std::filesystem::path&, const ConfigurationSelection&,
                                  const SoundFiles& files,
                                  std::vector<std::filesystem::path>* source_paths = nullptr,
                                  std::vector<std::filesystem::path>* raw_filters = nullptr,
                                  bool plugin = false, bool options = false,
-                                 std::vector<std::filesystem::path>* chosen_paths = nullptr);
+                                 std::vector<std::filesystem::path>* chosen_paths = nullptr,
+                                 FilterLayout* chosen_layout = nullptr,
+                                 bool default_layouts = true);
 
 // Shared by the readers.
 // What the first bytes of a file say about it: a container marker no sample
@@ -88,6 +96,11 @@ void fill_in_sizes(const WaveSizes&, std::uint64_t position,
 // Other files pass unchecked. Returns the sizes of a WAV whose header never
 // got them, which is read to the end of the file.
 std::optional<WaveSizes> validate_wave(const std::filesystem::path&);
+// EDGE-3: whether a WAV's format chunk marks it as Ambisonics B-format (the
+// extensible format's B-format subtypes, as .amb files carry), which is never
+// played as true stereo. False for anything else, a file that cannot be read
+// included: its reader explains that.
+bool ambisonic_b_format(const std::filesystem::path&) noexcept;
 // DIAG-1: what to do about a sound file that cannot be read because of its
 // content, added to the reason by both readers.
 inline constexpr std::string_view damaged_file_advice =

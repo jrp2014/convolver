@@ -61,9 +61,11 @@ ls *.wav | xargs -P 8 -I{} convolver --filter room.cfg --input {} --output out/{
 
 The filter may be an IR file, a [configuration](configuration.md) (`.cfg`), or a
 configuration list. An IR file used directly maps each IR channel to the
-corresponding input and output; a mono IR requires mono input. Use a
-configuration to apply one mono IR to several channels. Lists select the first
-entry matching input rate and channel count. `--output-channels N` adds the
+corresponding input and output. A filter with one input and one output (a
+mono IR file, for example) filters each input channel on its own, and a
+four-channel IR file on stereo input plays as true stereo; a line on stderr
+says so ([mono and true-stereo IR files](configuration.md#mono-and-true-stereo-ir-files)). Lists select the first entry matching input rate and channel
+count, and only if none does, the first that one of those routings fits. `--output-channels N` adds the
 requirement of N output channels; a single configuration or IR file that has a
 different count is rejected (an IR file has as many outputs as inputs). There is no resampling or
 nearest-rate substitution.
@@ -511,9 +513,13 @@ convolver --inspect room.cfg --syntax-only --json
 ```
 
 - Selection matches rendering: the first list entry matching `--sample-rate`,
-  `--input-channels` and `--output-channels` (or the first entry with none). The
-  report lists each visited file and why it was skipped, for example
-  `rate-and-output-mismatch`. Unselected entries' IR files are not opened.
+  `--input-channels` and `--output-channels` (or the first entry with none);
+  only when none matches, the first entry that plays on each input channel
+  or as true stereo ([mono and true-stereo IR files](configuration.md#mono-and-true-stereo-ir-files)).
+  The report lists each visited file and why it was skipped, for example
+  `rate-and-output-mismatch`, and names a default routing in its text and as
+  `layout` in JSON: `as-written`, `each-channel` or `true-stereo`.
+  Unselected entries' IR files are not opened.
 - `--all-configurations` validates every leaf of a list, continues after a failed
   entry, and fails if any entry fails. It cannot be combined with selectors.
   Each entry is decoded and prepared as a render would, so one check stops,

@@ -222,8 +222,8 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'the file changes are checked only by '
             'automated tests.\n'
             '- In Ardour, the VST3 plug-in on a Flexible-I/O track gets 2 inputs and 2 outputs whatever the track '
-            'has, so a mono filter plays silence until its outputs are set by hand in Pin Connections (steps not yet '
-            "confirmed in Ardour's window), and a crossover cannot play; nor can a crossover on a Strict-I/O track, "
+            "has; a mono filter plays on each of them (checked by automated tests, not yet in Ardour's window), "
+            'but a crossover cannot play; nor can a crossover on a Strict-I/O track, '
             "Ardour's default, in either format. "
             'On Linux use the LV2 plug-in on a Flexible-I/O track for a crossover '
             f'([Ardour]({docs}/plugins.md#ardour)).\n'

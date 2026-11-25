@@ -5,6 +5,7 @@
 #include "utf8.hpp"
 #include <algorithm>
 #include <exception>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -86,10 +87,12 @@ HostState filter_file_state(const std::filesystem::path& path,
                             const ConfigurationSelection& selection,
                             const detail::SoundFiles& reader,
                             std::vector<std::filesystem::path>* raw_filters, bool plugin,
-                            bool options, std::vector<std::filesystem::path>* sources) {
+                            bool options, std::vector<std::filesystem::path>* sources,
+                            bool default_layouts) {
     HostState state;
-    state.configuration = detail::load_configuration(path, selection, reader, nullptr, raw_filters,
-                                                     plugin, options, sources);
+    state.configuration =
+        detail::load_configuration(path, selection, reader, nullptr, raw_filters, plugin, options,
+                                   sources, nullptr, default_layouts);
     return state;
 }
 
@@ -116,8 +119,22 @@ std::optional<HostState> read_for(const std::string& path, const std::optional<H
     if (!known || (!settled && !list)) {
         try {
             std::vector<std::filesystem::path> sources;
-            auto state = filter_file_state(detail::utf8_path(path), {}, reader, nullptr, true,
-                                           false, &sources);
+            // EDGE-3: a four-channel IR file plays as true stereo only when
+            // read for two channels, so with the channels the host last
+            // started with, a file is read for them where they fit, the rate
+            // left open; otherwise as it is, as before.
+            std::optional<HostState> fitted;
+            if (known)
+                try {
+                    fitted = filter_file_state(detail::utf8_path(path),
+                                               {0, known->inputs, known->outputs}, reader, nullptr,
+                                               true, false, &sources);
+                } catch (const detail::NoMatch&) {
+                    sources.clear();
+                }
+            auto state = fitted ? std::move(*fitted)
+                                : filter_file_state(detail::utf8_path(path), {}, reader, nullptr,
+                                                    true, false, &sources);
             if (files) {
                 std::vector<std::string> named;
                 for (const auto& source : sources)
@@ -135,15 +152,18 @@ std::optional<HostState> read_for(const std::string& path, const std::optional<H
         // Explained in the host's terms, not the command line's (jrp's
         // GarageBand run: the window advised omitting --output-channels).
         std::vector<std::filesystem::path> sources;
-        const auto read = [&](std::size_t inputs) {
+        const auto read = [&](std::size_t inputs, bool default_layouts) {
             sources.clear();
             return filter_file_state(detail::utf8_path(path),
                                      {host.sample_rate, inputs, host.outputs}, reader, nullptr,
-                                     true, false, &sources);
+                                     true, false, &sources, default_layouts);
         };
         HostState state;
         try {
-            state = read(host.inputs);
+            // EDGE-3: an exact match first, then PLUG-33's fewer inputs,
+            // then the default routings, so a list that played an entry
+            // for fewer inputs before plays it still.
+            state = read(host.inputs, false);
         } catch (const detail::NoMatch& e) {
             // PLUG-33: a chosen file follows the rule a preset follows
             // (PLUG-23, HostFilter::mismatch()): the host's outputs exactly
@@ -153,8 +173,9 @@ std::optional<HostState> read_for(const std::string& path, const std::optional<H
             const auto inputs =
                 host.fractional_rate == 0 ? wider_bus_inputs(*e.candidates, host) : 0;
             if (inputs == 0)
-                throw;
-            state = read(inputs);
+                state = read(host.inputs, true); // Or refused, explaining all.
+            else
+                state = read(inputs, false);
             // A list's entry is named, so the log and the window can say
             // which one plays (jrp: the choice must be clear to the user).
             // The selection takes the first such entry in list order.
