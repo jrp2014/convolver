@@ -500,8 +500,9 @@ stereo, plus a 20 s true-stereo replacement, and turns each into a
 self-contained `.vstpreset` with the package's `bin/convolver-preset`. It then
 starts REAPER once with a new project: four source tracks, each repeating a
 2-second sound (noise hits, a chord, clicks from side to side, a rising tone)
-with 3 to 20 s of silence between, play dry to the master and send at unity
-to their own return track, which holds Convolver's VST3 with one of the
+with 3 to 20 s of silence between. Each source's fader is at -6 dB; it plays
+to the master and, through a send at 0 dB (REAPER's default, after the
+fader), to its own return track, which holds Convolver's VST3 with one of the
 reverbs. All four sources are silent for 60 s twice (from 25% and 65% of the
 way through), longer than the longest tail, so each return goes quiet and
 wakes again. Once every return reads exactly
@@ -516,22 +517,35 @@ REAPER's `GetUnderrunTime` gives the time of the most recent audio and media
 underrun, not a count, so one dropout and ten look the same. The script
 compares those times just before playing and after the soak, and `result.md`
 opens with one of three results: **no new underrun**, **at least one new
-underrun** (with the times it saw one, from the readings each second), or
-**underrun reporting unavailable** (no `GetUnderrunTime`, or a clock that did
-not advance). An underrun while the filters load, before playing, is named
-but not counted. Six checks follow: the ReaScript ran to the end; all four
-returns loaded; the device ran at 48 kHz with a block of 128 frames or fewer;
-the transport ran the whole time; every Status reading while playing, and at
-the end, was the Active text (any other is listed with its time); and the
-replacement was accepted and read Active afterwards. The exit status is 0
-only for no new underrun with all six checks passing. The rest of
-`result.md` is what [every report](#every-report) needs, as for the
-eight checks. REAPER's own preferences, such as anticipative FX processing,
-stay as they are; `--soak-minutes` sets a shorter trial. The run folder,
-`reaper-soak-DATE-TIME` in the package folder, holds about 60 MB of presets
-and can be deleted afterwards. `tests/reaper_check_tests.py` checks the
-option in pre-commit against a stand-in REAPER, as for the eight checks.
-No run on jrp's Mac is recorded yet.
+underrun** (with the times it saw one, from the readings each second, or a
+note when the only change came as playback started), or **underrun reporting
+unavailable** (no `GetUnderrunTime`, or a clock that did not advance). A
+soak that did not run its whole length (REAPER quit, the ReaScript stopped
+or the transport stopped) has no result: `result.md` says **soak
+incomplete** and what the times showed up to then. REAPER reports the audio
+underrun time only where the driver does, so when it is 0 before and after
+the report says that none happened or the device does not report them. An
+underrun while the filters load, before playing, is named but not counted.
+
+Six checks follow: the ReaScript ran to the end; all four returns loaded;
+the device ran at 48 kHz with a block of 128 frames or fewer; the transport
+ran the whole time; every Status reading while playing, and at the end, was
+the Active text (any other is listed with its time); and the replacement was
+accepted, read Active afterwards and left a saved state the replacement's
+size rather than the replaced filter's (both filters read the same Status,
+and the state holds the filter). The exit status is 0 only for no new
+underrun with all six checks passing. The rest of `result.md` is what
+[every report](#every-report) needs, as for the eight checks. REAPER's own
+preferences stay as they are. With anticipative FX processing, REAPER's
+default, effects on tracks that are not monitored run ahead of the device,
+so the device's block size is not their deadline; the report records
+REAPER's `workrender` and `renderaheadlen` settings as REAPER gives them.
+`--soak-minutes` sets a shorter trial. The run folder,
+`reaper-soak-DATE-TIME` in the package folder, holds the presets and the
+saved project, which holds every return's filter again, about 150 MB in all;
+delete it afterwards. `tests/reaper_check_tests.py` checks the option in
+pre-commit against a stand-in REAPER, as for the eight checks. No run on
+jrp's Mac is recorded yet.
 
 ### Audacity (VST3)
 

@@ -485,6 +485,17 @@ step(function()
   record("device_block", device_info("BSIZE"))
   record("device_output", device_info("IDENT_OUT"))
   record("underrun_api", reaper.GetUnderrunTime and "yes" or "no")
+  -- REAPER's anticipative FX settings, recorded as REAPER gives them: with
+  -- anticipative processing, effects on these tracks run ahead of the
+  -- device, so its block size is not their deadline.
+  for _, name in ipairs({"workrender", "renderaheadlen"}) do
+    local value = "(not reported)"
+    if reaper.get_config_var_string then
+      local ok, text = reaper.get_config_var_string(name)
+      if ok then value = text end
+    end
+    record("config_" .. name, value)
+  end
   record_underrun_times("underrun_setup")
   record("template_tracks", reaper.CountTracks(project))
   for index = reaper.CountTracks(project) - 1, 0, -1 do
@@ -569,6 +580,7 @@ step(function()
   soak.start = reaper.time_precise()
   soak.next_poll, soak.next_status = 0, 0
   soak.last_audio, soak.last_media = underrun_times()
+  record_underrun_times("underrun_playing")
   soak.underruns, soak.readings, soak.other, soak.changes = 0, 0, 0, 0
   -- Only changes from the readings before playing are recorded.
   soak.last_status = {}
@@ -639,6 +651,11 @@ step(function()
     record("status_end_" .. index, status(entry.track, entry.fx))
   end
   reaper.OnStopButton()
+  -- The size of the replaced return's state, which holds its filter, tells
+  -- the replacement from the filter it replaced (both read the same Status).
+  local replaced = returns[CONFIG.replace_return]
+  local ok, chunk = reaper.TrackFX_GetNamedConfigParm(replaced.track, replaced.fx, "vst_chunk")
+  record("state_chars_" .. CONFIG.replace_return, ok and #chunk or "unavailable")
   return 0.5
 end)
 
@@ -1265,6 +1282,8 @@ def parse_underrun_times(text):
 UNDERRUN_NONE = 'no new underrun'
 UNDERRUN_SOME = 'at least one new underrun'
 UNDERRUN_UNAVAILABLE = 'underrun reporting unavailable'
+# Not a result: the soak did not run its whole length.
+SOAK_INCOMPLETE = 'soak incomplete, so no result'
 
 
 def underrun_result(results):
@@ -1288,10 +1307,32 @@ def underrun_result(results):
         f'last audio underrun {before[0]} ms before and {after[0]} ms after; last media underrun {before[1]} ms '
         f'before and {after[1]} ms after; clock {before[2]} ms to {after[2]} ms'
     )
+    audio = (
+        ' REAPER reported no audio underrun at any time in this session: none happened, or this device does not '
+        'report them (REAPER gives the audio underrun time only where the driver does).'
+        if before[0] == after[0] == 0
+        else ''
+    )
     if before[:2] == after[:2] and not seen:
-        return UNDERRUN_NONE, f'Both times unchanged ({times}).'
+        return UNDERRUN_NONE, f'Both times unchanged ({times}).{audio}'
     sightings = f' Seen at: {"; ".join(seen)}.' if seen else ''
-    return UNDERRUN_SOME, f'The times changed ({times}).{sightings}'
+    playing = parse_underrun_times(results.get('underrun_playing'))
+    start = (
+        ' The only change came as playback started, before the readings each second began.'
+        if not seen and playing and playing[:2] == after[:2]
+        else ''
+    )
+    return UNDERRUN_SOME, f'The times changed ({times}).{sightings}{start}{audio}'
+
+
+def soak_result(checks, results):
+    """The underrun result, unless the soak did not run its whole length
+    (checks 1 and 4), when there is none: a short or broken run must not
+    count as one of the three results."""
+    result, evidence = underrun_result(results)
+    if checks[0][1] and checks[3][1]:
+        return result, evidence
+    return SOAK_INCOMPLETE, f'the soak did not run its whole length (checks 1 and 4). Up to then, {result}: {evidence}'
 
 
 def block_size(results):
@@ -1301,8 +1342,30 @@ def block_size(results):
         return None
 
 
-def evaluate_soak(outcome, duration):
-    """The soak's checks, in order: (name, passed, evidence)."""
+def replacement_state(results, sizes):
+    """Whether Reverb 1's saved state, after the soak, is the replacement's
+    size rather than the replaced filter's (both read the same Status), and
+    the evidence. `sizes` are the two presets' sizes in bytes."""
+    replaced, replacement = sizes
+    try:
+        state = int(results.get(f'state_chars_{SOAK_REPLACE_RETURN}', '')) * 3 / 4  # base64
+    except ValueError:
+        return False, (
+            f"REAPER did not give Reverb {SOAK_REPLACE_RETURN}'s state "
+            f'({results.get(f"state_chars_{SOAK_REPLACE_RETURN}", "not read")}), so the new filter cannot be told '
+            'from the old'
+        )
+    new = state > 0 and replaced > 0 and replacement > 0
+    new = new and abs(math.log(state / replacement)) < abs(math.log(state / replaced))
+    return new, (
+        f'its state after the soak is {state / 1e6:.2f} MB, the replacement preset {replacement / 1e6:.2f} MB '
+        f'and the replaced one {replaced / 1e6:.2f} MB'
+    )
+
+
+def evaluate_soak(outcome, duration, sizes):
+    """The soak's checks, in order: (name, passed, evidence). `sizes` are
+    the replaced and the replacement presets' sizes in bytes."""
     one = outcome['results']
     count = len(SOAK_REVERBS)
     loaded = [
@@ -1321,6 +1384,7 @@ def evaluate_soak(outcome, duration):
     changes = [value for key, value in one.items() if key.startswith('status_change_')]
     ends = [one.get(f'status_end_{n}') for n in range(1, count + 1)]
     replaced = SOAK_REPLACE_RETURN
+    state_new, state_evidence = replacement_state(one, sizes)
     return [
         (
             'REAPER ran the soak ReaScript to the end',
@@ -1331,9 +1395,10 @@ def evaluate_soak(outcome, duration):
             f"Each of the {count} returns has Convolver's VST3 with its reverb loaded",
             all(loaded)
             and all('Convolver' in one.get(f'fx_name_{n}', '') for n in range(1, count + 1))
-            and len(loaded) == count,
+            and all('VST3' in one.get(f'fx_type_{n}', '') + one.get(f'fx_name_{n}', '') for n in range(1, count + 1)),
             '; '.join(
-                f'Reverb {n} ({SOAK_REVERBS[n - 1][0]}): {one.get(f"fx_name_{n}", "(not added)")}, preset '
+                f'Reverb {n} ({SOAK_REVERBS[n - 1][0]}): {one.get(f"fx_name_{n}", "(not added)")} '
+                f'(type {one.get(f"fx_type_{n}") or "not reported"}), preset '
                 f'{one.get(f"preset_applied_{n}") or "not applied"}, Status {one.get(f"status_ready_{n}", "(none)")}'
                 for n in range(1, count + 1)
             ),
@@ -1343,7 +1408,7 @@ def evaluate_soak(outcome, duration):
             block is not None
             and block <= SMALL_BLOCK
             and one.get('device_rate') == str(RATE)
-            and one.get('device_rate_playing', str(RATE)) == str(RATE),
+            and one.get('device_rate_playing') == str(RATE),
             (
                 f'{one.get("device_rate", "?")} Hz ({one.get("device_rate_playing", "?")} Hz while playing), '
                 f'block {one.get("device_block", "not reported")}'
@@ -1378,11 +1443,12 @@ def evaluate_soak(outcome, duration):
         ),
         (
             f"Replacing Reverb {replaced}'s filter while playing loaded the new one",
-            one.get('replacement_applied') == 'true' and active(one.get('replacement_status')),
+            one.get('replacement_applied') == 'true' and active(one.get('replacement_status')) and state_new,
             (
                 f'at {one.get("replacement_at", "?")} s TrackFX_SetPreset returned '
                 f'{one.get("replacement_applied") or "nothing"}; Status '
-                f'{one.get("replacement_settled_after", "?")} s later: {one.get("replacement_status", "(none)")}'
+                f'{one.get("replacement_settled_after", "?")} s later: {one.get("replacement_status", "(none)")}; '
+                f'{state_evidence}'
             )
             if 'replacement_at' in one
             else 'not reached',
@@ -1445,6 +1511,11 @@ def soak_report(context):
             f'(2 in, 2 out) and playing dry to the stereo master'
         ),
         (
+            "- REAPER's anticipative FX settings, as REAPER gives them: workrender "
+            f'{one.get("config_workrender", "(not read)")}, renderaheadlen '
+            f'{one.get("config_renderaheadlen", "(not read)")}'
+        ),
+        (
             f'- Default template: {one.get("template_tracks", "?")} tracks and '
             f'{one.get("template_master_fx", "?")} master effects removed'
         ),
@@ -1458,7 +1529,8 @@ def soak_report(context):
             f'Convolver (VST3) and a decaying-noise reverb from a preset made by `bin/convolver-preset`: {reverbs}.'
         ),
         (
-            f"2. With every return Active, it played for {duration:g} s from the start, reading REAPER's "
+            f'2. {"With every return Active" if checks[1][1] else "With the returns as check 2 shows"}, '
+            f"it played for up to {duration:g} s from the start, reading REAPER's "
             f"underrun times and transport each second and each return's Status every {SOAK_STATUS_EVERY} s. "
             f'All sources were silent from {windows}'
             + (
@@ -1468,12 +1540,19 @@ def soak_report(context):
             )
         ),
         (
-            f'3. At {one.get("replacement_at", "?")} s, while playing, it loaded {SOAK_REPLACEMENT[0]} '
+            f'3. At {one["replacement_at"]} s, while playing, it loaded {SOAK_REPLACEMENT[0]} '
             f'({SOAK_REPLACEMENT[1]} s {SOAK_REPLACEMENT[2]}) into Reverb {SOAK_REPLACE_RETURN}.'
+            if 'replacement_at' in one
+            else f'3. The soak ended before the replacement of Reverb {SOAK_REPLACE_RETURN} was due.'
         ),
         (
-            f'4. It stopped, saved the project as `{context["project"].name}` and quit '
-            f'({"by itself" if outcome.get("quit_by_itself") else "only when this script stopped it"}).'
+            '4. It stopped, '
+            + (
+                f'saved the project as `{context["project"].name}`'
+                if one.get('project_saved') == 'yes'
+                else 'did not save the project'
+            )
+            + f' and quit ({"by itself" if outcome.get("quit_by_itself") else "only when this script stopped it"}).'
         ),
         '',
         f'Underruns while the filters loaded: {setup_note}',
@@ -1579,8 +1658,9 @@ def run_soak(args, package, reaper):
         args.timeout + duration + SOAK_SETTLE_SECONDS,
         keep_awake=True,
     )
-    checks = evaluate_soak(outcome, duration)
-    underruns = underrun_result(outcome['results'])
+    sizes = (presets[SOAK_REPLACE_RETURN - 1].stat().st_size, replacement.stat().st_size)
+    checks = evaluate_soak(outcome, duration, sizes)
+    underruns = soak_result(checks, outcome['results'])
     context = {
         'when': f'{when:%Y-%m-%d %H:%M}',
         'checks': checks,

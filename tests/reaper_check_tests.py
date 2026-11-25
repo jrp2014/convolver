@@ -48,11 +48,15 @@ FAKE_REAPER = textwrap.dedent(
     # underruns, noapi a REAPER without GetUnderrunTime, frozen a clock
     # that does not advance, stopped a transport that stopped early,
     # big_block a 512-frame buffer, fault one return's fault while playing,
-    # and refused a replacement preset that REAPER did not load.
-    def soak(config, mode, duration):
+    # refused a replacement preset that REAPER did not load, old_state a
+    # replacement that REAPER accepted but left the old filter in place,
+    # nostate a REAPER that gives no plug-in state, and start_underrun an
+    # underrun only as playback started.
+    def soak(config, mode, duration, presets):
         loaded = 'Filter loaded: 48000 Hz, 2 in, 2 out.'
         ran = duration / 3 if mode == 'stopped' else duration
-        after = {'underrun': '9000 0 99000', 'frozen': '0 0 1000'}.get(mode, '0 0 99000')
+        after = {'underrun': '9000 0 99000', 'frozen': '0 0 1000', 'start_underrun': '3000 0 99000'}.get(
+            mode, '0 0 99000')
         lines = [('stage', 'soak'), ('reaper_version', '7.99/macOS-arm64'), ('device_rate', '48000'),
                  ('device_block', '512' if mode == 'big_block' else '64'), ('device_output', 'Test device'),
                  ('underrun_api', 'no' if mode == 'noapi' else 'yes'), ('items', '40'), ('tracks', '8')]
@@ -61,6 +65,7 @@ FAKE_REAPER = textwrap.dedent(
             lines += [(f'fx_name_{n}', 'VST3: Convolver (Convolver)'), (f'fx_type_{n}', 'VST3'),
                       (f'preset_applied_{n}', 'true'), (f'status_ready_{n}', loaded)]
         lines += [('underrun_before', 'unavailable' if mode == 'noapi' else '0 0 1000'), ('play_started', 'yes'),
+                  ('underrun_playing', '3000 0 1100' if mode == 'start_underrun' else '0 0 1100'),
                   ('device_rate_playing', '48000'), ('status_readings', '40'),
                   ('status_other', '1' if mode == 'fault' else '0')]
         if mode == 'fault':
@@ -76,6 +81,9 @@ FAKE_REAPER = textwrap.dedent(
         lines += [('soak_seconds', f'{ran:.1f}'), ('play_state', '0' if mode == 'stopped' else '1'),
                   ('play_position', f'{ran:.3f}'), ('underrun_after', 'unavailable' if mode == 'noapi' else after)]
         lines += [(f'status_end_{n}', loaded) for n in range(1, 5)]
+        state = presets[0] if mode == 'old_state' else config['replacement']
+        size = 'unavailable' if mode == 'nostate' else str(os.path.getsize(state) * 4 // 3)
+        lines.append(('state_chars_1', size))
         open(config['project'], 'w').write('<REAPER_PROJECT\n>\n')
         lines += [('project_saved', 'yes'), ('done', 'yes')]
         with open(config['results'], 'w') as f:
@@ -85,7 +93,8 @@ FAKE_REAPER = textwrap.dedent(
     if mode == 'exit':
         sys.exit(3)
     if 'record("stage", "soak")' in text:
-        soak(config, mode, float(re.search(r'^  duration = ([0-9.e+-]+),$', text, re.M).group(1)))
+        presets = re.findall(r'"((?:[^"\\]|\\.)*)"', re.search(r'^  presets = \{(.*)\},$', text, re.M).group(1))
+        soak(config, mode, float(re.search(r'^  duration = ([0-9.e+-]+),$', text, re.M).group(1)), presets)
         sys.exit(0)
     reopen = 'record("stage", "reopen")' in text
     loaded = 'Filter loaded: 48000 Hz, 2 in, 2 out.'
@@ -137,7 +146,9 @@ FAKE_PRESET_TOOL = textwrap.dedent(
     if 'refuse' in sys.argv[1]:
         print('convolver-preset: the filter is damaged')
         sys.exit(1)
-    open(sys.argv[2], 'w').write('preset of ' + sys.argv[1])
+    # The replacement is a 20 s filter, the replaced one 10 s: sizes differ.
+    size = 2000 if 'replacement' in sys.argv[1] else 500
+    open(sys.argv[2], 'w').write('preset of ' + sys.argv[1] + ' ' * size)
     """
 ).lstrip()
 
@@ -529,6 +540,9 @@ class Run(unittest.TestCase):
             'All sources were silent from 30 to 42 s, 78 to 90 s',
             'At 60.0 s, while playing, it loaded true-stereo-replacement',
             'Underruns while the filters loaded: none reported.',
+            'REAPER reported no audio underrun at any time in this session',
+            "REAPER's anticipative FX settings",
+            '; its state after the soak is ',
             '78 to 90 s, longer than the longest tail.',
             '## Convolver log',
         ):
@@ -540,7 +554,15 @@ class Run(unittest.TestCase):
             'noapi': ('underrun reporting unavailable', 6, 'This REAPER has no GetUnderrunTime.'),
             'frozen': ('underrun reporting unavailable', 6, 'did not advance'),
             'big_block': ('no new underrun', 5, 'Set the block size to 128 or fewer'),
-            'stopped': ('no new underrun', 4, 'transport stopped after 40.0 s of 120 s'),
+            'stopped': ('soak incomplete, so no result', 4, 'transport stopped after 40.0 s of 120 s'),
+            'exit': ('soak incomplete, so no result', 0, 'REAPER exited (status 3) before the ReaScript finished.'),
+            'old_state': (
+                'no new underrun',
+                5,
+                'filter while playing loaded the new one | **FAIL** | at 60.0 s TrackFX_SetPreset returned true',
+            ),
+            'nostate': ('no new underrun', 5, 'so the new filter cannot be told from the old'),
+            'start_underrun': ('at least one new underrun', 6, 'The only change came as playback started'),
             'fault': ('no new underrun', 5, 'changes: 30.0 s, Reverb 2: Fault: output too large.'),
             'refused': ('no new underrun', 5, 'TrackFX_SetPreset returned false'),
         }

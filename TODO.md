@@ -159,7 +159,8 @@ Foundation items are parked by owner decision instead.
 - [ ] **HOST-12 — A long REAPER soak with reverb returns.** **Remains:**
   jrp's first run of the
   [soak](docs/develop/host-testing.md#a-long-reaper-soak)
-  (`scripts/reaper_check.py --soak`, 30 minutes, block size 128 or fewer).
+  (`scripts/reaper_check.py --soak`, 30 minutes, the audio device's block
+  size 128 or fewer).
   Ordinary use, not a corner case, so outside the park of 8 November (jrp
   approved it on 23 November 2026). **Done when** that run is recorded in
   [host testing](docs/develop/host-testing.md) with one of its three
