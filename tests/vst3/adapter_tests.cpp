@@ -4886,6 +4886,7 @@ void accepted_restore_follows_its_own_request() {
 //   w: the window chooses preset B (tap .25, Latency 1024).
 //   F: the window chooses a preset with no settings (tap .0625).
 //   L: the user sets Latency 256.
+//   l: the user sets Latency 64 (the refused preset's).
 //   M: the user sets Gain mode to No clipping.
 //   R: the host restores preset P (tap .5, Latency 512), accepted.
 //   Q: the host restores preset Q (tap .375, Latency 128), accepted.
@@ -4988,6 +4989,11 @@ void latest_action_wins() {
          0, 1, true},
         {"Bypass, then a host preset", "BR", .5f, 512},
         {"Bypass, then a refused host preset", "BX", 1, 4096, GainMode::set, 0, 1, true},
+        {"jrp's sequence test: a refused host preset, then its Latency chosen", "Xl", 1, 64},
+        {"jrp's sequence test: a window preset, Mix, then a refused host preset twice", "WKXX",
+         .125f, 2048, GainMode::set, 0, .25},
+        {"a window preset, Gain, then a refused host preset twice", "WGXX", .125f, 2048,
+         GainMode::set, -3},
     };
     const char* const deliveries[] = {"no delivery", "the processor's queue", "both queues"};
     std::size_t runs = 0;
@@ -5177,6 +5183,9 @@ void latest_action_wins() {
                             break;
                         case 'L':
                             c.setParamNormalized(latency_id, normalized_latency(256));
+                            break;
+                        case 'l':
+                            c.setParamNormalized(latency_id, normalized_latency(64));
                             break;
                         case 'M':
                             c.setParamNormalized(gain_mode_id,

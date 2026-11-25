@@ -1299,8 +1299,13 @@ the plan's Gain modes (12 November 2026); its meters follow later
   Gain mode keeps its value (the processor heard it after the preset), and
   a later Gain or Mix is reported again (the preset replaced it in the
   processor). A Latency or Gain mode set to the value shown still counts as
-  a choice while such an answer is to come, except a value the host hands
-  back while the controller reports an edit. An answer that arrives after a
+  a choice while such an answer, or the outcome of a restore the controller
+  mirrored, is to come (the window shows the state's setting, which a
+  refused state does not play), except a value the host hands back while
+  the controller reports an edit. A Gain or Mix the controller reported as
+  an edit after a restore's mirror keeps its value when that restore's
+  outcome arrives, as one the host set does (jrp's sequence test, PR
+  #282). An answer that arrives after a
   later `setComponentState` waits for that restore's outcome: if the
   processor accepted the restore, the restore's settings stand (PLUG-48);
   if it refused it, the window's choice still plays (unless an accepted

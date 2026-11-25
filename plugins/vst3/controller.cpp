@@ -273,12 +273,13 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         if (follow_state_ && playing &&
             static_cast<std::uint64_t>(followed_state) == follow_state_) {
             followed = playing;
+            followed_ = mirrored_;
             held = followed_refused ? load_held_ : 0;
             held_mirror = mirrored_;
             load_held_ = 0;
         }
-        keep_gain = gain_set_ > mirrored_;
-        keep_mix = mix_set_ > mirrored_;
+        keep_gain = std::max(gain_set_, gain_reported_) > mirrored_;
+        keep_mix = std::max(mix_set_, mix_reported_) > mirrored_;
         keep_bypass = bypass_set_ > mirrored_;
         // Only a choice made since the restore: one before it was replaced
         // by the state, and one the processor never heard (a message lost)
@@ -449,6 +450,10 @@ bool Controller::publish_preset(int64 request, int64 choices_since, const HostSe
         performEdit(id, getParamNormalized(id));
         endEdit(id);
         edited = true;
+        if (id == gain_id || id == mix_id) {
+            std::lock_guard lock(status_lock_);
+            (id == gain_id ? gain_reported_ : mix_reported_) = next_action();
+        }
     };
     const auto kept = [](bool k, ParamValue v) { return k ? std::optional(v) : std::nullopt; };
     const auto before = latency_frames(getParamNormalized(latency_id));
@@ -466,7 +471,7 @@ bool Controller::publish_preset(int64 request, int64 choices_since, const HostSe
 }
 bool Controller::chosen_again() {
     std::lock_guard lock(status_lock_);
-    return !publishing_ && load_requests_ > load_answered_;
+    return !publishing_ && (load_requests_ > load_answered_ || mirrored_ > followed_);
 }
 void Controller::latency_chosen(std::size_t frames) {
     int64 request = 0;
@@ -678,6 +683,8 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
         std::lock_guard lock(status_lock_);
         follow_state_ = digest;
         mirrored_ = next_action(); // VST3-23: later actions number above it.
+        if (!digest)               // No outcome will follow (chosen_again()).
+            followed_ = mirrored_;
         restart_at_restore_ = latency_changed;
         sending_follow_ = true;
         latency_before = latency_requests_;

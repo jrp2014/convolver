@@ -597,7 +597,11 @@ class Controller final : public Steinberg::Vst::EditController,
     // value shown is still the user's choice while a load_message's answer
     // is to come, as a preset it loads may change that setting: Latency 256,
     // a 2048 preset chosen in the window, then 256 again before its answer,
-    // played and saved 2048. Not for a value the host hands back while
+    // played and saved 2048. Also while the outcome of a restore the
+    // controller mirrored is to come: the window shows the state's setting,
+    // which a refused state does not play (jrp's sequence test, PR #282:
+    // a refused state's Latency 64, then the user's 64, ended at the 1024
+    // that played). Not for a value the host hands back while
     // publish_preset() reports it.
     bool chosen_again();
     // The host may restore state (and so send the status) on another thread
@@ -647,11 +651,21 @@ class Controller final : public Steinberg::Vst::EditController,
     // Latency and Gain mode go as messages, in order, and a later choice
     // keeps its value once the processor has heard it or will.
     Steinberg::int64 mirrored_ = 0, gain_set_ = 0, mix_set_ = 0, bypass_set_ = 0;
+    // VST3-23, under status_lock_: the last setComponentState whose outcome
+    // (the processor's status for that state) has arrived.
+    Steinberg::int64 followed_ = 0;
     // VST3-24, under status_lock_: the Gain and Mix those sets left, which
     // a later setComponentState replaces in the controller; a window
     // preset's answer held back for a refused restore reports them again
     // (the independent review of PR #281).
     Steinberg::Vst::ParamValue gain_value_ = 0, mix_value_ = 0;
+    // VST3-24, under status_lock_: the last Gain and Mix publish_preset()
+    // reported as edits, which also reach the processor in process(): a
+    // later restore outcome keeps them as it keeps the host's (jrp's
+    // sequence test, PR #282: a held window preset's Mix, reported after
+    // two refusals of one state, was undone by the second's answer).
+    // Not compared with load answers, as a later window preset still wins.
+    Steinberg::int64 gain_reported_ = 0, mix_reported_ = 0;
     // VST3-23, under status_lock_: publish_preset() or VST3-17's unchanged
     // Latency edit is reporting edits; a host that hands one straight back
     // to setParamNormalized is not recorded as setting it.
