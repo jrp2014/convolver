@@ -1624,7 +1624,11 @@ input and output, with `FftPlanning::estimate`, `measure` and `patient`.
   after. Playing such a filter is unchanged: one tap above 2^127 still
   overflows in the FFT stages, and the plug-ins count it as an output
   overflow (the [adapter contract](plugin-contract.md)'s processing
-  faults).
+  faults). The command line with a block of 256 or more now passes
+  `--gain-db auto` for it, as `no-clip` already did, and then stops
+  mid-render with its output-overflow error, whose advice to lower
+  `--gain-db` does not help there; its default zero latency uses the
+  direct sum for such short filters.
 
 ## Reproduce
 

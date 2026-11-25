@@ -507,9 +507,9 @@ format.
   plays." where Mix's dry share plays, and nothing beyond Mix's own note at
   Mix 0%); the gain notes come before the speaker-label and Mix 0% notes,
   and the 127-character limit cuts what does not fit
-  (`native.host_settings` `status_names_settings`; "Too loud to estimate"
-  is untested, as no filter fails its estimate while keeping its bound in
-  every build). With a filter that plays and Gain mode at Estimate or No
+  (`native.host_settings` `status_names_settings`, which also checks that
+  a 3e38 tap has its estimate: a filter that fails its estimate has no
+  bound either, FFT-5). With a filter that plays and Gain mode at Estimate or No
   clipping, the line ends with the gain that mode plays ("Estimate plays
   -7.3 dB.", PLUG-44), which hosts showing only their generic controls
   cannot see beside Gain; not where Mix lets only the dry signal through.

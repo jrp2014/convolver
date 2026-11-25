@@ -697,7 +697,8 @@ void estimate_at_any_level(const Configuration& c) {
                 (what + ": the estimate scales exactly").c_str());
     };
     // Base peaks 2.25 (bound) and above 0.5 (noise): 2^125 puts the bound near
-    // 1.2e38 and the noise above 2^124, where an unscaled FFT overflowed.
+    // 1.2e38 and the noise above 2^124. An unscaled run managed these too
+    // (one tap overflowed from 2^127); the largest-float tap below did not.
     for (const int shift : {-100, -20, 20, 125}) {
         auto taps = c;
         for (auto& p : taps.paths)

@@ -774,7 +774,7 @@ defaults play exactly as Convolver did before the settings existed.
   Estimate needs a moment for a long filter (about half a second for a
   10-second stereo filter): until it is ready, Estimate plays the No
   clipping figure, then fades to its own. Every filter with a No clipping
-  figure has an estimate too; one too loud for either plays silence, and
+  figure has an estimate too; one too loud for both plays silence, and
   the log and window say so. In LV2,
   without the host's worker thread, Estimate plays the No clipping figure
   until the host next starts the plug-in. An LV2 preset saved before this
