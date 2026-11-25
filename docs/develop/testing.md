@@ -895,7 +895,14 @@ A's answer is held, then moves the controller to B: B saves and shows its
 own setting, and A saves its own too, also once A's held answer arrives. A
 choice made before any connection, or while the controller is connected to
 nothing, reaches B. Reconnected to A itself, the controller drops the
-choice and shows A's Latency. The plug-in reads the files with AudioToolbox on
+choice and shows A's Latency. `edits_follow_connection()` (VST3-29, jrp's
+review of `main` since `v0.18.16`) does the same with Gain, Mix and Bypass
+set by the host: set on A's connection, the controller shows B's value after
+pairing; set before any connection or between two, the host's value stays.
+`component_state_off_ui_thread()` restores the controller 200 times on
+another thread, unpaired and paired, while the UI thread edits, reads and
+reports; under ThreadSanitizer nothing races, and the UI thread then shows
+the last restore. The plug-in reads the files with AudioToolbox on
 macOS and libsndfile on Linux and Windows (VST3-12). PLUG-22's
 `saved_filter_name()` checks the controller state: its format read back,
 and damaged, newer, over-long or empty-field states read as no name; an

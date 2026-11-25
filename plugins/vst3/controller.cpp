@@ -152,6 +152,10 @@ template <class F> bool Controller::with_processor(F&& f) {
 bool Controller::on_ui_thread() const noexcept {
     return std::this_thread::get_id() == ui_thread_;
 }
+std::uint64_t Controller::current_connection() const {
+    std::lock_guard lock(bridge_lock_);
+    return connection_;
+}
 tresult PLUGIN_API Controller::connect(IConnectionPoint* other) {
     const auto result = EditController::connect(other);
     if (result != kResultOk)
@@ -276,8 +280,28 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     return EditController::notify(message);
 }
 void Controller::refresh_if_changed() {
+    take_restore_from_other_thread();
     if (const auto bridge = this->bridge(); bridge && on_ui_thread() && bridge->take_changed())
         refresh(false);
+}
+void Controller::take_restore_from_other_thread() {
+    if (!on_ui_thread())
+        return;
+    std::optional<RestoredSettings> restored;
+    {
+        std::lock_guard lock(status_lock_);
+        restored = std::exchange(restored_elsewhere_, std::nullopt);
+    }
+    if (!restored)
+        return;
+    if (const auto bridge = this->bridge(); bridge && bridge->attached())
+        bridge->changed(); // Paired since: the processor's values.
+    else
+        adopt_restore(*restored);
+}
+ParamValue PLUGIN_API Controller::getParamNormalized(ParamID id) {
+    take_restore_from_other_thread(); // VST3-29: a host reads after it restores.
+    return EditController::getParamNormalized(id);
 }
 void Controller::refresh(bool adopt_all, bool tell_host) {
     PairView view;
@@ -314,12 +338,19 @@ void Controller::refresh(bool adopt_all, bool tell_host) {
         set(gain_mode_id, normalized_gain_mode(view.settings.gain_mode));
     if (adopt_all || view.generation != generation_) {
         // Automation the host set while unpaired, after the processor's last
-        // accepted restore, is newer: the host passes it in process().
-        if (gain_edit_at_ <= view.restored_at)
+        // accepted restore, is newer: the host passes it in process(). Only
+        // if set on this connection or on none (VST3-29, as VST3-28 keeps a
+        // pending Latency): one set while connected to another processor
+        // whose answer never came was that one's.
+        const auto connection = current_connection();
+        const auto kept = [&](std::uint64_t at, std::uint64_t on) {
+            return at > view.restored_at && (on == 0 || on == connection);
+        };
+        if (!kept(gain_edit_at_, gain_edit_on_))
             set(gain_id, normalized_gain(view.settings.gain_db));
-        if (mix_edit_at_ <= view.restored_at)
+        if (!kept(mix_edit_at_, mix_edit_on_))
             set(mix_id, std::clamp(view.settings.mix, 0.0, 1.0));
-        if (bypass_edit_at_ <= view.restored_at)
+        if (!kept(bypass_edit_at_, bypass_edit_on_))
             set(bypass_id, view.bypass ? 1 : 0);
     }
     generation_ = view.generation;
@@ -367,7 +398,9 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
         // proxy): when, so that the first read after pairing keeps it if it
         // is newer than the processor's last restore.
         auto& at = id == gain_id ? gain_edit_at_ : id == mix_id ? mix_edit_at_ : bypass_edit_at_;
+        auto& on = id == gain_id ? gain_edit_on_ : id == mix_id ? mix_edit_on_ : bypass_edit_on_;
         at = Bridges::stamp();
+        on = current_connection(); // VST3-29: the connection it was set on.
     }
     if (id == bypass_id) {
         // PLUG-22: the processor shows Bypassed at once, and so does the
@@ -396,11 +429,7 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
                 p.chosen_gain_mode(gain_mode(chosen));
         });
         if (!sent) {
-            std::uint64_t on = 0; // VST3-28: the connection it was made on.
-            {
-                std::lock_guard lock(bridge_lock_);
-                on = connection_;
-            }
+            const auto on = current_connection(); // VST3-28: the connection it was made on.
             if (id == latency_id) {
                 unsent_latency_ = latency_frames(chosen);
                 unsent_latency_at_ = Bridges::stamp();
@@ -501,7 +530,20 @@ tresult PLUGIN_API Controller::getParamValueByString(ParamID id, TChar* string, 
     return EditController::getParamValueByString(id, string, value);
 }
 tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
+    // VST3-29: the controller's state changes only on the UI thread. A host
+    // may restore on another (an offline render): the paired controller
+    // then reads the processor at its next call on the UI thread, and the
+    // unpaired one adopts the state's values there.
+    const bool ui = on_ui_thread();
+    if (ui) {
+        std::lock_guard lock(status_lock_);
+        restored_elsewhere_.reset(); // This restore is the newer.
+    }
     if (const auto bridge = this->bridge(); bridge && bridge->attached()) {
+        if (!ui) {
+            bridge->changed();
+            return kResultOk;
+        }
         // VST3-26: what the processor plays, not the stream: the processor
         // may have refused the state (PLUG-48: REAPER's preset menu offers a
         // preset made for another rate while a filter plays, and it then
@@ -514,12 +556,6 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
         if (bridge->attached())
             return kResultOk;
     }
-    // A choice or an edit made before pairing is older than this restore,
-    // whose values the parameters now take; once paired, the processor's
-    // replace them unless it refused the restore.
-    unsent_latency_.reset();
-    unsent_gain_mode_.reset();
-    gain_edit_at_ = mix_edit_at_ = bypass_edit_at_ = 0;
     // Unpaired: the state's values, as the host restored them.
     HostState state;
     try {
@@ -527,12 +563,27 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
     } catch (...) {
         return kResultFalse;
     }
-    const auto saved = state.settings.value_or(HostSettings{});
+    const RestoredSettings restored{state.settings.value_or(HostSettings{}), state.bypass};
+    if (!ui) {
+        std::lock_guard lock(status_lock_);
+        restored_elsewhere_ = restored;
+        return kResultOk;
+    }
+    return adopt_restore(restored);
+}
+tresult Controller::adopt_restore(const RestoredSettings& restored) {
+    // A choice or an edit made before pairing is older than this restore,
+    // whose values the parameters now take; once paired, the processor's
+    // replace them unless it refused the restore.
+    unsent_latency_.reset();
+    unsent_gain_mode_.reset();
+    gain_edit_at_ = mix_edit_at_ = bypass_edit_at_ = 0;
+    const auto& saved = restored.settings;
     EditController::setParamNormalized(gain_id, normalized_gain(saved.gain_db));
     EditController::setParamNormalized(mix_id, std::clamp(saved.mix, 0.0, 1.0));
     EditController::setParamNormalized(gain_mode_id, normalized_gain_mode(saved.gain_mode));
     EditController::setParamNormalized(latency_id, normalized_latency(saved.latency));
-    return EditController::setParamNormalized(bypass_id, state.bypass ? 1 : 0);
+    return EditController::setParamNormalized(bypass_id, restored.bypass ? 1 : 0);
 }
 IPlugView* PLUGIN_API Controller::createView(FIDString name) {
     if (!name || std::string_view(name) != ViewType::kEditor)

@@ -361,8 +361,10 @@ class Controller final : public Steinberg::Vst::EditController,
     // Paired, the parameters show what the processor plays, which the host
     // restored first (the SDK's order), or, restoring the controller first,
     // once the processor's own restore says it changed. Unpaired, the
-    // parameters show the state's values.
+    // parameters show the state's values. VST3-29: made on another thread
+    // than the UI thread, it takes effect at the next call on the UI thread.
     Steinberg::tresult PLUGIN_API setComponentState(Steinberg::IBStream*) override;
+    Steinberg::Vst::ParamValue PLUGIN_API getParamNormalized(Steinberg::Vst::ParamID) override;
     // Bypass reads "Off" and "On"; accept them back, as hosts that let users
     // type a value need (VST3-8), with 0 and 1, and refuse other text.
     Steinberg::tresult PLUGIN_API getParamValueByString(Steinberg::Vst::ParamID,
@@ -445,8 +447,19 @@ class Controller final : public Steinberg::Vst::EditController,
     std::shared_ptr<Bridge> bridge() const;
     void set_bridge(std::shared_ptr<Bridge>);
     bool on_ui_thread() const noexcept;
-    // On the UI thread: reads the processor if it said it changed.
+    std::uint64_t current_connection() const; // connection_, under bridge_lock_.
+    // On the UI thread: adopts a restore made on another thread, then reads
+    // the processor if it said it changed.
     void refresh_if_changed();
+    // VST3-29: what an unpaired restore sets, and the restore a host made on
+    // another thread than the UI thread, adopted at the next call on it
+    // (refresh_if_changed(), getParamNormalized()).
+    struct RestoredSettings {
+        HostSettings settings;
+        bool bypass = false;
+    };
+    Steinberg::tresult adopt_restore(const RestoredSettings&);
+    void take_restore_from_other_thread();
     // On the UI thread: the parameters, the report and the latency the host
     // last read take the processor's (the class comment says which).
     // `adopt_all`: Gain, Mix and Bypass too (pairing, setComponentState).
@@ -474,8 +487,10 @@ class Controller final : public Steinberg::Vst::EditController,
     std::uint64_t unsent_latency_at_ = 0, unsent_gain_mode_at_ = 0;
     std::uint64_t unsent_latency_on_ = 0, unsent_gain_mode_on_ = 0;
     // When the host set Gain, Mix or Bypass while unpaired (Bridges::stamp());
-    // 0 once the first read after pairing has used them.
+    // 0 once the first read after pairing has used them. And on which
+    // connection (VST3-29): kept only by a pairing through it, or set on none.
     std::uint64_t gain_edit_at_ = 0, mix_edit_at_ = 0, bypass_edit_at_ = 0;
+    std::uint64_t gain_edit_on_ = 0, mix_edit_on_ = 0, bypass_edit_on_ = 0;
     // The processor's generation when it was last read; the latency the host
     // was last asked to read (none before pairing).
     std::uint64_t generation_ = 0;
@@ -495,5 +510,8 @@ class Controller final : public Steinberg::Vst::EditController,
     // filter that plays ("filter saved name"), and this pair only when that
     // filter has none.
     std::string name_, identity_;
+    // VST3-29, under status_lock_: an unpaired restore made on another
+    // thread than the UI thread, not yet adopted.
+    std::optional<RestoredSettings> restored_elsewhere_;
 };
 } // namespace convolver::vst3

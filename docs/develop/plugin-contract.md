@@ -796,7 +796,12 @@ in it:
   that message when it arrives on the UI thread (the thread that
   initialized the controller, as the SDK requires), otherwise at its next
   call there. Every host callback therefore comes on the UI thread, also
-  when an offline render restores the processor on its own thread. A host
+  when an offline render restores the processor on its own thread. The
+  controller's own state also changes only there (VST3-29): a host that
+  restores the controller on another thread leaves a paired controller to
+  read the processor at its next call on the UI thread, and an unpaired
+  one adopts the state's values then (at the latest when the host reads a
+  parameter there). A host
   that initialized the controller on another thread would see the
   parameters and the window stop following the processor. The controller
   never calls `restartComponent` inside another: Ardour 8 and 9 read the
@@ -1271,7 +1276,8 @@ the plan's Gain modes (12 November 2026); its meters follow later
   instance must not pass the choice on. Reconnecting to the same processor
   drops it too; the controller then shows that processor's own setting. Likewise Gain, Mix or Bypass the
   host set before they pair stays if it is newer than that restore and
-  than any state the host restored to the controller since, and
+  than any state the host restored to the controller since, and if it was
+  set on the same connection or on none (VST3-29), and
   the filter name a restored controller state gives reaches the processor
   when they pair. The host's
   order and when it delivers messages do not matter: `convolver_vst3_sync`
