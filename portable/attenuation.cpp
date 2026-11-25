@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <bit>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -12,6 +13,56 @@ namespace convolver {
 namespace {
 double attenuation_db(double peak) {
     return peak > 0 ? -20 * std::log10(peak) : 0;
+}
+// The power of two at or below a positive finite value.
+int exponent_of(double v) {
+    return std::ilogb(v);
+}
+// FFT-5: `c` with each path's input gains, taps and output gains scaled by
+// powers of two so that the mixed input, the convolution and every output are
+// at most a few times full scale for input within full scale, and the output
+// is exactly 2^-shift times `c`'s. Each stage is linear and scaling by a power
+// of two rounds the same, so the scaled run gives the same floats times
+// 2^-shift, unless a value is subnormal; but no FFT library or plan can
+// overflow inside it, as it could with coefficients near the largest float
+// (one tap of 3e38 overflowed in one build and not in others).
+Configuration unit_scaled(const Configuration& c, int& shift) {
+    // A path's level at each stage, from the absolute sums, so cancellation
+    // between routes or paths cannot hide a large intermediate value.
+    const auto absolute_sum = [](const auto& values, auto value) {
+        double total = 0;
+        for (const auto& v : values)
+            total += std::abs(static_cast<double>(value(v)));
+        return total;
+    };
+    std::vector<double> inputs(c.paths.size()), taps(c.paths.size());
+    std::vector<double> output_level(c.output_channels);
+    for (std::size_t p = 0; p < c.paths.size(); ++p) {
+        const auto& path = c.paths[p];
+        inputs[p] = absolute_sum(path.inputs, [](const Route& r) { return r.gain; });
+        taps[p] = absolute_sum(path.impulse, [](float v) { return v; });
+        for (const auto& r : path.outputs)
+            output_level[r.channel] += inputs[p] * taps[p] * std::abs(r.gain);
+    }
+    double level = 0;
+    for (const double l : output_level)
+        level = std::max(level, l);
+    Configuration scaled = c;
+    shift = level > 0 ? exponent_of(level) : 0;
+    for (std::size_t p = 0; p < c.paths.size(); ++p) {
+        if (!(inputs[p] > 0 && taps[p] > 0))
+            continue; // Silent: its output is zero at any scale.
+        auto& path = scaled.paths[p];
+        const int in = exponent_of(inputs[p]), h = exponent_of(taps[p]);
+        for (auto& r : path.inputs)
+            r.gain = std::ldexp(r.gain, -in);
+        for (auto& v : path.impulse)
+            v = std::ldexp(v, -h);
+        // Below 2 in magnitude, as |gain| * inputs * taps <= level < 2^(shift + 1).
+        for (auto& r : path.outputs)
+            r.gain = std::ldexp(r.gain, in + h - shift);
+    }
+    return scaled;
 }
 } // namespace
 // Exact peak bound: output o is sum_i (k_oi * x_i) with k_oi the sum over paths of
@@ -66,7 +117,8 @@ AttenuationEstimate estimate_attenuation(const Configuration& c, std::uint64_t s
     // per frame, small for long filters; the result does not depend on it beyond
     // float rounding.
     const auto block = std::clamp<std::size_t>(std::bit_ceil(longest), 256, 65536);
-    Engine engine(c, block);
+    int shift = 0;
+    Engine engine(unit_scaled(c, shift), block);
     constexpr std::size_t chunk = 4096;
     std::vector<float> in(chunk * c.input_channels), out(chunk * c.output_channels);
     std::uint64_t state = seed;
@@ -96,19 +148,35 @@ AttenuationEstimate estimate_attenuation(const Configuration& c, std::uint64_t s
         scan(frames);
         remaining -= frames;
     }
-    // std::max ignores NaN, so overflow inside the convolution (finite but enormous
-    // coefficients) is refused here rather than reported as a smaller peak. The
-    // bound below is computed in double from finite floats and cannot overflow.
+    // std::max ignores NaN, so a non-finite output is refused here rather than
+    // reported as a smaller peak (jrp's review of 0.4.43). At unit scale it
+    // would be a fault in the convolution, not the filter's level.
     if (!finite_output || !std::isfinite(peak))
-        throw std::overflow_error(
-            "cannot estimate the attenuation: filtering full-scale noise gave infinite or "
-            "undefined output, so the filter coefficients are too large for single-precision "
-            "processing. Check how the filter files are scaled");
+        throw std::overflow_error("cannot estimate the attenuation: filtering noise at unit "
+                                  "scale gave infinite or undefined output");
     AttenuationEstimate result;
-    result.noise_peak = peak;
-    result.noise_attenuation_db = attenuation_db(peak);
     result.worst_case_peak = worst_case_peak(c);
     result.worst_case_attenuation_db = attenuation_db(result.worst_case_peak);
+    // Back to the filter's own level, exactly. The peak cannot exceed the
+    // bound; float rounding could put it a few units above, so the bound caps
+    // it, and a filter whose bound is within the largest float always has an
+    // estimate. Only the level of the output decides overflow, in double, the
+    // same in every build: whether single-precision processing could carry
+    // the noise response, as the CLI's no-clip refuses a bound beyond it. So
+    // the estimate has a figure whenever the bound has one.
+    peak = std::min(std::ldexp(peak, shift), result.worst_case_peak);
+    // Output below the smallest normal float is flushed to zero while
+    // Convolver processes (PERF-15), so such a filter plays silence: 0 dB, as
+    // an unscaled run gave, rather than a gain beyond the largest float.
+    if (peak < std::numeric_limits<float>::min())
+        peak = 0;
+    if (peak > std::numeric_limits<float>::max())
+        throw std::overflow_error(
+            "cannot estimate the attenuation: filtering full-scale noise peaks beyond the "
+            "largest single-precision value, so the filter coefficients are too large. Check "
+            "how the filter files are scaled");
+    result.noise_peak = peak;
+    result.noise_attenuation_db = attenuation_db(peak);
     return result;
 }
 } // namespace convolver

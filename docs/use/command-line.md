@@ -114,8 +114,10 @@ Both report the chosen gain on stderr, with every digit needed to give the
 same figure back to `--gain-db` and get the same samples. `auto` may take time
 before rendering, as it filters the noise; `no-clip` only adds up the taps. Both stop with an
 error, before rendering, when the filter's coefficients are too large for
-single precision (filtering the noise overflows, or the bound exceeds the
-largest float); check how the filter files are scaled. The noise estimate is
+single precision (the noise or the bound peaks beyond the largest float);
+check how the filter files are scaled. `auto` decides that from the
+filter's level alone, the same with every FFT library and plan, and never
+refuses a filter that `no-clip` accepts. The noise estimate is
 the old Windows Convolver's "optimum attenuation" method.
 
 Neither option is a limiter: the bound holds for input within full scale, so

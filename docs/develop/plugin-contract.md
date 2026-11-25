@@ -502,8 +502,7 @@ format.
   start, so it is never "not in use yet", although for a moment, until the
   Latency queue publishes it, the host may still read the previous
   latency, AU-19), and, with a filter, Estimate chosen without an
-  estimate ("No estimate: No clipping's gain plays." or "Too loud to
-  estimate: …") or no gain figure at all ("Silent: no gain figure for this
+  estimate ("No estimate: No clipping's gain plays.") or no gain figure at all ("Silent: no gain figure for this
   filter.", or "No gain figure for this filter: only the dry signal
   plays." where Mix's dry share plays, and nothing beyond Mix's own note at
   Mix 0%); the gain notes come before the speaker-label and Mix 0% notes,
@@ -1082,9 +1081,10 @@ the plan's Gain modes (12 November 2026); its meters follow later
   state, or a chosen preset that holds them) gets its estimate as it loads:
   `HostFilter::load()` follows the settings' Gain mode, and a refused
   request leaves `estimating()` as it was. A filter
-  whose estimate overflows has none (`estimate_failed`), and Estimate plays
-  its bound; a filter with no finite bound plays silence in both modes,
-  which the log and the window say. Without a filter both figures are 0 dB.
+  whose noise peaks beyond the largest float has no estimate
+  (`estimate_failed`); the noise peak is never above the bound, so such a
+  filter has no bound either (FFT-5), and a filter with no finite bound
+  plays silence in both modes, which the log and the window say. Without a filter both figures are 0 dB.
   The log line `gain_mode_line()` and `settings_words()` give the mode and
   the gain it plays (`gain_words()`). In the macOS and Windows windows the
   Gain mode menu leads the Gain row (PLUG-50): outside Set, the Gain

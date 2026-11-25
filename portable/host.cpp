@@ -272,7 +272,8 @@ std::optional<double> figure_db(double peak) {
     return db;
 }
 // The noise estimate's figure, or absent with estimate_failed set when the
-// noise overflowed single precision.
+// noise peaks beyond the largest float; FFT-5: only a filter whose bound
+// does too, so it has no figure at all.
 void find_estimate(FilterGains& g, const Configuration& c) {
     try {
         g.estimate_db = figure_db(estimate_attenuation(c).noise_peak);
@@ -1287,9 +1288,7 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
                                  ? " No gain figure for this filter: only the dry signal plays."
                                  : " Silent: no gain figure for this filter.";
         } else if (settings.gain_mode == GainMode::estimate && !filter.gains().estimate_db) {
-            line.text += filter.gains().estimate_failed
-                             ? " Too loud to estimate: No clipping's gain plays."
-                             : " No estimate: No clipping's gain plays.";
+            line.text += " No estimate: No clipping's gain plays.";
         } else if (settings.gain_mode != GainMode::set && !mix_dry_only) {
             // PLUG-44: the figure the Gain mode plays, which hosts without
             // Convolver's window cannot show beside the Gain setting.

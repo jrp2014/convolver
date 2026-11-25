@@ -682,6 +682,57 @@ void no_clip_endpoint() {
     require(reached > 1 - 1e-5 && reached < 1 + 1e-5,
             "the no-clip gain reaches full scale within float rounding");
 }
+// FFT-5: the estimate is the same, scaled, at any level a float filter can
+// have, so whether it overflows is decided by the filter's level alone, not
+// by the FFT library or the plan it chooses (one tap of 3e38 got no estimate
+// in one Linux build and an estimate in another). Scaling taps or route gains
+// by a power of two scales both peaks exactly, down to the smallest normal
+// float and up to the largest.
+void estimate_at_any_level(const Configuration& c) {
+    const auto base = estimate_attenuation(c, 3);
+    const auto same_scaled = [&](const Configuration& s, int shift, const std::string& what) {
+        const auto e = estimate_attenuation(s, 3);
+        require(e.noise_peak == std::ldexp(base.noise_peak, shift) &&
+                    e.worst_case_peak == std::ldexp(base.worst_case_peak, shift),
+                (what + ": the estimate scales exactly").c_str());
+    };
+    // Base peaks 2.25 (bound) and above 0.5 (noise): 2^125 puts the bound near
+    // 1.2e38 and the noise above 2^124, where an unscaled FFT overflowed.
+    for (const int shift : {-100, -20, 20, 125}) {
+        auto taps = c;
+        for (auto& p : taps.paths)
+            for (auto& v : p.impulse)
+                v = std::ldexp(v, shift);
+        same_scaled(taps, shift, "taps by 2^" + std::to_string(shift));
+        // The same level reached by the route gains instead of the taps.
+        auto routes = c;
+        for (auto& p : routes.paths) {
+            for (auto& r : p.inputs)
+                r.gain = std::ldexp(r.gain, shift / 2);
+            for (auto& r : p.outputs)
+                r.gain = std::ldexp(r.gain, shift - shift / 2);
+        }
+        same_scaled(routes, shift, "route gains by 2^" + std::to_string(shift));
+    }
+    // Beyond the largest float only with the bound: the noise peak is capped
+    // by the bound, so one tap at the largest float has an estimate.
+    Configuration top;
+    top.sample_rate = 48000;
+    top.input_channels = top.output_channels = 1;
+    top.paths.push_back({{std::numeric_limits<float>::max()}, {{0, 1}}, {{0, 1}}});
+    const auto t = estimate_attenuation(top);
+    require(t.noise_peak > 0.999 * t.worst_case_peak && t.noise_peak <= t.worst_case_peak,
+            "a tap at the largest float has an estimate within its bound");
+    // Output that would be flushed to zero while processing (below the
+    // smallest normal float) gives 0 dB, as a silent filter does.
+    auto quiet = top;
+    quiet.paths[0].impulse[0] = 1;
+    quiet.paths[0].inputs[0].gain = 1e-20f;
+    quiet.paths[0].outputs[0].gain = 1e-20f;
+    const auto q = estimate_attenuation(quiet);
+    require(q.noise_peak == 0 && q.noise_attenuation_db == 0 && q.worst_case_peak > 0,
+            "noise below the smallest normal float is silence");
+}
 void attenuation() {
     // Two inputs, two outputs. Output 0 combines a cancelling pair on input 0
     // (kernel {0, 0.5, 0.25}) and a scaled path from input 1; output 1 mirrors.
@@ -748,6 +799,7 @@ void attenuation() {
         overflowed = true;
     }
     require(overflowed, "non-finite noise response is refused");
+    estimate_at_any_level(c);
     no_clip_endpoint();
 }
 // PERF-4: the AVX2 set uses fused multiply-add (owner's decision, 24 October
