@@ -13,7 +13,7 @@ Convolver applies that response continuously to every input sample.
 
 | I want to… | Start here |
 | --- | --- |
-| Use Convolver: filter files, use the plug-ins, or filter everything Windows plays | [Using Convolver](use/README.md) |
+| Use Convolver: filter files, use the plug-ins, or filter everything Windows or Linux plays | [Using Convolver](use/README.md) |
 | Filter my first file | [Your first filter](use/first-filter.md) |
 | Hear the plug-in in a host | [Install](use/install.md), then [your first sound in a host](use/first-sound-in-a-host.md) |
 | Write a filter configuration | [Configuration files](use/configuration.md) |
@@ -46,7 +46,7 @@ These pages are in `docs/use/` and are shipped in preview packages.
 | [Using Convolver](use/README.md) | How-to | Choosing how to run it; the tools in a preview package |
 | [Concepts](use/concepts.md) | Background | Audio terms, the words Convolver uses for filters, presets and projects, latency, tails, files versus streams |
 | [Your first filter](use/first-filter.md) | Tutorial | The bundled examples with the command-line tool |
-| [Your first sound in a host](use/first-sound-in-a-host.md) | Tutorial | The example presets in a plug-in host |
+| [Your first sound in a host](use/first-sound-in-a-host.md) | Tutorial | Choosing an example filter in a plug-in host, playing it and saving the project |
 | [Check a stereo filter in a host](use/check-a-stereo-filter.md) | Tutorial | Download to checked host render: checksum, install, render, `--compare`, save and reopen, a preset that does not fit |
 | [Check a crossover in a host](use/check-a-crossover-in-a-host.md) | Tutorial | The same journey for the 2→6 crossover on a six-channel track |
 | [Check file rendering with the command line](use/check-files-with-the-command-line.md) | Tutorial | Download to checked CLI renders of the three examples, and filters refused for another rate or channel count |

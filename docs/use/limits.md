@@ -17,10 +17,10 @@ stereo reverbs up to 60 s and true-stereo reverbs up to 60 s at 48 kHz or
 | Convolver does not… | Instead |
 | --- | --- |
 | Measure a room or design filters | Make the filter with a tool such as DRC, REW or Audiolense, then load it |
-| Resample a filter, or adapt its channel count | Make the filter at your audio's sample rate, or keep one per rate in a [configuration list](configuration.md#paths-and-configuration-lists); use a `.cfg` to apply a mono IR to several channels |
+| Resample a filter, or adapt its channel count | Make the filter at your audio's sample rate, or keep one per rate in a [configuration list](configuration.md#paths-and-configuration-lists); use a `.cfg` to apply a mono IR to several channels or a true-stereo reverb to a stereo track ([reverb responses](configuration.md#reverb-responses)) |
 | Play to or record from an audio device | Use a plug-in host, a pipe between programs ([RAW streams](command-line.md#raw-streams)), on Windows [Equalizer APO](equalizer-apo.md) or, for playback on Linux, [PipeWire](pipewire.md) |
 | Filter everything a computer plays, by itself | On Windows, export to [Equalizer APO](equalizer-apo.md); on Linux, run the LV2 plug-in in [PipeWire](pipewire.md) |
-| Show a window or file chooser in the VST3 plug-in on Linux, or in LV2 (the VST3 plug-in has [one on macOS and Windows](plugins.md#convolvers-window), as has the Audio Unit) | Load a [preset](presets.md); the host's own bypass switch works |
+| Show a window in the VST3 plug-in on Linux, or in LV2 (the VST3 plug-in has [one on macOS and Windows](plugins.md#convolvers-window), as has the Audio Unit) | Use the host's controls for the settings and Status. Load a [preset](presets.md) to choose a filter, or in LV2 use the host's file chooser where it shows one ([LV2 filter files](plugins.md#lv2-filter-files)) |
 | Handle more than 8 channels in a plug-in, or more than one input and one output | Use the [command-line tool](command-line.md), which takes up to 256 channels |
 | Offer every channel layout in LV2 | Use one of the [LV2 layouts](plugins.md#lv2-channel-layouts), or the VST® 3 or Audio Unit plug-in |
 | Open projects saved with the old Windows VST 2 plug-in | Load a preset made from the same `.cfg` |
@@ -29,7 +29,7 @@ stereo reverbs up to 60 s and true-stereo reverbs up to 60 s at 48 kHz or
 | Write output files all-or-nothing | Check the exit status: after a failure the output file may be incomplete |
 | Run in a plug-in host at double precision | Processing is single precision; 64-bit host buffers are converted |
 | Reach audio that ASIO or WASAPI exclusive mode sends on Windows | Use shared mode with [Equalizer APO](equalizer-apo.md), or a plug-in in the player |
-| Come signed, or tested in named DAWs | Previews are unsigned ([install](install.md#unsigned-previews)); the [status page](../project/status.md) tracks what is ready |
+| Come signed, or tested in many hosts | Previews are unsigned ([install](install.md#unsigned-previews)); the [status page](../project/status.md) says which hosts they have been tried in |
 
 Some configurations from other programs, or from the old Windows Convolver,
 need small changes first; see [other programs](other-programs.md).
