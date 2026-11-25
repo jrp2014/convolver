@@ -656,8 +656,6 @@ tresult PLUGIN_API Processor::setProcessing(TBool state) {
 }
 tresult PLUGIN_API Processor::setState(IBStream* stream) {
     const auto result = load_state(stream);
-    if (result == kResultOk)
-        restored_at_.store(Bridges::stamp());
     write_log();
     signal_change();
     return result;
@@ -713,9 +711,12 @@ tresult Processor::load_state(IBStream* stream) {
         // was silent. State that is exactly what the plug-in would save now
         // changes nothing, so the list keeps waiting.
         if (request.kind == HostRequestKind::restore && filter_.list_waits() &&
-            unchanged_state(next))
+            unchanged_state(next)) {
+            restored_at_.store(Bridges::stamp()); // Newer than a choice before it.
             return kResultOk;
+        }
         install(std::move(next), request);
+        restored_at_.store(Bridges::stamp()); // Under control_, as view() reads it.
         return kResultOk;
     } catch (...) {
         refused();

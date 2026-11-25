@@ -879,6 +879,30 @@ void choice_before_pairing() {
                                     (controller_first ? "controller" : "processor") +
                                     " first): " + (failed.empty() ? "" : failed.front()));
     }
+    // Latency before the processor's restore, Gain mode after it: only Gain
+    // mode is newer than the restore.
+    {
+        Pair pair(Connection::delaying);
+        pair.c.setParamNormalized(latency_id, normalized_latency(1024));
+        pair.host.values[latency_id] = normalized_latency(1024);
+        auto stream = stream_of(state_with(rate, state_r.tap, state_r.settings, state_r.bypass));
+        pair.p.setState(stream.get());
+        pair.c.setParamNormalized(gain_mode_id, normalized_gain_mode(GainMode::estimate));
+        pair.host.values[gain_mode_id] = normalized_gain_mode(GainMode::estimate);
+        while (pair.deliver() > 0) {
+        }
+        stream->seek(0, IBStream::kIBSeekSet, nullptr);
+        pair.c.setComponentState(stream.get());
+        require(pair.p.setActive(true) == kResultOk, "choices around a restore: activate");
+        pair.host.latency_read = pair.p.getLatencySamples();
+        pair.settle();
+        pair.host.rescan();
+        auto m = state_r;
+        m.settings.gain_mode = GainMode::estimate;
+        const auto failed = judge(pair, m);
+        require(failed.empty(), "choices before and after a restore, before pairing: " +
+                                    (failed.empty() ? "" : failed.front()));
+    }
     for (const bool latency : {true, false}) {
         Pair pair(Connection::delaying);
         pair.restore(state_with(rate, initial.tap, initial.settings, initial.bypass), false, false);

@@ -192,13 +192,12 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
             const auto mode = std::exchange(unsent_gain_mode_, std::nullopt);
             if (!frames && !mode)
                 return;
+            // A restore the processor accepted after a choice wins over it.
             const auto view = p.view();
-            if (view.restored_at > unsent_at_)
-                return; // A restore the processor accepted after the choice wins.
             latency_told_ = view.latency;
-            if (frames)
+            if (frames && unsent_latency_at_ > view.restored_at)
                 p.chosen_latency(*frames);
-            if (mode)
+            if (mode && unsent_gain_mode_at_ > view.restored_at)
                 p.chosen_gain_mode(*mode);
         });
         // From now on the parameters show the processor's, Gain, Mix and
@@ -320,12 +319,12 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
             else
                 p.chosen_gain_mode(gain_mode(chosen));
         });
-        if (!sent) {
-            if (id == latency_id)
-                unsent_latency_ = latency_frames(chosen);
-            else
-                unsent_gain_mode_ = gain_mode(chosen);
-            unsent_at_ = Bridges::stamp();
+        if (!sent && id == latency_id) {
+            unsent_latency_ = latency_frames(chosen);
+            unsent_latency_at_ = Bridges::stamp();
+        } else if (!sent) {
+            unsent_gain_mode_ = gain_mode(chosen);
+            unsent_gain_mode_at_ = Bridges::stamp();
         }
         if (on_ui_thread())
             refresh(false); // A new Latency asks the host to restart.

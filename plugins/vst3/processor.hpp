@@ -456,7 +456,7 @@ class Controller final : public Steinberg::Vst::EditController,
     // restore after it.
     std::optional<std::size_t> unsent_latency_;
     std::optional<GainMode> unsent_gain_mode_;
-    std::uint64_t unsent_at_ = 0;
+    std::uint64_t unsent_latency_at_ = 0, unsent_gain_mode_at_ = 0;
     // The processor's generation when it was last read; the latency the host
     // was last asked to read (none before pairing).
     std::uint64_t generation_ = 0;
