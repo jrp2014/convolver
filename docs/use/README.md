@@ -16,12 +16,12 @@ helps you choose how to run it and points to the page for each step.
   `.cfg` configuration that routes channels through IRs, or a configuration
   list naming several of them. The same files work in all three
   ([words Convolver uses](concepts.md#words-convolver-uses)).
-- The filter's sample rate and channel counts must match the audio. Convolver
-  never resamples.
+- The filter must be made for the audio's sample rate and channel counts.
+  Convolver never resamples or adapts a filter's channels.
 
 **Status:** Convolver is a developer preview. Preview packages are not signed,
-and the plug-ins have not yet been tested in named DAWs. The
-[status page](../project/status.md) says what is ready.
+and they have been tried in only a few hosts, by the project itself. The
+[status page](../project/status.md) says which, and what is ready.
 
 ## Choose how to run it
 
@@ -68,8 +68,10 @@ Check the package's SHA-256 checksum against the one published with it before
 installing ([install](install.md)).
 
 Run the tools from the extracted package folder. On Windows add `.exe`
-(`./bin/convolver-preset.exe` in PowerShell). Outputs must be new paths: the
-tools never replace an existing file or folder. All three print `--help`.
+(`./bin/convolver-preset.exe` in PowerShell). `convolver-preset` and
+`convolver-equalizer-apo` never replace an existing file or folder;
+`convolver` replaces an existing output file without asking
+([output safety](command-line.md#output-safety)). All three print `--help`.
 
 ### convolver
 

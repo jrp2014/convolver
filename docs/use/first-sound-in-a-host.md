@@ -12,17 +12,14 @@ window shows 48000 Hz and `2 in → 2 out`, and you hear no change. Choose `echo
 three more times, fading) and `repeat-48000-stereo/filter.cfg` (each sound
 once more, a quarter of a second later), then save, close and reopen the project: the filter is still
 there. Your own IR file, `.cfg` or configuration list loads the same way,
-from any folder. Presets are an [optional route](#optional-load-a-preset);
-in Audacity both the preset menu and **Choose File…** are checked (Audacity
-4.0.2 on macOS, Convolver previews after 0.14.0;
-[In Audacity](#in-audacity)).
+from any folder. Presets are an [optional route](#optional-load-a-preset).
+Audacity needs a few extra steps ([In Audacity](#in-audacity)).
 
 You need a plug-in host that loads VST® 3, such as REAPER or Audacity
 (version 4 or later), or one that loads Audio Units, such as GarageBand or
 Logic. On macOS both formats have the same window, and the VST3 plug-in on
 Windows has it too, so the steps are the same. On Linux the VST3 plug-in
-has no window yet, nor on Windows up to 0.13.2: use a
-[preset](#optional-load-a-preset) instead. On Linux the LV2 plug-in also
+has no window yet: use a [preset](#optional-load-a-preset) instead. On Linux the LV2 plug-in also
 works, in hosts such as Ardour: add the Convolver layout that matches the
 track (2→2 for stereo, [LV2 layouts](plugins.md#lv2-channel-layouts)) and
 pick the same `filter.cfg` with the file chooser of its **Filter**
@@ -37,10 +34,6 @@ see the [Equalizer APO export](equalizer-apo.md) on Windows and
 - The filter's sample rate must match the host's: Convolver does not
   resample. Audacity plays effects at its Default sample rate, which can
   differ from the rate it exports at.
-- **In Audacity**, Audacity's own preset menu and Convolver's **Choose File…**
-  and recent files are checked ways to load filters (Audacity 4.0.2, VST3 on
-  macOS, Convolver previews after 0.14.0; in 0.14.0 use the preset menu),
-  as [In Audacity](#in-audacity) says.
 - Changing **Latency** during playback leaves a short gap and cuts off a
   tail that is still sounding; hosts differ in when they line the audio up
   again ([latency and tail](plugins.md#latency-and-tail)).
@@ -48,7 +41,8 @@ see the [Equalizer APO export](equalizer-apo.md) on Windows and
   around Convolver unfiltered, unlike Convolver's bypass. With a crossover
   that can send full-range audio to a tweeter ([bypass](plugins.md#bypass)).
 - The project saves a copy of the filter, not a link to its file: after
-  reopening, **Reload** stays dimmed until you choose the file again.
+  reopening, **Reload** in the **Choose Filter** menu stays dimmed until
+  you choose the file again.
 
 ## 1. Choose a filter
 
@@ -129,7 +123,7 @@ report a problem, see [report a problem](report-a-problem.md).
 
 A preset is the filter saved in the host's preset format, loaded from the
 host's preset menu instead of the window. You need one where the plug-in has
-no window (the VST3 plug-in on Linux, and on Windows up to 0.13.2), to keep filters in the
+no window (the VST3 plug-in on Linux), to keep filters in the
 host's preset library, or to pass one self-contained file to someone else.
 
 Each example folder holds a VST3 preset named after it
@@ -158,20 +152,21 @@ choosing an entry from a list, and the folders where hosts look for presets.
 ## In Audacity
 
 Audacity's own preset menu and Convolver's **Choose File…** and recent files
-(separate **Choose…** and **Recent** buttons in the builds checked) are
-the routes checked in Audacity 4.0.2 (VST3, on macOS, from the preview
-after 0.14.0; [status](../project/status.md#checks-left-before-publication)):
-a filter chosen with **Choose…** before playing was in the export and, after
-saving and reopening the project, in the next export; one chosen from
-**Recent** was in the export. Up to 0.13.2, Audacity 4.0.2 did not keep a
-filter loaded from the window for an export or a saved project.
-**Reload**, reloading when the file changes, a `.vstpreset` chosen in the
-window, and Audacity on Windows are not yet checked.
-Audacity sets up the plug-in at 44.1 kHz until it first plays, so a single
-IR file or `.cfg` chosen before then is kept and checked when Audacity plays,
-and a configuration list needs one playback first
-([when a chosen file is checked](plugins.md#loading-a-filter)); 0.14.0 and
-earlier refused such a file.
+are the routes checked in Audacity 4.0.2 (VST3, on macOS;
+[status](../project/status.md#checks-left-before-publication)), on a build
+that had separate **Choose…** and **Recent** buttons in place of the
+**Choose Filter** menu: a filter chosen before playing was in the export
+and, after saving and reopening the project, in the next export; one chosen
+from **Recent** was in the export. **Reload**, reloading when the file
+changes, a `.vstpreset` chosen in the window, and Audacity on Windows are
+not yet checked. Audacity sets up the plug-in at 44.1 kHz until it first
+plays, so a single IR file or `.cfg` chosen before then is kept and checked
+when Audacity plays. A configuration list chosen before then should load
+when Audacity first plays with Convolver's window open, and otherwise needs
+choosing again after one playback
+([when a chosen file is checked](plugins.md#loading-a-filter)); automated
+tests check this, but not yet Audacity itself, where 0.18.10 left such a
+list silent.
 If you load a filter in an unchecked way, export a few seconds and check that
 the export has the filter you chose (for example by comparing it with
 `convolver --compare`, as in [check a stereo filter in a host](check-a-stereo-filter.md)).

@@ -144,8 +144,11 @@ playing for hours with the window closed. Convolver is built for that:
   ([another rate](docs/use/plugins.md#when-a-filter-does-not-fit)). To
   play at the new rate, choose the list again.
 - **Reverb on a send.** Choose the reverb's IR file and leave Mix at its
-  fully wet default; a stereo file plays as it is, and a mono or
-  true-stereo response needs a short `.cfg` ([configuration](docs/use/configuration.md)). A reverb of up
+  fully wet default. A file with one channel for each of the track's channels
+  plays as it is: a stereo file on a stereo send, a mono file on a mono one. A
+  mono response on a stereo send, or a four-channel true-stereo response,
+  needs a short `.cfg` that says which channel goes where
+  ([reverb responses](docs/use/configuration.md#reverb-responses)). A reverb of up
   to 30 seconds took at most 4% of one core at 48 kHz with no added delay,
   and once the input has been silent for longer than the tail, an instance
   costs 93 to 99% less, measured on Linux
@@ -167,19 +170,16 @@ part to the other. Automated tests check thousands of such sequences
 Convolver is a developer preview: the latest, [0.18.12](https://github.com/jrp2014/convolver/releases/tag/v0.18.12), is an
 unsigned pre-release for macOS, Windows and Linux. Its VST3 plug-in has a
 window on macOS and Windows and uses the host's controls on Linux, and the
-Linux package holds the LV2 plug-in. 0.13.20 added the Gain mode and
-opening a Convolver preset from the window; 0.13.24 reduces the risk of an
-LV2 crash in hosts built on JUCE after a Gain mode change; 0.14.0 restores
-the playing filter more quickly, uses less CPU once the sound has stopped
-and reports clipping after a command-line render; 0.18.10 keeps a filter
-chosen before the host plays, waits for a start that suits a filter and
-words the window and Status more plainly; 0.18.12 fixes a configuration
-list chosen before Audacity first plays and replaces the window's Choose…,
-Recent and Reload controls with one Choose Filter menu. These previews
-were published before anyone listened to the new audio engine (since 0.13)
-or tried the Windows window, LV2 or the features new since 0.13.20 in a host, and
-before an independent user's walkthrough, which are still to come
-([status](docs/project/status.md)).
+Linux package holds the LV2 plug-in. The [changelog](CHANGELOG.md) says
+what each preview changed. jrp ran a build of 0.18.10 on macOS in REAPER,
+Audacity and GarageBand: renders in REAPER and GarageBand matched the
+expected output, and the two faults the session found, in Audacity and
+REAPER, are fixed in 0.18.12
+([record](docs/archive/reviews/2026-11-22-live-session-0.18.10.md)).
+0.18.12's changes are so far checked only by automated tests. Nobody has
+yet tried the Windows window or the packaged LV2 plug-in in a host,
+listened for clicks during live changes, or followed these guides as an
+independent user ([status](docs/project/status.md)).
 Processing is single precision; [limits](docs/use/limits.md) lists what
 Convolver does not do.
 
