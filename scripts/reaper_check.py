@@ -24,8 +24,14 @@ folder, and result.md there holds what a host report needs
 status is 0 when every check passed, 1 when one failed, and 2 when the run
 could not start.
 
-This is the plan's first version: the smallest run that shows REAPER doing
-one render and one save and reopen from a script. Refusals, the wrong host
+With --soak (HOST-12), it instead starts REAPER once for a 30-minute soak:
+four sparse sources, each sending to a return with Convolver and a long
+reverb that this script makes, one filter replaced halfway, and REAPER's
+last-underrun times compared before and after
+(docs/develop/host-testing.md#a-long-reaper-soak).
+
+The checks are the plan's first version: the smallest run that shows REAPER
+doing one render and one save and reopen from a script. Refusals, the wrong host
 rate, a Latency change and the Audio Unit stay manual (HOST-13 in TODO;
 docs/archive/plans/2026-11-21-host-test-automation.md). It uses only
 Python's standard library, so it runs with the python3 that macOS provides.
@@ -34,6 +40,7 @@ Python's standard library, so it runs with the python3 that macOS provides.
 import argparse
 import array
 import datetime as dt
+import functools
 import hashlib
 import math
 import platform
@@ -1066,6 +1073,7 @@ SMALL_BLOCK = 128
 SOAK_STATUS_EVERY = 10
 SOAK_SETTLE_SECONDS = 120
 SOAK_DRY_GAIN = 0.5
+SOAK_PATH_ENERGY = 0.25  # -6 dB
 SOAK_SEED = 1200
 
 
@@ -1084,8 +1092,8 @@ def wav_bytes(rate, channels, frames, samples):
 
 def reverb_samples(seconds, paths, seed, rate=RATE):
     """Interleaved decaying noise, one channel per path, falling 60 dB over
-    its length; each path's energy is 0.1 (-10 dB), so four sounds summed
-    through a return stay well clear of clipping."""
+    its length. Each path's energy is SOAK_PATH_ENERGY, so a return is
+    plainly heard beside the dry sources without clipping the master."""
     frames = int(seconds * rate)
     generator = random.Random(seed)  # noqa: S311 - a reproducible filter, not a secret
     decay = math.exp(math.log(0.001) / frames)
@@ -1099,7 +1107,7 @@ def reverb_samples(seconds, paths, seed, rate=RATE):
     # Uniform noise has a mean square of 1/3; the envelope's mean square is
     # the sum of a geometric series.
     energy = (1 / 3) * (1 - decay ** (2 * frames)) / (1 - decay * decay)
-    scale = math.sqrt(0.1 / energy)
+    scale = math.sqrt(SOAK_PATH_ENERGY / energy)
     for index in range(len(samples)):
         samples[index] *= scale
     return frames, samples
@@ -1142,6 +1150,7 @@ def write_reverb(folder, name, seconds, layout, seed):
     return config
 
 
+@functools.lru_cache(maxsize=None)
 def sound_samples(kind, rate=RATE):
     """Two seconds of stereo, peaking at -12 dBFS, that each source repeats:
     noise hits, a chord, clicks from side to side, or a rising tone."""
@@ -1188,13 +1197,15 @@ def quiet_windows(duration):
 
 def soak_schedule(duration, tracks=4, seed=SOAK_SEED):
     """Each source's item start times: the sound, then 3 to 20 s of silence,
-    on to 10 s past the end, with no sound in the quiet windows."""
+    on to at least 5 s past the end, with no sound in the quiet windows."""
     windows = quiet_windows(duration)
     schedule = []
     for track in range(tracks):
         generator = random.Random(seed + track)  # noqa: S311 - a reproducible schedule
         times, start = [], 1.0 + 1.3 * track
-        while start < duration + 10:
+        # Until a sound ends past the end, so that REAPER, which can stop
+        # at the end of a project, plays the whole time.
+        while not times or times[-1] + SOAK_SOUND_SECONDS < duration + 5:
             clash = next((end for begin, end in windows if start < end and start + SOAK_SOUND_SECONDS > begin), None)
             if clash is not None:
                 start = clash + generator.uniform(0.5, 3)
@@ -1393,7 +1404,7 @@ def soak_report(context):
         'REAPER reported an underrun while the filters loaded, before the soak started '
         f'(times {one.get("underrun_setup")}, then {one.get("underrun_before")}); it does not count.'
         if setup_before and setup_after and setup_before[:2] != setup_after[:2]
-        else 'None reported while the filters loaded.'
+        else 'none reported.'
     )
     lines = [
         f'# REAPER soak, {context["when"]}',
@@ -1449,7 +1460,12 @@ def soak_report(context):
         (
             f"2. With every return Active, it played for {duration:g} s from the start, reading REAPER's "
             f"underrun times and transport each second and each return's Status every {SOAK_STATUS_EVERY} s. "
-            f'All sources were silent from {windows}, longer than the longest tail.'
+            f'All sources were silent from {windows}'
+            + (
+                ', longer than the longest tail.'
+                if context['windows'][0][1] - context['windows'][0][0] > max(seconds for _, seconds, _ in SOAK_REVERBS)
+                else ', shorter than the longest tail at this length.'
+            )
         ),
         (
             f'3. At {one.get("replacement_at", "?")} s, while playing, it loaded {SOAK_REPLACEMENT[0]} '
