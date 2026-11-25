@@ -469,8 +469,8 @@ jobs:
             tests: -L vst3
             cache: vst3-asan-ubuntu-latest
             tsan: false
-          # The processor replaced while process() holds it, and the messages
-          # between processor and controller: the adapter tests again under
+          # The processor replaced while process() holds it, and the
+          # controller calling its processor (VST3-26): the adapter tests again under
           # ThreadSanitizer, with the shipped backend. Everything, the SDK
           # included, is instrumented, so the SDK's tools are not built.
           - name: VST3 adapter tests (Debug, ThreadSanitizer)
