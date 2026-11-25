@@ -36,9 +36,9 @@ yet folded in are in [`changes/`](changes/README.md).
 
 - README (DOC-24): **What to expect** now says that in the VST3 plug-in the
   window, the host's controls, what plays and what the project saves end up
-  agreeing whatever order you choose presets, change settings and reopen
-  projects in, even when the host is slow to pass a change from one part to
-  the other, as VST3-26 made them; checked by automated tests but not yet in
+  agreeing in each order of presets, setting changes and reopened projects
+  its automated tests try, even when the host is slow to pass a change from
+  one part to the other, as VST3-26 made them; checked by automated tests but not yet in
   a host. See
   [what to expect](README.md#what-to-expect).
 - VST3: the plug-in's two halves no longer pass settings and answers to
@@ -46,8 +46,8 @@ yet folded in are in [`changes/`](changes/README.md).
   two calls of a restore. The controller now reads and asks the processor
   of its own instance directly (VST3-26, from jrp's step back on 24
   November 2026 after VST3-18, VST3-19 and the window-preset fixes), so the window,
-  the host's parameters, what plays and what is saved agree whatever order
-  the host uses. A window preset chosen before a later edit or restore no
+  the host's parameters, what plays and what is saved agree in every order
+  of host calls the tests try. A window preset chosen before a later edit or restore no
   longer comes back over it, a refused host preset no longer leaves the
   window showing its Bypass, and the host reads a restored latency even
   when it restores the same state twice. No change to the sound or to saved
@@ -55,17 +55,6 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### Fixed
 
-- VST3: a late pairing message can no longer connect the plug-in's controls
-  to another instance of Convolver. When a host that passes messages late
-  moved the controller from one instance to another, the first instance's
-  delayed message could pair the controller with it again: the controls
-  showed that instance's settings, and a later Latency, Gain mode or chosen
-  file went to it and changed what it saved, while the instance on screen
-  kept its old settings (VST3-27, found by jrp's review of 25 November 2026 in the test
-  harness; whether a shipping host delivers that sequence is unknown). The
-  controller now pairs only with the answer to its current connection. No
-  change to the sound or to saved projects. See the
-  [adapter contract](docs/develop/plugin-contract.md#status-and-log).
 - Estimate (FFT-5): whether a filter near the largest float gets a noise
   estimate no longer depends on the build. One tap of 3e38 got no estimate
   in one Linux build and an estimate in others, because the noise could
@@ -121,6 +110,18 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### For contributors
 
+- VST3 (VST3-27, a regression from VST3-26 that no published preview had):
+  a late pairing message can no longer connect the plug-in's controls
+  to another instance of Convolver. When a host that passes messages late
+  moved the controller from one instance to another, the first instance's
+  delayed message could pair the controller with it again: the controls
+  showed that instance's settings, and a later Latency, Gain mode or chosen
+  file went to it and changed what it saved, while the instance on screen
+  kept its old settings (VST3-27, found by jrp's review of 25 November 2026 in the test
+  harness; whether a shipping host delivers that sequence is unknown). The
+  controller now pairs only with the answer to its current connection. No
+  change to the sound or to saved projects. See the
+  [adapter contract](docs/develop/plugin-contract.md#status-and-log).
 - VST3 (VST3-27): the controller numbers each connection
   (`Bridges::stamp()`), starts it unpaired and sends the number in
   `ConvolverPairRequest`; the processor answers with its key and the number

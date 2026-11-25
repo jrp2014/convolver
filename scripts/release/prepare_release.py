@@ -37,20 +37,16 @@ CHANGES = (
     (
         'In VST3, host presets, window presets and later Latency, Gain mode, Gain and Mix changes now play, show '
         "and save the same in every order of host calls the plug-in's tests try, delivered on time or late: the "
-        "plug-in's two halves ask each other directly instead of passing messages that a host could deliver late "
-        'or in the middle of a restore. A Latency or Gain mode chosen just '
+        "plug-in's two halves ask each other directly for settings instead of passing them in messages that a "
+        'host could deliver late or in the middle of a restore, and each window pairs only with its own '
+        "instance's audio half, even when the host passes the pairing message late. A Latency or Gain mode chosen "
+        'just '
         'before a preset is restored no longer overrides that preset when the host delivers it late, which could '
         "play and save the earlier Latency while the window showed the preset's. Settings changed after a refused "
         'preset no longer jump back when the host answers late, a window preset no longer comes back over a later '
         'edit or restore, a refused preset no longer leaves the window showing its Bypass or Status showing '
         "Active, and a host that restores the window's half first, or the same state twice, reads the latency "
         'that plays. No change to how a filter sounds or to the saved-project format.'
-    ),
-    (
-        "A late pairing message from another instance of Convolver can no longer connect the VST3 plug-in's "
-        'controls to that instance, which could send a later Latency, Gain mode or chosen file to it and change '
-        "what it saved. It was found in the plug-in's test harness; whether a host delivers that sequence is "
-        'unknown.'
     ),
     (
         'A valid VST3 project or preset is no longer refused as "could not be read: std::bad_alloc" when memory '

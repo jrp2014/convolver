@@ -298,9 +298,11 @@ Contents: [direction](#direction) · [releases](#releases) ·
 
 - **25 November 2026.** The ninth preview is not cut from v0.18.20: jrp's
   review of `main` at `33971caf` found that a delayed pairing message can
-  reconnect the VST3 window to another instance's processor, so the
-  preview waits for that fix and is cut from the tag after it, with its
-  own load-budget measurement once PERF-21 is a release step. See
+  reconnect the VST3 window to another instance's processor ("fix one
+  pairing bug before cutting the preview"), so the preview waits for that
+  fix (VST3-27) and is cut from a tag that has it and these notes. It is
+  measured against the load budget only if PERF-21 is a release step by
+  then. See
   [Releasing](../develop/releasing.md#publishing-an-unsigned-preview).
 - **25 November 2026.** A ninth unsigned developer preview, cut from
   `main` once the VST3 sequence test (VST3-25) and the redesigned sync
