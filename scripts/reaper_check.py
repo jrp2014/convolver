@@ -65,6 +65,10 @@ CLI = Path('bin/convolver')
 # dry signal, or that speaker labels differ (jrp's review of 21 November
 # 2026), so only the whole text counts.
 ACTIVE = 'Filter loaded: 48000 Hz, 2 in, 2 out.'
+# The same for a true-stereo filter (four paths, left and right to each
+# output at unit gain), which Status names since EDGE-3 (jrp's review of
+# 25 November 2026: the soak's true-stereo returns read this).
+ACTIVE_TRUE_STEREO = 'Filter loaded: 48000 Hz, 2 in, 2 out; true stereo.'
 REAPERS = (
     '/Applications/REAPER.app/Contents/MacOS/REAPER',
     '/Applications/REAPER64.app/Contents/MacOS/REAPER',
@@ -593,7 +597,12 @@ step(function()
     for index, entry in ipairs(returns) do
       local text = status(entry.track, entry.fx)
       soak.readings = soak.readings + 1
-      if text ~= CONFIG.active then soak.other = soak.other + 1 end
+      -- Once the replacement is tried, its return is Active with either
+      -- filter: whether the new one plays is check 6's question.
+      local replaced = index == CONFIG.replace_return and soak.replaced
+      if text ~= CONFIG.active[index] and not (replaced and text == CONFIG.replacement_active) then
+        soak.other = soak.other + 1
+      end
       if text ~= soak.last_status[index] then
         soak.changes = soak.changes + 1
         record("status_change_" .. soak.changes, string.format("%.1f s, Reverb %d: %s", elapsed, index, text))
@@ -631,9 +640,12 @@ step(function()
     if soak.replaced and not soak.replacement_read then
       local entry = returns[CONFIG.replace_return]
       local waited = elapsed - soak.replaced
-      -- The old filter reads the same until the new one plays, so the
-      -- reading waits a moment as well as past any waiting text.
-      if (waited >= 2 and settled(entry.track, entry.fx)()) or waited >= CONFIG.settle_seconds then
+      -- The old filter reads its own text until the new one plays, so the
+      -- reading waits for the replacement's (a stereo filter replaced by a
+      -- true-stereo one) or for the settling time.
+      local swapped = status(entry.track, entry.fx) == CONFIG.replacement_active
+      local tells = CONFIG.active[CONFIG.replace_return] ~= CONFIG.replacement_active
+      if (swapped and (tells or waited >= 2)) or waited >= CONFIG.settle_seconds then
         soak.replacement_read = true
         record("replacement_status", status(entry.track, entry.fx))
         record("replacement_settled_after", string.format("%.1f", waited))
@@ -654,7 +666,7 @@ step(function()
   end
   reaper.OnStopButton()
   -- The size of the replaced return's state, which holds its filter, tells
-  -- the replacement from the filter it replaced (both read the same Status).
+  -- the replacement from the filter it replaced, as well as its Status.
   local replaced = returns[CONFIG.replace_return]
   local ok, chunk = reaper.TrackFX_GetNamedConfigParm(replaced.track, replaced.fx, "vst_chunk")
   record("state_chars_" .. CONFIG.replace_return, ok and #chunk or "unavailable")
@@ -860,9 +872,14 @@ def playing(results):
         return False
 
 
-def active(text):
-    """Whether a Status reading is exactly the stereo example's Active text."""
-    return (text or '').strip() == ACTIVE
+def active(text, expected=ACTIVE):
+    """Whether a Status reading is exactly the Active text, by default the stereo example's."""
+    return (text or '').strip() == expected
+
+
+def soak_active(layout):
+    """The Active text of a soak filter with this layout ('stereo' or 'true stereo')."""
+    return ACTIVE_TRUE_STEREO if layout == 'true stereo' else ACTIVE
 
 
 def loaded_while_playing(results):
@@ -1365,7 +1382,7 @@ def small_block(results):
 
 def replacement_state(results, sizes):
     """Whether Reverb 1's saved state, after the soak, is the replacement's
-    size rather than the replaced filter's (both read the same Status), and
+    size rather than the replaced filter's (evidence beside its Status), and
     the evidence. `sizes` are the two presets' sizes in bytes."""
     replaced, replacement = sizes
     try:
@@ -1397,8 +1414,10 @@ def evaluate_soak(outcome, duration, sizes):
     the replaced and the replacement presets' sizes in bytes."""
     one = outcome['results']
     count = len(SOAK_REVERBS)
+    expected = [soak_active(layout) for _, _, layout in SOAK_REVERBS]
     loaded = [
-        one.get(f'preset_applied_{n}') == 'true' and active(one.get(f'status_ready_{n}')) for n in range(1, count + 1)
+        one.get(f'preset_applied_{n}') == 'true' and active(one.get(f'status_ready_{n}'), expected[n - 1])
+        for n in range(1, count + 1)
     ]
     small = small_block(one)
     try:
@@ -1413,6 +1432,12 @@ def evaluate_soak(outcome, duration, sizes):
     changes = [value for key, value in one.items() if key.startswith('status_change_')]
     ends = [one.get(f'status_end_{n}') for n in range(1, count + 1)]
     replaced = SOAK_REPLACE_RETURN
+    replacement_active = soak_active(SOAK_REPLACEMENT[2])
+
+    def active_at_end(n, text):
+        # The replaced return is Active with either filter; check 6 says which.
+        return active(text, expected[n - 1]) or (n == replaced and active(text, replacement_active))
+
     state_new, state_evidence = replacement_state(one, sizes)
     return [
         (
@@ -1459,18 +1484,20 @@ def evaluate_soak(outcome, duration, sizes):
         ),
         (
             'Every return read Active at every reading, and at the end',
-            readings > 0 and other == 0 and all(active(text) for text in ends),
+            readings > 0 and other == 0 and all(active_at_end(n, text) for n, text in enumerate(ends, 1)),
             f'{readings} readings while playing, {other if other is not None else "?"} not Active'
             + (f'; changes: {"; ".join(changes)}' if changes else '')
             + ''.join(
                 f'; at the end, Reverb {n}: {text or "(not read)"}'
                 for n, text in enumerate(ends, 1)
-                if not active(text)
+                if not active_at_end(n, text)
             ),
         ),
         (
             f"Replacing Reverb {replaced}'s filter while playing loaded the new one",
-            one.get('replacement_applied') == 'true' and active(one.get('replacement_status')) and state_new,
+            one.get('replacement_applied') == 'true'
+            and active(one.get('replacement_status'), replacement_active)
+            and state_new,
             (
                 f'at {one.get("replacement_at", "?")} s TrackFX_SetPreset returned '
                 f'{one.get("replacement_applied") or "nothing"}; Status '
@@ -1663,7 +1690,8 @@ def run_soak(args, package, reaper):
                 'project': str(project),
                 'rate': RATE,
                 'fx_names': list(FX_NAMES),
-                'active': ACTIVE,
+                'active': [soak_active(layout) for _, _, layout in SOAK_REVERBS],
+                'replacement_active': soak_active(SOAK_REPLACEMENT[2]),
                 'presets': [str(preset) for preset in presets],
                 'replacement': str(replacement),
                 'replace_return': SOAK_REPLACE_RETURN,

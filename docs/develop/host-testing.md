@@ -504,8 +504,11 @@ with 3 to 20 s of silence between. Each source's fader is at -6 dB; it plays
 to the master and, through a send at 0 dB after the fader, to its own return
 track, which holds Convolver's VST3 with one of the reverbs. All four sources are silent for 60 s twice (from 25% and 65% of the
 way through), longer than the longest tail, so each return goes quiet and
-wakes again. Once every return reads exactly
-`Filter loaded: 48000 Hz, 2 in, 2 out.`, REAPER plays from the start. Each
+wakes again. Once no return is waiting any more, REAPER plays from the
+start. A return is Active when its Status reads exactly
+`Filter loaded: 48000 Hz, 2 in, 2 out.` for a stereo reverb, or
+`Filter loaded: 48000 Hz, 2 in, 2 out; true stereo.` for a true-stereo one
+(since EDGE-3). Each
 second the ReaScript reads REAPER's underrun times and the transport, every
 10 s each return's Status, and halfway it loads the replacement into the
 first return while the others play. At the end it stops, saves the project
@@ -531,11 +534,12 @@ Six checks follow: the ReaScript ran to the end; all four returns loaded;
 the device ran at 48 kHz with a block of 1 to 128 frames (a whole number,
 read before and while playing; a 0 or an unreported block fails); the transport
 ran the whole time; every Status reading while playing, and at the end, was
-the Active text (any other is listed with its time); and the replacement was
-accepted, read Active afterwards and left a saved state within 10% of the
-replacement preset's size, which the replaced filter's preset is far from
-(both filters read the same Status, and the state holds the filter's
-samples). The steps in `result.md` say the replacement loaded only when
+its return's Active text (any other is listed with its time; once the
+replacement is tried, its return may read either filter's); and the
+replacement was accepted, read the true-stereo Active text afterwards, which
+the stereo filter it replaced does not, and left a saved state within 10% of
+the replacement preset's size, which the replaced filter's preset is far
+from (the state holds the filter's samples). The steps in `result.md` say the replacement loaded only when
 that check passed, and otherwise that it was tried. The exit status is 0 only for no new
 underrun with all six checks passing. The rest of `result.md` is what
 [every report](#every-report) needs, as for the eight checks. REAPER's own
