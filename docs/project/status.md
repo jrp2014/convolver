@@ -189,7 +189,11 @@ none qualifies a workload by itself ([responsiveness qualification](../develop/r
   of one core with its 99th-percentile callback under half its period;
   shared machines, so indicative only. The [limits
   guide](../use/limits.md#filter-length-channels-and-processor-load) states
-  them; jrp's Mac has not run them.
+  them; jrp's Mac has not run them. Stereo room correction and the 2-to-6
+  crossover have an everyday budget of 3% of one core at 48 kHz, Latency 0
+  and 64-frame callbacks (0.6 to 2.1% then), checked on the runners before
+  each preview (PERF-21,
+  [the everyday budget](../develop/fft-measurements.md#the-everyday-budget)).
 
 ## Compatibility guarantees
 

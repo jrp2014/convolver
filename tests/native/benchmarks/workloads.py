@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Measure the supported plug-in workloads (PERF-3).
+"""Measure the supported plug-in workloads (PERF-3) against their limits (PERF-21).
 
 Runs convolver_callback_benchmark, which drives the engine through
 HostProcessor as the plug-ins do, over a fixed set of long and multichannel
@@ -28,6 +28,21 @@ workloads over it are measured as command-line work only.
 
 The summary (Markdown, on standard output) gives the median over rounds of
 each measurement; the CSV keeps every run with the machine's description.
+It opens with two verdicts:
+
+  budget   the everyday load budget (PERF-21): stereo room correction and the
+           2-to-6 crossover at most 3% of one core at 48 kHz, Latency 0 and
+           64-frame callbacks
+  ceiling  the supported-workload ceiling (PERF-3): mean at most 25% of one
+           core and the 99th-percentile callback at most half its period, at
+           every warm setting; judged only for workloads measured at all four
+
+The script exits with status 1 when a budgeted workload is over the budget,
+after writing the summary; a workload over the ceiling is reported only, since
+the full 7.1 matrix at 96 kHz is known to be over it.
+--budget measures only the budget's two workloads at its one setting, in
+about a minute: the check before each preview
+(docs/develop/releasing.md#candidates).
 --quick runs one round of three workloads, to check a build and the script.
 Results are indicative on shared machines (cloud VMs, CI runners): read the
 medians and spread, not single maxima.
@@ -69,6 +84,17 @@ RATES = (48000, 96000)
 WARM = [(0, 64), (0, 512), (256, 64), (256, 512)]
 ONCE = [('startup', 0, 512), ('replace', 0, 512)]
 
+# The everyday load budget (PERF-21, docs/project/decisions.md#releases):
+# the median over rounds of the mean share of one core, per workload, at one
+# setting: rate, Latency and callback frames.
+BUDGET = ('stereo correction', '2-to-6 crossover')
+BUDGET_PERCENT = 3.0
+BUDGET_SETTING = (48000, 0, 64)
+# The supported-workload ceiling (PERF-3): at every warm setting, the mean
+# share of one core and the 99th-percentile callback as a share of its period.
+CEILING_PERCENT = 25.0
+CEILING_P99_PERCENT = 50.0
+
 
 def paths(layout, inputs, outputs):
     if layout == 'diagonal':
@@ -78,12 +104,16 @@ def paths(layout, inputs, outputs):
     return inputs * outputs
 
 
-def cases(quick):
+def cases(*, quick=False, budget=False):
     for name, layout, inputs, outputs, seconds, taps48 in WORKLOADS:
         if quick and name not in QUICK:
             continue
+        if budget and name not in BUDGET:
+            continue
         for rate in RATES:
             if name == 'baseline' and rate != 48000:
+                continue
+            if budget and rate != BUDGET_SETTING[0]:
                 continue
             taps = seconds * rate if seconds else taps48 * rate // 48000
             n = paths(layout, inputs, outputs)
@@ -194,12 +224,106 @@ def spread(rows, key):
     return min(values), max(values)
 
 
+def core_percent(row):
+    """Mean processing time of one run as a percentage of one core at its rate."""
+    return float(row['ns_per_frame']) * int(row['rate']) / 1e7
+
+
+def p99_percent(row):
+    """One run's 99th-percentile callback as a percentage of its period."""
+    return float(row['p99_us']) * int(row['rate']) / (int(row['callback']) * 1e4)
+
+
+def warm_groups(rows):
+    """Warm runs grouped by workload, rate, Latency and callback, in first-seen order."""
+    groups = {}
+    for r in rows:
+        if r['scenario'] == 'warm':
+            k = (r['workload'], int(r['rate']), int(r['latency']), int(r['callback']))
+            groups.setdefault(k, []).append(r)
+    return groups
+
+
+def budget_verdicts(rows):
+    """For each budgeted workload measured at the budget's setting:
+    (workload, median core %, lowest, highest, within the budget)."""
+    groups = warm_groups(rows)
+    rate, latency, callback = BUDGET_SETTING
+    verdicts = []
+    for name in BUDGET:
+        g = groups.get((name, rate, latency, callback))
+        if not g:
+            continue
+        shares = [core_percent(r) for r in g]
+        core = statistics.median(shares)
+        verdicts.append((name, core, min(shares), max(shares), core <= BUDGET_PERCENT))
+    return verdicts
+
+
+def ceiling_verdicts(rows):
+    """For each workload and rate measured at every warm setting:
+    (workload, rate, highest median core %, highest median p99 % of period,
+    within the ceiling). The highest is over the settings; each setting's
+    figure is the median over rounds, as the measurements record it."""
+    by_case = {}
+    for (name, rate, latency, callback), g in warm_groups(rows).items():
+        core = statistics.median(core_percent(r) for r in g)
+        p99 = statistics.median(p99_percent(r) for r in g)
+        by_case.setdefault((name, rate), {})[(latency, callback)] = (core, p99)
+    verdicts = []
+    for (name, rate), settings in by_case.items():
+        if set(settings) != set(WARM):
+            continue
+        core = max(c for c, _ in settings.values())
+        p99 = max(p for _, p in settings.values())
+        verdicts.append((name, rate, core, p99, core <= CEILING_PERCENT and p99 <= CEILING_P99_PERCENT))
+    return verdicts
+
+
+def verdict_section(rows):
+    rate, latency, callback = BUDGET_SETTING
+    ceiling = ceiling_verdicts(rows)
+    out = ['## Against the budget and the ceiling' if ceiling else '## Against the budget', '']
+    out.append(
+        f'Everyday budget (PERF-21): at most {BUDGET_PERCENT:g}% of one core at {rate // 1000} kHz, '
+        f'Latency {latency}, {callback}-frame callbacks; median over rounds [lowest to highest round].'
+    )
+    out.append('')
+    out.append('| Workload | Core % [range] | Budget % | Verdict |')
+    out.append('| --- | ---: | ---: | --- |')
+    measured = {v[0]: v for v in budget_verdicts(rows)}
+    for name in BUDGET:
+        if name in measured:
+            _, core, lo, hi, ok = measured[name]
+            out.append(
+                f'| {name} | {core:.2f} [{lo:.2f} to {hi:.2f}] | {BUDGET_PERCENT:g} | '
+                f'{"within" if ok else "OVER: investigate before publishing"} |'
+            )
+        else:
+            out.append(f'| {name} | not measured | {BUDGET_PERCENT:g} | not judged |')
+    out.append('')
+    if ceiling:
+        out.append(
+            f'Supported ceiling (PERF-3): mean at most {CEILING_PERCENT:g}% of one core and the '
+            f'99th-percentile callback at most {CEILING_P99_PERCENT:g}% of its period, at every warm '
+            'setting; the highest median over the four settings.'
+        )
+        out.append('')
+        out.append('| Workload | Rate | Core % | p99 % of period | Verdict |')
+        out.append('| --- | ---: | ---: | ---: | --- |')
+        for name, rate, core, p99, ok in ceiling:
+            out.append(f'| {name} | {rate // 1000} kHz | {core:.2f} | {p99:.0f} | {"within" if ok else "over"} |')
+        out.append('')
+    return out
+
+
 def summary(rows, label):
     out = [f'# Workload measurements: {label}', '', f'Machine: {rows[0]["machine"]}', '']
     out.append(
         f'Backend: {rows[0]["backend"]}; kernels: {rows[0]["kernels"]}; rounds: {max(int(r["round"]) for r in rows)}'
     )
     out.append('')
+    out += verdict_section(rows)
     out.append('## Callbacks once the history is full')
     out.append('')
     out.append(
@@ -213,19 +337,7 @@ def summary(rows, label):
         '| p99 µs | max µs [range] | Period µs | RSS MiB |'
     )
     out.append('| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |')
-    key = lambda r: (r['workload'], int(r['rate']), int(r['latency']), int(r['callback']))  # noqa: E731
-    order = []
-    groups = {}
-    for r in rows:
-        if r['scenario'] != 'warm':
-            continue
-        k = key(r)
-        if k not in groups:
-            order.append(k)
-            groups[k] = []
-        groups[k].append(r)
-    for k in order:
-        g = groups[k]
+    for k, g in warm_groups(rows).items():
         rate = int(g[0]['rate'])
         core = median(g, 'ns_per_frame') * rate / 1e7
         lo, hi = spread(g, 'max_us')
@@ -238,6 +350,13 @@ def summary(rows, label):
             f'{median(g, "peak_rss_bytes") / 2**20:.0f} |'
         )
     out.append('')
+    seen = []
+    for r in rows:
+        k = (r['workload'], int(r['rate']))
+        if r['scenario'] in ('startup', 'replace') and k not in seen:
+            seen.append(k)
+    if not seen:
+        return '\n'.join(out) + '\n'
     out.append('## Preparation and replacement')
     out.append('')
     out.append(
@@ -252,11 +371,6 @@ def summary(rows, label):
         '| Replace prepare ms | Replace max µs | Replace RSS MiB |'
     )
     out.append('| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |')
-    seen = []
-    for r in rows:
-        k = (r['workload'], int(r['rate']))
-        if r['scenario'] in ('startup', 'replace') and k not in seen:
-            seen.append(k)
     for k in seen:
         s = [r for r in rows if (r['workload'], int(r['rate'])) == k and r['scenario'] == 'startup']
         p = [r for r in rows if (r['workload'], int(r['rate'])) == k and r['scenario'] == 'replace']
@@ -271,24 +385,36 @@ def summary(rows, label):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('benchmark', help='path to convolver_callback_benchmark (a Release build)')
-    parser.add_argument('--rounds', type=int, default=3)
+    parser.add_argument('--rounds', type=int, help='rounds of every workload (default 3; 5 with --budget)')
     parser.add_argument('--seconds', type=float, default=1.0, help='timed seconds per warm run')
     parser.add_argument('--csv', help='write every run here')
     parser.add_argument('--label', default=platform.node() or 'this machine')
-    parser.add_argument('--quick', action='store_true', help='one round of three workloads')
+    choice = parser.add_mutually_exclusive_group()
+    choice.add_argument('--quick', action='store_true', help='one round of three workloads')
+    choice.add_argument(
+        '--budget', action='store_true', help="only the everyday budget's workloads at its setting (PERF-21)"
+    )
     args = parser.parse_args()
-    rounds = 1 if args.quick else args.rounds
+    if args.quick:
+        rounds = 1
+    elif args.rounds:
+        rounds = args.rounds
+    else:
+        rounds = 5 if args.budget else 3
     host = machine()
     rows = []
     started = time.monotonic()
-    all_cases = list(cases(args.quick))
+    all_cases = list(cases(quick=args.quick, budget=args.budget))
     for number in range(1, rounds + 1):
         # Every other round runs the workloads in reverse, so drift on the
         # machine does not fall on the same workloads each time.
         ordered = all_cases if number % 2 else list(reversed(all_cases))
         for case in ordered:
-            runs = [('warm', latency, callback) for latency, callback in WARM]
-            runs += ONCE if case['workload'] != 'baseline' else []
+            if args.budget:
+                runs = [('warm', *BUDGET_SETTING[1:])]
+            else:
+                runs = [('warm', latency, callback) for latency, callback in WARM]
+                runs += ONCE if case['workload'] != 'baseline' else []
             for scenario, latency, callback in runs:
                 command = [
                     args.benchmark,
@@ -327,7 +453,16 @@ def main():
             writer.writeheader()
             writer.writerows(rows)
     sys.stdout.write(summary(rows, args.label))
+    over = [v[0] for v in budget_verdicts(rows) if not v[4]]
+    if over:
+        print(
+            f'Over the everyday budget of {BUDGET_PERCENT:g}% of one core: {", ".join(over)}. '
+            'Investigate before publishing a preview (docs/develop/releasing.md#candidates).',
+            file=sys.stderr,
+        )
+        return 1
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

@@ -14,7 +14,10 @@
 - The supported workloads (PERF-3, 21 November 2026): every filter that
   fits the plug-ins' saved state, except a full 7.1 matrix at 96 kHz,
   played in real time with room to spare on four shared machines
-  ([supported workloads](#supported-workloads)).
+  ([supported workloads](#supported-workloads)). Stereo room correction
+  and the 2-to-6 crossover stay within the everyday budget of 3% of one
+  core, checked before each preview
+  ([the everyday budget](#the-everyday-budget)).
 - Then and now (22 November 2026, jrp's M5 Max): with a 65,536-tap stereo
   filter in large blocks, the historical 4.3 and current engines both ran
   at about 1,540 times real time, against 40 times for 2.19 on a 2006
@@ -1521,6 +1524,36 @@ What this means for the items waiting on PERF-3:
   share of a core. Only the 7.1 matrix at 96 kHz did (up to 52% on the VM);
   like EDGE-11's candidates, that is a reason only if users need it.
 
+### The everyday budget
+
+Beside the supported ceiling, the two most common uses have a budget of
+their own (PERF-21, [decisions](../project/decisions.md#releases)): stereo
+room correction and the 2-to-6 crossover, with 65,536-tap filters, stay at
+or under **3% of one core** at 48 kHz, Latency 0 and 64-frame callbacks,
+the median over rounds of the mean processing time. That keeps everyday
+listening cheap enough to leave the host room for everything else, and
+catches an engine change that makes it dearer long before the ceiling
+would. On 21 November 2026 the four machines above measured 0.6 to 1.0%
+for stereo correction and 1.3 to 2.1% for the crossover, the most on the
+Windows runner: about a third of the budget to spare there.
+
+[`workloads.py`](../../tests/native/benchmarks/workloads.py) opens every
+summary with both verdicts: each budgeted workload against the budget, and
+each workload measured at all four warm settings against the ceiling. It
+exits with status 1 when a budgeted workload is over the budget, after
+writing the summary; a workload over the ceiling is reported only, since
+the full 7.1 matrix at 96 kHz is known to be over it. With `--budget` it
+measures only the two workloads at the budget's setting, five rounds, in
+about ten seconds on the cloud VM. Before each preview the
+[release steps](releasing.md#candidates) run it on the tag, on the Linux,
+macOS and Windows runners. The cloud VM and jrp's Mac run it when someone
+measures there.
+
+On 25 November 2026 (`main` at `eb79d6e`, 0.18.18; the cloud VM, now an
+Intel Xeon @ 2.10 GHz, 4 vCPUs, Clang 18.1.3, Ooura with AVX2+FMA),
+`--budget` gave 0.90% for stereo correction (0.86 to 0.93 over five
+rounds) and 1.95% for the crossover (1.86 to 2.38).
+
 ## Performance then and now
 
 jrp's comparison of the 2006 release with the current engine (22 November
@@ -1838,10 +1871,14 @@ python3 tests/native/benchmarks/workloads.py build/convolver_callback_benchmark 
     --rounds 3 --csv workloads.csv > workloads.md
 ```
 
-`--quick` runs one round of three workloads in about 30 seconds. On GitHub's
+`--quick` runs one round of three workloads in about 30 seconds, and
+`--budget` only [the everyday budget](#the-everyday-budget)'s two workloads in
+about ten. On GitHub's
 runners, start the [Workload measurements](../../.github/workflows/workloads.yml)
-workflow by hand (Actions, then "Run workflow"); each job writes the
-summary to its log and job summary, and keeps both files as an artifact.
+workflow by hand (Actions, then "Run workflow", ticking "Only the everyday
+budget's workloads" for `--budget`); each job writes the
+summary to its log and job summary, and keeps both files as an artifact. A
+job fails when a workload is over the budget.
 
 ### Comparing backends
 
