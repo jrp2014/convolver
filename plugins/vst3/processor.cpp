@@ -472,7 +472,8 @@ PairView Processor::view() {
         filter_.confirm(known_layout());
     // PLUG-39 step 5: the report holds the Status line too.
     return {report_locked(),      tag_,        settings(),
-            shown_bypass_.load(), generation_, getLatencySamples()};
+            shown_bypass_.load(), generation_, getLatencySamples(),
+            restored_at_.load()};
 }
 void Processor::chosen_latency(std::size_t frames) {
     {
@@ -655,6 +656,8 @@ tresult PLUGIN_API Processor::setProcessing(TBool state) {
 }
 tresult PLUGIN_API Processor::setState(IBStream* stream) {
     const auto result = load_state(stream);
+    if (result == kResultOk)
+        restored_at_.store(Bridges::stamp());
     write_log();
     signal_change();
     return result;

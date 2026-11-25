@@ -323,8 +323,9 @@ class Processor final : public Steinberg::Vst::AudioEffect, public ProcessorLink
     // restores a project and gives it the track's). Under control_, except
     // played(), which process() calls.
     HostSettling settling_{HostBinding::activation};
-    // VST3-26, under control_: PairView::generation.
+    // VST3-26, under control_: PairView::generation. PairView::restored_at.
     std::uint64_t generation_ = 0;
+    std::atomic<std::uint64_t> restored_at_{0};
     std::shared_ptr<Bridge> bridge_;
     std::uint64_t bridge_key_ = 0;
     bool layout_refusal_logged_ = false; // Refused layouts are logged once per instance.
@@ -450,9 +451,12 @@ class Controller final : public Steinberg::Vst::EditController,
     mutable std::mutex bridge_lock_;
     std::shared_ptr<Bridge> bridge_; // Null while unpaired.
     std::thread::id ui_thread_;
-    // A Latency or Gain mode chosen while unpaired, sent once paired.
+    // A Latency or Gain mode chosen while unpaired, and when
+    // (Bridges::stamp()), sent once paired if the processor accepted no
+    // restore after it.
     std::optional<std::size_t> unsent_latency_;
     std::optional<GainMode> unsent_gain_mode_;
+    std::uint64_t unsent_at_ = 0;
     // The processor's generation when it was last read; the latency the host
     // was last asked to read (none before pairing).
     std::uint64_t generation_ = 0;

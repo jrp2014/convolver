@@ -48,6 +48,9 @@ struct PairView {
     // two moves they are the host's, which passes them in process().
     std::uint64_t generation = 0;
     std::uint32_t latency = 0; // What getLatencySamples() returns.
+    // Bridges::stamp() at the last restore the processor accepted: a choice
+    // the controller made while unpaired is sent only if it is newer.
+    std::uint64_t restored_at = 0;
 };
 // The outcome of a file the window chose, or of a waiting configuration list
 // read again (`tried`: there was one).
@@ -156,6 +159,12 @@ class Bridges {
         std::lock_guard lock(t.mutex);
         const auto at = t.bridges.find(key);
         return at == t.bridges.end() ? nullptr : at->second.lock();
+    }
+    // A process-wide count that orders what the two halves did before they
+    // paired (both live in one process).
+    static std::uint64_t stamp() noexcept {
+        static std::atomic<std::uint64_t> count{0};
+        return ++count;
     }
 
   private:

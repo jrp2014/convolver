@@ -188,11 +188,17 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         // now, as a message would have; a host that read the latency before
         // is told the new one.
         with_processor([&](ProcessorLink& p) {
-            if (unsent_latency_ || unsent_gain_mode_)
-                latency_told_ = p.view().latency;
-            if (const auto frames = std::exchange(unsent_latency_, std::nullopt))
+            const auto frames = std::exchange(unsent_latency_, std::nullopt);
+            const auto mode = std::exchange(unsent_gain_mode_, std::nullopt);
+            if (!frames && !mode)
+                return;
+            const auto view = p.view();
+            if (view.restored_at > unsent_at_)
+                return; // A restore the processor accepted after the choice wins.
+            latency_told_ = view.latency;
+            if (frames)
                 p.chosen_latency(*frames);
-            if (const auto mode = std::exchange(unsent_gain_mode_, std::nullopt))
+            if (mode)
                 p.chosen_gain_mode(*mode);
         });
         // From now on the parameters show the processor's, Gain, Mix and
@@ -218,8 +224,8 @@ void Controller::refresh(bool adopt_all, bool tell_host) {
     PairView view;
     if (!with_processor([&](ProcessorLink& p) { view = p.view(); }))
         return;
-    if (const auto bridge = this->bridge())
-        bridge->take_changed(); // Read now.
+    if (const auto bridge = this->bridge(); bridge && on_ui_thread())
+        bridge->take_changed(); // Read now; off it, read again on it.
     auto* status = getParameterObject(status_id);
     if (!status) // Not initialized, or terminated: nothing to show it on.
         return;
@@ -255,21 +261,23 @@ void Controller::refresh(bool adopt_all, bool tell_host) {
     generation_ = view.generation;
     // Ask the host to read the parameters again (the status is not edited
     // by the user, so performEdit does not apply). Hosts may ignore this.
-    if (changed && tell_host)
+    if (changed && tell_host && on_ui_thread())
         restart(kParamValuesChanged);
     // The SDK's way to report a new latency: the host deactivates the
     // component, reads getLatencySamples() and activates it again; some
     // (REAPER 7.85) only read it. The processor already plays the new
     // Latency (VST3-16), so either way the host reads the latency that
     // plays. The first read after pairing only records it: the host reads
-    // it when it activates the processor.
+    // it when it activates the processor. Off the UI thread (a host that
+    // restores the controller there) the next refresh on it tells the host.
+    if (!on_ui_thread())
+        return;
     const bool told = latency_told_.has_value();
     if (std::exchange(latency_told_, view.latency) != view.latency && told)
         restart(kLatencyChanged);
 }
 void Controller::restart(int32 flags) {
-    if (!componentHandler)
-        return;
+    // On the UI thread only (refresh()), so restarting_ needs no lock.
     restart_waiting_ |= flags;
     // Ardour 8 and 9 read parameters inside restartComponent, which passes
     // values it holds to setParamNormalized and so to a refresh; a second
@@ -278,8 +286,11 @@ void Controller::restart(int32 flags) {
     if (restarting_)
         return;
     restarting_ = true;
-    while (restart_waiting_ != 0)
-        componentHandler->restartComponent(std::exchange(restart_waiting_, 0));
+    // The handler, held: a host may clear it inside restartComponent.
+    const IPtr<IComponentHandler> handler = componentHandler;
+    while (handler && restart_waiting_ != 0)
+        handler->restartComponent(std::exchange(restart_waiting_, 0));
+    restart_waiting_ = 0;
     restarting_ = false;
 }
 tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) {
@@ -309,10 +320,13 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
             else
                 p.chosen_gain_mode(gain_mode(chosen));
         });
-        if (!sent && id == latency_id)
-            unsent_latency_ = latency_frames(chosen);
-        else if (!sent)
-            unsent_gain_mode_ = gain_mode(chosen);
+        if (!sent) {
+            if (id == latency_id)
+                unsent_latency_ = latency_frames(chosen);
+            else
+                unsent_gain_mode_ = gain_mode(chosen);
+            unsent_at_ = Bridges::stamp();
+        }
         if (on_ui_thread())
             refresh(false); // A new Latency asks the host to restart.
         return result;
@@ -439,6 +453,9 @@ IPlugView* PLUGIN_API Controller::createView(FIDString name) {
     return create_editor(*this);
 }
 std::optional<HostReport> Controller::report() {
+    // First what the processor changed before (accepted_file reports
+    // edits against the values the controller shows).
+    refresh_if_changed();
     LoadAnswer retried;
     with_processor([&](ProcessorLink& p) {
         retried = p.read_waiting_list();
@@ -467,6 +484,10 @@ std::string Controller::diagnostics() {
 bool Controller::load_file(const std::string& path) {
     if (path.empty())
         return false;
+    // First what the processor changed before: VST3-17's edit keeps the
+    // Latency the controller shows, which a host without setDirty hands
+    // back to setParamNormalized; a stale one would be taken as a choice.
+    refresh_if_changed();
     LoadAnswer answer;
     with_processor([&](ProcessorLink& p) { answer = p.load_chosen(path); });
     if (answer.accepted)

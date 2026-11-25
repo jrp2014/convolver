@@ -20,6 +20,10 @@
 //   w  the window chooses a file that does not exist (refused)
 //   R  the host restores state R (accepted); X  state made for 44.1 kHz,
 //      refused while the host plays at 48 kHz
+// and, in the random sequences and the earlier rows only:
+//   F  the window chooses preset F, a filter without settings
+//   l  the host's generic view chooses Latency 64, X's
+//   Q  the host restores state Q (accepted), another filter and Latency
 //
 // Variations: the connection (direct, a proxy that forwards at once, one
 // that delivers later), and for the delaying proxy what is delivered after
@@ -44,10 +48,17 @@
 // - the host last read as the latency, when asked to restart;
 // - the processor saves, and a fresh processor restored from that save plays.
 // And every host callback came on the thread that made the host call (the
-// UI thread here), and none inside another restartComponent. Gain, Mix and Bypass reach the
-// processor in process(), so they are judged only after the host has delivered them (jrp's review
-// of the shared-processor proposal, 24 November 2026); the save between an
-// edit and its delivery is its own case with its own expectation.
+// UI thread here), and none inside another restartComponent. Gain, Mix and
+// Bypass reach the processor in process(), so they are judged only after
+// the host has delivered them (jrp's review of the shared-processor
+// proposal, 24 November 2026); the save between an edit and its delivery is
+// its own case with its own expectation.
+//
+// The earlier rows are the sequences of PR #281's `latest_action_wins`,
+// which jrp's reviews since VST3-19 found, each in every variant
+// with one delivery schedule per proxy, and also with a host that has no
+// setDirty and hands every edit straight back to setParamNormalized
+// (Audacity 4.0.2, VST3-17).
 //
 // Named cases cover what sequences of one pair cannot: two instances at
 // once and closing one while the other plays, a processor with no
@@ -129,6 +140,8 @@ HostSettings settings_of(double gain, double mix, std::size_t latency, GainMode 
 // Preset W (chosen in the window), state R (restored) and state X (refused).
 const Model preset_w{.125f, settings_of(-3, .75, 2048, GainMode::estimate), false};
 const Model state_r{.5f, settings_of(-9, 1, 512, GainMode::set), false};
+const Model state_q{.375f, settings_of(0, 1, 128, GainMode::set), false};
+constexpr float preset_f_tap = .0625f; // Preset F holds no settings.
 const Model initial{1, HostSettings{}, false};
 
 std::unique_ptr<MemoryStream> stream_of(const HostState& state) {
@@ -201,6 +214,8 @@ class Host final : public IComponentHandler, public IComponentHandler2 {
         note_thread();
         values[id] = value;
         queue(id, value);
+        if (hand_back && controller)
+            controller->setParamNormalized(id, value);
         return kResultOk;
     }
     tresult PLUGIN_API endEdit(ParamID) override {
@@ -212,8 +227,10 @@ class Host final : public IComponentHandler, public IComponentHandler2 {
         // Ardour 8 waits forever in a restartComponent made inside another.
         if (restarting)
             reentered = true;
-        if (++restarts > 10000)
-            throw std::runtime_error("restartComponent called without end");
+        if (++restarts > 10000) { // Called without end: stop, and fail the sequence.
+            runaway = true;
+            return kResultOk;
+        }
         ++restarting;
         if ((flags & kLatencyChanged) && processor)
             latency_read = processor->getLatencySamples();
@@ -238,7 +255,8 @@ class Host final : public IComponentHandler, public IComponentHandler2 {
     tresult PLUGIN_API queryInterface(const TUID _iid, void** obj) override {
         QUERY_INTERFACE(_iid, obj, FUnknown::iid, IComponentHandler)
         QUERY_INTERFACE(_iid, obj, IComponentHandler::iid, IComponentHandler)
-        QUERY_INTERFACE(_iid, obj, IComponentHandler2::iid, IComponentHandler2)
+        if (!hand_back)
+            QUERY_INTERFACE(_iid, obj, IComponentHandler2::iid, IComponentHandler2)
         *obj = nullptr;
         return kNoInterface;
     }
@@ -282,8 +300,11 @@ class Host final : public IComponentHandler, public IComponentHandler2 {
     std::thread::id ui_thread = std::this_thread::get_id();
     bool off_thread = false;
     bool float_values = false;
+    // Audacity 4.0.2 (VST3-17): no IComponentHandler2, so no setDirty, and
+    // every edit handed straight back to setParamNormalized.
+    bool hand_back = false;
     int restarting = 0, restarts = 0;
-    bool reentered = false;
+    bool reentered = false, runaway = false;
 };
 
 // One block through `p`: silence, or `input`, with the parameter changes
@@ -402,6 +423,7 @@ struct Variant {
     bool split_delivery = false; // Deliver between the two calls of a restore.
     std::vector<Delivery> after; // After each step but the last (delaying only).
     bool flush = true;           // Queued automation reaches the processor before a restore.
+    bool hand_back = false;      // The host has no setDirty and hands edits back.
 };
 std::string describe(const Variant& v, std::string_view steps) {
     std::string text = v.connection == Connection::direct       ? "direct"
@@ -413,6 +435,8 @@ std::string describe(const Variant& v, std::string_view steps) {
         text += ", delivered mid-restore";
     if (!v.flush)
         text += ", automation after restores";
+    if (v.hand_back)
+        text += ", host without setDirty";
     text += ": ";
     static const char* const names[] = {"none", "processor's", "controller's", "both"};
     for (std::size_t i = 0; i < steps.size(); ++i) {
@@ -427,11 +451,12 @@ std::string describe(const Variant& v, std::string_view steps) {
 
 // One processor and controller pair as a host holds them.
 struct Pair {
-    explicit Pair(Connection connection, ProcessModes mode = kRealtime)
+    explicit Pair(Connection connection, ProcessModes mode = kRealtime, bool hand_back = false)
         : delaying(connection == Connection::delaying), to_controller(c, delaying),
           to_processor(p, delaying) {
         host.processor = &p;
         host.controller = &c;
+        host.hand_back = hand_back;
         if (p.initialize(&context) != kResultOk || c.initialize(&context) != kResultOk ||
             c.setComponentHandler(&host) != kResultOk)
             throw std::runtime_error("initialize");
@@ -592,6 +617,8 @@ std::vector<std::string> judge(Pair& pair, const Model& m) {
         fail("thread", "a host callback came off the UI thread");
     if (pair.host.reentered)
         fail("thread", "restartComponent was called inside restartComponent");
+    if (pair.host.runaway)
+        fail("thread", "restartComponent was called without end");
     MemoryStream saved;
     if (pair.p.getState(&saved) != kResultOk) {
         fail("saved", "getState failed");
@@ -615,9 +642,13 @@ std::vector<std::string> judge(Pair& pair, const Model& m) {
 }
 
 // Runs one sequence; returns the failed checks.
-std::vector<std::string> run(std::string_view steps, const Variant& v,
-                             const std::filesystem::path& preset, const std::string& missing) {
-    Pair pair(v.connection);
+struct Files {
+    std::filesystem::path preset;      // W
+    std::filesystem::path bare_preset; // F
+    std::string missing;               // w
+};
+std::vector<std::string> run(std::string_view steps, const Variant& v, const Files& files) {
+    Pair pair(v.connection, kRealtime, v.hand_back);
     pair.start(initial);
     Model m = initial;
     std::size_t next_latency = 0, next_mode = 0, next_gain = 0, next_mix = 0;
@@ -657,13 +688,29 @@ std::vector<std::string> run(std::string_view steps, const Variant& v,
             pair.host.automate(bypass_id, m.bypass ? 1 : 0);
             break;
         case 'W':
-            if (!pair.c.load_file(preset.string()))
+            if (!pair.c.load_file(files.preset.string()))
                 return {"step (the window's preset was refused)"};
             m.tap = preset_w.tap;
             m.settings = preset_w.settings;
             break;
+        case 'F':
+            if (!pair.c.load_file(files.bare_preset.string()))
+                return {"step (preset F was refused)"};
+            m.tap = preset_f_tap;
+            break;
         case 'w':
-            pair.c.load_file(missing);
+            pair.c.load_file(files.missing);
+            break;
+        case 'l':
+            pair.c.setParamNormalized(latency_id, normalized_latency(64));
+            pair.host.values[latency_id] = normalized_latency(64);
+            m.settings.latency = 64;
+            break;
+        case 'Q':
+            if (!pair.restore(state_with(rate, state_q.tap, state_q.settings, state_q.bypass),
+                              v.controller_first, v.split_delivery, v.flush))
+                return {"step (state Q was refused)"};
+            m = state_q;
             break;
         case 'R':
             if (!pair.restore(state_with(rate, state_r.tap, state_r.settings, state_r.bypass),
@@ -688,6 +735,13 @@ std::vector<std::string> run(std::string_view steps, const Variant& v,
 }
 
 constexpr std::string_view alphabet = "LMGmBWwRX";
+constexpr std::string_view random_alphabet = "LMGmBWwRXFlQ";
+// PR #281's latest_action_wins rows (its K, Mix, is m here).
+constexpr std::string_view earlier_rows[] = {
+    "WL",  "WR",  "LRX", "LW",  "RW",   "WX",  "LWL", "Ww", "WLR", "WRL",  "RWL",
+    "RLW", "WRX", "WXL", "WwR", "RQWR", "RWR", "WRR", "WM", "MW",  "MWM",  "LFw",
+    "FL",  "WF",  "WG",  "GW",  "WGX",  "GR",  "RG",  "GX", "WGR", "WGRX", "WmRX",
+    "Wm",  "mW",  "WmX", "Rm",  "BW",   "WBX", "BR",  "BX", "Xl",  "WmXX", "WGXX"};
 
 // Every variant of a sequence of `length` steps.
 std::vector<Variant> every_variant(std::size_t length) {
@@ -805,10 +859,26 @@ void save_before_delivery() {
     const auto failed = judge(pair, m);
     require(failed.empty(), "save after delivery: " + (failed.empty() ? "" : failed.front()));
 }
-// A Latency chosen before the controller has paired with the processor (a
-// proxy that has not yet delivered the processor's messages) plays once
-// they pair.
+// A Latency or Gain mode chosen before the controller has paired with the
+// processor (a proxy that has not yet delivered the processor's messages)
+// plays once they pair, unless the host restored a state after it, in
+// either order.
 void choice_before_pairing() {
+    for (const bool controller_first : {false, true}) {
+        Pair pair(Connection::delaying);
+        pair.c.setParamNormalized(latency_id, normalized_latency(1024));
+        pair.host.values[latency_id] = normalized_latency(1024);
+        pair.restore(state_with(rate, state_r.tap, state_r.settings, state_r.bypass),
+                     controller_first, !controller_first);
+        require(pair.p.setActive(true) == kResultOk, "restore after a choice: activate");
+        pair.host.latency_read = pair.p.getLatencySamples();
+        pair.settle();
+        pair.host.rescan();
+        const auto failed = judge(pair, state_r);
+        require(failed.empty(), std::string("a restore after a choice made before pairing (") +
+                                    (controller_first ? "controller" : "processor") +
+                                    " first): " + (failed.empty() ? "" : failed.front()));
+    }
     for (const bool latency : {true, false}) {
         Pair pair(Connection::delaying);
         pair.restore(state_with(rate, initial.tap, initial.settings, initial.bypass), false, false);
@@ -889,7 +959,16 @@ int main(int argc, char** argv) {
         out.write(reinterpret_cast<const char*>(bytes.data()),
                   static_cast<std::streamsize>(bytes.size()));
     }
-    const auto missing = (folder / "missing.cfg").string();
+    const auto bare_preset = folder / "F.vstpreset";
+    {
+        auto state = state_with(rate, preset_f_tap, HostSettings{}, false);
+        state.settings.reset();
+        const auto bytes = convolver::presets::vst3_preset(state);
+        std::ofstream out(bare_preset, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
+    }
+    const Files files{preset, bare_preset, (folder / "missing.cfg").string()};
 
     Failures failures;
     std::size_t runs = 0, failed_runs = 0;
@@ -899,12 +978,12 @@ int main(int argc, char** argv) {
         table << "sequence\tresult\n";
     }
     const auto one = [&](std::string_view steps, const Variant& v) {
-        if (!v.flush && steps.find('R') != std::string_view::npos)
+        if (!v.flush && steps.find_first_of("RQ") != std::string_view::npos)
             return; // Late automation over an accepted restore: the host's mistake.
         const auto how = describe(v, steps);
         std::vector<std::string> failed;
         try {
-            failed = run(steps, v, preset, missing);
+            failed = run(steps, v, files);
         } catch (const std::exception& e) {
             failed = {std::string("exception (") + e.what() + ")"};
         }
@@ -941,14 +1020,28 @@ int main(int argc, char** argv) {
         const auto length = 3 + random() % (max_length - 2);
         std::string steps;
         for (std::size_t i = 0; i < length; ++i)
-            steps += alphabet[random() % alphabet.size()];
+            steps += random_alphabet[random() % random_alphabet.size()];
         const auto variants = every_variant(1);
         auto v = variants[random() % variants.size()];
         if (v.connection == Connection::delaying)
             for (std::size_t i = 1; i < length; ++i)
                 v.after.push_back(static_cast<Delivery>(random() % 4));
+        v.hand_back = random() % 4 == 0;
         one(steps, v);
     }
+    // The earlier rows, in every variant: a delaying proxy delivers nothing
+    // between steps, or both queues after each; each with both hosts.
+    for (const auto steps : earlier_rows)
+        for (auto v : every_variant(1))
+            for (const bool hand_back : {false, true}) {
+                v.hand_back = hand_back;
+                one(steps, v);
+                if (v.connection == Connection::delaying) {
+                    auto both = v;
+                    both.after.assign(steps.size() - 1, both_queues);
+                    one(steps, both);
+                }
+            }
     // The named cases.
     const std::pair<const char*, std::function<void()>> cases[] = {
         {"two_instances", [&] { two_instances(preset); }},

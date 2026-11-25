@@ -790,7 +790,12 @@ in it:
   `setParamNormalized`, and a second call there waits forever, so flags
   asked for meanwhile are sent once the first returns. Ardour holds those
   values as float, so the controller compares Latency and Gain mode by
-  their entry, not their exact value. The controller keeps the report
+  their entry, not their exact value. `float_host` covers the comparison
+  in the refresh; the deferral and the comparison in `setParamNormalized`
+  are defence that no known host reaches yet. Before a window load and a
+  report the controller reads what the processor changed, since VST3-17's
+  edit, which a host without `setDirty` hands back, carries the Latency
+  it shows. The controller keeps the report
   under its own lock, derives the Status parameter, its text and the
   window's content from it, and asks the host to reread the parameters
   only when one changed; Copy diagnostics joins the report's text with the
@@ -1241,7 +1246,9 @@ the plan's Gain modes (12 November 2026); its meters follow later
   parameters at `kParamValuesChanged`, which hosts do (a host that ignores
   it shows them until its next read). A Latency or Gain mode chosen before
   the halves pair (a proxy that delivers later) goes to the processor when
-  they pair, unless a restore comes first. The host's
+  they pair, unless the host restored either half after the choice (a
+  process-wide count, `Bridges::stamp()`, orders the choice and the
+  processor's last accepted restore). The host's
   order and when it delivers messages do not matter: `convolver_vst3_sync`
   checks every sequence of one and two host actions, window choices and
   deliveries in every order, and 300 longer ones, against the same
