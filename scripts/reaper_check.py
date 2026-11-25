@@ -578,6 +578,7 @@ end)
 step(function()
   record("play_started", (reaper.GetPlayState() & 1) == 1 and "yes" or "no")
   record("device_rate_playing", device_info("SRATE"))
+  record("device_block_playing", device_info("BSIZE"))
   soak.start = reaper.time_precise()
   soak.next_poll, soak.next_status = 0, 0
   soak.last_audio, soak.last_media = underrun_times()
@@ -1345,11 +1346,21 @@ def soak_result(checks, results):
     )
 
 
-def block_size(results):
-    try:
-        return int(float(results.get('device_block', '')))
-    except ValueError:
+def block_size(text):
+    """A device block size REAPER reported, in frames, or None unless it is
+    a whole number from 1 up (a 0, a fraction or "(not reported)" is not a
+    buffer the soak ran with; jrp's review of 25 November 2026)."""
+    text = (text or '').strip()
+    if not text.isdigit() or int(text) < 1:
         return None
+    return int(text)
+
+
+def small_block(results):
+    """Whether the device's block, read before and while playing, was a
+    whole number from 1 to SMALL_BLOCK frames both times."""
+    blocks = [block_size(results.get(key)) for key in ('device_block', 'device_block_playing')]
+    return all(block is not None and block <= SMALL_BLOCK for block in blocks)
 
 
 def replacement_state(results, sizes):
@@ -1389,7 +1400,7 @@ def evaluate_soak(outcome, duration, sizes):
     loaded = [
         one.get(f'preset_applied_{n}') == 'true' and active(one.get(f'status_ready_{n}')) for n in range(1, count + 1)
     ]
-    block = block_size(one)
+    small = small_block(one)
     try:
         ran = float(one.get('soak_seconds', ''))
     except ValueError:
@@ -1422,19 +1433,17 @@ def evaluate_soak(outcome, duration, sizes):
             ),
         ),
         (
-            f'The audio device ran at {RATE} Hz with a block of {SMALL_BLOCK} frames or fewer',
-            block is not None
-            and block <= SMALL_BLOCK
-            and one.get('device_rate') == str(RATE)
-            and one.get('device_rate_playing') == str(RATE),
+            f'The audio device ran at {RATE} Hz with a block of 1 to {SMALL_BLOCK} frames',
+            small and one.get('device_rate') == str(RATE) and one.get('device_rate_playing') == str(RATE),
             (
                 f'{one.get("device_rate", "?")} Hz ({one.get("device_rate_playing", "?")} Hz while playing), '
-                f'block {one.get("device_block", "not reported")}'
+                f'block {one.get("device_block", "not reported")} '
+                f'({one.get("device_block_playing", "not reported")} while playing)'
                 + (
                     ''
-                    if block is not None and block <= SMALL_BLOCK
-                    else f". Set the block size to {SMALL_BLOCK} or fewer in REAPER's Settings > Audio > Device "
-                    'and run again.'
+                    if small
+                    else f'. The block must be a whole number of frames from 1 to {SMALL_BLOCK}, before and while '
+                    f"playing: set it in REAPER's Settings > Audio > Device and run again."
                 )
                 + rate_hint(one)
             ),
