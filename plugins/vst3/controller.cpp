@@ -233,16 +233,23 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         with_processor([&](ProcessorLink& p) {
             if (!name.empty())
                 p.offer_name(name, identity);
+            // VST3-28: a choice made on an earlier connection (whose processor
+            // never answered, so may be another one) is dropped; one made
+            // while connected to nothing (before the first connection, or
+            // between two) belongs to this one.
+            const auto ours = [&](std::uint64_t on) {
+                return on == 0 || on == static_cast<std::uint64_t>(connection);
+            };
             const auto frames = std::exchange(unsent_latency_, std::nullopt);
             const auto mode = std::exchange(unsent_gain_mode_, std::nullopt);
-            if (!frames && !mode)
+            if (!(frames && ours(unsent_latency_on_)) && !(mode && ours(unsent_gain_mode_on_)))
                 return;
             // A restore the processor accepted after a choice wins over it.
             const auto view = p.view();
             latency_told_ = view.latency;
-            if (frames && unsent_latency_at_ > view.restored_at)
+            if (frames && ours(unsent_latency_on_) && unsent_latency_at_ > view.restored_at)
                 p.chosen_latency(*frames);
-            if (mode && unsent_gain_mode_at_ > view.restored_at)
+            if (mode && ours(unsent_gain_mode_on_) && unsent_gain_mode_at_ > view.restored_at)
                 p.chosen_gain_mode(*mode);
         });
         // From now on the parameters show the processor's, Gain, Mix and
@@ -388,12 +395,21 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
             else
                 p.chosen_gain_mode(gain_mode(chosen));
         });
-        if (!sent && id == latency_id) {
-            unsent_latency_ = latency_frames(chosen);
-            unsent_latency_at_ = Bridges::stamp();
-        } else if (!sent) {
-            unsent_gain_mode_ = gain_mode(chosen);
-            unsent_gain_mode_at_ = Bridges::stamp();
+        if (!sent) {
+            std::uint64_t on = 0; // VST3-28: the connection it was made on.
+            {
+                std::lock_guard lock(bridge_lock_);
+                on = connection_;
+            }
+            if (id == latency_id) {
+                unsent_latency_ = latency_frames(chosen);
+                unsent_latency_at_ = Bridges::stamp();
+                unsent_latency_on_ = on;
+            } else {
+                unsent_gain_mode_ = gain_mode(chosen);
+                unsent_gain_mode_at_ = Bridges::stamp();
+                unsent_gain_mode_on_ = on;
+            }
         }
         if (on_ui_thread())
             refresh(false); // A new Latency asks the host to restart.

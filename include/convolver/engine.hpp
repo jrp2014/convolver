@@ -34,6 +34,12 @@ struct Configuration {
     std::vector<FilterPath> paths;
 };
 
+// EDGE-3: a configuration with one input and one output as it plays on each
+// of `channels` channels: its paths and delays repeated for each channel, so
+// channel c feeds only output c. Throws std::invalid_argument for any other
+// configuration or for no channels. Allocates: not for the audio thread.
+Configuration on_each_channel(const Configuration&, std::size_t channels);
+
 // Timing and storage an Engine would have for this configuration and block size,
 // computed by the same validation used at construction, without FFT planning or
 // spectral allocation. Throws as validate_configuration does.

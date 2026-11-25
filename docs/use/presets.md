@@ -128,7 +128,8 @@ ignores them there.
   such as `room-48000.vstpreset`. This preset menu is checked in Audacity,
   as are Choose File… and the recent files in Convolver's window, which need no copying
   ([in Audacity](first-sound-in-a-host.md#in-audacity)). Audacity always runs Convolver with two channels, even on a
-  mono track, so use a stereo (2-in, 2-out) filter, and set its playback
+  mono track, so use a stereo (2-in, 2-out) or mono filter (a mono one plays
+  on each channel), and set its playback
   rate to the filter's
   ([the rate a host plays at](plugins.md#status-and-the-convolver-log)).
 - **VST3 or AU, from Convolver's window:** choose the `.vstpreset` with

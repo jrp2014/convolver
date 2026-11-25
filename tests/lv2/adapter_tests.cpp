@@ -846,12 +846,12 @@ void lifecycle(host::World& world, const Fixture& f, unsigned seed,
 // 0.5, A at 0.25 and B at 0.75. A crossfade from the original to B never
 // goes below 0.5, so any output near 0.25 means A was audible.
 struct Files {
-    fs::path original, a, b, wrong_rate, mono_ir, missing;
+    fs::path original, a, b, wrong_rate, wide_ir, missing;
 };
-void write_impulse(const fs::path& path, int rate) {
+void write_impulse(const fs::path& path, int rate, std::size_t channels = 1) {
     fs::remove(path);
-    AudioWriter writer(path, {rate, 1}, OutputFormat::wav_float);
-    const std::array<float, 1> one{1};
+    AudioWriter writer(path, {rate, channels}, OutputFormat::wav_float);
+    const std::vector<float> one(channels, 1.f);
     writer.write(one);
     writer.close();
 }
@@ -872,8 +872,11 @@ Files worker_files(const fs::path& work) {
     fs::create_directories(folder);
     write_impulse(folder / "impulse.wav", 48000);
     write_impulse(folder / "impulse-44.wav", 44100);
-    Files f{folder / "original.cfg", folder / "a.cfg",       folder / "b.cfg",
-            folder / "44100.cfg",    folder / "impulse.wav", folder / "missing.cfg"};
+    // EDGE-3: a mono IR file plays on each channel, so the file for other
+    // channels has three.
+    write_impulse(folder / "three.wav", 48000, 3);
+    Files f{folder / "original.cfg", folder / "a.cfg",     folder / "b.cfg",
+            folder / "44100.cfg",    folder / "three.wav", folder / "missing.cfg"};
     write_text(f.original, scaling_cfg(48000, "impulse.wav", ".5"));
     write_text(f.a, scaling_cfg(48000, "impulse.wav", ".25"));
     write_text(f.b, scaling_cfg(48000, "impulse.wav", ".75"));
@@ -1002,7 +1005,7 @@ void worker_loads(host::World& world, const fs::path& work) {
               "a good file after a failure clears it");
         for (const auto& [path, kind, what] :
              {std::tuple{files.wrong_rate.string(), HostFailureKind::sample_rate, "44100"},
-              std::tuple{files.mono_ir.string(), HostFailureKind::channels, "1 channel"},
+              std::tuple{files.wide_ir.string(), HostFailureKind::channels, "3 channels"},
               std::tuple{files.missing.string(), HostFailureKind::filter_file, "missing"}}) {
             p->log.messages.clear();
             p->set_filter(path);
@@ -1018,7 +1021,7 @@ void worker_loads(host::World& world, const fs::path& work) {
             // GarageBand run of the Audio Unit, which shares this step) and
             // names no window, as LV2 has none.
             check((kind != HostFailureKind::sample_rate || r->sample_rate == 44100) &&
-                      (kind != HostFailureKind::channels || (r->inputs == 1 && r->outputs == 1)) &&
+                      (kind != HostFailureKind::channels || (r->inputs == 3 && r->outputs == 3)) &&
                       detail::advice_text(r->message).find("--") == std::string::npos &&
                       detail::advice_text(r->message).find("window") == std::string::npos,
                   "failed replacement with " + path + ": its rate and counts, host advice");

@@ -13,9 +13,11 @@ This page describes the current portable parser, not the old Windows installer.
 
 **In short:**
 
-- For a simple per-channel filter, pass an IR file with one channel per
-  input channel directly; use a `.cfg` file for routing, mixing, delays,
-  sharing one mono IR or a true-stereo reverb ([reverb responses](#reverb-responses)).
+- For a simple per-channel filter, pass an IR file directly: one with a
+  channel per input channel, a mono file, which filters every channel, or a
+  four-channel true-stereo file on stereo audio
+  ([mono and true-stereo IR files](#mono-and-true-stereo-ir-files)). Use a
+  `.cfg` file for any other routing, mixing or delays.
 - A `.cfg` file is a header line, a line of input delays, a line of output
   delays, then four lines per path: IR file, IR channel, input routes, output
   routes. Channels count from zero.
@@ -30,9 +32,10 @@ This page describes the current portable parser, not the old Windows installer.
 ## The simplest filter: an IR file
 
 Pass an IR file directly to `--filter` to filter each input channel with
-the matching IR channel. Input and IR must have the same sample rate and channel
-count. Use a `.cfg` file for cross-channel routing, delays, or applying one mono
-IR to multiple channels.
+the matching IR channel. Input and IR must have the same sample rate, and the
+IR file one channel per input channel, except for the two layouts in
+[mono and true-stereo IR files](#mono-and-true-stereo-ir-files). Use a `.cfg`
+file for cross-channel routing or delays.
 
 ## A stereo example
 
@@ -58,8 +61,9 @@ room.wav
 ```
 
 This filters input 0 with IR channel 0 and sends it to output 0. The second path
-does the same for channel 1. To use one **mono** IR on both channels, change the
-second path's IR-channel line from `1` to `0`; keep its input and output lines `1`.
+does the same for channel 1. A path that names IR channel `0` of a mono file
+on both inputs gives each channel the same response, as the mono file used
+directly does; written out, each channel can have its own delay or gain.
 
 Check and render it with:
 
@@ -72,56 +76,102 @@ convolver --filter room.cfg --input music.wav --output corrected.wav
 These examples assume `convolver` is on PATH. From your own build, use its
 path instead, such as `./build/convolver`.
 
-## Reverb responses
+<a id="reverb-responses"></a>
 
-An IR file used directly filters each channel with the IR channel of the
-same number, so a stereo reverb file plays as it is on a stereo track, and a
-mono one on a mono track. Two kinds of reverb response need a `.cfg`:
+## Mono and true-stereo IR files
 
-- **A mono response on a stereo track:** the mono version of the
-  [stereo example](#a-stereo-example).
-- **A true-stereo response**, a four-channel file whose channels are
-  left to left, left to right, right to left and right to right. Used
-  directly it needs four inputs, so a stereo track refuses it. This
-  `.cfg`, for a `hall.wav` at 48 kHz (the first line's rate must be the
-  file's), feeds each input through two of the channels and adds them on
-  each output:
+An IR file used directly needs one channel per input channel, with two
+exceptions, which play without a `.cfg`:
 
-  ```text
-  // sample rate, input channels, output channels, speaker mask
-  48000 2 2 3
-  // input delays in milliseconds
-  0 0
-  // output delays in milliseconds
-  0 0
-  // left to left
-  hall.wav
-  0
-  0
-  0
-  // left to right
-  hall.wav
-  1
-  0
-  1
-  // right to left
-  hall.wav
-  2
-  1
-  0
-  // right to right
-  hall.wav
-  3
-  1
-  1
-  ```
+- **A mono IR file on audio with two or more channels** filters each
+  channel on its own with the same response, as if the file were repeated
+  for each channel. Nothing is mixed: left stays left. A `.cfg` with one
+  input and one output does the same, its delays and gains repeated for each
+  channel.
+- **A four-channel IR file on stereo audio** plays as true stereo. A
+  true-stereo response is a space measured from two sources to two
+  microphones, so each input reaches both outputs. Its four channels are, in
+  order, left to left, left to right, right to left and right to right.
+  Convolver feeds the left input through channels 1 and 2, the right input
+  through channels 3 and 4, and adds them on each output.
 
-  Check the order of the channels in the reverb's own documentation: if it
-  is left to left, right to left, left to right, right to right, swap the
-  IR-channel lines `1` and `2`. A reverb that comes as two stereo files,
-  one for each input side, needs the same four paths: name the left
-  input's file on the first two and the right input's file on the last
-  two, each with IR channels `0` and `1`.
+Convolver uses these routings only where the counts leave one sensible
+reading:
+
+- **A mono file on several channels** can only be repeated: mixing the
+  channels to mono first would lose the stereo image.
+- **A four-channel file on two channels** has no other way to use all four
+  channels. The order is the one Steinberg's REVerence, SIR3 and IR.lv2's
+  `convert4chan` use. On four channels the file filters each channel, as
+  any IR file does.
+- **An exact match comes first**, across a whole
+  [configuration list](#paths-and-configuration-lists) too: a list naming
+  `mono.wav` before `stereo.wav` plays `stereo.wav` on stereo audio and
+  `mono.wav` on mono audio.
+- **Convolver says when it uses one.** The command line prints a line such
+  as `convolver: the four-channel IR file plays as true stereo: left to
+  left, left to right, right to left, right to right`, `--inspect` reports
+  it as the entry's `layout`, and the plug-ins' Status and Routing line say
+  so ([Convolver's window](plugins.md#convolvers-window)).
+
+**Not every four-channel file is true stereo.** Check the reverb's own
+documentation:
+
+- **Quad or 4.0 surround** (front left, front right, back left, back right)
+  would play as true stereo on a stereo track and sound wrong. Use it on a
+  four-channel track. Convolver cannot tell the two apart from the file:
+  many programs, FFmpeg among them, label every four-channel WAV as quad.
+- **Ambisonics B-format** (W, X, Y and Z) has to be decoded for speakers. A
+  WAV marked as B-format, as `.amb` files are, is refused on stereo audio,
+  with the reason. An unmarked one, such as an AmbiX file, cannot be told
+  apart, so do not use it directly.
+- **True stereo in another order**, or as two stereo files, needs a `.cfg`
+  (below).
+
+**A `.cfg` with the audio's channel counts plays as written**, so it
+overrides these routings (only a `.cfg` with one input and one output is
+spread over the channels). This
+one plays a true-stereo `hall.wav` at 48 kHz (the first line's rate must be
+the file's) exactly as the file used directly plays:
+
+```text
+// sample rate, input channels, output channels, speaker mask
+48000 2 2 3
+// input delays in milliseconds
+0 0
+// output delays in milliseconds
+0 0
+// left to left
+hall.wav
+0
+0
+0
+// left to right
+hall.wav
+1
+0
+1
+// right to left
+hall.wav
+2
+1
+0
+// right to right
+hall.wav
+3
+1
+1
+```
+
+If the reverb's order is left to left, right to left, left to right, right
+to right, swap the IR-channel lines `1` and `2`. A reverb that comes as two
+stereo files, one for each input side, needs the same four paths: name the
+left input's file on the first two and the right input's file on the last
+two, each with IR channels `0` and `1`.
+
+Convolver 4.4, the 2006 Windows version, refused an IR file whose channel
+count differed from the audio's, so a mono or true-stereo reverb needed a
+`.cfg` there. Those `.cfg` files play as before.
 
 ## File layout
 

@@ -1345,46 +1345,49 @@ void kept_until_channels_fit() {
         require(p.setActive(true) == kResultOk, "restart");
         p.setProcessing(true);
     };
+    // EDGE-3: a mono filter plays on each channel of stereo buses, so the
+    // filter that does not suit is a stereo one on mono buses.
     for (const bool working : {false, true}) {
         HostApplication context;
         Processor p;
         require(p.initialize(&context) == kResultOk, "initialize");
-        require(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "stereo buses");
+        require(p.setBusArrangements(&one, 1, &one, 1) == kResultOk, "mono buses");
         p.activateBus(kAudio, kInput, 0, true);
         p.activateBus(kAudio, kOutput, 0, true);
         require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk, "start");
         p.setProcessing(true);
         if (working)
-            require(p.setState(state_of(stereo_filter).get()) == kResultOk, "the working filter");
-        play_block(p, 2, 2, 512); // The host plays with stereo buses.
+            require(p.setState(state_of(mono).get()) == kResultOk, "the working filter");
+        play_block(p, 1, 1, 512); // The host plays with mono buses.
         if (!working) {
-            // 1. Nothing plays: the mono preset waits, saved as the filter.
-            require(p.setState(state_of(mono).get()) == kResultOk,
-                    "a mono preset refused with nothing playing");
-            require(contains(p.status().text, "Silent, waiting for 1 in, 1 out"),
-                    ("kept mono preset: " + p.status().text).c_str());
+            // 1. Nothing plays: the stereo preset waits, saved as the filter.
+            require(p.setState(state_of(stereo_filter).get()) == kResultOk,
+                    "a stereo preset refused with nothing playing");
+            require(contains(p.status().text, "Silent, waiting for 2 in, 2 out"),
+                    ("kept stereo preset: " + p.status().text).c_str());
             require(contains(log.text(), "No other filter was playing, so it was not refused: it "
                                          "waits for audio settings that suit it"),
                     "the log does not say the kept preset waits");
-            require(saved_outputs(p) == 1, "the kept preset not saved as the filter");
-            restart_with(p, one);
-            require(std::abs(play_ones(p, 1) - .5f) < 1e-5,
+            require(saved_outputs(p) == 2, "the kept preset not saved as the filter");
+            restart_with(p, stereo);
+            require(std::abs(play_ones(p, 2) - .25f) < 1e-5,
                     "the kept preset does not play once the buses suit it");
             require(contains(p.status().text, "Filter loaded"),
-                    ("mono buses: " + p.status().text).c_str());
+                    ("stereo buses: " + p.status().text).c_str());
         } else {
-            // 2. A filter plays: the mono preset is refused and stays so.
-            require(p.setState(state_of(mono).get()) != kResultOk,
-                    "a mono preset accepted while a stereo filter played");
+            // 2. A filter plays: the stereo preset is refused and stays so.
+            require(p.setState(state_of(stereo_filter).get()) != kResultOk,
+                    "a stereo preset accepted while a mono filter played");
             require(contains(log.text(), "The filter Convolver has now stays selected when the "
                                          "host restarts the plug-in, even with settings that "
                                          "suit this one"),
                     "the refusal does not say the playing filter stays selected");
-            restart_with(p, stereo);
-            require(std::abs(play_ones(p, 2) - .25f) < 1e-5 && saved_outputs(p) == 2,
-                    "a restart with the same buses switched filters");
             restart_with(p, one);
-            require(play_ones(p, 1) == 0 && saved_outputs(p) == 2,
+            require(std::abs(play_ones(p, 1) - .5f) < 1e-5 && saved_outputs(p) == 1,
+                    "a restart with the same buses switched filters");
+            // The mono filter, on each channel, not the refused one.
+            restart_with(p, stereo);
+            require(std::abs(play_ones(p, 2) - .5f) < 1e-5 && saved_outputs(p) == 1,
                     "a restart with the refused preset's buses switched to it");
         }
         p.setProcessing(false);
@@ -4490,6 +4493,137 @@ void pairing_follows_connection() {
     c.terminate();
     a.terminate();
 }
+// VST3-28 (jrp's review of 777299f3, 25 November 2026): a Latency or Gain
+// mode chosen while the controller is connected to processor A but not yet
+// paired (A's answer still on its way) belongs to A. jrp chose 256 then, and
+// the host moved the controller to B before A's answer arrived: B, which had
+// 1024 like A, saved 256 before any choice was made on it. A choice made
+// before the controller was first connected, or while it is connected to
+// nothing, still reaches the processor it pairs with next.
+void pending_choice_follows_connection() {
+    using convolver::GainMode;
+    enum class Made { on_a, before_any, between };
+    for (const auto made : {Made::on_a, Made::before_any, Made::between})
+        for (const bool latency : {true, false}) {
+            const std::string how =
+                std::string(latency ? " (Latency" : " (Gain mode") +
+                (made == Made::on_a         ? ", chosen while connected to A)"
+                 : made == Made::before_any ? ", chosen before any connection)"
+                                            : ", chosen while connected to nothing)");
+            const auto check = [&](bool v, const char* what) {
+                if (!v)
+                    throw std::runtime_error(what + how);
+            };
+            HostApplication context;
+            Handler handler;
+            Processor a, b;
+            Controller c;
+            check(a.initialize(&context) == kResultOk && b.initialize(&context) == kResultOk &&
+                      c.initialize(&context) == kResultOk &&
+                      c.setComponentHandler(&handler) == kResultOk,
+                  "pending choice: initialize");
+            for (auto* p : {&a, &b}) { // Both at 1024, as jrp's were.
+                auto& link = static_cast<ProcessorLink&>(*p);
+                link.chosen_latency(1024);
+                link.chosen_gain_mode(GainMode::set);
+            }
+            Proxy a_to_c(c, true), c_to_a(a, true), b_to_c(c, true), c_to_b(b, true);
+            const auto saved = [&](Processor& p) {
+                MemoryStream stream;
+                check(p.getState(&stream) == kResultOk, "pending choice: save");
+                stream.seek(0, IBStream::kIBSeekSet, nullptr);
+                const auto settings = read_state(&stream).settings;
+                check(settings.has_value(), "pending choice: saved no settings");
+                return *settings;
+            };
+            const auto choose = [&] {
+                check(latency
+                          ? c.setParamNormalized(latency_id, normalized_latency(256)) == kResultOk
+                          : c.setParamNormalized(gain_mode_id,
+                                                 normalized_gain_mode(GainMode::estimate)) ==
+                                kResultOk,
+                      "pending choice: choose");
+            };
+            const auto chosen = [&](Processor& p) {
+                const auto s = saved(p);
+                return latency ? s.latency == 256 : s.gain_mode == GainMode::estimate;
+            };
+            if (made == Made::before_any)
+                choose();
+            // Connected to A; A's answer is held.
+            check(a.connect(&a_to_c) == kResultOk && c.connect(&c_to_a) == kResultOk,
+                  "pending choice: connect A");
+            c_to_a.deliver();
+            if (made == Made::on_a)
+                choose();
+            check(c.disconnect(&c_to_a) == kResultOk, "pending choice: disconnect A");
+            if (made == Made::between)
+                choose();
+            check(b.connect(&b_to_c) == kResultOk && c.connect(&c_to_b) == kResultOk,
+                  "pending choice: connect B");
+            while (c_to_b.deliver() + b_to_c.deliver() > 0) {
+            }
+            if (made == Made::on_a) {
+                check(!chosen(b), "a choice made while connected to A reached B");
+                check(saved(b).latency == 1024 && saved(b).gain_mode == GainMode::set,
+                      "B's settings changed");
+                const auto shown = c.getParamNormalized(latency ? latency_id : gain_mode_id);
+                check(latency ? latency_frames(shown) == 1024 : gain_mode(shown) == GainMode::set,
+                      "the controller does not show B's setting");
+            } else {
+                check(chosen(b), "a choice made before B's connection did not reach B");
+            }
+            check(!chosen(a), "a choice reached A after the controller left it");
+            // A's answer, delivered at last, is refused (VST3-27) and sends
+            // nothing anywhere.
+            check(a_to_c.deliver() >= 1, "pending choice: A's answer was not held");
+            check(!chosen(a) && chosen(b) == (made != Made::on_a),
+                  "A's late answer moved a pending choice");
+            c.disconnect(&c_to_b);
+            b.disconnect(&b_to_c);
+            a.disconnect(&a_to_c);
+            c.terminate();
+            b.terminate();
+            a.terminate();
+        }
+    // The same processor connected again: the controller cannot tell it from
+    // another until it answers, so the choice made on the first connection is
+    // dropped too, and the controller shows the processor's own Latency
+    // rather than leaving the host to believe the choice was made.
+    HostApplication context;
+    Handler handler;
+    Processor a;
+    Controller c;
+    require(a.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk,
+            "pending choice, reconnected: initialize");
+    static_cast<ProcessorLink&>(a).chosen_latency(1024);
+    Proxy a_to_c(c, true), c_to_a(a, true);
+    require(a.connect(&a_to_c) == kResultOk && c.connect(&c_to_a) == kResultOk,
+            "pending choice, reconnected: connect");
+    c_to_a.deliver();
+    require(c.setParamNormalized(latency_id, normalized_latency(256)) == kResultOk,
+            "pending choice, reconnected: choose");
+    require(c.disconnect(&c_to_a) == kResultOk && a.disconnect(&a_to_c) == kResultOk,
+            "pending choice, reconnected: disconnect");
+    a_to_c.drop(); // The host lost the first connection's messages.
+    require(a.connect(&a_to_c) == kResultOk && c.connect(&c_to_a) == kResultOk,
+            "pending choice, reconnected: connect again");
+    while (c_to_a.deliver() + a_to_c.deliver() > 0) {
+    }
+    MemoryStream stream;
+    require(a.getState(&stream) == kResultOk, "pending choice, reconnected: save");
+    stream.seek(0, IBStream::kIBSeekSet, nullptr);
+    const auto settings = read_state(&stream).settings;
+    require(settings && settings->latency == 1024 &&
+                latency_frames(c.getParamNormalized(latency_id)) == 1024,
+            "a choice from an earlier connection reached the processor, or the controller "
+            "does not show the processor's Latency");
+    c.disconnect(&c_to_a);
+    a.disconnect(&a_to_c);
+    c.terminate();
+    a.terminate();
+}
 // VST3-18 (jrp's review of 0.18.12, 23 November 2026): a host that delivers
 // messages later. After a refused preset the user chose Latency 256 before
 // the processor's answer to the restore arrived; both halves had 256, then
@@ -5240,6 +5374,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"saved_filter_name", saved_filter_name},
         {"messages_through_proxies", messages_through_proxies},
         {"pairing_follows_connection", pairing_follows_connection},
+        {"pending_choice_follows_connection", pending_choice_follows_connection},
         {"edits_survive_late_answer", edits_survive_late_answer},
         {"edits_before_controller_first_restore", edits_before_controller_first_restore},
         {"accepted_restore_beats_queued_edit", accepted_restore_beats_queued_edit},

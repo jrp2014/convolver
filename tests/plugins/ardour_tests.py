@@ -81,13 +81,14 @@ LATENCIES = [
 # LV2 host chooses the layout by URI. With its automatic pin configuration,
 # Ardour (8.4 and 9.0) runs Convolver's VST3 with 2 in, 2 out on a
 # Flexible-I/O track, the kind its Lua adds, feeding a mono track to both
-# inputs, so a mono or crossover preset plays silence there (HOST-10):
-# Ardour 9.0's request for one channel reaches the plug-in as none
+# inputs, so a crossover preset plays silence there (HOST-10): Ardour
+# 9.0's request for one channel reaches the plug-in as none
 # (VST3PI::request_bus_layout masks kMono with the default bus width), and a
-# request for more as two. On a Strict-I/O track, the kind Ardour's window
-# adds by default ('strict'), the mono preset plays as it is: Ardour
-# connects one output and asks for a mono layout without the mask. On a
-# Flexible-I/O track it plays once set by hand, as the Pin Connections
+# request for more as two. A mono preset plays there on each of the two
+# channels (EDGE-3), and Ardour mixes them to the mono track. On a
+# Strict-I/O track, the kind Ardour's window adds by default ('strict'), the
+# mono preset plays as it is: Ardour connects one output and asks for a mono
+# layout without the mask. On a Flexible-I/O track it also plays as set by hand, as the Pin Connections
 # window's Manual Config does: with the outputs set to 1 ('outputs', all
 # Ardour 8's window can set for a VST3) and with the input pins set to 1 as
 # well ('all', which Ardour 9's window can set). A crossover set by hand
@@ -108,6 +109,7 @@ CASES = {
         ('stereo', 0, 'strict'),
         ('stereo', 1024),
         ('mono', 0, 'strict'),
+        ('mono', 0),
         ('mono', 0, 'outputs'),
         ('mono', 0, 'all'),
     ],

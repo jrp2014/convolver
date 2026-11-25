@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "cases.hpp"
+#include "config_parse.hpp"
 #include "convolver/io.hpp"
 #include "sound_files.hpp"
 #include "utf8.hpp"
@@ -84,6 +85,54 @@ void wave(const fs::path& p, int rate, std::size_t channels, std::vector<float> 
     AudioWriter w(p, {rate, channels}, OutputFormat::wav_float);
     w.write(samples);
     w.close();
+}
+// Two configurations equal in every stored value.
+bool same_configuration(const Configuration& a, const Configuration& b) {
+    const auto same_routes = [](const std::vector<Route>& x, const std::vector<Route>& y) {
+        return std::equal(x.begin(), x.end(), y.begin(), y.end(),
+                          [](const Route& p, const Route& q) {
+                              return p.channel == q.channel && p.gain == q.gain;
+                          });
+    };
+    return a.sample_rate == b.sample_rate && a.input_channels == b.input_channels &&
+           a.output_channels == b.output_channels && a.channel_mask == b.channel_mask &&
+           a.input_delays == b.input_delays && a.output_delays == b.output_delays &&
+           std::equal(a.paths.begin(), a.paths.end(), b.paths.begin(), b.paths.end(),
+                      [&](const FilterPath& x, const FilterPath& y) {
+                          return x.impulse == y.impulse && same_routes(x.inputs, y.inputs) &&
+                                 same_routes(x.outputs, y.outputs);
+                      });
+}
+// EDGE-3: a four-channel float WAV marked as Ambisonics B-format (an .amb
+// file's WAVE_FORMAT_EXTENSIBLE subtype), two frames long.
+void b_format_wave(const fs::path& p) {
+    std::string bytes;
+    const auto put = [&](std::uint32_t value, int size) {
+        for (int i = 0; i < size; ++i)
+            bytes += static_cast<char>((value >> (8 * i)) & 0xffU);
+    };
+    bytes += "RIFF";
+    put(4 + 8 + 40 + 8 + 32, 4);
+    bytes += "WAVEfmt ";
+    put(40, 4);
+    put(0xfffe, 2);
+    put(4, 2);
+    put(48000, 4);
+    put(48000 * 16, 4);
+    put(16, 2);
+    put(32, 2);
+    put(22, 2);
+    put(32, 2);
+    put(0, 4);
+    bytes += std::string("\x03\x00\x00\x00\x21\x07\xd3\x11\x86\x44\xc8\xc1\xca\x00\x00\x00", 16);
+    bytes += "data";
+    put(32, 4);
+    for (const float sample : {1.f, 0.f, 0.f, 0.f, .5f, 0.f, 0.f, 0.f})
+        put(std::bit_cast<std::uint32_t>(sample), 4);
+    std::ofstream f(p, std::ios::binary);
+    f << bytes;
+    if (!f)
+        throw std::runtime_error("fixture write failed");
 }
 #ifndef _WIN32
 struct Redirect {
@@ -1388,28 +1437,75 @@ void run(const fs::path& dir) {
         const auto has = [](const std::string& text, std::string_view part) {
             return text.find(part) != std::string::npos;
         };
+        // EDGE-3: a mono IR file on stereo audio filters each channel, as
+        // the configuration repeating it for each channel does (the one
+        // Convolver's refusal used to print).
         wave(dir / "mono.wav", 48000, 1, {1, .5f});
-        const auto mono = failure(dir / "mono.wav", {48000, 2, 0});
-        require(has(mono, "is an IR file used directly as the filter (48000 Hz, 1 channel)") &&
-                    has(mono, "it takes 1 input channel, not 2") &&
-                    has(mono, "To apply this mono IR to all 2 channels") &&
-                    has(mono, "    48000 2 2 0\n") &&
-                    has(mono, "    mono.wav\n    0\n    1\n    1\n"),
-                "mono IR with stereo input explains the mismatch and suggests a configuration");
-        // The suggested configuration is valid and applies the IR to both channels.
-        std::string suggestion;
-        for (std::size_t start = 0; start < mono.size();) {
-            const auto end = std::min(mono.find('\n', start), mono.size());
-            if (mono.compare(start, 4, "    ") == 0)
-                suggestion += mono.substr(start + 4, end - start - 4) + '\n';
-            start = end + 1;
-        }
-        text_file(dir / "suggested.cfg", suggestion);
-        const auto applied = load_configuration(dir / "suggested.cfg", 48000, 2);
-        require(applied.paths.size() == 2 && applied.paths[1].inputs[0].channel == 1 &&
-                    applied.paths[1].outputs[0].channel == 1 &&
-                    applied.paths[1].impulse == std::vector<float>({1, .5f}),
-                "suggested mono configuration loads");
+        text_file(dir / "mono-each.cfg",
+                  "48000 2 2 0\n0 0\n0 0\nmono.wav\n0\n0\n0\nmono.wav\n0\n1\n1\n");
+        require(same_configuration(load_configuration(dir / "mono.wav", {48000, 2, 0}),
+                                   load_configuration(dir / "mono-each.cfg")),
+                "a mono IR file on stereo audio plays as the configuration repeating it");
+        const auto mono_rate = failure(dir / "mono.wav", {44100, 2, 0});
+        require(has(mono_rate, "its sample rate is 48000 Hz, not 44100 Hz") &&
+                    !has(mono_rate, "input channel"),
+                "a mono IR file at another rate is refused for its rate alone");
+        // A mono configuration does the same, delays and gains included.
+        text_file(dir / "mono.cfg", "48000 1 1 0\n1\n2\nmono.wav\n0\n0.5\n0\n");
+        text_file(dir / "mono-cfg-each.cfg", "48000 3 3 0\n1 1 1\n2 2 2\nmono.wav\n0\n0.5\n0\n"
+                                             "mono.wav\n0\n1.5\n1\nmono.wav\n0\n2.5\n2\n");
+        require(same_configuration(load_configuration(dir / "mono.cfg", {48000, 3, 3}),
+                                   load_configuration(dir / "mono-cfg-each.cfg")),
+                "a mono configuration plays on each channel with its delays and gains");
+        // An exact match anywhere in a list wins over a default routing.
+        wave(dir / "stereo.wav", 48000, 2, {1, 1, .25f, .75f});
+        text_file(dir / "mono-first.txt", "mono.wav\nstereo.wav\n");
+        require(load_configuration(dir / "mono-first.txt", {48000, 2, 0}).paths.size() == 2 &&
+                    load_configuration(dir / "mono-first.txt", {48000, 2, 0}).paths[1].impulse ==
+                        std::vector<float>({1, .75f}),
+                "a list's exact entry wins over an earlier mono one");
+        require(load_configuration(dir / "mono-first.txt", {48000, 1, 0}).paths.size() == 1,
+                "a list's mono entry plays on mono audio");
+        // True stereo: a four-channel IR file on two channels, in the order
+        // left to left, left to right, right to left, right to right.
+        wave(dir / "hall.wav", 48000, 4, {1, 2, 3, 4, .5f, .25f, .125f, .0625f});
+        text_file(dir / "hall.cfg", "48000 2 2 0\n0 0\n0 0\nhall.wav\n0\n0\n0\nhall.wav\n1\n0\n"
+                                    "1\nhall.wav\n2\n1\n0\nhall.wav\n3\n1\n1\n");
+        require(same_configuration(load_configuration(dir / "hall.wav", {48000, 2, 0}),
+                                   load_configuration(dir / "hall.cfg")),
+                "a four-channel IR file on stereo audio plays as true stereo");
+        require(load_configuration(dir / "hall.wav", {48000, 4, 0}).paths[1].inputs[0].channel == 1,
+                "a four-channel IR file on four channels filters each channel");
+        rejects([&] { load_configuration(dir / "hall.wav", {48000, 3, 0}); });
+        rejects([&] { load_configuration(dir / "stereo.wav", {48000, 4, 0}); });
+        // Only an IR file used directly: a four-channel configuration's
+        // routing is its own.
+        text_file(dir / "quad.cfg", "48000 4 4 0\n0 0 0 0\n0 0 0 0\nhall.wav\n0\n0\n0\n");
+        rejects([&] { load_configuration(dir / "quad.cfg", {48000, 2, 0}); });
+        // Ambisonics B-format is never taken for true stereo.
+        b_format_wave(dir / "b-format.wav");
+        require(detail::ambisonic_b_format(dir / "b-format.wav") &&
+                    !detail::ambisonic_b_format(dir / "hall.wav"),
+                "the B-format marking is recognised");
+        require(load_configuration(dir / "b-format.wav", {48000, 4, 0}).paths.size() == 4,
+                "a B-format file reads as four channels");
+        const auto ambisonic = failure(dir / "b-format.wav", {48000, 2, 0});
+        require(has(ambisonic, "Ambisonics B-format") && has(ambisonic, "true stereo"),
+                "a B-format file on two channels says why it is not true stereo");
+        // The layout used, for the command line's note.
+        auto layout = detail::FilterLayout::as_is;
+        detail::load_configuration(dir / "hall.wav", {48000, 2, 0}, detail::libsndfile_files(),
+                                   nullptr, nullptr, false, false, nullptr, &layout);
+        require(layout == detail::FilterLayout::true_stereo, "the true-stereo layout is reported");
+        detail::load_configuration(dir / "mono.wav", {48000, 2, 0}, detail::libsndfile_files(),
+                                   nullptr, nullptr, false, false, nullptr, &layout);
+        require(layout == detail::FilterLayout::each_channel,
+                "the each-channel layout is reported");
+        // A plug-in keeps a mono filter as it is, to lay out when it starts.
+        require(detail::load_configuration(dir / "mono.wav", {48000, 2, 2},
+                                           detail::libsndfile_files(), nullptr, nullptr, true)
+                        .input_channels == 1,
+                "a plug-in keeps a mono filter as it is");
         const auto rate = failure(dir / "good.cfg", {44100, 2, 0});
         require(has(rate, "is a configuration for 48000 Hz audio with 2 input channels") &&
                     has(rate, "its sample rate is 48000 Hz, not 44100 Hz") &&

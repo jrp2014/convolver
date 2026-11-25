@@ -487,7 +487,7 @@ for 30 minutes and reports whether REAPER saw a new underrun. The short
 [engine measurements](fft-measurements.md#supported-workloads) cannot show
 a host's dropouts over a long session. Prepare as for
 [REAPER from one command](#reaper-from-one-command), set the audio device
-to 48 kHz and its block size to 128 frames or fewer (REAPER's Settings >
+to 48 kHz and its block size to 1 to 128 frames (REAPER's Settings >
 Audio > Device), quit REAPER, and run from the unzipped package folder:
 
 ```sh
@@ -528,7 +528,8 @@ the report says that none happened or the device does not report them. An
 underrun while the filters load, before playing, is named but not counted.
 
 Six checks follow: the ReaScript ran to the end; all four returns loaded;
-the device ran at 48 kHz with a block of 128 frames or fewer; the transport
+the device ran at 48 kHz with a block of 1 to 128 frames (a whole number,
+read before and while playing; a 0 or an unreported block fails); the transport
 ran the whole time; every Status reading while playing, and at the end, was
 the Active text (any other is listed with its time); and the replacement was
 accepted, read Active afterwards and left a saved state within 10% of the

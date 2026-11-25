@@ -157,6 +157,12 @@ repos:
         language: python
         pass_filenames: false
         files: ^(scripts/reaper_check\.py|tests/reaper_check_tests\.py)$
+      - id: workloads-tests
+        name: Workload measurements' budget and ceiling verdicts (PERF-21)
+        entry: python tests/native/benchmarks/workloads_tests.py
+        language: python
+        pass_filenames: false
+        files: ^tests/native/benchmarks/workloads(_tests)?\.py$
       - id: fuzz-scheduler-tests
         name: Fuzz campaign scheduler failure paths
         entry: python tests/fuzz/scheduler_tests.py

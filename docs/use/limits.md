@@ -17,7 +17,7 @@ stereo reverbs up to 60 s and true-stereo reverbs up to 60 s at 48 kHz or
 | Convolver does not… | Instead |
 | --- | --- |
 | Measure a room or design filters | Make the filter with a tool such as DRC, REW or Audiolense, then load it |
-| Resample a filter, or adapt its channel count | Make the filter at your audio's sample rate, or keep one per rate in a [configuration list](configuration.md#paths-and-configuration-lists); use a `.cfg` to apply a mono IR to several channels or a true-stereo reverb to a stereo track ([reverb responses](configuration.md#reverb-responses)) |
+| Resample a filter, or adapt its channel count | Make the filter at your audio's sample rate, or keep one per rate in a [configuration list](configuration.md#paths-and-configuration-lists); a mono IR file plays on every channel and a four-channel one as true stereo on two ([mono and true-stereo IR files](configuration.md#mono-and-true-stereo-ir-files)); a `.cfg` routes channels any other way |
 | Play to or record from an audio device | Use a plug-in host, a pipe between programs ([RAW streams](command-line.md#raw-streams)), on Windows [Equalizer APO](equalizer-apo.md) or, for playback on Linux, [PipeWire](pipewire.md) |
 | Filter everything a computer plays, by itself | On Windows, export to [Equalizer APO](equalizer-apo.md); on Linux, run the LV2 plug-in in [PipeWire](pipewire.md) |
 | Show a window in the VST3 plug-in on Linux, or in LV2 (the VST3 plug-in has [one on macOS and Windows](plugins.md#convolvers-window), as has the Audio Unit) | Use the host's controls for the settings and Status. Load a [preset](presets.md) to choose a filter, or in LV2 use the host's file chooser where it shows one ([LV2 filter files](plugins.md#lv2-filter-files)) |

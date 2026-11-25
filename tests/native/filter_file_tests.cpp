@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -69,9 +70,10 @@ std::string refused(const fs::path& path, const HostLayout& host, HostFailureKin
 void run(const fs::path& dir) {
     const HostLayout stereo{44100, 2, 2};
     impulse(dir / "mono.wav", 44100, 1);
+    impulse(dir / "three.wav", 44100, 3);
     impulse(dir / "fast.wav", 48000, 2);
-    const auto channels = refused(dir / "mono.wav", stereo, HostFailureKind::channels);
-    require(has(channels, "the filter has 1 in, 1 out, the host 2 in, 2 out."),
+    const auto channels = refused(dir / "three.wav", stereo, HostFailureKind::channels);
+    require(has(channels, "the filter has 3 in, 3 out, the host 2 in, 2 out."),
             "channel counts: " + channels);
     const auto rate = refused(dir / "fast.wav", stereo, HostFailureKind::sample_rate);
     require(has(rate, "the filter is for 48000 Hz, the host runs at 44100 Hz."), "rate: " + rate);
@@ -86,7 +88,7 @@ void run(const fs::path& dir) {
                                          "The host may play at a different rate from the one it "
                                          "exports at."),
                 "chosen file's rate refusal without the playback-rate line: " + why.message.fix);
-        require(!read_filter_file((dir / "mono.wav").string(), stereo, detail::libsndfile_files(),
+        require(!read_filter_file((dir / "three.wav").string(), stereo, detail::libsndfile_files(),
                                   why) &&
                     !has(why.message.fix, "exports at"),
                 "chosen file's channel refusal names the playback rate: " + why.message.fix);
@@ -179,9 +181,11 @@ void run(const fs::path& dir) {
         return text;
     };
     // It names no window: the LV2 plug-in has none (review of 8177017).
-    const auto mono = explanation(dir / "mono.wav", stereo);
-    require(has(mono, "load it in Convolver instead") && !has(mono, "window"),
-            "the mono example: " + mono);
+    const auto three = explanation(dir / "three.wav", stereo);
+    require(has(three, "Use an IR file with one channel per input channel (2), a four-channel "
+                       "true-stereo file or one channel for all of them") &&
+                !has(three, "window"),
+            "the channel advice: " + three);
     require(has(explanation(dir / "fast.wav", stereo), "set the host's project or audio device"),
             "the rate advice names the host");
     {
@@ -202,10 +206,10 @@ void run(const fs::path& dir) {
     // entries differ (review of 8177017). With an entry at the host's rate it
     // is refused for channels, otherwise for the rate.
     const HostLayout fast_stereo{48000, 2, 2};
-    impulse(dir / "fast-mono.wav", 48000, 1);
+    impulse(dir / "fast-three.wav", 48000, 3);
     {
         std::ofstream list(dir / "mixed.txt");
-        list << "mono.wav\nfast-mono.wav\n";
+        list << "three.wav\nfast-three.wav\n";
     }
     const auto mixed = refused(dir / "mixed.txt", fast_stereo, HostFailureKind::channels);
     require(has(mixed, "the filter does not fit the host's 2 in, 2 out.") && !has(mixed, "44100"),
@@ -344,6 +348,25 @@ void wider_bus(const fs::path& dir) {
     require(inputs("wide-exact.txt", six) == 6, "an exact entry passed over for a smaller one");
     require(inputs("wide-exact.txt", HostLayout{44100, 4, 6}, "wide-2x6.cfg") == 2,
             "the 2-in entry on 4 inputs");
+    // EDGE-3: the default routings come after PLUG-33, so a list that
+    // played its entry for fewer inputs before plays it still: a mono entry
+    // later in the list does not play on each channel instead.
+    write("wide-1x1.cfg", "44100 1 1 0\n0\n0\nwide.wav\n0\n0\n0\n");
+    write("wide-1x2.cfg", "44100 1 2 0\n0\n0 0\nwide.wav\n0\n0\n0\nwide.wav\n0\n0\n1\n");
+    write("wide-mono-last.txt", "wide-1x2.cfg\nwide-1x1.cfg\n");
+    write("wide-crossover-last.txt", "wide-1x1.cfg\nwide-2x6.cfg\n");
+    require(inputs("wide-mono-last.txt", HostLayout{44100, 2, 2}, "wide-1x2.cfg") == 1,
+            "the 1-in, 2-out entry passed over for a mono one on each channel");
+    require(inputs("wide-crossover-last.txt", six, "wide-2x6.cfg") == 2,
+            "the crossover passed over for a mono entry on each of 6 channels");
+    // With no entry for fewer inputs, the mono entry plays on each channel.
+    write("wide-mono-only.txt", "wide-48k.cfg\nwide-1x1.cfg\n");
+    {
+        auto [state, why, named] = chosen("wide-mono-only.txt", HostLayout{44100, 2, 2});
+        require(state && state->configuration->input_channels == 1 &&
+                    state->configuration->output_channels == 1 && named.empty(),
+                "a list's mono entry on 2 channels: " + detail::advice_text(why.message));
+    }
     // Still refused as before: fewer inputs than the filter, other outputs,
     // another rate, and a rate that is not whole hertz.
     const auto refusal = [&](const std::string& name, const HostLayout& host,
@@ -424,8 +447,8 @@ void non_ansi_names(const fs::path& dir) {
     }
     // Refusals name the file in UTF-8: a filter for other channels, and a
     // damaged WAV (validate_wave()'s message).
-    impulse(folder / detail::utf8_path(name + "-mono.wav"), 44100, 1);
-    refused(folder / detail::utf8_path(name + "-mono.wav"), stereo, HostFailureKind::channels);
+    impulse(folder / detail::utf8_path(name + "-three.wav"), 44100, 3);
+    refused(folder / detail::utf8_path(name + "-three.wav"), stereo, HostFailureKind::channels);
     {
         const auto whole = folder / detail::utf8_path(name + ".wav");
         const auto cut = folder / detail::utf8_path(name + "-cut.wav");
@@ -536,6 +559,97 @@ void before_host_settles(const fs::path& dir) {
                 has(why.message.problem, "early-junk.cfg"),
             "an unreadable file: " + detail::advice_text(why.message));
 }
+// EDGE-3 (jrp, 25 November 2026): a mono IR file on a stereo track plays on
+// each channel, kept as it is so that it suits a mono track too; a
+// four-channel one plays as true stereo, read so whenever the host's two
+// channels are known, also while it is not playing.
+void default_layouts(const fs::path& dir) {
+    const HostLayout stereo{48000, 2, 2}, mono{48000, 1, 1};
+    impulse(dir / "each.wav", 48000, 1);
+    impulse(dir / "hall.wav", 48000, 4);
+    const auto fact = [](const HostReport& report, const std::string& label) {
+        for (const auto& f : report.audio)
+            if (f.label == label)
+                return f;
+        return HostFact{};
+    };
+    for (const bool settled : {true, false}) {
+        FilterFileFailure why;
+        auto state = read_filter_file((dir / "each.wav").string(), stereo,
+                                      detail::libsndfile_files(), why, nullptr, nullptr, settled);
+        require(state && state->configuration && state->configuration->input_channels == 1 &&
+                    state->configuration->output_channels == 1,
+                "a mono IR file on a stereo track not kept as it is: " +
+                    detail::advice_text(why.message));
+        HostFilter filter;
+        std::shared_ptr<const Configuration> installed;
+        filter.load(std::move(*state), stereo, [&](const HostPlayback& p) { installed = p.filter; },
+                    {HostFilterSource::file, (dir / "each.wav").string(), 0});
+        require(installed && installed->input_channels == 2 && installed->output_channels == 2 &&
+                    installed->paths.size() == 2 && installed->paths[1].inputs[0].channel == 1 &&
+                    installed->paths[1].outputs[0].channel == 1,
+                "the mono filter installed on a stereo track is not on each channel");
+        require(filter.filter()->input_channels == 1, "the saved filter is not the mono one");
+        const auto played = filter.activation(stereo).playback.filter;
+        require(played->input_channels == 2 && played->paths.size() == 2 &&
+                    !filter.activation(stereo).failure,
+                "a start on a stereo track does not play the mono filter on each channel");
+        const auto one = filter.activation(mono);
+        require(!one.failure && one.playback.filter->input_channels == 1,
+                "the mono filter does not play as it is on a mono track");
+        const auto status = host_status(filter, stereo).text;
+        require(has(status, "Filter loaded: 48000 Hz, 1 in, 1 out; on each of 2 channels."),
+                "status: " + status);
+        HostReportFacts facts;
+        facts.host = stereo;
+        const auto routing = fact(host_report(filter, facts), "Routing");
+        require(routing.value == "In 1 → Out 1, In 2 → Out 2" &&
+                    routing.note == "(the one-channel filter on each channel)",
+                "routing: " + routing.value + " " + routing.note);
+        const auto host_channels = fact(host_report(filter, facts), "Host channels");
+        require(host_channels.note.empty(), "an input reported ignored: " + host_channels.note);
+        const auto line = loaded_line(filter, std::optional<HostLayout>(stereo));
+        require(has(line, "it plays on each of the host's 2 channels"), "log: " + line);
+    }
+    // True stereo, once the host's channels are known (settled or not).
+    for (const bool settled : {true, false}) {
+        FilterFileFailure why;
+        auto state = read_filter_file((dir / "hall.wav").string(), stereo,
+                                      detail::libsndfile_files(), why, nullptr, nullptr, settled);
+        require(state && state->configuration && state->configuration->input_channels == 2 &&
+                    state->configuration->paths.size() == 4 &&
+                    true_stereo_routing(*state->configuration),
+                "a four-channel IR file not read as true stereo: " +
+                    detail::advice_text(why.message));
+        HostFilter filter;
+        filter.load(std::move(*state), stereo);
+        const auto status = host_status(filter, stereo).text;
+        require(has(status, "2 in, 2 out; true stereo."), "status: " + status);
+        HostReportFacts facts;
+        facts.host = stereo;
+        require(fact(host_report(filter, facts), "Routing").note == "(true stereo)",
+                "the true-stereo routing not named");
+    }
+    // On four channels it filters each channel; before any start it is read
+    // as it is, and a stereo start says to choose it again.
+    {
+        FilterFileFailure why;
+        auto quad = read_filter_file((dir / "hall.wav").string(), HostLayout{48000, 4, 4},
+                                     detail::libsndfile_files(), why);
+        require(quad && quad->configuration->input_channels == 4 &&
+                    !true_stereo_routing(*quad->configuration),
+                "a four-channel IR file on four channels not read as it is");
+        auto early = read_filter_file((dir / "hall.wav").string(), std::nullopt,
+                                      detail::libsndfile_files(), why);
+        require(early && early->configuration->input_channels == 4,
+                "a four-channel IR file before the host's channels not read as it is");
+        HostFilter filter;
+        filter.load(std::move(*early), std::nullopt);
+        const auto start = filter.activation(stereo);
+        require(start.failure && has(start.failure->message.note, "choose it again"),
+                "a four-channel file read before the host started gives no advice");
+    }
+}
 } // namespace
 
 int main() {
@@ -553,6 +667,7 @@ int main() {
         {"non_ansi_names", [&] { non_ansi_names(dir); }},
         {"wider_bus", [&] { wider_bus(dir); }},
         {"before_host_settles", [&] { before_host_settles(dir); }},
+        {"default_layouts", [&] { default_layouts(dir); }},
     });
     std::error_code ec;
     fs::remove_all(dir, ec);

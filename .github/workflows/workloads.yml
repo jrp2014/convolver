@@ -7,13 +7,21 @@ name: Workload measurements
 # the FFT library each platform's plug-ins ship (Ooura on Linux and Windows,
 # Accelerate on macOS). Shared runners give indicative figures only
 # (docs/develop/fft-measurements.md#supported-workloads). Started by hand
-# only: each run takes about 15 minutes on three runners, one of them macOS.
+# only: each run takes about 15 minutes on three runners, one of them macOS
+# (a budget run, a few minutes).
+# With "budget", only the everyday budget's two workloads (PERF-21), the
+# check on the tag before each preview (docs/develop/releasing.md#candidates);
+# a job fails when a workload is over the budget.
 'on':
   workflow_dispatch:
     inputs:
       rounds:
-        description: Rounds of every workload
-        default: '3'
+        description: Rounds of every workload (empty for 3, or 5 with budget)
+        default: ''
+      budget:
+        description: Only the everyday budget's workloads (before a preview)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -34,7 +42,8 @@ jobs:
           - os: windows-latest
             fft: OOURA
     env:
-      ROUNDS: ${{ inputs.rounds || '3' }}
+      ROUNDS: ${{ inputs.rounds }}
+      BUDGET: ${{ inputs.budget && '--budget' || '' }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -104,18 +113,22 @@ jobs:
         shell: bash
         run: grep -hE 'CMAKE_CXX_COMPILER(_ID|_VERSION)? ' build/CMakeFiles/*/CMakeCXXCompiler.cmake || true
       # The summary and every run go to the log and the job summary, so the
-      # results can be read without downloading the artifact.
+      # results can be read without downloading the artifact; the job then
+      # fails if a workload was over the everyday budget.
       - name: Measure
         shell: bash
         env:
           PYTHON: ${{ runner.os == 'Windows' && 'python' || 'python3' }}
         run: |
-          "$PYTHON" tests/native/benchmarks/workloads.py "$BENCHMARK" --rounds "$ROUNDS" \
-            --label "${{ matrix.os }} runner, $(date -u +%Y-%m-%d)" --csv workloads.csv > workloads.md
+          status=0
+          # shellcheck disable=SC2086 # BUDGET and the rounds option are empty or one word
+          "$PYTHON" tests/native/benchmarks/workloads.py "$BENCHMARK" $BUDGET ${ROUNDS:+--rounds "$ROUNDS"} \
+            --label "${{ matrix.os }} runner, $(date -u +%Y-%m-%d)" --csv workloads.csv > workloads.md || status=$?
           cat workloads.md >> "$GITHUB_STEP_SUMMARY"
           cat workloads.md
           echo '--- raw CSV ---'
-          cat workloads.csv
+          cat workloads.csv || true
+          exit "$status"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

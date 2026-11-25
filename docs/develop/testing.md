@@ -888,7 +888,14 @@ A, and A's answer is delivered a second time, or not yet received it. In
 each of the 18 variants at least one late answer from A arrives, the
 controller keeps showing B's Latency, a later choice reaches B, and A saves
 what it had. Last, one pair is disconnected and connected again controller
-first, with the request dropped: it pairs again. The plug-in reads the files with AudioToolbox on
+first, with the request dropped: it pairs again.
+`pending_choice_follows_connection()` (VST3-28, jrp's review of `777299f3`)
+chooses a Latency or a Gain mode while the controller is connected to A but
+A's answer is held, then moves the controller to B: B saves and shows its
+own setting, and A saves its own too, also once A's held answer arrives. A
+choice made before any connection, or while the controller is connected to
+nothing, reaches B. Reconnected to A itself, the controller drops the
+choice and shows A's Latency. The plug-in reads the files with AudioToolbox on
 macOS and libsndfile on Linux and Windows (VST3-12). PLUG-22's
 `saved_filter_name()` checks the controller state: its format read back,
 and damaged, newer, over-long or empty-field states read as no name; an
@@ -1397,7 +1404,7 @@ at a Latency:
 | Format | Cases |
 | --- | --- |
 | LV2 | Mono (1 in, 1 out) at Latency 0 on both kinds of track; the stereo cross-feed (2 in, 2 out) at Latency 0 on a Strict-I/O track; the crossover (2 in, 6 out) at Latency 0; the stereo cross-feed at 1024 and the crossover at 256 |
-| VST3 | The stereo cross-feed at Latency 0 on a Strict-I/O track and at 1024; mono at Latency 0 on a Strict-I/O track, and on a Flexible-I/O track with the plug-in's channels set by hand, outputs only and outputs with input pins |
+| VST3 | The stereo cross-feed at Latency 0 on a Strict-I/O track and at 1024; mono at Latency 0 on a Strict-I/O track, on a Flexible-I/O track as Ardour sets it up (Convolver's 2 in, 2 out, the mono filter on each channel; EDGE-3), and with the plug-in's channels set by hand, outputs only and outputs with input pins |
 
 A track the script adds is Flexible-I/O unless the case asks for
 Strict-I/O (`Route::set_strict_io`), which is what Ardour's window gives a
@@ -1423,7 +1430,8 @@ exports differed from the oracle by about the output peak), so the
 crossover cases run on Flexible-I/O tracks. On a Flexible-I/O track, with
 its automatic pin configuration, Ardour runs Convolver's VST3 with 2 in
 and 2 out (HOST-10): on a mono track it feeds the one input to both, so a
-mono or crossover filter plays silence. Ardour 8 keeps a VST3 plug-in's
+crossover filter plays silence, and a mono filter plays on each of the two
+channels (EDGE-3; the `mono` case without a Pin Mode checks it). Ardour 8 keeps a VST3 plug-in's
 default buses. Ardour 9 asks for the track's inputs and, unless they are set
 by hand, as many outputs (`request_bus_layout` in its `vst3_plugin.cc`, which
 8.12 lacks), but 9.0 masks each request with the bus's default width, 2 for
@@ -1949,7 +1957,8 @@ packages are built from or hold
 ([below](#when-pull-requests-build-the-candidates)), and the fuzz workflow
 only when it changes what the fuzz targets are built from
 ([below](#when-pull-requests-run-the-fuzz-targets)). The workload
-measurement workflow runs only when started by hand
+measurement workflow runs only when started by hand, as on each preview's
+tag for [the everyday budget](fft-measurements.md#the-everyday-budget)
 ([supported workloads](fft-measurements.md#supported-workloads)). A commit pushed to a branch that has a pull request runs
 once, as part of that pull request; a branch without one gets no automatic
 run, so open the draft pull request early ([workflow](workflow.md#before-you-start))
