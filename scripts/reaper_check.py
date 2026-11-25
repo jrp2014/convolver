@@ -1351,7 +1351,7 @@ def block_size(text):
     a whole number from 1 up (a 0, a fraction or "(not reported)" is not a
     buffer the soak ran with; jrp's review of 25 November 2026)."""
     text = (text or '').strip()
-    if not text.isdigit() or int(text) < 1:
+    if not (text.isascii() and text.isdigit()) or int(text) < 1:
         return None
     return int(text)
 
@@ -1532,7 +1532,7 @@ def soak_report(context):
         (
             f'- Project rate: {one.get("project_rate", "(not reported)")} Hz; audio device: '
             f'{one.get("device_output", "(not reported)")} at {one.get("device_rate", "?")} Hz, '
-            f'block size {one.get("device_block", "?")}'
+            f'block size {one.get("device_block", "?")} ({one.get("device_block_playing", "?")} while playing)'
         ),
         (
             f'- Channels: {len(SOAK_SOUNDS)} stereo source tracks, each sending to its own stereo return '

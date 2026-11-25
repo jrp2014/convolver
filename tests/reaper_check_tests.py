@@ -337,6 +337,9 @@ class BlockSize(unittest.TestCase):
             ('(not reported)', None),
             ('', None),
             (None, None),
+            ('+64', None),
+            ('\u0661\u0662\u0668', None),  # Arabic-Indic 128
+            ('\u00b2', None),  # superscript two, which int() refuses
         ):
             self.assertEqual(reaper_check.block_size(text), wanted, text)
 
@@ -590,7 +593,7 @@ class Run(unittest.TestCase):
             '- REAPER: 7.99/macOS-arm64',
             '- Package SHA-256: `',
             'FFT: test',
-            'block size 64',
+            'block size 64 (64 while playing)',
             '- Channels: 4 stereo source tracks',
             'Reverb 1: stereo-10s',
             'true-stereo-30s',

@@ -487,7 +487,7 @@ for 30 minutes and reports whether REAPER saw a new underrun. The short
 [engine measurements](fft-measurements.md#supported-workloads) cannot show
 a host's dropouts over a long session. Prepare as for
 [REAPER from one command](#reaper-from-one-command), set the audio device
-to 48 kHz and its block size to 128 frames or fewer (REAPER's Settings >
+to 48 kHz and its block size to 1 to 128 frames (REAPER's Settings >
 Audio > Device), quit REAPER, and run from the unzipped package folder:
 
 ```sh
