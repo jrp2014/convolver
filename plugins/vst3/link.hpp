@@ -82,15 +82,17 @@ class ProcessorLink {
 
 // Shared by the processor and the controllers that paired with it. The
 // processor detaches before it goes, waiting for calls in progress; after
-// that call() refuses.
+// that call() refuses and attached() is false.
 class Bridge {
   public:
     explicit Bridge(ProcessorLink& processor) : processor_(&processor) {}
     template <class F> bool call(F&& f) {
+        ProcessorLink* processor = nullptr;
         {
             std::lock_guard lock(mutex_);
             if (!processor_)
                 return false;
+            processor = processor_; // detach() may clear processor_ now; it waits for this call.
             ++calls_;
         }
         struct Done {
@@ -101,8 +103,12 @@ class Bridge {
                     bridge.idle_.notify_all();
             }
         } done{*this};
-        std::forward<F>(f)(*processor_);
+        std::forward<F>(f)(*processor);
         return true;
+    }
+    bool attached() {
+        std::lock_guard lock(mutex_);
+        return processor_ != nullptr;
     }
     void detach() {
         std::unique_lock lock(mutex_);

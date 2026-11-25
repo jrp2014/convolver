@@ -26,8 +26,11 @@
 // each step (nothing, the processor's queue, the controller's, both) and
 // whether messages are delivered between the two calls of a restore; the
 // restore order (processor first, as the SDK requires, or controller
-// first); and whether the host plays a block after every step or only at
-// the end.
+// first); whether the host plays a block after every step or only at the
+// end; and, for a stopped host without a delaying proxy, whether automation
+// queued before a restore reaches the processor before the restore or after
+// it (judged only in sequences whose restores are refused: after an
+// accepted one, the late automation is the host's mistake).
 //
 // The oracle, once the host has delivered everything (messages, and its
 // queued parameter changes in a process() call): the model's result of the
@@ -41,14 +44,16 @@
 // - the host last read as the latency, when asked to restart;
 // - the processor saves, and a fresh processor restored from that save plays.
 // And every host callback came on the thread that made the host call (the
-// UI thread here). Gain, Mix and Bypass reach the processor in process(),
-// so they are judged only after the host has delivered them (jrp's review
+// UI thread here), and none inside another restartComponent. Gain, Mix and Bypass reach the
+// processor in process(), so they are judged only after the host has delivered them (jrp's review
 // of the shared-processor proposal, 24 November 2026); the save between an
 // edit and its delivery is its own case with its own expectation.
 //
 // Named cases cover what sequences of one pair cannot: two instances at
 // once and closing one while the other plays, a processor with no
-// controller, and a restore made on another thread (an offline render).
+// controller, a restore made on another thread (an offline render), a
+// choice made before the halves have paired, and a host that holds values
+// as float and passes them back (Ardour).
 //
 // Usage: convolver_vst3_sync [--random N] [--seed S] [--length K] [--tsv FILE]
 // (defaults 300 random sequences of 3 to 5 steps, seed 1). Each run prints
@@ -204,10 +209,17 @@ class Host final : public IComponentHandler, public IComponentHandler2 {
     }
     tresult PLUGIN_API restartComponent(int32 flags) override {
         note_thread();
+        // Ardour 8 waits forever in a restartComponent made inside another.
+        if (restarting)
+            reentered = true;
+        if (++restarts > 10000)
+            throw std::runtime_error("restartComponent called without end");
+        ++restarting;
         if ((flags & kLatencyChanged) && processor)
             latency_read = processor->getLatencySamples();
         if ((flags & kParamValuesChanged) && controller)
             rescan();
+        --restarting;
         return kResultOk;
     }
     tresult PLUGIN_API setDirty(TBool) override {
@@ -237,9 +249,16 @@ class Host final : public IComponentHandler, public IComponentHandler2 {
         return 1;
     }
     // What the host reads from the controller: all settings parameters.
+    // `float_values`: as Ardour 8 and 9, which hold values as float and pass
+    // a value that changed back to the controller when they next read it.
     void rescan() {
-        for (const auto id : {gain_id, mix_id, latency_id, gain_mode_id, bypass_id})
-            values[id] = controller->getParamNormalized(id);
+        for (const auto id : {gain_id, mix_id, latency_id, gain_mode_id, bypass_id}) {
+            const auto value = controller->getParamNormalized(id);
+            const auto held = static_cast<ParamValue>(static_cast<float>(value));
+            values[id] = float_values ? held : value;
+            if (float_values && held != value)
+                controller->setParamNormalized(id, held);
+        }
     }
     // An automatable parameter the host sets: in the controller now, and in
     // the processor at the next process() call.
@@ -262,6 +281,9 @@ class Host final : public IComponentHandler, public IComponentHandler2 {
     std::optional<uint32> latency_read;
     std::thread::id ui_thread = std::this_thread::get_id();
     bool off_thread = false;
+    bool float_values = false;
+    int restarting = 0, restarts = 0;
+    bool reentered = false;
 };
 
 // One block through `p`: silence, or `input`, with the parameter changes
@@ -379,6 +401,7 @@ struct Variant {
     bool playing = true;         // A process() block after every step.
     bool split_delivery = false; // Deliver between the two calls of a restore.
     std::vector<Delivery> after; // After each step but the last (delaying only).
+    bool flush = true;           // Queued automation reaches the processor before a restore.
 };
 std::string describe(const Variant& v, std::string_view steps) {
     std::string text = v.connection == Connection::direct       ? "direct"
@@ -388,6 +411,8 @@ std::string describe(const Variant& v, std::string_view steps) {
     text += v.playing ? ", playing" : ", stopped";
     if (v.split_delivery)
         text += ", delivered mid-restore";
+    if (!v.flush)
+        text += ", automation after restores";
     text += ": ";
     static const char* const names[] = {"none", "processor's", "controller's", "both"};
     for (std::size_t i = 0; i < steps.size(); ++i) {
@@ -443,12 +468,13 @@ struct Pair {
         return n;
     }
     // A restore of `state` in the host's order; true if the processor took it.
-    bool restore(const HostState& state, bool controller_first, bool split_delivery) {
+    bool restore(const HostState& state, bool controller_first, bool split_delivery,
+                 bool flush = true) {
         auto stream = stream_of(state);
         tresult result = kResultFalse;
-        // A host passes automation queued before a restore before it, never
-        // after it (the race JUCE's host fixed in a37f5f23).
-        if (!host.pending.empty())
+        // A host should pass automation queued before a restore before it,
+        // not after it (the race JUCE's host fixed in a37f5f23).
+        if (flush && !host.pending.empty())
             play();
         if (!controller_first)
             result = p.setState(stream.get());
@@ -564,6 +590,8 @@ std::vector<std::string> judge(Pair& pair, const Model& m) {
                                                          : std::string("nothing")));
     if (pair.host.off_thread)
         fail("thread", "a host callback came off the UI thread");
+    if (pair.host.reentered)
+        fail("thread", "restartComponent was called inside restartComponent");
     MemoryStream saved;
     if (pair.p.getState(&saved) != kResultOk) {
         fail("saved", "getState failed");
@@ -639,12 +667,12 @@ std::vector<std::string> run(std::string_view steps, const Variant& v,
             break;
         case 'R':
             if (!pair.restore(state_with(rate, state_r.tap, state_r.settings, state_r.bypass),
-                              v.controller_first, v.split_delivery))
+                              v.controller_first, v.split_delivery, v.flush))
                 return {"step (state R was refused)"};
             m = state_r;
             break;
         case 'X':
-            if (pair.restore(x_state, v.controller_first, v.split_delivery))
+            if (pair.restore(x_state, v.controller_first, v.split_delivery, v.flush))
                 return {"step (the 44.1 kHz state was accepted)"};
             break;
         default:
@@ -669,6 +697,8 @@ std::vector<Variant> every_variant(std::size_t length) {
             for (const bool playing : {true, false}) {
                 if (connection != Connection::delaying) {
                     all.push_back({connection, controller_first, playing, false, {}});
+                    if (!playing) // Playing, nothing is queued at a restore.
+                        all.push_back({connection, controller_first, playing, false, {}, false});
                     continue;
                 }
                 std::size_t schedules = 1;
@@ -775,6 +805,57 @@ void save_before_delivery() {
     const auto failed = judge(pair, m);
     require(failed.empty(), "save after delivery: " + (failed.empty() ? "" : failed.front()));
 }
+// A Latency chosen before the controller has paired with the processor (a
+// proxy that has not yet delivered the processor's messages) plays once
+// they pair.
+void choice_before_pairing() {
+    for (const bool latency : {true, false}) {
+        Pair pair(Connection::delaying);
+        pair.restore(state_with(rate, initial.tap, initial.settings, initial.bypass), false, false);
+        auto m = initial;
+        if (latency) {
+            m.settings.latency = 1024;
+            pair.c.setParamNormalized(latency_id, normalized_latency(1024));
+            pair.host.values[latency_id] = normalized_latency(1024);
+        } else {
+            m.settings.gain_mode = GainMode::estimate;
+            pair.c.setParamNormalized(gain_mode_id, normalized_gain_mode(GainMode::estimate));
+            pair.host.values[gain_mode_id] = normalized_gain_mode(GainMode::estimate);
+        }
+        require(pair.p.setActive(true) == kResultOk, "choice before pairing: activate");
+        pair.host.latency_read = pair.p.getLatencySamples();
+        pair.settle();
+        pair.host.rescan();
+        const auto failed = judge(pair, m);
+        require(failed.empty(), std::string("choice before pairing (") +
+                                    (latency ? "Latency" : "Gain mode") +
+                                    "): " + (failed.empty() ? "" : failed.front()));
+    }
+}
+// Ardour 8 and 9 hold parameter values as float: reading the parameters
+// when asked to restart, they pass each value that differs back to the
+// controller, which must not take it for a new choice and restart again.
+void float_host() {
+    Pair pair(Connection::direct);
+    pair.host.float_values = true;
+    pair.start(initial);
+    auto m = initial;
+    for (const auto frames : {std::size_t{1024}, std::size_t{256}}) {
+        const auto value = static_cast<ParamValue>(static_cast<float>(normalized_latency(frames)));
+        pair.c.setParamNormalized(latency_id, value);
+        pair.host.values[latency_id] = value;
+        m.settings.latency = frames;
+        pair.settle();
+    }
+    const auto mode =
+        static_cast<ParamValue>(static_cast<float>(normalized_gain_mode(GainMode::estimate)));
+    pair.c.setParamNormalized(gain_mode_id, mode);
+    pair.host.values[gain_mode_id] = mode;
+    m.settings.gain_mode = GainMode::estimate;
+    pair.settle();
+    const auto failed = judge(pair, m);
+    require(failed.empty(), "float host: " + (failed.empty() ? "" : failed.front()));
+}
 
 std::filesystem::path private_temp(const char* name) {
     return std::filesystem::temp_directory_path() /
@@ -818,6 +899,8 @@ int main(int argc, char** argv) {
         table << "sequence\tresult\n";
     }
     const auto one = [&](std::string_view steps, const Variant& v) {
+        if (!v.flush && steps.find('R') != std::string_view::npos)
+            return; // Late automation over an accepted restore: the host's mistake.
         const auto how = describe(v, steps);
         std::vector<std::string> failed;
         try {
@@ -872,6 +955,8 @@ int main(int argc, char** argv) {
         {"headless_processor", headless_processor},
         {"offline_restore", offline_restore},
         {"save_before_delivery", save_before_delivery},
+        {"choice_before_pairing", choice_before_pairing},
+        {"float_host", float_host},
     };
     std::size_t failed_cases = 0;
     for (const auto& [name, test] : cases) {

@@ -428,6 +428,10 @@ class Controller final : public Steinberg::Vst::EditController,
     // Calls `f` with the processor; false while unpaired, or once the
     // processor has gone (the controller is then unpaired).
     template <class F> bool with_processor(F&& f);
+    // The Bridge, under bridge_lock_: a host may restore state (and so call
+    // the processor) on another thread than the one that pairs.
+    std::shared_ptr<Bridge> bridge() const;
+    void set_bridge(std::shared_ptr<Bridge>);
     bool on_ui_thread() const noexcept;
     // On the UI thread: reads the processor if it said it changed.
     void refresh_if_changed();
@@ -437,15 +441,25 @@ class Controller final : public Steinberg::Vst::EditController,
     // `tell_host`: values that changed are announced (kParamValuesChanged);
     // setComponentState leaves that to the host, which reads them after it.
     void refresh(bool adopt_all, bool tell_host = true);
+    // IComponentHandler::restartComponent, never inside another: flags asked
+    // for while the host is in one are sent after it returns.
+    void restart(Steinberg::int32 flags);
     // PLUG-26 and VST3-17 after an accepted file: a preset's settings as
     // edits, and the project marked changed.
     void accepted_file(const LoadAnswer&);
+    mutable std::mutex bridge_lock_;
     std::shared_ptr<Bridge> bridge_; // Null while unpaired.
     std::thread::id ui_thread_;
+    // A Latency or Gain mode chosen while unpaired, sent once paired.
+    std::optional<std::size_t> unsent_latency_;
+    std::optional<GainMode> unsent_gain_mode_;
     // The processor's generation when it was last read; the latency the host
     // was last asked to read (none before pairing).
     std::uint64_t generation_ = 0;
     std::optional<std::uint32_t> latency_told_;
+    // restart(), on the UI thread.
+    bool restarting_ = false;
+    Steinberg::int32 restart_waiting_ = 0;
     // The host may restore state (and so refresh) on another thread than the
     // one reading parameter text.
     std::mutex status_lock_;

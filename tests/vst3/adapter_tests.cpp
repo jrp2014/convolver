@@ -3790,7 +3790,7 @@ void chosen_before_host_plays() {
                     s.text.find("48000 Hz") != std::string::npos,
                 (std::string(when) + ": status " + s.text).c_str());
     };
-    // The window reads its report while the host plays (send_status()):
+    // The window reads its report while the host plays (Processor::view()):
     // that confirms the check.
     {
         const auto r = c.report();

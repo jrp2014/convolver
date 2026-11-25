@@ -134,16 +134,20 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
     return result;
 }
 tresult PLUGIN_API Controller::terminate() {
-    bridge_.reset();
+    set_bridge(nullptr);
     return EditController::terminate();
 }
+std::shared_ptr<Bridge> Controller::bridge() const {
+    std::lock_guard lock(bridge_lock_);
+    return bridge_;
+}
+void Controller::set_bridge(std::shared_ptr<Bridge> bridge) {
+    std::lock_guard lock(bridge_lock_);
+    bridge_ = std::move(bridge);
+}
 template <class F> bool Controller::with_processor(F&& f) {
-    if (!bridge_)
-        return false;
-    if (bridge_->call(std::forward<F>(f)))
-        return true;
-    bridge_.reset(); // The processor has gone.
-    return false;
+    const auto bridge = this->bridge();
+    return bridge && bridge->call(std::forward<F>(f));
 }
 bool Controller::on_ui_thread() const noexcept {
     return std::this_thread::get_id() == ui_thread_;
@@ -158,7 +162,7 @@ tresult PLUGIN_API Controller::connect(IConnectionPoint* other) {
     return result;
 }
 tresult PLUGIN_API Controller::disconnect(IConnectionPoint* other) {
-    bridge_.reset();
+    set_bridge(nullptr);
     return EditController::disconnect(other);
 }
 tresult PLUGIN_API Controller::notify(IMessage* message) {
@@ -175,13 +179,25 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         auto bridge = Bridges::find(static_cast<std::uint64_t>(key));
         if (!bridge)
             return kResultFalse;
-        const bool again = bridge == bridge_;
-        bridge_ = std::move(bridge);
-        if (!again)
-            bridge_->changed();
+        if (bridge == this->bridge())
+            return kResultOk; // Paired already.
+        set_bridge(bridge);
+        bridge->changed();
+        // A Latency or Gain mode the host or the window chose before the
+        // halves paired (a proxy that delivers later) goes to the processor
+        // now, as a message would have; a host that read the latency before
+        // is told the new one.
+        with_processor([&](ProcessorLink& p) {
+            if (unsent_latency_ || unsent_gain_mode_)
+                latency_told_ = p.view().latency;
+            if (const auto frames = std::exchange(unsent_latency_, std::nullopt))
+                p.chosen_latency(*frames);
+            if (const auto mode = std::exchange(unsent_gain_mode_, std::nullopt))
+                p.chosen_gain_mode(*mode);
+        });
         // From now on the parameters show the processor's, Gain, Mix and
         // Bypass included.
-        if (!again && on_ui_thread())
+        if (on_ui_thread())
             refresh(true);
         return kResultOk;
     }
@@ -195,15 +211,15 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     return EditController::notify(message);
 }
 void Controller::refresh_if_changed() {
-    if (bridge_ && on_ui_thread() && bridge_->take_changed())
+    if (const auto bridge = this->bridge(); bridge && on_ui_thread() && bridge->take_changed())
         refresh(false);
 }
 void Controller::refresh(bool adopt_all, bool tell_host) {
     PairView view;
     if (!with_processor([&](ProcessorLink& p) { view = p.view(); }))
         return;
-    if (bridge_)
-        bridge_->take_changed(); // Read now.
+    if (const auto bridge = this->bridge())
+        bridge->take_changed(); // Read now.
     auto* status = getParameterObject(status_id);
     if (!status) // Not initialized, or terminated: nothing to show it on.
         return;
@@ -225,8 +241,12 @@ void Controller::refresh(bool adopt_all, bool tell_host) {
         EditController::setParamNormalized(id, value);
         changed = true;
     };
-    set(latency_id, normalized_latency(view.settings.latency));
-    set(gain_mode_id, normalized_gain_mode(view.settings.gain_mode));
+    // Compared by the entry, not the value: a host may hold a value with
+    // less precision (Ardour, as float) and pass it back.
+    if (latency_frames(getParamNormalized(latency_id)) != view.settings.latency)
+        set(latency_id, normalized_latency(view.settings.latency));
+    if (gain_mode(getParamNormalized(gain_mode_id)) != view.settings.gain_mode)
+        set(gain_mode_id, normalized_gain_mode(view.settings.gain_mode));
     if (adopt_all || view.generation != generation_) {
         set(gain_id, normalized_gain(view.settings.gain_db));
         set(mix_id, std::clamp(view.settings.mix, 0.0, 1.0));
@@ -235,8 +255,8 @@ void Controller::refresh(bool adopt_all, bool tell_host) {
     generation_ = view.generation;
     // Ask the host to read the parameters again (the status is not edited
     // by the user, so performEdit does not apply). Hosts may ignore this.
-    if (changed && tell_host && componentHandler)
-        componentHandler->restartComponent(kParamValuesChanged);
+    if (changed && tell_host)
+        restart(kParamValuesChanged);
     // The SDK's way to report a new latency: the host deactivates the
     // component, reads getLatencySamples() and activates it again; some
     // (REAPER 7.85) only read it. The processor already plays the new
@@ -244,8 +264,23 @@ void Controller::refresh(bool adopt_all, bool tell_host) {
     // plays. The first read after pairing only records it: the host reads
     // it when it activates the processor.
     const bool told = latency_told_.has_value();
-    if (std::exchange(latency_told_, view.latency) != view.latency && told && componentHandler)
-        componentHandler->restartComponent(kLatencyChanged);
+    if (std::exchange(latency_told_, view.latency) != view.latency && told)
+        restart(kLatencyChanged);
+}
+void Controller::restart(int32 flags) {
+    if (!componentHandler)
+        return;
+    restart_waiting_ |= flags;
+    // Ardour 8 and 9 read parameters inside restartComponent, which passes
+    // values it holds to setParamNormalized and so to a refresh; a second
+    // restartComponent there waits for the first forever. The host is told
+    // once the call it is in returns.
+    if (restarting_)
+        return;
+    restarting_ = true;
+    while (restart_waiting_ != 0)
+        componentHandler->restartComponent(std::exchange(restart_waiting_, 0));
+    restarting_ = false;
 }
 tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) {
     // The host's value goes over what the processor said before it.
@@ -261,15 +296,23 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
     if (id == gain_mode_id || id == latency_id) {
         const auto before = getParamNormalized(id);
         const auto result = EditController::setParamNormalized(id, value);
-        if (result != kResultOk || getParamNormalized(id) == before)
-            return result;
         const auto chosen = getParamNormalized(id);
-        with_processor([&](ProcessorLink& p) {
+        // The same entry is no choice: Ardour passes back, as float, the
+        // value the controller gave it when it reads the parameters.
+        const bool same = id == latency_id ? latency_frames(chosen) == latency_frames(before)
+                                           : gain_mode(chosen) == gain_mode(before);
+        if (result != kResultOk || same)
+            return result;
+        const bool sent = with_processor([&](ProcessorLink& p) {
             if (id == latency_id)
                 p.chosen_latency(latency_frames(chosen));
             else
                 p.chosen_gain_mode(gain_mode(chosen));
         });
+        if (!sent && id == latency_id)
+            unsent_latency_ = latency_frames(chosen);
+        else if (!sent)
+            unsent_gain_mode_ = gain_mode(chosen);
         if (on_ui_thread())
             refresh(false); // A new Latency asks the host to restart.
         return result;
@@ -360,17 +403,22 @@ tresult PLUGIN_API Controller::getParamValueByString(ParamID id, TChar* string, 
     return EditController::getParamValueByString(id, string, value);
 }
 tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
-    if (bridge_) {
+    if (const auto bridge = this->bridge(); bridge && bridge->attached()) {
         // VST3-26: what the processor plays, not the stream: the processor
         // may have refused the state (PLUG-48: REAPER's preset menu offers a
         // preset made for another rate while a filter plays, and it then
         // keeps its own settings), and a host that restores the controller
         // first brings the processor's own restore after this, which says
-        // it changed.
-        refresh(true, false);
-        if (bridge_)
+        // it changed. Gain, Mix and Bypass only if an accepted restore set
+        // them: otherwise they stay the host's, whose automation may not
+        // have reached process() yet.
+        refresh(false, false);
+        if (bridge->attached())
             return kResultOk;
     }
+    // A choice made before pairing is older than this restore.
+    unsent_latency_.reset();
+    unsent_gain_mode_.reset();
     // Unpaired: the state's values, as the host restored them.
     HostState state;
     try {

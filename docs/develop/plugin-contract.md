@@ -140,9 +140,9 @@ before they set the sample rate and channel layout (VST3 `setState` before
   (`HostFilter::awaiting()`, cleared by `confirm()`, which the adapters
   call only when a control call finds the host running the plug-in with
   audio processed in that start, `HostSettling::playing()`: in VST3
-  `Processor::status()` and `send_status()`, so the window's timed report
-  read or a message such as Bypass, as the controller's Status parameter
-  never asks the processor; in the Audio Unit `update_status()` and
+  `Processor::status()` and `Processor::view()`, so the window's timed
+  report read or any other time the controller reads the processor, as
+  the controller's Status parameter never asks it; in the Audio Unit `update_status()` and
   `confirm_rendered()`, so also the host's Status and report reads; never at the stop, so Audacity's start, one
   block and stop with no call between confirms nothing, without guessing
   which starts are brief; jrp, 21 November 2026): a start
@@ -780,9 +780,17 @@ in it:
   processor again (`PairView`: the editor report, which holds the Status
   line, the log tag, the settings, Bypass, a generation and the latency) at
   that message when it arrives on the UI thread (the thread that
-  initialized the controller), otherwise at its next call there. Every host
-  callback therefore comes on the UI thread, also when an offline render
-  restores the processor on its own thread. The controller keeps the report
+  initialized the controller, as the SDK requires), otherwise at its next
+  call there. Every host callback therefore comes on the UI thread, also
+  when an offline render restores the processor on its own thread. A host
+  that initialized the controller on another thread would see the
+  parameters and the window stop following the processor. The controller
+  never calls `restartComponent` inside another: Ardour 8 and 9 read the
+  parameters inside it and pass changed values back to
+  `setParamNormalized`, and a second call there waits forever, so flags
+  asked for meanwhile are sent once the first returns. Ardour holds those
+  values as float, so the controller compares Latency and Gain mode by
+  their entry, not their exact value. The controller keeps the report
   under its own lock, derives the Status parameter, its text and the
   window's content from it, and asks the host to reread the parameters
   only when one changed; Copy diagnostics joins the report's text with the
@@ -1228,7 +1236,12 @@ the plan's Gain modes (12 November 2026); its meters follow later
   plays, jrp's live session of 22 November 2026) leaves the processor's
   settings and Bypass as they were, and the window and host show those, not
   the refused state's; a host that restores the controller first brings
-  the processor's own restore after it, which says it changed. The host's
+  the processor's own restore after it, which says it changed. The
+  controller then shows the earlier values until the host rereads the
+  parameters at `kParamValuesChanged`, which hosts do (a host that ignores
+  it shows them until its next read). A Latency or Gain mode chosen before
+  the halves pair (a proxy that delivers later) goes to the processor when
+  they pair, unless a restore comes first. The host's
   order and when it delivers messages do not matter: `convolver_vst3_sync`
   checks every sequence of one and two host actions, window choices and
   deliveries in every order, and 300 longer ones, against the same
