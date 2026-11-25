@@ -64,6 +64,12 @@ struct FilterFileFailure {
 // HostFilter::load() keeps one that does not suit rather than refusing it) reads a
 // single filter that does not suit `host` as it is, as `settled` false does, rather
 // than refusing it; a list still needs an entry for `host`.
+// EDGE-3: the default routings come between the exact match and PLUG-33. A
+// one-input, one-output filter is read as it is (HostFilter plays it on
+// each channel), and a four-channel IR file for a host with two inputs and
+// two outputs is read as true stereo. Where `host` is not binding (unsettled
+// or kept), the file is first read for its counts, then as it is, so a
+// four-channel file chosen on a stereo host is still true stereo.
 std::optional<HostState>
 read_filter_file(const std::string& path, const std::optional<HostLayout>& host,
                  const detail::SoundFiles& reader, FilterFileFailure& failure,

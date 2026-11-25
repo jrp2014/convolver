@@ -96,9 +96,10 @@ With a configuration, and 24-bit output:
 ./build/convolver --filter room.cfg --input music.wav --output corrected.wav --output-format wav-pcm24
 ```
 
-The input's sample rate and channel count must match the filter. If they do
-not, the message lists each candidate filter and what differs; for a mono IR
-with stereo input it prints a configuration you can save.
+The input's sample rate and channel count must match the filter, except
+that a mono IR file filters every channel and a four-channel one plays as
+true stereo on stereo input ([mono and true-stereo IR files](configuration.md#mono-and-true-stereo-ir-files)). If they do not match, the message lists
+each candidate filter and what differs.
 
 ## If it did not work
 

@@ -64,7 +64,7 @@ cannot be used ([when a filter does not fit](plugins.md#when-a-filter-does-not-f
 | Cause | Fix |
 | --- | --- |
 | The filter's sample rate differs from the host's | Set the host to the filter's rate, or choose a filter made for the host's rate; Convolver does not resample |
-| The track has fewer inputs than the filter, or a different number of outputs | Use a track or bus with at least the filter's inputs and exactly its outputs, or choose a filter that matches the track. A mono or true-stereo reverb on a stereo track needs a short `.cfg` ([reverb responses](configuration.md#reverb-responses)) |
+| The track has fewer inputs than the filter, or a different number of outputs | Use a track or bus with at least the filter's inputs and exactly its outputs, or choose a filter that matches the track. A mono filter plays on each channel of any track, and a four-channel IR file as true stereo on a stereo one ([mono and true-stereo IR files](configuration.md#mono-and-true-stereo-ir-files)) |
 | A project was opened at another rate or layout | VST® 3 and Audio Unit: set the host back to the rate and layout the filter was made for, and the filter returns. LV2: do not save; reopen the session at the filter's rate, or load the filter again ([details](plugins.md#when-a-filter-does-not-fit)) |
 | No filter is loaded, and the input and output counts differ (a crossover, for example) | Choose a filter in Convolver's window, or load a preset |
 | The project was saved after its first filter failed | Choose or load a matching filter |
@@ -92,7 +92,7 @@ the plug-in, for example when the sample rate changes.
 
 | Symptom | Next step |
 | --- | --- |
-| Rate or channel mismatch | Read the error: it lists each candidate filter and what differs. Choose the matching configuration or generate the right IR; for a mono IR it suggests a configuration to save |
+| Rate or channel mismatch | Read the error: it lists each candidate filter and what differs. Choose the matching configuration or generate the right IR |
 | Cannot find an IR | Check its name relative to the configuration, including upper and lower case; run `--profile portable-paths` |
 | A Windows drive path fails on a Mac or Linux | Copy the IRs beside the configuration and replace the drive path with a relative path |
 | An old configuration is rejected for missing delays | Add input and output delay lines ([old Windows configurations](other-programs.md#configurations-from-the-old-windows-convolver)) |

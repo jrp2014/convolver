@@ -60,7 +60,7 @@ then takes up one of the EDGE items.
   plug-in state, with opt-in resampling (EDGE-1, IO-2); savings in today's
   engine, measured first (PERF-3, EDGE-11); long reverbs at low CPU with
   lower and finer latency (PERF-2, with EDGE-10); true-stereo and other file
-  layouts without a `.cfg` (EDGE-3); and an opt-in report of a filter's own
+  layouts without a `.cfg` (EDGE-3, done 25 November 2026); and an opt-in report of a filter's own
   delay, which answers the lip-sync complaint in part (EDGE-13). Then edges
   nobody was found citing: filters larger than the saved-state limit that
   Convolver itself sets (EDGE-12), and the easy room-correction wins,
@@ -207,7 +207,7 @@ question; TODO holds the acceptance criteria.
 | 1 | [A filter for every sample rate](#1-a-filter-for-every-sample-rate) | Yes | M | EDGE-1, IO-2 |
 | 2 | [Savings in today's engine](#2-savings-in-todays-engine) | Yes | S–M each | PERF-3, EDGE-11 |
 | 3 | [Long reverbs at low CPU and latency](#3-long-reverbs-at-low-cpu-and-latency) | Yes | L | PERF-2, EDGE-10 |
-| 4 | [Reverb file layouts without a `.cfg`](#4-reverb-file-layouts-without-a-cfg) | Yes | S–M | EDGE-3 |
+| 4 | [Reverb file layouts without a `.cfg`](#4-reverb-file-layouts-without-a-cfg) | Yes | S–M | EDGE-3 (done) |
 | 5 | [Report a filter's own delay](#5-report-a-filters-own-delay) | In part | S–M | EDGE-13 |
 | 6 | [Filters larger than the saved-state limit](#6-filters-larger-than-the-saved-state-limit) | No | M | EDGE-12 |
 | 7 | [Delays finer than a sample](#7-delays-finer-than-a-sample) | No | S–M | EDGE-9 |
@@ -365,13 +365,15 @@ the release, not before. Once it does:
 **Approach.** Mono on stereo, and true stereo as one four-channel file or
 two stereo files, load without a hand-written configuration.
 
-**Gap.** A sound file filters channel by channel only; true stereo needs a
-hand-written `.cfg`. Reverb responses are commonly distributed in these
-layouts; Ableton's true stereo needs two stereo files of equal length named
-Left and Right.
-
-**jrp decides first.** The channel order assumed for four-channel files,
-and how the layout is chosen.
+**Done (EDGE-3, PR #292, 25 November 2026).** A filter with one input and
+one output plays on each channel, and a four-channel IR file on stereo plays
+as true stereo in the order LL, LR, RL, RR, which REVerence, SIR3, IR.lv2 and
+KlangFalter use; a file marked as Ambisonic B-format is never taken for true
+stereo, and an exact match always wins
+([configuration](../../use/configuration.md#mono-and-true-stereo-ir-files),
+[decision](../decisions.md#configuration-and-sound)). Two stereo files as
+one true-stereo filter, as Ableton takes them, still need a `.cfg`; that waits
+until a user asks.
 
 ### 5. Report a filter's own delay
 

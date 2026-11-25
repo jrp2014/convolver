@@ -144,11 +144,11 @@ playing for hours with the window closed. Convolver is built for that:
   ([another rate](docs/use/plugins.md#when-a-filter-does-not-fit)). To
   play at the new rate, choose the list again.
 - **Reverb on a send.** Choose the reverb's IR file and leave Mix at its
-  fully wet default. A file with one channel for each of the track's channels
-  plays as it is: a stereo file on a stereo send, a mono file on a mono one. A
-  mono response on a stereo send, or a four-channel true-stereo response,
-  needs a short `.cfg` that says which channel goes where
-  ([reverb responses](docs/use/configuration.md#reverb-responses)). A reverb of up
+  fully wet default. A stereo file plays as it is on a stereo send, a mono
+  file on each channel, and a four-channel file as true stereo (left to
+  left, left to right, right to left, right to right); a `.cfg` routes any
+  other layout
+  ([mono and true-stereo IR files](docs/use/configuration.md#mono-and-true-stereo-ir-files)). A reverb of up
   to 30 seconds took at most 4% of one core at 48 kHz with no added delay,
   and once the input has been silent for longer than the tail, an instance
   costs 93 to 99% less, measured on Linux
