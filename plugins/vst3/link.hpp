@@ -7,12 +7,17 @@
 // settings, requests and answers in messages, which a host may deliver late
 // or between two calls of a restore (VST3-15 to VST3-24).
 //
-// The processor owns a Bridge and registers it under a random key. Its
-// connect() and its answer to the controller's pair_request_message send the
-// key in a pair_message; the controller looks the key up and keeps the
-// Bridge. A key that is unknown (another process, a closed processor) leaves
-// the controller unpaired: it then shows the host's values and can load
-// nothing. Messages carry no settings, so a late one has nothing stale in it:
+// The processor owns a Bridge and registers it under a random key. The
+// controller numbers each connection it makes (Bridges::stamp()) and sends
+// the number in a pair_request_message; the processor answers with its key
+// and that number in a pair_message, from notify() or, if the request came
+// before the processor was connected, from its connect(). The controller
+// keeps the Bridge only for an answer to its current connection (VST3-27): a
+// host that delivers late may pass on an earlier processor's answer after it
+// connected the controller to another one, and that processor's key is still
+// valid while it lives. A key that is unknown (another process, a closed
+// processor) leaves the controller unpaired: it then shows the host's values
+// and can load nothing. Messages carry no settings, so a late one has nothing stale in it:
 // changed_message only says "read me again".
 #include "convolver/host.hpp"
 #include "host_report.hpp"
@@ -29,7 +34,9 @@
 #include <utility>
 
 namespace convolver::vst3 {
-inline constexpr const char* pair_message = "ConvolverPair"; // "key": the Bridge's key.
+// "key": the Bridge's key; "connection": the number from the request it answers.
+inline constexpr const char* pair_message = "ConvolverPair";
+// "connection": the controller's number for its current connection.
 inline constexpr const char* pair_request_message = "ConvolverPairRequest";
 // The processor changed in a call the host made to it (a restore, an
 // activation, new buses): the controller reads it again on the UI thread.

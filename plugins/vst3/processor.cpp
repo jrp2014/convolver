@@ -441,29 +441,35 @@ void Processor::signal_change() noexcept {
         sendMessage(message);
     }
 }
-void Processor::send_key() noexcept {
-    if (!getPeer() || !bridge_)
-        return;
+void Processor::send_key(std::uint64_t connection) noexcept {
+    if (!getPeer() || !bridge_ || connection == 0)
+        return; // Unconnected, or no request to answer: the controller asks when it connects.
     auto message = owned(allocateMessage());
     if (!message)
         return;
     message->setMessageID(pair_message);
     if (auto* attributes = message->getAttributes()) {
         attributes->setInt("key", static_cast<int64>(bridge_key_));
+        attributes->setInt("connection", static_cast<int64>(connection));
         sendMessage(message);
     }
 }
 tresult PLUGIN_API Processor::connect(IConnectionPoint* other) {
     const auto result = AudioEffect::connect(other);
     if (result == kResultOk)
-        send_key();
+        send_key(pair_connection_.load()); // A request that came before the connection.
     return result;
 }
 tresult PLUGIN_API Processor::notify(IMessage* message) {
     if (!message || !message->getMessageID() ||
         std::string_view(message->getMessageID()) != pair_request_message)
         return AudioEffect::notify(message);
-    send_key();
+    int64 connection = 0;
+    auto* attributes = message->getAttributes();
+    if (!attributes || attributes->getInt("connection", connection) != kResultOk || connection == 0)
+        return kInvalidArgument;
+    pair_connection_.store(static_cast<std::uint64_t>(connection));
+    send_key(static_cast<std::uint64_t>(connection));
     return kResultOk;
 }
 PairView Processor::view() {
