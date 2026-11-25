@@ -952,19 +952,26 @@ accepted and a refused restore. It runs every sequence of one and two steps
 in every variant, and 300 seeded random sequences of three to five steps.
 The variants are the connection (direct, a proxy that forwards at once, one
 that delivers later, with what it delivers after each step and whether it
-delivers between the two calls of a restore), the restore order, and
-whether the host plays a block after each step. Once the host has
+delivers between the two calls of a restore), the restore order, whether
+the host plays a block after each step, and, for a stopped host without
+the delaying proxy, whether automation queued before a restore reaches the
+processor before it or after it (only in sequences whose restores are
+refused: late automation over an accepted restore is the host's mistake).
+Once the host has
 delivered everything, one oracle judges each sequence: the controller's
 parameters, the host's view of them, the window's settings line, what the
 processor plays (its settings, its latency and its impulse response
 against a fresh processor restored from the expected state), the latency
 the host last read, the saved state and what a processor restored from it
 plays must all match the latest step that succeeded, and every host
-callback must come on the UI thread. Gain, Mix and Bypass are judged only
+callback must come on the UI thread, none inside another
+`restartComponent`. Gain, Mix and Bypass are judged only
 after the host has delivered them in `process()`. Named cases cover two
 instances at once and closing one, a processor with no controller, a
-restore on another thread in an offline render, and a save between a Gain
-edit and its delivery. A failure prints the sequence and its variant, for
+restore on another thread in an offline render, a save between a Gain
+edit and its delivery, a Latency or Gain mode chosen before the halves
+pair, and a host that holds values as float and passes them back to the
+controller when it reads them (Ardour 8 and 9). A failure prints the sequence and its variant, for
 example `delaying proxy, processor first, playing: W [none] G`;
 `--tsv FILE` writes every result, and `--random`, `--seed` and `--length`
 change the random part (run `build/plugins/vst3/convolver_vst3_sync` with
