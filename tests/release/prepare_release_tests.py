@@ -183,7 +183,7 @@ class PrepareReleaseTests(unittest.TestCase):
         # The host checks not repeated on this version stay listed as unverified (jrp, 8 November 2026);
         # what jrp's live session checked on 0.18.10 is credited to 0.18.10 only.
         self.assertIn('Checked on 0.18.10, built from its tag on one Mac', text)
-        self.assertIn('Not yet repeated on 0.18.10 or this version: in REAPER', text)
+        self.assertIn('To retest on this preview, with what 0.18.10 showed where it was tried: in REAPER', text)
         # Check 10 ran on the 0.16.14 candidate; the chosen-file path changed after it (status.md).
         self.assertIn('a configuration list chosen before playing (failed on 0.18.10, fixed in 0.18.12)', text)
         self.assertIn('with the 0.16.14 candidate', text)
