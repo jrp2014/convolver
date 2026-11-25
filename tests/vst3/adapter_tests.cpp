@@ -2273,8 +2273,10 @@ void settings_parameters() {
         read_at_restart.clear();
         const auto chosen = c.setParamNormalized(latency_id, normalized_latency(2048));
         latency_preparation_for_tests = nullptr;
+        // VST3-26: the latency that plays did not change, so the host is not
+        // asked to read it again.
         require(chosen == kResultOk && p.settings().latency == 2048 &&
-                    p.getLatencySamples() == 512 && read_at_restart == std::vector<uint32>{512},
+                    p.getLatencySamples() == 512 && read_at_restart.empty(),
                 "a failed Latency preparation changed the latency the host reads");
         require(log.text().find("Latency 2048 frames could not be applied, so the plug-in keeps "
                                 "512 frames: no memory for the test") != std::string::npos,
@@ -2310,18 +2312,19 @@ void settings_parameters() {
                 impulse_delay() == 1024,
             "the Latency chosen after a stop");
     // A state with another Latency plays it at once too, and the
-    // controller's host is asked to restart.
+    // controller's host is asked to restart once (VST3-26: as soon as the
+    // processor has restored it).
     MemoryStream with_latency;
     require(p.getState(&with_latency) == kResultOk, "save latency");
     with_latency.seek(0, IBStream::kIBSeekSet, nullptr);
     require(read_state(&with_latency).settings->latency == 1024, "latency not saved");
     handler.restarts.clear();
+    read_at_restart.clear();
     state.seek(0, IBStream::kIBSeekSet, nullptr);
     require(p.setState(&state) == kResultOk && p.settings().latency == latency_samples &&
                 p.getLatencySamples() == latency_samples && impulse_delay() == L,
             "an older state kept the Latency, or it did not play at once");
     state.seek(0, IBStream::kIBSeekSet, nullptr);
-    read_at_restart.clear();
     require(c.setComponentState(&state) == kResultOk &&
                 latency_frames(c.getParamNormalized(latency_id)) == latency_samples &&
                 handler.latency_restarts() == 1 &&
@@ -2692,6 +2695,9 @@ void latency_while_playing() {
             gain = i % 2 ? .25f : .5f;
             next->seek(0, IBStream::kIBSeekSet, nullptr);
             require(p.setState(next.get()) == kResultOk, "playing latency filter");
+            // VST3-26: the restore's Latency, which the host reads again.
+            if (playing != latency_samples)
+                expected.push_back(static_cast<uint32>(latency_samples));
             playing = latency_samples;
             after_a_block();
         }
@@ -4249,23 +4255,17 @@ void messages_through_proxies() {
         deliver();
         check(latency_at_restart == std::vector<std::size_t>{1024},
               "host asked to restart before the processor had the new Latency");
-        if (defer) {
-            // Changed three times before the processor hears: only the
-            // last choice's answer asks for the restart, so the host never
-            // restarts at a Latency that is about to change.
-            latency_at_restart.clear();
-            check(c.setParamNormalized(latency_id, normalized_latency(512)) == kResultOk &&
-                      c.setParamNormalized(latency_id, normalized_latency(2048)) == kResultOk &&
-                      c.setParamNormalized(latency_id, normalized_latency(512)) == kResultOk,
-                  "proxy Latency three times");
-            to_processor.deliver_one(); // The first 512 arrives; its answer comes back.
-            to_controller.deliver();
-            check(latency_at_restart.empty() && p.settings().latency == 512,
-                  "host asked to restart while a later Latency was on its way");
-            deliver();
-            check(latency_at_restart == std::vector<std::size_t>{512},
-                  "host not asked to restart for the last Latency");
-        }
+        // VST3-26: the controller gives each choice to the processor itself,
+        // so even a proxy that delivers later cannot leave the host reading a
+        // Latency that is about to change: each plays when it is read.
+        latency_at_restart.clear();
+        check(c.setParamNormalized(latency_id, normalized_latency(512)) == kResultOk &&
+                  c.setParamNormalized(latency_id, normalized_latency(2048)) == kResultOk &&
+                  c.setParamNormalized(latency_id, normalized_latency(512)) == kResultOk,
+              "proxy Latency three times");
+        check(latency_at_restart == std::vector<std::size_t>{512, 2048, 512} &&
+                  p.getLatencySamples() == 512,
+              "a Latency the host read was not the one in use");
         handler.on_restart = nullptr;
         // Accepted: the project is marked changed once, when the answer arrives.
         check(c.load_file(good.string()), "proxy file not loaded");
@@ -4273,14 +4273,13 @@ void messages_through_proxies() {
         auto seen = shown(report());
         check(handler.dirty == 1 && seen.filter_name == "room.wav",
               "proxy file not playing, or the project not marked changed");
-        // Refused (the host plays audio, PLUG-27): never marked changed. A
-        // forwarding proxy brings the refusal at once; a deferring one later,
-        // in the report.
+        // Refused (the host plays audio, PLUG-27): never marked changed, and
+        // answered at once through either proxy (VST3-26).
         play_block(p, 1, 1, 64);
         const bool refused_result = c.load_file(wrong.string());
         deliver();
         seen = shown(report());
-        check(defer || !refused_result, "a refused file reported as accepted");
+        check(!refused_result, "a refused file reported as accepted");
         check(handler.dirty == 1, "a refused file marked the project changed");
         check(seen.filter_name == "room.wav" && !seen.filter_note.empty(),
               "refused file not explained in the report");
@@ -4862,187 +4861,6 @@ void accepted_restore_follows_its_own_request() {
         }
     std::filesystem::remove_all(folder);
 }
-// PLUG-39 step 5a (the independent review of PR #246): a status message
-// whose report does not decode, as a damaged message would, is not shown,
-// but the load answer it carries still counts, and notify says the message
-// was not valid.
-class Damaging final : public IConnectionPoint {
-  public:
-    explicit Damaging(IConnectionPoint& to) : to_(to) {}
-    tresult PLUGIN_API connect(IConnectionPoint*) override {
-        return kResultOk;
-    }
-    tresult PLUGIN_API disconnect(IConnectionPoint*) override {
-        return kResultOk;
-    }
-    tresult PLUGIN_API notify(IMessage* message) override {
-        const void* data = nullptr;
-        uint32 size = 0;
-        auto* attributes = message ? message->getAttributes() : nullptr;
-        if (damage && attributes && attributes->getBinary("report", data, size) == kResultOk &&
-            size > 1) {
-            // The same message with the report cut short. A new message,
-            // since the SDK's HostAttributeList leaks the value setBinary
-            // replaces.
-            IPtr<HostMessage> cut = owned(new HostMessage);
-            cut->setMessageID(message->getMessageID());
-            auto* to = cut->getAttributes();
-            to->setBinary("report", data, size / 2);
-            for (const char* key : {"load request", "accepted", "latency request", "followed state",
-                                    "playing latency", "playing gain mode", "heard latency request",
-                                    "heard gain mode request"}) {
-                int64 value = 0;
-                if (attributes->getInt(key, value) == kResultOk)
-                    to->setInt(key, value);
-            }
-            for (const char* key : {"playing gain", "playing mix"}) {
-                double value = 0;
-                if (attributes->getFloat(key, value) == kResultOk)
-                    to->setFloat(key, value);
-            }
-            last = to_.notify(cut);
-            ++damaged;
-            return last;
-        }
-        return to_.notify(message);
-    }
-    tresult PLUGIN_API queryInterface(const TUID _iid, void** obj) override {
-        QUERY_INTERFACE(_iid, obj, FUnknown::iid, IConnectionPoint)
-        QUERY_INTERFACE(_iid, obj, IConnectionPoint::iid, IConnectionPoint)
-        *obj = nullptr;
-        return kNoInterface;
-    }
-    uint32 PLUGIN_API addRef() override {
-        return 1;
-    }
-    uint32 PLUGIN_API release() override {
-        return 1;
-    }
-    bool damage = false;
-    tresult last = kResultOk;
-    int damaged = 0;
-
-  private:
-    IConnectionPoint& to_;
-};
-void damaged_report_message() {
-    const auto folder = private_temp("convolver-vst3-damaged-report");
-    std::filesystem::create_directories(folder);
-    const auto good = folder / "room.wav";
-    write_wav(good, 48000, 1, 8);
-    HostApplication context;
-    Handler handler;
-    Processor p;
-    Controller c;
-    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
-                c.setComponentHandler(&handler) == kResultOk,
-            "damaged report: initialize");
-    Damaging to_controller(c);
-    require(p.connect(&to_controller) == kResultOk && c.connect(&p) == kResultOk,
-            "damaged report: connect");
-    const auto before = shown(c.report());
-    const auto text_before = c.status_text();
-    require(before.status_name == "No filter",
-            ("damaged report: first report " + before.status_name).c_str());
-    to_controller.damage = true;
-    require(c.load_file(good.string()), "a load whose answer came with a damaged report was "
-                                        "not answered as accepted");
-    require(to_controller.damaged > 0 && to_controller.last == kInvalidArgument,
-            "notify accepted a report that does not decode");
-    const auto during = shown(c.report());
-    require(during.status_name == "No filter" && during.filter_name == before.filter_name &&
-                c.status_text() == text_before,
-            ("a damaged report replaced the one shown: " + during.status_name + " " +
-             during.filter_name)
-                .c_str());
-    require(handler.dirty == 1, "the accepted load did not mark the project changed");
-    // Whole again: the next report shows the filter.
-    to_controller.damage = false;
-    const auto after = shown(c.report());
-    require(after.filter_name == "room.wav" && c.status_text() != text_before,
-            ("the next whole report not shown: " + after.status_name + " " + after.filter_name)
-                .c_str());
-    p.disconnect(&to_controller);
-    c.disconnect(&p);
-    c.terminate();
-    p.terminate();
-    std::filesystem::remove_all(folder);
-}
-// VST3-22 (jrp's review of 0.18.14): a damaged status message that answers
-// a refused preset still sets the parameters to what plays (PLUG-48), but
-// its report says nothing of the status, so the Status parameter keeps the
-// last one a whole report gave. It showed Active after a refusal.
-void damaged_report_keeps_status() {
-    HostApplication context;
-    Handler handler;
-    Processor p;
-    Controller c;
-    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
-                c.setComponentHandler(&handler) == kResultOk,
-            "damaged status: initialize");
-    Damaging to_controller(c);
-    require(p.connect(&to_controller) == kResultOk && c.connect(&p) == kResultOk,
-            "damaged status: connect");
-    SpeakerArrangement mono = SpeakerArr::kMono;
-    require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "damaged status: buses");
-    p.activateBus(kAudio, kInput, 0, true);
-    p.activateBus(kAudio, kOutput, 0, true);
-    const auto state_at = [](int rate, std::size_t latency) {
-        convolver::HostState state;
-        state.configuration =
-            convolver::Configuration{rate, 1, 1, 0, {}, {}, {{{.5f}, {{0, 1}}, {{0, 1}}}}};
-        state.settings.emplace();
-        state.settings->latency = latency;
-        auto stream = std::make_unique<MemoryStream>();
-        require(write_state(stream.get(), state), "damaged status: encode");
-        return stream;
-    };
-    const auto restore = [&](IBStream& stream) {
-        stream.seek(0, IBStream::kIBSeekSet, nullptr);
-        const auto result = p.setState(&stream);
-        stream.seek(0, IBStream::kIBSeekSet, nullptr);
-        require(c.setComponentState(&stream) == kResultOk, "damaged status: the controller's");
-        return result;
-    };
-    const auto status = [&] {
-        return static_cast<convolver::HostStatus>(
-            std::lround(c.getParameterObject(status_id)->toPlain(c.getParamNormalized(status_id))));
-    };
-    const auto shown_latency = [&] { return latency_frames(c.getParamNormalized(latency_id)); };
-    auto playing = state_at(48000, 1024);
-    require(restore(*playing) == kResultOk, "damaged status: the first filter");
-    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
-    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
-            "damaged status: activate");
-    play_block(p, 1, 1, 64);
-    require(status() == convolver::HostStatus::active, "damaged status: Active before");
-    // A preset for another rate is refused while the filter plays: Load
-    // failed, and the parameters show the 1024 that plays.
-    auto other_rate = state_at(44100, 0);
-    require(restore(*other_rate) != kResultOk && status() == convolver::HostStatus::load_failed &&
-                shown_latency() == 1024,
-            "damaged status: the first refusal");
-    // Refused again, with every report damaged on its way: the answer still
-    // brings Latency back to 1024 from the preset's 0, and Status still says
-    // the newest request failed.
-    to_controller.damage = true;
-    require(restore(*other_rate) != kResultOk && to_controller.damaged > 0,
-            "damaged status: the second refusal");
-    require(shown_latency() == 1024 && p.getLatencySamples() == 1024,
-            ("damaged status: the parameter shows Latency " + std::to_string(shown_latency()) +
-             " while the processor plays " + std::to_string(p.getLatencySamples()))
-                .c_str());
-    require(status() == convolver::HostStatus::load_failed,
-            ("damaged status: a report that does not decode set Status to " +
-             std::to_string(static_cast<int>(status())))
-                .c_str());
-    to_controller.damage = false;
-    p.setActive(false);
-    p.disconnect(&to_controller);
-    c.disconnect(&p);
-    c.terminate();
-    p.terminate();
-}
 // PLUG-13 (jrp's review of 276c7dc): a filter that fills the saved state at
 // default settings loaded and saved, and after Gain changed to -6 dB
 // getState() failed. Load, change a setting, save and restore, at the limit.
@@ -5227,8 +5045,6 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"edits_before_controller_first_restore", edits_before_controller_first_restore},
         {"accepted_restore_beats_queued_edit", accepted_restore_beats_queued_edit},
         {"accepted_restore_follows_its_own_request", accepted_restore_follows_its_own_request},
-        {"damaged_report_message", damaged_report_message},
-        {"damaged_report_keeps_status", damaged_report_keeps_status},
         {"settings_at_state_limit", settings_at_state_limit},
         {"tail_measured_at_output", tail_measured_at_output},
         {"output_silence_flags", output_silence_flags},

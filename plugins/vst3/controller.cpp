@@ -11,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -47,25 +48,14 @@ tresult PLUGIN_API Controller::setState(IBStream* stream) {
         name_ = state.name;
         identity_ = state.identity;
     }
-    // The processor puts the name in its report and the report's text; it
-    // answers with a new status_message.
-    if (auto message = owned(allocateMessage())) {
-        message->setMessageID(name_message);
-        if (auto* attributes = message->getAttributes()) {
-            // No name sends neither (the SDK's host attributes leak an empty
-            // binary value); decode_controller_state() gives both or neither.
-            if (!state.name.empty()) {
-                attributes->setBinary("name", state.name.data(),
-                                      static_cast<uint32>(state.name.size()));
-                attributes->setBinary("identity", state.identity.data(),
-                                      static_cast<uint32>(state.identity.size()));
-            }
-            sendMessage(message);
-        }
-    }
+    // The processor puts the name in its report and the report's text.
+    with_processor([&](ProcessorLink& p) { p.offer_name(state.name, state.identity); });
+    if (on_ui_thread())
+        refresh(false);
     return kResultOk;
 }
 tresult PLUGIN_API Controller::getState(IBStream* stream) {
+    refresh_if_changed();
     std::string bytes;
     {
         std::lock_guard lock(status_lock_);
@@ -90,6 +80,7 @@ tresult PLUGIN_API Controller::getState(IBStream* stream) {
 }
 tresult PLUGIN_API Controller::initialize(FUnknown* context) {
     auto result = EditController::initialize(context);
+    ui_thread_ = std::this_thread::get_id(); // Hosts initialize on the UI thread.
     if (result == kResultOk) {
         // VST3-4: the settings first, as generic host views list them in
         // this order (the Audio Unit lists the same).
@@ -100,7 +91,7 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
         gain->setPrecision(1);
         parameters.addParameter(gain);
         // PLUG-10: not automatable, as Latency: Estimate may need time to
-        // find the filter's figure (gain_mode_message).
+        // find the filter's figure (chosen_gain_mode()).
         auto* mode = new StringListParameter(STR16("Gain mode"), gain_mode_id, nullptr,
                                              ParameterInfo::kIsList, kRootUnitId, STR16("Mode"));
         for (std::size_t i = 0; i < gain_mode_count; ++i) {
@@ -142,318 +133,145 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
     }
     return result;
 }
-tresult PLUGIN_API Controller::notify(IMessage* message) {
-    if (!message || !message->getMessageID() ||
-        std::string_view(message->getMessageID()) != status_message)
-        return EditController::notify(message);
-    auto* attributes = message->getAttributes();
-    // PLUG-39 step 5: the report, which holds the Status line too.
-    const void* data = nullptr;
-    uint32 size = 0;
-    if (!attributes || attributes->getBinary("report", data, size) != kResultOk || (size && !data))
-        return kInvalidArgument;
-    // VST3-15: the answer to a request, when the message follows one.
-    int64 load_request = 0, load_retried = 0, load_accepted = 0, latency_request = 0;
-    attributes->getInt("load request", load_request);
-    attributes->getInt("retried", load_retried); // PLUG-40 (StatusAnswer).
-    const bool loaded = load_request || load_retried;
-    attributes->getInt("accepted", load_accepted);
-    attributes->getInt("latency request", latency_request);
-    // PLUG-26: the settings an accepted .vstpreset applied, which the
-    // processor already plays.
-    double preset_gain = 0, preset_mix = 0;
-    int64 preset_latency = -1, preset_mode = 0;
-    const bool preset_settings =
-        loaded && load_accepted && attributes->getFloat("gain", preset_gain) == kResultOk &&
-        attributes->getFloat("mix", preset_mix) == kResultOk &&
-        attributes->getInt("latency frames", preset_latency) == kResultOk &&
-        std::isfinite(preset_gain) && std::isfinite(preset_mix) &&
-        std::find(host_latencies.begin(), host_latencies.end(), preset_latency) !=
-            host_latencies.end();
-    // PLUG-10: the preset's Gain mode; absent from an older processor, so Set.
-    attributes->getInt("gain mode", preset_mode);
-    if (preset_mode < 0 || preset_mode >= static_cast<int64>(gain_mode_count))
-        preset_mode = 0;
-    // PLUG-48: the settings the processor plays after its outcome for the
-    // state setComponentState mirrored (`followed_state`, its
-    // read_state()'s digest); absent otherwise or from a damaged message, which
-    // then changes no parameter.
-    std::optional<HostSettings> playing;
-    int64 followed_state = 0, heard_latency = 0, heard_gain_mode = 0;
-    attributes->getInt("followed state", followed_state);
-    // VST3-18: the last Latency and Gain mode choices the processor had heard.
-    attributes->getInt("heard latency request", heard_latency);
-    attributes->getInt("heard gain mode request", heard_gain_mode);
-    // VST3-19: the latency that plays changed since the host last read it.
-    int64 latency_restored = 0, restored_after_mirror = 0;
-    attributes->getInt("latency restored", latency_restored);
-    attributes->getInt("restored after mirror", restored_after_mirror);
-    if (followed_state) {
-        double gain = 0, mix = 0;
-        int64 latency = -1, mode = -1;
-        if (attributes->getFloat("playing gain", gain) == kResultOk &&
-            attributes->getFloat("playing mix", mix) == kResultOk &&
-            attributes->getInt("playing latency", latency) == kResultOk &&
-            attributes->getInt("playing gain mode", mode) == kResultOk && std::isfinite(gain) &&
-            std::isfinite(mix) &&
-            std::find(host_latencies.begin(), host_latencies.end(), latency) !=
-                host_latencies.end() &&
-            mode >= 0 && mode < static_cast<int64>(gain_mode_count)) {
-            playing.emplace();
-            playing->gain_db = gain;
-            playing->mix = mix;
-            playing->latency = static_cast<std::size_t>(latency);
-            playing->gain_mode = static_cast<GainMode>(mode);
+tresult PLUGIN_API Controller::terminate() {
+    bridge_.reset();
+    return EditController::terminate();
+}
+template <class F> bool Controller::with_processor(F&& f) {
+    if (!bridge_)
+        return false;
+    if (bridge_->call(std::forward<F>(f)))
+        return true;
+    bridge_.reset(); // The processor has gone.
+    return false;
+}
+bool Controller::on_ui_thread() const noexcept {
+    return std::this_thread::get_id() == ui_thread_;
+}
+tresult PLUGIN_API Controller::connect(IConnectionPoint* other) {
+    const auto result = EditController::connect(other);
+    if (result == kResultOk)
+        if (auto message = owned(allocateMessage())) {
+            message->setMessageID(pair_request_message);
+            sendMessage(message);
         }
+    return result;
+}
+tresult PLUGIN_API Controller::disconnect(IConnectionPoint* other) {
+    bridge_.reset();
+    return EditController::disconnect(other);
+}
+tresult PLUGIN_API Controller::notify(IMessage* message) {
+    if (!message || !message->getMessageID())
+        return EditController::notify(message);
+    const std::string_view id = message->getMessageID();
+    if (id == pair_message) {
+        int64 key = 0;
+        auto* attributes = message->getAttributes();
+        if (!attributes || attributes->getInt("key", key) != kResultOk)
+            return kInvalidArgument;
+        // A key from another process, or a processor that has gone, finds
+        // nothing: the controller stays unpaired.
+        auto bridge = Bridges::find(static_cast<std::uint64_t>(key));
+        if (!bridge)
+            return kResultFalse;
+        const bool again = bridge == bridge_;
+        bridge_ = std::move(bridge);
+        if (!again)
+            bridge_->changed();
+        // From now on the parameters show the processor's, Gain, Mix and
+        // Bypass included.
+        if (!again && on_ui_thread())
+            refresh(true);
+        return kResultOk;
     }
-    std::optional<HostReport> report;
-    std::string format;
-    try {
-        report = decode_report(std::string_view(static_cast<const char*>(data), size));
-        const void* bytes = nullptr;
-        uint32 length = 0;
-        if (attributes->getBinary("format", bytes, length) == kResultOk && (bytes || !length))
-            format.assign(static_cast<const char*>(bytes), length);
-    } catch (...) {
-        return kOutOfMemory;
+    if (id == changed_message) {
+        // Off the UI thread (an offline restore) the next call on it reads
+        // the processor: the host's callbacks belong there.
+        if (on_ui_thread())
+            refresh_if_changed();
+        return kResultOk;
     }
-    // A report that does not decode (a damaged message) is not shown, but
-    // the answer the message carries still counts, so a load or Latency
-    // request is never left waiting.
-    const bool readable = report.has_value();
-    const auto status = readable ? report->status.status : HostStatus{};
-    auto* parameter = getParameterObject(status_id);
-    if (!parameter) // Not initialized, or terminated: nothing to show it on.
-        return kResultFalse;
-    bool changed = false, restart = false;
-    std::optional<HostSettings> followed;
-    unsigned keep = 0; // VST3-18: the settings the answer leaves as they are.
+    return EditController::notify(message);
+}
+void Controller::refresh_if_changed() {
+    if (bridge_ && on_ui_thread() && bridge_->take_changed())
+        refresh(false);
+}
+void Controller::refresh(bool adopt_all, bool tell_host) {
+    PairView view;
+    if (!with_processor([&](ProcessorLink& p) { view = p.view(); }))
+        return;
+    if (bridge_)
+        bridge_->take_changed(); // Read now.
+    auto* status = getParameterObject(status_id);
+    if (!status) // Not initialized, or terminated: nothing to show it on.
+        return;
+    bool changed = false;
+    const auto shown = view.report.status.status;
     {
         std::lock_guard lock(status_lock_);
-        if (load_request) {
-            load_answered_ = load_request;
-            load_accepted_ = load_accepted != 0;
-        }
-        // The Latency sent last: an earlier one's answer asks for nothing,
-        // as the processor has later choices still to come.
-        if (latency_waiting_ && latency_request == latency_requests_) {
-            latency_waiting_ = false;
-            restart = true;
-        }
-        if (readable) {
-            changed = !report_ || report_->status.text != report->status.text ||
-                      report_->status.status != status;
-            report_.swap(report);
-            format_.swap(format);
-        }
-        if (follow_state_ && playing && static_cast<std::uint64_t>(followed_state) == follow_state_)
-            followed = playing;
-        keep = edited_since_restore_;
-        // Only a choice made since the restore: one before it was replaced
-        // by the state, and one the processor never heard (a message lost)
-        // must not keep a setting for later restores.
-        if (latency_requests_ > std::max<int64>(heard_latency, latency_at_restore_))
-            keep |= setting_bit(latency_id);
-        if (gain_mode_requests_ > std::max<int64>(heard_gain_mode, gain_mode_at_restore_))
-            keep |= setting_bit(gain_mode_id);
-        // VST3-19: setComponentState asked the host to read a changed
-        // latency. That was before the processor restored the state if the
-        // outcome came from the processor's own restore, or if this answer
-        // arrives later than the request's own delivery (a host that
-        // delivers messages later may have restored the processor between).
-        if (followed && (latency_restored ||
-                         (restart_at_restore_ && (restored_after_mirror || !sending_follow_))))
-            restart = true;
-        if (followed)
-            restart_at_restore_ = false;
+        changed = !report_ || report_->status.text != view.report.status.text ||
+                  report_->status.status != shown;
+        report_ = std::move(view.report);
+        format_ = std::move(view.format);
     }
-    // PLUG-48: after restored state, the settings the processor plays, which
-    // differ from the state's when it refused that state. Not edits:
-    // the host restored them, so nothing is recorded as the user's.
-    // VST3-18 (jrp's review of 0.18.12): a host that delivers messages later
-    // may bring this answer after the user chose another setting. A Latency
-    // or Gain mode the processor had not yet heard, which it will play once
-    // it does, and a Gain or Mix the host set since the restore, keep their values.
-    if (followed) {
-        const auto set = [&](ParamID id, ParamValue value) {
-            if ((keep & setting_bit(id)) || getParamNormalized(id) == value)
-                return;
-            EditController::setParamNormalized(id, value);
-            changed = true;
-        };
-        const auto before = latency_frames(getParamNormalized(latency_id));
-        set(gain_id, normalized_gain(followed->gain_db));
-        set(mix_id, std::clamp(followed->mix, 0.0, 1.0));
-        set(gain_mode_id, normalized_gain_mode(followed->gain_mode));
-        set(latency_id, normalized_latency(followed->latency));
-        if (latency_frames(getParamNormalized(latency_id)) != before)
-            restart = true;
+    if (changed)
+        EditController::setParamNormalized(status_id,
+                                           status->toNormalized(static_cast<ParamValue>(shown)));
+    const auto set = [&](ParamID id, ParamValue value) {
+        if (getParamNormalized(id) == value)
+            return;
+        EditController::setParamNormalized(id, value);
+        changed = true;
+    };
+    set(latency_id, normalized_latency(view.settings.latency));
+    set(gain_mode_id, normalized_gain_mode(view.settings.gain_mode));
+    if (adopt_all || view.generation != generation_) {
+        set(gain_id, normalized_gain(view.settings.gain_db));
+        set(mix_id, std::clamp(view.settings.mix, 0.0, 1.0));
+        set(bypass_id, view.bypass ? 1 : 0);
     }
-    // A window asks for the report twice a second; only a new status line
-    // is news for the host.
-    if (changed) {
-        // VST3-22: a report that does not decode says nothing of the status,
-        // though the settings it carries changed: Status keeps its value.
-        if (readable)
-            EditController::setParamNormalized(
-                status_id, parameter->toNormalized(static_cast<ParamValue>(status)));
-        // Ask the host to read the parameters again (the status is not edited
-        // by the user, so performEdit does not apply). Hosts may ignore this.
-        if (componentHandler)
-            componentHandler->restartComponent(kParamValuesChanged);
-    }
-    // PLUG-26: a chosen preset's Gain, Gain mode, Mix and Latency, which the processor
-    // already plays, reach the host as the user's edits would, one gesture
-    // each for those that change, so the host's parameters and the state
-    // it saves agree with what plays. Where the host is writing automation,
-    // they are recorded as edits would be. The host hands Gain and Mix
-    // back in process() with the values the processor has; Latency in
-    // process() is ignored, and handed back to setParamNormalized it is no
-    // change, so no latency_message follows. A changed Latency asks for the
-    // restart below, as a restored one does (setComponentState).
-    bool edited = false;
-    if (preset_settings) {
-        const auto report_edit = [&](ParamID id, ParamValue value) {
-            if (getParamNormalized(id) == value)
-                return;
-            EditController::setParamNormalized(id, value);
-            beginEdit(id);
-            performEdit(id, getParamNormalized(id));
-            endEdit(id);
-            edited = true;
-        };
-        const auto before = latency_frames(getParamNormalized(latency_id));
-        report_edit(gain_id, normalized_gain(preset_gain));
-        report_edit(gain_mode_id, normalized_gain_mode(static_cast<GainMode>(preset_mode)));
-        report_edit(mix_id, std::clamp(preset_mix, 0.0, 1.0));
-        report_edit(latency_id, normalized_latency(static_cast<std::size_t>(preset_latency)));
-        if (latency_frames(getParamNormalized(latency_id)) != before)
-            restart = true;
-    }
-    // The component state now holds the file's filter: the host saves it
-    // only if it knows the project changed. Edits reported for a preset's
-    // settings tell a host without setDirty already.
-    if (loaded && load_accepted && setDirty(true) != kResultOk && !edited) {
-        // VST3-17, a narrow fix: setDirty did not succeed, so the host may
-        // not know the state changed. Audacity 4.0.2 offers no
-        // IComponentHandler2 and, while the window stays open and playback
-        // is stopped, stores the state only after the plug-in reports an
-        // edit, so a filter chosen in the window played but was missing
-        // from exports and saved projects. Report an edit of Latency that
-        // keeps its value: not automatable, ignored by process() (the
-        // controller sends Latency as a message, only when it changes), so
-        // the sound, automation and Gain and Mix are untouched. A host whose
-        // setDirty succeeds sees nothing new. The general fix is the host's:
-        // implementing IComponentHandler2 (draft Audacity issue, VST3-17).
-        // Like setDirty, this runs on the thread that delivered the answer:
-        // the UI thread for a direct or forwarding connection.
-        const auto latency = getParamNormalized(latency_id);
-        beginEdit(latency_id);
-        performEdit(latency_id, latency);
-        endEdit(latency_id);
-    }
+    generation_ = view.generation;
+    // Ask the host to read the parameters again (the status is not edited
+    // by the user, so performEdit does not apply). Hosts may ignore this.
+    if (changed && tell_host && componentHandler)
+        componentHandler->restartComponent(kParamValuesChanged);
     // The SDK's way to report a new latency: the host deactivates the
     // component, reads getLatencySamples() and activates it again; some
     // (REAPER 7.85) only read it. The processor already plays the new
-    // Latency when it answers (VST3-16), so either way the host reads the
-    // latency that plays. Last,
-    // after this message's Status: with a direct connection this runs inside
-    // Processor::notify, and a host that restarts at once sends newer
-    // status messages from setActive.
-    if (restart && componentHandler)
+    // Latency (VST3-16), so either way the host reads the latency that
+    // plays. The first read after pairing only records it: the host reads
+    // it when it activates the processor.
+    const bool told = latency_told_.has_value();
+    if (std::exchange(latency_told_, view.latency) != view.latency && told && componentHandler)
         componentHandler->restartComponent(kLatencyChanged);
-    return readable ? kResultOk : kInvalidArgument;
-}
-unsigned Controller::setting_bit(ParamID id) noexcept {
-    switch (id) {
-    case gain_id:
-        return 1U;
-    case mix_id:
-        return 2U;
-    case gain_mode_id:
-        return 4U;
-    case latency_id:
-        return 8U;
-    default:
-        return 0;
-    }
-}
-void Controller::edited_since_restore(ParamID id) {
-    std::lock_guard lock(status_lock_);
-    edited_since_restore_ |= setting_bit(id);
-}
-void Controller::latency_chosen(std::size_t frames) {
-    int64 request = 0;
-    {
-        std::lock_guard lock(status_lock_);
-        request = ++latency_requests_;
-        latency_waiting_ = true;
-    }
-    // The processor's answer asks the host to restart (notify).
-    if (auto message = owned(allocateMessage())) {
-        message->setMessageID(latency_message);
-        if (auto* attributes = message->getAttributes()) {
-            attributes->setInt("frames", static_cast<int64>(frames));
-            attributes->setInt("request", request);
-            sendMessage(message);
-        }
-    }
 }
 tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) {
+    // The host's value goes over what the processor said before it.
+    refresh_if_changed();
     if (id == bypass_id) {
-        // PLUG-22: the processor shows Bypassed at once (bypass_message).
-        const bool before = getParamNormalized(bypass_id) >= .5;
+        // PLUG-22: the processor shows Bypassed at once.
         const auto result = EditController::setParamNormalized(id, value);
         const bool after = getParamNormalized(bypass_id) >= .5;
-        if (result == kResultOk && after != before) {
-            if (auto message = owned(allocateMessage())) {
-                message->setMessageID(bypass_message);
-                if (auto* attributes = message->getAttributes()) {
-                    attributes->setInt("bypass", after ? 1 : 0);
-                    sendMessage(message);
-                }
-            }
-        }
-        return result;
-    }
-    if (id == gain_mode_id) {
-        const auto before = gain_mode(getParamNormalized(gain_mode_id));
-        const auto result = EditController::setParamNormalized(id, value);
-        const auto after = gain_mode(getParamNormalized(gain_mode_id));
-        if (result == kResultOk && after != before) {
-            int64 request = 0;
-            {
-                std::lock_guard lock(status_lock_);
-                request = ++gain_mode_requests_;
-            }
-            // The processor answers with its status_message.
-            if (auto message = owned(allocateMessage())) {
-                message->setMessageID(gain_mode_message);
-                if (auto* attributes = message->getAttributes()) {
-                    attributes->setInt("mode", static_cast<int64>(after));
-                    attributes->setInt("request", request);
-                    sendMessage(message);
-                }
-            }
-        }
-        return result;
-    }
-    if (id == latency_id) {
-        const auto before = latency_frames(getParamNormalized(latency_id));
-        const auto result = EditController::setParamNormalized(id, value);
-        const auto after = latency_frames(getParamNormalized(latency_id));
-        if (result == kResultOk && after != before)
-            latency_chosen(after);
-        return result;
-    }
-    if (id == gain_id || id == mix_id) {
-        // VST3-18: a value the host passes here it passes to the processor
-        // in process() too (automation, or the window's edit through the
-        // host), also when it is the value shown: automation to the refused
-        // preset's Gain plays that Gain (jrp's review of PR #278).
-        const auto result = EditController::setParamNormalized(id, value);
         if (result == kResultOk)
-            edited_since_restore(id);
+            with_processor([&](ProcessorLink& p) { p.show_bypass(after); });
+        return result;
+    }
+    if (id == gain_mode_id || id == latency_id) {
+        const auto before = getParamNormalized(id);
+        const auto result = EditController::setParamNormalized(id, value);
+        if (result != kResultOk || getParamNormalized(id) == before)
+            return result;
+        const auto chosen = getParamNormalized(id);
+        with_processor([&](ProcessorLink& p) {
+            if (id == latency_id)
+                p.chosen_latency(latency_frames(chosen));
+            else
+                p.chosen_gain_mode(gain_mode(chosen));
+        });
+        if (on_ui_thread())
+            refresh(false); // A new Latency asks the host to restart.
         return result;
     }
     const auto result = EditController::setParamNormalized(id, value);
@@ -465,11 +283,9 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
         if (report_ && report_->status.status == HostStatus::fault)
             return result; // The processor has explained it already.
     }
-    // Outside the lock: the processor answers with its status_message.
-    if (auto message = owned(allocateMessage())) {
-        message->setMessageID(faults_message);
-        sendMessage(message);
-    }
+    with_processor([](ProcessorLink& p) { p.explain_faults(false); });
+    if (on_ui_thread())
+        refresh(false);
     return result;
 }
 tresult PLUGIN_API Controller::getParamStringByValue(ParamID id, ParamValue value,
@@ -487,7 +303,7 @@ tresult PLUGIN_API Controller::getParamStringByValue(ParamID id, ParamValue valu
     }
     if (id == status_id && value == getParamNormalized(status_id)) {
         std::lock_guard lock(status_lock_);
-        // The text belongs to the status the processor sent last; a Fault
+        // The text belongs to the status read last; a Fault
         // value from the audio thread reads as its name until it explains.
         if (report_ && !report_->status.text.empty() &&
             status_index(value) == static_cast<long>(report_->status.status)) {
@@ -544,64 +360,30 @@ tresult PLUGIN_API Controller::getParamValueByString(ParamID id, TChar* string, 
     return EditController::getParamValueByString(id, string, value);
 }
 tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
+    if (bridge_) {
+        // VST3-26: what the processor plays, not the stream: the processor
+        // may have refused the state (PLUG-48: REAPER's preset menu offers a
+        // preset made for another rate while a filter plays, and it then
+        // keeps its own settings), and a host that restores the controller
+        // first brings the processor's own restore after this, which says
+        // it changed.
+        refresh(true, false);
+        if (bridge_)
+            return kResultOk;
+    }
+    // Unpaired: the state's values, as the host restored them.
     HostState state;
-    std::uint64_t digest = 0;
     try {
-        state = read_state(stream, &digest);
+        state = read_state(stream);
     } catch (...) {
         return kResultFalse;
     }
     const auto saved = state.settings.value_or(HostSettings{});
     EditController::setParamNormalized(gain_id, normalized_gain(saved.gain_db));
     EditController::setParamNormalized(mix_id, std::clamp(saved.mix, 0.0, 1.0));
-    // The processor has the Gain mode from the same state: no message.
     EditController::setParamNormalized(gain_mode_id, normalized_gain_mode(saved.gain_mode));
-    // The processor has the Latency from the same state: no message, but the
-    // host is asked to read it again when it changed.
-    const auto before = latency_frames(getParamNormalized(latency_id));
     EditController::setParamNormalized(latency_id, normalized_latency(saved.latency));
-    const bool latency_changed = latency_frames(getParamNormalized(latency_id)) != before;
-    if (latency_changed && componentHandler)
-        componentHandler->restartComponent(kLatencyChanged);
-    const auto result = EditController::setParamNormalized(bypass_id, state.bypass ? 1 : 0);
-    // PLUG-48 (jrp's live session, 22 November 2026): the processor may
-    // have refused this state, as REAPER's preset menu offers a preset made
-    // for another rate while a filter plays; it then keeps its own settings,
-    // but the values above came from the refused preset (REAPER showed
-    // Latency 0 while 1024 played). This message names the state (its
-    // digest); the processor's status after its outcome for this state says
-    // what plays, and the parameters take it (notify). That status answers
-    // this message when the processor refused the state already (it read it
-    // first, as the SDK says hosts do); otherwise it follows the processor's
-    // restore. A refusal of the same state in an earlier restore also
-    // answers this message, and the restore that follows corrects it
-    // (Codex's review).
-    int64 latency_before = 0, gain_mode_before = 0;
-    {
-        std::lock_guard lock(status_lock_);
-        follow_state_ = digest;
-        edited_since_restore_ = 0;
-        latency_at_restore_ = latency_requests_;
-        gain_mode_at_restore_ = gain_mode_requests_;
-        restart_at_restore_ = latency_changed;
-        sending_follow_ = true;
-        latency_before = latency_at_restore_;
-        gain_mode_before = gain_mode_at_restore_;
-    }
-    if (auto message = owned(allocateMessage())) {
-        message->setMessageID(report_message);
-        if (auto* attributes = message->getAttributes(); attributes && digest) {
-            attributes->setInt("follow state", static_cast<int64>(digest));
-            attributes->setInt("latency requests", latency_before);
-            attributes->setInt("gain mode requests", gain_mode_before);
-        }
-        sendMessage(message);
-    }
-    {
-        std::lock_guard lock(status_lock_);
-        sending_follow_ = false;
-    }
-    return result;
+    return EditController::setParamNormalized(bypass_id, state.bypass ? 1 : 0);
 }
 IPlugView* PLUGIN_API Controller::createView(FIDString name) {
     if (!name || std::string_view(name) != ViewType::kEditor)
@@ -609,11 +391,16 @@ IPlugView* PLUGIN_API Controller::createView(FIDString name) {
     return create_editor(*this);
 }
 std::optional<HostReport> Controller::report() {
-    // Outside the lock: the processor answers with its status_message.
-    if (auto message = owned(allocateMessage())) {
-        message->setMessageID(report_message);
-        sendMessage(message);
-    }
+    LoadAnswer retried;
+    with_processor([&](ProcessorLink& p) {
+        retried = p.read_waiting_list();
+        p.explain_faults(true);
+    });
+    if (retried.tried && retried.accepted)
+        accepted_file(retried);
+    // Gain and Mix change in process(), which says nothing: always read.
+    if (on_ui_thread())
+        refresh(false);
     std::lock_guard lock(status_lock_);
     return report_;
 }
@@ -630,27 +417,61 @@ std::string Controller::diagnostics() {
     return diagnostics_text(*report, format);
 }
 bool Controller::load_file(const std::string& path) {
-    auto message = owned(allocateMessage());
-    if (!message || path.empty())
+    if (path.empty())
         return false;
-    message->setMessageID(load_message);
-    int64 request = 0;
-    {
-        std::lock_guard lock(status_lock_);
-        request = ++load_requests_;
+    LoadAnswer answer;
+    with_processor([&](ProcessorLink& p) { answer = p.load_chosen(path); });
+    if (answer.accepted)
+        accepted_file(answer);
+    if (on_ui_thread())
+        refresh(false);
+    return answer.accepted;
+}
+void Controller::accepted_file(const LoadAnswer& answer) {
+    // PLUG-26: a chosen preset's Gain, Gain mode, Mix and Latency, which the
+    // processor already plays, reach the host as the user's edits would, one
+    // gesture each for those that change, so the host's parameters and the
+    // state it saves agree with what plays. Where the host is writing
+    // automation, they are recorded as edits would be. The host hands Gain
+    // and Mix back in process() with the values the processor has; Latency in
+    // process() is ignored. The refresh that follows sees nothing more to
+    // take, and asks the host to read a changed latency.
+    bool edited = false;
+    if (const auto& settings = answer.settings) {
+        const auto report_edit = [&](ParamID id, ParamValue value) {
+            if (getParamNormalized(id) == value)
+                return;
+            EditController::setParamNormalized(id, value);
+            beginEdit(id);
+            performEdit(id, getParamNormalized(id));
+            endEdit(id);
+            edited = true;
+        };
+        report_edit(gain_id, normalized_gain(settings->gain_db));
+        report_edit(gain_mode_id, normalized_gain_mode(settings->gain_mode));
+        report_edit(mix_id, std::clamp(settings->mix, 0.0, 1.0));
+        report_edit(latency_id, normalized_latency(settings->latency));
     }
-    auto* attributes = message->getAttributes();
-    if (!attributes ||
-        attributes->setBinary("path", path.data(), static_cast<uint32>(path.size())) != kResultOk ||
-        attributes->setInt("request", request) != kResultOk)
-        return false;
-    if (sendMessage(message) != kResultOk)
-        return false; // Refused, or not delivered.
-    // A direct connection or a forwarding proxy has brought the answer
-    // (notify, which marks the project changed); a deferring one brings it
-    // later.
-    std::lock_guard lock(status_lock_);
-    return load_answered_ != request || load_accepted_;
+    // The component state now holds the file's filter: the host saves it
+    // only if it knows the project changed. Edits reported for a preset's
+    // settings tell a host without setDirty already.
+    if (setDirty(true) != kResultOk && !edited) {
+        // VST3-17, a narrow fix: setDirty did not succeed, so the host may
+        // not know the state changed. Audacity 4.0.2 offers no
+        // IComponentHandler2 and, while the window stays open and playback
+        // is stopped, stores the state only after the plug-in reports an
+        // edit, so a filter chosen in the window played but was missing
+        // from exports and saved projects. Report an edit of Latency that
+        // keeps its value: not automatable, ignored by process() (Latency
+        // reaches the processor only when it changes), so the sound,
+        // automation and Gain and Mix are untouched. A host whose setDirty
+        // succeeds sees nothing new. The general fix is the host's:
+        // implementing IComponentHandler2 (draft Audacity issue, VST3-17).
+        const auto latency = getParamNormalized(latency_id);
+        beginEdit(latency_id);
+        performEdit(latency_id, latency);
+        endEdit(latency_id);
+    }
 }
 tresult PLUGIN_API Controller::getParameterIDFromFunctionName(UnitID unit, FIDString name,
                                                               ParamID& id) {

@@ -156,15 +156,9 @@ class Vst3 final : public lc::Driver {
             ->addPoint(0, convolver::vst3::normalized_gain(db), index);
         check(call({}, {}, 0, &changes), "Gain parameter");
     }
-    // The controller's latency_message, as a new Latency choice sends it.
+    // A new Latency choice, as the controller gives it (link.hpp).
     void set_latency(std::size_t frames) override {
-        IPtr<HostMessage> message = owned(new HostMessage);
-        message->setMessageID(convolver::vst3::latency_message);
-        auto* attributes = message->getAttributes();
-        check(attributes && attributes->setInt("frames", static_cast<int64>(frames)) == kResultOk,
-              "latency message");
-        attributes->setInt("request", ++requests_);
-        check(processor_->notify(message) == kResultOk, "latency message");
+        static_cast<convolver::vst3::ProcessorLink&>(*processor_).chosen_latency(frames);
     }
     std::optional<std::size_t> latency() override {
         return processor_->getLatencySamples();
@@ -199,17 +193,10 @@ class Vst3 final : public lc::Driver {
     std::size_t max_block() const override {
         return 512;
     }
-    // The window's Choose Filter, as the controller sends it (load_message),
-    // on the calling thread. True if the processor accepted the file.
+    // The window's Choose Filter, as the controller asks it (link.hpp), on
+    // the calling thread. True if the processor accepted the file.
     bool load_file(const std::string& path) {
-        IPtr<HostMessage> message = owned(new HostMessage);
-        message->setMessageID(convolver::vst3::load_message);
-        auto* attributes = message->getAttributes();
-        check(attributes && attributes->setBinary("path", path.data(),
-                                                  static_cast<uint32>(path.size())) == kResultOk,
-              "load message");
-        attributes->setInt("request", ++requests_);
-        return processor_->notify(message) == kResultOk;
+        return static_cast<convolver::vst3::ProcessorLink&>(*processor_).load_chosen(path).accepted;
     }
 
   private:
@@ -246,7 +233,6 @@ class Vst3 final : public lc::Driver {
     std::size_t inputs_ = 2, outputs_ = 2;
     bool active_ = false;
     std::optional<std::pair<std::size_t, bool>> starve_; // For restore_starved.
-    int64 requests_ = 0; // load_file's and set_latency's message numbers.
 };
 
 // VST3-20 (jrp's review of 0.18.14). Contract, loading and failure: a valid

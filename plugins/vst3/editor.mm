@@ -10,8 +10,8 @@
 // resizable by the user (canResize is false). The view talks only to the
 // edit controller, on the host's main thread: settings as parameter edits
 // (beginEdit, performEdit, endEdit, with setParamNormalized for the
-// controller's own copy; Bypass too), the report the processor sent, and a
-// chosen file as a message the processor handles (Controller::load_file).
+// controller's own copy; Bypass too), the report read from the processor,
+// and a chosen file the processor loads (Controller::load_file).
 #include "editor.hpp"
 #import "diagnostic_view.h"
 #include "pluginterfaces/vst/ivsteditcontroller.h"

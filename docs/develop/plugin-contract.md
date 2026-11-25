@@ -160,9 +160,9 @@ before they set the sample rate and channel layout (VST3 `setState` before
   unnecessarily"): such a list is read again by itself, as if chosen, once,
   when the window reads its report while the host plays audio through the
   plug-in (`HostSettling::playing()`, `HostFilter::take_unsettled_list()`),
-  on the window's thread: VST3's processor in its `report_message`, which
-  answers with `"retried"` so the controller marks the project changed as for
-  a chosen file (setDirty, or VST3-17's Latency edit), and the Audio Unit in
+  on the window's thread: VST3's controller in its `report()`
+  (`read_waiting_list()`), marking the project changed as for a chosen
+  file (setDirty, or VST3-17's Latency edit), and the Audio Unit in
   its `report()`, through `load_file()`. An accepted list joins the
   windows' recent files there, as a chosen file does, so it does not matter
   which window reads the report (PLUG-47). PLUG-49: Audacity 4.0.2 restores
@@ -520,10 +520,9 @@ format.
   recomputes the line each time a host reads it, as Gain and Mix may have
   changed. The parameter is not automatable and is not part of the host
   state. VST3: parameter ID 1001 (Bypass is 1000), a list parameter with `kIsReadOnly`; the
-  processor sends the line to the controller in a `ConvolverStatus` message
-  after every load, activation, connection, `setupProcessing` and
-  `setBusArrangements` (outside its control lock), and the controller asks the
-  host to reread its parameters (`restartComponent(kParamValuesChanged)`;
+  controller reads the line from the processor after every load, activation,
+  pairing, `setupProcessing` and `setBusArrangements`, and asks the host to
+  reread its parameters when it changed (`restartComponent(kParamValuesChanged)`;
   hosts may ignore it). Audio Unit: global parameter 1001, indexed, readable
   and not writable; the line is the current value's
   `kAudioUnitProperty_ParameterStringFromValue`, recomputed after every
@@ -744,8 +743,8 @@ format.
   file-loading paths are checked by review only. The audio
   thread shows a new fault at once without logging: VST3 writes Fault to the
   Status parameter as an output parameter change, and when the host passes it
-  to the controller (`setParamNormalized`), the controller sends
-  `ConvolverFaults` and the processor explains; it also explains on
+  to the controller (`setParamNormalized`), the controller asks the
+  processor, which explains; it also explains on
   `getState`, `setState` and `setActive` (not `setProcessing`, which hosts
   may call on the audio thread). Each episode is logged, even if its text
   repeats the last line. The Audio Unit's
@@ -760,46 +759,56 @@ LV2 keeps its own routes (the `status` port, whose values are Active, No
 filter, Load failed, Loading and Fault, and `log:log`) and does not write
 the file. An editor (HOST-2) would show the same text.
 
-VST3 carries the window's traffic in `IMessage`s between the processor and
-the controller (VST3-3), which hosts may deliver on any thread and may run in
-separate processes, so each carries values, never pointers:
+VST3's controller reaches the processor of its own instance directly
+(VST3-26, [`link.hpp`](../../plugins/vst3/link.hpp)). The factory does not
+mark the processor distributable, so the SDK requires a host to keep both
+halves in one process. The processor registers a `Bridge` under a random
+key and sends the key in a `ConvolverPair` message when it connects, and
+again when the controller asks (`ConvolverPairRequest`, sent when the
+controller connects), so pairing works in either order and through a proxy
+that delivers later. A key that finds nothing (another process, a closed
+processor) leaves the controller unpaired: it shows the host's values,
+reports nothing and loads nothing. The processor detaches the `Bridge` when
+it terminates, waiting for a call in progress; later calls refuse. Messages
+carry no settings and no answers, so one delivered late has nothing stale
+in it:
 
-- The processor's `ConvolverStatus` message carries the editor report,
-  which holds the Status line too: `encode_report()`'s bytes as one binary
-  attribute, and the log tag ("VST3 #2"). The controller keeps the decoded
-  report under its own lock, derives the Status parameter, its text and the
-  window's content from it, does not show a report that does not decode
-  (answering kInvalidArgument, though the load or Latency answer and the
-  settings that play which the message carries still count, and the Status
-  parameter keeps its value; `vst3.adapter` `damaged_report_message` and
-  `damaged_report_keeps_status`, VST3-22), and asks
-  the host to reread the parameters only when the Status line changed; Copy
-  diagnostics joins the report's text with the recent log lines
-  (`diagnostics_text()`).
-- A window reading the report sends `ConvolverReport`, and the processor
-  answers with a fresh `ConvolverStatus`, so faults the audio thread counted
-  appear as they do in the Audio Unit's twice-a-second read. It looks for new
-  faults at most every 10 seconds, as the Audio Unit does.
-- `ConvolverLoad` carries a chosen file's UTF-8 path and a request number.
-  The processor reads it with `read_chosen_file()` for the current rate and
-  channels (macOS AudioToolbox, as the Audio Unit reads; libsndfile on
-  Windows and Linux; builds with no reader refuse it with a reason) and
-  installs it as `setState` does, or records the refusal; its
-  `ConvolverStatus` answer names the request and whether the file was
+- After a host call that may change what the controller shows (a restore,
+  an activation, `setupProcessing`, `setBusArrangements`, a save that
+  explained faults), the processor marks the `Bridge` and sends
+  `ConvolverChanged`, outside its control lock. The controller reads the
+  processor again (`PairView`: the editor report, which holds the Status
+  line, the log tag, the settings, Bypass, a generation and the latency) at
+  that message when it arrives on the UI thread (the thread that
+  initialized the controller), otherwise at its next call there. Every host
+  callback therefore comes on the UI thread, also when an offline render
+  restores the processor on its own thread. The controller keeps the report
+  under its own lock, derives the Status parameter, its text and the
+  window's content from it, and asks the host to reread the parameters
+  only when one changed; Copy diagnostics joins the report's text with the
+  recent log lines (`diagnostics_text()`).
+- A window reading the report (`Controller::report()`) reads the processor
+  each time, since Gain and Mix change in `process()`, which says nothing,
+  and first asks it to explain faults at most every 10 seconds, as the
+  Audio Unit does.
+- A chosen file goes to the processor as a call (`load_chosen()`), which
+  reads it with `read_chosen_file()` for the current rate and channels
+  (macOS AudioToolbox, as the Audio Unit reads; libsndfile on Windows and
+  Linux; builds with no reader refuse it with a reason) and installs it as
+  `setState` does, or records the refusal, and returns whether it was
   accepted. PLUG-26: a chosen Convolver `.vstpreset` is read as
   `convolver-preset` reads it, and when it holds settings its Gain, Mix and
   Latency apply with its filter (its bypass flag does not: the host's
-  Bypass stays); the answer then carries them (`gain`, `mix`,
-  `latency frames`), and the controller reports each one that changes to the
-  host as an edit (`beginEdit`, `performEdit`, `endEdit`), so the host's
-  parameters and saved project agree with what plays, then asks for a
-  latency restart when Latency changed. They are three separate gestures:
-  a host writing automation records them, which its own preset menu never
-  does, and undoing one in the host changes that setting back, not the
-  filter. The host hands Gain and Mix back in
+  Bypass stays); the answer then carries them, and the controller reports
+  each one that changes to the host as an edit (`beginEdit`, `performEdit`,
+  `endEdit`), so the host's parameters and saved project agree with what
+  plays, then asks for a latency restart when the latency changed. They are
+  three separate gestures: a host writing automation records them, which
+  its own preset menu never does, and undoing one in the host changes that
+  setting back, not the filter. The host hands Gain and Mix back in
   `process()` with the values the processor already has, and Latency to
-  `setParamNormalized` as no change. A preset without settings leaves them; one
-  holding the defaults reports any that change (PLUG-35).
+  `setParamNormalized` as no change. A preset without settings leaves them;
+  one holding the defaults reports any that change (PLUG-35).
   The controller then calls
   `setDirty(true)` for an accepted file, so the host marks the project
   changed. When `setDirty` does not succeed (a host without
@@ -811,22 +820,18 @@ separate processes, so each carries values, never pointers:
   and jrp's [Audacity pass](../archive/reviews/2026-11-21-vst3-17-audacity-pass.md)
   confirms it), unless a chosen preset's settings were already reported as
   edits. Latency is used because it is not automatable and `process()`
-  ignores it (the controller sends a new Latency as a message, only when the
-  value changes), so neither the sound nor Gain, Mix or automation change.
-  It is a narrow fix: a host whose `setDirty` succeeds sees nothing new, and
-  the general fix is the host implementing `IComponentHandler2`. Reading
-  happens on the thread that delivered the message, never in `process()`.
-- A host may put a proxy between the two components
-  ([`IConnectionPoint`](https://steinbergmedia.github.io/vst3_doc/vstinterfaces/classSteinberg_1_1Vst_1_1IConnectionPoint.html))
-  that delivers a message after `sendMessage()` returns and answers
-  `kResultOk` itself (VST3-15). The controller therefore acts on the
-  processor's answers, not on `sendMessage()`'s result: a load is refused at
-  once only when the answer came during the call (a direct connection or a
-  forwarding proxy, such as the SDK's `ConnectionProxy`); otherwise the
-  window's report shows the result when the answer arrives, and only an
-  accepted answer marks the project changed. `ConvolverLatency` carries a
-  request number too, and only the answer to the last one sent asks the
-  host to restart (below).
+  ignores it (the controller gives a new Latency to the processor only when
+  the value changes), so neither the sound nor Gain, Mix or automation
+  change. It is a narrow fix: a host whose `setDirty` succeeds sees nothing
+  new, and the general fix is the host implementing `IComponentHandler2`.
+  Reading happens on the window's thread, never in `process()`.
+- Until VST3-26 the two halves exchanged eight kinds of message, each
+  carrying settings or an answer, which a host could deliver late
+  (VST3-15) or between the two calls of a restore; each fix for an answer
+  overtaken by a later action (VST3-18, VST3-19 and the window-preset cases
+  of pull request #281) added
+  bookkeeping. JUCE's VST3 wrapper also lets its controller use the
+  processor directly, and Steinberg's simplest example is a single object.
 
 ## Scope of each change
 
@@ -1053,7 +1058,7 @@ the plan's Gain modes (12 November 2026); its meters follow later
   is none yet, so a restore that changes only the settings does not filter
   the noise again (PLUG-39 step 1a). Choosing Estimate plays the bound at once;
   `HostFilter::estimate()` then finds the estimate for the filter already
-  accepted, on the adapter's control side (VST3's message thread, the Audio
+  accepted, on the adapter's control side (VST3's UI thread, the Audio
   Unit's Latency worker, LV2's worker), and the adapter gives it to the
   playing filter with `HostProcessor::update_gains()`, which ramps to it
   like a Gain change. The engine is not replaced, so it keeps its history:
@@ -1182,25 +1187,21 @@ the plan's Gain modes (12 November 2026); its meters follow later
   (1002, a `StringListParameter` Set, Estimate, No clipping, not
   automatable), listed before Bypass and Status, with the same IDs as the
   Audio Unit. Each has a short title for narrow host controls: Gain, Mode,
-  Mix, Lat, Bypass and Status (PLUG-44). A new Gain mode goes from the controller to the processor in a
-  `ConvolverGainMode` message; the processor finds Estimate's figure if it
-  needs it, publishes the filter with it, then plays the new mode and
-  answers with its status. The controller's `setComponentState` mirrors a
-  restored mode without sending it back. The processor reads the last
+  Mix, Lat, Bypass and Status (PLUG-44). A new Gain mode goes from the controller to the processor
+  as a call (`chosen_gain_mode()`); the processor finds Estimate's figure if
+  it needs it, publishes the filter with it, then plays the new mode. The
+  processor reads the last
   point of each parameter queue in `process()`, as the SDK examples do, and
   hands Gain and Mix to the processor on every call. A Gain within 1e-5 dB
   of 0 counts as 0 dB, because hosts that keep normalized values as float
   cannot send 0 dB exactly, and a project reset to the default must still
-  save as version 1 or 2. A new Latency follows
-  the SDK's documented route: the controller tells the processor
-  (`ConvolverLatency` message) and, once the processor's `ConvolverStatus`
-  answer says it has the new Latency, asks the host to restart the component
-  (`restartComponent(kLatencyChanged)`), so a host that delivers messages
-  late still reads the new latency (VST3-15). While active, the processor
-  builds a processor with the new Latency and plays it before it answers
-  (VST3-16), as the Audio Unit does: REAPER 7.85 reads
-  `getLatencySamples()` inside `restartComponent` and does not deactivate and
-  activate the component, as the SDK describes
+  save as version 1 or 2. A new Latency also goes to the processor as a
+  call (`chosen_latency()`), and the controller then asks the host to
+  restart the component (`restartComponent(kLatencyChanged)`). While
+  active, the processor builds a processor with the new Latency and plays
+  it before the call returns (VST3-16), as the Audio Unit does: REAPER 7.85
+  reads `getLatencySamples()` inside `restartComponent` and does not
+  deactivate and activate the component, as the SDK describes
   ([trace](../archive/reviews/2026-11-07-vst3-16-reaper-trace.md)), so the
   latency must already be the one that plays. `getLatencySamples()` always
   reports the latency the running processor has (the choice while
@@ -1208,80 +1209,33 @@ the plan's Gain modes (12 November 2026); its meters follow later
   the new processor at its next block, and the control side frees the old
   one only once `process()` has left it. If the new processor cannot be
   built, the old Latency keeps playing, the log says why, the window says the
-  choice is not in use yet, and the next activation builds it. A host that
+  choice is not in use yet, the host is not asked to read a latency that
+  did not change, and the next activation builds it. A host that
   does restart the component builds the processor a second time, at the
-  same Latency. A restored state sets all three
-  (a version 1 or 2 state resets them to their defaults), and the
-  controller's `setComponentState` mirrors them, asking for a restart when the
-  Latency differs. PLUG-48: a state the processor refuses (REAPER's preset
-  menu offering a 44.1 kHz preset at 48 kHz while a filter plays, jrp's
-  live session of 22 November 2026) leaves the processor's settings as
-  they were, but the controller had mirrored the refused state, so the
-  window and the host showed Latency 0 while 1024 played.
-  `setComponentState` sends the processor a report request naming the
-  state it mirrored (`follow state`, a digest of the state's bytes as
-  `read_state()` reads them, the same in both halves; it copies nothing,
-  so memory running short after the read no longer makes a valid state
-  count as unreadable, VST3-20), so the answer also comes when no window
-  is open; while the host plays, that request reads a waiting list again,
-  as the window's does. The status that follows the
-  processor's outcome for that state carries the digest (`followed state`)
-  and the settings that play: the answer to the request when the processor
-  had already refused the state (the SDK's order), or the status after its
-  own restore of it (the controller first). That status sets Gain, Gain
-  mode, Mix and Latency to what plays, without reporting edits, asking for
-  a restart if the Latency changed, so the host's order does not matter.
-  Every outcome answers, not only a refusal: a refusal of the same state in
-  an earlier restore also answers a controller-first request, and the
-  restore that follows corrects it. Bypass is the host's
-  and is not corrected. VST3-18 (jrp's review of 0.18.12, 23 November
-  2026): a host that delivers messages later can bring that status after
-  the user has changed a setting, so it once set Latency back to the 1024
-  played at the refusal while the processor played the user's 256. Latency
-  and Gain mode reach the processor as numbered messages, in order with the
-  report request, so that status also carries the numbers of the last
-  `latency_message` and `gain_mode_message` the processor had heard: a
-  choice it had not heard keeps its value, since the processor plays it
-  once it does, and one it had heard follows the status, which includes
-  it (or the restore that replaced it, when the host gave the controller
-  the state first and the choice came between the two calls). Gain and Mix
-  reach the processor in `process()`, whose order against the status
-  cannot be told, so a Gain or Mix the host or the window set after
-  `setComponentState` (any `setParamNormalized`, even to the value shown,
-  since the host passes it to `process()` too: jrp's review found
-  automation to the refused preset's own Gain and Mix left apart) keeps
-  its value. The one order that leaves them apart: a host that restores the
-  controller first and passes a Gain or Mix edit made between the two calls
-  to `process()` before restoring the processor, whose restore then
-  replaces it. The others still take what plays (`vst3.adapter`
-  `edits_survive_late_answer`, `edits_before_controller_first_restore`).
-  VST3-19 (jrp's review of 0.18.14, 24 November 2026): the other way
-  round, a Latency or Gain mode chosen before a restore the processor
-  accepts, delivered after it, played and was saved while the window
-  showed the restored preset's. The report request also carries the
-  controller's request numbers when it mirrored the state; a processor
-  that accepted that state and then played a choice numbered at or below
-  them plays the state's setting again, and its status says so
-  (`latency restored`), so the controller asks the host to read the
-  latency again. A processor that accepted the state answers that request
-  too. `setComponentState` asks the host to read a changed latency, which
-  is before the processor restores when the host gives the controller the
-  state first; the controller asks again when the status says the outcome
-  came from the processor's own restore (`restored after mirror`), or when
-  the answer arrives after its request was sent rather than during it (a
-  host that delivers messages later may have restored the processor in
-  between; with one that restores the processor first this is one extra
-  read). Restoring the same state again in the SDK's order asks nothing
-  more (`vst3.adapter` `accepted_restore_beats_queued_edit`). The
-  processor compares a request only with the newest restore, while it is
-  accepted and nothing else has installed since (`RestoreFollow` in
-  `processor.hpp`): a request for an older state, delivered late, leaves it
-  for its own request; each request for the same state, sent again,
-  compares with the choices numbered before it; any later install, a
-  chosen file included, clears it, so a later refused restore of the same
-  state cannot bring its settings back; and a refused restore of another
-  state leaves it, since the accepted restore still plays (jrp's reviews
-  of PR #279, `accepted_restore_follows_its_own_request`).
+  same Latency. A restored state sets all three (a version 1 or 2 state
+  resets them to their defaults).
+  VST3-26: Latency and Gain mode belong to the processor, so the controller
+  always shows the processor's. Gain, Mix and Bypass belong to the host,
+  which passes them to the processor in `process()`; the controller takes
+  the processor's only when something other than `process()` set them (an
+  accepted restore or a chosen preset that holds settings, counted by the
+  processor's generation), so reading the processor late never undoes a
+  value the host set since. Whenever the latency the processor reports
+  differs from the one the controller last told the host, it asks the host
+  to read it again. Paired, `setComponentState` shows what the processor
+  plays rather than the stream: a state the processor refused (PLUG-48:
+  REAPER's preset menu offering a 44.1 kHz preset at 48 kHz while a filter
+  plays, jrp's live session of 22 November 2026) leaves the processor's
+  settings and Bypass as they were, and the window and host show those, not
+  the refused state's; a host that restores the controller first brings
+  the processor's own restore after it, which says it changed. The host's
+  order and when it delivers messages do not matter: `convolver_vst3_sync`
+  checks every sequence of one and two host actions, window choices and
+  deliveries in every order, and 300 longer ones, against the same
+  expectations (VST3-25), and `vst3.adapter` keeps the earlier cases
+  (`edits_survive_late_answer`, `edits_before_controller_first_restore`,
+  `accepted_restore_beats_queued_edit`,
+  `accepted_restore_follows_its_own_request`).
 
 ## Channel layouts
 
@@ -1583,17 +1537,17 @@ How each adapter meets the contract where its format differs:
   `endEdit` (a drag is one edit; a click, a typed value, a menu choice or a
   reset is one each), with `setParamNormalized` for the controller's own
   copy; the Bypass checkbox edits the bypass parameter (1000) the same way,
-  one edit per click; the report as `ConvolverReport` and the copy the processor sent;
-  a chosen or dropped file as `ConvolverLoad`. A bypass change through
-  the controller's `setParamNormalized` also sends `ConvolverBypass`, so the
-  processor's status and report say Bypassed before the audio thread sees
-  the change (PLUG-22). The controller state (`getState`, `setState`) holds
+  one edit per click; the report as `Controller::report()`, which reads the
+  processor; a chosen or dropped file as `Controller::load_file()`. A bypass
+  change through the controller's `setParamNormalized` also tells the
+  processor (`show_bypass()`), so its status and report say Bypassed before
+  the audio thread sees the change (PLUG-22). The controller state (`getState`, `setState`) holds
   the accepted file's name and its filter's identity (`"CVCS"`, version 1,
   each string as a little-endian 32-bit length and UTF-8); an empty or
   unknown stream reads as no name, so projects saved before PLUG-22, whose
   controller state is empty, still open. `setState` passes the name and
-  identity to the processor as `ConvolverName`, and the processor offers
-  them to its `HostFilter` (`offer_name()`); `getState` saves the report's
+  identity to the processor (`offer_name()`), and the processor offers
+  them to its `HostFilter` (`HostFilter::offer_name()`); `getState` saves the report's
   `filter saved name` for the playing filter, or the pair `setState`
   brought when that filter has none. The view's blocks hold a
   shared link that the editor clears in its destructor, so nothing the view

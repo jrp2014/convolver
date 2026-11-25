@@ -872,11 +872,13 @@ them, reporting each as an edit, with a latency restart (PLUG-35); another plug-
 filter, a missing file and a preset for another rate are refused, changing
 neither the filter nor the settings. `chosen_preset_before_activation()`
 chooses one before the host activates the plug-in: the settings are stored
-and reported, and the first activation plays its Latency. The messages also go through a forwarding
-proxy and a deferring one, as a host may connect the components (VST3-15):
-the report, a new Latency (the host asked to restart only once the processor
-has it, and after three quick changes only for the last) and a chosen file accepted and refused (the project marked changed
-only for the accepted one). The plug-in reads the files with AudioToolbox on
+and reported, and the first activation plays its Latency. The components also connect
+through a forwarding proxy and a deferring one, as a host may connect them
+(VST3-15), which only delays pairing (VST3-26): the report, a new Latency
+(the host asked to restart only once the processor has it, and three quick
+changes each read as it plays) and a chosen file accepted and refused (the
+project marked changed only for the accepted one, and the refusal answered
+at once). The plug-in reads the files with AudioToolbox on
 macOS and libsndfile on Linux and Windows (VST3-12). PLUG-22's
 `saved_filter_name()` checks the controller state: its format read back,
 and damaged, newer, over-long or empty-field states read as no name; an
@@ -942,7 +944,7 @@ a margin instead. The validator, the adapter tests and the plug-in
 all use Steinberg's SDK code, so CI also loads the bundle in an independent
 host, pluginval.
 
-`convolver_vst3_sync` (VST3-25, [`sync_tests.cpp`](../../tests/vst3/sync_tests.cpp))
+`vst3.sync` (VST3-25, [`sync_tests.cpp`](../../tests/vst3/sync_tests.cpp))
 generates sequences of what a host and a user do to one processor and
 controller pair: Latency and Gain mode choices, Gain, Mix and Bypass
 automation, a preset and a missing file chosen in the window, and an
@@ -965,10 +967,9 @@ restore on another thread in an offline render, and a save between a Gain
 edit and its delivery. A failure prints the sequence and its variant, for
 example `delaying proxy, processor first, playing: W [none] G`;
 `--tsv FILE` writes every result, and `--random`, `--seed` and `--length`
-change the random part. It is built with the VST3 tests but is not yet a
-CTest test, because `main` still fails it; run
-`build/plugins/vst3/convolver_vst3_sync` after a build with the VST3 SDK.
-The change that makes it pass registers it.
+change the random part (run `build/plugins/vst3/convolver_vst3_sync` with
+them). Before VST3-26 the messages between the halves failed 194 of the
+3,684 sequences.
 
 The [VST3 workflow](../../.github/workflows/vst3.yml) runs these tests in
 Release builds on Linux (Ooura), macOS and Windows, with the validator and
