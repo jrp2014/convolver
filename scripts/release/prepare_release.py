@@ -42,18 +42,18 @@ CHANGES = (
         "play and save the earlier Latency while the window showed the preset's. Settings changed after a refused "
         'preset no longer jump back when the host answers late, a window preset no longer comes back over a later '
         'edit or restore, a refused preset no longer leaves the window showing its Bypass or Status showing '
-        'Active, and the host reads the latency again when it restores the same state twice. No change to the '
-        'sound or to saved projects.'
+        "Active, and a host that restores the window's half first, or the same state twice, reads the latency "
+        'that plays. No change to how a filter sounds or to the saved-project format.'
     ),
     (
         'A valid VST3 project or preset is no longer refused as "could not be read: std::bad_alloc" when memory '
-        'runs short, and restores are quicker, including the one Audacity makes at every playback start: for a '
-        '120-second stereo filter, 538 ms instead of 708 ms in a Linux build. On Windows, running out of memory '
-        'while loading a filter could leave the plug-in not responding; it now reports the failure.'
+        'runs short, and restores are quicker, including the one Audacity makes at every playback start, because '
+        'they no longer make a second copy of the filter. On Windows, running out of memory while loading a '
+        'filter could leave the plug-in not responding; it now reports the failure.'
     ),
     (
         "On Windows, the note under the Gain row in Estimate or No clipping uses the small type of the window's "
-        'other notes, so its lines are no longer cut off.'
+        'other notes, so its lines can no longer be cut off.'
     ),
     (
         "The README's new What to expect section says, for room correction and crossovers, music at each track's "
