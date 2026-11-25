@@ -59,14 +59,17 @@ const SoundFiles& audio_toolbox_files();
 // of list entries passed over. `chosen_layout` receives the routing the
 // result was laid out with (EDGE-3, default_layout()): as_is for an exact
 // match. A plug-in or preset keeps a one-channel filter as it is, and
-// chosen_layout still says each_channel.
+// chosen_layout still says each_channel. `default_layouts` false takes an
+// exact match only, so a plug-in can try PLUG-33's fewer inputs before the
+// default routings (read_filter_file()); a refusal then explains only that.
 Configuration load_configuration(const std::filesystem::path&, const ConfigurationSelection&,
                                  const SoundFiles& files,
                                  std::vector<std::filesystem::path>* source_paths = nullptr,
                                  std::vector<std::filesystem::path>* raw_filters = nullptr,
                                  bool plugin = false, bool options = false,
                                  std::vector<std::filesystem::path>* chosen_paths = nullptr,
-                                 FilterLayout* chosen_layout = nullptr);
+                                 FilterLayout* chosen_layout = nullptr,
+                                 bool default_layouts = true);
 
 // Shared by the readers.
 // What the first bytes of a file say about it: a container marker no sample

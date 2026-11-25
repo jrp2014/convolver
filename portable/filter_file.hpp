@@ -23,14 +23,15 @@ namespace convolver {
 // command-line options alone (convolver-preset). `sources` receives what
 // the chosen filter was read from: the file, each list and configuration
 // visited, and the chosen configuration's IRs, not those of list entries
-// passed over (detail::Resolver::chosen_sources()). Throws as
-// load_configuration() does.
+// passed over (detail::Resolver::chosen_sources()). `default_layouts` as
+// for load_configuration(). Throws as load_configuration() does.
 HostState filter_file_state(const std::filesystem::path& path,
                             const ConfigurationSelection& selection,
                             const detail::SoundFiles& reader,
                             std::vector<std::filesystem::path>* raw_filters = nullptr,
                             bool plugin = false, bool options = false,
-                            std::vector<std::filesystem::path>* sources = nullptr);
+                            std::vector<std::filesystem::path>* sources = nullptr,
+                            bool default_layouts = true);
 
 // Why a chosen filter file could not be used, for HostFilter::reject().
 struct FilterFileFailure {

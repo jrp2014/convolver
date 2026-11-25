@@ -953,7 +953,7 @@ Configuration load_configuration(const std::filesystem::path& path,
                                  std::vector<std::filesystem::path>* source_paths,
                                  std::vector<std::filesystem::path>* raw_filters, bool plugin,
                                  bool options, std::vector<std::filesystem::path>* chosen_paths,
-                                 FilterLayout* chosen_layout) {
+                                 FilterLayout* chosen_layout, bool default_layouts) {
     if (raw_filters)
         raw_filters->clear(); // Also empty for a sound file or on failure.
     if (selection.sample_rate < 0 || selection.sample_rate > max_sample_rate ||
@@ -1040,7 +1040,7 @@ Configuration load_configuration(const std::filesystem::path& path,
     if (chosen_layout)
         *chosen_layout = FilterLayout::as_is;
     for (const bool second : {false, true}) {
-        if (second && !selection.input_channels)
+        if (second && (!selection.input_channels || !default_layouts))
             break; // No channels asked for: the first pass took any.
         defaults = second;
         detail::Resolver resolver(

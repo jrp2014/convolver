@@ -829,7 +829,7 @@ void files() {
                 !contains(r.status.text, "0 in, 0 out"),
             "three-channel file summary: " + text(r.status.text));
     require(!contains(r.explanation, "--") &&
-                contains(r.explanation, "load it in Convolver instead"),
+                contains(r.explanation, "Use an IR file with one channel per input channel (2)"),
             "three-channel file advice: " + text(r.explanation));
     require(loaded_path(unit) == stereo.string(), "the refused file replaced the stereo one");
     require(present_preset(unit) == "stereo.wav", "a refused file renamed the present preset");
@@ -926,7 +926,7 @@ void files() {
             "the refused three-channel file replaced the playing filter");
     // EDGE-3: a mono file replaces it and plays on each channel, saved as
     // the one-channel filter it is.
-    check(choose(empty, mono.string()), "a mono file refused by a stereo unit");
+    check(choose(empty, mono.string()), "a mono file chosen on a stereo unit");
     const auto each = empty.failure();
     require(!each.present && empty.saved().configuration &&
                 empty.saved().configuration->input_channels == 1 &&

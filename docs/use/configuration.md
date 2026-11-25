@@ -128,7 +128,9 @@ documentation:
 - **True stereo in another order**, or as two stereo files, needs a `.cfg`
   (below).
 
-**A `.cfg` always plays as written**, so it overrides these routings. This
+**A `.cfg` with the audio's channel counts plays as written**, so it
+overrides these routings (only a `.cfg` with one input and one output is
+spread over the channels). This
 one plays a true-stereo `hall.wav` at 48 kHz (the first line's rate must be
 the file's) exactly as the file used directly plays:
 

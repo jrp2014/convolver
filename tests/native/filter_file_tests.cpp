@@ -348,6 +348,25 @@ void wider_bus(const fs::path& dir) {
     require(inputs("wide-exact.txt", six) == 6, "an exact entry passed over for a smaller one");
     require(inputs("wide-exact.txt", HostLayout{44100, 4, 6}, "wide-2x6.cfg") == 2,
             "the 2-in entry on 4 inputs");
+    // EDGE-3: the default routings come after PLUG-33, so a list that
+    // played its entry for fewer inputs before plays it still: a mono entry
+    // later in the list does not play on each channel instead.
+    write("wide-1x1.cfg", "44100 1 1 0\n0\n0\nwide.wav\n0\n0\n0\n");
+    write("wide-1x2.cfg", "44100 1 2 0\n0\n0 0\nwide.wav\n0\n0\n0\nwide.wav\n0\n0\n1\n");
+    write("wide-mono-last.txt", "wide-1x2.cfg\nwide-1x1.cfg\n");
+    write("wide-crossover-last.txt", "wide-1x1.cfg\nwide-2x6.cfg\n");
+    require(inputs("wide-mono-last.txt", HostLayout{44100, 2, 2}, "wide-1x2.cfg") == 1,
+            "the 1-in, 2-out entry passed over for a mono one on each channel");
+    require(inputs("wide-crossover-last.txt", six, "wide-2x6.cfg") == 2,
+            "the crossover passed over for a mono entry on each of 6 channels");
+    // With no entry for fewer inputs, the mono entry plays on each channel.
+    write("wide-mono-only.txt", "wide-48k.cfg\nwide-1x1.cfg\n");
+    {
+        auto [state, why, named] = chosen("wide-mono-only.txt", HostLayout{44100, 2, 2});
+        require(state && state->configuration->input_channels == 1 &&
+                    state->configuration->output_channels == 1 && named.empty(),
+                "a list's mono entry on 2 channels: " + detail::advice_text(why.message));
+    }
     // Still refused as before: fewer inputs than the filter, other outputs,
     // another rate, and a rate that is not whole hertz.
     const auto refusal = [&](const std::string& name, const HostLayout& host,
