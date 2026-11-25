@@ -299,7 +299,10 @@ Contents: [direction](#direction) · [releases](#releases) ·
 - **25 November 2026.** A ninth unsigned developer preview, cut from
   `main` once the VST3 sequence test (VST3-25) and the redesigned sync
   between the VST3 plug-in's halves (VST3-26) had merged (jrp: "issue a
-  new preview on the basis of the current state of play"). See
+  new preview on the basis of the current state of play"). It was cut
+  before the everyday load budget of 23 November became a release step:
+  jrp chose "Cut now, budget from next one", since nothing after 0.18.12
+  changed the engine. See
   [Releasing](../develop/releasing.md#publishing-an-unsigned-preview).
 - **23 November 2026.** An everyday load budget beside the supported
   ceiling of 21 November: stereo room correction and the 2-to-6 crossover
