@@ -188,6 +188,11 @@ class Inspector {
         // fits. Its steps were recorded by the first pass, in the same order.
         auto layout = detail::FilterLayout::as_is;
         if (defaults_) {
+            // A list that grew on disk between the passes has entries the
+            // first pass never saw: they are not selected (jrp's review of
+            // a404df0).
+            if (visited_ >= leaf_steps_.size())
+                return false;
             const auto index = leaf_steps_[visited_++];
             const auto fits =
                 options_.expected_rate && options_.expected_rate != rate

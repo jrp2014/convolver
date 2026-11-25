@@ -314,6 +314,10 @@ std::vector<std::string> differences(const SelectionCandidate& c, const Configur
     if (w.output_channels && w.output_channels != c.output_channels)
         result.push_back("it produces " + channels(c.output_channels, "output ") + ", not " +
                          std::to_string(w.output_channels));
+    // jrp's review of a404df0: say why a four-channel entry is not true stereo.
+    if (c.ambisonic)
+        result.push_back("its header marks it as Ambisonics B-format, so it does not play as "
+                         "true stereo");
     return result;
 }
 std::string joined(const std::vector<std::string>& parts, const char* separator) {
@@ -486,16 +490,20 @@ Advice explain_no_match(const std::filesystem::path& filter, bool list,
              : "none of the " + std::to_string(candidates.size()) +
                    " filters in the configuration list " + name + " matches ") +
         std::string(subject) + " (" + wanted_text(w) + ")";
-    a.cause = "A list uses the first entry whose " + criteria + " equal these" +
-              (w.input_channels >= 2
-                   ? "; if none does, the first with the rate that has one input and one "
-                     "output, which filters every channel" +
-                         std::string(w.input_channels == 2
-                                         ? ", or that is a four-channel IR file, which plays as "
-                                           "true stereo"
-                                         : "")
-                   : std::string()) +
-              ". Entries checked, in order:";
+    // The default routings apply only where they can (default_layout()):
+    // two or more inputs and as many outputs, or outputs not asked for.
+    const bool defaults =
+        w.input_channels >= 2 && (!w.output_channels || w.output_channels == w.input_channels);
+    a.cause =
+        "A list uses the first entry whose " + criteria + " equal these" +
+        (defaults ? "; if none does, the first with the rate that has one input and one "
+                    "output, which filters every channel" +
+                        std::string(w.input_channels == 2
+                                        ? ", or that is a four-channel IR file, which plays as "
+                                          "true stereo"
+                                        : "")
+                  : std::string()) +
+        ". Entries checked, in order:";
     constexpr std::size_t shown = 10;
     for (std::size_t i = 0; i < candidates.size() && i < shown; ++i) {
         const auto& c = candidates[i];
