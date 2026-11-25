@@ -179,8 +179,9 @@ before any audio plays starts at once; one loaded during playback fades in
   rate, as Audacity does at 44.1 kHz to pass on an edit. Once the host
   plays, the filter plays if it fits; if not, it plays silence and Status
   says "Silent" with the filter's and the host's rates.
-- **When Convolver takes that result:** when its window is open during
-  playback, and in the Audio Unit also when the host reads Status. In the
+- **When Convolver takes the result of that check:** when its window is
+  open during playback, and in the Audio Unit also when the host reads
+  Status. In the
   VST3 plug-in the host's Status control does not ask by itself, so with
   the window closed Status may keep saying it is waiting until the window
   is opened while the host plays, or a setting such as Bypass changes. If
@@ -207,9 +208,11 @@ before any audio plays starts at once; one loaded during playback fades in
   after a parameter edit, does not count. A list with no entry for the rate
   and channels the host last ran with is refused, naming them; whenever
   the host is not playing audio through the plug-in at that moment, the
-  advice adds the same step.
-- **LV2** knows its host's rate and channels from the start, so it checks
-  every file at once.
+  advice adds the same step, for a host such as Audacity that runs the
+  plug-in briefly at 44.1 kHz before it first plays.
+
+LV2 knows its host's rate and channels from the start, so it checks every
+file at once.
 
 ## When a filter does not fit
 

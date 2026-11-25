@@ -20,9 +20,8 @@ helps you choose how to run it and points to the page for each step.
   Convolver never resamples or adapts a filter's channels.
 
 **Status:** Convolver is a developer preview. Preview packages are not signed,
-and only jrp has tried the plug-ins in a host (REAPER, Audacity and
-GarageBand, on macOS). The [status page](../project/status.md) says what is
-ready.
+and they have been tried in only a few hosts, by the project itself. The
+[status page](../project/status.md) says which, and what is ready.
 
 ## Choose how to run it
 

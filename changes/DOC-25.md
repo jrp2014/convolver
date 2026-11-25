@@ -17,7 +17,12 @@
   Windows previews before 0.13.12 had no window are gone, and the long
   paragraph on when a chosen file is checked is split by case.
 
+## For contributors
+
+- Status (DOC-25): the summary no longer says nobody has tried a build
+  newer than 0.12.x in a host; it cites jrp's 0.18.10 session.
+
 ## Done
 
 - [x] **DOC-25 — Correct and tighten the README and user guides.**
-  25 November 2026 ([configuration](../docs/use/configuration.md#reverb-responses)).
+  25 November 2026, PR #291 ([configuration](../docs/use/configuration.md#reverb-responses)).

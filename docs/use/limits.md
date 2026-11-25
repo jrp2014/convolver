@@ -29,7 +29,7 @@ stereo reverbs up to 60 s and true-stereo reverbs up to 60 s at 48 kHz or
 | Write output files all-or-nothing | Check the exit status: after a failure the output file may be incomplete |
 | Run in a plug-in host at double precision | Processing is single precision; 64-bit host buffers are converted |
 | Reach audio that ASIO or WASAPI exclusive mode sends on Windows | Use shared mode with [Equalizer APO](equalizer-apo.md), or a plug-in in the player |
-| Come signed, or tested in many hosts | Previews are unsigned ([install](install.md#unsigned-previews)). Only jrp has tried them, on macOS in REAPER, Audacity and GarageBand; the [status page](../project/status.md) tracks what is ready |
+| Come signed, or tested in many hosts | Previews are unsigned ([install](install.md#unsigned-previews)); the [status page](../project/status.md) says which hosts they have been tried in |
 
 Some configurations from other programs, or from the old Windows Convolver,
 need small changes first; see [other programs](other-programs.md).

@@ -161,10 +161,12 @@ from **Recent** was in the export. **Reload**, reloading when the file
 changes, a `.vstpreset` chosen in the window, and Audacity on Windows are
 not yet checked. Audacity sets up the plug-in at 44.1 kHz until it first
 plays, so a single IR file or `.cfg` chosen before then is kept and checked
-when Audacity plays. A configuration list chosen before then loads when
-Audacity first plays with Convolver's window open; with the window closed,
-choose it again after one playback
-([when a chosen file is checked](plugins.md#loading-a-filter)).
+when Audacity plays. A configuration list chosen before then should load
+when Audacity first plays with Convolver's window open, and otherwise needs
+choosing again after one playback
+([when a chosen file is checked](plugins.md#loading-a-filter)); automated
+tests check this, but not yet Audacity itself, where 0.18.10 left such a
+list silent.
 If you load a filter in an unchecked way, export a few seconds and check that
 the export has the filter you chose (for example by comparing it with
 `convolver --compare`, as in [check a stereo filter in a host](check-a-stereo-filter.md)).

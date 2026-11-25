@@ -78,13 +78,13 @@ An IR file used directly filters each channel with the IR channel of the
 same number, so a stereo reverb file plays as it is on a stereo track, and a
 mono one on a mono track. Two kinds of reverb response need a `.cfg`:
 
-- **A mono response on a stereo track.** Use the stereo example above with
-  the mono file, and set the second path's IR-channel line to `0`, so the
-  same response filters both sides.
+- **A mono response on a stereo track:** the mono version of the
+  [stereo example](#a-stereo-example).
 - **A true-stereo response**, a four-channel file whose channels are
   left to left, left to right, right to left and right to right. Used
   directly it needs four inputs, so a stereo track refuses it. This
-  `.cfg` feeds each input through two of the channels and adds them on
+  `.cfg`, for a `hall.wav` at 48 kHz (the first line's rate must be the
+  file's), feeds each input through two of the channels and adds them on
   each output:
 
   ```text
@@ -120,8 +120,8 @@ mono one on a mono track. Two kinds of reverb response need a `.cfg`:
   is left to left, right to left, left to right, right to right, swap the
   IR-channel lines `1` and `2`. A reverb that comes as two stereo files,
   one for each input side, needs the same four paths: name the left
-  input's file, channels `0` and `1`, on the first two, and the right
-  input's file on the last two.
+  input's file on the first two and the right input's file on the last
+  two, each with IR channels `0` and `1`.
 
 ## File layout
 
