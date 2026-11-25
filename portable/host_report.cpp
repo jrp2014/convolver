@@ -370,9 +370,33 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
         // EDGE-3: a one-channel filter shows the routes it plays on the
         // host's channels; true stereo is named.
         const bool each = host && !idle && plays_on_each_channel(*c, *host);
-        // With the filter's own route gains (review of 4a7b9af).
-        std::string routes =
-            each ? routing_words(on_each_channel(*c, host->inputs)) : routing_words(*c);
+        std::string routes;
+        if (each) {
+            // With the filter's own route gains (review of 4a7b9af), from
+            // the routes alone: the window reads this twice a second, so the
+            // coefficients are not copied for each channel.
+            constexpr std::size_t shown = 4;
+            Configuration first;
+            for (std::size_t channel = 0; channel < host->inputs; ++channel)
+                for (const auto& path : c->paths) {
+                    if (first.paths.size() == shown)
+                        break;
+                    FilterPath only;
+                    only.inputs = path.inputs;
+                    only.outputs = path.outputs;
+                    for (auto& route : only.inputs)
+                        route.channel = channel;
+                    for (auto& route : only.outputs)
+                        route.channel = channel;
+                    first.paths.push_back(std::move(only));
+                }
+            routes = routing_words(first);
+            const auto total = host->inputs * c->paths.size();
+            if (total > shown)
+                routes += ", and " + std::to_string(total - shown) + " more";
+        } else {
+            routes = routing_words(*c);
+        }
         audio.push_back({"Routing", std::move(routes),
                          idle                      ? "(not playing)"
                          : each                    ? "(the one-channel filter on each channel)"

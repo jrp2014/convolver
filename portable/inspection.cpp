@@ -240,9 +240,12 @@ class Inspector {
                     f.ir_file_channels = inputs;
                     f.ir_frames = cfg.paths[f.ir_channel].impulse.size();
                 }
-                // A one-channel filter is verified as it is, as plug-ins keep it.
-                if (layout == detail::FilterLayout::true_stereo)
-                    cfg = detail::laid_out(std::move(cfg), layout, 2);
+                // Verified as it renders, laid out on the requested channels
+                // (Codex review of c246693: the engine's limits apply to the
+                // paths repeated for each channel); the paths reported stay
+                // the file's own.
+                if (layout != detail::FilterLayout::as_is)
+                    cfg = detail::laid_out(std::move(cfg), layout, options_.expected_inputs);
                 verify(result, std::move(cfg));
             } else {
                 auto cfg = detail::configuration_graph(l.document->configuration);
@@ -257,6 +260,8 @@ class Inspector {
                     f.ir_frames = decoded[i].frames;
                     f.raw_encoding = decoded[i].raw;
                 }
+                if (layout == detail::FilterLayout::each_channel)
+                    cfg = detail::laid_out(std::move(cfg), layout, options_.expected_inputs);
                 verify(result, std::move(cfg));
             }
         } catch (ConfigurationError& e) {

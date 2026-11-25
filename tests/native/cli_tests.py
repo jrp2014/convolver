@@ -373,6 +373,12 @@ def default_layout_tests(d):
     assert report['configurations'][0]['layout'] == 'each-channel', report
     traversal = report['selection']['traversal']
     assert [step['outcome'] for step in traversal] == ['list', 'input-mismatch', 'selected'], traversal
+    # Validated as it renders, laid out on the requested channels: 2,049
+    # paths are within the engine's 4,096 for one channel, not for two.
+    (d / 'dl-many.cfg').write_text('48000 1 1 0\n0\n0\n' + 'dl-mono.wav\n0\n0\n0\n' * 2049)
+    call(['--validate', d / 'dl-many.cfg'])
+    p = call(['--validate', d / 'dl-many.cfg', '--input-channels', '2'], ok=False)
+    assert b'4096' in p.stdout + p.stderr or b'4,096' in p.stdout + p.stderr, p.stdout + p.stderr
 
 
 def integer_format_tests(d):
