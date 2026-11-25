@@ -5322,6 +5322,126 @@ void latest_action_wins() {
 // plays then. VST3-23: a Gain the user sets after choosing a preset in the window,
 // before its answer, keeps its value and is reported to the host again (the
 // preset replaced it in the processor); a Gain left alone takes the preset's.
+// VST3-24 (the independent review of PR #281 at f5bb6f7): a host restores
+// the controller first, delivers messages, and the user chooses a preset in
+// the window before the host restores the processor. The restore is the
+// later action: its filter, Latency and Gain play, show and are saved, also
+// after the host passes the preset's Gain, which the controller reported as
+// an edit, to process() first.
+void window_choice_between_restore_calls() {
+    const auto folder = private_temp("convolver-vst3-between-calls");
+    std::filesystem::create_directories(folder);
+    convolver::HostState a;
+    a.configuration = convolver::Configuration{48000, 1, 1, 0, {}, {}, {}};
+    a.configuration->paths.push_back({{.125f}, {{0, 1}}, {{0, 1}}});
+    a.settings.emplace();
+    a.settings->latency = 2048;
+    a.settings->gain_db = -6;
+    const auto preset = (folder / "a.vstpreset").string();
+    {
+        const auto bytes = convolver::presets::vst3_preset(a);
+        std::ofstream out(preset, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
+        require(static_cast<bool>(out), "between calls: write a preset");
+    }
+    const auto check = [](bool v, const std::string& what) {
+        if (!v)
+            throw std::runtime_error("between calls: " + what);
+    };
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    check(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+              c.setComponentHandler(&handler) == kResultOk,
+          "initialize");
+    Proxy to_controller(c, true), to_processor(p, true);
+    check(p.connect(&to_controller) == kResultOk && c.connect(&to_processor) == kResultOk,
+          "connect");
+    // The host passes the Gain edits the controller reports in its next block.
+    std::vector<ParamValue> gains;
+    handler.on_perform = [&](ParamID id, ParamValue value) {
+        if (id == gain_id)
+            gains.push_back(value);
+    };
+    const auto deliver = [&] {
+        for (;;) {
+            bool any = false;
+            if (!gains.empty()) {
+                ParameterChanges changes;
+                int32 index = 0;
+                if (auto* data = changes.addParameterData(gain_id, index))
+                    data->addPoint(0, gains.back(), index);
+                gains.clear();
+                play_block(p, 1, 1, 64, &changes);
+                any = true;
+            }
+            while (to_controller.deliver() + to_processor.deliver() > 0)
+                any = true;
+            if (!any)
+                return;
+        }
+    };
+    SpeakerArrangement mono = SpeakerArr::kMono;
+    check(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    const auto state_with = [&](float tap, std::size_t latency) {
+        convolver::HostState state;
+        state.configuration =
+            convolver::Configuration{48000, 1, 1, 0, {}, {}, {{{tap}, {{0, 1}}, {{0, 1}}}}};
+        state.settings.emplace();
+        state.settings->latency = latency;
+        auto stream = std::make_unique<MemoryStream>();
+        check(write_state(stream.get(), state), "encode");
+        return stream;
+    };
+    auto first = state_with(1, 4096);
+    first->seek(0, IBStream::kIBSeekSet, nullptr);
+    check(p.setState(first.get()) == kResultOk, "the first filter");
+    first->seek(0, IBStream::kIBSeekSet, nullptr);
+    check(c.setComponentState(first.get()) == kResultOk, "the controller's first restore");
+    deliver();
+    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+    check(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk, "activate");
+    play_block(p, 1, 1, 64);
+    deliver();
+    auto restored = state_with(.5f, 512);
+    restored->seek(0, IBStream::kIBSeekSet, nullptr);
+    check(c.setComponentState(restored.get()) == kResultOk, "the controller's restore");
+    deliver();
+    check(c.load_file(preset), "the window's preset was refused");
+    deliver();
+    restored->seek(0, IBStream::kIBSeekSet, nullptr);
+    check(p.setState(restored.get()) == kResultOk, "the processor's restore");
+    deliver();
+    c.report();
+    deliver();
+    MemoryStream saved_stream;
+    check(p.getState(&saved_stream) == kResultOk, "getState");
+    saved_stream.seek(0, IBStream::kIBSeekSet, nullptr);
+    const auto saved = read_state(&saved_stream);
+    const auto settings = saved.settings.value_or(convolver::HostSettings{});
+    const auto shown_gain = gain_db(static_cast<float>(c.getParamNormalized(gain_id)));
+    check(saved.configuration && saved.configuration->paths.size() == 1 &&
+              saved.configuration->paths.front().impulse == std::vector<float>{.5f} &&
+              p.getLatencySamples() == 512 &&
+              latency_frames(c.getParamNormalized(latency_id)) == 512 &&
+              std::abs(shown_gain) < 1e-3 && std::abs(p.settings().gain_db) < 1e-3 &&
+              std::abs(settings.gain_db) < 1e-3,
+          "the restore should win with Gain 0 dB; shown " + std::to_string(shown_gain) +
+              ", playing " + std::to_string(p.settings().gain_db) + ", saved " +
+              std::to_string(settings.gain_db) + ", Latency " +
+              std::to_string(p.getLatencySamples()));
+    p.setActive(false);
+    p.disconnect(&to_controller);
+    c.disconnect(&to_processor);
+    deliver();
+    c.terminate();
+    p.terminate();
+    std::filesystem::remove_all(folder);
+}
 void window_choice_orders() {
     const auto folder = private_temp("convolver-vst3-window-orders");
     std::filesystem::create_directories(folder);
@@ -5926,6 +6046,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"accepted_restore_follows_its_own_request", accepted_restore_follows_its_own_request},
         {"latest_action_wins", latest_action_wins},
         {"window_choice_orders", window_choice_orders},
+        {"window_choice_between_restore_calls", window_choice_between_restore_calls},
         {"refused_state_accepted_later", refused_state_accepted_later},
         {"damaged_report_message", damaged_report_message},
         {"damaged_report_keeps_status", damaged_report_keeps_status},
