@@ -4490,6 +4490,95 @@ void pairing_follows_connection() {
     c.terminate();
     a.terminate();
 }
+// VST3-28 (jrp's review of 777299f3, 25 November 2026): a Latency or Gain
+// mode chosen while the controller is connected to processor A but not yet
+// paired (A's answer still on its way) belongs to A. jrp chose 256 then, and
+// the host moved the controller to B before A's answer arrived: B, which had
+// 1024 like A, saved 256 before any choice was made on it. A choice made
+// before the controller was first connected, or while it is connected to
+// nothing, still reaches the processor it pairs with next.
+void pending_choice_follows_connection() {
+    using convolver::GainMode;
+    enum class Made { on_a, before_any, between };
+    for (const auto made : {Made::on_a, Made::before_any, Made::between})
+        for (const bool latency : {true, false}) {
+            const std::string how =
+                std::string(latency ? " (Latency" : " (Gain mode") +
+                (made == Made::on_a         ? ", chosen while connected to A)"
+                 : made == Made::before_any ? ", chosen before any connection)"
+                                            : ", chosen while connected to nothing)");
+            const auto check = [&](bool v, const char* what) {
+                if (!v)
+                    throw std::runtime_error(what + how);
+            };
+            HostApplication context;
+            Handler handler;
+            Processor a, b;
+            Controller c;
+            check(a.initialize(&context) == kResultOk && b.initialize(&context) == kResultOk &&
+                      c.initialize(&context) == kResultOk &&
+                      c.setComponentHandler(&handler) == kResultOk,
+                  "pending choice: initialize");
+            for (auto* p : {&a, &b}) { // Both at 1024, as jrp's were.
+                auto& link = static_cast<ProcessorLink&>(*p);
+                link.chosen_latency(1024);
+                link.chosen_gain_mode(GainMode::set);
+            }
+            Proxy a_to_c(c, true), c_to_a(a, true), b_to_c(c, true), c_to_b(b, true);
+            const auto saved = [&](Processor& p) {
+                MemoryStream stream;
+                check(p.getState(&stream) == kResultOk, "pending choice: save");
+                stream.seek(0, IBStream::kIBSeekSet, nullptr);
+                const auto settings = read_state(&stream).settings;
+                check(settings.has_value(), "pending choice: saved no settings");
+                return *settings;
+            };
+            const auto choose = [&] {
+                check(latency
+                          ? c.setParamNormalized(latency_id, normalized_latency(256)) == kResultOk
+                          : c.setParamNormalized(gain_mode_id,
+                                                 normalized_gain_mode(GainMode::estimate)) ==
+                                kResultOk,
+                      "pending choice: choose");
+            };
+            const auto chosen = [&](Processor& p) {
+                const auto s = saved(p);
+                return latency ? s.latency == 256 : s.gain_mode == GainMode::estimate;
+            };
+            if (made == Made::before_any)
+                choose();
+            // Connected to A; A's answer is held.
+            check(a.connect(&a_to_c) == kResultOk && c.connect(&c_to_a) == kResultOk,
+                  "pending choice: connect A");
+            c_to_a.deliver();
+            if (made == Made::on_a)
+                choose();
+            check(c.disconnect(&c_to_a) == kResultOk, "pending choice: disconnect A");
+            if (made == Made::between)
+                choose();
+            check(b.connect(&b_to_c) == kResultOk && c.connect(&c_to_b) == kResultOk,
+                  "pending choice: connect B");
+            while (c_to_b.deliver() + b_to_c.deliver() > 0) {
+            }
+            if (made == Made::on_a) {
+                check(!chosen(b), "a choice made while connected to A reached B");
+                check(saved(b).latency == 1024 && saved(b).gain_mode == GainMode::set,
+                      "B's settings changed");
+                const auto shown = c.getParamNormalized(latency ? latency_id : gain_mode_id);
+                check(latency ? latency_frames(shown) == 1024 : gain_mode(shown) == GainMode::set,
+                      "the controller does not show B's setting");
+            } else {
+                check(chosen(b), "a choice made before B's connection did not reach B");
+            }
+            check(!chosen(a), "a choice reached A after the controller left it");
+            c.disconnect(&c_to_b);
+            b.disconnect(&b_to_c);
+            a.disconnect(&a_to_c);
+            c.terminate();
+            b.terminate();
+            a.terminate();
+        }
+}
 // VST3-18 (jrp's review of 0.18.12, 23 November 2026): a host that delivers
 // messages later. After a refused preset the user chose Latency 256 before
 // the processor's answer to the restore arrived; both halves had 256, then
@@ -5240,6 +5329,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"saved_filter_name", saved_filter_name},
         {"messages_through_proxies", messages_through_proxies},
         {"pairing_follows_connection", pairing_follows_connection},
+        {"pending_choice_follows_connection", pending_choice_follows_connection},
         {"edits_survive_late_answer", edits_survive_late_answer},
         {"edits_before_controller_first_restore", edits_before_controller_first_restore},
         {"accepted_restore_beats_queued_edit", accepted_restore_beats_queued_edit},

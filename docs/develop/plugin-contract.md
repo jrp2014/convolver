@@ -1259,7 +1259,11 @@ the plan's Gain modes (12 November 2026); its meters follow later
   the halves pair (a proxy that delivers later) goes to the processor when
   they pair, unless the host restored either half after the choice (a
   process-wide count, `Bridges::stamp()`, orders the choice and the
-  processor's last accepted restore). Likewise Gain, Mix or Bypass the
+  processor's last accepted restore), and only if the controller made it
+  while connected to that processor or to none, before its first connection
+  or between two (VST3-28): one made while connected to another processor,
+  whose answer had not arrived, was that processor's, and a host that then
+  moves the controller does not pass it on. Likewise Gain, Mix or Bypass the
   host set before they pair stays if it is newer than that restore and
   than any state the host restored to the controller since, and
   the filter name a restored controller state gives reaches the processor
