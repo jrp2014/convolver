@@ -465,12 +465,14 @@ class Controller final : public Steinberg::Vst::EditController,
     // (Bridges::stamp()); 0 while disconnected.
     std::uint64_t connection_ = 0;
     std::thread::id ui_thread_;
-    // A Latency or Gain mode chosen while unpaired, and when
-    // (Bridges::stamp()), sent once paired if the processor accepted no
-    // restore after it.
+    // A Latency or Gain mode chosen while unpaired, when (Bridges::stamp())
+    // and on which connection (connection_, 0 for none): sent once paired if
+    // the processor accepted no restore after it, and if it was chosen on
+    // this connection or on none (VST3-28).
     std::optional<std::size_t> unsent_latency_;
     std::optional<GainMode> unsent_gain_mode_;
     std::uint64_t unsent_latency_at_ = 0, unsent_gain_mode_at_ = 0;
+    std::uint64_t unsent_latency_on_ = 0, unsent_gain_mode_on_ = 0;
     // When the host set Gain, Mix or Bypass while unpaired (Bridges::stamp());
     // 0 once the first read after pairing has used them.
     std::uint64_t gain_edit_at_ = 0, mix_edit_at_ = 0, bypass_edit_at_ = 0;
