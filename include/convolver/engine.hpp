@@ -79,10 +79,16 @@ struct AttenuationEstimate {
     double worst_case_peak = 0;
     double worst_case_attenuation_db = 0;
 };
-// Validates like the Engine. A zero peak (silent routing) gives 0 dB. Throws
-// std::overflow_error when the noise response is not finite (coefficients too
-// large for single precision). Runs the convolution offline with estimate
-// planning: not for the audio thread.
+// Validates like the Engine. A zero peak (silent routing) gives 0 dB. The noise
+// is filtered through a copy of the filter scaled by powers of two to fixed
+// levels well inside the float range, which changes no figure beyond subnormal
+// rounding, so no FFT library or plan overflows inside the convolution (FFT-5);
+// noise_peak is at most worst_case_peak, and 0 below the smallest normal float
+// (such output is flushed to silence while processing). Throws
+// std::overflow_error when noise_peak is beyond the largest float (coefficients
+// too large for single precision), which only a filter whose worst_case_peak is
+// beyond it too can reach: the same decision in every build. Runs the
+// convolution offline with estimate planning: not for the audio thread.
 AttenuationEstimate estimate_attenuation(const Configuration&, std::uint64_t seed = 0,
                                          std::size_t lengths = 10);
 
