@@ -35,9 +35,10 @@ CANDIDATE_WORKFLOW = '.github/workflows/release.yml'
 PREVIOUS_PREVIEW = '0.18.12'
 CHANGES = (
     (
-        "In VST3, the window, the host's controls, what plays and what a project saves now agree whatever order "
-        "the host delivers its calls in: the plug-in's two halves ask each other directly instead of passing "
-        'messages that a host could deliver late or in the middle of a restore. A Latency or Gain mode chosen just '
+        'In VST3, host presets, window presets and later Latency, Gain mode, Gain and Mix changes now play, show '
+        "and save the same in every order of host calls the plug-in's tests try, delivered on time or late: the "
+        "plug-in's two halves ask each other directly instead of passing messages that a host could deliver late "
+        'or in the middle of a restore. A Latency or Gain mode chosen just '
         'before a preset is restored no longer overrides that preset when the host delivers it late, which could '
         "play and save the earlier Latency while the window showed the preset's. Settings changed after a refused "
         'preset no longer jump back when the host answers late, a window preset no longer comes back over a later '
