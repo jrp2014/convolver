@@ -762,12 +762,23 @@ VST3's controller reaches the processor of its own instance directly
 (VST3-26, [`link.hpp`](../../plugins/vst3/link.hpp)). The factory does not
 mark the processor distributable, so the SDK requires a host to keep both
 halves in one process. The processor registers a `Bridge` under a random
-key and sends the key in a `ConvolverPair` message when it connects, and
-again when the controller asks (`ConvolverPairRequest`, sent when the
-controller connects), so pairing works in either order and through a proxy
-that delivers later. A key that finds nothing (another process, a closed
-processor) leaves the controller unpaired: it shows the host's values,
-reports nothing and loads nothing. The processor detaches the `Bridge` when
+key. Each time the controller connects, it starts unpaired, numbers the
+connection and asks for the key (`ConvolverPairRequest`, with the number);
+the processor answers with its key and that number in a `ConvolverPair`
+message, from `notify()`, or from its own `connect()` if the request came
+before it was connected. Each time the processor connects it also sends
+`ConvolverPairAsk`, which carries nothing, and the controller asks again for
+its current connection, so a host that dropped the request still pairs.
+Pairing therefore works in either order and through a proxy that delivers
+later, but needs the host to deliver messages in both directions, as the
+SDK's connection proxy does. The controller pairs only with an answer that
+carries its current connection's number, and with none while disconnected
+(VST3-27): a host that delivers late may pass on an earlier processor's
+answer after it connected the controller to another, and that processor's
+key stays valid while it lives, so a key alone would send the next Latency,
+Gain mode or chosen file to the wrong instance. A key that finds nothing
+(another process, a closed processor) leaves the controller unpaired: it
+shows the host's values, reports nothing and loads nothing. The processor detaches the `Bridge` when
 it terminates, waiting for a call in progress; later calls refuse. Messages
 carry no settings and no answers, so one delivered late has nothing stale
 in it:

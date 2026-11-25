@@ -154,34 +154,70 @@ bool Controller::on_ui_thread() const noexcept {
 }
 tresult PLUGIN_API Controller::connect(IConnectionPoint* other) {
     const auto result = EditController::connect(other);
-    if (result == kResultOk)
-        if (auto message = owned(allocateMessage())) {
-            message->setMessageID(pair_request_message);
-            sendMessage(message);
-        }
+    if (result != kResultOk)
+        return result;
+    {
+        // VST3-27: a new connection, paired only by the answer to its own request.
+        std::lock_guard lock(bridge_lock_);
+        connection_ = Bridges::stamp();
+        bridge_.reset();
+    }
+    ask_for_key();
     return result;
 }
 tresult PLUGIN_API Controller::disconnect(IConnectionPoint* other) {
-    set_bridge(nullptr);
+    {
+        std::lock_guard lock(bridge_lock_);
+        connection_ = 0;
+        bridge_.reset();
+    }
     return EditController::disconnect(other);
+}
+void Controller::ask_for_key() {
+    std::uint64_t connection = 0;
+    {
+        std::lock_guard lock(bridge_lock_);
+        connection = connection_;
+    }
+    if (connection == 0)
+        return; // Connected to nothing: no processor to ask.
+    if (auto message = owned(allocateMessage())) {
+        message->setMessageID(pair_request_message);
+        if (auto* attributes = message->getAttributes()) {
+            attributes->setInt("connection", static_cast<int64>(connection));
+            sendMessage(message);
+        }
+    }
 }
 tresult PLUGIN_API Controller::notify(IMessage* message) {
     if (!message || !message->getMessageID())
         return EditController::notify(message);
     const std::string_view id = message->getMessageID();
     if (id == pair_message) {
-        int64 key = 0;
+        int64 key = 0, connection = 0;
         auto* attributes = message->getAttributes();
-        if (!attributes || attributes->getInt("key", key) != kResultOk)
+        if (!attributes || attributes->getInt("key", key) != kResultOk ||
+            attributes->getInt("connection", connection) != kResultOk)
             return kInvalidArgument;
         // A key from another process, or a processor that has gone, finds
         // nothing: the controller stays unpaired.
         auto bridge = Bridges::find(static_cast<std::uint64_t>(key));
         if (!bridge)
             return kResultFalse;
-        if (bridge == this->bridge())
-            return kResultOk; // Paired already.
-        set_bridge(bridge);
+        {
+            // VST3-27: an answer to an earlier connection, which a host that
+            // delivers late may pass on after it connected the controller to
+            // another processor (or to none), names a processor this
+            // controller no longer talks to, though its key is valid while it
+            // lives. Checked and kept under one lock, so a disconnect on
+            // another thread cannot come between.
+            std::lock_guard lock(bridge_lock_);
+            if (connection_ == 0 || static_cast<std::uint64_t>(connection) != connection_)
+                return kResultFalse;
+            if (bridge == bridge_)
+                return kResultOk; // Paired already.
+            bridge_ = bridge;
+        }
         bridge->changed();
         // What the controller learned before the halves paired (a proxy
         // that delivers later) goes to the processor now, as a message would
@@ -214,6 +250,13 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         // after the processor's last restore.
         if (on_ui_thread())
             refresh(true);
+        return kResultOk;
+    }
+    if (id == pair_ask_message) {
+        // VST3-27: the processor connected before any request reached it (a
+        // host that dropped the one sent when the controller connected): ask
+        // again for the current connection. A late one only asks again.
+        ask_for_key();
         return kResultOk;
     }
     if (id == changed_message) {
