@@ -949,7 +949,13 @@ generates sequences of what a host and a user do to one processor and
 controller pair: Latency and Gain mode choices, Gain, Mix and Bypass
 automation, a preset and a missing file chosen in the window, and an
 accepted and a refused restore. It runs every sequence of one and two steps
-in every variant, and 300 seeded random sequences of three to five steps.
+in every variant, and 300 seeded random sequences of three to five steps,
+which may also choose a preset without settings, Latency 64 (the refused
+state's) and a second accepted restore, and a host without `setDirty` that
+hands every edit straight back to `setParamNormalized` (Audacity 4.0.2,
+VST3-17). It also runs the 44 rows of pull request #281's
+`latest_action_wins`, the sequences jrp's reviews since VST3-19
+found, in every variant with both hosts.
 The variants are the connection (direct, a proxy that forwards at once, one
 that delivers later, with what it delivers after each step and whether it
 delivers between the two calls of a restore), the restore order, whether
