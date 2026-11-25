@@ -547,8 +547,16 @@ REAPER's `workrender` and `renderaheadlen` settings as REAPER gives them.
 `reaper-soak-DATE-TIME` in the package folder, holds the presets and the
 saved project, which holds every return's filter again, about 150 MB in all;
 delete it afterwards. `tests/reaper_check_tests.py` checks the option in
-pre-commit against a stand-in REAPER, as for the eight checks. No run on
-jrp's Mac is recorded yet.
+pre-commit against a stand-in REAPER, as for the eight checks.
+
+jrp's first run, on 25 November 2026 with the 0.18.23 candidate in REAPER
+7.86 on macOS 27.2.1 (CoreAudio's default device, 48 kHz, block 128), had
+**no new underrun** and passed all six checks: 724 Status readings while
+playing were all Active, and the replacement loaded at 900 s
+([record](../archive/reviews/2026-11-25-host12-reaper-soak.md)). REAPER's
+audio and media underrun times stayed 0 for the whole session, so that run
+cannot tell no dropout from a device that does not report them; no run yet
+shows REAPER reporting an audio underrun through that device.
 
 ### Audacity (VST3)
 
