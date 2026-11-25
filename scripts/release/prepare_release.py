@@ -35,6 +35,15 @@ CANDIDATE_WORKFLOW = '.github/workflows/release.yml'
 PREVIOUS_PREVIEW = '0.18.12'
 CHANGES = (
     (
+        'A mono IR file, or any filter with one input and one output, now filters every channel of stereo or '
+        'wider audio on its own, and a four-channel IR file on stereo audio plays as true stereo (left to left, '
+        'left to right, right to left, right to right), without a `.cfg`, as other convolution reverbs read these '
+        'files. A filter that matches the channels exactly still wins, in a list too, so existing setups play as '
+        "before; a file marked as Ambisonic B-format is refused with the reason. Status, the log, the window's "
+        'Routing line and the command line say when such a routing plays. In Ardour, a mono filter now plays with '
+        'the VST3 plug-in on a Flexible-I/O track without setting its channels by hand.'
+    ),
+    (
         'In VST3, host presets, window presets and later Latency, Gain mode, Gain and Mix changes now play, show '
         "and save the same in every order of host calls the plug-in's tests try, delivered on time or late: the "
         "plug-in's two halves ask each other directly for settings instead of passing them in messages that a "
