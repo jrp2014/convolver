@@ -57,10 +57,11 @@ struct HostSettings {
 // when it exceeds the largest float, as the CLI's --gain-db no-clip refuses.
 // The estimate filters noise for ten filter lengths, which takes time for a
 // long filter, so HostFilter finds it only while Estimate is chosen; it is
-// absent until then, and when the noise overflows single precision
-// (estimate_failed), as --gain-db auto refuses. Where the estimate is absent,
-// Estimate plays the bound instead, which is never louder; where the bound is
-// absent too, the filter plays silence.
+// absent until then, and when the noise peaks beyond the largest float
+// (estimate_failed), as --gain-db auto refuses. The noise peak is never above
+// the bound, so a filter whose estimate failed has no bound either (FFT-5).
+// Where the estimate is absent, Estimate plays the bound instead, which is
+// never louder; where the bound is absent too, the filter plays silence.
 struct FilterGains {
     std::optional<double> estimate_db = 0.0;
     std::optional<double> no_clipping_db = 0.0;

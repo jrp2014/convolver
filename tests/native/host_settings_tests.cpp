@@ -467,15 +467,12 @@ void settings_text() {
     {
         HostSettings mode{-6, 1, 0, GainMode::estimate};
         const FilterGains both{-12.34, -6.02, false}, unestimated{std::nullopt, -6.02, false},
-            too_loud{std::nullopt, -6.02, true}, none{std::nullopt, std::nullopt, true};
+            none{std::nullopt, std::nullopt, true};
         for (const auto& [gains, words, box, note] :
              {std::tuple{&both, "gain -12.3 dB (Estimate)", "-12.3", ""},
               std::tuple{&unestimated,
                          "gain -6 dB (No clipping, until the filter's Estimate is found)", "-6",
                          "No clipping plays until the filter is estimated."},
-              std::tuple{&too_loud,
-                         "gain -6 dB (No clipping: the filter is too loud for an Estimate)", "-6",
-                         "No clipping plays: the filter is too loud to estimate."},
               std::tuple{&none,
                          "gain by Estimate: silence, as the filter's peak is beyond the range of a "
                          "no-clipping figure",
@@ -1022,6 +1019,17 @@ void filter_estimates() {
     const auto none = filter_gains(huge);
     require(!none.estimate_db && none.estimate_failed && !none.no_clipping_db,
             "an overflowing filter has no figures");
+    // FFT-5: a filter whose bound has a figure has an estimate too, in every
+    // build, however close to the largest float (one 3e38 tap had none in
+    // one build and had one in others): Estimate plays its own figure, never
+    // No clipping's for want of one.
+    for (const float tap : {3e38f, std::numeric_limits<float>::max()}) {
+        Configuration loud{48000, 1, 1, 0, {}, {}, {{{tap}, {{0, 1}}, {{0, 1}}}}};
+        const auto g = filter_gains(loud);
+        require(g.no_clipping_db && g.estimate_db && !g.estimate_failed &&
+                    *g.estimate_db >= *g.no_clipping_db,
+                "a filter with a bound has an estimate, never louder than the bound");
+    }
 }
 // DIAG-10: Status says what the window's report says about the settings, in
 // short: a Latency chosen but not in use yet, Estimate with no estimate (so
@@ -1081,10 +1089,16 @@ void status_names_settings() {
     require(!contains(host_status(filter, layout, true, HostSettings{}).text, "estimate"),
             "Set mode says nothing about the estimate");
 
-    // "Too loud to estimate" (estimate_failed with a bound) has no portable
-    // test filter: whether a filter's noise overflows before its bound does
-    // depends on the build and the FFT library (a 3e38 tap failed its
-    // estimate in one Linux build and not in others), so it is untested.
+    // FFT-5: the noise peak is never above the bound, so a filter loud
+    // enough to fail its estimate has no bound either: "Too loud to
+    // estimate" with No clipping's gain playing cannot happen, and Status
+    // has no words for it. One tap of 3e38 has both figures.
+    Configuration loud{48000, 1, 1, 0, {}, {}, {{{3e38f}, {{0, 1}}, {{0, 1}}}}};
+    HostFilter loud_filter;
+    loud_filter.load(HostState{loud}, layout);
+    require(loud_filter.estimate(true) &&
+                !contains(host_status(loud_filter, layout, true, estimate).text, "estimate"),
+            "loud filter's estimate: " + host_status(loud_filter, layout, true, estimate).text);
     // No figure at all: silence, whichever mode needs one.
     Configuration huge{48000, 1, 1, 0, {}, {}, {}};
     for (int i = 0; i < 2; ++i)
