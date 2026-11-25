@@ -106,6 +106,7 @@ struct StatusAnswer {
     bool accepted = false;
     bool superseded = false;
     Steinberg::int64 latency_request = 0;
+    bool latency_unchanged = false;
     std::optional<HostSettings> settings = std::nullopt;
 };
 inline constexpr const char* load_message = "ConvolverLoad";

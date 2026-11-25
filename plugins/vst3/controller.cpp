@@ -159,6 +159,9 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     const bool loaded = load_request || load_retried;
     attributes->getInt("accepted", load_accepted);
     attributes->getInt("latency request", latency_request);
+    // VST3-23: that Latency already played; absent from an older processor.
+    int64 latency_unchanged = 0;
+    attributes->getInt("latency unchanged", latency_unchanged);
     // PLUG-26: the settings an accepted .vstpreset applied, which the
     // processor already plays.
     double preset_gain = 0, preset_mix = 0;
@@ -253,9 +256,14 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         }
         // The Latency sent last: an earlier one's answer asks for nothing,
         // as the processor has later choices still to come.
+        // VST3-23: not when that Latency already played. A value chosen
+        // again while an answer is to come (chosen_again()) is sent though
+        // the window shows it; a host that sets parameters again when asked
+        // to restart (Ardour reopening a session) would otherwise go round
+        // for good.
         if (latency_waiting_ && latency_request == latency_requests_) {
             latency_waiting_ = false;
-            restart = true;
+            restart = !latency_unchanged;
         }
         if (readable) {
             changed = !report_ || report_->status.text != report->status.text ||

@@ -5442,6 +5442,63 @@ void window_choice_between_restore_calls() {
     p.terminate();
     std::filesystem::remove_all(folder);
 }
+// VST3-23 (Ardour's reopening timed out on PR #281 at f5bb6f7): while a
+// restore's outcome is to come, a Latency set to the value shown is sent,
+// in case the window shows a refused state's. Its answer must not ask the
+// host to read the latency when it did not change: a host that sets its
+// parameters again when asked would go round for good.
+void unchanged_latency_asks_nothing() {
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk,
+            "unchanged latency: initialize");
+    require(p.connect(&c) == kResultOk && c.connect(&p) == kResultOk, "unchanged latency: connect");
+    convolver::HostState state;
+    state.configuration =
+        convolver::Configuration{48000, 1, 1, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
+    state.settings.emplace();
+    state.settings->latency = 1024;
+    MemoryStream stream;
+    require(write_state(&stream, state), "unchanged latency: encode");
+    stream.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&stream) == kResultOk, "unchanged latency: the processor's restore");
+    // A second state the controller alone is given: its outcome never comes.
+    state.settings->latency = 512;
+    MemoryStream other;
+    require(write_state(&other, state), "unchanged latency: encode");
+    other.seek(0, IBStream::kIBSeekSet, nullptr);
+    std::size_t asked = 0;
+    handler.on_restart = [&](int32 flags) {
+        if (!(flags & kLatencyChanged) || ++asked > 10)
+            return;
+        c.setParamNormalized(latency_id, c.getParamNormalized(latency_id));
+    };
+    require(c.setComponentState(&other) == kResultOk,
+            "unchanged latency: the controller's restore");
+    // 256 is a change: the host is asked once, sets 256 again, and that
+    // answer asks nothing.
+    asked = 0;
+    c.setParamNormalized(latency_id, normalized_latency(256));
+    if (asked != 1 || p.getLatencySamples() != 256)
+        throw std::runtime_error(
+            "unchanged latency: choosing 256 should ask the host once, asked " +
+            std::to_string(asked));
+    // The value the processor plays already asks nothing.
+    asked = 0;
+    c.setParamNormalized(latency_id, normalized_latency(256));
+    if (asked != 0)
+        throw std::runtime_error(
+            "unchanged latency: the same Latency again asked the host to read it " +
+            std::to_string(asked) + " times");
+    handler.on_restart = nullptr;
+    p.disconnect(&c);
+    c.disconnect(&p);
+    c.terminate();
+    p.terminate();
+}
 void window_choice_orders() {
     const auto folder = private_temp("convolver-vst3-window-orders");
     std::filesystem::create_directories(folder);
@@ -6046,6 +6103,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"accepted_restore_follows_its_own_request", accepted_restore_follows_its_own_request},
         {"latest_action_wins", latest_action_wins},
         {"window_choice_orders", window_choice_orders},
+        {"unchanged_latency_asks_nothing", unchanged_latency_asks_nothing},
         {"window_choice_between_restore_calls", window_choice_between_restore_calls},
         {"refused_state_accepted_later", refused_state_accepted_later},
         {"damaged_report_message", damaged_report_message},

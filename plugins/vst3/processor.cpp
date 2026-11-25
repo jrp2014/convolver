@@ -497,6 +497,10 @@ void Processor::send_status(const StatusAnswer& answer) noexcept {
         }
         if (answer.latency_request)
             attributes->setInt("latency request", answer.latency_request);
+        // VST3-23: the Latency chosen already played, so the host need not
+        // read it again.
+        if (answer.latency_unchanged)
+            attributes->setInt("latency unchanged", 1);
         sendMessage(message);
     } catch (...) { // Out of memory: the controller keeps the previous status.
     }
@@ -519,13 +523,15 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
             return kInvalidArgument;
         int64 request = 0;
         attributes->getInt("request", request);
+        bool unchanged = false;
         {
             const Locked lock(*this);
             follow_.heard_latency(request);
+            unchanged = latency_.load() == static_cast<std::size_t>(frames);
             choose_latency(static_cast<std::size_t>(frames));
         }
         write_log();
-        send_status({.latency_request = request});
+        send_status({.latency_request = request, .latency_unchanged = unchanged});
         return kResultOk;
     }
     if (id == gain_mode_message) {

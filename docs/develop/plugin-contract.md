@@ -1302,7 +1302,11 @@ the plan's Gain modes (12 November 2026); its meters follow later
   a choice while such an answer, or the outcome of a restore the controller
   mirrored, is to come (the window shows the state's setting, which a
   refused state does not play), except a value the host hands back while
-  the controller reports an edit. A Gain or Mix the controller reported as
+  the controller reports an edit. The processor's answer to a Latency it
+  already plays does not ask the host to read the latency again, so a host
+  that sets its parameters again when asked (Ardour reopening a session)
+  cannot go round for good (`unchanged_latency_asks_nothing`). A Gain or
+  Mix the controller reported as
   an edit after a restore's mirror keeps its value when that restore's
   outcome arrives, as one the host set does (jrp's sequence test, PR
   #282). An answer that arrives after a
