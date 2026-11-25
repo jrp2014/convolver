@@ -992,9 +992,9 @@ names the channels Ardour gave it
   so it filters a mono track's audio too (checked with Ardour 8.4 by
   automated tests, not yet in Ardour's window). On a mono track,
   Ardour 9 first asks for one channel, but the request reaches Convolver as
-  a layout with no channels and the log says `Refused the host's channel
-  layout: it has 0 input and 0 output channels`; the `Started at` line
-  after it names the channels that play. A filter with other outputs, such
+  a layout with no channels and the log says `The host offered 0 input
+  and 0 output channels; Convolver takes 1 to 8 of each, so it declined.`;
+  the `Started at` line after it names the channels that play. A filter with other outputs, such
   as a 2→6 crossover, plays silence, because Convolver still gets only 2
   outputs: use the LV2 plug-in for it.
 - **Settings.** Ardour leaves Gain mode and Latency out of its own controls

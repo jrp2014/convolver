@@ -154,11 +154,20 @@ def log_size(directory):
     return path.stat().st_size if path.is_file() else 0
 
 
+# The lines that say what layout the plug-in was given: a refusal, a declined
+# offer (DIAG-11) and the start.
+LAYOUT_LINE = re.compile(
+    r"(Refused the host's channel layout: .*"
+    r'|The host offered .*, so it declined\..*'
+    r'|Started at .*?, blocks of up to \d+ frames\.)'
+)
+
+
 def print_layout_lines(directory, name, start):
     """The layout lines the Convolver log gained since start: what the plug-in was given.
 
-    A refused layout is followed by the one Ardour gave next, so a Refused
-    line is not by itself a failure; the export says what was heard.
+    A declined layout is followed by the one Ardour gave next, so a declined
+    offer is not by itself a failure; the export says what was heard.
     """
     path = convolver_log(directory)
     if not path.is_file():
@@ -169,7 +178,7 @@ def print_layout_lines(directory, name, start):
         text = log.read().decode('utf-8', errors='replace')
     last = None
     for line in text.splitlines():
-        found = re.search(r"(Refused the host's channel layout: .*|Started at .*?, blocks of up to \d+ frames\.)", line)
+        found = LAYOUT_LINE.search(line)
         if found and found[1] != last:  # Repeats in a row say nothing new.
             last = found[1]
             print(f'{name}: log: {found[1]}')

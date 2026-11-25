@@ -161,43 +161,49 @@ tresult Processor::arrange(SpeakerArrangement* in, int32 ni, SpeakerArrangement*
     // DIAG-1: say why. A layout Convolver cannot take is logged once per
     // instance: hosts offer layouts one after another until one is accepted,
     // and only the first refusal is news. log() skips a repeated line.
-    const auto refuse = [&](auto&& why, bool once) noexcept {
+    // DIAG-11: an offer Convolver declines is ordinary (REAPER offers every
+    // instance 64 channels each way first), so its line says what was offered
+    // and that another may follow, not that something failed.
+    const auto refuse = [&](auto&& why) noexcept {
         try {
-            if (once && std::exchange(layout_refusal_logged_, true))
-                return kResultFalse;
-            log("Refused the host's channel layout: " + why() +
-                (once ? " The host may go on to offer another layout; only the first refusal "
-                        "is logged."
-                      : ""));
+            log("Refused the host's channel layout: " + why());
         } catch (...) { // Out of memory for the message: refused all the same.
+        }
+        return kResultFalse;
+    };
+    const auto decline = [&](auto&& offer) noexcept {
+        try {
+            if (!std::exchange(layout_refusal_logged_, true))
+                log(offer() +
+                    " Hosts often offer several layouts before one is taken; the next "
+                    "\"Started at\" line gives the one in use. Only the first declined layout "
+                    "is logged.");
+        } catch (...) { // Out of memory for the message: declined all the same.
         }
         return kResultFalse;
     };
     if (active_)
         return refuse(
-            [] { return std::string("the host changed it while the plug-in was active."); }, false);
+            [] { return std::string("the host changed it while the plug-in was active."); });
     if (ni != 1 || no != 1 || !in || !out)
-        return refuse(
-            [&] {
-                return "it has " + std::to_string(ni) + " input and " + std::to_string(no) +
-                       " output buses; Convolver takes one of each.";
-            },
-            true);
+        return decline([&] {
+            return "The host offered " + std::to_string(ni) + " input and " + std::to_string(no) +
+                   " output buses; Convolver takes one of each, so it declined.";
+        });
     const auto inputs = SpeakerArr::getChannelCount(in[0]);
     const auto outputs = SpeakerArr::getChannelCount(out[0]);
     if (inputs < min_bus_channels || inputs > max_bus_channels || outputs < min_bus_channels ||
         outputs > max_bus_channels || (!identity::unequal_counts && inputs != outputs))
-        return refuse(
-            [&] {
-                return "it has " + std::to_string(inputs) + " input and " +
-                       std::to_string(outputs) + " output channels; Convolver takes " +
-                       std::to_string(min_bus_channels) + " to " +
-                       std::to_string(max_bus_channels) + " of each." +
-                       (inputs > max_bus_channels || outputs > max_bus_channels
-                            ? " Use the command-line tool for filters with more channels."
-                            : "");
-            },
-            true);
+        return decline([&] {
+            return "The host offered " + std::to_string(inputs) + " input and " +
+                   std::to_string(outputs) + " output channels; Convolver takes " +
+                   std::to_string(min_bus_channels) + " to " + std::to_string(max_bus_channels) +
+                   " of each, so it declined." +
+                   (inputs > max_bus_channels || outputs > max_bus_channels
+                        ? " For a filter with more than " + std::to_string(max_bus_channels) +
+                              " channels, use the command-line tool."
+                        : "");
+        });
     auto result = AudioEffect::setBusArrangements(in, ni, out, no);
     if (result == kResultOk) {
         inputs_ = inputs;
