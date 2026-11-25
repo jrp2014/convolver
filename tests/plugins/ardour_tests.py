@@ -185,7 +185,7 @@ def print_layout_lines(directory, name, start):
 
 
 def show_convolver_log(directory):
-    """For a failure: the Convolver log in the test's home folder, which explains a refused layout."""
+    """For a failure: the Convolver log in the test's home folder, which explains a declined layout."""
     path = convolver_log(directory)
     if path.is_file():
         print(f'--- {path.relative_to(directory)}')

@@ -10,8 +10,9 @@
   that the next "Started at" line gives the one in use. REAPER offers every
   instance 64 channels each way first, so every REAPER session logged a
   "Refused" line that looked like a fault (jrp's soak of 25 November 2026).
-  The command-line advice now appears only for a layout with more than
-  8 channels, as before, worded for the filter. See
+  On macOS the line goes to the unified log as information, no longer as an
+  error. The command-line advice still appears only for a layout with more
+  than 8 channels. See
   [status and the Convolver log](../docs/use/plugins.md#status-and-the-convolver-log).
 
 ## Done

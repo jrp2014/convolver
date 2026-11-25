@@ -160,7 +160,7 @@ tresult Processor::arrange(SpeakerArrangement* in, int32 ni, SpeakerArrangement*
     const Locked lock(*this);
     // DIAG-1: say why. A layout Convolver cannot take is logged once per
     // instance: hosts offer layouts one after another until one is accepted,
-    // and only the first refusal is news. log() skips a repeated line.
+    // and only the first declined offer is news. log() skips a repeated line.
     // DIAG-11: an offer Convolver declines is ordinary (REAPER offers every
     // instance 64 channels each way first), so its line says what was offered
     // and that another may follow, not that something failed.
@@ -173,11 +173,13 @@ tresult Processor::arrange(SpeakerArrangement* in, int32 ni, SpeakerArrangement*
     };
     const auto decline = [&](auto&& offer) noexcept {
         try {
+            // An offer, not a problem (false), so macOS's log keeps it out of its errors.
             if (!std::exchange(layout_refusal_logged_, true))
                 log(offer() +
-                    " Hosts often offer several layouts before one is taken; the next "
-                    "\"Started at\" line gives the one in use. Only the first declined layout "
-                    "is logged.");
+                        " Hosts often offer several layouts before one is taken; the next "
+                        "\"Started at\" line gives the one in use. Only the first declined layout "
+                        "is logged.",
+                    false);
         } catch (...) { // Out of memory for the message: declined all the same.
         }
         return kResultFalse;
@@ -187,6 +189,9 @@ tresult Processor::arrange(SpeakerArrangement* in, int32 ni, SpeakerArrangement*
             [] { return std::string("the host changed it while the plug-in was active."); });
     if (ni != 1 || no != 1 || !in || !out)
         return decline([&] {
+            if (ni == 1 && no == 1) // Counts that fit, without their arrangements.
+                return std::string("The host offered a layout without its speaker arrangements; "
+                                   "Convolver needs both, so it declined.");
             return "The host offered " + std::to_string(ni) + " input and " + std::to_string(no) +
                    " output buses; Convolver takes one of each, so it declined.";
         });
