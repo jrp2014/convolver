@@ -547,6 +547,7 @@ step(function()
     local send = reaper.CreateTrackSend(sources[index], track)
     if send < 0 then error("REAPER made no send from Source " .. index .. " to Reverb " .. index, 0) end
     reaper.SetTrackSendInfo_Value(sources[index], 0, send, "D_VOL", 1)
+    reaper.SetTrackSendInfo_Value(sources[index], 0, send, "I_SENDMODE", 0) -- after the fader
     local fx = add_convolver(track)
     local _, name = reaper.TrackFX_GetFXName(track, fx, "")
     returns[index] = {track = track, fx = fx}
@@ -1282,8 +1283,8 @@ def parse_underrun_times(text):
 UNDERRUN_NONE = 'no new underrun'
 UNDERRUN_SOME = 'at least one new underrun'
 UNDERRUN_UNAVAILABLE = 'underrun reporting unavailable'
-# Not a result: the soak did not run its whole length.
-SOAK_INCOMPLETE = 'soak incomplete, so no result'
+# Not a result: the soak did not run as specified (checks 1 to 4).
+SOAK_INCOMPLETE = 'no result'
 
 
 def underrun_result(results):
@@ -1326,13 +1327,19 @@ def underrun_result(results):
 
 
 def soak_result(checks, results):
-    """The underrun result, unless the soak did not run its whole length
-    (checks 1 and 4), when there is none: a short or broken run must not
-    count as one of the three results."""
+    """The underrun result, unless the soak did not run as specified: to
+    the end (check 1), with every return loaded (2), at the stated rate and
+    block size (3) and for its whole length (4). Such a run has no result,
+    so it cannot count as one of the three."""
     result, evidence = underrun_result(results)
-    if checks[0][1] and checks[3][1]:
+    missed = [str(number) for number, (_, passed, _) in enumerate(checks[:4], 1) if not passed]
+    if not missed:
         return result, evidence
-    return SOAK_INCOMPLETE, f'the soak did not run its whole length (checks 1 and 4). Up to then, {result}: {evidence}'
+    read = parse_underrun_times(results.get('underrun_before')) and parse_underrun_times(results.get('underrun_after'))
+    return SOAK_INCOMPLETE, (
+        f'the soak did not run as specified ({"checks" if len(missed) > 1 else "check"} {", ".join(missed)} failed). '
+        + (f'What the times showed anyway, {result}: {evidence}' if read else 'No underrun times were read after it.')
+    )
 
 
 def block_size(results):
@@ -1476,7 +1483,8 @@ def soak_report(context):
         f'# REAPER soak, {context["when"]}',
         '',
         (
-            f'**Result: {result}.** {len(checks) - len(failed)} of {len(checks)} checks passed. '
+            ('**No result.** ' if result == SOAK_INCOMPLETE else f'**Result: {result}.** ')
+            + f'{len(checks) - len(failed)} of {len(checks)} checks passed. '
             'Written by `scripts/reaper_check.py --soak` (HOST-12).'
         ),
         '',
@@ -1546,7 +1554,9 @@ def soak_report(context):
             else f'3. The soak ended before the replacement of Reverb {SOAK_REPLACE_RETURN} was due.'
         ),
         (
-            '4. It stopped, '
+            f'4. REAPER quit, or was stopped, before the ReaScript finished: {outcome.get("problem", "")}'
+            if not outcome['finished']
+            else '4. It stopped, '
             + (
                 f'saved the project as `{context["project"].name}`'
                 if one.get('project_saved') == 'yes'

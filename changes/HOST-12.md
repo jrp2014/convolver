@@ -10,6 +10,6 @@
   one return's filter halfway, and reports one of three results from
   REAPER's last-underrun times: no new underrun, at least one new underrun,
   or underrun reporting unavailable (or no result, when the soak did not
-  run its whole length). Its harness tests run in pre-commit against a stand-in
+  run as specified). Its harness tests run in pre-commit against a stand-in
   REAPER; jrp's first run remains. See
   [a long REAPER soak](../docs/develop/host-testing.md#a-long-reaper-soak).

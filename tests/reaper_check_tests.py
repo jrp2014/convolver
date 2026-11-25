@@ -553,9 +553,9 @@ class Run(unittest.TestCase):
             'underrun': ('at least one new underrun', 6, 'Seen at: 20.0 s: audio 3000, media 0; 80.0 s'),
             'noapi': ('underrun reporting unavailable', 6, 'This REAPER has no GetUnderrunTime.'),
             'frozen': ('underrun reporting unavailable', 6, 'did not advance'),
-            'big_block': ('no new underrun', 5, 'Set the block size to 128 or fewer'),
-            'stopped': ('soak incomplete, so no result', 4, 'transport stopped after 40.0 s of 120 s'),
-            'exit': ('soak incomplete, so no result', 0, 'REAPER exited (status 3) before the ReaScript finished.'),
+            'big_block': (None, 5, 'Set the block size to 128 or fewer'),
+            'stopped': (None, 4, 'transport stopped after 40.0 s of 120 s'),
+            'exit': (None, 0, 'No underrun times were read after it.'),
             'old_state': (
                 'no new underrun',
                 5,
@@ -566,11 +566,13 @@ class Run(unittest.TestCase):
             'fault': ('no new underrun', 5, 'changes: 30.0 s, Reverb 2: Fault: output too large.'),
             'refused': ('no new underrun', 5, 'TrackFX_SetPreset returned false'),
         }
+        # No result (None) for a soak that did not run as specified.
         for mode, (wanted, passed, evidence) in cases.items():
             with self.subTest(mode=mode):
                 status, result, _ = self.run_soak(mode)
                 self.assertEqual(status, 1, result)
-                self.assertIn(f'**Result: {wanted}.** {passed} of 6 checks passed.', result)
+                headline = '**No result.**' if wanted is None else f'**Result: {wanted}.**'
+                self.assertIn(f'{headline} {passed} of 6 checks passed.', result)
                 self.assertIn(evidence, result)
 
     def test_a_soak_whose_presets_cannot_be_made(self):

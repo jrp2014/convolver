@@ -501,9 +501,8 @@ self-contained `.vstpreset` with the package's `bin/convolver-preset`. It then
 starts REAPER once with a new project: four source tracks, each repeating a
 2-second sound (noise hits, a chord, clicks from side to side, a rising tone)
 with 3 to 20 s of silence between. Each source's fader is at -6 dB; it plays
-to the master and, through a send at 0 dB (REAPER's default, after the
-fader), to its own return track, which holds Convolver's VST3 with one of the
-reverbs. All four sources are silent for 60 s twice (from 25% and 65% of the
+to the master and, through a send at 0 dB after the fader, to its own return
+track, which holds Convolver's VST3 with one of the reverbs. All four sources are silent for 60 s twice (from 25% and 65% of the
 way through), longer than the longest tail, so each return goes quiet and
 wakes again. Once every return reads exactly
 `Filter loaded: 48000 Hz, 2 in, 2 out.`, REAPER plays from the start. Each
@@ -520,9 +519,10 @@ opens with one of three results: **no new underrun**, **at least one new
 underrun** (with the times it saw one, from the readings each second, or a
 note when the only change came as playback started), or **underrun reporting
 unavailable** (no `GetUnderrunTime`, or a clock that did not advance). A
-soak that did not run its whole length (REAPER quit, the ReaScript stopped
-or the transport stopped) has no result: `result.md` says **soak
-incomplete** and what the times showed up to then. REAPER reports the audio
+soak that did not run as specified (checks 1 to 4 below: REAPER quit or the
+ReaScript stopped, a return did not load, the device ran at another rate or
+a larger block, or the transport stopped) has **no result**, and
+`result.md` says which check failed and what the times showed anyway. REAPER reports the audio
 underrun time only where the driver does, so when it is 0 before and after
 the report says that none happened or the device does not report them. An
 underrun while the filters load, before playing, is named but not counted.
