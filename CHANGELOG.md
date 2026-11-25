@@ -49,12 +49,10 @@ yet folded in are in [`changes/`](changes/README.md).
   plays with the VST3 plug-in as Ardour sets it up, without setting its
   channels by hand. See [Ardour](docs/use/plugins.md#ardour).
 - Documentation (DOC-25): the README no longer says that any mono or
-  true-stereo reverb needs a `.cfg`. An IR file with one channel for each
-  of the track's plays as it is, a mono file on a mono track included; a
-  mono response on a stereo track, or a four-channel true-stereo response,
-  needs a short `.cfg`, which the new
+  true-stereo reverb needs a `.cfg`, and the new
   [reverb responses](docs/use/configuration.md#reverb-responses) section
-  shows. The README's preview status now says what jrp ran in hosts on
+  explains how responses are routed (EDGE-3 then let mono and
+  four-channel files play without one). The README's preview status now says what jrp ran in hosts on
   0.18.10, and the user guides no longer say the plug-ins are untried in
   named hosts, that every tool refuses to replace an existing output
   (`convolver` replaces it), or that a configuration list chosen before
