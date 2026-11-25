@@ -23,10 +23,11 @@ and the Gain mode in all three plug-ins and a window for VST3 and the Audio
 Unit on macOS and for VST3 on Windows. jrp's Audacity check failed on 0.14.0 on 20
 November 2026, before the fix it was checking could matter (PLUG-27), and
 passed on the 0.16.14 candidate on 21 November
-([check 10](#checks-left-before-publication)). Otherwise nobody has tried 0.14.0, the non-uniform engine (0.13.2), the
-Windows window or the packaged LV2 plug-in in a host: jrp's other REAPER,
-Audacity and GarageBand results are from 0.12.x builds and stay records of
-those builds. No independent user has followed
+([check 10](#checks-left-before-publication)). On 22 November jrp ran a
+build of the v0.18.10 tag in REAPER, Audacity and GarageBand on macOS
+([record](../archive/reviews/2026-11-22-live-session-0.18.10.md)); the
+checks below say what it covered. Nobody has tried the Windows window or
+the packaged LV2 plug-in in a host. No independent user has followed
 the instructions; that is the [next milestone](#next-milestone-an-independent-user-runs-a-preview)
 (REL-3). [Checks left](#checks-left-before-publication) is the one list of
 what remains to be run.
