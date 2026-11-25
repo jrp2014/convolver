@@ -297,13 +297,23 @@ limitation that no longer holds is removed. Its merge makes the tag.
    (`gh workflow run workloads.yml --ref vX.Y.Z -f budget=true`), which
    checks [the everyday budget](fft-measurements.md#the-everyday-budget)
    on the Linux, macOS and Windows runners. Step 4 does not require this
-   run, but a job that failed because a workload was over the budget is
-   investigated before step 5's Publish, and a rerun that passes does not
-   settle it alone: runners draw different CPUs from run to run. Compare the
-   job's machine line and figures with the
+   run, but a job that failed is investigated before step 5's Publish (the
+   log's last lines say whether a workload was over the budget or the
+   build or benchmark failed), and a rerun that passes does not settle it
+   alone: runners draw different CPUs from run to run. Compare the job's
+   machine line and figures with the
    [measured workloads](fft-measurements.md#supported-workloads), and
-   compare the engine with the previous preview's tag on one machine
-   (`tests/native/benchmarks/compare_engines.py`). Record what was found in
+   compare the engine with the previous preview's tag on one machine, both
+   at the budget's setting:
+
+   ```sh
+   python3 tests/native/benchmarks/compare_engines.py --baseline vPREVIOUS \
+     --candidate vX.Y.Z --baseline-latency 0 --latency 0 --callbacks 64 \
+     --taps 65536 --layouts stereo,crossover --work ../engine-compare
+   ```
+
+   Its defaults compare the baseline at Latency 256 with the candidate at
+   Latency 0, which costs more by itself. Record what was found in
    the release evidence, and tell jrp, who decides whether a real
    regression holds the preview.
 2. For the first preview, the independent walkthrough (REL-3 in

@@ -7,7 +7,8 @@ name: Workload measurements
 # the FFT library each platform's plug-ins ship (Ooura on Linux and Windows,
 # Accelerate on macOS). Shared runners give indicative figures only
 # (docs/develop/fft-measurements.md#supported-workloads). Started by hand
-# only: each run takes about 15 minutes on three runners, one of them macOS.
+# only: each run takes about 15 minutes on three runners, one of them macOS
+# (a budget run, a few minutes).
 # With "budget", only the everyday budget's two workloads (PERF-21), the
 # check on the tag before each preview (docs/develop/releasing.md#candidates);
 # a job fails when a workload is over the budget.

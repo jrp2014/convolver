@@ -1552,7 +1552,10 @@ measures there.
 On 25 November 2026 (`main` at `eb79d6e`, 0.18.18; the cloud VM, now an
 Intel Xeon @ 2.10 GHz, 4 vCPUs, Clang 18.1.3, Ooura with AVX2+FMA),
 `--budget` gave 0.90% for stereo correction (0.86 to 0.93 over five
-rounds) and 1.95% for the crossover (1.86 to 2.38).
+rounds) and 1.95% for the crossover (1.86 to 2.38). The workflow's budget
+run the same day (45656957150, on `4f286bc`) gave 0.79 and 1.65% on the
+Linux runner (AMD EPYC 7763) and 1.02 and 2.19% on the Windows runner;
+the macOS runner's job passed, so both were within the budget there too.
 
 ## Performance then and now
 

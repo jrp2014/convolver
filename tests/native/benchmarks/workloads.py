@@ -41,7 +41,7 @@ The script exits with status 1 when a budgeted workload is over the budget,
 after writing the summary; a workload over the ceiling is reported only, since
 the full 7.1 matrix at 96 kHz is known to be over it.
 --budget measures only the budget's two workloads at its one setting, in
-about a minute: the check before each preview
+about ten seconds: the check before each preview
 (docs/develop/releasing.md#candidates).
 --quick runs one round of three workloads, to check a build and the script.
 Results are indicative on shared machines (cloud VMs, CI runners): read the
@@ -397,10 +397,12 @@ def main():
     args = parser.parse_args()
     if args.quick:
         rounds = 1
-    elif args.rounds:
+    elif args.rounds is not None:
         rounds = args.rounds
     else:
         rounds = 5 if args.budget else 3
+    if rounds < 1:
+        parser.error('--rounds must be at least 1')
     host = machine()
     rows = []
     started = time.monotonic()
