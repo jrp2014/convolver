@@ -62,7 +62,7 @@ Check the open pull requests for an ID before starting anything.
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **PLUG-51** | Every output's routes in the window and Copy Diagnostics | From jrp's usage review of 22 November 2026 (PR #277) |
-| **HOST-12** | A 30-minute REAPER soak with four reverb returns, checking for underruns | The script unattended; one run on jrp's Mac |
+| **HOST-12** | jrp's first 30-minute run of the [REAPER soak](docs/develop/host-testing.md#a-long-reaper-soak) | The script is built (PR #288); one run on jrp's Mac |
 | **PERF-21** | The everyday load budget, checked before each preview | Uses the existing workload measurements |
 
 ### Depends on
@@ -156,21 +156,16 @@ Foundation items are parked by owner decision instead.
   REAPER finding comes from one of these, as the refused preset that reset
   Latency to 0 in jrp's live session of 22 November 2026 did, or before a
   release whose changes touch them; one addition per run on jrp's Mac.
-- [ ] **HOST-12 — A long REAPER soak with reverb returns.** Four tracks
-  feeding four Convolver reverb returns (a long stereo or true-stereo
-  response each) at a small buffer for 30 minutes, with sparse passages and
-  one filter replacement, run by an option of HOST-11's
-  [script](docs/develop/host-testing.md#reaper-from-one-command) that reads
-  REAPER's last-underrun times (`GetUnderrunTime`) before and after. Those
-  give the time of the most recent audio and media underrun, not a count,
-  so one dropout and ten look the same; the result is one of: no new
-  underrun, at least one new underrun, or underrun reporting unavailable.
-  The short engine measurements cannot show the host's dropouts over a
-  long session. Ordinary use, not a corner case, so outside the park of
-  8 November (jrp approved it on 23 November 2026). **Done when** the
-  option exists with its harness tests and jrp's first run is recorded in
-  [host testing](docs/develop/host-testing.md) with one of those three
-  results.
+- [ ] **HOST-12 — A long REAPER soak with reverb returns.** **Remains:**
+  jrp's first run of the
+  [soak](docs/develop/host-testing.md#a-long-reaper-soak)
+  (`scripts/reaper_check.py --soak`, 30 minutes, the audio device's block
+  size 128 or fewer).
+  Ordinary use, not a corner case, so outside the park of 8 November (jrp
+  approved it on 23 November 2026). **Done when** that run is recorded in
+  [host testing](docs/develop/host-testing.md) with one of its three
+  results: no new underrun, at least one new underrun, or underrun
+  reporting unavailable.
 - [ ] **DIAG-9 — Numbers in the user's locale.** Low priority. **Done when**
   the window shows numbers in the system locale from one formatting path,
   Status and the log stay plain, and a test covers other separators.

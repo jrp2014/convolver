@@ -480,6 +480,75 @@ position it records is REAPER's `GetPlayPosition`, which allows for the
 device's output latency, so it can read a little under that. Without REAPER, `tests/reaper_check_tests.py`
 checks the script in pre-commit against a stand-in REAPER.
 
+### A long REAPER soak
+
+`scripts/reaper_check.py --soak` (HOST-12) plays a reverb session in REAPER
+for 30 minutes and reports whether REAPER saw a new underrun. The short
+[engine measurements](fft-measurements.md#supported-workloads) cannot show
+a host's dropouts over a long session. Prepare as for
+[REAPER from one command](#reaper-from-one-command), set the audio device
+to 48 kHz and its block size to 128 frames or fewer (REAPER's Settings >
+Audio > Device), quit REAPER, and run from the unzipped package folder:
+
+```sh
+python3 /path/to/convolver/scripts/reaper_check.py --soak
+```
+
+The script first makes, with Python's standard library, four decaying-noise
+reverbs at 48 kHz: 10 s stereo, 10 s true stereo, 30 s stereo and 30 s true
+stereo, plus a 20 s true-stereo replacement, and turns each into a
+self-contained `.vstpreset` with the package's `bin/convolver-preset`. It then
+starts REAPER once with a new project: four source tracks, each repeating a
+2-second sound (noise hits, a chord, clicks from side to side, a rising tone)
+with 3 to 20 s of silence between. Each source's fader is at -6 dB; it plays
+to the master and, through a send at 0 dB after the fader, to its own return
+track, which holds Convolver's VST3 with one of the reverbs. All four sources are silent for 60 s twice (from 25% and 65% of the
+way through), longer than the longest tail, so each return goes quiet and
+wakes again. Once every return reads exactly
+`Filter loaded: 48000 Hz, 2 in, 2 out.`, REAPER plays from the start. Each
+second the ReaScript reads REAPER's underrun times and the transport, every
+10 s each return's Status, and halfway it loads the replacement into the
+first return while the others play. At the end it stops, saves the project
+and quits; `caffeinate` keeps the Mac from idle sleep meanwhile. Leave the Mac
+alone while it plays: other work on it counts towards what is being tested.
+
+REAPER's `GetUnderrunTime` gives the time of the most recent audio and media
+underrun, not a count, so one dropout and ten look the same. The script
+compares those times just before playing and after the soak, and `result.md`
+opens with one of three results: **no new underrun**, **at least one new
+underrun** (with the times it saw one, from the readings each second, or a
+note when the only change came as playback started), or **underrun reporting
+unavailable** (no `GetUnderrunTime`, or a clock that did not advance). A
+soak that did not run as specified (checks 1 to 4 below: REAPER quit or the
+ReaScript stopped, a return did not load, the device ran at another rate or
+a larger block, or the transport stopped) has **no result**, and
+`result.md` says which check failed and what the times showed anyway. REAPER reports the audio
+underrun time only where the driver does, so when it is 0 before and after
+the report says that none happened or the device does not report them. An
+underrun while the filters load, before playing, is named but not counted.
+
+Six checks follow: the ReaScript ran to the end; all four returns loaded;
+the device ran at 48 kHz with a block of 128 frames or fewer; the transport
+ran the whole time; every Status reading while playing, and at the end, was
+the Active text (any other is listed with its time); and the replacement was
+accepted, read Active afterwards and left a saved state within 10% of the
+replacement preset's size, which the replaced filter's preset is far from
+(both filters read the same Status, and the state holds the filter's
+samples). The steps in `result.md` say the replacement loaded only when
+that check passed, and otherwise that it was tried. The exit status is 0 only for no new
+underrun with all six checks passing. The rest of `result.md` is what
+[every report](#every-report) needs, as for the eight checks. REAPER's own
+preferences stay as they are. With anticipative FX processing, REAPER's
+default, effects on tracks that are not monitored run ahead of the device,
+so the device's block size is not their deadline; the report records
+REAPER's `workrender` and `renderaheadlen` settings as REAPER gives them.
+`--soak-minutes` sets a shorter trial. The run folder,
+`reaper-soak-DATE-TIME` in the package folder, holds the presets and the
+saved project, which holds every return's filter again, about 150 MB in all;
+delete it afterwards. `tests/reaper_check_tests.py` checks the option in
+pre-commit against a stand-in REAPER, as for the eight checks. No run on
+jrp's Mac is recorded yet.
+
 ### Audacity (VST3)
 
 jrp ran these steps in Audacity 4.0.2 on 7 November 2026, from PR #131's
