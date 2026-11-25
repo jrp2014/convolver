@@ -887,7 +887,8 @@ dropped (A then asks for it again); the controller has either paired with
 A, and A's answer is delivered a second time, or not yet received it. In
 each of the 18 variants at least one late answer from A arrives, the
 controller keeps showing B's Latency, a later choice reaches B, and A saves
-what it had. The plug-in reads the files with AudioToolbox on
+what it had. Last, one pair is disconnected and connected again controller
+first, with the request dropped: it pairs again. The plug-in reads the files with AudioToolbox on
 macOS and libsndfile on Linux and Windows (VST3-12). PLUG-22's
 `saved_filter_name()` checks the controller state: its format read back,
 and damaged, newer, over-long or empty-field states read as no name; an

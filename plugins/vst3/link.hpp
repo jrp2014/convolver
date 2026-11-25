@@ -11,9 +11,9 @@
 // controller numbers each connection it makes (Bridges::stamp()) and sends
 // the number in a pair_request_message; the processor answers with its key
 // and that number in a pair_message, from notify() or, if the request came
-// before the processor was connected, from its connect(). A processor that
-// connects before any request reached it sends a pair_ask_message, and the
-// controller asks again for its current connection. The controller
+// before the processor was connected, from its connect(). Every connect()
+// also sends a pair_ask_message, and the controller asks again for its
+// current connection, as the host may have dropped the request. The controller
 // keeps the Bridge only for an answer to its current connection (VST3-27): a
 // host that delivers late may pass on an earlier processor's answer after it
 // connected the controller to another one, and that processor's key is still
@@ -40,7 +40,7 @@ namespace convolver::vst3 {
 inline constexpr const char* pair_message = "ConvolverPair";
 // "connection": the controller's number for its current connection.
 inline constexpr const char* pair_request_message = "ConvolverPairRequest";
-// Carries nothing: "ask me", from a processor that connected before a request.
+// Carries nothing: "ask me", from a processor that has just connected.
 inline constexpr const char* pair_ask_message = "ConvolverPairAsk";
 // The processor changed in a call the host made to it (a restore, an
 // activation, new buses): the controller reads it again on the UI thread.

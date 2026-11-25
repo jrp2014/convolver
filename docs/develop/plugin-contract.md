@@ -766,9 +766,9 @@ key. Each time the controller connects, it starts unpaired, numbers the
 connection and asks for the key (`ConvolverPairRequest`, with the number);
 the processor answers with its key and that number in a `ConvolverPair`
 message, from `notify()`, or from its own `connect()` if the request came
-before it was connected. A processor that connects before any request
-reached it (a host that dropped the request) sends `ConvolverPairAsk`, which
-carries nothing, and the controller asks again for its current connection.
+before it was connected. Each time the processor connects it also sends
+`ConvolverPairAsk`, which carries nothing, and the controller asks again for
+its current connection, so a host that dropped the request still pairs.
 Pairing therefore works in either order and through a proxy that delivers
 later, but needs the host to deliver messages in both directions, as the
 SDK's connection proxy does. The controller pairs only with an answer that

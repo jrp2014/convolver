@@ -4446,6 +4446,49 @@ void pairing_follows_connection() {
                 b.terminate();
                 a.terminate();
             }
+    // A pair the host disconnects and connects again, the controller first,
+    // through a proxy that drops the request because the processor is not
+    // connected yet: the processor's answer to the earlier connection is
+    // refused, and its ask brings a request for the new one.
+    HostApplication context;
+    Handler handler;
+    Processor a;
+    Controller c;
+    require(a.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk,
+            "reconnected pair: initialize");
+    Proxy a_to_c(c, true), c_to_a(a, true);
+    const auto deliver = [&] {
+        while (c_to_a.deliver() + a_to_c.deliver() > 0) {
+        }
+    };
+    const auto latency_saved = [&] {
+        MemoryStream saved;
+        require(a.getState(&saved) == kResultOk, "reconnected pair: save");
+        saved.seek(0, IBStream::kIBSeekSet, nullptr);
+        const auto settings = read_state(&saved).settings;
+        require(settings.has_value(), "reconnected pair: saved no settings");
+        return settings->latency;
+    };
+    require(a.connect(&a_to_c) == kResultOk && c.connect(&c_to_a) == kResultOk,
+            "reconnected pair: connect");
+    deliver();
+    require(c.setParamNormalized(latency_id, normalized_latency(1024)) == kResultOk &&
+                latency_saved() == 1024,
+            "reconnected pair: the first connection did not pair");
+    require(c.disconnect(&c_to_a) == kResultOk && a.disconnect(&a_to_c) == kResultOk,
+            "reconnected pair: disconnect");
+    require(c.connect(&c_to_a) == kResultOk, "reconnected pair: connect again");
+    c_to_a.drop();
+    require(a.connect(&a_to_c) == kResultOk, "reconnected pair: connect again");
+    deliver();
+    require(c.setParamNormalized(latency_id, normalized_latency(512)) == kResultOk &&
+                latency_saved() == 512,
+            "a pair connected again, with the request dropped, did not pair");
+    c.disconnect(&c_to_a);
+    a.disconnect(&a_to_c);
+    c.terminate();
+    a.terminate();
 }
 // VST3-18 (jrp's review of 0.18.12, 23 November 2026): a host that delivers
 // messages later. After a refused preset the user chose Latency 256 before

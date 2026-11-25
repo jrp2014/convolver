@@ -458,10 +458,12 @@ tresult PLUGIN_API Processor::connect(IConnectionPoint* other) {
     const auto result = AudioEffect::connect(other);
     if (result != kResultOk)
         return result;
+    // A request that came before the connection is answered; and the
+    // controller is asked to ask again, as the host may have dropped a later
+    // one (an answer to an earlier connection is refused).
     if (const auto connection = pair_connection_.load())
-        send_key(connection); // A request that came before the connection.
-    else
-        ask_for_request();
+        send_key(connection);
+    ask_for_request();
     return result;
 }
 void Processor::ask_for_request() noexcept {

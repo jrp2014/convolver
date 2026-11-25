@@ -148,7 +148,7 @@ class Processor final : public Steinberg::Vst::AudioEffect, public ProcessorLink
     // VST3-26: sends the Bridge's key (pair_message) when the controller
     // asks (pair_request_message), with the number of the connection it
     // asked from (VST3-27). On connecting, answers a request that came
-    // first, or else asks the controller to ask (pair_ask_message).
+    // first, and asks the controller to ask again (pair_ask_message).
     Steinberg::tresult PLUGIN_API connect(Steinberg::Vst::IConnectionPoint*) override;
     Steinberg::tresult PLUGIN_API notify(Steinberg::Vst::IMessage*) override;
     // The filter's advisory notice (HostFilter::notice), for example output
