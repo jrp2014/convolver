@@ -1248,7 +1248,10 @@ the plan's Gain modes (12 November 2026); its meters follow later
   the halves pair (a proxy that delivers later) goes to the processor when
   they pair, unless the host restored either half after the choice (a
   process-wide count, `Bridges::stamp()`, orders the choice and the
-  processor's last accepted restore). The host's
+  processor's last accepted restore). Likewise Gain, Mix or Bypass the
+  host set before they pair stays if it is newer than that restore, and
+  the filter name a restored controller state gives reaches the processor
+  when they pair. The host's
   order and when it delivers messages do not matter: `convolver_vst3_sync`
   checks every sequence of one and two host actions, window choices and
   deliveries in every order, 300 longer ones and the sequences jrp's

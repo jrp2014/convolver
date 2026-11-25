@@ -457,6 +457,9 @@ class Controller final : public Steinberg::Vst::EditController,
     std::optional<std::size_t> unsent_latency_;
     std::optional<GainMode> unsent_gain_mode_;
     std::uint64_t unsent_latency_at_ = 0, unsent_gain_mode_at_ = 0;
+    // When the host set Gain, Mix or Bypass while unpaired (Bridges::stamp());
+    // 0 once the first read after pairing has used them.
+    std::uint64_t gain_edit_at_ = 0, mix_edit_at_ = 0, bypass_edit_at_ = 0;
     // The processor's generation when it was last read; the latency the host
     // was last asked to read (none before pairing).
     std::uint64_t generation_ = 0;

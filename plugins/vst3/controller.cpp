@@ -183,11 +183,20 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
             return kResultOk; // Paired already.
         set_bridge(bridge);
         bridge->changed();
-        // A Latency or Gain mode the host or the window chose before the
-        // halves paired (a proxy that delivers later) goes to the processor
-        // now, as a message would have; a host that read the latency before
-        // is told the new one.
+        // What the controller learned before the halves paired (a proxy
+        // that delivers later) goes to the processor now, as a message would
+        // have: the name a restored controller state gives the filter
+        // (PLUG-22), and a Latency or Gain mode the host chose; a host that
+        // read the latency before is told the new one.
+        std::string name, identity;
+        {
+            std::lock_guard lock(status_lock_);
+            name = name_;
+            identity = identity_;
+        }
         with_processor([&](ProcessorLink& p) {
+            if (!name.empty())
+                p.offer_name(name, identity);
             const auto frames = std::exchange(unsent_latency_, std::nullopt);
             const auto mode = std::exchange(unsent_gain_mode_, std::nullopt);
             if (!frames && !mode)
@@ -201,7 +210,8 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
                 p.chosen_gain_mode(*mode);
         });
         // From now on the parameters show the processor's, Gain, Mix and
-        // Bypass included.
+        // Bypass included, except automation the host set while unpaired
+        // after the processor's last restore.
         if (on_ui_thread())
             refresh(true);
         return kResultOk;
@@ -253,11 +263,17 @@ void Controller::refresh(bool adopt_all, bool tell_host) {
     if (gain_mode(getParamNormalized(gain_mode_id)) != view.settings.gain_mode)
         set(gain_mode_id, normalized_gain_mode(view.settings.gain_mode));
     if (adopt_all || view.generation != generation_) {
-        set(gain_id, normalized_gain(view.settings.gain_db));
-        set(mix_id, std::clamp(view.settings.mix, 0.0, 1.0));
-        set(bypass_id, view.bypass ? 1 : 0);
+        // Automation the host set while unpaired, after the processor's last
+        // accepted restore, is newer: the host passes it in process().
+        if (gain_edit_at_ <= view.restored_at)
+            set(gain_id, normalized_gain(view.settings.gain_db));
+        if (mix_edit_at_ <= view.restored_at)
+            set(mix_id, std::clamp(view.settings.mix, 0.0, 1.0));
+        if (bypass_edit_at_ <= view.restored_at)
+            set(bypass_id, view.bypass ? 1 : 0);
     }
     generation_ = view.generation;
+    gain_edit_at_ = mix_edit_at_ = bypass_edit_at_ = 0; // Only the first read after pairing.
     // Ask the host to read the parameters again (the status is not edited
     // by the user, so performEdit does not apply). Hosts may ignore this.
     if (changed && tell_host && on_ui_thread())
@@ -295,12 +311,20 @@ void Controller::restart(int32 flags) {
 tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) {
     // The host's value goes over what the processor said before it.
     refresh_if_changed();
+    if ((id == gain_id || id == mix_id || id == bypass_id) && !bridge()) {
+        // Unpaired: when, so that the first read after pairing keeps it if
+        // it is newer than the processor's last restore.
+        auto& at = id == gain_id ? gain_edit_at_ : id == mix_id ? mix_edit_at_ : bypass_edit_at_;
+        at = Bridges::stamp();
+    }
     if (id == bypass_id) {
-        // PLUG-22: the processor shows Bypassed at once.
+        // PLUG-22: the processor shows Bypassed at once, and so does the
+        // Status parameter, which hosts show without the window.
         const auto result = EditController::setParamNormalized(id, value);
         const bool after = getParamNormalized(bypass_id) >= .5;
-        if (result == kResultOk)
-            with_processor([&](ProcessorLink& p) { p.show_bypass(after); });
+        if (result == kResultOk &&
+            with_processor([&](ProcessorLink& p) { p.show_bypass(after); }) && on_ui_thread())
+            refresh(false);
         return result;
     }
     if (id == gain_mode_id || id == latency_id) {
