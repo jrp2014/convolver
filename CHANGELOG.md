@@ -55,6 +55,17 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### Fixed
 
+- VST3: a late pairing message can no longer connect the plug-in's controls
+  to another instance of Convolver. When a host that passes messages late
+  moved the controller from one instance to another, the first instance's
+  delayed message could pair the controller with it again: the controls
+  showed that instance's settings, and a later Latency, Gain mode or chosen
+  file went to it and changed what it saved, while the instance on screen
+  kept its old settings (VST3-27, found by jrp's review of 25 November 2026 in the test
+  harness; whether a shipping host delivers that sequence is unknown). The
+  controller now pairs only with the answer to its current connection. No
+  change to the sound or to saved projects. See the
+  [adapter contract](docs/develop/plugin-contract.md#status-and-log).
 - Estimate (FFT-5): whether a filter near the largest float gets a noise
   estimate no longer depends on the build. One tap of 3e38 got no estimate
   in one Linux build and an estimate in others, because the noise could
@@ -110,6 +121,28 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### For contributors
 
+- VST3 (VST3-27): the controller numbers each connection
+  (`Bridges::stamp()`), starts it unpaired and sends the number in
+  `ConvolverPairRequest`; the processor answers with its key and the number
+  in `ConvolverPair`. Each time the processor connects it also sends
+  `ConvolverPairAsk`, and the controller asks again, so a host that drops
+  the request still pairs, on a reconnection too. The controller checks the number and
+  keeps the `Bridge` under one lock, refusing an answer to any other
+  connection and every answer while disconnected. `vst3.adapter`
+  `pairing_follows_connection` checks jrp's two-instance sequence in 18
+  variants through delaying proxies (three connection orders, whether the
+  controller had paired with A, three arrival times), and that a pair the
+  host disconnects and connects again, controller first with the request
+  dropped, pairs again; on `main` the six in which A's answer arrives after
+  B's failed ("a late pairing message from A changed the controller's
+  Latency").
+- Releases (REL-3): the preview notes no longer say the VST3 halves agree
+  "whatever order the host delivers its calls in"; they name what the
+  tests cover (host presets, window presets and later Latency, Gain mode,
+  Gain and Mix changes, in every order the tests try), from jrp's review
+  of 25 November 2026, and list the pairing fix that review asked for
+  (VST3-27)
+  ([publishing an unsigned preview](docs/develop/releasing.md#publishing-an-unsigned-preview)).
 - Engine (FFT-5): `estimate_attenuation()` filters the noise through a copy
   of the filter whose input gains, taps and output gains are scaled by
   powers of two to fixed levels well inside the float range, then scales

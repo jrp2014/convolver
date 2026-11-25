@@ -296,6 +296,12 @@ Contents: [direction](#direction) · [releases](#releases) ·
 
 ## Releases
 
+- **25 November 2026.** The ninth preview is not cut from v0.18.20: jrp's
+  review of `main` at `33971caf` found that a delayed pairing message can
+  reconnect the VST3 window to another instance's processor, so the
+  preview waits for that fix and is cut from the tag after it, with its
+  own load-budget measurement once PERF-21 is a release step. See
+  [Releasing](../develop/releasing.md#publishing-an-unsigned-preview).
 - **25 November 2026.** A ninth unsigned developer preview, cut from
   `main` once the VST3 sequence test (VST3-25) and the redesigned sync
   between the VST3 plug-in's halves (VST3-26) had merged (jrp: "issue a

@@ -47,6 +47,12 @@ CHANGES = (
         'that plays. No change to how a filter sounds or to the saved-project format.'
     ),
     (
+        "A late pairing message from another instance of Convolver can no longer connect the VST3 plug-in's "
+        'controls to that instance, which could send a later Latency, Gain mode or chosen file to it and change '
+        "what it saved. It was found in the plug-in's test harness; whether a host delivers that sequence is "
+        'unknown.'
+    ),
+    (
         'A valid VST3 project or preset is no longer refused as "could not be read: std::bad_alloc" when memory '
         'runs short, and restores are quicker, including the one Audacity makes at every playback start, because '
         'they no longer make a second copy of the filter. On Windows, running out of memory while loading a '
