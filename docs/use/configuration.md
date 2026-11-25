@@ -13,8 +13,9 @@ This page describes the current portable parser, not the old Windows installer.
 
 **In short:**
 
-- For a simple per-channel filter, pass a multichannel IR file directly;
-  use a `.cfg` file for routing, mixing, delays or sharing one mono IR.
+- For a simple per-channel filter, pass an IR file with one channel per
+  input channel directly; use a `.cfg` file for routing, mixing, delays,
+  sharing one mono IR or a true-stereo reverb ([reverb responses](#reverb-responses)).
 - A `.cfg` file is a header line, a line of input delays, a line of output
   delays, then four lines per path: IR file, IR channel, input routes, output
   routes. Channels count from zero.
@@ -70,6 +71,57 @@ convolver --filter room.cfg --input music.wav --output corrected.wav
 
 These examples assume `convolver` is on PATH. From your own build, use its
 path instead, such as `./build/convolver`.
+
+## Reverb responses
+
+An IR file used directly filters each channel with the IR channel of the
+same number, so a stereo reverb file plays as it is on a stereo track, and a
+mono one on a mono track. Two kinds of reverb response need a `.cfg`:
+
+- **A mono response on a stereo track.** Use the stereo example above with
+  the mono file, and set the second path's IR-channel line to `0`, so the
+  same response filters both sides.
+- **A true-stereo response**, a four-channel file whose channels are
+  left to left, left to right, right to left and right to right. Used
+  directly it needs four inputs, so a stereo track refuses it. This
+  `.cfg` feeds each input through two of the channels and adds them on
+  each output:
+
+  ```text
+  // sample rate, input channels, output channels, speaker mask
+  48000 2 2 3
+  // input delays in milliseconds
+  0 0
+  // output delays in milliseconds
+  0 0
+  // left to left
+  hall.wav
+  0
+  0
+  0
+  // left to right
+  hall.wav
+  1
+  0
+  1
+  // right to left
+  hall.wav
+  2
+  1
+  0
+  // right to right
+  hall.wav
+  3
+  1
+  1
+  ```
+
+  Check the order of the channels in the reverb's own documentation: if it
+  is left to left, right to left, left to right, right to right, swap the
+  IR-channel lines `1` and `2`. A reverb that comes as two stereo files,
+  one for each input side, needs the same four paths: name the left
+  input's file, channels `0` and `1`, on the first two, and the right
+  input's file on the last two.
 
 ## File layout
 

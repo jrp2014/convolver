@@ -85,7 +85,8 @@ audio devices or timing. The CLI itself is not an audio-device application.
 
 An IR's sample rate must match the configured processing rate. A direct stereo
 IR requires stereo input; a mono IR is not automatically copied to stereo.
-Use a [configuration](configuration.md) to share a mono IR between channels.
+Use a configuration to share a mono IR between channels or to play a
+true-stereo reverb ([reverb responses](configuration.md#reverb-responses)).
 Convolver does not resample or design a replacement IR automatically.
 
 Floating-point samples normally use -1 to +1 as full scale, but a float WAV can

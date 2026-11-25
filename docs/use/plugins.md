@@ -26,7 +26,7 @@ does not fit. Installing is in [install](install.md); making presets is in
   [window](#convolvers-window) that shows the status, why it is silent and
   what to change, the filter and settings, what plays in plain words, with
   Copy Diagnostics and Show Log; the VST3 plug-in on Linux and the LV2
-  plug-in have no window yet. (The Windows window is new in 0.13.12.)
+  plug-in have no window yet.
 - Convolver adds no processing delay by default: the filtered sound comes
   out as the filter shapes it, with no wait for blocks of audio. (A filter
   can still delay the sound itself, with a delay in its impulse response or
@@ -153,60 +153,63 @@ preset's, as choosing it again would.
 `convolver-preset`, which reads an IR file, a `.cfg`, a configuration list
 or a Convolver `.vstpreset`, and lists the folders where hosts look for
 presets. A preset is needed where the plug-in has no window (the VST3
-plug-in on Linux, and on Windows up to 0.13.2), and in an LV2 host with no file chooser. In
+plug-in on Linux), and in an LV2 host with no file chooser. In
 Audacity 4.0.2 (VST3, on macOS) both routes are checked: its preset menu,
 and the window, where a filter chosen with Choose File… was kept for exports and
-saved projects and one chosen from the recent files for an export (up to 0.13.2 it
-was not kept) ([in Audacity](first-sound-in-a-host.md#in-audacity)).
+saved projects and one chosen from the recent files for an export
+([in Audacity](first-sound-in-a-host.md#in-audacity)).
 
 The filter is prepared away from the audio, then installed. A filter loaded
 before any audio plays starts at once; one loaded during playback fades in
 ([replacing a filter](#replacing-a-filter)).
 
-**When a chosen file is checked.** In the Audio Unit and the VST3 plug-in, a
-file chosen while the host plays audio through the plug-in is checked at
-once against the host's sample rate and channels, and one that does not fit
-is refused while the working filter keeps playing. Before the host has
-played, and while the host has stopped the plug-in (some hosts keep it
-running after the transport stops), the host may not have given its real
-rate yet (Audacity sets up the plug-in at 44.1 kHz until it first plays,
-whatever the project's rate), so a single IR file or `.cfg` is kept, saved
-with the project, and checked when the host plays audio through the plug-in.
-Until then the window keeps the file's name and Status says "Filter
-selected. Waiting for the host's audio settings.", even if the host has
-started the plug-in briefly at another rate, as Audacity does at 44.1 kHz to
-pass on an edit. Once the host plays, the filter plays if it fits; if not,
-it plays silence and Status says "Silent" with the filter's and the host's
-rates. Convolver takes that result when its window is open during playback;
-the Audio Unit also takes it when the host reads Status. In the VST3
-plug-in, the host's Status control does not ask by itself: with the window
-closed it may keep saying it is waiting until the window is opened while the
-host plays, or a setting such as Bypass changes. If playback stops before
-the result is taken, Status may say it is waiting again, and the filter
-stays selected either way. A configuration list needs the rate and channels
-to choose its entry, so it uses the ones the host last ran the plug-in with;
-before the host has run it with them, the list is not loaded, and the window
-says: "Play audio once so Convolver can check the host's sample rate and
-channel counts, then choose the configuration list again." With Convolver's
-window open, you need not choose it again: when the host plays, the window
-loads the list itself, choosing its entry for the host's rate and channels,
-and Convolver tells the host the project has changed and adds the list to
-Recent, as for a chosen file, even if you closed and reopened the window
-meanwhile. This is checked by automated tests, including Audacity 4.0.2's
-way of starting playback, but not yet in a host. If the window was closed while the host played, choose the
-list again, or play again with the window open. Once Convolver has seen the
-host play (for example when the host reads the Audio Unit's Status while it
-plays; the VST3 plug-in's Status is not read that way), the
-window says "The host's settings are now known (48000 Hz, 2 in, 2 out):
-choose the configuration list again." (with the host's values), and Status
-says the same in short; a brief start the host makes without playing, such
-as Audacity's after a parameter edit, does not count. If the list has
-no entry for the rate and channels the host last ran with, it is refused
-naming them, and whenever the host is not playing audio through the plug-in
-at that moment the advice adds the same step, for a host such as Audacity
-that runs the plug-in briefly at 44.1 kHz before it first plays. LV2 knows
-its host's rate and channels from the start, so it checks every file at
-once.
+**When a chosen file is checked.** In the Audio Unit and the VST3 plug-in:
+
+- **While the host plays audio through the plug-in,** a chosen file is
+  checked at once against the host's sample rate and channels; one that
+  does not fit is refused and the working filter keeps playing.
+- **Before the host has played, or while it has stopped the plug-in**
+  (some hosts keep it running after the transport stops), the host may not
+  have given its real rate yet: Audacity sets up the plug-in at 44.1 kHz
+  until it first plays, whatever the project's rate. A single IR file or
+  `.cfg` is then kept, saved with the project, and checked when the host
+  plays audio through the plug-in. Until then the window keeps the file's
+  name and Status says "Filter selected. Waiting for the host's audio
+  settings.", even if the host has started the plug-in briefly at another
+  rate, as Audacity does at 44.1 kHz to pass on an edit. Once the host
+  plays, the filter plays if it fits; if not, it plays silence and Status
+  says "Silent" with the filter's and the host's rates.
+- **When Convolver takes that result:** when its window is open during
+  playback, and in the Audio Unit also when the host reads Status. In the
+  VST3 plug-in the host's Status control does not ask by itself, so with
+  the window closed Status may keep saying it is waiting until the window
+  is opened while the host plays, or a setting such as Bypass changes. If
+  playback stops before the result is taken, Status may say it is waiting
+  again, and the filter stays selected either way.
+- **A configuration list** needs the rate and channels to choose its entry,
+  so it uses the ones the host last ran the plug-in with. Before the host
+  has run it with them, the list is not loaded, and the window says: "Play
+  audio once so Convolver can check the host's sample rate and channel
+  counts, then choose the configuration list again." With Convolver's
+  window open you need not choose it again: when the host plays, the window
+  loads the list itself, choosing its entry for the host's rate and
+  channels, tells the host the project has changed and adds the list to
+  Recent, as for a chosen file, even if you closed and reopened the window
+  meanwhile. Automated tests check this, including Audacity 4.0.2's way of
+  starting playback, but it is not yet checked in a host. If the window was
+  closed while the host played, choose the list again, or play again with
+  the window open. Once Convolver has seen the host play (for example when
+  the host reads the Audio Unit's Status while it plays; the VST3
+  plug-in's Status is not read that way), the window says "The host's
+  settings are now known (48000 Hz, 2 in, 2 out): choose the configuration
+  list again." (with the host's values), and Status says the same in
+  short; a brief start the host makes without playing, such as Audacity's
+  after a parameter edit, does not count. A list with no entry for the rate
+  and channels the host last ran with is refused, naming them; whenever
+  the host is not playing audio through the plug-in at that moment, the
+  advice adds the same step.
+- **LV2** knows its host's rate and channels from the start, so it checks
+  every file at once.
 
 ## When a filter does not fit
 
@@ -714,7 +717,7 @@ above, except:
 - The software line names macOS AudioToolbox as the reader of filter files,
   as in the Audio Unit. Not yet tried in REAPER or Audacity.
 
-**On Windows** (new since 0.13.2) the VST3 window is built from
+**On Windows** the VST3 window is built from
 Windows' own controls, with the same parts in the same order, and behaves
 as the VST3 window above, except:
 
