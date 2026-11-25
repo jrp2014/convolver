@@ -1617,7 +1617,8 @@ input and output, with `FftPlanning::estimate`, `measure` and `patient`.
   were not available to compare, so what made them differ is not known.
 - **What changed:** `estimate_attenuation()` now filters the noise through
   a copy of the filter whose taps and route gains are scaled by powers of
-  two to about full scale, and scales the peak back in double; it then
+  two to fixed levels well inside the float range, and scales the peak
+  back in double; it then
   overflows only when the peak itself is beyond the largest float, which
   only a filter whose bound is beyond it can reach. Twelve random 3,000- and
   48,000-tap two-channel filters gave bit-identical noise peaks before and

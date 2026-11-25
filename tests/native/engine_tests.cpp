@@ -724,6 +724,27 @@ void estimate_at_any_level(const Configuration& c) {
     const auto t = estimate_attenuation(top);
     require(t.noise_peak > 0.999 * t.worst_case_peak && t.noise_peak <= t.worst_case_peak,
             "a tap at the largest float has an estimate within its bound");
+    // A route that cancels a far louder one on the same channel scales with
+    // it, so the path that is left still sounds (Codex's review of PR #286:
+    // a shared scale had flushed the quiet path's gain, giving 0 dB). Output
+    // routes of +-1e38 on one path and 1.5 on another, then the same on the
+    // input side: the noise peak is the quiet path's.
+    for (const bool input_side : {false, true}) {
+        Configuration cancel;
+        cancel.sample_rate = 48000;
+        cancel.input_channels = input_side ? 2 : 1;
+        cancel.output_channels = 1;
+        if (input_side) {
+            cancel.paths.push_back({{1}, {{0, 1e38f}, {0, -1e38f}, {1, 1.5f}}, {{0, 1}}});
+        } else {
+            cancel.paths.push_back({{1}, {{0, 1}}, {{0, 1e38f}, {0, -1e38f}}});
+            cancel.paths.push_back({{1}, {{0, 1}}, {{0, 1.5f}}});
+        }
+        const auto k = estimate_attenuation(cancel);
+        require(k.worst_case_peak == 1.5 && k.noise_peak > 1.49 && k.noise_peak <= 1.5,
+                input_side ? "a quiet input route beside cancelling loud ones is kept"
+                           : "a quiet path beside cancelling loud routes is kept");
+    }
     // Output that would be flushed to zero while processing (below the
     // smallest normal float) gives 0 dB, as a silent filter does.
     auto quiet = top;

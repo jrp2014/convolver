@@ -17,11 +17,13 @@
 
 - Engine (FFT-5): `estimate_attenuation()` filters the noise through a copy
   of the filter whose input gains, taps and output gains are scaled by
-  powers of two to about full scale, then scales the peak back in double,
+  powers of two to fixed levels well inside the float range, then scales
+  the peak back in double,
   caps it at the bound and reads output below the smallest normal float as
   silence; it throws `std::overflow_error` only when that peak is beyond
   the largest float. `native.engine` `attenuation` checks that the estimate
-  scales exactly from 2^-100 to 2^125, by taps or by route gains;
+  scales exactly from 2^-100 to 2^125, by taps or by route gains, and that
+  a quiet route beside cancelling 1e38 routes is kept (from Codex's review);
   `native.host_settings` `filter_estimates` and `status_names_settings`
   check that 3e38 and largest-float taps have both figures. FFTW's plan
   changed output only by rounding at every level tested, and one tap above
