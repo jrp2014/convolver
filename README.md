@@ -157,10 +157,10 @@ playing for hours with the window closed. Convolver is built for that:
 
 In the VST3 plug-in, whose window and audio run as two parts in the host,
 the window, the host's controls, what plays and what the project saves
-agree whatever order you choose filters and presets, change settings and
-reopen projects in, and however late the host passes your choices on. This
-is checked by automated tests of thousands of such sequences
-([VST3 tests](docs/develop/testing.md#vst3-tests)), not yet in a host.
+end up agreeing whatever order you choose presets, change settings and
+reopen projects in, even when the host is slow to pass a change from one
+part to the other. Automated tests check thousands of such sequences
+([VST3 tests](docs/develop/testing.md#vst3-tests)), but not yet in a host.
 
 ## Preview status
 
